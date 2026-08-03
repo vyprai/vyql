@@ -1,0 +1,10 @@
+module bindings.php.generated.mfbe84119;
+
+binding csrfProtection427 {
+  query pattern callExpr where callee.method == "checkToken"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

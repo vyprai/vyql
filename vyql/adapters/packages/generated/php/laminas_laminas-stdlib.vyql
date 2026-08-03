@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-
-adapter php {
-  package "laminas/laminas-stdlib" {
-    sink method "Laminas\Stdlib\Glob::glob" -> code.FilePathAccess
-    sink method "Laminas\Stdlib\Parameters::parse_str" -> code.Deserialization
-  }
-}

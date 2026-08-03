@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mf98b3aca;
+
+binding regexCompile9 {
+  requires {
+    dependency("elixir")
+  }
+  query pattern callExpr where callee.path ~= "Regex.compile"
+  emit sink code.RegexCompileSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m90ee6c25;
+
+binding urlFetch3 {
+  requires {
+    dependency("JTSImageViewController")
+  }
+  query pattern callExpr where callee.method == "downloadImageForURL:"
+  emit sink code.UrlFetch at args[0]
+}

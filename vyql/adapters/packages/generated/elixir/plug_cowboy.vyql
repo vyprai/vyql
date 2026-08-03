@@ -1,6 +1,0 @@
-import code.{HttpInput}
-adapter elixir {
-  package "plug_cowboy" {
-    source method "read_req_body" -> code.HttpInput
-  }
-}

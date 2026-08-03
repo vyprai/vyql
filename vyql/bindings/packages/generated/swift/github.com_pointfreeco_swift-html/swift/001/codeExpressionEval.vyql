@@ -1,0 +1,9 @@
+module bindings.swift.generated.mceef4e68;
+
+binding expressionEval1 {
+  requires {
+    dependency("github.com/pointfreeco/swift-html")
+  }
+  query pattern callExpr where callee.method == "ondragstart"
+  emit sink code.ExpressionEval at args[0]
+}

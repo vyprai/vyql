@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m308cb3d5;
+
+binding networkData2 {
+  requires {
+    dependency("rb-kqueue")
+  }
+  query pattern callExpr where callee.method == "watch_stream_for_write"
+  emit source code.NetworkData at call.result
+}

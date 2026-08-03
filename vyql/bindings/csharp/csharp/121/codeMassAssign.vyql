@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding massAssign121 {
+  query pattern callExpr where callee.method == "TryUpdateModelAsync"
+  emit sink code.MassAssign at args.any
+}

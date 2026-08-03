@@ -1,9 +1,0 @@
-import code.{NetworkData, NetworkSend}
-
-adapter perl {
-  package "Fliggy" {
-    source method "_try_read_headers" -> code.NetworkData
-    source method "_safe_read" -> code.NetworkData
-    sink method "_write_flash_policy_response" -> code.NetworkSend
-  }
-}

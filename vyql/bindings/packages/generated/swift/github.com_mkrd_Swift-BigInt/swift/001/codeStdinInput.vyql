@@ -1,0 +1,9 @@
+module bindings.swift.generated.m1dfd5712;
+
+binding stdinInput1 {
+  requires {
+    dependency("github.com/mkrd/Swift-BigInt")
+  }
+  query pattern callExpr where callee.method == "getKeyboardInputAsInt"
+  emit source code.StdinInput at call.result
+}

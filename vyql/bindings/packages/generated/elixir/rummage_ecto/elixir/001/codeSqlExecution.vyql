@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m8c90c26d;
+
+binding sqlExecution1 {
+  requires {
+    dependency("rummage_ecto")
+  }
+  query pattern callExpr where callee.method == "rummageq"
+  emit sink code.SqlExecution at args[0]
+}

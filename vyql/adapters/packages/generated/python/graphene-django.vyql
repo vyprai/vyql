@@ -1,6 +1,0 @@
-adapter python {
-  package "graphene-django" {
-    source method "parse_body" -> core.UserControlledData
-    sink method "execute_graphql_request" -> code.CodeEval
-  }
-}

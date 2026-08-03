@@ -1,9 +1,0 @@
-import code.{HttpInput}
-
-adapter scala {
-  package "org.eclipse.jetty.websocket:websocket-server" {
-    source method "handle" -> code.HttpInput
-    source method "acceptWebSocket" -> code.HttpInput
-    source method "createWebSocket" -> code.HttpInput
-  }
-}

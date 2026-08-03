@@ -1,0 +1,9 @@
+module bindings.perl.generated.md9a0635a;
+
+binding deserialization0 {
+  requires {
+    dependency("Valiemon")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit sink code.Deserialization at args[0]
+}

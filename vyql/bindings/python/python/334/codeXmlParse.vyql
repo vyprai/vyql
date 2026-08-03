@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding xmlParse334 {
+  query pattern callExpr where callee.path ~= "xmlrpc.client.loads"
+  emit sink code.XmlParse at args[0]
+}

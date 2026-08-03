@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mc519b01a;
+
+binding weakHash1 {
+  requires {
+    dependency("arrow")
+  }
+  query pattern callExpr where callee.method == "Compress"
+  emit issue code.WeakHash at call
+}

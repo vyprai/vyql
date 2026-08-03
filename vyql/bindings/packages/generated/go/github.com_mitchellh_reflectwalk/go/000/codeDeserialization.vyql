@@ -1,0 +1,9 @@
+module bindings.go.generated.m7d68f756;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/mitchellh/reflectwalk")
+  }
+  query pattern callExpr where callee.method == "Walk"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "boost-ptr-container" {
-    sink method "serialize" -> code.Deserialization
-    sink method "load" -> code.Deserialization
-  }
-}

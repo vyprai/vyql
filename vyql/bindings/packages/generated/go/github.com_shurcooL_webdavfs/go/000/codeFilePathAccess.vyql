@@ -1,0 +1,9 @@
+module bindings.go.generated.m08dfef3f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/shurcooL/webdavfs")
+  }
+  query pattern callExpr where callee.method == "Create"
+  emit sink code.FilePathAccess at args[0]
+}

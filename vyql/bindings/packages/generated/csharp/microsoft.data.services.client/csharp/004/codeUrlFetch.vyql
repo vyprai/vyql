@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m9974d4d4;
+
+binding urlFetch4 {
+  requires {
+    dependency("microsoft.data.services.client")
+  }
+  query pattern callExpr where callee.method == "BuildNavigationLinkUri"
+  emit sink code.UrlFetch at args[0]
+}

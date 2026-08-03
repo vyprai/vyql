@@ -1,0 +1,10 @@
+module vypr.cloud;
+
+rule PublicStorageSensitive {
+  meta {
+    id: "VYQL-CLD-004"
+    severity: critical
+  }
+  fact cloud.PublicStorage as s
+  where holdsAssetKind(s, [data.Pii])
+}

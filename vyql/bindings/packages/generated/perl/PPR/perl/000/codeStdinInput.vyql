@@ -1,0 +1,9 @@
+module bindings.perl.generated.m84e43ec5;
+
+binding stdinInput0 {
+  requires {
+    dependency("PPR")
+  }
+  query pattern callExpr where callee.method == "slurp"
+  emit source code.StdinInput at call.result
+}

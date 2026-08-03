@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m4b4a65da;
+
+binding stdinInput1 {
+  requires {
+    dependency("org.apache.hadoop:hadoop-yarn-client")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.StdinInput at call.result
+}

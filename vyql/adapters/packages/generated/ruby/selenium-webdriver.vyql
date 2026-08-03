@@ -1,8 +1,0 @@
-adapter ruby {
-  package "selenium-webdriver" {
-    sink method "get" -> code.UrlFetch
-    sink method "execute_script" -> code.CodeEval
-    sink method "execute_async_script" -> code.CodeEval
-    source method "send_keys" -> core.UserControlledData
-  }
-}

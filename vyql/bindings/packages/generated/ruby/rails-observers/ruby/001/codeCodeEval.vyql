@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m20d1aa9d;
+
+binding codeEval1 {
+  requires {
+    dependency("rails-observers")
+  }
+  query pattern callExpr where callee.method == "method_missing"
+  emit sink code.CodeEval at args[0]
+}

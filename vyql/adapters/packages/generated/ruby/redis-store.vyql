@@ -1,7 +1,0 @@
-import code.{DatabaseRead}
-adapter ruby {
-  package "redis-store" {
-    sink method "keys" -> code.DatabaseRead
-    sink method "scan" -> code.DatabaseRead
-  }
-}

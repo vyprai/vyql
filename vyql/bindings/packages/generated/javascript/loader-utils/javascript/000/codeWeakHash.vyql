@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m15b7d022;
+
+binding weakHash0 {
+  requires {
+    dependency("loader-utils")
+  }
+  query pattern callExpr where callee.method == "getHashDigest"
+  emit issue code.WeakHash at call
+}

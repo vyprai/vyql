@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m0d1769df;
+
+binding urlFetch6 {
+  requires {
+    dependency("webrat")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.UrlFetch at args[0]
+}

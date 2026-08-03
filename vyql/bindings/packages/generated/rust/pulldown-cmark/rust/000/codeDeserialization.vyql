@@ -1,0 +1,9 @@
+module bindings.rust.generated.m26d20518;
+
+binding deserialization0 {
+  requires {
+    dependency("pulldown-cmark")
+  }
+  query pattern callExpr where callee.method == "Parser.new"
+  emit sink code.Deserialization at args[0]
+}

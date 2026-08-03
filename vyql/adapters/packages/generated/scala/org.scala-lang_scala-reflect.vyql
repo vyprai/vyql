@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.scala-lang:scala-reflect" {
-    control method "escape" -> core.InputValidation
-  }
-}

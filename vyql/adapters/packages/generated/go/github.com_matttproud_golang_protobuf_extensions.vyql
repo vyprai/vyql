@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/matttproud/golang_protobuf_extensions" {
-    sink method "ReadDelimited" -> code.Deserialization
-  }
-}

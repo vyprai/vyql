@@ -1,0 +1,9 @@
+module bindings.objc.generated.mc6b72449;
+
+binding networkSend0 {
+  requires {
+    dependency("Socket.IO-Client-Swift")
+  }
+  query pattern callExpr where callee.method == "emit"
+  emit sink code.NetworkSend at args[0]
+}

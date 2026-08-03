@@ -1,0 +1,11 @@
+module code;
+
+concept PairwiseConstraintIntersectionDos : issue {
+  cwe: [CWE_400, CWE_407]
+  reviewAssumption: "attackers can provide certificates or structured inputs with many constraints, causing CPU and allocation growth from pairwise intersection"
+  reviewCategory: resource
+  reviewCondition: "constraint-list intersection performs pairwise nested intersection work instead of a sorted or bounded merge"
+  reviewConfidence: high
+  reviewEvidence: "constraint intersection context {pattern} iterates one constraint list against another and adds intersection results without observed sorted-view merge processing"
+  vulnerableTo: [dos.UncontrolledResourceConsumption]
+}

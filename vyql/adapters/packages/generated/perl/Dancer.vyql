@@ -1,9 +1,0 @@
-import code.{HttpInput}
-
-adapter perl {
-  package "Dancer" {
-    source method "request" -> code.HttpInput
-    source method "params" -> code.HttpInput
-    source method "param" -> code.HttpInput
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m3841641d;
+
+binding deserialization0 {
+  requires {
+    dependency("yajl-ruby")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

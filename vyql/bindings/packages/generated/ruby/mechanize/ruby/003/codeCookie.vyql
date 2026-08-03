@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m0dd155e0;
+
+binding cookie3 {
+  requires {
+    dependency("mechanize")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.Cookie at call.result
+}

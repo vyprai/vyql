@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-import core.{UserControlledData}
-
-adapter ruby {
-  package "premailer" {
-    source method "initialize" -> core.UserControlledData
-    sink method "load_css_from_local_file!" -> code.FilePathAccess
-  }
-}

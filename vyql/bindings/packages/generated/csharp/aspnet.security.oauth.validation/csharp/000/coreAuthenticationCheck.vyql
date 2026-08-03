@@ -1,0 +1,13 @@
+module bindings.csharp.generated.mad49fb34;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("aspnet.security.oauth.validation")
+  }
+  query pattern callExpr where callee.method == "ValidateToken"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

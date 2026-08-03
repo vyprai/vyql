@@ -1,0 +1,9 @@
+module bindings.go.generated.m39efcd29;
+
+binding externalApiResponse9 {
+  requires {
+    dependency("github.com/go-resty/resty")
+  }
+  query pattern callExpr where callee.method == "Body"
+  emit source code.ExternalApiResponse at call.result
+}

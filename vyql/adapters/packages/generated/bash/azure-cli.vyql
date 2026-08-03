@@ -1,5 +1,0 @@
-adapter bash {
-  package "azure-cli" {
-    source path "extract-loc.py.argv" -> code.CliArgument
-  }
-}

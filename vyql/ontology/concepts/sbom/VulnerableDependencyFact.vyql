@@ -1,0 +1,4 @@
+module sbom;
+
+concept VulnerableDependencyFact : fact {
+}

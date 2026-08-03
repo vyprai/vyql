@@ -1,9 +1,0 @@
-import code.{NetworkData, NetworkSend}
-adapter scala {
-  package "com.sun.jersey:jersey-client" {
-    sink method "post" -> code.NetworkSend
-    sink method "put" -> code.NetworkSend
-    source method "get" -> code.NetworkData
-    source method "delete" -> code.NetworkData
-  }
-}

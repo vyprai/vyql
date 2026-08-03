@@ -1,0 +1,9 @@
+module bindings.objc.generated.mc1361ff5;
+
+binding weakHash2 {
+  requires {
+    dependency("MSAL")
+  }
+  query pattern presenceNode where node.path ~= "msal.hash"
+  emit issue code.WeakHash at node
+}

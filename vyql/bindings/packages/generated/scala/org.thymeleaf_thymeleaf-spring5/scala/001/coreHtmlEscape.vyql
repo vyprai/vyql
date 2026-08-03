@@ -1,0 +1,14 @@
+module bindings.scala.generated.m4d9f4d82;
+
+binding htmlEscape1 {
+  requires {
+    dependency("org.thymeleaf:thymeleaf-spring5")
+  }
+  query pattern callExpr where callee.method == "getDisplayString"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.rust.generated.m73c78517;
+
+binding filePathAccess0 {
+  requires {
+    dependency("xattr")
+  }
+  query pattern callExpr where callee.method == "get_path"
+  emit sink code.FilePathAccess at args[0]
+}

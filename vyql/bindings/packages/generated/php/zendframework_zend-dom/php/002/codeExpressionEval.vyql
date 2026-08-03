@@ -1,0 +1,9 @@
+module bindings.php.generated.m9ac0a306;
+
+binding expressionEval2 {
+  requires {
+    dependency("zendframework/zend-dom")
+  }
+  query pattern callExpr where callee.method == "queryXpath"
+  emit sink code.ExpressionEval at args[0]
+}

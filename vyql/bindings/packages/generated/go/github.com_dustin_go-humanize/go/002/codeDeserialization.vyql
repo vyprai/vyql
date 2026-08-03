@@ -1,0 +1,9 @@
+module bindings.go.generated.m568cb411;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/dustin/go-humanize")
+  }
+  query pattern callExpr where callee.method == "ParseBigBytes"
+  emit sink code.Deserialization at args[0]
+}

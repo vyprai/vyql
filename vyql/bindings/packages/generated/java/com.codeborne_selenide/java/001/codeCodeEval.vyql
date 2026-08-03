@@ -1,0 +1,9 @@
+module bindings.java.generated.md03dc35e;
+
+binding codeEval1 {
+  requires {
+    dependency("com.codeborne:selenide")
+  }
+  query pattern callExpr where callee.method == "executeJavaScript"
+  emit sink code.CodeEval at args[0]
+}

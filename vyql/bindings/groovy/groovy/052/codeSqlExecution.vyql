@@ -1,0 +1,6 @@
+module bindings.groovy.generated.m6eabb149;
+
+binding sqlExecution52 {
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.BbcodeUrlTagProtocolXss {
+  category: xss
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review BBCode/UBB URL and image tag parsing for http/https protocol allowlisting before rendering href or src attributes"
+}

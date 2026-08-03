@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mb5a1490f;
+
+binding deserialization0 {
+  requires {
+    dependency("redo")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

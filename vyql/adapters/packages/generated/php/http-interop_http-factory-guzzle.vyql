@@ -1,5 +1,0 @@
-adapter php {
-  package "http-interop/http-factory-guzzle" {
-    sink method "Request" -> code.UrlFetch
-  }
-}

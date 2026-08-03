@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m80b6432b;
+
+binding filePathAccess1 {
+  requires {
+    dependency("conform")
+  }
+  query pattern callExpr where callee.method == "file"
+  emit sink code.FilePathAccess at args[0]
+}

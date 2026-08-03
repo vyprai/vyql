@@ -1,6 +1,0 @@
-adapter scala {
-  package "org.apache.thrift:libthrift" {
-    sink method "deserialize" -> code.Deserialization
-    sink method "partialDeserialize" -> code.Deserialization
-  }
-}

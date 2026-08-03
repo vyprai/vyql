@@ -1,0 +1,9 @@
+module bindings.objc.generated.m882eaacf;
+
+binding networkConnect0 {
+  requires {
+    dependency("Giphy")
+  }
+  query pattern callExpr where callee.method == "httpRequestWith"
+  emit sink code.NetworkConnectSink at args[0]
+}

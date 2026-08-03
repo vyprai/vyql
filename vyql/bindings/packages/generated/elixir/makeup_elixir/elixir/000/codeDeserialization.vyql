@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mda87d814;
+
+binding deserialization0 {
+  requires {
+    dependency("makeup_elixir")
+  }
+  query pattern callExpr where callee.method == "lex"
+  emit sink code.Deserialization at args[0]
+}

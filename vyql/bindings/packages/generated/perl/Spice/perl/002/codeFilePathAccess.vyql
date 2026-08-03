@@ -1,0 +1,9 @@
+module bindings.perl.generated.m780bfafd;
+
+binding filePathAccess2 {
+  requires {
+    dependency("Spice")
+  }
+  query pattern callExpr where callee.method == "readSpice"
+  emit sink code.FilePathAccess at args[0]
+}

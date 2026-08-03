@@ -1,0 +1,9 @@
+module bindings.perl.generated.mfddc86fe;
+
+binding deserialization3 {
+  requires {
+    dependency("KiokuDB")
+  }
+  query pattern callExpr where callee.method == "STORABLE_thaw"
+  emit sink code.Deserialization at args[0]
+}

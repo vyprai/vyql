@@ -1,0 +1,9 @@
+module bindings.elixir.generated.md062d001;
+
+binding storedDataRead6 {
+  requires {
+    dependency("google_api_storage")
+  }
+  query pattern callExpr where callee.method == "storage_buckets_get"
+  emit source code.StoredDataRead at call.result
+}

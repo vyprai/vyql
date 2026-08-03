@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding nullableDeref90 {
+  query pattern presenceNode where node.path ~= "__deref"
+  emit issue code.NullableDeref at node
+}

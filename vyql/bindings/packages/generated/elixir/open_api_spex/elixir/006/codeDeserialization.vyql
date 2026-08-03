@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m2ad324d3;
+
+binding deserialization6 {
+  requires {
+    dependency("open_api_spex")
+  }
+  query pattern callExpr where callee.method == "schema_from_map"
+  emit sink code.Deserialization at args[0]
+}

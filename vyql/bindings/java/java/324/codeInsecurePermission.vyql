@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding insecurePermission324 {
+  query pattern callExpr where callee.path ~= "setWritable" and args.any.literal contains "true" and args.any.literal contains "false"
+  emit issue code.InsecurePermission at call
+}

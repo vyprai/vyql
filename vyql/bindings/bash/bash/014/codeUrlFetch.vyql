@@ -1,0 +1,6 @@
+module bindings.bash.generated.m59952d5d;
+
+binding urlFetch14 {
+  query pattern callExpr where callee.path ~= "wget"
+  emit sink code.UrlFetch at args[0]
+}

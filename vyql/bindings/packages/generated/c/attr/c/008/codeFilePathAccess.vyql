@@ -1,0 +1,9 @@
+module bindings.c.generated.ma3178d8e;
+
+binding filePathAccess8 {
+  requires {
+    dependency("attr")
+  }
+  query pattern callExpr where callee.method == "attr_copy_action"
+  emit sink code.FilePathAccess at args[0]
+}

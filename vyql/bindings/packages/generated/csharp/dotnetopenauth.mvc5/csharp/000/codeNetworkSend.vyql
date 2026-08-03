@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m2d41ba62;
+
+binding networkSend0 {
+  requires {
+    dependency("dotnetopenauth.mvc5")
+  }
+  query pattern callExpr where callee.method == "AsActionResultMvc5"
+  emit sink code.NetworkSend at args[0]
+}

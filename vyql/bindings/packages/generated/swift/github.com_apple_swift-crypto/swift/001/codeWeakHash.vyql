@@ -1,0 +1,9 @@
+module bindings.swift.generated.ma63f91f2;
+
+binding weakHash1 {
+  requires {
+    dependency("github.com/apple/swift-crypto")
+  }
+  query pattern callExpr where callee.method == "Digest"
+  emit issue code.WeakHash at call
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m6666bade;
+
+binding responseHeaderWrite6 {
+  requires {
+    dependency("fake_server")
+  }
+  query pattern callExpr where callee.method == "FakeServer.Response.new"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

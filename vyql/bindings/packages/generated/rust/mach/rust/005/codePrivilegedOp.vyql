@@ -1,0 +1,10 @@
+module bindings.rust.generated.mfb74f871;
+
+binding privilegedOp5 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "task_resume"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

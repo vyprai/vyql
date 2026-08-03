@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-adapter php {
-  package "symfony/doctrine-bridge" {
-    sink method "query" -> code.SqlExecution
-    sink method "exec" -> code.SqlExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.m252beaed;
+
+binding fileUse1 {
+  requires {
+    dependency("flutter_downloader")
+  }
+  query pattern callExpr where callee.method == "enqueue"
+  emit sink code.FileUseSink at args[0]
+}

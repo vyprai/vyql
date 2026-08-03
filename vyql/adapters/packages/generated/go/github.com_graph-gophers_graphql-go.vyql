@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "github.com/graph-gophers/graphql-go" {
-    sink method "ParseSchema" -> code.Deserialization
-  }
-}

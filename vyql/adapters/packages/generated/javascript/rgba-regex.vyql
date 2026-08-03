@@ -1,7 +1,0 @@
-adapter javascript {
-  package "rgba-regex" {
-    flag code.RegexCompile on any {
-      method "module.exports"
-    }
-  }
-}

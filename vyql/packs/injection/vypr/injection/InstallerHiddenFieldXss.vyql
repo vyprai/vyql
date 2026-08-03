@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule InstallerHiddenFieldXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-137"
+    severity: high
+  }
+  issue code.InstallerHiddenFieldXss as sink
+}

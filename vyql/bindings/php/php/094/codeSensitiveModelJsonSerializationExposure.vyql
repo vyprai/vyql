@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding sensitiveModelJsonSerializationExposure94 {
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.className contains "UpdateUserController" and node.context.phpReview == "sensitive_model_json_serialization_update_user"
+  emit issue code.SensitiveModelJsonSerializationExposure at node
+}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.m7db56771;
+
+binding storedDataWrite7 {
+  requires {
+    dependency("github.com/kishikawakatsumi/KeychainAccess")
+  }
+  query pattern callExpr where callee.method == "removeAll"
+  emit sink code.StoredDataWrite at args[0]
+}

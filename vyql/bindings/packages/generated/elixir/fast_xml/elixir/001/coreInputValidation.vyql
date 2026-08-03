@@ -1,0 +1,14 @@
+module bindings.elixir.generated.m62850d13;
+
+binding inputValidation1 {
+  requires {
+    dependency("fast_xml")
+  }
+  query pattern callExpr where callee.method == "sanitize_for_atd"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

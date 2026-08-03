@@ -1,0 +1,9 @@
+module bindings.objc.generated.mff36b5b7;
+
+binding networkData2 {
+  requires {
+    dependency("GooglePlaces")
+  }
+  query pattern callExpr where callee.method == "findAutocompletePredictionsFromQuery"
+  emit source code.NetworkData at call.result
+}

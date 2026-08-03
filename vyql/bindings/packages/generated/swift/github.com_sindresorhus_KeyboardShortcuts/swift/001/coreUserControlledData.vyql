@@ -1,0 +1,9 @@
+module bindings.swift.generated.m72740eb4;
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/sindresorhus/KeyboardShortcuts")
+  }
+  query pattern callExpr where callee.method == "onKeyUp"
+  emit source core.UserControlledData at call.result
+}

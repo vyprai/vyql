@@ -1,5 +1,0 @@
-adapter php {
-  package "mikehaertl/php-shellcommand" {
-    sink method "exec" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mc2d0f686;
+
+binding filePathAccess2 {
+  requires {
+    dependency("fltk")
+  }
+  query pattern callExpr where callee.method == "fl_fopen"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.generated.m0dc49fb6;
+
+binding deserialization7 {
+  requires {
+    dependency("jeepney")
+  }
+  query pattern callExpr where callee.method == "generate_from_introspection"
+  emit sink code.Deserialization at args[0]
+}

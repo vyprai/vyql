@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m25d58cd9;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("rocksdb")
+  }
+  query pattern callExpr where callee.method == "Get"
+  emit sink code.NosqlQuery at args[0]
+}

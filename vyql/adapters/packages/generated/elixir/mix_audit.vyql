@@ -1,7 +1,0 @@
-import code.{CliArgument}
-
-adapter elixir {
-  package "mix_audit" {
-    source method "MixAudit.CLI.run" -> code.CliArgument
-  }
-}

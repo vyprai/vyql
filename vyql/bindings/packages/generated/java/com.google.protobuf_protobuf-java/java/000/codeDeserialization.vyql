@@ -1,0 +1,9 @@
+module bindings.java.generated.mdf550646;
+
+binding deserialization0 {
+  requires {
+    dependency("com.google.protobuf:protobuf-java")
+  }
+  query pattern callExpr where callee.method == "parseFrom"
+  emit sink code.Deserialization at args[0]
+}

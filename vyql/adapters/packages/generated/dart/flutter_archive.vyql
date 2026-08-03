@@ -1,7 +1,0 @@
-import code.{FilePathAccess, ArchiveEntryWrite}
-adapter dart {
-  package "flutter_archive" {
-    sink method "createFromFiles" -> code.ArchiveEntryWrite
-    sink method "extractToDirectory" -> code.FilePathAccess
-  }
-}

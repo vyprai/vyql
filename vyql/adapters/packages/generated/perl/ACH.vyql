@@ -1,7 +1,0 @@
-import code.{NetworkData, SecretValue}
-adapter perl {
-  package "ACH" {
-    source method "printAllData" -> code.NetworkData
-    source method "getData" -> code.SecretValue
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.mc2679962;
+
+binding codeEval2 {
+  requires {
+    dependency("Metabrik")
+  }
+  query pattern callExpr where callee.method == "run_code"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.Free5gcChfRechargeInfoSplitPanic {
+  category: resource
+  expected: [core.MemoryBoundsCheck]
+  kind: attention
+  text: "review recharge route parsing for a split-result length check before indexing rating-group fields"
+}

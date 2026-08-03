@@ -1,5 +1,0 @@
-adapter javascript {
-  package "ansi-html" {
-    sink method "ansiHTML" -> code.HtmlRender
-  }
-}

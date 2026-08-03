@@ -1,0 +1,14 @@
+module bindings.ruby.generated.m7b3b1e13;
+
+binding htmlEscape3 {
+  requires {
+    dependency("rails_autolink")
+  }
+  query pattern callExpr where callee.method == "conditional_sanitize"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

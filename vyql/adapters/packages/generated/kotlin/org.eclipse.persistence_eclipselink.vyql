@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "org.eclipse.persistence:eclipselink" {
-    sink method "load" -> code.Deserialization
-  }
-}

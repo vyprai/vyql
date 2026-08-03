@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter kotlin {
-  package "org.eclipse.jetty:jetty-servlets" {
-    sink method "exec" -> code.CommandExecution
-  }
-}

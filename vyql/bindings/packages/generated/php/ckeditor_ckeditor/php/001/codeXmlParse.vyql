@@ -1,0 +1,9 @@
+module bindings.php.generated.me4bd0673;
+
+binding xmlParse1 {
+  requires {
+    dependency("ckeditor/ckeditor")
+  }
+  query pattern callExpr where callee.method == "onLoad"
+  emit sink code.XmlParse at args[0]
+}

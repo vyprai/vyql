@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mbfd454d1;
+
+binding deserialization17 {
+  requires {
+    dependency("snakeyaml")
+  }
+  query pattern callExpr where callee.path ~= "Yaml.load"
+  emit sink code.Deserialization at args[0]
+}

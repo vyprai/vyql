@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m391346ae;
+
+binding userControlledData2 {
+  requires {
+    dependency("qt5-androidextras")
+  }
+  query pattern callExpr where callee.method == "writeBinder"
+  emit source core.UserControlledData at call.result
+}

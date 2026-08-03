@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m971fbd3c;
+
+binding networkConnect1 {
+  requires {
+    dependency("payjp")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkConnectSink at args[0]
+}

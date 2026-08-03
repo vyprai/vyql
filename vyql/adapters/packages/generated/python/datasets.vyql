@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter python {
-  package "datasets" {
-    sink method "load_dataset" -> code.FilePathAccess
-    sink method "load_from_disk" -> code.FilePathAccess
-  }
-}

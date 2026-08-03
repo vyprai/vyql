@@ -1,0 +1,10 @@
+module vypr.misconfig;
+
+rule HostNamespaceShare {
+  meta {
+    cwe: [CWE_653]
+    id: "VYQL-CFG-011"
+    severity: medium
+  }
+  issue code.HostNamespaceShare as h
+}

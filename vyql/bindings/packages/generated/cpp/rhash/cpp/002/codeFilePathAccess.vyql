@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m64fe9f9b;
+
+binding filePathAccess2 {
+  requires {
+    dependency("rhash")
+  }
+  query pattern callExpr where callee.method == "rhash_file"
+  emit sink code.FilePathAccess at args[0]
+}

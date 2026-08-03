@@ -1,0 +1,6 @@
+module memory;
+
+threat OobWrite {
+  cwe: [CWE_787]
+  desc: "Out-of-bounds write (buffer overflow)"
+}

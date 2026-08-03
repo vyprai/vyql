@@ -1,7 +1,0 @@
-import code.{CliArgument}
-adapter c {
-  package "argparse" {
-    source method "ArgumentParser.parse_args" -> code.CliArgument
-    source method "ArgumentParser.parse_known_args" -> code.CliArgument
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding protoPollute560 {
+  query pattern callExpr where callee.path ~= "_.mergeWith"
+  emit sink code.ProtoPollute at args[1]
+}

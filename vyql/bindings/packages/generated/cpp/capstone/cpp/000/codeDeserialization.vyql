@@ -1,0 +1,9 @@
+module bindings.cpp.generated.ma86305e4;
+
+binding deserialization0 {
+  requires {
+    dependency("capstone")
+  }
+  query pattern callExpr where callee.method == "cs_disasm"
+  emit sink code.Deserialization at args[0]
+}

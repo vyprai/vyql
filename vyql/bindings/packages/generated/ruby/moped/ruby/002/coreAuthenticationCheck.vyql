@@ -1,0 +1,13 @@
+module bindings.ruby.generated.m220f41eb;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("moped")
+  }
+  query pattern callExpr where callee.method == "login"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

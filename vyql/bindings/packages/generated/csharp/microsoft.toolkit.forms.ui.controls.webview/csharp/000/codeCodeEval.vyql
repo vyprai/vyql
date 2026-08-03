@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m4e76e37d;
+
+binding codeEval0 {
+  requires {
+    dependency("microsoft.toolkit.forms.ui.controls.webview")
+  }
+  query pattern callExpr where callee.method == "InvokeScript"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.mdcbba98f;
+
+binding networkSend7 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "PATCH:JSON:error:"
+  emit sink code.NetworkSend at args[0]
+}

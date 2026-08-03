@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding computedSizeValue141 {
+  query pattern callExpr where callee.path ~= "__binop.mul"
+  emit source code.ComputedSizeValue at call.result
+}

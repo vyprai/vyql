@@ -1,0 +1,9 @@
+module bindings.perl.generated.ma29b5eb2;
+
+binding codeEval2 {
+  requires {
+    dependency("Fennec")
+  }
+  query pattern callExpr where callee.method == "load_file"
+  emit sink code.CodeEval at args[0]
+}

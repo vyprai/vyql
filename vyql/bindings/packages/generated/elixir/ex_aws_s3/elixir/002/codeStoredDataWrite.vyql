@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m384b2ed3;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("ex_aws_s3")
+  }
+  query pattern callExpr where callee.method == "ExAws.S3.upload"
+  emit sink code.StoredDataWrite at args[0]
+}

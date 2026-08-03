@@ -1,6 +1,0 @@
-adapter scala {
-  package "com.github.oshi:oshi-core" {
-    sink method "readFile" -> code.FilePathAccess
-    sink method "readLines" -> code.FilePathAccess
-  }
-}

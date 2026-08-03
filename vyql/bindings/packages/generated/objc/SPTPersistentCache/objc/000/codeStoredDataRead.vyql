@@ -1,0 +1,9 @@
+module bindings.objc.generated.m68bf71d8;
+
+binding storedDataRead0 {
+  requires {
+    dependency("SPTPersistentCache")
+  }
+  query pattern callExpr where callee.method == "read:buffer:bufferSize:"
+  emit source code.StoredDataRead at call.result
+}

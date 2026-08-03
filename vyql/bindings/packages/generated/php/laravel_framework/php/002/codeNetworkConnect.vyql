@@ -1,0 +1,9 @@
+module bindings.php.generated.mec5dfadc;
+
+binding networkConnect2 {
+  requires {
+    dependency("laravel/framework")
+  }
+  query pattern callExpr where callee.method == "onConnection"
+  emit sink code.NetworkConnectSink at args[0]
+}

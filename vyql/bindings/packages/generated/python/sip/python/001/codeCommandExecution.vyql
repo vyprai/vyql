@@ -1,0 +1,9 @@
+module bindings.python.generated.m189a9e7e;
+
+binding commandExecution1 {
+  requires {
+    dependency("sip")
+  }
+  query pattern callExpr where callee.method == "run_command"
+  emit sink code.CommandExecution at args[0]
+}

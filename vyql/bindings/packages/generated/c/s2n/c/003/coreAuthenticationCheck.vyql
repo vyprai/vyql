@@ -1,0 +1,13 @@
+module bindings.c.generated.md601388a;
+
+binding authenticationCheck3 {
+  requires {
+    dependency("s2n")
+  }
+  query pattern callExpr where callee.method == "s2n_config_set_verification_ca_location"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m1c1357ee;
+
+binding xmlParse27 {
+  requires {
+    dependency("libxml2")
+  }
+  query pattern callExpr where callee.path ~= "xmlReadMemory"
+  emit sink code.XmlParse at args[0]
+}

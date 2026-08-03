@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m9be29d9a;
+
+binding sqlExecution0 {
+  requires {
+    dependency("geocoder")
+  }
+  query pattern callExpr where callee.method == "insert_into_table"
+  emit sink code.SqlExecution at args[0]
+}

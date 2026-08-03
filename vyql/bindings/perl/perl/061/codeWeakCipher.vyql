@@ -1,0 +1,6 @@
+module bindings.perl.generated.mfca40a44;
+
+binding weakCipher61 {
+  query pattern callExpr where callee.path ~= "Crypt.CBC.new" and args.any.literal contains "Blowfish"
+  emit issue code.WeakCipher at call
+}

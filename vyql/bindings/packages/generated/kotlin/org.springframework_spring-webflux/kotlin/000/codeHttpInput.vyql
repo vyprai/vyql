@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m85bf6ae2;
+
+binding httpInput0 {
+  requires {
+    dependency("org.springframework:spring-webflux")
+  }
+  query pattern callExpr where callee.path ~= "org.springframework.spring.webflux.cookie"
+  emit source code.HttpInput at call.result
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider" {
-    sink method "JsonEndpointConfig.forReading" -> code.Deserialization
-  }
-}

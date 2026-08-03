@@ -1,0 +1,10 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding csrfProtection169 {
+  query pattern callExpr where callee.path ~= "verifyCsrfToken"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

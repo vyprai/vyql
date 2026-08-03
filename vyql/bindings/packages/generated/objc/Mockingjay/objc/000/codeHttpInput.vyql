@@ -1,0 +1,9 @@
+module bindings.objc.generated.mc8a5efdc;
+
+binding httpInput0 {
+  requires {
+    dependency("Mockingjay")
+  }
+  query pattern callExpr where callee.method == "canInit"
+  emit source code.HttpInput at call.result
+}

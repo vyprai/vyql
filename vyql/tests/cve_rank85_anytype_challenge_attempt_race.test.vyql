@@ -1,0 +1,6 @@
+test "rank85: challenge failed-attempt limit update requires auth review"
+  expect VYQL-AUTH-088
+  graph
+  ```
+  node op code.AuthAttemptLimitReview
+  ```

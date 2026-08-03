@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter kotlin {
-  package "org.codehaus.groovy:groovy" {
-    sink method "parse" -> code.CodeEval
-  }
-}

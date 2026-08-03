@@ -1,8 +1,0 @@
-import core.{UserControlledData, AuthenticationCheck}
-adapter elixir {
-  package "basic_auth" {
-    source method "BasicAuth.call" -> core.UserControlledData
-    control method "BasicAuth.Configured.respond" -> core.AuthenticationCheck
-    control method "BasicAuth.WithCallback.respond" -> core.AuthenticationCheck
-  }
-}

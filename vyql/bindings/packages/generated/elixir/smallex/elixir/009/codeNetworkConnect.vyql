@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m9bacb8bf;
+
+binding networkConnect9 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkConnectSink at args[0]
+}

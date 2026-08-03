@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "glib" {
-    sink method "set_parse" -> code.Deserialization
-  }
-}

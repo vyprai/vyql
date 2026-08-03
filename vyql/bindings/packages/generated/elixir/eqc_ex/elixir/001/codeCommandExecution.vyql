@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mb8201a6c;
+
+binding commandExecution1 {
+  requires {
+    dependency("eqc_ex")
+  }
+  query pattern callExpr where callee.method == "check_commands"
+  emit sink code.CommandExecution at args[0]
+}

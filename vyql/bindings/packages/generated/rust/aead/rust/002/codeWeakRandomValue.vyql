@@ -1,0 +1,9 @@
+module bindings.rust.generated.m1bbcfdab;
+
+binding weakRandomValue2 {
+  requires {
+    dependency("aead")
+  }
+  query pattern callExpr where callee.method == "encrypt_in_place_detached"
+  emit issue code.WeakRandomValue at call
+}

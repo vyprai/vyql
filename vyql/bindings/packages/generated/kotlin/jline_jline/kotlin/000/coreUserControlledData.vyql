@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mfb23522e;
+
+binding userControlledData0 {
+  requires {
+    dependency("jline:jline")
+  }
+  query pattern callExpr where callee.method == "Options.parse"
+  emit source core.UserControlledData at call.result
+}

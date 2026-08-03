@@ -1,0 +1,9 @@
+module bindings.swift.generated.m21ea1486;
+
+binding userControlledData3 {
+  requires {
+    dependency("github.com/OperatorFoundation/AdversaryLabClientSwift")
+  }
+  query pattern callExpr where callee.method == "RawPacket.payload"
+  emit source core.UserControlledData at call.result
+}

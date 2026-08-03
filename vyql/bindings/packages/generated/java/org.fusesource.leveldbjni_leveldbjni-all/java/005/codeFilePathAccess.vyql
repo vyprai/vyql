@@ -1,0 +1,9 @@
+module bindings.java.generated.m6cedf005;
+
+binding filePathAccess5 {
+  requires {
+    dependency("org.fusesource.leveldbjni:leveldbjni-all")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

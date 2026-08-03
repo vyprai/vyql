@@ -1,0 +1,9 @@
+module bindings.go.generated.m713c4f03;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/xo/terminfo")
+  }
+  query pattern callExpr where callee.method == "Load"
+  emit source core.UserControlledData at call.result
+}

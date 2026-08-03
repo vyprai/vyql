@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding unsafeBuildClientCommandAssembly283 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "BuildClient" and node.context.literal contains "GO_ENABLED=1 GOOS=%s GOARCH=amd64 go build" and node.context.selector contains "input.Filename" and node.context.call contains "handleFilename" and node.context.callPath contains "fmt.Sprintf" and node.context.callPath contains "exec.Command" and not (node.context.callPath contains "utils.NormalizeString") and not (node.context.callPath contains "utils.StringIsNumber") and not (node.context.callPath contains "utils.IsValidIPAddress")
+  emit issue code.UnsafeBuildClientCommandAssembly at node
+}

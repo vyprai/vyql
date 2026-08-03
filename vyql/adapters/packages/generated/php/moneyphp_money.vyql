@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter php {
-  package "moneyphp/money" {
-    sink method "MoneyParser.parse" -> code.Deserialization
-  }
-}

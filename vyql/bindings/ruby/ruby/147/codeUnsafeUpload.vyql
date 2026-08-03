@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding unsafeUpload147 {
+  query pattern callExpr where callee.path ~= "uploaded_file.save"
+  emit sink code.UnsafeUpload at args[0]
+}

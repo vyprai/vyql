@@ -1,8 +1,0 @@
-import code.{DatabaseRead, SqlExecution}
-
-adapter go {
-  package "gorm.io/gorm" {
-    sink method "Open" -> code.DatabaseRead
-    sink method "RawExec" -> code.SqlExecution
-  }
-}

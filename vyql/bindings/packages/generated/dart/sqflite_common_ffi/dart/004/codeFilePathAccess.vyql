@@ -1,0 +1,9 @@
+module bindings.dart.generated.m5a58048f;
+
+binding filePathAccess4 {
+  requires {
+    dependency("sqflite_common_ffi")
+  }
+  query pattern callExpr where callee.method == "handleOpenDatabase"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.powershell.generated.m92132a18;
+
+binding regexCompile12 {
+  requires {
+    dependency("Microsoft.PowerShell.Utility")
+  }
+  query pattern callExpr where callee.path ~= "Select-String"
+  emit sink code.RegexCompileSink at args[0]
+}

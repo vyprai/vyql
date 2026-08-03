@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m8eefbb4a;
+
+binding deserialization4 {
+  requires {
+    dependency("pdf-reader")
+  }
+  query pattern callExpr where callee.method == "PDF::Reader::Page#callback"
+  emit sink code.Deserialization at args[0]
+}

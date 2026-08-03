@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mbf870ebd;
+
+binding deserialization0 {
+  requires {
+    dependency("nimble_publisher")
+  }
+  query pattern callExpr where callee.method == "parse_contents"
+  emit sink code.Deserialization at args[0]
+}

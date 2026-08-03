@@ -1,0 +1,9 @@
+module bindings.go.generated.m785e0061;
+
+binding userControlledData11 {
+  requires {
+    dependency("github.com/gliderlabs/ssh")
+  }
+  query pattern callExpr where callee.method == "parseString"
+  emit source core.UserControlledData at call.result
+}

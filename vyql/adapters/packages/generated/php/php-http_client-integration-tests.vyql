@@ -1,5 +1,0 @@
-adapter php {
-  package "php-http/client-integration-tests" {
-    sink method "requestProvider" -> code.UrlFetch
-  }
-}

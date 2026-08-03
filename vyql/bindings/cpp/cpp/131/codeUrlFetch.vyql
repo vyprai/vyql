@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding urlFetch131 {
+  query pattern callExpr where callee.path ~= "curl_easy_setopt"
+  emit sink code.UrlFetch at args[2]
+}

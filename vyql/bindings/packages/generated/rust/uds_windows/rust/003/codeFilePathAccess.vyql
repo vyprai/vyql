@@ -1,0 +1,9 @@
+module bindings.rust.generated.m71105256;
+
+binding filePathAccess3 {
+  requires {
+    dependency("uds_windows")
+  }
+  query pattern callExpr where callee.method == "from_path"
+  emit sink code.FilePathAccess at args[0]
+}

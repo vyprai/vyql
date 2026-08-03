@@ -1,7 +1,0 @@
-adapter kotlin {
-  package "org.apache.commons:commons-lang3" {
-    flag code.WeakRandomValue on any {
-      path "org.apache.commons.commons.lang3.random"
-    }
-  }
-}

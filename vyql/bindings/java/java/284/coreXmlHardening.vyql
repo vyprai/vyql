@@ -1,0 +1,11 @@
+module bindings.java.generated.m420f6b67;
+
+binding xmlHardening284 {
+  query pattern callExpr where callee.path ~= "setFeature" and args.any.literal contains "FEATURE_SECURE_PROCESSING" and args.any.literal contains "true"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}

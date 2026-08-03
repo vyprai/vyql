@@ -1,0 +1,9 @@
+module bindings.perl.generated.m4a781ab9;
+
+binding weakHash0 {
+  requires {
+    dependency("Digest-Adler32")
+  }
+  query pattern callExpr where callee.method == "add"
+  emit issue code.WeakHash at call
+}

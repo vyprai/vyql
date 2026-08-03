@@ -1,0 +1,13 @@
+module bindings.ruby.generated.ma1da0d8f;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("google-apis-storage_v1")
+  }
+  query pattern callExpr where callee.method == "set_bucket_iam_policy"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

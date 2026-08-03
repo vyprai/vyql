@@ -1,0 +1,9 @@
+module bindings.swift.generated.m4ba7f8dd;
+
+binding networkData3 {
+  requires {
+    dependency("github.com/brightdigit/PrchNIO")
+  }
+  query pattern callExpr where callee.method == "data"
+  emit source code.NetworkData at call.result
+}

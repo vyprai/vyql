@@ -1,0 +1,8 @@
+module code;
+
+review code.JenkinsRemoteValidationMissingPermission {
+  category: auth
+  expected: [core.AuthorizationCheck]
+  kind: attention
+  text: "review Jenkins remote form-validation endpoints for Overall/Administer permission checks before connecting to supplied services"
+}

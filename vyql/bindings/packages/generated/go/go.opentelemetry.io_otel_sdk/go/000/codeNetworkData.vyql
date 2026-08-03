@@ -1,0 +1,9 @@
+module bindings.go.generated.m60673661;
+
+binding networkData0 {
+  requires {
+    dependency("go.opentelemetry.io/otel/sdk")
+  }
+  query pattern callExpr where callee.method == "WithSyncer"
+  emit source code.NetworkData at call.result
+}

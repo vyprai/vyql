@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m13d3fd0d;
+
+binding filePathAccess1 {
+  requires {
+    dependency("serum")
+  }
+  query pattern callExpr where callee.method == "Serum.File.write"
+  emit sink code.FilePathAccess at args[0]
+}

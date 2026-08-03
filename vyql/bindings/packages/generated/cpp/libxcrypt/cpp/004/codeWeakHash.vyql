@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mba04978c;
+
+binding weakHash4 {
+  requires {
+    dependency("libxcrypt")
+  }
+  query pattern callExpr where callee.method == "sha1_process_bytes"
+  emit issue code.WeakHash at call
+}

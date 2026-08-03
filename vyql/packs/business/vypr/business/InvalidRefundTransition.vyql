@@ -1,0 +1,9 @@
+module vypr.business;
+
+rule InvalidRefundTransition {
+  meta {
+    id: "VYQL-BIZ-002"
+    severity: high
+  }
+  query state as t where t.machine == Order and t.from == "*" and t.to == Refunded select t
+}

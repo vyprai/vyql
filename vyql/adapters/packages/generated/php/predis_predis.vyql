@@ -1,7 +1,0 @@
-adapter php {
-  package "predis/predis" {
-    sink method "connect" -> code.NetworkConnect
-    sink method "executeRaw" -> code.NosqlQuery
-    sink method "executeCommand" -> code.NosqlQuery
-  }
-}

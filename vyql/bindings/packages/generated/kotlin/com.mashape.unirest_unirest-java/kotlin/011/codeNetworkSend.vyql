@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mb26cebfd;
+
+binding networkSend11 {
+  requires {
+    dependency("com.mashape.unirest:unirest-java")
+  }
+  query pattern callExpr where callee.method == "patch"
+  emit sink code.NetworkSend at args[0]
+}

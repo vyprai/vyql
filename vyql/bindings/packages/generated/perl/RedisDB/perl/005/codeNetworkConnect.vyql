@@ -1,0 +1,9 @@
+module bindings.perl.generated.m2e3f45c8;
+
+binding networkConnect5 {
+  requires {
+    dependency("RedisDB")
+  }
+  query pattern callExpr where callee.method == "_connect_to_node"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,13 @@
+module bindings.csharp.generated.me666ff19;
+
+binding authenticationCheck3 {
+  requires {
+    dependency("microsoft.azure.mobile.client")
+  }
+  query pattern callExpr where callee.method == "MobileServiceTokenAuthentication"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept PackageEntryPointScriptWrite : issue {
+  cwe: [CWE_22]
+  reviewAssumption: "a package can provide an entry point name with path separators or parent-directory components"
+  reviewCategory: path
+  reviewCondition: "package entry point script names are generated without confinement to the scripts directory"
+  reviewConfidence: medium
+  reviewEvidence: "entry point script generation context {pattern} lacks a scripts-directory containment check"
+  vulnerableTo: [path.PathTraversal]
+}

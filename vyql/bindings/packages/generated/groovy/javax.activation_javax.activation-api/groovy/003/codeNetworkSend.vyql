@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m1f1ce152;
+
+binding networkSend3 {
+  requires {
+    dependency("javax.activation:javax.activation-api")
+  }
+  query pattern callExpr where callee.method == "writeTo"
+  emit sink code.NetworkSend at args[0]
+}

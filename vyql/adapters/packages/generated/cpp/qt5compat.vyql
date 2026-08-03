@@ -1,6 +1,0 @@
-import code.{XmlParse}
-adapter cpp {
-  package "qt5compat" {
-    sink method "parse" -> code.XmlParse
-  }
-}

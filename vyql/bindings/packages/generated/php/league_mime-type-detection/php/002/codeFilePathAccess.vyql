@@ -1,0 +1,9 @@
+module bindings.php.generated.mb8835c4b;
+
+binding filePathAccess2 {
+  requires {
+    dependency("league/mime-type-detection")
+  }
+  query pattern callExpr where callee.method == "LeagueMimeTypeDetectionFinfoMimeTypeDetector::detectMimeType"
+  emit sink code.FilePathAccess at args[0]
+}

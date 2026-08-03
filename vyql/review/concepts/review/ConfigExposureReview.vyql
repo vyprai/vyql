@@ -1,0 +1,8 @@
+module code;
+
+review code.ConfigExposureReview {
+  category: secret
+  expected: [core.SecretRedaction]
+  kind: attention
+  text: "verify config or diagnostic serialization redacts inline secrets before exposure"
+}

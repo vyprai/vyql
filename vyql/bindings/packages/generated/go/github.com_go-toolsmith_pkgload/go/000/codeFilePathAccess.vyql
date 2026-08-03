@@ -1,0 +1,9 @@
+module bindings.go.generated.m92b9fdc0;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/go-toolsmith/pkgload")
+  }
+  query pattern callExpr where callee.method == "LoadPackages"
+  emit sink code.FilePathAccess at args[0]
+}

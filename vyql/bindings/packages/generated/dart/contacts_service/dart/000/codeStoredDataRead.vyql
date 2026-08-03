@@ -1,0 +1,9 @@
+module bindings.dart.generated.m3ee45a62;
+
+binding storedDataRead0 {
+  requires {
+    dependency("contacts_service")
+  }
+  query pattern callExpr where callee.method == "getContacts"
+  emit source code.StoredDataRead at call.result
+}

@@ -2,6 +2,7 @@
 
 test "rank130: c full-frame call lookup without destination binding is review-visible"
   lang c
+  expect VYQL-AUTH-087
   expect_review code.ProtocolFrameBindingReview
   code
   ```
@@ -31,6 +32,7 @@ test "rank130: c full-frame call lookup without destination binding is review-vi
 
 test "rank130: c full-frame call lookup with destination binding is clean"
   lang c
+  reject VYQL-AUTH-087
   reject_review code.ProtocolFrameBindingReview
   code
   ```
@@ -53,6 +55,29 @@ test "rank130: c full-frame call lookup with destination binding is clean"
               (full_frame ? dcallno == cur->callno : 1)) {
               return 1;
           }
+      }
+      return 0;
+  }
+  ```
+
+test "rank130: full-frame call lookup generalizes across names"
+  lang c
+  expect VYQL-AUTH-087
+  expect_review code.ProtocolFrameBindingReview
+  code
+  ```
+  struct channel_peer {
+      unsigned short peercallno;
+      unsigned short callno;
+  };
+
+  static int candidate_matches(unsigned short src_call,
+                               unsigned short dst_call,
+                               const struct channel_peer *entry)
+  {
+      if ((entry->peercallno == src_call) ||
+          ((dst_call == entry->callno) && !entry->peercallno)) {
+          return 1;
       }
       return 0;
   }

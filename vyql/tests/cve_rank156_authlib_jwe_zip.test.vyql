@@ -5,6 +5,7 @@
 
 test "rank156: python authlib JWE direct zlib decompress requires resource review"
   lang python
+  expect VYQL-DOS-042
   expect_review code.UnboundedResourceOperation
   code
   ```
@@ -22,6 +23,7 @@ test "rank156: python authlib JWE direct zlib decompress requires resource revie
 
 test "rank156: python authlib JWE bounded decompressobj is clean"
   lang python
+  reject VYQL-DOS-042
   reject_review code.UnboundedResourceOperation
   code
   ```

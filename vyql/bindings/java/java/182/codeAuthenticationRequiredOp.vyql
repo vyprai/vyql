@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding authenticationRequiredOp182 {
+  query pattern presenceNode where node.path ~= "changeEmail"
+  emit issue code.AuthenticationRequiredOp at node
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m942721f9;
+
+binding ldapQuery26 {
+  requires {
+    dependency("openldap")
+  }
+  query pattern callExpr where callee.path ~= "ldap_search_ext_s"
+  emit sink code.LdapQuery at args[3]
+}

@@ -1,8 +1,0 @@
-import code.{CodeEval, Deserialization}
-
-adapter rust {
-  package "javascriptcore-rs" {
-    sink method "evaluate_with_source_uri" -> code.CodeEval
-    sink method "from_json" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.rust.generated.m222602a5;
+
+binding archiveEntryWrite25 {
+  requires {
+    dependency("zip")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

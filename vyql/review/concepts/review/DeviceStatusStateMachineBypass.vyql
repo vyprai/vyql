@@ -1,0 +1,8 @@
+module code;
+
+review code.DeviceStatusStateMachineBypass {
+  category: input_validation
+  expected: [core.InputValidation, core.MemoryBoundsCheck]
+  kind: target
+  text: "review device status register writes for required state-machine transition validation before updating stored status bits"
+}

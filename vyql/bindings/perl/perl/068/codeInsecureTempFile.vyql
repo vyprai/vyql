@@ -1,0 +1,6 @@
+module bindings.perl.generated.mfca40a44;
+
+binding insecureTempFile68 {
+  query pattern presenceNode where node.path ~= "POSIX.tmpnam"
+  emit issue code.InsecureTempFile at node
+}

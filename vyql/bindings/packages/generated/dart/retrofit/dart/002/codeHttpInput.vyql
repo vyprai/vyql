@@ -1,0 +1,9 @@
+module bindings.dart.generated.m0ea56420;
+
+binding httpInput2 {
+  requires {
+    dependency("retrofit")
+  }
+  query pattern callExpr where callee.method == "Headers"
+  emit source code.HttpInput at call.result
+}

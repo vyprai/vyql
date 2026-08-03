@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding redirectTarget506 {
+  query pattern callExpr where callee.path ~= "django.shortcuts.redirect"
+  emit sink code.RedirectTargetSink at args[0]
+}

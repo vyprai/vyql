@@ -1,0 +1,11 @@
+module bindings.rust.generated.mdc4f74cd;
+
+pattern bindingMetadata {
+  binding: {
+    name: "rust"
+    meta: {
+      fidelity: "resolved"
+      match: "contains"
+    }
+  }
+}

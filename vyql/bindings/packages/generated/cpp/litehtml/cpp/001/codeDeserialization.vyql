@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m477776c8;
+
+binding deserialization1 {
+  requires {
+    dependency("litehtml")
+  }
+  query pattern callExpr where callee.method == "document::create_node"
+  emit sink code.Deserialization at args[0]
+}

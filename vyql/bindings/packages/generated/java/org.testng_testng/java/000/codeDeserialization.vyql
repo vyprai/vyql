@@ -1,0 +1,9 @@
+module bindings.java.generated.mf9de9ddd;
+
+binding deserialization0 {
+  requires {
+    dependency("org.testng:testng")
+  }
+  query pattern callExpr where callee.method == "org.testng.internal.Yaml.parse"
+  emit sink code.Deserialization at args[0]
+}

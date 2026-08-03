@@ -1,9 +1,0 @@
-adapter scala {
-  package "org.apache.activemq:activemq-kahadb-store" {
-    source method "read" -> code.StoredDataRead
-    sink method "write" -> code.StoredDataWrite
-    sink method "addMessage" -> code.StoredDataWrite
-    sink method "removeMessage" -> code.StoredDataWrite
-    sink method "removeAllMessages" -> code.StoredDataWrite
-  }
-}

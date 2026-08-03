@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m697c2941;
+
+binding filePathAccess3 {
+  requires {
+    dependency("net.masterthought:cucumber-reporting")
+  }
+  query pattern callExpr where callee.method == "Configuration"
+  emit sink code.FilePathAccess at args[0]
+}

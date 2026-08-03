@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-
-adapter dart {
-  package "image_picker_android" {
-    source method "getMedia" -> core.UserControlledData
-    source method "getLostData" -> core.UserControlledData
-  }
-}

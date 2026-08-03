@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mb3455c2f;
+
+binding networkSend1 {
+  requires {
+    dependency("nerves_network_interface")
+  }
+  query pattern callExpr where callee.method == "erlcmd_send"
+  emit sink code.NetworkSend at args[0]
+}

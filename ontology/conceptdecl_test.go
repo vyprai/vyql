@@ -1,7 +1,12 @@
 package ontology
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
+	"runtime"
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -10,10 +15,10 @@ import (
 // fields in the body.
 func TestConceptDeclMatchesSeed(t *testing.T) {
 	src := `
-package code;
+module code;
 concept Deserialization : sink {
-  vulnerable_to: [deserialization.DeserializationAbuse]
-  enabled_by: [taint.UntrustedData]
+  vulnerableTo: [deserialization.DeserializationAbuse]
+  enabledBy: [taint.UntrustedData]
   cwe: [CWE_502]
 }
 `
@@ -37,25 +42,32 @@ concept Deserialization : sink {
 	}
 }
 
-// The dotted-header form and a `control` with neutralizes/applies both parse,
-// and a loaded ontology type-checks `sanitized_by` correctly.
+// Multi-file v2 concept text and a neutralizing `check` both parse, and a
+// loaded ontology type-checks v2 path coveredBy controls correctly.
 func TestConceptDeclDottedAndTyping(t *testing.T) {
-	src := `
-concept code.HttpInput : source {
+	sources := []string{`
+module code;
+concept HttpInput : source {
   taint: [taint.UntrustedData]
 }
-concept code.SqlExecution : sink {
-  vulnerable_to: [injection.SqlInjection]
-  enabled_by: [taint.UntrustedData]
+concept SqlExecution : sink {
+  vulnerableTo: [injection.SqlInjection]
+  enabledBy: [taint.UntrustedData]
 }
-concept core.SqlParameterization : control {
+`, `
+module core;
+concept SqlParameterization : check {
   neutralizes: [injection.SqlInjection]
   applies: path
 }
-`
-	concepts, err := LoadConceptText(src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
+`}
+	var concepts []Concept
+	for _, src := range sources {
+		loaded, err := LoadConceptText(src)
+		if err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		concepts = append(concepts, loaded...)
 	}
 	o := New()
 	for _, c := range concepts {
@@ -64,13 +76,97 @@ concept core.SqlParameterization : control {
 	if _, err := o.CheckSanitizerTyping("code.HttpInput", "code.SqlExecution", "core.SqlParameterization"); err != nil {
 		t.Fatalf("well-typed sanitizer rejected: %v", err)
 	}
-	// a control bound to the wrong threat must NOT type-check
-	o.Add(Concept{Name: "HtmlEscape", Package: "core", Kind: "control", Neutralizes: []string{"injection.Xss"}})
+	// a neutralizing check bound to the wrong threat must NOT type-check
+	o.Add(Concept{Name: "HtmlEscape", Package: "core", Kind: "check", Neutralizes: []string{"injection.Xss"}})
 	if _, err := o.CheckSanitizerTyping("code.HttpInput", "code.SqlExecution", "core.HtmlEscape"); err == nil {
-		t.Fatal("wrong-threat control should not defend a SQL sink")
+		t.Fatal("wrong-threat check should not defend a SQL sink")
 	}
-	// applies defaulted to "path" on Add for a control with no explicit applies
+	// applies defaulted to "path" on Add for a neutralizing check with no explicit applies
 	if c := o.MustGet("core.HtmlEscape"); c.Applies != "path" {
-		t.Fatalf("control applies should default to path, got %q", c.Applies)
+		t.Fatalf("neutralizing check applies should default to path, got %q", c.Applies)
 	}
+}
+
+func TestConceptDeclUsesV2MechanicMetadataNames(t *testing.T) {
+	sources := []string{`
+module identity;
+concept AdminPrivilege : privilege {
+  grantMinLevel: ADMIN
+}
+`, `
+module core;
+concept CharFilter : check {
+  covers: [path]
+  internalRoles: [char_filter]
+}
+`}
+	var got []Concept
+	for _, src := range sources {
+		loaded, err := LoadConceptText(src)
+		if err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		got = append(got, loaded...)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 concepts, got %d", len(got))
+	}
+	if got[0].GrantMinLevel != "ADMIN" {
+		t.Fatalf("grantMinLevel = %q, want ADMIN", got[0].GrantMinLevel)
+	}
+	if !reflect.DeepEqual(got[1].InternalRoles, []string{InternalConceptRoleCharFilter}) {
+		t.Fatalf("internalRoles = %v, want [%s]", got[1].InternalRoles, InternalConceptRoleCharFilter)
+	}
+}
+
+func TestOntologyResolvesGoOwnedInternalConceptRoles(t *testing.T) {
+	o := Seed()
+	for role, want := range map[string][]string{
+		InternalConceptRoleAttributeSink:      {"code.ProtoPollute"},
+		InternalConceptRoleCharFilter:         {"threat.CharFilter"},
+		InternalConceptRoleDomInput:           {"code.DomInput"},
+		InternalConceptRolePathAccessCheck:    {"core.PathAccessCheck", "core.PathAccessCheckIssue"},
+		InternalConceptRoleProcessArgVector:   {"core.ProcessArgVector"},
+		InternalConceptRoleSameReceiverGuard:  {"core.XmlHardening", "core.XmlHardeningIssue"},
+		InternalConceptRoleSameReceiverTarget: {"code.XmlParserCreate"},
+	} {
+		got := mapKeys(o.ConceptsWithInternalConceptRole(role))
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("role %s concepts = %v, want %v", role, got, want)
+		}
+	}
+}
+
+func TestInternalConceptRolesAreDataBacked(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(file), "ontology.go"))
+	if err != nil {
+		t.Fatalf("read ontology.go: %v", err)
+	}
+	src := string(raw)
+	for _, forbidden := range []string{
+		"code.ProtoPollute",
+		"threat.CharFilter",
+		"code.DomInput",
+		"core.PathAccessCheck",
+		"core.ProcessArgVector",
+		"core.XmlHardening",
+		"code.XmlParserCreate",
+	} {
+		if strings.Contains(src, forbidden) {
+			t.Fatalf("ontology.go must not hardcode internal role concept %q", forbidden)
+		}
+	}
+}
+
+func mapKeys(values map[string]bool) []string {
+	out := make([]string, 0, len(values))
+	for value := range values {
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
 }

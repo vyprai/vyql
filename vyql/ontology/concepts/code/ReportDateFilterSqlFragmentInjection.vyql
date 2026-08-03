@@ -1,0 +1,11 @@
+module code;
+
+concept ReportDateFilterSqlFragmentInjection : issue {
+  cwe: [CWE_89, CWE_20]
+  reviewAssumption: "authenticated report users can submit date or comparison parameters containing SQL metacharacters"
+  reviewCategory: sql
+  reviewCondition: "a report date filter builds a SQL predicate fragment from request-controlled date and comparison values"
+  reviewConfidence: high
+  reviewEvidence: "report query context {pattern} derives a date predicate fragment from request subscripts and concatenates it into SQL before executing the query"
+  vulnerableTo: [injection.SqlInjection, validation.ImproperInputValidation]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept McpSqlExecutionMissingValidation : issue {
+  cwe: [CWE_89, CWE_863]
+  reviewAssumption: "MCP clients can provide SQL text to the helper and the backing database permissions exceed the intended read-only tool surface"
+  reviewCategory: sql
+  reviewCondition: "an MCP SQL helper executes caller-provided SQL through an internal query executor without applying the configured SQL security policy"
+  reviewConfidence: high
+  reviewEvidence: "MCP SQL execution context {pattern} builds a QueryRequest from sql and executes it before validate_sql_security or equivalent authorization/operation checks"
+  vulnerableTo: [injection.SqlInjection, access_control.IncorrectAuthorization]
+}

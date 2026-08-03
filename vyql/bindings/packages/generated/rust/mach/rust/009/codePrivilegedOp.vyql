@@ -1,0 +1,10 @@
+module bindings.rust.generated.mfb74f871;
+
+binding privilegedOp9 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "clock_set_time"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

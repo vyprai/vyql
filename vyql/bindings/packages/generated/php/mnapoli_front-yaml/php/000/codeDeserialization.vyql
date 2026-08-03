@@ -1,0 +1,9 @@
+module bindings.php.generated.m74bcdba6;
+
+binding deserialization0 {
+  requires {
+    dependency("mnapoli/front-yaml")
+  }
+  query pattern callExpr where callee.method == "MniFrontYAMLParser::parse"
+  emit sink code.Deserialization at args[0]
+}

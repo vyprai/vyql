@@ -1,0 +1,9 @@
+module bindings.python.generated.m6291d0c4;
+
+binding httpInput2 {
+  requires {
+    dependency("fastapi")
+  }
+  query pattern callExpr where callee.method == "Cookie"
+  emit source code.HttpInput at call.result
+}

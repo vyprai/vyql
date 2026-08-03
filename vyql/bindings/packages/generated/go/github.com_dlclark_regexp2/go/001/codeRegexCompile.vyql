@@ -1,0 +1,10 @@
+module bindings.go.generated.m77b40e56;
+
+binding regexCompile1 {
+  requires {
+    dependency("github.com/dlclark/regexp2")
+  }
+  query pattern callExpr where callee.method == "MustCompile"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

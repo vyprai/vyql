@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m2bdb1d7d;
+
+binding deserialization0 {
+  requires {
+    dependency("resque")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

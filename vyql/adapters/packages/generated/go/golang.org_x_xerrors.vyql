@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter go {
-  package "golang.org/x/xerrors" {
-    source method "Errorf" -> core.UserControlledData
-  }
-}

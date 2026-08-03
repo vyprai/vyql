@@ -1,0 +1,53 @@
+# Rank 549 / CVE-2020-36732: CryptoJS native random bytes were converted
+# through a decimal float string and then scaled into 32-bit WordArray words.
+test "rank549: cryptojs random word generation loses entropy through float conversion"
+  lang javascript
+  file core.js
+  expect VYQL-CRY-031
+  code
+  ```
+  var CryptoJS = CryptoJS || (function () {
+    var nativeWordFraction = function () {
+      var nativeCrypto = global.crypto;
+      return Number('0.' + nativeCrypto.randomBytes(3).readUIntBE(0, 3));
+    };
+
+    var WordArray = {
+      random: function (nBytes) {
+        var words = [];
+
+        for (var i = 0; i < nBytes; i += 4) {
+          words.push((nativeWordFraction() * 0x100000000) | 0);
+        }
+
+        return words;
+      }
+    };
+  }());
+  ```
+
+test "rank549: cryptojs random word generation keeps native random integer words"
+  lang javascript
+  file core.js
+  reject VYQL-CRY-031
+  code
+  ```
+  var CryptoJS = CryptoJS || (function () {
+    var nativeWordInt = function () {
+      var nativeCrypto = global.crypto || require('crypto');
+      return nativeCrypto.randomBytes(4).readInt32LE();
+    };
+
+    var WordArray = {
+      random: function (nBytes) {
+        var words = [];
+
+        for (var i = 0; i < nBytes; i += 4) {
+          words.push(nativeWordInt());
+        }
+
+        return words;
+      }
+    };
+  }());
+  ```

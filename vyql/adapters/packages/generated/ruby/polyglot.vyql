@@ -1,9 +1,0 @@
-import code.{CodeEval, FilePathAccess}
-
-adapter ruby {
-  package "polyglot" {
-    sink method "find" -> code.FilePathAccess
-    sink method "load" -> code.CodeEval
-    sink method "require" -> code.CodeEval
-  }
-}

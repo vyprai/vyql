@@ -1,8 +1,0 @@
-import code.{CodeEval}
-adapter rust {
-  package "javascriptcore-rs-sys" {
-    sink method "jsc_context_evaluate" -> code.CodeEval
-    sink method "jsc_context_evaluate_in_object" -> code.CodeEval
-    sink method "jsc_context_evaluate_with_source_uri" -> code.CodeEval
-  }
-}

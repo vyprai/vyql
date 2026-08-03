@@ -1,0 +1,9 @@
+module bindings.c.generated.m26a84cad;
+
+binding deserialization2 {
+  requires {
+    dependency("ebml")
+  }
+  query pattern callExpr where callee.method == "Read"
+  emit sink code.Deserialization at args[0]
+}

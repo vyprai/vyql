@@ -1,0 +1,9 @@
+module bindings.python.generated.m14b3b136;
+
+binding userControlledData0 {
+  requires {
+    dependency("passlib")
+  }
+  query pattern callExpr where callee.method == "hash"
+  emit source core.UserControlledData at call.result
+}

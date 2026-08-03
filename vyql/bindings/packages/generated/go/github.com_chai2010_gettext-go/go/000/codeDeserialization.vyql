@@ -1,0 +1,9 @@
+module bindings.go.generated.m8318b172;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/chai2010/gettext-go")
+  }
+  query pattern callExpr where callee.method == "Load"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,14 @@
+module bindings.ruby.generated.mdb706b1a;
+
+binding inputValidation3 {
+  requires {
+    dependency("faraday")
+  }
+  query pattern callExpr where callee.method == "Faraday::Utils.escape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,7 +1,0 @@
-adapter python {
-  package "tensorflow-datasets" {
-    source method "load" -> core.UserControlledData
-    source method "load_dataset" -> core.UserControlledData
-    source method "parse_builder_name_kwargs" -> core.UserControlledData
-  }
-}

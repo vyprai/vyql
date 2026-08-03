@@ -1,8 +1,0 @@
-import code.{NetworkSend}
-
-adapter groovy {
-  package "org.springframework.amqp:spring-rabbit" {
-    sink method "sendAndReceive" -> code.NetworkSend
-    sink method "sendDirect" -> code.NetworkSend
-  }
-}

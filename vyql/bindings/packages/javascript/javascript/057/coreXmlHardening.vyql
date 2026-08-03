@@ -1,0 +1,13 @@
+module bindings.javascript.generated.m5c270092;
+
+binding xmlHardening57 {
+  requires {
+    dependency("sax")
+  }
+  query pattern callExpr where callee.path ~= "sax.parser"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}

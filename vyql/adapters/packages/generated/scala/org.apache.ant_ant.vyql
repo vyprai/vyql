@@ -1,7 +1,0 @@
-import code.{CliArgument}
-
-adapter scala {
-  package "org.apache.ant:ant" {
-    source method "processArgs" -> code.CliArgument
-  }
-}

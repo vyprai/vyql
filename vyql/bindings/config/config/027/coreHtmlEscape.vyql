@@ -1,0 +1,11 @@
+module bindings.config.generated.m2b6375a9;
+
+binding htmlEscape27 {
+  query pattern callExpr where callee.analysis ~= "template.jsp.escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

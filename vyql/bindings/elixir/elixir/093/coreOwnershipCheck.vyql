@@ -1,0 +1,10 @@
+module bindings.elixir.generated.m728b8a72;
+
+binding ownershipCheck93 {
+  query pattern callExpr where callee.path ~= "owner?"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

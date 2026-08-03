@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter csharp {
-  package "semver" {
-    sink method "Semver.Parsing.SemVersionParser.Parse" -> code.Deserialization
-    sink method "Semver.SemVersion.TryParse" -> code.Deserialization
-  }
-}

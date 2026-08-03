@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m33140466;
+
+binding commandExecution0 {
+  requires {
+    dependency("phx_new")
+  }
+  query pattern callExpr where callee.method == "cmd"
+  emit sink code.CommandExecution at args[0]
+}

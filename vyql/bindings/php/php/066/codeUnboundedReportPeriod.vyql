@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding unboundedReportPeriod66 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "unbounded_report_period"
+  emit issue code.UnboundedReportPeriod at node
+}

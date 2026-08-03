@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m40bbd9be;
+
+binding filePathAccess1 {
+  requires {
+    dependency("attr")
+  }
+  query pattern callExpr where callee.method == "attr_multi"
+  emit sink code.FilePathAccess at args[0]
+}

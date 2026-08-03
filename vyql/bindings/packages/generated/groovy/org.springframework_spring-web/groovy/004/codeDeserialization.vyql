@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m007728c4;
+
+binding deserialization4 {
+  requires {
+    dependency("org.springframework:spring-web")
+  }
+  query pattern callExpr where callee.method == "tokenize"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-adapter elixir {
-  package "params" {
-    source method "create" -> core.UserControlledData
-    source method "changeset" -> core.UserControlledData
-    source method "from" -> core.UserControlledData
-    source method "data" -> core.UserControlledData
-  }
-}

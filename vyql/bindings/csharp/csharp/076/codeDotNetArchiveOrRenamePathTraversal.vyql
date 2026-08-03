@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding dotNetArchiveOrRenamePathTraversal76 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.functionName contains "RenameAsync" and node.context.callPath contains "Path.Combine" and node.context.selector contains "path.File.DirectoryName" and node.context.identifier contains "name" and node.context.callPath contains "File.Move" and node.context.selector contains "path.File.FullName" and node.context.selector contains "newPath.FullName" and not (node.context.callPath contains "Path.GetFullPath") and not (node.context.callPath contains "StartsWith")
+  emit issue code.DotNetArchiveOrRenamePathTraversal at node
+}

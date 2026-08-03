@@ -1,0 +1,9 @@
+module bindings.c.generated.m2816daee;
+
+binding httpInput10 {
+  requires {
+    dependency("libevent")
+  }
+  query pattern callExpr where callee.path ~= "evhttp_find_header"
+  emit source code.HttpInput at call.result
+}

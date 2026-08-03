@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter objc {
-  package "TrustWalletCore" {
-    sink method "TWAsnParserEcdsaSignatureFromDer" -> code.Deserialization
-  }
-}

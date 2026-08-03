@@ -1,0 +1,6 @@
+module bindings.swift.generated.m388f23d0;
+
+binding weakHash50 {
+  query pattern presenceNode where node.path ~= "Insecure.MD5"
+  emit issue code.WeakHash at node
+}

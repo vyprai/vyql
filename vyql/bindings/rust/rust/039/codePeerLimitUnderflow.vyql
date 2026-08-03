@@ -1,0 +1,6 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding peerLimitUnderflow39 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "peer_limit_underflow"
+  emit issue code.PeerLimitUnderflow at node
+}

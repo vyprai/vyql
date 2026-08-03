@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter rust {
-  package "clap_builder" {
-    source method "parse" -> core.UserControlledData
-    source method "try_parse" -> core.UserControlledData
-  }
-}

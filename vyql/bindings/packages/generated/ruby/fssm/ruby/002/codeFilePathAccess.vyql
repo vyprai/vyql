@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mafb9df01;
+
+binding filePathAccess2 {
+  requires {
+    dependency("fssm")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.FilePathAccess at args[0]
+}

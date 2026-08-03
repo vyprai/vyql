@@ -1,0 +1,9 @@
+module bindings.dart.generated.m5342780c;
+
+binding filePathAccess5 {
+  requires {
+    dependency("dart:io")
+  }
+  query pattern callExpr where callee.path ~= "File"
+  emit sink code.FilePathAccess at args[0]
+}

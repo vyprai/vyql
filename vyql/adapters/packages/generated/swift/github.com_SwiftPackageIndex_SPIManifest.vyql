@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-import core.{UserControlledData}
-
-adapter swift {
-  package "github.com/SwiftPackageIndex/SPIManifest" {
-    sink method "load" -> code.FilePathAccess
-    source method "init" -> core.UserControlledData
-  }
-}

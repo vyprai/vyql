@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	groovy "github.com/vyprai/vyql/extract/frontend/treesitter/grammars/groovy"
 
@@ -11,9 +13,26 @@ import (
 // Gradle) models calls as function_call(function, argument_list); member access is
 // dotted_identifier; `+` and GString interpolation build tainted strings.
 type gvConv struct {
-	src  []byte
-	file string
-	key  string
+	src        []byte
+	file       string
+	key        string
+	childCache map[uintptr][]*tree_sitter.Node
+}
+
+func (c *gvConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = make(map[uintptr][]*tree_sitter.Node)
+	}
+	key := uintptr(n.Id())
+	if kids, ok := c.childCache[key]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[key] = kids
+	return kids
 }
 
 // ExtractGroovy parses Groovy files into one NIR Program (one module per file).
@@ -46,22 +65,44 @@ func (c *gvConv) text(n *tree_sitter.Node) string {
 func (c *gvConv) gvModuleContext(n *tree_sitter.Node) []nir.Stmt {
 	loc := c.file + ":1"
 	text := c.text(n)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=groovy"},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: compactNoSpace(text)},
+	}
+	for _, tok := range c.gvSemanticModuleTokens(text) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
-		Args: []nir.Expr{
-			nir.Const{Loc: loc, Value: "lang=groovy"},
-			nir.Const{Loc: loc, Value: text},
-			nir.Const{Loc: loc, Value: compactNoSpace(text)},
-		},
+		Args:   args,
 		Path:   "analysis.module.context",
 		Method: "context",
 		Loc:    loc,
 	}}}
 }
 
+func (c *gvConv) gvSemanticModuleTokens(text string) []string {
+	if gvHasChecksumErrorLogoutRedirect(text) {
+		return []string{"redirect_flow:checksum_error_uses_default_logout"}
+	}
+	return nil
+}
+
+func gvHasChecksumErrorLogoutRedirect(text string) bool {
+	compact := compactNoSpace(text)
+	if !strings.Contains(compact, "checksumError") || !strings.Contains(compact, "invalid(") {
+		return false
+	}
+	if strings.Contains(compact, `,"",false)`) {
+		return false
+	}
+	return strings.Contains(compact, "redirectClient")
+}
+
 func (c *gvConv) decls(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		out = append(out, c.stmt(ch)...)
 	}
 	return out
@@ -74,14 +115,14 @@ func (c *gvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		var name string
 		var params []string
 		paramTypes := map[string]string{}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			switch ch.Kind() {
 			case "identifier":
 				if name == "" {
 					name = c.text(ch)
 				}
 			case "parameter_list":
-				for _, p := range namedChildren(ch) {
+				for _, p := range c.namedChildren(ch) {
 					if name := c.paramName(p); name != "" {
 						params = append(params, name)
 						putParamType(paramTypes, name, paramTypeFromField(c, p))
@@ -92,7 +133,7 @@ func (c *gvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		body := c.block(lastChildKind(n, "closure"))
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.gvFunctionContext(name, n)}}
 	case "declaration":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) >= 2 && kids[0].Kind() == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(kids[0])}, Value: c.expr(kids[len(kids)-1])}}
 		}
@@ -101,7 +142,7 @@ func (c *gvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		left := field(n, "left")
 		right := field(n, "right")
 		if left == nil || right == nil {
-			kids := namedChildren(n)
+			kids := c.namedChildren(n)
 			if len(kids) >= 2 {
 				left, right = kids[0], kids[len(kids)-1]
 			}
@@ -156,7 +197,7 @@ func (c *gvConv) block(n *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	var out []nir.Stmt
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "parameter_list" {
 			continue
 		}
@@ -167,7 +208,7 @@ func (c *gvConv) block(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *gvConv) paramName(n *tree_sitter.Node) string {
 	var name string
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "identifier" {
 			name = c.text(ch)
 		}
@@ -220,7 +261,7 @@ func (c *gvConv) gvSwitch(n *tree_sitter.Node) nir.Stmt {
 	if body == nil {
 		return sw
 	}
-	for _, cs := range namedChildren(body) {
+	for _, cs := range c.namedChildren(body) {
 		if cs.Kind() != "case" {
 			continue
 		}
@@ -293,10 +334,10 @@ func (c *gvConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "string", "gstring":
 		var parts []nir.Expr
 		var content string
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			switch ch.Kind() {
 			case "interpolation":
-				for _, e := range namedChildren(ch) {
+				for _, e := range c.namedChildren(ch) {
 					parts = append(parts, c.expr(e))
 				}
 			case "string_content":
@@ -311,13 +352,13 @@ func (c *gvConv) expr(n *tree_sitter.Node) nir.Expr {
 		return c.callExpr(n)
 	case "dotted_identifier":
 		// member access `a.b` → Attr (so a source like params.X and receiver taint work).
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) >= 2 {
 			return nir.Attr{Base: c.expr(kids[0]), Attr: c.text(kids[len(kids)-1]), Path: c.dotted(n), Loc: L}
 		}
 		return nir.Name{ID: c.dotted(n), Loc: L}
 	case "binary_op":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) == 2 {
 			op := c.gvOp(n)
 			if op == "+" {
@@ -332,7 +373,7 @@ func (c *gvConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Format{Parts: parts, Loc: L}
 	case "index", "subscript":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		var base nir.Expr = nir.Const{Loc: L}
 		var key nir.Expr
 		if len(kids) > 0 {
@@ -346,23 +387,23 @@ func (c *gvConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Ternary{Cond: c.expr(field(n, "condition")),
 			Then: c.expr(field(n, "then")), Else: c.expr(field(n, "else")), Loc: L}
 	case "unary_op":
-		if k := namedChildren(n); len(k) > 0 {
+		if k := c.namedChildren(n); len(k) > 0 {
 			return nir.Unary{Op: c.gvOp(n), Operand: c.expr(k[len(k)-1]), Loc: L}
 		}
 		return nir.Const{Loc: L}
 	case "parenthesized_expression":
-		if k := namedChildren(n); len(k) > 0 {
+		if k := c.namedChildren(n); len(k) > 0 {
 			return nir.Thru{Inner: c.expr(k[len(k)-1])}
 		}
 	case "list", "map":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Seq{Parts: parts, Loc: L}
 	}
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	if len(parts) == 1 {
@@ -373,7 +414,7 @@ func (c *gvConv) expr(n *tree_sitter.Node) nir.Expr {
 
 func (c *gvConv) callExpr(n *tree_sitter.Node) nir.Expr {
 	L := c.loc(n)
-	kids := namedChildren(n)
+	kids := c.namedChildren(n)
 	if len(kids) == 0 {
 		return nir.Const{Loc: L}
 	}
@@ -381,7 +422,7 @@ func (c *gvConv) callExpr(n *tree_sitter.Node) nir.Expr {
 	path := c.dotted(fn)
 	var args []nir.Expr
 	if al := lastChildKind(n, "argument_list"); al != nil {
-		for _, a := range namedChildren(al) {
+		for _, a := range c.namedChildren(al) {
 			args = append(args, c.expr(a))
 		}
 	}
@@ -396,7 +437,7 @@ func (c *gvConv) dotted(n *tree_sitter.Node) string {
 	case "identifier":
 		return c.text(n)
 	case "dotted_identifier":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) >= 2 {
 			return c.dotted(kids[0]) + "." + c.dotted(kids[len(kids)-1])
 		}
@@ -404,7 +445,7 @@ func (c *gvConv) dotted(n *tree_sitter.Node) string {
 			return c.dotted(kids[0])
 		}
 	case "function_call":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return c.dotted(kids[0])
 		}
 	case "string", "gstring":

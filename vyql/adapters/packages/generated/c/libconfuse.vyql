@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter c {
-  package "libconfuse" {
-    sink method "cfg_parse" -> code.Deserialization
-    sink method "cfg_parse_fp" -> code.Deserialization
-    sink method "cfg_parse_buf" -> code.Deserialization
-  }
-}

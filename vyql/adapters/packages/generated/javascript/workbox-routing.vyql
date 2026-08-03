@@ -1,6 +1,0 @@
-import code.{HttpInput}
-adapter javascript {
-  package "workbox-routing" {
-    source method "handleRequest" -> code.HttpInput
-  }
-}

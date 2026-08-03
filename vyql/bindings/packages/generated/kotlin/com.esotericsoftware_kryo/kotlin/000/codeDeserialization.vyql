@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m48a5487b;
+
+binding deserialization0 {
+  requires {
+    dependency("com.esotericsoftware:kryo")
+  }
+  query pattern callExpr where callee.method == "readObject"
+  emit sink code.Deserialization at args[0]
+}

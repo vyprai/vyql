@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "org.springframework.hateoas:spring-hateoas" {
-    sink method "Links.parse" -> code.Deserialization
-  }
-}

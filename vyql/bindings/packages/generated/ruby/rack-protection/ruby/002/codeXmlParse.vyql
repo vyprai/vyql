@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mb421e707;
+
+binding xmlParse2 {
+  requires {
+    dependency("rack-protection")
+  }
+  query pattern callExpr where callee.method == "decode_token"
+  emit sink code.XmlParse at args[0]
+}

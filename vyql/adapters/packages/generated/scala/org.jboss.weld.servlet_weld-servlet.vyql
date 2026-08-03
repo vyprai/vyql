@@ -1,8 +1,0 @@
-import code.{CodeEval}
-
-adapter scala {
-  package "org.jboss.weld.servlet:weld-servlet" {
-    sink method "write" -> code.CodeEval
-    sink method "define" -> code.CodeEval
-  }
-}

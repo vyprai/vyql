@@ -1,0 +1,10 @@
+module bindings.objc.generated.m05416fb9;
+
+binding redirectTarget2 {
+  requires {
+    dependency("Siren")
+  }
+  query pattern callExpr where callee.method == "launchAppStore"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

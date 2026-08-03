@@ -1,7 +1,0 @@
-import code.{HtmlRender}
-
-adapter ruby {
-  package "kramdown-math-katex" {
-    sink method "call" -> code.HtmlRender
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.mb6af0173;
+
+binding filePathAccess0 {
+  requires {
+    dependency("CWB")
+  }
+  query pattern callExpr where callee.method == "OpenFile"
+  emit sink code.FilePathAccess at args[0]
+}

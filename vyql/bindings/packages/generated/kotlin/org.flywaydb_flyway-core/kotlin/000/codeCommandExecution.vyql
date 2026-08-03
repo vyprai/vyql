@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m633a64de;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.flywaydb:flyway-core")
+  }
+  query pattern callExpr where callee.method == "runCommand"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding weakRandomValue190 {
+  query pattern presenceNode where node.path ~= "Random"
+  emit issue code.WeakRandomValue at node
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m6d39e99c;
+
+binding userControlledData0 {
+  requires {
+    dependency("mint_web_socket")
+  }
+  query pattern callExpr where callee.method == "upgrade"
+  emit source core.UserControlledData at call.result
+}

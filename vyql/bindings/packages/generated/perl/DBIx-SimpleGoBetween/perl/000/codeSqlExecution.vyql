@@ -1,0 +1,9 @@
+module bindings.perl.generated.m6ba04fab;
+
+binding sqlExecution0 {
+  requires {
+    dependency("DBIx-SimpleGoBetween")
+  }
+  query pattern callExpr where callee.method == "get_list_of_hashes"
+  emit sink code.SqlExecution at args[0]
+}

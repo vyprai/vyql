@@ -1,0 +1,9 @@
+module bindings.go.generated.m0665be9c;
+
+binding httpInput0 {
+  requires {
+    dependency("github.com/getsentry/raven-go")
+  }
+  query pattern callExpr where callee.method == "NewHttp"
+  emit source code.HttpInput at call.result
+}

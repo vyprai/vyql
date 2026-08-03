@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding cleartextChannel330 {
+  query pattern callExpr where callee.path ~= "http.Get" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}

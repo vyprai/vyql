@@ -1,0 +1,13 @@
+module bindings.java.generated.m4093815c;
+
+binding authenticationCheck4 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity4")
+  }
+  query pattern callExpr where callee.method == "AuthenticationAttrProcessor.doProcess"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m80caef93;
+
+binding httpInput0 {
+  requires {
+    dependency("darkaonline/l5-swagger")
+  }
+  query pattern callExpr where callee.method == "docs"
+  emit source code.HttpInput at call.result
+}

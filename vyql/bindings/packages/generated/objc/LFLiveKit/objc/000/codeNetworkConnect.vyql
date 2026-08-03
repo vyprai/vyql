@@ -1,0 +1,9 @@
+module bindings.objc.generated.m6190fe32;
+
+binding networkConnect0 {
+  requires {
+    dependency("LFLiveKit")
+  }
+  query pattern callExpr where callee.method == "start"
+  emit sink code.NetworkConnectSink at args[0]
+}

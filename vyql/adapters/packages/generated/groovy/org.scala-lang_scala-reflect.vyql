@@ -1,5 +1,0 @@
-adapter groovy {
-  package "org.scala-lang:scala-reflect" {
-    sink method "parse" -> code.Deserialization
-  }
-}

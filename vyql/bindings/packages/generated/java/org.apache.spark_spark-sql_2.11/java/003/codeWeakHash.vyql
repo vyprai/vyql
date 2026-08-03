@@ -1,0 +1,9 @@
+module bindings.java.generated.m34ad357f;
+
+binding weakHash3 {
+  requires {
+    dependency("org.apache.spark:spark-sql_2.11")
+  }
+  query pattern presenceNode where node.path ~= "org.apache.spark.spark.sql_2.11.hash"
+  emit issue code.WeakHash at node
+}

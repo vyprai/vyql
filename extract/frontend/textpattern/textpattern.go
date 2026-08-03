@@ -1,5 +1,5 @@
 // Package textpattern runs a data-defined text-pattern profile over files that do not need
-// a language parser. The scanner mechanics are generic; the adapter metadata declares the
+// a language parser. The scanner mechanics are generic; the binding metadata declares the
 // patterns, file extensions, emitted event path, and the concept label for that event.
 package textpattern
 
@@ -189,20 +189,29 @@ func charClasses(s string) int {
 
 func loadProfile() textPatternProfile {
 	profileOnce.Do(func() {
-		raw := string(datadir.MustRead("adapters/textpattern.vyql"))
-		decls, err := parser.Parse(raw)
+		files, err := datadir.ReadVYQLDir("bindings/textpattern")
 		if err != nil {
-			panic("textpattern: parse adapters/textpattern.vyql: " + err.Error())
+			panic("textpattern: read bindings/textpattern: " + err.Error())
+		}
+		selected := map[string]bool{}
+		for _, file := range files {
+			selected[file.Name] = true
+		}
+		decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForProfile(files), func(src parser.V2DefinitionSource) bool {
+			return selected[src.Name]
+		})
+		if err != nil {
+			panic("textpattern: parse binding corpus: " + err.Error())
 		}
 		var meta map[string]any
 		for _, d := range decls {
-			if ad, ok := d.(*parser.AdapterDecl); ok && ad.Name == "textpattern" {
+			if ad, ok := d.(*parser.BindingSet); ok && ad.Name == "textpattern" {
 				meta = ad.Meta
 				break
 			}
 		}
 		if meta == nil {
-			panic("textpattern: missing adapter metadata")
+			panic("textpattern: missing binding metadata")
 		}
 		profile = textPatternProfile{
 			Event:              metaString(meta, "text_pattern_event"),
@@ -231,6 +240,29 @@ func loadProfile() textPatternProfile {
 		}
 	})
 	return profile
+}
+
+func v2DefinitionSourcesForProfile(files []datadir.Source) []parser.V2DefinitionSource {
+	out := make([]parser.V2DefinitionSource, 0, len(files)+32)
+	if core, err := datadir.ReadVYQLDir("ontology/concepts"); err == nil {
+		for _, file := range core {
+			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+		}
+	}
+	if threats, err := datadir.ReadVYQLDir("ontology/threatkinds"); err == nil {
+		for _, file := range threats {
+			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+		}
+	}
+	if policies, err := datadir.ReadVYQLDir("policies"); err == nil {
+		for _, file := range policies {
+			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+		}
+	}
+	for _, file := range files {
+		out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+	}
+	return out
 }
 
 func metaString(meta map[string]any, key string) string {

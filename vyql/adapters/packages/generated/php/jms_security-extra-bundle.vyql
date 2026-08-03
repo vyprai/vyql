@@ -1,9 +1,0 @@
-import code.{WeakRandomValue}
-
-adapter php {
-  package "jms/security-extra-bundle" {
-    flag code.WeakRandomValue on any {
-      method "JMS\\SecurityExtraBundle\\Command\\InitSecureRandomCommand::execute"
-    }
-  }
-}

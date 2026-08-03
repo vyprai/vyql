@@ -1,0 +1,9 @@
+module bindings.go.generated.mfd18c1a7;
+
+binding filePathAccess3 {
+  requires {
+    dependency("github.com/vishvananda/netns")
+  }
+  query pattern callExpr where callee.method == "GetFromDocker"
+  emit sink code.FilePathAccess at args[0]
+}

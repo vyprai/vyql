@@ -1,0 +1,9 @@
+module bindings.scala.generated.m598079d2;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework.batch:spring-batch-core")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

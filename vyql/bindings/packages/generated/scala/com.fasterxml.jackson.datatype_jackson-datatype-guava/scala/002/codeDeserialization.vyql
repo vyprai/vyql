@@ -1,0 +1,9 @@
+module bindings.scala.generated.ma1c60eba;
+
+binding deserialization2 {
+  requires {
+    dependency("com.fasterxml.jackson.datatype:jackson-datatype-guava")
+  }
+  query pattern callExpr where callee.method == "deserializeRangeFromString"
+  emit sink code.Deserialization at args[0]
+}

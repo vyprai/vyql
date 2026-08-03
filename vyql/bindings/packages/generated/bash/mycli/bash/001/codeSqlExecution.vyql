@@ -1,0 +1,9 @@
+module bindings.bash.generated.m1cfd78d2;
+
+binding sqlExecution1 {
+  requires {
+    dependency("mycli")
+  }
+  query pattern callExpr where callee.path ~= "mycli"
+  emit sink code.SqlExecution at args.any
+}

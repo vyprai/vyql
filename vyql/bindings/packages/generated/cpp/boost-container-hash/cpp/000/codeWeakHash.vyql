@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m32f513a3;
+
+binding weakHash0 {
+  requires {
+    dependency("boost-container-hash")
+  }
+  query pattern callExpr where callee.method == "hash_value"
+  emit issue code.WeakHash at call
+}

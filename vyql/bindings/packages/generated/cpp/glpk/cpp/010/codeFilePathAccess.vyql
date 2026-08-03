@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mdddbcb0d;
+
+binding filePathAccess10 {
+  requires {
+    dependency("glpk")
+  }
+  query pattern callExpr where callee.method == "glp_read_prob"
+  emit sink code.FilePathAccess at args[0]
+}

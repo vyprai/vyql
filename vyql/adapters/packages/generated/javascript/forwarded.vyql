@@ -1,9 +1,0 @@
-import code.{HttpInput}
-
-adapter javascript {
-  package "forwarded" {
-    source method "forwarded" -> code.HttpInput
-    source method "parse" -> code.HttpInput
-    source method "getSocketAddr" -> code.HttpInput
-  }
-}

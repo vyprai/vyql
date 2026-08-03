@@ -1,0 +1,107 @@
+# Rank 586 / CVE-2015-8949: DBD::mysql freed the MYSQL handle on a failed
+# connect helper path, then the caller read mysql_errno/mysql_error from it.
+
+test "rank586: failed mysql connect frees handle before caller reads error state"
+  lang c
+  file dbdimp.c
+  expect VYQL-MEM-050
+  expect_review code.MysqlConnectErrorUseAfterFree
+  code
+  ```
+  typedef int bool;
+  #define TRUE 1
+  #define FALSE 0
+
+  static bool
+  my_login(void *dbh, imp_dbh_t *imp_dbh)
+  {
+      bool result;
+      Newz(908, imp_dbh->pmysql, 1, MYSQL);
+      result = mysql_dr_connect(imp_dbh->pmysql) ? TRUE : FALSE;
+      if (!result) {
+          Safefree(imp_dbh->pmysql);
+      }
+      return result;
+  }
+
+  int
+  dbd_db_login(void *dbh, imp_dbh_t *imp_dbh)
+  {
+      if (!my_login(dbh, imp_dbh)) {
+          if (imp_dbh->pmysql)
+              do_error(dbh, mysql_errno(imp_dbh->pmysql),
+                       mysql_error(imp_dbh->pmysql), mysql_sqlstate(imp_dbh->pmysql));
+          return FALSE;
+      }
+      return TRUE;
+  }
+  ```
+
+test "rank586: caller owns failed mysql handle until after error reporting"
+  lang c
+  file dbdimp.c
+  reject VYQL-MEM-050
+  reject_review code.MysqlConnectErrorUseAfterFree
+  code
+  ```
+  typedef int bool;
+  #define TRUE 1
+  #define FALSE 0
+
+  static bool
+  my_login(void *dbh, imp_dbh_t *imp_dbh)
+  {
+      bool result;
+      Newz(908, imp_dbh->pmysql, 1, MYSQL);
+      result = mysql_dr_connect(imp_dbh->pmysql) ? TRUE : FALSE;
+      return result;
+  }
+
+  int
+  dbd_db_login(void *dbh, imp_dbh_t *imp_dbh)
+  {
+      if (!my_login(dbh, imp_dbh)) {
+          if (imp_dbh->pmysql) {
+              do_error(dbh, mysql_errno(imp_dbh->pmysql),
+                       mysql_error(imp_dbh->pmysql), mysql_sqlstate(imp_dbh->pmysql));
+              Safefree(imp_dbh->pmysql);
+          }
+          return FALSE;
+      }
+      return TRUE;
+  }
+  ```
+
+test "rank586: mysql connect error lifetime generalizes across names"
+  lang c
+  file dbdimp.c
+  expect VYQL-MEM-050
+  expect_review code.MysqlConnectErrorUseAfterFree
+  code
+  ```
+  typedef int bool;
+  #define TRUE 1
+  #define FALSE 0
+
+  static bool
+  open_database(struct wrapper *owner)
+  {
+      bool ok;
+      Newz(908, owner->connection, 1, MYSQL);
+      ok = mysql_real_connect(owner->connection) ? TRUE : FALSE;
+      if (!ok) {
+          free(owner->connection);
+      }
+      return ok;
+  }
+
+  int
+  attach_database(struct wrapper *owner)
+  {
+      if (!open_database(owner)) {
+          report(mysql_error(owner->connection));
+          return FALSE;
+      }
+      return TRUE;
+  }
+  ```

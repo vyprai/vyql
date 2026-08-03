@@ -1,0 +1,6 @@
+module bindings.perl.generated.mfca40a44;
+
+binding authenticationRequiredOp51 {
+  query pattern presenceNode where node.path ~= "make_admin"
+  emit issue code.AuthenticationRequiredOp at node
+}

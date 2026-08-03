@@ -1,0 +1,6 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding archiveMarkerSymlinkOverwrite36 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "archive_marker_symlink_overwrite"
+  emit issue code.ArchiveMarkerSymlinkOverwrite at node
+}

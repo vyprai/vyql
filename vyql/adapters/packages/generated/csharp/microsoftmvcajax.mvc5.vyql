@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter csharp {
-  package "microsoftmvcajax.mvc5" {
-    control method "validate" -> core.InputValidation
-  }
-}

@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/extract/nir"
@@ -15,25 +16,51 @@ import (
 	"github.com/vyprai/vyql/usg"
 )
 
-var scanAdapterOverlay string
+var scanBindingOverlay string
 
-// closeStore releases a graph store the caller owns. Nil-safe, so callers can defer it against a
-// variable that may never be assigned (an early error) or that is legitimately nil ("recognized
-// files, nothing to analyze"). This matters for the badger-backed store used under a RAM ceiling:
-// badger.Open starts background goroutines that root its memtable arenas, so an unclosed store is
-// never collectable. Every code path that RECEIVES a store from scanPaths/scanPathsFull/buildGraph
-// owns it and must close it.
-func closeStore(s usg.Store) {
-	if s != nil {
-		_ = s.Close()
+// scanExcludes holds path segments to skip during source discovery (e.g. "_vendor",
+// "node_modules"). Set from --exclude; matched against whole path segments so
+// "_vendor" skips src/pip/_vendor/... but not a file literally named my_vendor.py.
+var scanExcludes []string
+
+func parseExcludes(s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
 	}
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
-// buildGraph runs extract → lower → adapters → SCA and returns the analysis graph (the
+// pathHasExcludedSegment reports whether any path segment of p equals an exclude.
+func pathHasExcludedSegment(p string, excludes []string) bool {
+	if len(excludes) == 0 {
+		return false
+	}
+	for _, seg := range strings.Split(filepath.ToSlash(p), "/") {
+		for _, ex := range excludes {
+			if seg == ex {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+type graphBuildOptions struct {
+	BindingConcepts map[string]bool
+}
+
+// buildGraph runs extract → lower → bindings → SCA and returns the analysis graph (the
 // USG the rule engine evaluates against). Shared by scanPaths and the -dump debug path.
 // Returns a nil store when recognized files produced nothing to analyze.
 func buildGraph(paths []string) (usg.Store, scanStats, error) {
-	return buildGraphWith(paths, lowerCache())
+	return buildGraphWithOptions(paths, lowerCache(), graphBuildOptions{})
 }
 
 // lowerCache returns the process cache as a lowering.DeltaCache, or nil when caching is off.
@@ -45,22 +72,26 @@ func lowerCache() lowering.DeltaCache {
 	return nil
 }
 
-// buildGraphWith runs extract → lower → adapters → SCA against an explicit lowering cache
+// buildGraphWith runs extract → lower → bindings → SCA against an explicit lowering cache
 // (nil = no caching / full lowering). Threading the cache makes the incremental path testable
 // (a findings-equivalence harness injects its own cache).
 func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanStats, error) {
+	return buildGraphWithOptions(paths, cache, graphBuildOptions{})
+}
+
+func buildGraphWithOptions(paths []string, cache lowering.DeltaCache, opts graphBuildOptions) (usg.Store, scanStats, error) {
+	restoreConcepts := frontend.SetActiveBindingConcepts(opts.BindingConcepts)
+	defer restoreConcepts()
+
 	tk := newTimer()
-	vlog("phase: extract — walking %s", strings.Join(paths, ", "))
-	prog, ads, ctorTypes, stats, err := extractAll(paths)
+	prog, bindingApps, ctorTypes, stats, err := extractAll(paths)
 	if err != nil {
 		return nil, stats, err
 	}
 	tk.mark("extract")
-	vlog("extracted %d module(s) from %d language(s)", len(prog.Modules), len(stats.languages))
-	// A tree with nothing parseable can still carry dependency evidence: applySCA does its own
-	// walk and reads manifests and vendored library banners without needing a parsed module. A
-	// project that vendors only minified bundles lands here, because the walker skips those as
-	// unparseable — so run SCA before concluding there is nothing to report.
+	if len(stats.files) == 0 {
+		return nil, stats, fmt.Errorf("no supported source found under %s", strings.Join(paths, ", "))
+	}
 	if len(prog.Modules) == 0 {
 		g := usg.NewInMemStore()
 		applySCA(g, paths)
@@ -69,25 +100,18 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 			return nil, stats, err
 		}
 		if len(nodes) == 0 {
-			// Nothing parseable AND no dependency evidence. Distinguish "you pointed me at a
-			// tree I cannot read" from "I read it and it is clean", so the former stays a
-			// diagnosable error rather than a silent zero-finding pass.
-			if len(stats.files) == 0 {
-				return nil, stats, fmt.Errorf("no supported source found under %s", strings.Join(paths, ", "))
-			}
 			return nil, stats, nil
 		}
-		if _, _, err := adapters.Apply(g, frontend.AutoAdapters(), nil); err != nil {
+		if _, _, err := bindings.Apply(g, frontend.AutoBindings(), nil); err != nil {
 			return nil, stats, err
 		}
-		tk.mark("sca+adapters")
+		tk.mark("sca+bindings")
 		return g, stats, nil
 	}
 	// Incremental lowering when a cache is provided: reuse the lowered sub-graph of unchanged
 	// modules, re-lowering only edited ones. Equivalent to LowerTyped (the merged graph is
-	// identical), so adapters/taint/rules below are untouched. Benefits every command that
+	// identical), so bindings/taint/rules below are untouched. Benefits every command that
 	// builds a graph (scan, trace, query, graph, …).
-	vlog("phase: lower — building the analysis graph")
 	var g usg.Store
 	var fresh map[string]bool
 	incremental := cache != nil
@@ -100,37 +124,33 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 		return nil, stats, err
 	}
 	tk.mark("lower")
-	if n, ok := g.(interface{ NodeCount() int }); ok {
-		vlog("lowered graph: %d node(s)", n.NodeCount())
-	}
-	vlog("phase: sca — discovering dependency manifests")
-	// SCA runs before adapter apply so SBOM/manifest packages join the import evidence
-	// that gates package-aware adapters (the generated catalog included).
+	// SCA runs before binding apply so SBOM/manifest packages join the import evidence
+	// that gates package-aware bindings (the generated catalog included).
 	applySCA(g, paths)
-	// Dynamic, dependency-gated package adapters: load the generated per-package catalog
+	// Dynamic, dependency-gated package bindings: load the generated per-package catalog
 	// only for packages this project actually depends on, then apply alongside the static
-	// framework adapters.
+	// framework bindings.
 	deps := frontend.DependencyEvidence(g)
 	for _, lang := range stats.languages {
-		ads = append(ads, frontend.GeneratedPackageAdaptersFor(lang, deps)...)
+		bindingApps = append(bindingApps, frontend.GeneratedPackageBindingsFor(lang, deps)...)
 	}
-	if overlay := strings.TrimSpace(scanAdapterOverlay); overlay != "" {
-		extra, err := frontend.OverlayAdapters(overlay, stats.languages)
+	if overlay := strings.TrimSpace(scanBindingOverlay); overlay != "" {
+		extra, err := frontend.OverlayBindings(overlay, stats.languages)
 		if err != nil {
-			return nil, stats, fmt.Errorf("adapter overlay: %w", err)
+			return nil, stats, fmt.Errorf("binding overlay: %w", err)
 		}
-		ads = append(ads, extra...)
+		bindingApps = append(bindingApps, extra...)
 	}
 	tk.mark("sca+pkg")
-	// Adapter labeling: incremental (reuse unchanged modules' cached labels) when caching is
-	// on, else a full pass. Both produce identical labels — adapter precedence is per-node.
+	// Binding labeling: incremental (reuse unchanged modules' cached labels) when caching is
+	// on, else a full pass. Both produce identical labels — binding precedence is per-node.
 	if incremental {
-		relabel, err := applyAdaptersIncremental(g, ads, moduleHashes(prog), deps, cache)
+		relabel, err := applyBindingsIncremental(g, bindingApps, moduleHashes(prog), deps, cache)
 		if err != nil {
 			return nil, stats, err
 		}
 		// Graph DB change-feed: collect the label rows of every label-dirty module. Label-dirty
-		// = the adapter relabel set ∪ the lowering fresh set (a fresh module's labels may also
+		// is the binding relabel set plus the lowering fresh set (a fresh module's labels may also
 		// have changed; re-emitting unchanged ones is an idempotent upsert). Nodes come from the
 		// same pass (fresh set); edges were collected creator-attributed during lowering.
 		if syncCollector != nil {
@@ -148,15 +168,15 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 				return nil, stats, err
 			}
 		}
-	} else if _, _, err := adapters.Apply(g, ads, nil); err != nil {
+	} else if _, _, err := bindings.Apply(g, bindingApps, nil); err != nil {
 		return nil, stats, err
 	}
-	tk.mark("adapters")
+	tk.mark("bindings")
 	return g, stats, nil
 }
 
 // moduleHashes maps each content-addressed module's namespace (lowering.ModuleNS) to its
-// content hash, the per-module identity the incremental adapter-label cache keys on. Modules
+// content hash, the per-module identity the incremental binding-label cache keys on. Modules
 // without a Hash (native frontends) are omitted, so they are always relabeled.
 func moduleHashes(prog nir.Program) map[string]string {
 	m := map[string]string{}
@@ -181,7 +201,6 @@ func dumpGraph(paths []string, mode string) error {
 	if err != nil {
 		return err
 	}
-	defer closeStore(g)
 	if g == nil {
 		fmt.Println("(no analyzable source)")
 		return nil
@@ -267,15 +286,6 @@ func nodeLine(g usg.Store, n usg.Node) string {
 	s := fmt.Sprintf("%-8s %-16s %s", n.ID, n.Type, n.Prop("loc"))
 	if r := n.Prop("region"); r != "" {
 		s += fmt.Sprintf("  [%s@%s]", r, n.Prop("order"))
-	}
-	if f := n.Prop("func"); f != "" {
-		s += "  func=" + f
-	}
-	if n.Type == "code.Function" {
-		s += "  name=" + n.Prop("name") + " end=" + n.Prop("end_loc")
-		if n.Prop("is_route") != "" {
-			s += " route"
-		}
 	}
 	if c := conceptsOf(g, n.ID); c != "" {
 		s += "  {" + c + "}"

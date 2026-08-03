@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m3dbcad4c;
+
+binding deserialization1 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "XML.toJSONObject"
+  emit sink code.Deserialization at args[0]
+}

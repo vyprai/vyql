@@ -1,0 +1,6 @@
+module bindings.dart.generated.m1c398214;
+
+binding weakHash40 {
+  query pattern presenceNode where node.path ~= "sha1.convert"
+  emit issue code.WeakHash at node
+}

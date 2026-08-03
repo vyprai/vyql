@@ -1,0 +1,11 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding inputValidation484 {
+  query pattern callExpr where callee.path ~= "validator.isInt"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,7 +1,0 @@
-import code.{CliArgument, Deserialization}
-adapter bash {
-  package "python-yq" {
-    source path "python-yq.argv" -> code.CliArgument
-    sink path "python-yq" -> code.Deserialization
-  }
-}

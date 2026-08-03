@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter ruby {
-  package "fog-cloudatcost" {
-    sink method "request" -> code.NetworkSend
-  }
-}

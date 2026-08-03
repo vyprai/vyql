@@ -1,0 +1,6 @@
+module bindings.kotlin.generated.m304d1620;
+
+binding staticIv66 {
+  query pattern callExpr where callee.path ~= "IvParameterSpec" and args.any.literal contains "0000000000000000"
+  emit issue code.StaticIv at call
+}

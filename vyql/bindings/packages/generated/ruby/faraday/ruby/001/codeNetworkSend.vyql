@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mdb706b1a;
+
+binding networkSend1 {
+  requires {
+    dependency("faraday")
+  }
+  query pattern callExpr where callee.method == "run_request"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.auditreview.generated.mbf0d19ec;
+
+binding sensitiveOperation15 {
+  query pattern callExpr where callee.method == "elevate"
+  emit issue code.SensitiveOperation at call
+}

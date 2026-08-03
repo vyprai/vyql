@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m5b8da753;
+
+binding deserialization0 {
+  requires {
+    dependency("cereal")
+  }
+  query pattern callExpr where callee.method == "serialize"
+  emit sink code.Deserialization at args[0]
+}

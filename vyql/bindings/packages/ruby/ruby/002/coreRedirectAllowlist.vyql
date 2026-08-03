@@ -1,0 +1,13 @@
+module bindings.ruby.generated.m5895bccf;
+
+binding redirectAllowlist2 {
+  requires {
+    dependency("rails")
+  }
+  query pattern callExpr where callee.path ~= "redirect_back_or_to"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,8 +1,0 @@
-import code.{ExpressionEval}
-adapter java {
-  package "org.apache.tomcat:tomcat-jasper-el" {
-    sink method "parse" -> code.ExpressionEval
-    sink method "createValueExpression" -> code.ExpressionEval
-    sink method "createMethodExpression" -> code.ExpressionEval
-  }
-}

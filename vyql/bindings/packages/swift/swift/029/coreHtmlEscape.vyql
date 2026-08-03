@@ -1,0 +1,14 @@
+module bindings.swift.generated.mc6005d88;
+
+binding htmlEscape29 {
+  requires {
+    dependency("swift-html-entities")
+  }
+  query pattern callExpr where callee.path ~= "HTMLEscape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mf6765854;
+
+binding userControlledData0 {
+  requires {
+    dependency("stringex")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit source core.UserControlledData at call.result
+}

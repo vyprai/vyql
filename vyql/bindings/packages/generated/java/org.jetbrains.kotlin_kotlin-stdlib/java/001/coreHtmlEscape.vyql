@@ -1,0 +1,14 @@
+module bindings.java.generated.mde557412;
+
+binding htmlEscape1 {
+  requires {
+    dependency("org.jetbrains.kotlin:kotlin-stdlib")
+  }
+  query pattern callExpr where callee.method == "escapeReplacement"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

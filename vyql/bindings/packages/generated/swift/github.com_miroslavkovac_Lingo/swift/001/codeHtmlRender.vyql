@@ -1,0 +1,9 @@
+module bindings.swift.generated.m294af653;
+
+binding htmlRender1 {
+  requires {
+    dependency("github.com/miroslavkovac/Lingo")
+  }
+  query pattern callExpr where callee.method == "localize"
+  emit sink code.HtmlRender at args[0]
+}

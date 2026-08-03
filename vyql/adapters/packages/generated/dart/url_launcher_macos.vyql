@@ -1,6 +1,0 @@
-import code.{UrlFetch}
-adapter dart {
-  package "url_launcher_macos" {
-    sink method "open" -> code.UrlFetch
-  }
-}

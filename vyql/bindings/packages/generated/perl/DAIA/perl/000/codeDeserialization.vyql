@@ -1,0 +1,9 @@
+module bindings.perl.generated.mc41fc632;
+
+binding deserialization0 {
+  requires {
+    dependency("DAIA")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

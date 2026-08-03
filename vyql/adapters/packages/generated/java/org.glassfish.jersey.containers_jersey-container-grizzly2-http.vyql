@@ -1,7 +1,0 @@
-import code.{HttpInput, ResponseHeaderWrite}
-adapter java {
-  package "org.glassfish.jersey.containers:jersey-container-grizzly2-http" {
-    source method "service" -> code.HttpInput
-    sink method "writeResponseStatusAndHeaders" -> code.ResponseHeaderWrite
-  }
-}

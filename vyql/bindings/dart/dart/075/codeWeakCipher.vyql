@@ -1,0 +1,6 @@
+module bindings.dart.generated.m1c398214;
+
+binding weakCipher75 {
+  query pattern callExpr where callee.path ~= "BlockCipher" and args.any.literal contains "RC4"
+  emit issue code.WeakCipher at call
+}

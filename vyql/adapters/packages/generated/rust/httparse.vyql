@@ -1,5 +1,0 @@
-adapter rust {
-  package "httparse" {
-    sink method "parse" -> code.Deserialization
-  }
-}

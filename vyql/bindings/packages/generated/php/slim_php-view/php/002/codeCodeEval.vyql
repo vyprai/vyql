@@ -1,0 +1,9 @@
+module bindings.php.generated.m23dc3db6;
+
+binding codeEval2 {
+  requires {
+    dependency("slim/php-view")
+  }
+  query pattern callExpr where callee.method == "fetchTemplate"
+  emit sink code.CodeEval at args[0]
+}

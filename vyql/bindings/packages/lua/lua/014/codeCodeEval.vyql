@@ -1,0 +1,9 @@
+module bindings.lua.generated.m49b0a04f;
+
+binding codeEval14 {
+  requires {
+    dependency("lua")
+  }
+  query pattern callExpr where callee.path ~= "load"
+  emit sink code.CodeEval at args[0]
+}

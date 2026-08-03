@@ -1,9 +1,0 @@
-import code.{CommandExecution, StdinInput}
-
-adapter python {
-  package "pywinpty" {
-    sink method "spawn" -> code.CommandExecution
-    source method "read" -> core.UserControlledData
-    source method "write" -> code.StdinInput
-  }
-}

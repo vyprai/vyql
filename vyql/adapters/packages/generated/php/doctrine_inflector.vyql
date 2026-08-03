@@ -1,7 +1,0 @@
-import core.{PathCanonicalization}
-
-adapter php {
-  package "doctrine/inflector" {
-    control method "urlize" -> core.PathCanonicalization
-  }
-}

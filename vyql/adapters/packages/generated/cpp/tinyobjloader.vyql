@@ -1,9 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter cpp {
-  package "tinyobjloader" {
-    sink method "ParseFromFile" -> code.Deserialization
-    sink method "ParseFromString" -> code.Deserialization
-    sink method "LoadObj" -> code.Deserialization
-    sink method "LoadMtl" -> code.Deserialization
-  }
-}

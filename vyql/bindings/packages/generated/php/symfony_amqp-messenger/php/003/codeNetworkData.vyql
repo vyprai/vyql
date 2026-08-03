@@ -1,0 +1,9 @@
+module bindings.php.generated.m44204587;
+
+binding networkData3 {
+  requires {
+    dependency("symfony/amqp-messenger")
+  }
+  query pattern callExpr where callee.method == "getFromQueues"
+  emit source code.NetworkData at call.result
+}

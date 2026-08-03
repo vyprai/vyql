@@ -1,5 +1,5 @@
-# B1.4 — path-sensitive guards. `unless guarded_by` suppresses only when the guard
-# DOMINATES the sink (lies on every CFG path to it). These graph specs carry CFG metadata
+# B1.4 — path-sensitive guards. `unless target.dominates coveredBy ...` suppresses only
+# when the guard DOMINATES the sink (lies on every CFG path to it). These graph specs carry CFG metadata
 # (region/order, as the lowering stamps) on the SAME topology as the presence-model reject
 # in coverage_csrf.test.vyql — proving the difference is dominance, not graph shape.
 # Without CFG metadata the engine falls back to presence semantics (that reject still holds).
@@ -10,7 +10,8 @@ test "path-sensitive: a CSRF guard that DOMINATES the sink suppresses (clean)"
   ```
   node src code.HttpInput {region=/fn1, order=1}
   node op code.StateChangingOp {region=/fn1/if2.t, order=5}
-  node guard core.CsrfProtection {region=/fn1, order=2}
+  label op code.StateChangingOpSink
+  node guard core.CsrfProtection {region=/fn1, order=2, coverage=endpoint}
   edge FLOWS src -> op
   edge PROTECTS guard -> op
   ```
@@ -21,13 +22,14 @@ test "path-sensitive: a CSRF guard in a SIBLING branch does NOT cover the sink (
   ```
   node src code.HttpInput {region=/fn1, order=1}
   node op code.StateChangingOp {region=/fn1/if2.t, order=5}
-  node guard core.CsrfProtection {region=/fn1/if2.e, order=4}
+  label op code.StateChangingOpSink
+  node guard core.CsrfProtection {region=/fn1/if2.e, order=4, coverage=endpoint}
   edge FLOWS src -> op
   edge PROTECTS guard -> op
   ```
 
 # Real-code guards (B1 enabler): a guard-control-labelled call (validate_csrf_token)
-# now suppresses the sinks it DOMINATES — `guarded_by` works on code, not just graphs.
+# now suppresses the sinks it DOMINATES through v2 coveredBy semantics.
 
 test "path-sensitive: a CSRF check dominating the state change suppresses (real code)"
   lang python
@@ -57,7 +59,7 @@ test "path-sensitive: a preflight validation loop covers a later bulk sink"
   graph
   ```
   node src core.UserControlledData {region=/fn1, order=1}
-  node guard core.PathAccessCheck {region=/fn1/loop2, order=3}
+  node guard core.PathAccessCheck {region=/fn1/loop2, order=3, coverage=endpoint}
   node sink code.ArchiveEntryWrite {region=/fn1, order=5}
   edge FLOWS src -> sink
   ```

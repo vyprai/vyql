@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m4348d449;
+
+binding nosqlQuery1 {
+  requires {
+    dependency("mongodb_ecto")
+  }
+  query pattern callExpr where callee.method == "command"
+  emit sink code.NosqlQuery at args[0]
+}

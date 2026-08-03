@@ -1,0 +1,9 @@
+module bindings.swift.generated.m168183f8;
+
+binding networkConnect1 {
+  requires {
+    dependency("github.com/segmentio/analytics-swift")
+  }
+  query pattern callExpr where callee.method == "requestFactory"
+  emit sink code.NetworkConnectSink at args[0]
+}

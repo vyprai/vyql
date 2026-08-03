@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding binarySearchTableIndexGuardBypass98 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "binary_search.endpoint_guard_bypass"
+  emit issue code.BinarySearchTableIndexGuardBypass at node
+}

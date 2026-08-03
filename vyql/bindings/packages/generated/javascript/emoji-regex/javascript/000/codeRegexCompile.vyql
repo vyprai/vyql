@@ -1,0 +1,10 @@
+module bindings.javascript.generated.m84287b75;
+
+binding regexCompile0 {
+  requires {
+    dependency("emoji-regex")
+  }
+  query pattern callExpr where callee.method == "module.exports"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

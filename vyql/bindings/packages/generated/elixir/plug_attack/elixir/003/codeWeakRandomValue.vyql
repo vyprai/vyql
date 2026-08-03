@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mf526726a;
+
+binding weakRandomValue3 {
+  requires {
+    dependency("plug_attack")
+  }
+  query pattern callExpr where callee.method == "throttle"
+  emit issue code.WeakRandomValue at call
+}

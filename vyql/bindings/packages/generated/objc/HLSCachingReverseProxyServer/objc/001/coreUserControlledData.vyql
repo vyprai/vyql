@@ -1,0 +1,9 @@
+module bindings.objc.generated.mfedb8893;
+
+binding userControlledData1 {
+  requires {
+    dependency("HLSCachingReverseProxyServer")
+  }
+  query pattern callExpr where callee.method == "reverseProxyPlaylist"
+  emit source core.UserControlledData at call.result
+}

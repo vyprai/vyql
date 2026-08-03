@@ -1,0 +1,9 @@
+module bindings.go.generated.m5157d1e5;
+
+binding httpInput0 {
+  requires {
+    dependency("github.com/zenazn/goji")
+  }
+  query pattern callExpr where callee.method == "Connect"
+  emit source code.HttpInput at call.result
+}

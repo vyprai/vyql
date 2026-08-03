@@ -1,8 +1,0 @@
-import code.{SecretValue, SqlExecution}
-
-adapter python {
-  package "psycopg2" {
-    source method "connect" -> code.SecretValue
-    sink method "connect" -> code.SqlExecution
-  }
-}

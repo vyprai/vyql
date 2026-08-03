@@ -1,0 +1,7 @@
+module bindings.c.generated.mce54b166;
+
+binding indexAccess78 {
+  query pattern presenceNode where node.path ~= "__subscript"
+  emit issue code.IndexAccess at node
+  emit sink code.IndexAccessSink at node
+}

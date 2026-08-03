@@ -1,0 +1,9 @@
+module bindings.objc.generated.m6e3df7af;
+
+binding commandExecution2 {
+  requires {
+    dependency("LetsMove")
+  }
+  query pattern callExpr where callee.method == "AuthorizedInstall"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.rust.generated.m7792a95b;
+
+binding deserialization1 {
+  requires {
+    dependency("trust-dns-proto")
+  }
+  query pattern callExpr where callee.method == "read_data"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{Deserialization, HttpInput, NetworkConnect}
-
-adapter kotlin {
-  package "io.github.bonigarcia:webdrivermanager" {
-    sink method "parse" -> code.Deserialization
-    source method "handleRequest" -> code.HttpInput
-    sink method "exchange" -> code.NetworkConnect
-  }
-}

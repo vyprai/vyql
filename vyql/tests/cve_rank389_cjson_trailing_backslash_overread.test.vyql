@@ -67,3 +67,34 @@ test "rank389: cJSON parse_string rejects trailing backslash before advancing"
       return end_ptr;
   }
   ```
+
+test "rank389: trailing backslash overread generalizes across names"
+  lang c
+  expect VYQL-MEM-025
+  expect_review code.CjsonTrailingBackslashStringOverread
+  code
+  ```
+  static void *json_alloc(int size);
+
+  static const char *decode_text(void *node, const char *input, const char **error)
+  {
+      const char *scan = input + 1;
+      int used = 0;
+      char *buffer;
+
+      if (*input != '\"') {
+          *error = input;
+          return 0;
+      }
+
+      while (*scan != '\"' && *scan && ++used)
+          if (*scan++ == '\\')
+              scan++;
+
+      buffer = (char*)json_alloc(used + 1);
+      if (!buffer) {
+          return 0;
+      }
+      return scan;
+  }
+  ```

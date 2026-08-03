@@ -1,0 +1,9 @@
+module bindings.scala.generated.m3b678ced;
+
+binding networkData1 {
+  requires {
+    dependency("org.apache.activemq:activemq-client")
+  }
+  query pattern callExpr where callee.method == "receiveBody"
+  emit source code.NetworkData at call.result
+}

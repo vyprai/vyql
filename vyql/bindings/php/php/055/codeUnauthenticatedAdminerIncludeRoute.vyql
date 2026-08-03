@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding unauthenticatedAdminerIncludeRoute55 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "index" and node.context.annotation contains "Route" and node.context.annotationArg contains "adminer" and node.context.annotationArg contains "auth_required'=>false" and node.context.callPath contains "chdir" and node.context.callPath contains "include" and node.context.callArg contains "../Adminer/Adminer.php" and not (node.context.subscript contains "$_SESSION['frosh_adminer_authenticated']")
+  emit issue code.UnauthenticatedAdminerIncludeRoute at node
+}

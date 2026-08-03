@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnneutralizedDiagnosticValue {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_150, CWE_117]
+    id: "VYQL-INJ-036"
+    severity: medium
+  }
+  issue code.UnneutralizedDiagnosticValue as diagnostic
+}

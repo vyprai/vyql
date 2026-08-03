@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m8be265dd;
+
+binding filePathAccess0 {
+  requires {
+    dependency("upath")
+  }
+  query pattern callExpr where callee.method == "normalizeSafe"
+  emit sink code.FilePathAccess at args[0]
+}

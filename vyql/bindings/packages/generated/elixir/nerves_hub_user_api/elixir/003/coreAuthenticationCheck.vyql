@@ -1,0 +1,13 @@
+module bindings.elixir.generated.md20c04e3;
+
+binding authenticationCheck3 {
+  requires {
+    dependency("nerves_hub_user_api")
+  }
+  query pattern callExpr where callee.method == "login"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

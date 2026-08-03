@@ -1,0 +1,9 @@
+module bindings.php.generated.m9fabed39;
+
+binding userControlledData0 {
+  requires {
+    dependency("fabpot/php-cs-fixer")
+  }
+  query pattern callExpr where callee.method == "PhpCsFixerFileReader::read"
+  emit source core.UserControlledData at call.result
+}

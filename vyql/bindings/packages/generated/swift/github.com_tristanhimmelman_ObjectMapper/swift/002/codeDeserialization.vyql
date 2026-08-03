@@ -1,0 +1,9 @@
+module bindings.swift.generated.m3bcd46e2;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/tristanhimmelman/ObjectMapper")
+  }
+  query pattern callExpr where callee.method == "map"
+  emit sink code.Deserialization at args[0]
+}

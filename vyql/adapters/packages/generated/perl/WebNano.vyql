@@ -1,8 +1,0 @@
-import code.{HttpInput, TemplateRender}
-
-adapter perl {
-  package "WebNano" {
-    source method "handle" -> code.HttpInput
-    sink method "render" -> code.TemplateRender
-  }
-}

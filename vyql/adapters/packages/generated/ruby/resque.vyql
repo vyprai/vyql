@@ -1,8 +1,0 @@
-import code.{Deserialization, CommandExecution}
-
-adapter ruby {
-  package "resque" {
-    sink method "decode" -> code.Deserialization
-    sink method "perform_with_fork" -> code.CommandExecution
-  }
-}

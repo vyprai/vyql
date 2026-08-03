@@ -1,6 +1,6 @@
 // Command vyql is the VyQL command-line scanner. It runs the full pipeline on
 // real source: native frontend (go/ast) -> NIR -> shared lowering with
-// import/type resolution -> framework adapters -> rule evaluation -> findings,
+// import/type resolution -> framework bindings -> rule evaluation -> findings,
 // rendered as a human report or SARIF 2.1.0.
 //
 // Usage:
@@ -19,15 +19,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
+	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/extract/frontend"
-	"github.com/vyprai/vyql/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/extract/parsecache"
 	"github.com/vyprai/vyql/findings"
@@ -35,6 +38,7 @@ import (
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/profile"
+	"github.com/vyprai/vyql/resultpolicy"
 	"github.com/vyprai/vyql/risk"
 	"github.com/vyprai/vyql/sarif"
 	"github.com/vyprai/vyql/usg"
@@ -42,10 +46,47 @@ import (
 
 const version = "0.1.0"
 
+type compiledRuleSet struct {
+	onto     *ontology.Ontology
+	compiled []*engine.CompiledRule
+}
+
+var compiledRulesCache sync.Map // map[rules source]compiledRuleSet
+
 func main() {
 	if len(os.Args) < 2 {
 		usage()
 		os.Exit(2)
+	}
+	// Opt-in CPU profile for local performance work (explicit env, no behavior change):
+	// VYQL_CPUPROFILE=/path/to/cpu.prof vyql scan ...
+	if p := os.Getenv("VYQL_CPUPROFILE"); p != "" {
+		f, err := os.Create(p)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "vyql: cpuprofile: "+err.Error())
+			os.Exit(1)
+		}
+		if err := pprof.StartCPUProfile(f); err != nil {
+			fmt.Fprintln(os.Stderr, "vyql: cpuprofile: "+err.Error())
+			os.Exit(1)
+		}
+		defer pprof.StopCPUProfile()
+	}
+	// Opt-in heap profile for local memory work (explicit env, no behavior change):
+	// VYQL_MEMPROFILE=/path/to/heap.prof vyql scan ...
+	if p := os.Getenv("VYQL_MEMPROFILE"); p != "" {
+		defer func() {
+			f, err := os.Create(p)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "vyql: memprofile: "+err.Error())
+				return
+			}
+			defer f.Close()
+			runtime.GC()
+			if err := pprof.WriteHeapProfile(f); err != nil {
+				fmt.Fprintln(os.Stderr, "vyql: memprofile: "+err.Error())
+			}
+		}()
 	}
 	// the data dir (ontology/taxonomy/packs) is required; a missing one panics
 	// deep in loading — recover into a clean message rather than a stack trace.
@@ -73,12 +114,12 @@ func main() {
 		err = cmdQuery(args)
 	case "graph":
 		err = cmdGraph(args)
-	case "adapters":
-		err = cmdAdapters(args)
+	case "bindings":
+		err = cmdBindings(args)
 	case "definitions":
 		err = cmdDefinitions(args)
-	case "validate-adapter":
-		err = cmdValidateAdapter(args)
+	case "validate-binding":
+		err = cmdValidateBinding(args)
 	case "diff":
 		err = cmdDiff(args)
 	default:
@@ -95,7 +136,7 @@ func main() {
 func cmdScan(args []string) error {
 	fs := flag.NewFlagSet("scan", flag.ExitOnError)
 	rulesPath := fs.String("rules", "", "load rule(s) from a .vyql file or directory (default: vyql/packs)")
-	format := fs.String("format", "text", "output format: text | sarif | json | graph-json")
+	format := fs.String("format", "text", "output format: text | sarif | json")
 	profileName := fs.String("profile", "auto", "analysis profile: auto | "+profileNames())
 	stats := fs.Bool("stats", false, "print scan profile: per-phase timing, node/edge counts, taint-hub warnings")
 	allResults := fs.Bool("all", false, "include all result sections: findings and flags (json output becomes {findings, flags})")
@@ -104,24 +145,11 @@ func cmdScan(args []string) error {
 	flagKind := fs.String("flag-kind", "all", "flag kind filter when flags are enabled: all | attention | target | check")
 	flagLoc := fs.String("flag-loc", "", "flag location substring filter when flags are enabled")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
-	exclude := fs.String("exclude", "", "comma-separated glob patterns to skip, layered on the built-in deps/build skips (e.g. test,examples,*.spec.js)")
-	maxFileSize := fs.String("max-file-size", "", "skip source files larger than this, e.g. 2MB (default 2MiB; 0 disables). Generated artifacts — coverage reports, bundles — explode into huge single-file graphs and contain no hand-written vulnerability")
-	adapterOverlay := fs.String("adapter-overlay", "", "optional repo-local adapter overlay directory")
-	verbose := fs.Bool("v", false, "log progress to stderr: each pipeline phase with its wall time, the file inventory (largest first), and every file skipped with the reason")
-	listFiles := fs.Bool("list-files", false, "with -v, list EVERY scanned and skipped file instead of only the largest")
+	bindingOverlay := fs.String("binding-overlay", "", "optional repo-local binding overlay directory")
+	exclude := fs.String("exclude", "", "comma-separated path segments to skip, e.g. _vendor,node_modules,tests")
+	cacheDir := fs.String("cache", "auto", "persistent scan cache: auto | off | <dir>")
+	incrementalCache := fs.Bool("incremental-cache", false, "also populate per-file parse/lower/binding caches for edit-loop scans")
 	_ = fs.Parse(args)
-	verboseOn = *verbose || *listFiles
-	listFilesOn = *listFiles
-	timingOn = verboseOn
-	treesitter.SetExcludes(strings.Split(*exclude, ","))
-	if v := strings.TrimSpace(*maxFileSize); v != "" {
-		n, err := parseBytes(v)
-		if err != nil || n < 0 {
-			fmt.Fprintf(os.Stderr, "vyql: invalid --max-file-size %q (use e.g. 2MB, 512KiB, or 0 to disable)\n", v)
-			os.Exit(2)
-		}
-		treesitter.SetMaxFileBytes(n)
-	}
 	paths := fs.Args()
 	if len(paths) == 0 {
 		usage()
@@ -129,9 +157,14 @@ func cmdScan(args []string) error {
 	}
 	cleanup := applyMaxRAM(*maxRAM)
 	defer cleanup()
-	oldOverlay := scanAdapterOverlay
-	scanAdapterOverlay = strings.TrimSpace(*adapterOverlay)
-	defer func() { scanAdapterOverlay = oldOverlay }()
+	cacheCleanup := applyScanCache(*cacheDir)
+	defer cacheCleanup()
+	oldOverlay := scanBindingOverlay
+	scanBindingOverlay = strings.TrimSpace(*bindingOverlay)
+	defer func() { scanBindingOverlay = oldOverlay }()
+	oldExcludes := scanExcludes
+	scanExcludes = parseExcludes(*exclude)
+	defer func() { scanExcludes = oldExcludes }()
 	return run(paths, *rulesPath, *format, *profileName, scanRunOptions{
 		ShowStats:    *stats,
 		IncludeFlags: *allResults,
@@ -139,7 +172,36 @@ func cmdScan(args []string) error {
 		FlagCategory: *flagCategory,
 		FlagKind:     *flagKind,
 		FlagLoc:      *flagLoc,
+		GraphCache:   *incrementalCache,
 	})
+}
+
+func applyScanCache(v string) func() {
+	v = strings.TrimSpace(v)
+	if v == "" || v == "auto" {
+		base, err := os.UserCacheDir()
+		if err != nil || base == "" {
+			base = filepath.Join(os.TempDir(), "vyql-cache")
+		}
+		v = filepath.Join(base, "vyql", "scan-cache")
+	}
+	if v == "off" || v == "none" || v == "false" {
+		return func() {}
+	}
+	if err := os.MkdirAll(v, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "vyql: scan cache disabled: %v\n", err)
+		return func() {}
+	}
+	cache, err := parsecache.Open(v)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "vyql: scan cache disabled: %v\n", err)
+		return func() {}
+	}
+	restore := parsecache.SetShared(cache)
+	return func() {
+		restore()
+		_ = cache.Close()
+	}
 }
 
 // applyMaxRAM honors --max-ram: set the soft heap limit and route the graph
@@ -163,24 +225,13 @@ func applyMaxRAM(v string) func() {
 		lowering.UseIntStore = true // fallback: lower-footprint in-RAM store
 		return noop
 	}
-	// Partition the budget ONCE across the pools that actually hold memory, and apply the heap
-	// ceiling here too. Previously this path spent the same figure three times over — badger's
-	// block cache, its index cache, AND the on-heap node-detail buffer were each sized from it —
-	// while debug.SetMemoryLimit was called only on the error path below, leaving the heap at
-	// init's 80%-of-physical default. `--max-ram 8GB` could therefore authorise past 20GB.
-	//
-	// Half to badger's off-heap caches, a quarter to the on-heap detail buffer, and the heap
-	// ceiling set to half — the detail buffer plus the resident structural core live inside it.
-	// A scan whose core fits comfortably never feels the limit.
-	lowering.DiskCacheBytes = n / 2
-	lowering.DiskDetailBuf = n / 4
+	// Program-controlled budget: the graph lives on disk and RAM is bounded by badger's (off-heap)
+	// cache, sized here — NOT by a tight GOMEMLIMIT, which would make the GC thrash whenever the
+	// resident core approaches the limit. Most of the budget is the cache (the dominant, tunable
+	// consumer); the resident structural core sits on top.
+	lowering.DiskCacheBytes = n * 3 / 4
 	lowering.DiskStorePath = dir
-	prev := debug.SetMemoryLimit(-1) // -1 reads the current limit without changing it
-	debug.SetMemoryLimit(n / 2)
-	return func() {
-		debug.SetMemoryLimit(prev)
-		os.RemoveAll(dir)
-	}
+	return func() { os.RemoveAll(dir) }
 }
 
 // parseBytes parses a human size like "8GB", "512MiB", "2G", "1048576". Decimal (KB/MB/GB) and
@@ -214,7 +265,10 @@ func parseBytes(s string) (int64, error) {
 // applyProfile selects the analysis profile (explicit name or auto-detected),
 // sets the active source families, and returns it for reporting.
 func applyProfile(paths []string, name string) profile.Profile {
-	profiles, _ := profile.Load()
+	profiles, err := profile.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "vyql: %v; using generic profile\n", err)
+	}
 	var p profile.Profile
 	switch {
 	case name == "" || name == "auto":
@@ -231,7 +285,10 @@ func applyProfile(paths []string, name string) profile.Profile {
 }
 
 func profileNames() string {
-	profiles, _ := profile.Load()
+	profiles, err := profile.Load()
+	if err != nil {
+		return "generic"
+	}
 	var names []string
 	for _, p := range profiles {
 		names = append(names, p.Name)
@@ -239,54 +296,229 @@ func profileNames() string {
 	return strings.Join(names, " | ")
 }
 
-// scanPaths runs the full pipeline (extract → lower → adapters → compile →
-// evaluate) and returns the findings + a scan summary + the lowered graph. Multi-language:
-// each file is routed to its real frontend and the matching framework adapters.
-func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats, usg.Store, error) {
-	all, g, _, stats, err := scanPathsFull(paths, rulesSrc)
-	return all, stats, g, err
+// scanPaths runs the full pipeline (extract → lower → bindings → compile →
+// evaluate) and returns the findings + a scan summary. Multi-language: each file
+// is routed to its real frontend and the matching framework bindings.
+func scanPaths(paths []string, ruleSources []parser.V2DefinitionSource) ([]*findings.Finding, scanStats, usg.Store, error) {
+	return scanPathsWithProfile(paths, ruleSources, "")
 }
 
-// scanPathsFull is scanPaths plus the per-rule meta (keyed by the finding's RuleID), which
-// the graph-json export needs for CWE. Same pipeline — it just retains the rule meta map.
-func scanPathsFull(paths []string, rulesSrc string) ([]*findings.Finding, usg.Store, map[string]map[string]any, scanStats, error) {
-	g, stats, err := buildGraph(paths)
+func scanPathsWithProfile(paths []string, ruleSources []parser.V2DefinitionSource, profileName string) ([]*findings.Finding, scanStats, usg.Store, error) {
+	return scanPathsWithProfileDemand(paths, ruleSources, profileName, false)
+}
+
+func scanPathsWithProfileDemand(paths []string, ruleSources []parser.V2DefinitionSource, profileName string, pruneBindings bool) ([]*findings.Finding, scanStats, usg.Store, error) {
+	rules, err := compiledRulesFor(ruleSources)
 	if err != nil {
-		return nil, nil, nil, stats, err
+		return nil, scanStats{}, nil, err
+	}
+	var bindingConcepts map[string]bool
+	if pruneBindings {
+		bindingConcepts = activeRuleBindingConcepts(rules, profileName)
+	}
+	g, stats, err := buildGraphWithOptions(paths, lowerCache(), graphBuildOptions{BindingConcepts: bindingConcepts})
+	if err != nil {
+		return nil, stats, nil, err
 	}
 	if g == nil {
-		return nil, nil, nil, stats, nil // recognized files, but nothing to analyze
+		return nil, stats, nil, nil // recognized files, but nothing to analyze
+	}
+	eng := engine.New(rules.onto, g)
+	var all []*findings.Finding
+	tk := newTimer()
+	ruleTimingOn := os.Getenv("VYQL_RULE_TIMING") != ""
+	var activeRules []*engine.CompiledRule
+	for _, cr := range rules.compiled {
+		if !ruleActiveForProfile(cr, profileName) {
+			continue
+		}
+		activeRules = append(activeRules, cr)
+	}
+	if err := eng.PrecomputeTaintFlows(activeRules); err != nil {
+		return nil, stats, g, err
+	}
+	for _, cr := range activeRules {
+		start := time.Now()
+		got, err := eng.Evaluate(cr)
+		if err != nil {
+			return nil, stats, g, err
+		}
+		if ruleTimingOn {
+			fmt.Fprintf(os.Stderr, "[rule] %-32s %7.1fms %6d finding(s)\n",
+				scanRuleID(cr), float64(time.Since(start))/1e6, len(got))
+		}
+		all = append(all, got...)
+	}
+	tk.mark("evaluate")
+	return all, stats, g, nil
+}
+
+func scanRuleID(cr *engine.CompiledRule) string {
+	if cr == nil || cr.Rule == nil {
+		return "<nil>"
+	}
+	if id, ok := cr.Rule.Meta["id"].(string); ok && strings.TrimSpace(id) != "" {
+		return id
+	}
+	return cr.Rule.QualifiedName()
+}
+
+func activeRuleBindingConcepts(rules compiledRuleSet, profileName string) map[string]bool {
+	out := map[string]bool{}
+	add := func(concept string) {
+		if strings.TrimSpace(concept) == "" {
+			return
+		}
+		out[concept] = true
+		for c := range rules.onto.Descendants(concept) {
+			out[c] = true
+		}
+	}
+	var addExpr func(parser.Expr)
+	addException := func(ex parser.Exception) {
+		switch x := ex.(type) {
+		case parser.PathCoveredBy:
+			add(x.Concept)
+		case parser.EndpointCoveredBy:
+			add(x.Concept)
+		case parser.SameReceiverCoveredBy:
+			add(x.Concept)
+		case parser.SameScopeCoveredBy:
+			add(x.Concept)
+		case parser.GlobalCoveredBy:
+			add(x.Concept)
+		case parser.DominatesCoveredBy:
+			add(x.Concept)
+		case parser.PostDominatesCoveredBy:
+			add(x.Concept)
+		case parser.ExprException:
+			addExpr(x.Expr)
+		}
+	}
+	addExpr = func(expr parser.Expr) {
+		switch x := expr.(type) {
+		case parser.And:
+			for _, part := range x.Parts {
+				addExpr(part)
+			}
+		case parser.Or:
+			for _, part := range x.Parts {
+				addExpr(part)
+			}
+		case parser.Not:
+			addExpr(x.Inner)
+		case parser.SolverCall:
+			for _, arg := range x.Args {
+				add(arg.Ref.String())
+			}
+		case parser.HoldsAssetKind:
+			add(x.Ref.String())
+		case parser.Is:
+			add(x.Concept)
+			add(x.Ref.String())
+		}
+	}
+	for _, cr := range rules.compiled {
+		if !ruleActiveForProfile(cr, profileName) {
+			continue
+		}
+		switch body := cr.Rule.Body.(type) {
+		case *parser.FlowStmt:
+			add(body.Src.Concept)
+			add(body.Dst.Concept)
+			for c := range cr.SourceConcepts {
+				add(c)
+			}
+			for c := range cr.SinkConcepts {
+				add(c)
+			}
+			for c := range cr.KillControls {
+				add(c)
+			}
+		case *parser.MatchStmt:
+			add(body.Concept)
+			add(body.RelatedConcept)
+		case *parser.OrderStmt:
+			add(body.First.Concept)
+			add(body.Second.Concept)
+		}
+		for _, cl := range cr.Rule.Clauses {
+			if cl.Kind == "where" {
+				addExpr(cl.Where)
+			}
+			if cl.Kind == "unless" {
+				addException(cl.Unless)
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func ruleActiveForProfile(cr *engine.CompiledRule, profileName string) bool {
+	if cr == nil || cr.Rule == nil {
+		return false
+	}
+	required := stringListMeta(cr.Rule.Meta["required_profiles"])
+	if len(required) == 0 || profileName == "" {
+		return true
+	}
+	for _, name := range required {
+		if name == profileName {
+			return true
+		}
+	}
+	return false
+}
+
+func stringListMeta(raw any) []string {
+	switch xs := raw.(type) {
+	case []string:
+		return xs
+	case []any:
+		out := make([]string, 0, len(xs))
+		for _, x := range xs {
+			if s, ok := x.(string); ok && s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	case string:
+		if xs == "" {
+			return nil
+		}
+		return []string{xs}
+	default:
+		return nil
+	}
+}
+
+func compiledRulesFor(ruleSources []parser.V2DefinitionSource) (compiledRuleSet, error) {
+	cacheKey := compiledRulesCacheKey{src: ruleSourcesKey(ruleSources)}
+	if cached, ok := compiledRulesCache.Load(cacheKey); ok {
+		return cached.(compiledRuleSet), nil
+	}
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(ruleSources), lowerNonCoreV2DefinitionSource)
+	if err != nil {
+		return compiledRuleSet{}, fmt.Errorf("rule parse: %w", err)
 	}
 	onto := ontology.Seed()
-	decls, err := parser.Parse(rulesSrc)
-	if err != nil {
-		return nil, nil, nil, stats, fmt.Errorf("rule parse: %w", err)
-	}
 	compiled, cerrs := engine.CompileRules(decls, onto)
 	if len(cerrs) != 0 {
 		for _, e := range cerrs {
 			fmt.Fprintln(os.Stderr, "rule error: "+e.Error())
 		}
-		return nil, nil, nil, stats, fmt.Errorf("%d rule(s) failed to compile", len(cerrs))
+		return compiledRuleSet{}, fmt.Errorf("%d rule(s) failed to compile", len(cerrs))
 	}
-	eng := engine.New(onto, g)
-	var all []*findings.Finding
-	meta := map[string]map[string]any{}
-	tk := newTimer()
-	for _, cr := range compiled {
-		id, _ := cr.Rule.Meta["id"].(string)
-		if id == "" {
-			id = cr.Rule.QualifiedName()
-		}
-		meta[id] = cr.Rule.Meta
-		got, err := eng.Evaluate(cr)
-		if err != nil {
-			return nil, nil, nil, stats, err
-		}
-		all = append(all, got...)
-	}
-	tk.mark("evaluate")
-	return all, g, meta, stats, nil
+	rules := compiledRuleSet{onto: onto, compiled: compiled}
+	actual, _ := compiledRulesCache.LoadOrStore(cacheKey, rules)
+	return actual.(compiledRuleSet), nil
+}
+
+type compiledRulesCacheKey struct {
+	src string
 }
 
 type scanRunOptions struct {
@@ -296,6 +528,7 @@ type scanRunOptions struct {
 	FlagCategory string
 	FlagKind     string
 	FlagLoc      string
+	GraphCache   bool
 }
 
 func (o scanRunOptions) wantsFlags() bool {
@@ -304,64 +537,59 @@ func (o scanRunOptions) wantsFlags() bool {
 
 func run(paths []string, rulesPath, format, profileName string, opts scanRunOptions) error {
 	prof := applyProfile(paths, profileName)
-	src, err := loadRules(rulesPath)
+	ruleSources, err := loadRules(rulesPath)
 	if err != nil {
 		return err
 	}
+	// whole-scan result cache: if an explicit process cache exists and nothing the output depends on
+	// changed — no source file edit and no vyql/ data change — replay the cached findings and
+	// skip the pipeline entirely. On a miss, the per-file parse cache still makes the rebuild
+	// reparse only the files that actually changed.
+	cache := parsecache.Shared()
+	tk := newTimer()
+	// Graph-DB change-feed: when requested, build the per-module delta during the scan. Force the
+	// full pipeline (skip the whole-scan findings cache) so the collector is populated.
+	syncPath := syncOutputPath()
+	if syncPath != "" {
+		syncCollector = graphsync.New()
+	}
+	var rkey string
 	var all []*findings.Finding
 	var stats scanStats
 	var graph usg.Store
-	defer func() { closeStore(graph) }() // read at defer time: graph is assigned below
-	var ruleMeta map[string]map[string]any
+	hit := false
 	wantsFlags := opts.wantsFlags()
-
-	if format == "graph-json" {
-		// graph-json needs the live graph + per-rule meta; the whole-scan findings cache can't
-		// serve those, so always run the full pipeline for it (no cache replay).
-		all, graph, ruleMeta, stats, err = scanPathsFull(paths, src)
+	if cache != nil && syncCollector == nil && !wantsFlags {
+		rkey = scanFingerprint(cache.Salt(), paths, ruleSources, prof.Name)
+		if cs, ok := loadCachedScan(cache, rkey); ok {
+			all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
+		}
+	}
+	tk.mark("fingerprint")
+	if !hit {
+		if cache != nil && !opts.GraphCache {
+			func() {
+				restore := parsecache.SetShared(nil)
+				defer restore()
+				all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !wantsFlags)
+			}()
+		} else {
+			all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !wantsFlags)
+		}
 		if err != nil {
 			return err
 		}
-	} else {
-		// whole-scan result cache (opt-in via $VYQL_CACHE): if nothing the output depends on
-		// changed — no source file edit and no vyql/ data change — replay the cached findings and
-		// skip the pipeline entirely. On a miss, the per-file parse cache still makes the rebuild
-		// reparse only the files that actually changed. Flags need the live graph, so they also
-		// bypass the findings cache.
-		cache := parsecache.Shared()
-		tk := newTimer()
-		// Graph-DB change-feed: when requested, build the per-module delta during the scan. Force
-		// the full pipeline (skip the whole-scan findings cache) so the collector is populated.
-		syncPath := syncOutputPath()
-		if syncPath != "" {
-			syncCollector = graphsync.New()
-		}
-		var rkey string
-		hit := false
 		if cache != nil && syncCollector == nil && !wantsFlags {
-			rkey = scanFingerprint(cache.Salt(), paths, src, prof.Name)
-			if cs, ok := loadCachedScan(cache, rkey); ok {
-				all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
-			}
+			storeCachedScan(cache, rkey, all, stats)
 		}
-		tk.mark("fingerprint")
-		if !hit {
-			all, stats, graph, err = scanPaths(paths, src)
-			if err != nil {
-				return err
-			}
-			if cache != nil && syncCollector == nil && !wantsFlags {
-				storeCachedScan(cache, rkey, all, stats)
-			}
+	}
+	if syncPath != "" {
+		n, e, l, d, serr := writeSyncDelta(syncPath)
+		if serr != nil {
+			return fmt.Errorf("graph sync: %w", serr)
 		}
-		if syncPath != "" {
-			n, e, l, d, serr := writeSyncDelta(syncPath)
-			if serr != nil {
-				return fmt.Errorf("graph sync: %w", serr)
-			}
-			fmt.Fprintf(os.Stderr, "[sync] wrote %s: %d node, %d edge, %d label upserts; %d module tombstones\n",
-				syncPath, n, e, l, d)
-		}
+		fmt.Fprintf(os.Stderr, "[sync] wrote %s: %d node, %d edge, %d label upserts; %d module tombstones\n",
+			syncPath, n, e, l, d)
 	}
 
 	// output
@@ -386,19 +614,6 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 		}
 		b, _ := json.MarshalIndent(payload, "", "  ")
 		fmt.Println(string(b))
-	case "graph-json":
-		root := ""
-		if len(paths) > 0 {
-			root = paths[0]
-		}
-		var doc gjDocument
-		if graph != nil {
-			doc = buildGraphJSON(graph, all, ruleMeta, root)
-		} else {
-			doc = gjDocument{SchemaVersion: gjSchemaVersion, Tool: gjTool{Name: "VyQL", Version: version}, Concepts: conceptLegend(), CodeMap: gjCodeMap{Root: root}}
-		}
-		b, _ := json.MarshalIndent(doc, "", "  ")
-		fmt.Println(string(b))
 	default:
 		fmt.Printf("analysis profile: %s (%s)\n\n", prof.Title, prof.Name)
 		if !opts.FlagsOnly {
@@ -419,20 +634,53 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	return nil
 }
 
-func loadRules(path string) (string, error) {
+func loadRules(path string) ([]parser.V2DefinitionSource, error) {
 	if path == "" {
-		// default: the standalone rule packs under <data root>/packs
-		path = filepath.Join(datadir.Root(), "packs")
+		// Default scans load authored policies before the standalone rule packs.
+		return loadDefaultRuleSources()
 	}
+	var out []parser.V2DefinitionSource
+	policies, err := loadRuleSourcesUnder(filepath.Join(datadir.Root(), "policies"))
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, policies...)
+	sources, err := loadRuleSourcesUnder(path)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, sources...)
+	return out, nil
+}
+
+func loadDefaultRuleSources() ([]parser.V2DefinitionSource, error) {
+	var out []parser.V2DefinitionSource
+	for _, dir := range []string{
+		filepath.Join(datadir.Root(), "policies"),
+		filepath.Join(datadir.Root(), "packs"),
+	} {
+		sources, err := loadRuleSourcesUnder(dir)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, sources...)
+	}
+	return out, nil
+}
+
+func loadRuleSourcesUnder(path string) ([]parser.V2DefinitionSource, error) {
 	info, err := os.Stat(path)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if !info.IsDir() {
 		b, err := os.ReadFile(path)
-		return string(b), err
+		if err != nil {
+			return nil, err
+		}
+		return []parser.V2DefinitionSource{{Name: sourceNameForPath(path), Source: string(b)}}, nil
 	}
-	var sb strings.Builder
+	var out []parser.V2DefinitionSource
 	err = filepath.WalkDir(path, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -442,12 +690,58 @@ func loadRules(path string) (string, error) {
 			if err != nil {
 				return err
 			}
-			sb.Write(b)
-			sb.WriteString("\n")
+			out = append(out, parser.V2DefinitionSource{Name: sourceNameForPath(p), Source: string(b)})
 		}
 		return nil
 	})
-	return sb.String(), err
+	return out, err
+}
+
+func sourceNameForPath(path string) string {
+	if rel, err := filepath.Rel(datadir.Root(), path); err == nil && !strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel) {
+		return filepath.ToSlash(rel)
+	}
+	return filepath.ToSlash(path)
+}
+
+func v2DefinitionSourcesForRules(ruleSources []parser.V2DefinitionSource) []parser.V2DefinitionSource {
+	var out []parser.V2DefinitionSource
+	if files, err := datadir.ReadVYQLDir("ontology/concepts"); err == nil {
+		for _, file := range files {
+			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+		}
+	}
+	if files, err := datadir.ReadVYQLDir("ontology/threatkinds"); err == nil {
+		for _, file := range files {
+			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+		}
+	}
+	if !v2SourcesContainPrefix(ruleSources, "policies/") {
+		if files, err := datadir.ReadVYQLDir("policies"); err == nil {
+			for _, file := range files {
+				out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+			}
+		}
+	}
+	out = append(out, ruleSources...)
+	return out
+}
+
+func v2SourcesContainPrefix(sources []parser.V2DefinitionSource, prefix string) bool {
+	for _, source := range sources {
+		if strings.HasPrefix(source.Name, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func ruleSourcesFromText(name, src string) []parser.V2DefinitionSource {
+	return parser.V2DefinitionSourcesFromText(name, src)
+}
+
+func lowerNonCoreV2DefinitionSource(src parser.V2DefinitionSource) bool {
+	return !strings.HasPrefix(src.Name, "ontology/")
 }
 
 func printReport(fs []*findings.Finding) {
@@ -467,7 +761,7 @@ func printReport(fs []*findings.Finding) {
 
 	fmt.Printf("%d finding(s):\n\n", len(fs))
 	for _, it := range items {
-		fmt.Printf("[%s] %s", it.s.Band, it.f.Render())
+		fmt.Printf("[%s] %s", it.s.Band, it.f.RenderWithFingerprint(resultpolicy.Fingerprint(it.f)))
 		for _, fac := range it.s.Factors {
 			fmt.Printf("    · %s\n", fac.Witness)
 		}
@@ -523,35 +817,10 @@ func printSummaryWithFlags(stats scanStats, findingsN, flagsN int, includeFlags 
 		scanned = strings.Join(parts, " ")
 	}
 	if includeFlags {
-		fmt.Printf("scanned %s — %d finding(s), %d flag(s)%s\n", scanned, findingsN, flagsN, oversizeNote())
+		fmt.Printf("scanned %s — %d finding(s), %d flag(s)\n", scanned, findingsN, flagsN)
 		return
 	}
-	fmt.Printf("scanned %s — %d finding(s)%s\n", scanned, findingsN, oversizeNote())
-}
-
-// oversizeNote reports files dropped by the size guard. Silently skipping input would read as
-// "everything was covered" when it was not, so the summary always says what was left out and how
-// to include it.
-func oversizeNote() string {
-	n := treesitter.OversizeSkipped()
-	if n == 0 {
-		return ""
-	}
-	return fmt.Sprintf(" — skipped %d file(s) over %s (--max-file-size)",
-		n, humanBytes(treesitter.MaxFileBytes()))
-}
-
-// humanBytes renders a byte count with a binary unit, e.g. 2097152 -> "2MiB".
-func humanBytes(n int64) string {
-	switch {
-	case n >= 1<<30:
-		return fmt.Sprintf("%gGiB", float64(n)/(1<<30))
-	case n >= 1<<20:
-		return fmt.Sprintf("%gMiB", float64(n)/(1<<20))
-	case n >= 1<<10:
-		return fmt.Sprintf("%gKiB", float64(n)/(1<<10))
-	}
-	return fmt.Sprintf("%dB", n)
+	fmt.Printf("scanned %s — %d finding(s)\n", scanned, findingsN)
 }
 
 func usage() {
@@ -560,15 +829,15 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage: vyql <command> [flags] <path>...")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "commands:")
-	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings/flags   [-rules -format text|sarif|json|graph-json -profile -stats -all -flags -exclude]")
+	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings/flags   [-rules -format text|sarif|json -profile -stats -all -flags -exclude _vendor,…]")
 	fmt.Fprintln(os.Stderr, "  trace      trace taint source→sink; show the path or where it dead-ends   [-from -to]")
 	fmt.Fprintln(os.Stderr, "  query      query the analysis graph by predicate   [-type -concept -call -loc -edges -count | -from -to]")
 	fmt.Fprintln(os.Stderr, "  explain    run rules and print each finding's full proof tree + negation evidence")
-	fmt.Fprintln(os.Stderr, "  match      list every node an adapter labelled (what matched which concept)")
+	fmt.Fprintln(os.Stderr, "  match      list every node a binding labelled (what matched which concept)")
 	fmt.Fprintln(os.Stderr, "  resolve    report interprocedural call resolution (which calls are unresolved)")
 	fmt.Fprintln(os.Stderr, "  graph      dump the USG (nodes+edges), or -taint reachability")
-	fmt.Fprintln(os.Stderr, "  adapters   list an adapter's source/sink/control/mark/assume vocabulary   [-lang go]")
-	fmt.Fprintln(os.Stderr, "  definitions inspect loaded VyQL concepts/rules/adapters/reviews   [-kind all -query TEXT -format text|json]")
-	fmt.Fprintln(os.Stderr, "  validate-adapter parse and summarize a VyQL adapter file   [-file adapter.vyql]")
+	fmt.Fprintln(os.Stderr, "  bindings   list a binding set's source/sink/check/issue/advisory vocabulary   [-lang go]")
+	fmt.Fprintln(os.Stderr, "  definitions inspect loaded VyQL concepts/rules/bindings/reviews; explain <concept|binding> traces a label's source; check-v2 verifies v2 definitions")
+	fmt.Fprintln(os.Stderr, "  validate-binding parse and summarize a VyQL binding file   [-file binding.vyql]")
 	fmt.Fprintln(os.Stderr, "  diff       diff two `scan -format json` outputs by fingerprint")
 }

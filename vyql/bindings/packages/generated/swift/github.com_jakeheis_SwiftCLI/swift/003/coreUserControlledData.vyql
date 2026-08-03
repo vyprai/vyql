@@ -1,0 +1,9 @@
+module bindings.swift.generated.mb6ad3d2c;
+
+binding userControlledData3 {
+  requires {
+    dependency("github.com/jakeheis/SwiftCLI")
+  }
+  query pattern callExpr where callee.method == "readLine"
+  emit source core.UserControlledData at call.result
+}

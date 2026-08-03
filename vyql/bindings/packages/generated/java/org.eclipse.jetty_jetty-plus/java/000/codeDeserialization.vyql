@@ -1,0 +1,9 @@
+module bindings.java.generated.m1b6c9591;
+
+binding deserialization0 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-plus")
+  }
+  query pattern callExpr where callee.method == "bindToENC"
+  emit sink code.Deserialization at args[0]
+}

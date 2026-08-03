@@ -1,0 +1,7 @@
+module code;
+
+review code.AmbiguousQueryParameterSeparator {
+  category: request
+  kind: attention
+  text: "review query parsers that treat semicolon as an alternate parameter separator"
+}

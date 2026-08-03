@@ -1,0 +1,9 @@
+module bindings.java.generated.mdfe57a12;
+
+binding httpInput0 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit source code.HttpInput at call.result
+}

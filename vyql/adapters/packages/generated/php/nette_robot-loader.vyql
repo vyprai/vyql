@@ -1,7 +1,0 @@
-adapter php {
-  package "nette/robot-loader" {
-    sink method "addDirectory" -> code.FilePathAccess
-    sink method "excludeDirectory" -> code.FilePathAccess
-    sink method "setTempDirectory" -> code.FilePathAccess
-  }
-}

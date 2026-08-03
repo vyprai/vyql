@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m35718952;
+
+binding storedDataWrite4 {
+  requires {
+    dependency("physfs")
+  }
+  query pattern callExpr where callee.method == "PHYSFS_write"
+  emit sink code.StoredDataWrite at args[0]
+}

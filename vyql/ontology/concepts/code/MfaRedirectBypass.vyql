@@ -1,0 +1,6 @@
+module code;
+
+concept MfaRedirectBypass : issue {
+  cwe: [CWE_288]
+  vulnerableTo: [authentication.AuthenticationBypass]
+}

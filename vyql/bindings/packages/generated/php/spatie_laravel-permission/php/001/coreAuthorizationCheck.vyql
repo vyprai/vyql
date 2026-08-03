@@ -1,0 +1,13 @@
+module bindings.php.generated.m140375a4;
+
+binding authorizationCheck1 {
+  requires {
+    dependency("spatie/laravel-permission")
+  }
+  query pattern callExpr where callee.method == "removeRole"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

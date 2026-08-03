@@ -1,0 +1,9 @@
+module bindings.php.generated.m74d8e92d;
+
+binding networkConnect4 {
+  requires {
+    dependency("yiisoft/yii2-httpclient")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkConnectSink at args[0]
+}

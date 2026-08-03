@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-adapter elixir {
-  package "cqerl" {
-    sink method "run_query" -> code.SqlExecution
-    sink method "query_async" -> code.SqlExecution
-  }
-}

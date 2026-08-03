@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m6a6f0e2a;
+
+binding expressionEval0 {
+  requires {
+    dependency("org.apache.camel:camel-spring")
+  }
+  query pattern callExpr where callee.method == "SpelExpression.evaluate"
+  emit sink code.ExpressionEval at args[0]
+}

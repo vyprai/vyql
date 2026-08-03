@@ -1,0 +1,9 @@
+module bindings.perl.generated.m1f2682d3;
+
+binding sqlExecution4 {
+  requires {
+    dependency("CPANDB")
+  }
+  query pattern callExpr where callee.method == "selectrow_hashref"
+  emit sink code.SqlExecution at args[0]
+}

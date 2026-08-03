@@ -1,5 +1,0 @@
-adapter cpp {
-  package "minizip-ng" {
-    sink method "mz_os_read_dir" -> code.ArchiveEntryWrite
-  }
-}

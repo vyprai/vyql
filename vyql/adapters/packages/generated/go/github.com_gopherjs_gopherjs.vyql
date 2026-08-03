@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter go {
-  package "github.com/gopherjs/gopherjs" {
-    sink method "runNode" -> code.CommandExecution
-  }
-}

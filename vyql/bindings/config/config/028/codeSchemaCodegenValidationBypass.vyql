@@ -1,0 +1,6 @@
+module bindings.config.generated.m2b6375a9;
+
+binding schemaCodegenValidationBypass28 {
+  query pattern presenceNode where node.analysis ~= "template.dot.schema_codegen_unvalidated"
+  emit issue code.SchemaCodegenValidationBypass at node
+}

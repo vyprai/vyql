@@ -1,0 +1,9 @@
+module bindings.python.generated.mef88326b;
+
+binding networkConnect0 {
+  requires {
+    dependency("pandas-datareader")
+  }
+  query pattern callExpr where callee.method == "DataReader"
+  emit sink code.NetworkConnectSink at args[0]
+}

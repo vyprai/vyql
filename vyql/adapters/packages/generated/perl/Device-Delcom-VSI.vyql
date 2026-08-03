@@ -1,8 +1,0 @@
-import code.{PrivilegedOp}
-adapter perl {
-  package "Device-Delcom-VSI" {
-    flag code.PrivilegedOp on any {
-      method "_delcom_write_command"
-    }
-  }
-}

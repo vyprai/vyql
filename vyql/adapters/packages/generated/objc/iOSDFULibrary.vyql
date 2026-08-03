@@ -1,7 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter objc {
-  package "iOSDFULibrary" {
-    sink method "unzip" -> code.Deserialization
-    sink method "createTemporaryFile" -> code.FilePathAccess
-  }
-}

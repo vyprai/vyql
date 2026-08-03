@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mbcc0a584;
+
+binding httpInput0 {
+  requires {
+    dependency("type-is")
+  }
+  query pattern callExpr where callee.method == "typeofrequest"
+  emit source code.HttpInput at call.result
+}

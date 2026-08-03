@@ -1,0 +1,9 @@
+module bindings.php.generated.mbcac32cf;
+
+binding deserialization0 {
+  requires {
+    dependency("sabberworm/php-css-parser")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

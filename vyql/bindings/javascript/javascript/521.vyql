@@ -1,0 +1,13 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding binding521 {
+  query pattern callExpr where callee.method == "includes"
+  emit check core.InputValidation at call {
+    advisory: true
+    about: code.FilePathAccess
+    covers dominates {
+      from: call
+      to: call
+    }
+  }
+}

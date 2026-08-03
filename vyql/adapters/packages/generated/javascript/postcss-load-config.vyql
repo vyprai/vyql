@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "postcss-load-config" {
-    sink method "yamlLoader" -> code.Deserialization
-  }
-}

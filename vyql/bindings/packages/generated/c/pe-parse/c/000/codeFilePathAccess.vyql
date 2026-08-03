@@ -1,0 +1,9 @@
+module bindings.c.generated.m6a5be51c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("pe-parse")
+  }
+  query pattern callExpr where callee.method == "readFileToFileBuffer"
+  emit sink code.FilePathAccess at args[0]
+}

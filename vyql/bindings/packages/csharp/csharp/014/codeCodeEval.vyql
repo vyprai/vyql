@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m2a0e231a;
+
+binding codeEval14 {
+  requires {
+    dependency("Microsoft.CodeAnalysis.CSharp.Scripting")
+  }
+  query pattern callExpr where callee.path ~= "CSharpScript.EvaluateAsync"
+  emit sink code.CodeEval at args[0]
+}

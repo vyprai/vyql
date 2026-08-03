@@ -1,9 +1,0 @@
-import code.{HttpInput, ExpressionEval}
-
-adapter swift {
-  package "github.com/d-exclaimation/pioneer" {
-    source method "query" -> code.HttpInput
-    sink method "executeOperation" -> code.ExpressionEval
-    sink method "executeHTTPGraphQLRequest" -> code.ExpressionEval
-  }
-}

@@ -1,6 +1,0 @@
-adapter scala {
-  package "org.springframework.cloud:spring-cloud-localconfig-connector" {
-    source method "readServicesData" -> core.UserControlledData
-    source method "readServices" -> core.UserControlledData
-  }
-}

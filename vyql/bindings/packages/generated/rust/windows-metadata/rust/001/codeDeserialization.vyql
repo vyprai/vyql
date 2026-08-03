@@ -1,0 +1,9 @@
+module bindings.rust.generated.m18178e15;
+
+binding deserialization1 {
+  requires {
+    dependency("windows-metadata")
+  }
+  query pattern callExpr where callee.method == "Blob.read_utf16"
+  emit sink code.Deserialization at args[0]
+}

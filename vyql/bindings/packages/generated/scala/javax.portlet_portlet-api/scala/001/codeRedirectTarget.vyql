@@ -1,0 +1,10 @@
+module bindings.scala.generated.m926e2474;
+
+binding redirectTarget1 {
+  requires {
+    dependency("javax.portlet:portlet-api")
+  }
+  query pattern callExpr where callee.method == "createRedirectURL"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

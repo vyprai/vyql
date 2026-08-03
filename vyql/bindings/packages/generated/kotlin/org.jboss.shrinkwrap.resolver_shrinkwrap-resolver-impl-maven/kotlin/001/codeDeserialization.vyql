@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mb0900c4f;
+
+binding deserialization1 {
+  requires {
+    dependency("org.jboss.shrinkwrap.resolver:shrinkwrap-resolver-impl-maven")
+  }
+  query pattern callExpr where callee.method == "loadPomFromClassLoaderResource"
+  emit sink code.Deserialization at args[0]
+}

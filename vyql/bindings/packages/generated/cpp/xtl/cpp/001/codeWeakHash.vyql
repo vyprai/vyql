@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m50d9fa15;
+
+binding weakHash1 {
+  requires {
+    dependency("xtl")
+  }
+  query pattern callExpr where callee.method == "murmur2_x86"
+  emit issue code.WeakHash at call
+}

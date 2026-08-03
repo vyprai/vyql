@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m47af3081;
+
+binding filePathAccess2 {
+  requires {
+    dependency("nanosvg")
+  }
+  query pattern callExpr where callee.method == "nsvgParseFromFile"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding weakHash179 {
+  query pattern presenceNode where node.path ~= "SHA1CryptoServiceProvider"
+  emit issue code.WeakHash at node
+}

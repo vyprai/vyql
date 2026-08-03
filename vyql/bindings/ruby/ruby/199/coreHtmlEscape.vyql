@@ -1,0 +1,11 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding htmlEscape199 {
+  query pattern callExpr where callee.path ~= "ERB.Util.h"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

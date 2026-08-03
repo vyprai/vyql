@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter objc {
-  package "YoutubePlayer-in-WKWebView" {
-    sink method "stringFromEvaluatingJavaScript:completionHandler:" -> code.CodeEval
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.m1b732e90;
+
+binding fileUse3 {
+  requires {
+    dependency("dartz")
+  }
+  query pattern callExpr where callee.method == "readBytes"
+  emit sink code.FileUseSink at args[0]
+}

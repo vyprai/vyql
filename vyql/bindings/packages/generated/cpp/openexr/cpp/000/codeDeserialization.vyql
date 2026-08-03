@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m437ce122;
+
+binding deserialization0 {
+  requires {
+    dependency("openexr")
+  }
+  query pattern callExpr where callee.method == "readPixels"
+  emit sink code.Deserialization at args[0]
+}

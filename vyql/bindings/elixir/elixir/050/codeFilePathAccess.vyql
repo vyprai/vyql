@@ -1,0 +1,6 @@
+module bindings.elixir.generated.m728b8a72;
+
+binding filePathAccess50 {
+  query pattern callExpr where callee.path ~= "File.rename!"
+  emit sink code.FilePathAccess at args[0]
+}

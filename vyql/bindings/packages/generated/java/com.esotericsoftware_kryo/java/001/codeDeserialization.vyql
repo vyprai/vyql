@@ -1,0 +1,9 @@
+module bindings.java.generated.m911d270c;
+
+binding deserialization1 {
+  requires {
+    dependency("com.esotericsoftware:kryo")
+  }
+  query pattern callExpr where callee.method == "readObjectOrNull"
+  emit sink code.Deserialization at args[0]
+}

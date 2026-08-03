@@ -1,0 +1,9 @@
+module bindings.scala.generated.m766f70e1;
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("org.glassfish.jersey.containers:jersey-container-servlet-core")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

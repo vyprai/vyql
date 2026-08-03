@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mb7779f7f;
+
+binding networkData2 {
+  requires {
+    dependency("google-cloud-env")
+  }
+  query pattern callExpr where callee.method == "ComputeMetadata.lookup_response"
+  emit source code.NetworkData at call.result
+}

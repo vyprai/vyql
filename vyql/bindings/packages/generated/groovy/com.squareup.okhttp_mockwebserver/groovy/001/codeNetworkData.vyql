@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m417fc301;
+
+binding networkData1 {
+  requires {
+    dependency("com.squareup.okhttp:mockwebserver")
+  }
+  query pattern callExpr where callee.method == "getBody"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule EcPointIdentityElementMissing {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_347, CWE_20]
+    id: "VYQL-CRY-026"
+    severity: high
+  }
+  issue code.EcPointIdentityElementMissing as point
+}

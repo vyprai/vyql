@@ -1,0 +1,11 @@
+module code;
+
+concept ProtocolFrameLengthUint16Wrap : issue {
+  cwe: [CWE_190, CWE_681, CWE_704]
+  reviewAssumption: "the peer controls the 16-bit wire length field and the parser uses the computed total length to decide whether a full protocol frame has arrived"
+  reviewCategory: memory
+  reviewCondition: "a protocol parser computes total frame length as a header constant plus a 16-bit network length inside a uint16_t accumulator before checking available bytes"
+  reviewConfidence: high
+  reviewEvidence: "protocol framing context {pattern} stores header + network uint16 length in a uint16_t total and uses the wrapped value for app_len/availability checks"
+  vulnerableTo: [memory.IntegerOverflow, memory.OobRead]
+}

@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m7db222d0;
+
+binding networkSend3 {
+  requires {
+    dependency("clrzmq")
+  }
+  query pattern callExpr where callee.method == "Send"
+  emit sink code.NetworkSend at args[0]
+}

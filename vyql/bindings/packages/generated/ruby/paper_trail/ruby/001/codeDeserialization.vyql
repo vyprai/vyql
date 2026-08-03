@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m73d0811f;
+
+binding deserialization1 {
+  requires {
+    dependency("paper_trail")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

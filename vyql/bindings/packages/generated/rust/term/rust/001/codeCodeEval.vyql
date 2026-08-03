@@ -1,0 +1,9 @@
+module bindings.rust.generated.m0db75f34;
+
+binding codeEval1 {
+  requires {
+    dependency("term")
+  }
+  query pattern callExpr where callee.method == "expand"
+  emit sink code.CodeEval at args[0]
+}

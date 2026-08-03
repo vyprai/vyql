@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter ruby {
-  package "mini_racer" {
-    sink method "load" -> code.CodeEval
-  }
-}

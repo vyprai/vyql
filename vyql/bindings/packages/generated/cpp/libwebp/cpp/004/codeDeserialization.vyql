@@ -1,0 +1,9 @@
+module bindings.cpp.generated.ma68ef4f6;
+
+binding deserialization4 {
+  requires {
+    dependency("libwebp")
+  }
+  query pattern callExpr where callee.method == "LoadWebP"
+  emit sink code.Deserialization at args[0]
+}

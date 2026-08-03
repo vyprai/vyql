@@ -1,0 +1,9 @@
+module bindings.dart.generated.m3ea09834;
+
+binding userControlledData0 {
+  requires {
+    dependency("chopper_generator")
+  }
+  query pattern callExpr where callee.method == "getMethodPath"
+  emit source core.UserControlledData at call.result
+}

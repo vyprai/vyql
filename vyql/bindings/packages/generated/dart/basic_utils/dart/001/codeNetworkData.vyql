@@ -1,0 +1,9 @@
+module bindings.dart.generated.m8bc63517;
+
+binding networkData1 {
+  requires {
+    dependency("basic_utils")
+  }
+  query pattern callExpr where callee.method == "getForJson"
+  emit source code.NetworkData at call.result
+}

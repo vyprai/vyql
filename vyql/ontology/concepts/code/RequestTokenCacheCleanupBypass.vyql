@@ -1,0 +1,11 @@
+module code;
+
+concept RequestTokenCacheCleanupBypass : issue {
+  cwe: [CWE_772]
+  reviewAssumption: "cached tokens reference request- or database-scoped objects whose lifetime ends after the request"
+  reviewCategory: resource
+  reviewCondition: "request-scoped cached authentication state should be cleared on every request completion path"
+  reviewConfidence: medium
+  reviewEvidence: "token cache cleanup pattern {pattern} can be bypassed by an early parameter binding return"
+  vulnerableTo: [resource.ResourceLeak]
+}

@@ -1,0 +1,10 @@
+module bindings.go.generated.m48a985c1;
+
+binding pathAccessCheck177 {
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.context.callPath contains "strings.Contains" and args.any.context.literal contains "bad path" and args.any.context.callPath contains "isSymbolLink" and args.any.context.callPath contains "ioutil.ReadFile"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

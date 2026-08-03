@@ -1,0 +1,9 @@
+module bindings.rust.generated.m54612438;
+
+binding deserialization5 {
+  requires {
+    dependency("os_str_bytes")
+  }
+  query pattern callExpr where callee.method == "from_raw_vec_unchecked"
+  emit sink code.Deserialization at args[0]
+}

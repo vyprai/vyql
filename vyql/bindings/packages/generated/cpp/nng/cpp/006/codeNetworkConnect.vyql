@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m5ac66786;
+
+binding networkConnect6 {
+  requires {
+    dependency("nng")
+  }
+  query pattern callExpr where callee.method == "nni_tcp_dialer_alloc"
+  emit sink code.NetworkConnectSink at args[0]
+}

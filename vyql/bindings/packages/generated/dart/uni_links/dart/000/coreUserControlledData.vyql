@@ -1,0 +1,9 @@
+module bindings.dart.generated.m5a8a2487;
+
+binding userControlledData0 {
+  requires {
+    dependency("uni_links")
+  }
+  query pattern callExpr where callee.method == "getInitialLink"
+  emit source core.UserControlledData at call.result
+}

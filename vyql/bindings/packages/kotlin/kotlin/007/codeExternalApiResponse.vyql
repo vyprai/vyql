@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m1457a768;
+
+binding externalApiResponse7 {
+  requires {
+    dependency("okhttp")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source code.ExternalApiResponse at call.result
+}

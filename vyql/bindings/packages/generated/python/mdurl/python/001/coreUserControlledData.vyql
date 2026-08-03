@@ -1,0 +1,9 @@
+module bindings.python.generated.m61021244;
+
+binding userControlledData1 {
+  requires {
+    dependency("mdurl")
+  }
+  query pattern callExpr where callee.method == "url_parse"
+  emit source core.UserControlledData at call.result
+}

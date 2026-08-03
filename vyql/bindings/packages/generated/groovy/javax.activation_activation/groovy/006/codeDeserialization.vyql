@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m05476c43;
+
+binding deserialization6 {
+  requires {
+    dependency("javax.activation:activation")
+  }
+  query pattern callExpr where callee.method == "readExternal"
+  emit sink code.Deserialization at args[0]
+}

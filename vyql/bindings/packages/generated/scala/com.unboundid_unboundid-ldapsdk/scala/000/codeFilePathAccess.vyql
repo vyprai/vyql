@@ -1,0 +1,9 @@
+module bindings.scala.generated.m2baaf3ae;
+
+binding filePathAccess0 {
+  requires {
+    dependency("com.unboundid:unboundid-ldapsdk")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

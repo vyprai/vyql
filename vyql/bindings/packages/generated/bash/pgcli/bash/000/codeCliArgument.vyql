@@ -1,0 +1,9 @@
+module bindings.bash.generated.mf01a1501;
+
+binding cliArgument0 {
+  requires {
+    dependency("pgcli")
+  }
+  query pattern callExpr where callee.path ~= "pgcli.argv"
+  emit source code.CliArgument at call.result
+}

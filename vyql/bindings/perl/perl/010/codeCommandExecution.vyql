@@ -1,0 +1,6 @@
+module bindings.perl.generated.mfca40a44;
+
+binding commandExecution10 {
+  query pattern callExpr where callee.path ~= "readpipe"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{HtmlRender}
-
-adapter python {
-  package "django-crispy-forms" {
-    sink method "render_field" -> code.HtmlRender
-    sink method "render_crispy_form" -> code.HtmlRender
-  }
-}

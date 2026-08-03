@@ -1,0 +1,9 @@
+module bindings.php.generated.me7b7042d;
+
+binding htmlRender2 {
+  requires {
+    dependency("laravel/jetstream")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.HtmlRender at args[0]
+}

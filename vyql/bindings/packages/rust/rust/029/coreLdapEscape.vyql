@@ -1,0 +1,14 @@
+module bindings.rust.generated.m222602a5;
+
+binding ldapEscape29 {
+  requires {
+    dependency("ldap3")
+  }
+  query pattern callExpr where callee.path ~= "ldap3.escape_filter"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

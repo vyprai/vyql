@@ -1,0 +1,9 @@
+module bindings.php.generated.mc093e29f;
+
+binding deserialization1 {
+  requires {
+    dependency("phpoffice/phpword")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m6ce07105;
+
+binding deserialization1 {
+  requires {
+    dependency("com.google.gwt:gwt-user")
+  }
+  query pattern callExpr where callee.method == "deserializeInstance"
+  emit sink code.Deserialization at args[0]
+}

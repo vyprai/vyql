@@ -1,0 +1,11 @@
+module bindings.groovy.generated.m6eabb149;
+
+binding resourceRelease75 {
+  query pattern callExpr where callee.method == "close"
+  emit check core.ResourceRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}

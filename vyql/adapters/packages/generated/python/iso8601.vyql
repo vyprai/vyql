@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "iso8601" {
-    sink method "parse_date" -> code.Deserialization
-    sink method "parse_timezone" -> code.Deserialization
-  }
-}

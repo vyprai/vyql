@@ -1,0 +1,9 @@
+module bindings.php.generated.mc5601031;
+
+binding httpInput2 {
+  requires {
+    dependency("php")
+  }
+  query pattern callExpr where callee.path ~= "$_REQUEST"
+  emit source code.HttpInput at call.result
+}

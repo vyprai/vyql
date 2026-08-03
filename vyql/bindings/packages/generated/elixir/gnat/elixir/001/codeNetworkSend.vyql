@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mff89069b;
+
+binding networkSend1 {
+  requires {
+    dependency("gnat")
+  }
+  query pattern callExpr where callee.method == "request_multi"
+  emit sink code.NetworkSend at args[0]
+}

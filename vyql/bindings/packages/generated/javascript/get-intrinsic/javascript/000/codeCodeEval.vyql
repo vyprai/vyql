@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m68683167;
+
+binding codeEval0 {
+  requires {
+    dependency("get-intrinsic")
+  }
+  query pattern callExpr where callee.method == "getEvalledConstructor"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkBind}
-
-adapter go {
-  package "github.com/mwitkow/go-conntrack" {
-    sink method "DialWithDialer" -> code.NetworkConnect
-    sink method "DialWithDialContextFunc" -> code.NetworkConnect
-    sink method "NewListener" -> code.NetworkBind
-  }
-}

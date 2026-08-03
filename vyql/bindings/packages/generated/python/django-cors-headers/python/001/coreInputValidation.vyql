@@ -1,0 +1,14 @@
+module bindings.python.generated.m3efd800e;
+
+binding inputValidation1 {
+  requires {
+    dependency("django-cors-headers")
+  }
+  query pattern callExpr where callee.method == "check_preflight"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

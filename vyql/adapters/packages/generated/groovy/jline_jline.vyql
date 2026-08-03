@@ -1,9 +1,0 @@
-import code.{FilePathAccess, CommandExecution}
-adapter groovy {
-  package "jline:jline" {
-    sink method "run" -> code.FilePathAccess
-    sink method "read" -> code.FilePathAccess
-    sink method "open" -> code.FilePathAccess
-    sink method "write" -> code.FilePathAccess
-  }
-}

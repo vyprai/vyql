@@ -1,0 +1,9 @@
+module bindings.python.generated.m7b761a9b;
+
+binding userControlledData0 {
+  requires {
+    dependency("wikipedia")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit source core.UserControlledData at call.result
+}

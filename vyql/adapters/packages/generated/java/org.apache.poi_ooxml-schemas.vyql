@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "org.apache.poi:ooxml-schemas" {
-    sink method "parse" -> code.Deserialization
-  }
-}

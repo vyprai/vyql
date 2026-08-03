@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m59ef1002;
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.hibernate:hibernate-annotations")
+  }
+  query pattern callExpr where callee.method == "nullSafeGet"
+  emit sink code.SqlExecution at args[0]
+}

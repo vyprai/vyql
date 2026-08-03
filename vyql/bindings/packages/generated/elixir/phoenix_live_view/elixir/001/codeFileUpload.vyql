@@ -1,0 +1,10 @@
+module bindings.elixir.generated.md4a63e53;
+
+binding fileUpload1 {
+  requires {
+    dependency("phoenix_live_view")
+  }
+  query pattern callExpr where callee.method == "live_file_input"
+  emit issue code.FileUpload at call
+  emit source code.FileUploadSource at call
+}

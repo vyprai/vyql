@@ -1,0 +1,9 @@
+module bindings.objc.generated.m0979643a;
+
+binding sqlExecution2 {
+  requires {
+    dependency("GoogleToolboxForMac")
+  }
+  query pattern callExpr where callee.method == "statementWithSQL"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m45ad04de;
+
+binding codeEval2 {
+  requires {
+    dependency("polyglot")
+  }
+  query pattern callExpr where callee.method == "require"
+  emit sink code.CodeEval at args[0]
+}

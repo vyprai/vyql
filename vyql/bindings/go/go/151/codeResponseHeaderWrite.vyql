@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding responseHeaderWrite151 {
+  query pattern callExpr where callee.path ~= "Header.Add"
+  emit sink code.ResponseHeaderWrite at args[1]
+}

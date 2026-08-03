@@ -1,7 +1,0 @@
-adapter php {
-  package "cache/filesystem-adapter" {
-    sink method "getFilePath" -> code.NosqlQuery
-    sink method "setFolder" -> code.StoredDataWrite
-    sink method "getFilePath" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,11 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding resourceRelease636 {
+  query pattern callExpr where callee.path ~= "fs.close"
+  emit check core.ResourceRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}

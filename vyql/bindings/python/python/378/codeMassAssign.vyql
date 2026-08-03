@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding massAssign378 {
+  query pattern callExpr where callee.path ~= "Model.objects.create"
+  emit sink code.MassAssign at args.any
+}

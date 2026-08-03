@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mb9e8e1dd;
+
+binding filePathAccess2 {
+  requires {
+    dependency("rubyzip")
+  }
+  query pattern callExpr where callee.method == "add"
+  emit sink code.FilePathAccess at args[0]
+}

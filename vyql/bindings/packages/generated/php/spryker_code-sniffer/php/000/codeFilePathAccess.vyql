@@ -1,0 +1,9 @@
+module bindings.php.generated.m17304d30;
+
+binding filePathAccess0 {
+  requires {
+    dependency("spryker/code-sniffer")
+  }
+  query pattern callExpr where callee.method == "SprykerToolsTokenizer::tokenize"
+  emit sink code.FilePathAccess at args[0]
+}

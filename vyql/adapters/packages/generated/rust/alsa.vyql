@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter rust {
-  package "alsa" {
-    sink method "system" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mb2829d39;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("javax.jcr:jcr")
+  }
+  query pattern callExpr where callee.method == "setProperty"
+  emit sink code.StoredDataWrite at args[0]
+}

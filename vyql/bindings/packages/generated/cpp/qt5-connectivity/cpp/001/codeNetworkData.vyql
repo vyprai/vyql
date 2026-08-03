@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m4d081a83;
+
+binding networkData1 {
+  requires {
+    dependency("qt5-connectivity")
+  }
+  query pattern callExpr where callee.method == "readData"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,14 @@
+module bindings.php.generated.m43a4a04a;
+
+binding inputValidation1 {
+  requires {
+    dependency("twig/extensions")
+  }
+  query pattern callExpr where callee.method == "twig_wordwrap_filter"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

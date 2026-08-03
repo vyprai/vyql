@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding insecureTempFile631 {
+  query pattern presenceNode where node.path ~= "tempfile.mktemp"
+  emit issue code.InsecureTempFile at node
+}

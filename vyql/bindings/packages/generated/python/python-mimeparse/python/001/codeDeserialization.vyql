@@ -1,0 +1,9 @@
+module bindings.python.generated.md6a6dd4a;
+
+binding deserialization1 {
+  requires {
+    dependency("python-mimeparse")
+  }
+  query pattern callExpr where callee.method == "parse_media_range"
+  emit sink code.Deserialization at args[0]
+}

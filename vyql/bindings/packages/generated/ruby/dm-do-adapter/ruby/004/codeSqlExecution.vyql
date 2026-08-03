@@ -1,0 +1,9 @@
+module bindings.ruby.generated.made672ab;
+
+binding sqlExecution4 {
+  requires {
+    dependency("dm-do-adapter")
+  }
+  query pattern callExpr where callee.method == "update"
+  emit sink code.SqlExecution at args[0]
+}

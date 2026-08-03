@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding htmlRender154 {
+  query pattern callExpr where callee.path ~= "render"
+  emit sink code.HtmlRender at args[0]
+}

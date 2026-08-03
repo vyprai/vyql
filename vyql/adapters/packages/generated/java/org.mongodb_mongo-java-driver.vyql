@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter java {
-  package "org.mongodb:mongo-java-driver" {
-    sink method "parse" -> code.Deserialization
-  }
-}

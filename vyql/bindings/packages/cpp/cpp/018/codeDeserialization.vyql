@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m1c1357ee;
+
+binding deserialization18 {
+  requires {
+    dependency("yaml-cpp")
+  }
+  query pattern callExpr where callee.method == "Load"
+  emit sink code.Deserialization at args[0]
+}

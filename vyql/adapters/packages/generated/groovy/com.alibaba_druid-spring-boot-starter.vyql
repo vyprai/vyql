@@ -1,7 +1,0 @@
-import code.{SecretValue}
-
-adapter groovy {
-  package "com.alibaba:druid-spring-boot-starter" {
-    source method "getLoginPassword" -> code.SecretValue
-  }
-}

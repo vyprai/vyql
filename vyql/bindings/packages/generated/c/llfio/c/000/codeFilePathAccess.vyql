@@ -1,0 +1,9 @@
+module bindings.c.generated.m3d7ecf5f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("llfio")
+  }
+  query pattern callExpr where callee.method == "file"
+  emit sink code.FilePathAccess at args[0]
+}

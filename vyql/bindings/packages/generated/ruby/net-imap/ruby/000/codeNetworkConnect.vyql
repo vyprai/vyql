@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m598a1a6b;
+
+binding networkConnect0 {
+  requires {
+    dependency("net-imap")
+  }
+  query pattern callExpr where callee.method == "initialize"
+  emit sink code.NetworkConnectSink at args[0]
+}

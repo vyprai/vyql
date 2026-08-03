@@ -1,6 +1,0 @@
-import code.{ExpressionEval}
-adapter objc {
-  package "GoogleTagManager" {
-    sink method "executeWithParameters:" -> code.ExpressionEval
-  }
-}

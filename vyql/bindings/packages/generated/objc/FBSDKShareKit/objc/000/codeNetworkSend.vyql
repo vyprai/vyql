@@ -1,0 +1,9 @@
+module bindings.objc.generated.m303b31d5;
+
+binding networkSend0 {
+  requires {
+    dependency("FBSDKShareKit")
+  }
+  query pattern callExpr where callee.method == "startGraphRequestWithGraphPath"
+  emit sink code.NetworkSend at args[0]
+}

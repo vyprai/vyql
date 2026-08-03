@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mf98b3aca;
+
+binding httpInput0 {
+  requires {
+    dependency("phoenix")
+  }
+  query pattern callExpr where callee.path ~= "params"
+  emit source code.HttpInput at call.result
+}

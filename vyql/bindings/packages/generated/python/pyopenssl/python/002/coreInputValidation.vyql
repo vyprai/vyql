@@ -1,0 +1,14 @@
+module bindings.python.generated.m26c104f7;
+
+binding inputValidation2 {
+  requires {
+    dependency("pyopenssl")
+  }
+  query pattern callExpr where callee.method == "load_verify_locations"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

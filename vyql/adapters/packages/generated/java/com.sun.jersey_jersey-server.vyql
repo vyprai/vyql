@@ -1,5 +1,0 @@
-adapter java {
-  package "com.sun.jersey:jersey-server" {
-    source path "com.sun.jersey.jersey.server.cookie" -> code.HttpInput
-  }
-}

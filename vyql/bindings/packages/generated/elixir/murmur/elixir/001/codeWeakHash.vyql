@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mc312bd2f;
+
+binding weakHash1 {
+  requires {
+    dependency("murmur")
+  }
+  query pattern callExpr where callee.method == "hash_x86_128"
+  emit issue code.WeakHash at call
+}

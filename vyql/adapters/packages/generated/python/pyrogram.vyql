@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkSend, NetworkData, FilePathAccess}
-
-adapter python {
-  package "pyrogram" {
-    sink method "connect" -> code.NetworkConnect
-    sink method "send" -> code.NetworkSend
-    source method "recv" -> code.NetworkData
-  }
-}

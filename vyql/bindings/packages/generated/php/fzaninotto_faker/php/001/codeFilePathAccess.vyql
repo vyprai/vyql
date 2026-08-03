@@ -1,0 +1,9 @@
+module bindings.php.generated.me493e472;
+
+binding filePathAccess1 {
+  requires {
+    dependency("fzaninotto/faker")
+  }
+  query pattern callExpr where callee.method == "Faker\\Provider\\Image::image"
+  emit sink code.FilePathAccess at args[0]
+}

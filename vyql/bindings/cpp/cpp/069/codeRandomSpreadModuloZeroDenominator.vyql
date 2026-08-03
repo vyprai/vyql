@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding randomSpreadModuloZeroDenominator69 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.context.callPath contains "randomish" and node.context.callPath contains "count" and containsAny(node.context.binary, ["%", "__binop.mod"]) and not (containsAny(node.context.callPath, ["milliseconds.zero", "seconds.zero", "minutes.zero", "hours.zero"]))
+  emit issue code.RandomSpreadModuloZeroDenominator at node
+}

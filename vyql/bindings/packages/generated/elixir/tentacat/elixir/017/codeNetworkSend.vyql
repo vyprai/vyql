@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m7ab87d2b;
+
+binding networkSend17 {
+  requires {
+    dependency("tentacat")
+  }
+  query pattern callExpr where callee.method == "json_request"
+  emit sink code.NetworkSend at args[0]
+}

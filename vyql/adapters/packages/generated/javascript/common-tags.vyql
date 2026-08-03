@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter javascript {
-  package "common-tags" {
-    control method "html" -> core.HtmlEscape
-  }
-}

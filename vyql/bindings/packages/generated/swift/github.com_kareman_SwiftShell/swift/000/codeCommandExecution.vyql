@@ -1,0 +1,9 @@
+module bindings.swift.generated.mdb97838d;
+
+binding commandExecution0 {
+  requires {
+    dependency("github.com/kareman/SwiftShell")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

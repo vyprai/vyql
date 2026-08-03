@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter go {
-  package "github.com/shurcooL/gopherjslib" {
-    sink method "BuildPackage" -> code.FilePathAccess
-  }
-}

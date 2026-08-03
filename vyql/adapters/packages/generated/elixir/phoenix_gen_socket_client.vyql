@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "phoenix_gen_socket_client" {
-    sink method "decode_message" -> code.Deserialization
-  }
-}

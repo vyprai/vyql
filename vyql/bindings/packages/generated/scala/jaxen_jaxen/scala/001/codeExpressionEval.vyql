@@ -1,0 +1,9 @@
+module bindings.scala.generated.m21069b65;
+
+binding expressionEval1 {
+  requires {
+    dependency("jaxen:jaxen")
+  }
+  query pattern callExpr where callee.method == "DOMXPath.<init>"
+  emit sink code.ExpressionEval at args[0]
+}

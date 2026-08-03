@@ -1,5 +1,0 @@
-adapter bash {
-  package "httpd" {
-    source path "suexec.argv" -> code.CliArgument
-  }
-}

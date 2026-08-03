@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding htmlRender414 {
+  query pattern callExpr where callee.path ~= "el.html"
+  emit sink code.HtmlRender at args[0]
+}

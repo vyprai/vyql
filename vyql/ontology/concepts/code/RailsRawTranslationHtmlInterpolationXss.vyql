@@ -1,0 +1,11 @@
+module code;
+
+concept RailsRawTranslationHtmlInterpolationXss : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "translation interpolation values can include stored or request-controlled model fields that are rendered in the browser"
+  reviewCategory: xss
+  reviewCondition: "Rails ERB marks a translated HTML fragment as raw after passing dynamic interpolation values that are not built through escaping helpers"
+  reviewConfidence: high
+  reviewEvidence: "ERB raw translation render {pattern} calls raw around a translation result and the template lacks content_tag or equivalent escaping around interpolated HTML values"
+  vulnerableTo: [injection.Xss]
+}

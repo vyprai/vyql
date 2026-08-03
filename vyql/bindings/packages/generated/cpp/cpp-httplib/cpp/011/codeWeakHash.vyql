@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mb7311fac;
+
+binding weakHash11 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "hash_core"
+  emit issue code.WeakHash at call
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m3722870d;
+
+binding cookie3 {
+  requires {
+    dependency("nette/http")
+  }
+  query pattern callExpr where callee.method == "getCookies"
+  emit source code.Cookie at call.result
+}

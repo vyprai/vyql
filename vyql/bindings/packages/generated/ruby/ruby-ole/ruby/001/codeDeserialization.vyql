@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m3c3b9a15;
+
+binding deserialization1 {
+  requires {
+    dependency("ruby-ole")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

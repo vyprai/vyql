@@ -1,0 +1,13 @@
+module bindings.php.generated.m86f7686e;
+
+binding csrfProtection4 {
+  requires {
+    dependency("symfony/security")
+  }
+  query pattern callExpr where callee.method == "refreshToken"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

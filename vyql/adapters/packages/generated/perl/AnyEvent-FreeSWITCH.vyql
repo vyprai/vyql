@@ -1,7 +1,0 @@
-import code.{NetworkData}
-
-adapter perl {
-  package "AnyEvent-FreeSWITCH" {
-    source method "recv_events" -> code.NetworkData
-  }
-}

@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter csharp {
-  package "jquery.keytips" {
-    control method "escapeId" -> core.InputValidation
-  }
-}

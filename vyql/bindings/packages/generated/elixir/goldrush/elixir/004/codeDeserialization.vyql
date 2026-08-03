@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mb12ac73f;
+
+binding deserialization4 {
+  requires {
+    dependency("goldrush")
+  }
+  query pattern callExpr where callee.method == "deleteall"
+  emit sink code.Deserialization at args[0]
+}

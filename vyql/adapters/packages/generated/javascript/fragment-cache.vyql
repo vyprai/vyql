@@ -1,6 +1,0 @@
-adapter javascript {
-  package "fragment-cache" {
-    sink method "set" -> code.StoredDataWrite
-    source method "get" -> code.StoredDataRead
-  }
-}

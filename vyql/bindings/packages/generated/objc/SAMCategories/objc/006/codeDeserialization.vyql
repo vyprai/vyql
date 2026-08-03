@@ -1,0 +1,9 @@
+module bindings.objc.generated.m0cb6a173;
+
+binding deserialization6 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_dictionaryWithFormEncodedString"
+  emit sink code.Deserialization at args[0]
+}

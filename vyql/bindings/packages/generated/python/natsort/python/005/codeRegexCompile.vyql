@@ -1,0 +1,10 @@
+module bindings.python.generated.mdbe7978b;
+
+binding regexCompile5 {
+  requires {
+    dependency("natsort")
+  }
+  query pattern callExpr where callee.method == "regex_chooser"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

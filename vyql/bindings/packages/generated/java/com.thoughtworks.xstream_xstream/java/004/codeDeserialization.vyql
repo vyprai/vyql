@@ -1,0 +1,9 @@
+module bindings.java.generated.m46692003;
+
+binding deserialization4 {
+  requires {
+    dependency("com.thoughtworks.xstream:xstream")
+  }
+  query pattern callExpr where callee.method == "readFieldsFromStream"
+  emit sink code.Deserialization at args[0]
+}

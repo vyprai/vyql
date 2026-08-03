@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding unescapedDiagnosticHtml140 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "unescaped_diagnostic_html"
+  emit issue code.UnescapedDiagnosticHtml at node
+}

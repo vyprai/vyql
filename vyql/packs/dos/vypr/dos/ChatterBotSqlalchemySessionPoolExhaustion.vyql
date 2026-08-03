@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule ChatterBotSqlalchemySessionPoolExhaustion {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_400]
+    id: "VYQL-DOS-014"
+    severity: high
+  }
+  issue code.ChatterBotSqlalchemySessionPoolExhaustion as s
+}

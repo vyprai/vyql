@@ -1,6 +1,0 @@
-adapter python {
-  package "msrest" {
-    source method "get" -> code.HttpInput
-    sink method "load" -> code.Deserialization
-  }
-}

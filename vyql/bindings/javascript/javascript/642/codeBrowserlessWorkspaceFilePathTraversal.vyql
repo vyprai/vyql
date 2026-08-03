@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding browserlessWorkspaceFilePathTraversal642 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.subscript contains "req.params[0]" and node.context.callPath contains "path.join" and node.context.identifier contains "workspaceDir" and node.context.callPath contains "rimraf" and not (node.context.callPath contains "includes")
+  emit issue code.BrowserlessWorkspaceFilePathTraversal at node
+}

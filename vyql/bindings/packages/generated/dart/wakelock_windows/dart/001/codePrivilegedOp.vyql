@@ -1,0 +1,10 @@
+module bindings.dart.generated.md9025eea;
+
+binding privilegedOp1 {
+  requires {
+    dependency("wakelock_windows")
+  }
+  query pattern callExpr where callee.method == "WakelockWindows.disable"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

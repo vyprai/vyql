@@ -1,0 +1,9 @@
+module bindings.rust.generated.m58c41ff1;
+
+binding deserialization2 {
+  requires {
+    dependency("rust-ini")
+  }
+  query pattern callExpr where callee.method == "load_from_str_opt"
+  emit sink code.Deserialization at args[0]
+}

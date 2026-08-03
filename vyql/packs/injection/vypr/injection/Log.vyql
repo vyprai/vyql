@@ -1,0 +1,10 @@
+module vypr.injection;
+
+rule Log {
+  meta {
+    cwe: [CWE_117]
+    id: "VYQL-INJ-009"
+    severity: medium
+  }
+  taint core.UserControlledData -> code.LogOutput
+}

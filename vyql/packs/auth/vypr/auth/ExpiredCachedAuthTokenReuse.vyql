@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule ExpiredCachedAuthTokenReuse {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_613]
+    id: "VYQL-AUTH-043"
+    severity: medium
+  }
+  issue code.ExpiredCachedAuthTokenReuse as cache
+}

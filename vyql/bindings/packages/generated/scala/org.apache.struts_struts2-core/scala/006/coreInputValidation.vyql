@@ -1,0 +1,14 @@
+module bindings.scala.generated.md67d9be3;
+
+binding inputValidation6 {
+  requires {
+    dependency("org.apache.struts:struts2-core")
+  }
+  query pattern callExpr where callee.method == "parseIfModifiedSince"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

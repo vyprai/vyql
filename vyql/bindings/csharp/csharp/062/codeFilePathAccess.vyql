@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding filePathAccess62 {
+  query pattern callExpr where callee.path ~= "File.Exists"
+  emit sink code.FilePathAccess at args[0]
+}

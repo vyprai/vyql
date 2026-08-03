@@ -1,0 +1,10 @@
+module vypr.auth;
+
+rule MassAssignment {
+  meta {
+    cwe: [CWE_915]
+    id: "VYQL-AUTH-099"
+    severity: high
+  }
+  taint core.UserControlledData -> code.MassAssignmentSink
+}

@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter python {
-  package "progressbar2" {
-    source method "create_argument_parser" -> code.CliArgument
-  }
-}

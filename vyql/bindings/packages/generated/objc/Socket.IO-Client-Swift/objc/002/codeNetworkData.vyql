@@ -1,0 +1,9 @@
+module bindings.objc.generated.mc6b72449;
+
+binding networkData2 {
+  requires {
+    dependency("Socket.IO-Client-Swift")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

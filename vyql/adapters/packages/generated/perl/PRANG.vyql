@@ -1,5 +1,0 @@
-adapter perl {
-  package "PRANG" {
-    sink method "parse_fh" -> code.XmlParse
-  }
-}

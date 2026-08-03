@@ -1,0 +1,9 @@
+module bindings.perl.generated.mc0510dbf;
+
+binding deserialization1 {
+  requires {
+    dependency("CracTools")
+  }
+  query pattern callExpr where callee.method == "parseGFFLine"
+  emit sink code.Deserialization at args[0]
+}

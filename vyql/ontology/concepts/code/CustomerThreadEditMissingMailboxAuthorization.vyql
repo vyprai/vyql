@@ -1,0 +1,11 @@
+module code;
+
+concept CustomerThreadEditMissingMailboxAuthorization : issue {
+  cwe: [CWE_862, CWE_863]
+  reviewAssumption: "mailbox membership limits which users may edit customer-originated conversation threads"
+  reviewCategory: auth
+  reviewCondition: "a customer-thread edit policy allows customer-created conversation threads without checking the user's mailbox or conversation access"
+  reviewConfidence: high
+  reviewEvidence: "thread policy context {pattern} allows Thread::TYPE_CUSTOMER edits for customer-created threads without userHasAccessToMailbox"
+  vulnerableTo: [access_control.MissingAuthorization, access_control.IncorrectAuthorization]
+}

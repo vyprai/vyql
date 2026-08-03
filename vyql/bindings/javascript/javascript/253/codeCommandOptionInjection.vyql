@@ -1,0 +1,7 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding commandOptionInjection253 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.callPath, ["spawn", "crossSpawn", "child_process.spawn", "spawnSync"]) and node.context.gitCloneArgvMissingDelimiter == "true"
+  emit issue code.CommandOptionInjection at node
+  emit sink code.CommandOptionInjectionSink at node
+}

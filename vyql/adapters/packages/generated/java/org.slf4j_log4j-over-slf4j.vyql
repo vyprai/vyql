@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "org.slf4j:log4j-over-slf4j" {
-    sink method "readObject" -> code.Deserialization
-  }
-}

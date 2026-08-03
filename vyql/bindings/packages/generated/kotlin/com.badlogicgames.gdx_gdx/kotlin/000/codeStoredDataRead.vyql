@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mb36ef84f;
+
+binding storedDataRead0 {
+  requires {
+    dependency("com.badlogicgames.gdx:gdx")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.StoredDataRead at call.result
+}

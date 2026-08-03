@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter elixir {
-  package "ex_cldr_plugs" {
-    source method "best_match" -> core.UserControlledData
-  }
-}

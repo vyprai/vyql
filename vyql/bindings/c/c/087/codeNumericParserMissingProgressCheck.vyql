@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding numericParserMissingProgressCheck87 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "numeric_parser.missing_progress_check"
+  emit issue code.NumericParserMissingProgressCheck at node
+}

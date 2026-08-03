@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding sensitiveModelJsonSerializationExposure93 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "_handleSuccessfulLogin" and node.context.phpReview == "sensitive_model_json_serialization_login"
+  emit issue code.SensitiveModelJsonSerializationExposure at node
+}

@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding jenkinsDescriptorPropertyFileValidationMissingPost232 {
+  query pattern presenceNode where node.scope == "function" and node.context.classBase contains "ParameterDescriptor" and node.context.functionName contains "doCheckPropertyFile" and node.context.identifier contains "QueryParameter" and node.context.call contains "Property" and node.context.call contains "File" and node.context.call contains "URL" and node.context.call contains "execute" and not (node.context.annotation contains "POST") and not (node.context.annotation contains "RequirePOST")
+  emit issue code.JenkinsDescriptorPropertyFileValidationMissingPost at node
+}

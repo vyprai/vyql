@@ -1,0 +1,31 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding benchmarkLdapEscape {
+  query pattern callExpr where callee.path ~= "Net.LDAP.Filter.escape"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding benchmarkLdapSearch {
+  query pattern callExpr where callee.path ~= "conn.search"
+  emit sink code.LdapQuery at call
+}
+
+binding benchmarkValidateRole {
+  query pattern callExpr where callee.method == "validate_role"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding benchmarkSessionSetTrustBoundary {
+  query pattern callExpr where callee.path ~= "session.set"
+  emit sink code.TrustBoundary at args[1]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.mdefa03ba;
+
+binding urlFetch1 {
+  requires {
+    dependency("XCDYouTubeKit")
+  }
+  query pattern callExpr where callee.method == "getVideoWithIdentifier"
+  emit sink code.UrlFetch at args[0]
+}

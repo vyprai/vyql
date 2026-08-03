@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m8a37c9af;
+
+binding deserialization0 {
+  requires {
+    dependency("nu-book-zxing-cpp")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

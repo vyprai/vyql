@@ -1,0 +1,9 @@
+module bindings.java.generated.m8f123f42;
+
+binding filePathAccess1 {
+  requires {
+    dependency("org.codehaus.plexus:plexus-archiver")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.FilePathAccess at args[0]
+}

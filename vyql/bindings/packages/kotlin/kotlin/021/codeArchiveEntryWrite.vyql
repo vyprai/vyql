@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m1457a768;
+
+binding archiveEntryWrite21 {
+  requires {
+    dependency("commons-compress")
+  }
+  query pattern callExpr where callee.method == "extractEntry"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

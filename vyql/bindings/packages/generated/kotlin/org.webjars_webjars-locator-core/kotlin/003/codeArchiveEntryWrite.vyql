@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m6154bf05;
+
+binding archiveEntryWrite3 {
+  requires {
+    dependency("org.webjars:webjars-locator-core")
+  }
+  query pattern callExpr where callee.method == "extractAllBowerComponentsTo"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

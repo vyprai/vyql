@@ -1,0 +1,9 @@
+module bindings.c.generated.m3c4a9620;
+
+binding filePathAccess4 {
+  requires {
+    dependency("parson")
+  }
+  query pattern callExpr where callee.method == "json_serialize_to_file"
+  emit sink code.FilePathAccess at args[0]
+}

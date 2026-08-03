@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule CloudStackBaremetalMacCommandInjection {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_78, CWE_20]
+    id: "VYQL-INJ-074"
+    severity: critical
+  }
+  issue code.CloudStackBaremetalMacCommandInjection as sink
+}

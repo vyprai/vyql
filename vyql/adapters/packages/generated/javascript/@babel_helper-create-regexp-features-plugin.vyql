@@ -1,8 +1,0 @@
-import code.{RegexCompile}
-adapter javascript {
-  package "@babel/helper-create-regexp-features-plugin" {
-    flag code.RegexCompile on any {
-      method "createRegExpFeaturePlugin"
-    }
-  }
-}

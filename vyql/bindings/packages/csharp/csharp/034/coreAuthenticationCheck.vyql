@@ -1,0 +1,13 @@
+module bindings.csharp.generated.m2a0e231a;
+
+binding authenticationCheck34 {
+  requires {
+    dependency("System.Security.Claims")
+  }
+  query pattern callExpr where callee.method == "IsAuthenticated"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

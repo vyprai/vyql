@@ -1,9 +1,0 @@
-import code.{HtmlRender}
-import core.{HtmlEscape}
-
-adapter csharp {
-  package "jquery.templates" {
-    control method "encode" -> core.HtmlEscape
-    sink method "tmpl" -> code.HtmlRender
-  }
-}

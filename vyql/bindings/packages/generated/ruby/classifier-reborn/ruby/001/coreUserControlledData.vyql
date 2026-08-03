@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m18dedbda;
+
+binding userControlledData1 {
+  requires {
+    dependency("classifier-reborn")
+  }
+  query pattern callExpr where callee.method == "classify"
+  emit source core.UserControlledData at call.result
+}

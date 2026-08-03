@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "com.google.code.gson:gson" {
-    sink method "parseString" -> code.Deserialization
-    sink method "parseReader" -> code.Deserialization
-    sink method "fromJson" -> code.Deserialization
-    sink method "next" -> code.Deserialization
-  }
-}

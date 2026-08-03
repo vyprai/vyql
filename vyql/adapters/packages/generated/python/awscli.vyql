@@ -1,8 +1,0 @@
-import code.{CliArgument, CommandExecution}
-
-adapter python {
-  package "awscli" {
-    source method "parse" -> code.CliArgument
-    control method "compat_shell_quote" -> core.ShellEscape
-  }
-}

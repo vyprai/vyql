@@ -1,0 +1,9 @@
+module bindings.go.generated.m39efcd29;
+
+binding archiveEntryWrite22 {
+  requires {
+    dependency("archive/zip")
+  }
+  query pattern callExpr where callee.path ~= "zip.File.Open"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

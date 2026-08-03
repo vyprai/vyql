@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m16a2cff2;
+
+binding sqlExecution0 {
+  requires {
+    dependency("com.github.miemiedev:mybatis-paginator")
+  }
+  query pattern callExpr where callee.method == "getPageSQL"
+  emit sink code.SqlExecution at args[0]
+}

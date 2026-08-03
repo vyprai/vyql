@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "oauth2client" {
-    sink path "oauth2client.clientsecrets.load" -> code.Deserialization
-    sink path "oauth2client.clientsecrets.loads" -> code.Deserialization
-  }
-}

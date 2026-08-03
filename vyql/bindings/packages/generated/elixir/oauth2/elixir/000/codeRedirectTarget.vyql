@@ -1,0 +1,10 @@
+module bindings.elixir.generated.md3704692;
+
+binding redirectTarget0 {
+  requires {
+    dependency("oauth2")
+  }
+  query pattern callExpr where callee.method == "authorize_url"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

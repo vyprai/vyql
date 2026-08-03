@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m6d4a3af2;
+
+binding sqlExecution5 {
+  requires {
+    dependency("dm-aggregates")
+  }
+  query pattern callExpr where callee.method == "sum"
+  emit sink code.SqlExecution at args[0]
+}

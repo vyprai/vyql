@@ -1,0 +1,9 @@
+module bindings.rust.generated.m3584c174;
+
+binding filePathAccess0 {
+  requires {
+    dependency("inotify-sys")
+  }
+  query pattern callExpr where callee.method == "inotify_add_watch"
+  emit sink code.FilePathAccess at args[0]
+}

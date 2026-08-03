@@ -1,0 +1,13 @@
+module bindings.go.generated.mcd64fc1b;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("github.com/smartystreets/go-aws-auth")
+  }
+  query pattern callExpr where callee.method == "Sign"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

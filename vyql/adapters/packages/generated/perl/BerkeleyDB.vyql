@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter perl {
-  package "BerkeleyDB" {
-    source method "ParseParameters" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.m85a320f2;
+
+binding cliArgument0 {
+  requires {
+    dependency("github.com/hartbit/Yaap")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.CliArgument at call.result
+}

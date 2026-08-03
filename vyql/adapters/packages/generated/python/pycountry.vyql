@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter python {
-  package "pycountry" {
-    sink method "resource_filename" -> code.FilePathAccess
-  }
-}

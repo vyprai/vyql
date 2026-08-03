@@ -1,7 +1,0 @@
-import code.{SecretValue}
-adapter kotlin {
-  package "org.jasypt:jasypt" {
-    source method "encrypt" -> code.SecretValue
-    source method "decrypt" -> code.SecretValue
-  }
-}

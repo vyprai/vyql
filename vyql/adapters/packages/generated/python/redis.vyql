@@ -1,6 +1,0 @@
-adapter python {
-  package "redis" {
-    source method "from_url" -> core.UserControlledData
-    sink method "execute_command" -> code.NosqlQuery
-  }
-}

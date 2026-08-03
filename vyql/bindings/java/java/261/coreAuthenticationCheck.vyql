@@ -1,0 +1,10 @@
+module bindings.java.generated.m420f6b67;
+
+binding authenticationCheck261 {
+  query pattern callExpr where callee.method == "ensureAuthenticated"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

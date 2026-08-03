@@ -1,8 +1,0 @@
-import code.{FilePathAccess, NetworkData, SecretValue}
-import core.{UserControlledData}
-
-adapter ruby {
-  package "aws_cf_signer" {
-    source method "sign" -> code.NetworkData
-  }
-}

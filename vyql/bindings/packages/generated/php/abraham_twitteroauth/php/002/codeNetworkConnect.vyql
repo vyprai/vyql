@@ -1,0 +1,9 @@
+module bindings.php.generated.m0e26dbfb;
+
+binding networkConnect2 {
+  requires {
+    dependency("abraham/twitteroauth")
+  }
+  query pattern callExpr where callee.method == "oauth2"
+  emit sink code.NetworkConnectSink at args[0]
+}

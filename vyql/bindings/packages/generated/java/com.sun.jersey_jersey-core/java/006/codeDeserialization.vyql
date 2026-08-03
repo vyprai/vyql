@@ -1,0 +1,9 @@
+module bindings.java.generated.m6daec676;
+
+binding deserialization6 {
+  requires {
+    dependency("com.sun.jersey:jersey-core")
+  }
+  query pattern callExpr where callee.method == "ServiceFinder.parse"
+  emit sink code.Deserialization at args[0]
+}

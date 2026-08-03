@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m8db168f8;
+
+binding deserialization9 {
+  requires {
+    dependency("urdfdom")
+  }
+  query pattern callExpr where callee.method == "parseBox"
+  emit sink code.Deserialization at args[0]
+}

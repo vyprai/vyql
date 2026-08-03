@@ -1,0 +1,9 @@
+module bindings.rust.generated.m343b14b7;
+
+binding deserialization1 {
+  requires {
+    dependency("jsonrpc-core")
+  }
+  query pattern callExpr where callee.method == "handle_request"
+  emit sink code.Deserialization at args[0]
+}

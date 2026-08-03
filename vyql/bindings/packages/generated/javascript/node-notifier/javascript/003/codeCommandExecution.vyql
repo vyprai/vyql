@@ -1,0 +1,9 @@
+module bindings.javascript.generated.med0ad15e;
+
+binding commandExecution3 {
+  requires {
+    dependency("node-notifier")
+  }
+  query pattern callExpr where callee.method == "immediateFileCommand"
+  emit sink code.CommandExecution at args[0]
+}

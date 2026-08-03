@@ -1,0 +1,6 @@
+module bindings.scala.generated.m06d0685b;
+
+binding staticIv38 {
+  query pattern callExpr where callee.path ~= "IvParameterSpec" and args.any.literal contains "0000000000000000"
+  emit issue code.StaticIv at call
+}

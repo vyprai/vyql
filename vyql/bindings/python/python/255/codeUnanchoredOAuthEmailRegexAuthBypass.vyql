@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding unanchoredOAuthEmailRegexAuthBypass255 {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "re.match" and operand(node, where: operand.path ~= "self.application.options.auth") and operand(node, where: containsAny(operand.key, [email, mail]))
+  emit issue code.UnanchoredOAuthEmailRegexAuthBypass at node
+}

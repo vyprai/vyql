@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding uncheckedPythonCapiHashError102 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "python_hash.unchecked_error"
+  emit issue code.UncheckedPythonCapiHashError at node
+}

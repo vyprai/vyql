@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m21df8bcd;
+
+binding sqlExecution1 {
+  requires {
+    dependency("com.zaxxer:HikariCP")
+  }
+  query pattern callExpr where callee.method == "setConnectionInitSql"
+  emit sink code.SqlExecution at args[0]
+}

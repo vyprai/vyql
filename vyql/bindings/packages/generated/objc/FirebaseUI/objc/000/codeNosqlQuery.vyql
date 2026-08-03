@@ -1,0 +1,9 @@
+module bindings.objc.generated.m01682b8f;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("FirebaseUI")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NosqlQuery at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.m35184d7f;
+
+binding deserialization1 {
+  requires {
+    dependency("org.mongodb:bson")
+  }
+  query pattern callExpr where callee.method == "readObject"
+  emit sink code.Deserialization at args[0]
+}

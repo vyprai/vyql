@@ -1,0 +1,8 @@
+# Rank 30 / CVE-2016-4855: ADOdb unrestricted variable-variable assignment.
+
+test "rank30: unrestricted variable-variable assignment is a CVE anchor"
+  expect VYQL-INJ-027
+  graph
+  ```
+  node sink code.UnrestrictedVariableVariableAssignment
+  ```

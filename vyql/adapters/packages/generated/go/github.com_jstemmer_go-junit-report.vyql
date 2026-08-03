@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter go {
-  package "github.com/jstemmer/go-junit-report" {
-    sink method "Parse" -> code.Deserialization
-  }
-}

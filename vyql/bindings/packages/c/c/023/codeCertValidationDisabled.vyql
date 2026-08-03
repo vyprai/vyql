@@ -1,0 +1,9 @@
+module bindings.c.generated.m2816daee;
+
+binding certValidationDisabled23 {
+  requires {
+    dependency("libcurl")
+  }
+  query pattern callExpr where callee.path ~= "curl_easy_setopt" and args.any.literal contains "CURLOPT_SSL_VERIFYPEER" and args.any.literal contains "0"
+  emit issue code.CertValidationDisabled at call
+}

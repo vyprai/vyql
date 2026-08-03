@@ -1,7 +1,0 @@
-adapter groovy {
-  package "org.codehaus.janino:janino" {
-    sink method "compile" -> code.DynamicCodeLoad
-    source method "Token" -> code.SecretValue
-    sink method "load" -> code.Deserialization
-  }
-}

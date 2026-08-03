@@ -1,7 +1,0 @@
-import code.{NetworkData}
-adapter ruby {
-  package "fog-profitbricks" {
-    source method "request" -> code.NetworkData
-    source method "request" -> code.NetworkData
-  }
-}

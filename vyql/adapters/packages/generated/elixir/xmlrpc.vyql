@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "xmlrpc" {
-    sink method "decode" -> code.Deserialization
-    sink method "decode!" -> code.Deserialization
-  }
-}

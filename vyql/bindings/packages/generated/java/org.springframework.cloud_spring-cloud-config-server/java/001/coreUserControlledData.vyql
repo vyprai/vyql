@@ -1,0 +1,9 @@
+module bindings.java.generated.mcdb35e01;
+
+binding userControlledData1 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-config-server")
+  }
+  query pattern callExpr where callee.method == "decrypt"
+  emit source core.UserControlledData at call.result
+}

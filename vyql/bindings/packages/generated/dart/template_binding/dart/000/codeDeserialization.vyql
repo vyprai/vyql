@@ -1,0 +1,9 @@
+module bindings.dart.generated.m89e77cfd;
+
+binding deserialization0 {
+  requires {
+    dependency("template_binding")
+  }
+  query pattern callExpr where callee.method == "MustacheTokens.parse"
+  emit sink code.Deserialization at args[0]
+}

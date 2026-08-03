@@ -1,0 +1,9 @@
+module bindings.php.generated.m0f2ba173;
+
+binding networkSend6 {
+  requires {
+    dependency("pestphp/pest-plugin-laravel")
+  }
+  query pattern callExpr where callee.method == "withCookies"
+  emit sink code.NetworkSend at args[0]
+}

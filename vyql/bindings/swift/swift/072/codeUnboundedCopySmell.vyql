@@ -1,0 +1,6 @@
+module bindings.swift.generated.m388f23d0;
+
+binding unboundedCopySmell72 {
+  query pattern presenceNode where node.path ~= "BIO_puts"
+  emit issue code.UnboundedCopySmell at node
+}

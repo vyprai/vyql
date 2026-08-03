@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m77236a9a;
+
+binding weakHash1 {
+  requires {
+    dependency("sockjs")
+  }
+  query pattern callExpr where callee.method == "md5_hex"
+  emit issue code.WeakHash at call
+}

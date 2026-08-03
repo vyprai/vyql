@@ -1,0 +1,9 @@
+module bindings.php.generated.mb6179e84;
+
+binding filePathAccess6 {
+  requires {
+    dependency("zendframework/zend-config")
+  }
+  query pattern callExpr where callee.method == "ZendConfigReaderYaml::fromFile"
+  emit sink code.FilePathAccess at args[0]
+}

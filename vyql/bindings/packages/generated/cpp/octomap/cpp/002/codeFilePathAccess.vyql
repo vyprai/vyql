@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m5124a248;
+
+binding filePathAccess2 {
+  requires {
+    dependency("octomap")
+  }
+  query pattern callExpr where callee.method == "exportDot"
+  emit sink code.FilePathAccess at args[0]
+}

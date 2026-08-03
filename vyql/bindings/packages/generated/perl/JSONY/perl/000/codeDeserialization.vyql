@@ -1,0 +1,9 @@
+module bindings.perl.generated.mefaefe88;
+
+binding deserialization0 {
+  requires {
+    dependency("JSONY")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

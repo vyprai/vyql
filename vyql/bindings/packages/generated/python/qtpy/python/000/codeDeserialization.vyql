@@ -1,0 +1,9 @@
+module bindings.python.generated.m406c28bc;
+
+binding deserialization0 {
+  requires {
+    dependency("qtpy")
+  }
+  query pattern callExpr where callee.method == "readResources"
+  emit sink code.Deserialization at args[0]
+}

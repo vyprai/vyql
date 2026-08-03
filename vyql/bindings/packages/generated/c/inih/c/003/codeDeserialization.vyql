@@ -1,0 +1,9 @@
+module bindings.c.generated.ma2eef6c5;
+
+binding deserialization3 {
+  requires {
+    dependency("inih")
+  }
+  query pattern callExpr where callee.method == "ini_parse_string"
+  emit sink code.Deserialization at args[0]
+}

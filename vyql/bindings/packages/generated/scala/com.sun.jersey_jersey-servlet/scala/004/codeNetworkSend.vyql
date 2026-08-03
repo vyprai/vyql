@@ -1,0 +1,9 @@
+module bindings.scala.generated.m0779b6f2;
+
+binding networkSend4 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "writeStatusAndHeaders"
+  emit sink code.NetworkSend at args[0]
+}

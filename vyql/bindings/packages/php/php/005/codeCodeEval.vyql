@@ -1,0 +1,9 @@
+module bindings.php.generated.mc5601031;
+
+binding codeEval5 {
+  requires {
+    dependency("php")
+  }
+  query pattern callExpr where callee.path ~= "eval"
+  emit sink code.CodeEval at args[0]
+}

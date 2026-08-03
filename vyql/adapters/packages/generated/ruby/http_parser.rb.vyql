@@ -1,6 +1,0 @@
-import code.{HttpInput}
-adapter ruby {
-  package "http_parser.rb" {
-    sink method "Parser_execute" -> code.UrlFetch
-  }
-}

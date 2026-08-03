@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m7c455364;
+
+binding deserialization0 {
+  requires {
+    dependency("marble")
+  }
+  query pattern callExpr where callee.method == "GeoUriParser.parse"
+  emit sink code.Deserialization at args[0]
+}

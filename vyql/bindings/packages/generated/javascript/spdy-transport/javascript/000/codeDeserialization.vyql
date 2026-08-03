@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m9b51afdb;
+
+binding deserialization0 {
+  requires {
+    dependency("spdy-transport")
+  }
+  query pattern callExpr where callee.method == "Parser"
+  emit sink code.Deserialization at args[0]
+}

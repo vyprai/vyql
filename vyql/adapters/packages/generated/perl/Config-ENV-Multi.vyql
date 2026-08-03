@@ -1,7 +1,0 @@
-import code.{CodeEval, EnvVariable}
-adapter perl {
-  package "Config-ENV-Multi" {
-    sink method "load" -> code.CodeEval
-    source method "param" -> code.EnvVariable
-  }
-}

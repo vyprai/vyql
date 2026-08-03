@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m5c270092;
+
+binding externalApiResponse12 {
+  requires {
+    dependency("node-fetch")
+  }
+  query pattern callExpr where callee.method == "json"
+  emit source code.ExternalApiResponse at call.result
+}

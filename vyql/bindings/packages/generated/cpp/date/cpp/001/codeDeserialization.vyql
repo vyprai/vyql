@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mbab8f7df;
+
+binding deserialization1 {
+  requires {
+    dependency("date")
+  }
+  query pattern callExpr where callee.method == "parse_info"
+  emit sink code.Deserialization at args[0]
+}

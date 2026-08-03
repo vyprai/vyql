@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter objc {
-  package "Mantle" {
-    sink method "modelOfClass:fromJSONDictionary:error:" -> code.Deserialization
-    sink method "modelsOfClass:fromJSONArray:error:" -> code.Deserialization
-  }
-}

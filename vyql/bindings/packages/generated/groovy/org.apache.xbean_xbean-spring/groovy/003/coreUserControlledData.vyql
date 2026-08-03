@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m6536ebb3;
+
+binding userControlledData3 {
+  requires {
+    dependency("org.apache.xbean:xbean-spring")
+  }
+  query pattern callExpr where callee.method == "unbind"
+  emit source core.UserControlledData at call.result
+}

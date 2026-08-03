@@ -1,0 +1,9 @@
+module bindings.objc.generated.m4fa4208d;
+
+binding logOutput2 {
+  requires {
+    dependency("Logging")
+  }
+  query pattern callExpr where callee.method == "debug"
+  emit sink code.LogOutput at args[0]
+}

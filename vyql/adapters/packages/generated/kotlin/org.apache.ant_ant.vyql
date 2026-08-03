@@ -1,7 +1,0 @@
-import code.{CliArgument, Deserialization}
-adapter kotlin {
-  package "org.apache.ant:ant" {
-    sink method "parse" -> code.Deserialization
-    source method "processArgs" -> code.CliArgument
-  }
-}

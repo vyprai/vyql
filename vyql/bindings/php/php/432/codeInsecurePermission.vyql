@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding insecurePermission432 {
+  query pattern callExpr where callee.path ~= "chmod" and args.any.literal contains "0777"
+  emit issue code.InsecurePermission at call
+}

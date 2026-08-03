@@ -1,8 +1,0 @@
-import code.{UrlFetch, NetworkData}
-
-adapter dart {
-  package "firebase_storage_web" {
-    sink method "getDownloadURL" -> code.UrlFetch
-    source method "readBytes" -> code.NetworkData
-  }
-}

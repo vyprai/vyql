@@ -1,0 +1,6 @@
+module bindings.pii.generated.m24e11c07;
+
+binding piiValue16 {
+  query pattern callExpr where callee.method == "getSsn"
+  emit source code.PiiValue at call.result
+}

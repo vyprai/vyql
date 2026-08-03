@@ -1,0 +1,9 @@
+module bindings.rust.generated.m7c060ca7;
+
+binding userControlledData1 {
+  requires {
+    dependency("futures-io")
+  }
+  query pattern callExpr where callee.method == "poll_read_vectored"
+  emit source core.UserControlledData at call.result
+}

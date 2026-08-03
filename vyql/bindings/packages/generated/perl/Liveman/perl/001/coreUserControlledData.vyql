@@ -1,0 +1,9 @@
+module bindings.perl.generated.m45c14b21;
+
+binding userControlledData1 {
+  requires {
+    dependency("Liveman")
+  }
+  query pattern callExpr where callee.method == "parse_options"
+  emit source core.UserControlledData at call.result
+}

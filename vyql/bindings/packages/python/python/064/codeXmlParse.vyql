@@ -1,0 +1,9 @@
+module bindings.python.generated.m3d9ccbad;
+
+binding xmlParse64 {
+  requires {
+    dependency("lxml")
+  }
+  query pattern callExpr where callee.path ~= "lxml.etree.fromstring"
+  emit sink code.XmlParse at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkData, Deserialization, NetworkSend}
-adapter swift {
-  package "github.com/grpc/grpc-swift" {
-    sink method "connect" -> code.NetworkConnect
-    sink method "deserialize" -> code.Deserialization
-    sink method "send" -> code.NetworkSend
-    source method "serialize" -> code.NetworkData
-  }
-}

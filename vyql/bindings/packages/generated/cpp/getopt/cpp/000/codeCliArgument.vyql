@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m5f34e6f0;
+
+binding cliArgument0 {
+  requires {
+    dependency("getopt")
+  }
+  query pattern callExpr where callee.method == "getopt"
+  emit source code.CliArgument at call.result
+}

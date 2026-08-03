@@ -1,0 +1,13 @@
+module bindings.java.generated.m9ef49b0f;
+
+binding authenticationCheck43 {
+  requires {
+    dependency("spring-security")
+  }
+  query pattern callExpr where callee.path ~= "SecurityContextHolder.getContext"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

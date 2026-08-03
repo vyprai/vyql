@@ -1,9 +1,0 @@
-import code.{FilePathAccess, Deserialization}
-adapter java {
-  package "com.aventstack:extentreports" {
-    sink method "addScreenCaptureFromPath" -> code.FilePathAccess
-    sink method "addVideoFromPath" -> code.FilePathAccess
-    sink method "createDomainFromJsonArchive" -> code.Deserialization
-    sink method "loadJSONConfig" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m8c2636a7;
+
+binding networkData2 {
+  requires {
+    dependency("Reachability")
+  }
+  query pattern callExpr where callee.method == "reachabilityWithAddress:"
+  emit source code.NetworkData at call.result
+}

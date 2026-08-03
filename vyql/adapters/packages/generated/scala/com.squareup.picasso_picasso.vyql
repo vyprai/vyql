@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter scala {
-  package "com.squareup.picasso:picasso" {
-    source method "load" -> core.UserControlledData
-  }
-}

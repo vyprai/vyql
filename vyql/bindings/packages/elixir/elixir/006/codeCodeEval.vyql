@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mf98b3aca;
+
+binding codeEval6 {
+  requires {
+    dependency("elixir")
+  }
+  query pattern callExpr where callee.path ~= "Code.eval_string"
+  emit sink code.CodeEval at args[0]
+}

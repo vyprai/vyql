@@ -1,0 +1,8 @@
+module code;
+
+review code.AbsoluteUriUserFolderLookup {
+  category: access_control
+  expected: [core.OwnershipCheck, core.AuthorizationCheck]
+  kind: target
+  text: "verify absolute file URI resolvers ignore caller-supplied user components and resolve user folders from the authenticated principal"
+}

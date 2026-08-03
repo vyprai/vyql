@@ -1,7 +1,0 @@
-adapter dart {
-  package "url_launcher_android" {
-    sink method "launchUrl" -> code.UrlFetch
-    sink method "openUrlInApp" -> code.UrlFetch
-    sink method "openCustomTab" -> code.UrlFetch
-  }
-}

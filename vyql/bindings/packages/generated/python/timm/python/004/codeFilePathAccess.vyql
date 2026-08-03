@@ -1,0 +1,9 @@
+module bindings.python.generated.m205c7f09;
+
+binding filePathAccess4 {
+  requires {
+    dependency("timm")
+  }
+  query pattern callExpr where callee.method == "load_model_config_from_path"
+  emit sink code.FilePathAccess at args[0]
+}

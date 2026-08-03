@@ -1,0 +1,8 @@
+module code;
+
+review code.OpnSenseRrdRestoreFilenameCommandInjection {
+  category: command
+  expected: [core.ShellEscape, core.InputValidation]
+  kind: attention
+  text: "review OPNsense RRD backup restore filenames for basename validation and shell-safe command execution"
+}

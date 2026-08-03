@@ -1,0 +1,9 @@
+module bindings.dart.generated.me672db61;
+
+binding networkSend2 {
+  requires {
+    dependency("mailer")
+  }
+  query pattern callExpr where callee.method == "Connection.send"
+  emit sink code.NetworkSend at args[0]
+}

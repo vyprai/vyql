@@ -1,0 +1,9 @@
+module bindings.elixir.generated.ma2e6b1a0;
+
+binding userControlledData5 {
+  requires {
+    dependency("petal_components")
+  }
+  query pattern callExpr where callee.method == "file_input"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.QuickAppsUserRealNameStoredXss {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review QuickApps user real-name accessors for h()-escaping before stored names are rendered"
+}

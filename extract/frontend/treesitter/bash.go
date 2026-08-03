@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"regexp"
 	"strings"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
@@ -14,9 +15,28 @@ import (
 // expansions become synthetic event calls; a string with embedded expansions
 // becomes a Format.
 type shConv struct {
-	src  []byte
-	file string
-	key  string
+	src        []byte
+	file       string
+	key        string
+	childCache map[uintptr][]*tree_sitter.Node
+}
+
+var shCatInputAssignRE = regexp.MustCompile(`(?m)([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\$\(\s*cat\s*\)`)
+
+func (c *shConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = make(map[uintptr][]*tree_sitter.Node)
+	}
+	key := uintptr(n.Id())
+	if kids, ok := c.childCache[key]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[key] = kids
+	return kids
 }
 
 // ExtractBash parses shell scripts into one NIR Program (one module per file).
@@ -52,22 +72,63 @@ func (c *shConv) shModuleContext(root *tree_sitter.Node) []nir.Stmt {
 	}
 	loc := c.file + ":1"
 	text := c.text(root)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=bash"},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
+	}
+	for _, tok := range c.shSemanticModuleTokens(text) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
-		Args: []nir.Expr{
-			nir.Const{Loc: loc, Value: "lang=bash"},
-			nir.Const{Loc: loc, Value: text},
-			nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
-		},
+		Args:   args,
 		Path:   "analysis.module.context",
 		Method: "context",
 		Loc:    loc,
 	}}}
 }
 
+func (c *shConv) shSemanticModuleTokens(text string) []string {
+	var out []string
+	add := func(tok string) {
+		for _, existing := range out {
+			if existing == tok {
+				return
+			}
+		}
+		out = append(out, tok)
+	}
+	if shHasPythonTripleQuoteStdinInterpolation(text) {
+		add("shell_bridge:python_triple_quote_stdin_interpolation")
+	}
+	return out
+}
+
+func shHasPythonTripleQuoteStdinInterpolation(text string) bool {
+	if !strings.Contains(text, "python3") || !strings.Contains(text, "-c") ||
+		!strings.Contains(text, "json.loads") || strings.Contains(text, "<<'PYEOF'") ||
+		strings.Contains(text, "os.environ.get") {
+		return false
+	}
+	for _, match := range shCatInputAssignRE.FindAllStringSubmatch(text, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		name := match[1]
+		if strings.Contains(text, "'''$"+name+"'''") ||
+			strings.Contains(text, "'''${"+name+"}'''") ||
+			strings.Contains(text, "'''$"+name) ||
+			strings.Contains(text, "'''${"+name+"}") {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *shConv) block(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, st := range namedChildren(n) {
+	for _, st := range c.namedChildren(n) {
 		out = append(out, c.stmt(st)...)
 	}
 	return out
@@ -85,7 +146,7 @@ func (c *shConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return nil
 	case "declaration_command", "unset_command":
 		var out []nir.Stmt
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "variable_assignment" {
 				out = append(out, c.stmt(ch)...)
 			}
@@ -137,7 +198,7 @@ func (c *shConv) command(n *tree_sitter.Node) nir.Expr {
 		prog = prog[i+1:]
 	}
 	var args []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		switch ch.Kind() {
 		case "command_name":
 			continue
@@ -163,14 +224,22 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 		if event, ok := sourceVarEvent("bash", name); ok {
 			return nir.Call{Callee: nir.Name{ID: event, Loc: L}, Path: event, Method: event, Loc: L}
 		}
+		if nested := c.shNestedSourceRefs(n, name); len(nested) > 0 {
+			parts := []nir.Expr{nir.Name{ID: name, Loc: L}}
+			parts = append(parts, nested...)
+			return nir.Format{Parts: parts, Loc: L}
+		}
 		return nir.Name{ID: name, Loc: L}
 	case "string", "concatenation":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if k := ch.Kind(); k == "simple_expansion" || k == "expansion" ||
 				k == "command_substitution" || k == "string" || k == "concatenation" {
 				parts = append(parts, c.expr(ch))
 			}
+		}
+		if event, ok := sourceVarEventInText("bash", c.text(n)); ok && !shExprsHaveCallPath(parts, event) {
+			parts = append(parts, nir.Call{Callee: nir.Name{ID: event, Loc: L}, Path: event, Method: event, Loc: L})
 		}
 		if len(parts) > 0 {
 			return nir.Format{Parts: parts, Loc: L}
@@ -178,7 +247,7 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: shLiteralValue(c.text(n))}
 	case "command_substitution":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "command" {
 				parts = append(parts, c.command(ch))
 			} else {
@@ -190,7 +259,7 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 		return c.command(n)
 	case "test_command":
 		// `[ expr ]` / `[[ expr ]]` — unwrap to the inner comparison.
-		if k := namedChildren(n); len(k) > 0 {
+		if k := c.namedChildren(n); len(k) > 0 {
 			return c.expr(k[0])
 		}
 	case "binary_expression":
@@ -200,7 +269,7 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.BinOp{Op: op, Left: c.expr(field(n, "left")), Right: c.expr(field(n, "right")), Loc: L}
 	case "unary_expression":
-		if k := namedChildren(n); len(k) > 0 {
+		if k := c.namedChildren(n); len(k) > 0 {
 			op := "?"
 			for i := uint(0); i < n.ChildCount(); i++ {
 				if ch := n.Child(i); !ch.IsNamed() {
@@ -212,10 +281,76 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 	}
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func (c *shConv) shNestedSourceRefs(root *tree_sitter.Node, outer string) []nir.Expr {
+	var out []nir.Expr
+	seen := map[string]bool{}
+	add := func(event string, loc string) {
+		if event == "" || seen[event] {
+			return
+		}
+		seen[event] = true
+		out = append(out, nir.Call{Callee: nir.Name{ID: event, Loc: loc}, Path: event, Method: event, Loc: loc})
+	}
+	if event, ok := sourceVarEventInText("bash", c.text(root)); ok {
+		add(event, c.loc(root))
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch n.Kind() {
+		case "variable_name", "special_variable_name":
+			name := c.text(n)
+			if name != outer {
+				if event, ok := sourceVarEvent("bash", name); ok {
+					add(event, c.loc(n))
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	for _, ch := range c.namedChildren(root) {
+		walk(ch)
+	}
+	return out
+}
+
+func shExprsHaveCallPath(exprs []nir.Expr, path string) bool {
+	for _, expr := range exprs {
+		if shExprHasCallPath(expr, path) {
+			return true
+		}
+	}
+	return false
+}
+
+func shExprHasCallPath(expr nir.Expr, path string) bool {
+	switch v := expr.(type) {
+	case nir.Call:
+		if v.Path == path {
+			return true
+		}
+		return shExprsHaveCallPath(v.Args, path)
+	case nir.Format:
+		return shExprsHaveCallPath(v.Parts, path)
+	case nir.Seq:
+		return shExprsHaveCallPath(v.Parts, path)
+	case nir.BinOp:
+		return shExprHasCallPath(v.Left, path) || shExprHasCallPath(v.Right, path)
+	case nir.Unary:
+		return shExprHasCallPath(v.Operand, path)
+	default:
+		return false
+	}
 }
 
 func shLiteralValue(raw string) string {
@@ -252,7 +387,7 @@ func (c *shConv) shIf(n *tree_sitter.Node) nir.Stmt {
 		}
 		switch ch.Kind() {
 		case "else_clause":
-			for _, e := range namedChildren(ch) {
+			for _, e := range c.namedChildren(ch) {
 				it.Else = append(it.Else, c.stmt(e)...)
 			}
 		case "elif_clause":
@@ -272,7 +407,7 @@ func (c *shConv) shCase(n *tree_sitter.Node) nir.Stmt {
 	if v := field(n, "value"); v != nil {
 		sw.Subject = c.expr(v)
 	}
-	for _, ci := range namedChildren(n) {
+	for _, ci := range c.namedChildren(n) {
 		if ci.Kind() != "case_item" {
 			continue
 		}
@@ -309,7 +444,7 @@ func (c *shConv) shCase(n *tree_sitter.Node) nir.Stmt {
 
 // expansionVar extracts the variable name from $x or ${x...}.
 func (c *shConv) expansionVar(n *tree_sitter.Node) string {
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "variable_name" || ch.Kind() == "special_variable_name" {
 			return c.text(ch)
 		}

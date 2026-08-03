@@ -1,0 +1,9 @@
+module bindings.groovy.generated.maa543884;
+
+binding deserialization3 {
+  requires {
+    dependency("org.apache.tomcat.embed:tomcat-embed-websocket")
+  }
+  query pattern callExpr where callee.method == "willDecode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m9638f916;
+
+binding expressionEval1 {
+  requires {
+    dependency("middleman-autoprefixer")
+  }
+  query pattern callExpr where callee.method == "prefix"
+  emit sink code.ExpressionEval at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization, SecretValue}
-adapter swift {
-  package "github.com/vapor/jwt" {
-    sink method "verify" -> code.Deserialization
-    source method "sign" -> code.SecretValue
-  }
-}

@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter go {
-  package "golang.org/x/arch" {
-    sink method "Decode" -> code.Deserialization
-    sink method "decode1" -> code.Deserialization
-  }
-}

@@ -1,6 +1,0 @@
-adapter java {
-  package "net.sf.ehcache:ehcache-core" {
-    sink method "createQuery" -> code.NosqlQuery
-    sink method "setBootstrapCacheLoader" -> code.StoredDataWrite
-  }
-}

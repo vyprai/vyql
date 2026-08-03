@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "paper_trail" {
-    sink method "load" -> code.Deserialization
-    sink method "deserialize" -> code.Deserialization
-    sink method "deserialize_with_ar" -> code.Deserialization
-  }
-}

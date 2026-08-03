@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mcaec459d;
+
+binding deserialization1 {
+  requires {
+    dependency("skogsra")
+  }
+  query pattern callExpr where callee.method == "Skogsra.Provider.YAML.load"
+  emit sink code.Deserialization at args[0]
+}

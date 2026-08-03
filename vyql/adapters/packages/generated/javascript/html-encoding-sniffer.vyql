@@ -1,6 +1,0 @@
-adapter javascript {
-  package "html-encoding-sniffer" {
-    sink method "module.exports" -> code.Deserialization
-    sink method "extractCharacterEncodingFromMeta" -> code.Deserialization
-  }
-}

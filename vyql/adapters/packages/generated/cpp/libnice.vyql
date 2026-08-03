@@ -1,6 +1,0 @@
-adapter cpp {
-  package "libnice" {
-    source method "stun_message_has_cookie" -> code.HttpInput
-    sink method "parse" -> code.Deserialization
-  }
-}

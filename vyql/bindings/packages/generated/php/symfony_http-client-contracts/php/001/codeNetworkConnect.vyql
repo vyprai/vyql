@@ -1,0 +1,9 @@
+module bindings.php.generated.m70032eae;
+
+binding networkConnect1 {
+  requires {
+    dependency("symfony/http-client-contracts")
+  }
+  query pattern callExpr where callee.method == "HttpClientInterface::request"
+  emit sink code.NetworkConnectSink at args[0]
+}

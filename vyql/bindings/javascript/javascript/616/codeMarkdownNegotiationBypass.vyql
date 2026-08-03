@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding markdownNegotiationBypass616 {
+  query pattern presenceNode where node.path ~= "acceptsMarkdown"
+  emit issue code.MarkdownNegotiationBypass at node
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m4d7844b7;
+
+binding networkSend2 {
+  requires {
+    dependency("gun")
+  }
+  query pattern callExpr where callee.method == "ws_send"
+  emit sink code.NetworkSend at args[0]
+}

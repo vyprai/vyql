@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter dart {
-  package "image_picker" {
-    source method "ImagePicker.pickImage" -> core.UserControlledData
-  }
-}

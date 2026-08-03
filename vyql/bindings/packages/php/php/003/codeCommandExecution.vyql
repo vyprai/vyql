@@ -1,0 +1,9 @@
+module bindings.php.generated.mc5601031;
+
+binding commandExecution3 {
+  requires {
+    dependency("php")
+  }
+  query pattern callExpr where callee.path ~= "system"
+  emit sink code.CommandExecution at args[0]
+}

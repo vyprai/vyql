@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "pbcs" {
-    sink method "decrypt" -> code.Deserialization
-    sink method "content_decrypt" -> code.Deserialization
-  }
-}

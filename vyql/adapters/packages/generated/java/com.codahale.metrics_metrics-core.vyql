@@ -1,7 +1,0 @@
-import core.{PathCanonicalization}
-
-adapter java {
-  package "com.codahale.metrics:metrics-core" {
-    control method "sanitize" -> core.PathCanonicalization
-  }
-}

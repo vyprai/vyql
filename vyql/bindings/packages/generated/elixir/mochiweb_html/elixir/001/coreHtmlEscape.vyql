@@ -1,0 +1,14 @@
+module bindings.elixir.generated.m779ba889;
+
+binding htmlEscape1 {
+  requires {
+    dependency("mochiweb_html")
+  }
+  query pattern callExpr where callee.method == "escape_attr"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.m540e69ab;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/p-x9/SwiftUIColor")
+  }
+  query pattern callExpr where callee.method == "generate"
+  emit sink code.FilePathAccess at args[0]
+}

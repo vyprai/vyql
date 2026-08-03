@@ -1,0 +1,9 @@
+module bindings.solidity.generated.m72929a80;
+
+binding urlFetch12 {
+  requires {
+    dependency("@chainlink/contracts")
+  }
+  query pattern callExpr where callee.method == "requestRandomWords"
+  emit sink code.UrlFetch at args[0]
+}

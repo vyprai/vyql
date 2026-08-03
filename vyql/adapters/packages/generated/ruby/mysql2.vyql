@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-
-adapter ruby {
-  package "mysql2" {
-    sink method "query" -> code.SqlExecution
-    sink method "execute" -> code.SqlExecution
-  }
-}

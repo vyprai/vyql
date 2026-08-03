@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter javascript {
-  package "num2fraction" {
-    source method "num2fraction" -> core.UserControlledData
-  }
-}

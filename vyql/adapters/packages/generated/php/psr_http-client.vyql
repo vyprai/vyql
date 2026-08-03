@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter php {
-  package "psr/http-client" {
-    sink method "ClientInterface::sendRequest" -> code.NetworkSend
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.generated.m2e933192;
+
+binding deserialization3 {
+  requires {
+    dependency("simplejson")
+  }
+  query pattern callExpr where callee.method == "raw_decode"
+  emit sink code.Deserialization at args[0]
+}

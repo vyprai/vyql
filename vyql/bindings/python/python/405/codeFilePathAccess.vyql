@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding filePathAccess405 {
+  query pattern callExpr where callee.path ~= "send_from_directory"
+  emit sink code.FilePathAccess at args[1]
+}

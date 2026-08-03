@@ -1,0 +1,9 @@
+module bindings.rust.generated.maacb195e;
+
+binding deserialization0 {
+  requires {
+    dependency("schannel")
+  }
+  query pattern callExpr where callee.method == "import_pkcs12"
+  emit sink code.Deserialization at args[0]
+}

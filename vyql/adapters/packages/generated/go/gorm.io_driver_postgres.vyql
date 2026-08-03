@@ -1,5 +1,0 @@
-adapter go {
-  package "gorm.io/driver/postgres" {
-    sink method "Open" -> code.SqlExecution
-  }
-}

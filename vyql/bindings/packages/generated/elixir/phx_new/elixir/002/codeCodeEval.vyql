@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m33140466;
+
+binding codeEval2 {
+  requires {
+    dependency("phx_new")
+  }
+  query pattern callExpr where callee.method == "generate"
+  emit sink code.CodeEval at args[0]
+}

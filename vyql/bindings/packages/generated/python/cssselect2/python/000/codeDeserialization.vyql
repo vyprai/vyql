@@ -1,0 +1,9 @@
+module bindings.python.generated.m20f6fffb;
+
+binding deserialization0 {
+  requires {
+    dependency("cssselect2")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

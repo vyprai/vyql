@@ -1,0 +1,9 @@
+module bindings.php.generated.mfd224668;
+
+binding networkData0 {
+  requires {
+    dependency("padraic/phar-updater")
+  }
+  query pattern callExpr where callee.method == "downloadPhar"
+  emit source code.NetworkData at call.result
+}

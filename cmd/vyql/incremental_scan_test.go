@@ -1,19 +1,20 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -29,14 +30,14 @@ func (f fakeDelta) PutRaw(k string, v []byte)      { f[k] = append([]byte(nil), 
 // source MUST yield the same set.
 func scanFindingKeys(t *testing.T, paths []string, cache lowering.DeltaCache) []string {
 	t.Helper()
-	g, err := buildGraphWithSyntheticAdapters(paths, cache)
+	g, err := buildGraphWithSyntheticBindings(paths, cache)
 	if err != nil {
-		t.Fatalf("buildGraphWithSyntheticAdapters: %v", err)
+		t.Fatalf("buildGraphWithSyntheticBindings: %v", err)
 	}
 	if g == nil {
 		return nil
 	}
-	decls, err := parser.Parse(syntheticIncrementalRules)
+	decls, err := parseV2DefinitionsForTest(syntheticIncrementalRules)
 	if err != nil {
 		t.Fatalf("rule parse: %v", err)
 	}
@@ -69,7 +70,7 @@ func findingKey(f *findings.Finding) string {
 	return f.RuleID + "@" + sink
 }
 
-func buildGraphWithSyntheticAdapters(paths []string, cache lowering.DeltaCache) (usg.Store, error) {
+func buildGraphWithSyntheticBindings(paths []string, cache lowering.DeltaCache) (usg.Store, error) {
 	prog, _, ctorTypes, stats, err := extractAll(paths)
 	if err != nil {
 		return nil, err
@@ -88,19 +89,19 @@ func buildGraphWithSyntheticAdapters(paths []string, cache lowering.DeltaCache) 
 	if err != nil {
 		return nil, err
 	}
-	ads := syntheticIncrementalAdapters()
+	bindingApps := syntheticIncrementalBindings()
 	if cache != nil {
-		if _, err := applyAdaptersIncremental(g, ads, moduleHashes(prog), nil, cache); err != nil {
+		if _, err := applyBindingsIncremental(g, bindingApps, moduleHashes(prog), nil, cache); err != nil {
 			return nil, err
 		}
-	} else if _, _, err := adapters.Apply(g, ads, nil); err != nil {
+	} else if _, _, err := bindings.Apply(g, bindingApps, nil); err != nil {
 		return nil, err
 	}
 	return g, nil
 }
 
 const syntheticIncrementalRules = `
-package test;
+module test;
 
 rule Flow {
   meta { id: "TEST-FLOW-001", severity: high }
@@ -109,7 +110,7 @@ rule Flow {
 
 rule Marker {
   meta { id: "TEST-MARKER-001", severity: low }
-  match custom.Marker as sink
+  issue custom.Marker as sink
 }
 `
 
@@ -130,19 +131,19 @@ func syntheticIncrementalOntology() *ontology.Ontology {
 	return onto
 }
 
-func syntheticIncrementalAdapters() []adapters.Adapter {
-	return []adapters.Adapter{
+func syntheticIncrementalBindings() []bindings.Applicator {
+	return []bindings.Applicator{
 		{
 			Name: "test.input", Technology: "test", Specificity: 10,
 			Fidelity: "resolved", Confidence: "high",
-			Apply: func(g usg.Store) []adapters.Mapping {
+			Apply: func(g usg.Store) []bindings.Mapping {
 				if !syntheticSourceActive("custom.Input") {
 					return nil
 				}
 				params, _ := g.NodesOfType("code.Param")
-				out := make([]adapters.Mapping, 0, len(params))
+				out := make([]bindings.Mapping, 0, len(params))
 				for _, id := range params {
-					out = append(out, adapters.Mapping{NodeID: id, Concept: "custom.Input"})
+					out = append(out, bindings.Mapping{NodeID: id, Concept: "custom.Input"})
 				}
 				return out
 			},
@@ -150,17 +151,17 @@ func syntheticIncrementalAdapters() []adapters.Adapter {
 		{
 			Name: "test.target", Technology: "test", Specificity: 10,
 			Fidelity: "resolved", Confidence: "high",
-			Apply: func(g usg.Store) []adapters.Mapping {
+			Apply: func(g usg.Store) []bindings.Mapping {
 				nodes, _ := g.AllNodes()
-				var out []adapters.Mapping
+				var out []bindings.Mapping
 				for _, n := range nodes {
 					switch n.Prop("method") {
 					case "emit":
 						if arg := n.Prop("arg0"); arg != "" {
-							out = append(out, adapters.Mapping{NodeID: arg, Concept: "custom.Target"})
+							out = append(out, bindings.Mapping{NodeID: arg, Concept: "custom.Target"})
 						}
 					case "marker":
-						out = append(out, adapters.Mapping{NodeID: n.ID, Concept: "custom.Marker"})
+						out = append(out, bindings.Mapping{NodeID: n.ID, Concept: "custom.Marker"})
 					}
 				}
 				return out
@@ -184,6 +185,9 @@ func syntheticSourceActive(concept string) bool {
 
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write %s: %v", path, err)
 	}
@@ -199,6 +203,52 @@ func eqKeys(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func bindingStatKey(root string) string {
+	h := sha256.New()
+	statStaticBindingData(h, root)
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func TestStaticBindingFingerprintIncludesSplitLayout(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "javascript.vyql"), "module bindings.javascript.flat;\n")
+	before := bindingStatKey(root)
+
+	writeFile(t, filepath.Join(root, "javascript", "javascript", "001", "codeHttpInput.vyql"), "module bindings.javascript.split;\n")
+	afterSplit := bindingStatKey(root)
+	if afterSplit == before {
+		t.Fatal("static binding fingerprint did not include split binding file")
+	}
+
+	writeFile(t, filepath.Join(root, "packages", "generated", "javascript", "express.vyql"), "module bindings.javascript.generated;\n")
+	afterGenerated := bindingStatKey(root)
+	if afterGenerated != afterSplit {
+		t.Fatal("static binding fingerprint should not include generated package corpus")
+	}
+}
+
+func TestScanFingerprintVendorAssetsMatchScanSurface(t *testing.T) {
+	root := t.TempDir()
+	cases := []struct {
+		rel  string
+		skip bool
+	}{
+		{"vendor", false},
+		{"vendor/assets", false},
+		{"vendor/assets/javascripts", false},
+		{"vendor/bundle", true},
+		{"vendor/lib", true},
+		{"app/vendor/assets/javascripts", false},
+		{"app/vendor/cache", true},
+	}
+	for _, tc := range cases {
+		path := filepath.Join(root, filepath.FromSlash(tc.rel))
+		if got := vendorFingerprintDirShouldSkip(root, path); got != tc.skip {
+			t.Fatalf("%s skip=%v, want %v", tc.rel, got, tc.skip)
+		}
+	}
 }
 
 // TestIncrementalFingerprintActiveSources proves the incremental cache fingerprints the active

@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m5c270092;
+
+binding urlFetch17 {
+  requires {
+    dependency("got")
+  }
+  query pattern callExpr where callee.path ~= "got"
+  emit sink code.UrlFetch at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m5f1cfebd;
+
+binding deserialization0 {
+  requires {
+    dependency("ipaddress")
+  }
+  query pattern callExpr where callee.method == "IPAddress::parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule PublicKeyHashBindingReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_347]
+    id: "VYQL-CRY-030"
+    severity: high
+  }
+  issue code.PublicKeyHashBindingReview as sink
+}

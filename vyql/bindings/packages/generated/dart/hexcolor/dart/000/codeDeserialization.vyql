@@ -1,0 +1,9 @@
+module bindings.dart.generated.m61e909bd;
+
+binding deserialization0 {
+  requires {
+    dependency("hexcolor")
+  }
+  query pattern callExpr where callee.method == "HexColor"
+  emit sink code.Deserialization at args[0]
+}

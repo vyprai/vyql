@@ -1,0 +1,11 @@
+module code;
+
+concept GitPackSignatureSearchParsingBypass : issue {
+  cwe: [CWE_20, CWE_115]
+  reviewAssumption: "a pusher can place PACK bytes in later commit or blob content so policy checks parse the wrong pack data"
+  reviewCategory: input_validation
+  reviewCondition: "Git smart-push pack parsing locates PACK bytes by searching the request body instead of deriving the pack offset from packet-line framing"
+  reviewConfidence: high
+  reviewEvidence: "Git pack parser context {pattern} searches req.body for PACK and slices at that offset before getPackMeta"
+  vulnerableTo: [validation.ImproperInputValidation, injection.ProtocolStateConfusion]
+}

@@ -1,0 +1,13 @@
+module bindings.rust.generated.maacb195e;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("schannel")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

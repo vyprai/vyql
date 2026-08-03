@@ -1,0 +1,9 @@
+module bindings.dart.generated.m44c57a46;
+
+binding networkSend1 {
+  requires {
+    dependency("cloud_functions")
+  }
+  query pattern callExpr where callee.method == "httpsFunctionCall"
+  emit sink code.NetworkSend at args[0]
+}

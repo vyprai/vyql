@@ -1,9 +1,0 @@
-import code.{CommandExecution, CliArgument}
-import core.{UserControlledData, ShellEscape}
-
-adapter rust {
-  package "shlex" {
-    source method "split" -> core.UserControlledData
-    control method "try_quote" -> core.ShellEscape
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m3e3aad71;
+
+binding filePathAccess9 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_unlink"
+  emit sink code.FilePathAccess at args[0]
+}

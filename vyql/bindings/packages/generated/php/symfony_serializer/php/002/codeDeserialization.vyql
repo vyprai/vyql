@@ -1,0 +1,9 @@
+module bindings.php.generated.m7cbcf5b4;
+
+binding deserialization2 {
+  requires {
+    dependency("symfony/serializer")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

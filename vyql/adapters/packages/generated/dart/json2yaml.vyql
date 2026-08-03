@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter dart {
-  package "json2yaml" {
-    sink method "json2yaml" -> code.Deserialization
-  }
-}

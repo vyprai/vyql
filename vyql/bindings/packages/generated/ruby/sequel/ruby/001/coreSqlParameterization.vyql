@@ -1,0 +1,14 @@
+module bindings.ruby.generated.me8697759;
+
+binding sqlParameterization1 {
+  requires {
+    dependency("sequel")
+  }
+  query pattern callExpr where callee.method == "prepare"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

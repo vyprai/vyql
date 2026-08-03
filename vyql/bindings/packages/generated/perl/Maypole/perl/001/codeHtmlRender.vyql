@@ -1,0 +1,9 @@
+module bindings.perl.generated.m586d2dfa;
+
+binding htmlRender1 {
+  requires {
+    dependency("Maypole")
+  }
+  query pattern callExpr where callee.method == "CGI::Maypole::run"
+  emit sink code.HtmlRender at args[0]
+}

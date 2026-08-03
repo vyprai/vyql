@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding stdinInput1 {
+  query pattern callExpr where callee.path ~= "Console.ReadLine"
+  emit source code.StdinInput at call.result
+}

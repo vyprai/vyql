@@ -1,0 +1,9 @@
+module bindings.rust.generated.m9bafc7e4;
+
+binding weakHash5 {
+  requires {
+    dependency("fxhash")
+  }
+  query pattern callExpr where callee.method == "write_u32"
+  emit issue code.WeakHash at call
+}

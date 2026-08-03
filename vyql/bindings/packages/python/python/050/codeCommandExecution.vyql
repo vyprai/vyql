@@ -1,0 +1,9 @@
+module bindings.python.generated.m3d9ccbad;
+
+binding commandExecution50 {
+  requires {
+    dependency("os")
+  }
+  query pattern callExpr where callee.path ~= "os.system"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m5db73ff9;
+
+binding codeEval1 {
+  requires {
+    dependency("capybara")
+  }
+  query pattern callExpr where callee.method == "evaluate_script"
+  emit sink code.CodeEval at args[0]
+}

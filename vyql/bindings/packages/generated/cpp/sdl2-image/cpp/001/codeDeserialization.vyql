@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m3f557ad4;
+
+binding deserialization1 {
+  requires {
+    dependency("sdl2-image")
+  }
+  query pattern callExpr where callee.method == "qoi_decode"
+  emit sink code.Deserialization at args[0]
+}

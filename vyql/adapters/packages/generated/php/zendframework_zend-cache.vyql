@@ -1,5 +1,0 @@
-adapter php {
-  package "zendframework/zend-cache" {
-    sink method "ob_start" -> code.HtmlRender
-  }
-}

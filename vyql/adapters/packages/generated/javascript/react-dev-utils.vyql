@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter javascript {
-  package "react-dev-utils" {
-    sink method "crossSpawn" -> code.CommandExecution
-  }
-}

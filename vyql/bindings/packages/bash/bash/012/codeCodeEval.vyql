@@ -1,0 +1,9 @@
+module bindings.bash.generated.mb6f991a5;
+
+binding codeEval12 {
+  requires {
+    dependency("python")
+  }
+  query pattern callExpr where callee.path ~= "python"
+  emit sink code.CodeEval at args[1]
+}

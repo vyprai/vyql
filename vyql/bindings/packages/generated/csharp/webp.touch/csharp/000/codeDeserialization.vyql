@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m57cf98ba;
+
+binding deserialization0 {
+  requires {
+    dependency("webp.touch")
+  }
+  query pattern callExpr where callee.method == "Decode"
+  emit sink code.Deserialization at args[0]
+}

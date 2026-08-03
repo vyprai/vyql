@@ -1,0 +1,9 @@
+module bindings.perl.generated.mc51f2d06;
+
+binding networkSend6 {
+  requires {
+    dependency("CDDB")
+  }
+  query pattern callExpr where callee.method == "submit_disc"
+  emit sink code.NetworkSend at args[0]
+}

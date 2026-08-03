@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter c {
-  package "qt5-x11extras" {
-    sink method "peekEventQueue" -> code.CodeEval
-  }
-}

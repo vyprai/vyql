@@ -1,6 +1,0 @@
-adapter elixir {
-  package "amrita" {
-    source method "Amrita.Engine.Filters.parse" -> core.UserControlledData
-    source method "Mix.Tasks.Amrita.run" -> core.UserControlledData
-  }
-}

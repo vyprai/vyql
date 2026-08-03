@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m3ccedd5b;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-frontend-jaxws")
+  }
+  query pattern callExpr where callee.method == "invoke"
+  emit sink code.Deserialization at args[0]
+}

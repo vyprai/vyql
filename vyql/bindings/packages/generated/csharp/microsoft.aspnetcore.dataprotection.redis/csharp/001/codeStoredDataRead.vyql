@@ -1,0 +1,9 @@
+module bindings.csharp.generated.mbb14a39b;
+
+binding storedDataRead1 {
+  requires {
+    dependency("microsoft.aspnetcore.dataprotection.redis")
+  }
+  query pattern callExpr where callee.method == "GetAllElements"
+  emit source code.StoredDataRead at call.result
+}

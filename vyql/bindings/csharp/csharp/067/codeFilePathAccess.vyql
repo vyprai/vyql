@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding filePathAccess67 {
+  query pattern callExpr where callee.path ~= "File.Move"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{HttpInput, NetworkSend}
-adapter scala {
-  package "org.glassfish.jersey.containers:jersey-container-grizzly2-http" {
-    source method "service" -> code.HttpInput
-    sink method "service" -> code.NetworkSend
-  }
-}

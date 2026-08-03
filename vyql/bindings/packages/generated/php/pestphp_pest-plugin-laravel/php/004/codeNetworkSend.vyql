@@ -1,0 +1,9 @@
+module bindings.php.generated.m0f2ba173;
+
+binding networkSend4 {
+  requires {
+    dependency("pestphp/pest-plugin-laravel")
+  }
+  query pattern callExpr where callee.method == "withoutToken"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter go {
-  package "github.com/fatih/structtag" {
-    sink method "Parse" -> code.Deserialization
-  }
-}

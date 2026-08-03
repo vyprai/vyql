@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc6b388cf;
+
+binding networkConnect4 {
+  requires {
+    dependency("github.com/Building42/Telegraph")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

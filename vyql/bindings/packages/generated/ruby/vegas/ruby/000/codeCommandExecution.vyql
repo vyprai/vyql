@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mfa6a3e56;
+
+binding commandExecution0 {
+  requires {
+    dependency("vegas")
+  }
+  query pattern callExpr where callee.method == "launch!"
+  emit sink code.CommandExecution at args[0]
+}

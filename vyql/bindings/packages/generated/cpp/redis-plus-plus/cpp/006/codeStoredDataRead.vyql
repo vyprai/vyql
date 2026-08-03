@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m2bcacd66;
+
+binding storedDataRead6 {
+  requires {
+    dependency("redis-plus-plus")
+  }
+  query pattern callExpr where callee.method == "info"
+  emit source code.StoredDataRead at call.result
+}

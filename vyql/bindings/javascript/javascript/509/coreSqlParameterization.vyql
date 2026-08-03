@@ -1,0 +1,11 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding sqlParameterization509 {
+  query pattern callExpr where callee.path ~= "mysql.escape"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

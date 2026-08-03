@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding compressedBlockSizeCapacityMismatch99 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "compressed_block.capacity_mismatch"
+  emit issue code.CompressedBlockSizeCapacityMismatch at node
+}

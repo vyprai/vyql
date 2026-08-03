@@ -1,0 +1,9 @@
+module bindings.swift.generated.ma9d2693c;
+
+binding cliArgument2 {
+  requires {
+    dependency("github.com/apple/swift-argument-parser")
+  }
+  query pattern callExpr where callee.method == "asyncParse"
+  emit source code.CliArgument at call.result
+}

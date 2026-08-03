@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding frappeLinkExpansionMissingReadPermission526 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "frappe_link_expansion_missing_read_permission"
+  emit issue code.FrappeLinkExpansionMissingReadPermission at node
+}

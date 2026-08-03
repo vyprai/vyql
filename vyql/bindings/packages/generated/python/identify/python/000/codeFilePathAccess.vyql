@@ -1,0 +1,9 @@
+module bindings.python.generated.mafcd9c02;
+
+binding filePathAccess0 {
+  requires {
+    dependency("identify")
+  }
+  query pattern callExpr where callee.method == "tags_from_path"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-adapter rust {
-  package "wayland-cursor" {
-    source method "load" -> core.UserControlledData
-    source method "load_or" -> core.UserControlledData
-    source method "load_from_name" -> core.UserControlledData
-  }
-}

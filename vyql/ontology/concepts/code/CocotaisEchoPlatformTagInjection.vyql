@@ -1,0 +1,11 @@
+module code;
+
+concept CocotaisEchoPlatformTagInjection : issue {
+  cwe: [CWE_74]
+  reviewAssumption: "QQ platform tags such as qqbot-at-everyone are interpreted in bot replies with privileges unavailable to ordinary users"
+  reviewCategory: injection
+  reviewCondition: "Cocotais builtin echo replies with user-controlled platform tags using bot privileges"
+  reviewConfidence: high
+  reviewEvidence: "builtin echo context {pattern} joins command arguments and passes them directly to event.reply"
+  vulnerableTo: [injection.ArgumentInjection, access_control.PrivilegeEscalation]
+}

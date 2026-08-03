@@ -1,0 +1,10 @@
+module bindings.java.generated.m420f6b67;
+
+binding authorizationCheck201 {
+  query pattern callExpr where callee.method == "hasRole"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

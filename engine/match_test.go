@@ -1,17 +1,18 @@
 package engine
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
 func compileEval(t *testing.T, src string, s usg.Store) []int {
 	t.Helper()
 	onto := solverContractOntology()
-	decls, err := parser.Parse(src)
+	decls, err := parseV2DefinitionsForTest(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -31,12 +32,60 @@ func compileEval(t *testing.T, src string, s usg.Store) []int {
 	return counts
 }
 
-func TestMatchComposesReachAndAssume(t *testing.T) {
+func compileEvalV2(t *testing.T, src string, s usg.Store) []int {
+	t.Helper()
+	onto := solverContractOntology()
+	decls, err := parseV2DefinitionsForTest(src)
+	if err != nil {
+		t.Fatalf("parse v2: %v", err)
+	}
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	eng := New(onto, s)
+	var counts []int
+	for _, cr := range compiled {
+		fs, err := eng.Evaluate(cr)
+		if err != nil {
+			t.Fatalf("eval: %v", err)
+		}
+		counts = append(counts, len(fs))
+	}
+	return counts
+}
+
+func compileFindingsV2(t *testing.T, src string, s usg.Store) []*findings.Finding {
+	t.Helper()
+	onto := solverContractOntology()
+	decls, err := parseV2DefinitionsForTest(src)
+	if err != nil {
+		t.Fatalf("parse v2: %v", err)
+	}
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	if len(compiled) != 1 {
+		t.Fatalf("compiled rules = %d, want 1", len(compiled))
+	}
+	fs, err := New(onto, s).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	return fs
+}
+
+func coverageLabel(concept, coverage string) usg.Label {
+	return usg.Label{Concept: concept, Detail: map[string]string{"coverage": coverage}}
+}
+
+func TestMatchComposesReachAndGrant(t *testing.T) {
 	src := `
-package test;
+module test;
 rule ComposedMatch {
-  match custom.WorkItem as w
-  where reach(custom.Edge, w.workload) and assume(w, custom.Capability)
+  issue custom.WorkItem as w
+  where reach(custom.Edge, w.workload) and grant(w, custom.Capability)
 }
 `
 	s := usg.NewInMemStore()
@@ -62,15 +111,84 @@ rule ComposedMatch {
 	}
 }
 
-func TestMatchConfidenceIgnoresUnrelatedCoLocatedLabel(t *testing.T) {
-	rule := `
-package test;
-rule PreciseMatch {
-  meta { id: "X-MATCH", confidence_floor: high }
-  match custom.Precise as p
+func TestMatchComposesRepeatedWhereClauses(t *testing.T) {
+	src := `
+module test;
+rule RepeatedWhere {
+  issue custom.WorkItem as w
+  where w.kind == api
+  where w.tier == prod
 }
 `
-	decls, err := parser.Parse(rule)
+	s := usg.NewInMemStore()
+	s.AddNode(usg.Node{ID: "ok", Type: "custom.WorkItem", Props: map[string]string{"kind": "api", "tier": "prod"}})
+	s.AddLabel("ok", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "wrong-tier", Type: "custom.WorkItem", Props: map[string]string{"kind": "api", "tier": "dev"}})
+	s.AddLabel("wrong-tier", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "wrong-kind", Type: "custom.WorkItem", Props: map[string]string{"kind": "worker", "tier": "prod"}})
+	s.AddLabel("wrong-kind", usg.Label{Concept: "custom.WorkItem"})
+
+	counts := compileEvalV2(t, src, s)
+	if counts[0] != 1 {
+		t.Fatalf("repeated where clauses should compose as AND, got %d", counts[0])
+	}
+}
+
+func TestMatchSupportsWhereOrExpression(t *testing.T) {
+	src := `
+module test;
+rule EitherKind {
+  issue custom.WorkItem as w
+  where w.kind == api or w.kind == worker
+}
+`
+	s := usg.NewInMemStore()
+	s.AddNode(usg.Node{ID: "api", Type: "custom.WorkItem", Props: map[string]string{"kind": "api"}})
+	s.AddLabel("api", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "worker", Type: "custom.WorkItem", Props: map[string]string{"kind": "worker"}})
+	s.AddLabel("worker", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "batch", Type: "custom.WorkItem", Props: map[string]string{"kind": "batch"}})
+	s.AddLabel("batch", usg.Label{Concept: "custom.WorkItem"})
+
+	counts := compileEvalV2(t, src, s)
+	if counts[0] != 2 {
+		t.Fatalf("or where expression should match two candidates, got %d", counts[0])
+	}
+}
+
+func TestMatchSupportsWhereNumericComparisons(t *testing.T) {
+	src := `
+module test;
+rule HighScore {
+  issue custom.WorkItem as w
+  where w.score >= 7
+}
+`
+	s := usg.NewInMemStore()
+	s.AddNode(usg.Node{ID: "high", Type: "custom.WorkItem", Props: map[string]string{"score": "9"}})
+	s.AddLabel("high", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "exact", Type: "custom.WorkItem", Props: map[string]string{"score": "7"}})
+	s.AddLabel("exact", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "low", Type: "custom.WorkItem", Props: map[string]string{"score": "6"}})
+	s.AddLabel("low", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "text", Type: "custom.WorkItem", Props: map[string]string{"score": "high"}})
+	s.AddLabel("text", usg.Label{Concept: "custom.WorkItem"})
+
+	counts := compileEvalV2(t, src, s)
+	if counts[0] != 2 {
+		t.Fatalf("numeric where comparison should match high and exact candidates, got %d", counts[0])
+	}
+}
+
+func TestMatchConfidenceIgnoresUnrelatedCoLocatedLabel(t *testing.T) {
+	rule := `
+module test;
+rule PreciseMatch {
+  meta { id: "X-MATCH", confidence_floor: high }
+  issue custom.Precise as p
+}
+`
+	decls, err := parseV2DefinitionsForTest(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -100,11 +218,11 @@ rule PreciseMatch {
 
 func TestConceptMatchAndTransition(t *testing.T) {
 	actionRule := `
-package test;
+module test;
 rule UnguardedAction {
-  match custom.Action as a
+  issue custom.Action as a
   where a.actor is custom.ActorKind and a.resource is custom.ResourceKind
-  unless guarded_by custom.Transform
+  unless sink.endpoint coveredBy custom.Transform
 }
 `
 	g := usg.NewInMemStore()
@@ -118,17 +236,16 @@ rule UnguardedAction {
 	g2.AddNode(usg.Node{ID: "action1", Type: "custom.Action", Props: map[string]string{"actor": "custom.ActorKind", "resource": "custom.ResourceKind"}})
 	g2.AddLabel("action1", usg.Label{Concept: "custom.Action"})
 	g2.AddNode(usg.Node{ID: "guard", Type: "custom.Control"})
-	g2.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g2.AddLabel("guard", coverageLabel("custom.Transform", "endpoint"))
 	g2.AddEdge(usg.Edge{Type: "CHECKS", Src: "guard", Dst: "action1"})
 	if c := compileEval(t, actionRule, g2); c[0] != 0 {
 		t.Fatalf("guarded action: expected 0 findings, got %d", c[0])
 	}
 
 	transitionRule := `
-package test;
+module test;
 rule InvalidTransition {
-  match transition * -> Done on Workflow as t
-  unless t.from == Allowed
+  query state as t where t.machine == Workflow and t.from == Started and t.to == Done select t
 }
 `
 	gt := usg.NewInMemStore()
@@ -145,15 +262,15 @@ rule InvalidTransition {
 
 func TestMatchGuardedByDominatingBranchCondition(t *testing.T) {
 	actionRule := `
-package test;
+module test;
 rule GuardedAction {
-  match custom.Action as a
-  unless guarded_by custom.Transform
+  issue custom.Action as a
+  unless a.endpoint coveredBy custom.Transform
 }
 `
 	g := usg.NewInMemStore()
 	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "sample.go:10", Region: "sample.go/fn1/if1.t", Order: 10, HasOrder: true})
-	g.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g.AddLabel("guard", coverageLabel("custom.Transform", "endpoint"))
 	g.AddNode(usg.Node{ID: "action", Type: "code.Arg", Loc: "sample.go:11", Region: "sample.go/fn1/if1.t/if2.t", Order: 11, HasOrder: true})
 	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
 
@@ -162,22 +279,213 @@ rule GuardedAction {
 	}
 }
 
+func TestMatchSameScopeCoveredBy(t *testing.T) {
+	rule := `
+module test;
+rule SameScopeAction {
+  issue custom.Action as a
+  unless a.sameScope coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.Call", Loc: "sample.go:10", Scope: "sample.go/fn1"})
+	g.AddLabel("guard", coverageLabel("custom.Transform", "sameScope"))
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:11", Scope: "sample.go/fn1/if1"})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	if c := compileEvalV2(t, rule, g); c[0] != 0 {
+		t.Fatalf("same-scope guard should suppress nested action, got %d", c[0])
+	}
+}
+
+func TestMatchSameScopeCoveredByDifferentScopeDoesNotSuppress(t *testing.T) {
+	rule := `
+module test;
+rule SameScopeAction {
+  issue custom.Action as a
+  unless a.sameScope coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.Call", Loc: "sample.go:10", Scope: "sample.go/fn1"})
+	g.AddLabel("guard", coverageLabel("custom.Transform", "sameScope"))
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:20", Scope: "sample.go/fn2"})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	if c := compileEvalV2(t, rule, g); c[0] != 1 {
+		t.Fatalf("different-scope guard should not suppress action, got %d", c[0])
+	}
+}
+
+func TestMatchGlobalCoveredByRequiresGlobalEvidence(t *testing.T) {
+	rule := `
+module test;
+rule GlobalAction {
+  issue custom.Action as a
+  unless a.global coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.Call", Loc: "sample.go:10"})
+	g.AddLabel("guard", usg.Label{Concept: "custom.Transform", Detail: map[string]string{"coverage": "global"}})
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:20"})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	if c := compileEvalV2(t, rule, g); c[0] != 0 {
+		t.Fatalf("global guard should suppress action, got %d", c[0])
+	}
+}
+
+func TestMatchGlobalCoveredByIgnoresOrdinaryEvidence(t *testing.T) {
+	rule := `
+module test;
+rule GlobalAction {
+  issue custom.Action as a
+  unless a.global coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.Call", Loc: "sample.go:10"})
+	g.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:20"})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	if c := compileEvalV2(t, rule, g); c[0] != 1 {
+		t.Fatalf("ordinary guard evidence should not satisfy global coverage, got %d", c[0])
+	}
+}
+
+func TestMatchCoverageEvidenceUsesV2ClauseSpelling(t *testing.T) {
+	rule := `
+module test;
+rule CoveredAction {
+  issue custom.Action as a
+  unless a.sameReceiver coveredBy custom.Transform
+  unless a.postDominates coveredBy custom.Transform
+  unless a.global coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:20"})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	fs := compileFindingsV2(t, rule, g)
+	if len(fs) != 1 {
+		t.Fatalf("expected unsuppressed finding, got %d", len(fs))
+	}
+	got := map[string]bool{}
+	for _, ne := range fs[0].NegationEvidence {
+		got[ne.Clause] = true
+		if strings.Contains(ne.Clause, "_covered_by") {
+			t.Fatalf("coverage clause used legacy spelling: %+v", ne)
+		}
+	}
+	for _, want := range []string{
+		"sameReceiver coveredBy custom.Transform",
+		"postDominates coveredBy custom.Transform",
+		"global coveredBy custom.Transform",
+	} {
+		if !got[want] {
+			t.Fatalf("missing coverage evidence clause %q in %+v", want, fs[0].NegationEvidence)
+		}
+	}
+}
+
+func TestMatchDominatesCoveredBySuppressesDominatedAction(t *testing.T) {
+	rule := `
+module test;
+rule DominatedAction {
+  issue custom.Action as a
+  unless a.dominates coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "sample.go:10", Region: "sample.go/fn1/if1.t", Order: 10, HasOrder: true})
+	g.AddLabel("guard", coverageLabel("custom.Transform", "dominates"))
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:11", Region: "sample.go/fn1/if1.t/if2.t", Order: 11, HasOrder: true})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	if c := compileEvalV2(t, rule, g); c[0] != 0 {
+		t.Fatalf("dominating guard should satisfy dominates coverage, got %d", c[0])
+	}
+}
+
+func TestMatchDominatesCoveredByDoesNotUsePostDominance(t *testing.T) {
+	rule := `
+module test;
+rule DominatedAction {
+  issue custom.Action as a
+  unless a.dominates coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:10", Region: "sample.go/fn1/if1.t", Order: 10, HasOrder: true})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+	g.AddNode(usg.Node{ID: "release", Type: "code.Call", Loc: "sample.go:20", Region: "sample.go/fn1", Order: 20, HasOrder: true})
+	g.AddLabel("release", coverageLabel("custom.Transform", "dominates"))
+
+	if c := compileEvalV2(t, rule, g); c[0] != 1 {
+		t.Fatalf("post-dominating release must not satisfy dominates coverage, got %d", c[0])
+	}
+}
+
+func TestMatchDominatesCoveredByIgnoresAdvisoryEvidence(t *testing.T) {
+	rule := `
+module test;
+rule DominatedAction {
+  issue custom.Action as a
+  unless a.dominates coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "sample.go:10", Region: "sample.go/fn1", Order: 10, HasOrder: true})
+	g.AddLabel("guard", usg.Label{Concept: "custom.Transform", Detail: map[string]string{"advisory": "true"}})
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:11", Region: "sample.go/fn1/if1.t", Order: 11, HasOrder: true})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	if c := compileEvalV2(t, rule, g); c[0] != 1 {
+		t.Fatalf("advisory guard must not satisfy dominates coverage, got %d", c[0])
+	}
+}
+
+func TestTaintDominatesCoveredBySuppressesDominatedSink(t *testing.T) {
+	rule := `
+module test;
+rule DominatedFlow {
+  taint custom.Input -> custom.Target as sink
+  unless sink.dominates coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "input", Type: "code.Call", Loc: "sample.go:5"})
+	g.AddLabel("input", usg.Label{Concept: "custom.Input"})
+	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "sample.go:10", Region: "sample.go/fn1", Order: 10, HasOrder: true})
+	g.AddLabel("guard", coverageLabel("custom.Transform", "dominates"))
+	g.AddNode(usg.Node{ID: "sink", Type: "code.Call", Loc: "sample.go:11", Region: "sample.go/fn1/if1.t", Order: 11, HasOrder: true})
+	g.AddLabel("sink", usg.Label{Concept: "custom.Target"})
+	g.AddEdge(usg.Edge{Type: "FLOWS", Src: "input", Dst: "sink"})
+
+	if c := compileEvalV2(t, rule, g); c[0] != 0 {
+		t.Fatalf("dominating guard should suppress taint finding, got %d", c[0])
+	}
+}
+
 func TestMatchGuardedByDominatingBranchConditionWithQualifiedConcepts(t *testing.T) {
 	rule := `
-package vypr.memory;
+module vypr.memory;
 rule CountDerivedElementAccess {
   meta { id: "TEST-MEM", severity: medium, cwe: [CWE_125] }
-  match code.CountDerivedElementAccess as idx
-  unless guarded_by core.MemoryBoundsCheck
+  issue code.CountDerivedElementAccess as idx
+  unless idx.endpoint coveredBy core.MemoryBoundsCheck
 }
 `
 	g := usg.NewInMemStore()
 	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "bucket.go:666", Region: "bucket.go/fn143/if144.e/if149.t", Order: 2032, HasOrder: true})
-	g.AddLabel("guard", usg.Label{Concept: "core.MemoryBoundsCheck"})
+	g.AddLabel("guard", coverageLabel("core.MemoryBoundsCheck", "endpoint"))
 	g.AddNode(usg.Node{ID: "idx", Type: "code.Arg", Loc: "bucket.go:667", Region: "bucket.go/fn143/if144.e/if149.t/if150.t", Order: 2038, HasOrder: true})
 	g.AddLabel("idx", usg.Label{Concept: "code.CountDerivedElementAccess"})
 
-	decls, err := parser.Parse(rule)
+	decls, err := parseV2DefinitionsForTest(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -196,20 +504,20 @@ rule CountDerivedElementAccess {
 
 func TestMatchGuardedBySameXmlFactoryHardening(t *testing.T) {
 	rule := `
-package vypr.deserialization;
+module vypr.deserialization;
 rule XxeUnhardened {
   meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
-  match code.XmlParserCreate as p
-  unless guarded_by core.XmlHardening
+  issue code.XmlParserCreate as p
+  unless p.sameReceiver coveredBy core.XmlHardening
 }
 `
 	g := usg.NewInMemStore()
 	g.AddNode(usg.Node{ID: "hardening", Type: "code.Call", Loc: "Parser.java:10", Region: "Parser.java/static", Props: map[string]string{"callee_path": "FACTORY.setFeature"}})
-	g.AddLabel("hardening", usg.Label{Concept: "core.XmlHardening"})
+	g.AddLabel("hardening", coverageLabel("core.XmlHardening", "sameReceiver"))
 	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Region: "Parser.java/fn1", Props: map[string]string{"callee_path": "FACTORY.newDocumentBuilder"}})
 	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
 
-	decls, err := parser.Parse(rule)
+	decls, err := parseV2DefinitionsForTest(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -223,5 +531,134 @@ rule XxeUnhardened {
 	}
 	if len(fs) != 0 {
 		t.Fatalf("same XML factory hardening should suppress parser creation, got %d", len(fs))
+	}
+}
+
+func TestMatchGuardedBySameReceiverNodeLabel(t *testing.T) {
+	rule := `
+module vypr.deserialization;
+rule XxeUnhardened {
+  meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
+  issue code.XmlParserCreate as p
+  unless p.sameReceiver coveredBy core.XmlHardening
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "factory", Type: "code.Name", Loc: "Parser.java:10"})
+	g.AddLabel("factory", coverageLabel("core.XmlHardening", "sameReceiver"))
+	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Props: map[string]string{"recv": "factory"}})
+	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
+
+	decls, err := parseV2DefinitionsForTest(rule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	compiled, errs := CompileRules(decls, ontology.Seed())
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	fs, err := New(ontology.Seed(), g).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 0 {
+		t.Fatalf("same receiver label should suppress parser creation, got %d", len(fs))
+	}
+}
+
+func TestV2SameReceiverCoveredByIgnoresEndpointEvidence(t *testing.T) {
+	rule := `
+module vypr.deserialization;
+rule XxeUnhardened {
+  meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
+  issue code.XmlParserCreate as p
+  unless p.sameReceiver coveredBy core.XmlHardening
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "hardening", Type: "code.Call", Loc: "Parser.java:10"})
+	g.AddLabel("hardening", coverageLabel("core.XmlHardening", "endpoint"))
+	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20"})
+	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
+	g.AddEdge(usg.Edge{Type: "PROTECTS", Src: "hardening", Dst: "parser"})
+
+	decls, err := parseV2DefinitionsForTest(rule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	compiled, errs := CompileRules(decls, ontology.Seed())
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	fs, err := New(ontology.Seed(), g).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 1 {
+		t.Fatalf("endpoint evidence should not satisfy sameReceiver coverage, got %d findings", len(fs))
+	}
+}
+
+func TestV2EndpointCoveredByIgnoresSameReceiverEvidence(t *testing.T) {
+	rule := `
+module vypr.deserialization;
+rule XxeUnhardened {
+  meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
+  issue code.XmlParserCreate as p
+  unless p.endpoint coveredBy core.XmlHardening
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "factory", Type: "code.Name", Loc: "Parser.java:10"})
+	g.AddLabel("factory", coverageLabel("core.XmlHardening", "sameReceiver"))
+	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Props: map[string]string{"recv": "factory"}})
+	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
+
+	decls, err := parseV2DefinitionsForTest(rule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	compiled, errs := CompileRules(decls, ontology.Seed())
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	fs, err := New(ontology.Seed(), g).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 1 {
+		t.Fatalf("sameReceiver evidence should not satisfy endpoint coverage, got %d findings", len(fs))
+	}
+}
+
+func TestV2SameReceiverCoveredByReceiverNodeLabel(t *testing.T) {
+	rule := `
+module vypr.deserialization;
+rule XxeUnhardened {
+  meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
+  issue code.XmlParserCreate as p
+  unless p.sameReceiver coveredBy core.XmlHardening
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "factory", Type: "code.Name", Loc: "Parser.java:10"})
+	g.AddLabel("factory", coverageLabel("core.XmlHardening", "sameReceiver"))
+	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Props: map[string]string{"recv": "factory"}})
+	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
+
+	decls, err := parseV2DefinitionsForTest(rule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	compiled, errs := CompileRules(decls, ontology.Seed())
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	fs, err := New(ontology.Seed(), g).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 0 {
+		t.Fatalf("same receiver label should satisfy sameReceiver coverage, got %d findings", len(fs))
 	}
 }

@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/eclipse/paho.mqtt.golang" {
-    source method "Get" -> code.SecretValue
-  }
-}

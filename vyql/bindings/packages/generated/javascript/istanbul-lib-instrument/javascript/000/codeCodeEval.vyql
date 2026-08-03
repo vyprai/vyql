@@ -1,0 +1,9 @@
+module bindings.javascript.generated.medd863f3;
+
+binding codeEval0 {
+  requires {
+    dependency("istanbul-lib-instrument")
+  }
+  query pattern callExpr where callee.method == "instrumentSync"
+  emit sink code.CodeEval at args[0]
+}

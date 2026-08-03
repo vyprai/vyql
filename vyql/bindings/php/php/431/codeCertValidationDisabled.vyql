@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding certValidationDisabled431 {
+  query pattern presenceNode where node.context.language == "php" and node.context.phpReview == "curl_ssl_verifyhost_disabled"
+  emit issue code.CertValidationDisabled at node
+}

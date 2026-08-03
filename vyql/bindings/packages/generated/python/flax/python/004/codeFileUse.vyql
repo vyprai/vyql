@@ -1,0 +1,9 @@
+module bindings.python.generated.m3a7d1447;
+
+binding fileUse4 {
+  requires {
+    dependency("flax")
+  }
+  query pattern callExpr where callee.method == "rename"
+  emit sink code.FileUseSink at args[0]
+}

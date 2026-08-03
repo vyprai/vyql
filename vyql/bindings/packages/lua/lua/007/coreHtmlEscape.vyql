@@ -1,0 +1,14 @@
+module bindings.lua.generated.m49b0a04f;
+
+binding htmlEscape7 {
+  requires {
+    dependency("lapis")
+  }
+  query pattern callExpr where callee.path ~= "lapis.util.escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

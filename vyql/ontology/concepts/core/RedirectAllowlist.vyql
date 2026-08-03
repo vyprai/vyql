@@ -1,0 +1,8 @@
+module core;
+
+concept RedirectAllowlist : check {
+  applies: path
+  covers: [endpoint, path]
+  cwe: [CWE_601]
+  neutralizes: [request_forgery.OpenRedirect]
+}

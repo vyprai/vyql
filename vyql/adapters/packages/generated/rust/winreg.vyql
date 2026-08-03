@@ -1,5 +1,0 @@
-adapter rust {
-  package "winreg" {
-    source method "Key" -> code.SecretValue
-  }
-}

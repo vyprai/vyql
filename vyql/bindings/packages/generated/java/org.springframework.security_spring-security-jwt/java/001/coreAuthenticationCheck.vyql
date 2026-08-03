@@ -1,0 +1,13 @@
+module bindings.java.generated.m3e5b9ddc;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("org.springframework.security:spring-security-jwt")
+  }
+  query pattern callExpr where callee.method == "JwtHelper.decodeAndVerify"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

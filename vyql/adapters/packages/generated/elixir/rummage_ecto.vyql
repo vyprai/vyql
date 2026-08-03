@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-
-adapter elixir {
-  package "rummage_ecto" {
-    sink method "rummage" -> code.SqlExecution
-    sink method "rummageq" -> code.SqlExecution
-  }
-}

@@ -1,5 +1,0 @@
-adapter python {
-  package "safety" {
-    source method "token" -> code.SecretValue
-  }
-}

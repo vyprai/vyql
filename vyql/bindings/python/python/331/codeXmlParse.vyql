@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding xmlParse331 {
+  query pattern callExpr where callee.path ~= "xml.sax.parseString"
+  emit sink code.XmlParse at args[0]
+}

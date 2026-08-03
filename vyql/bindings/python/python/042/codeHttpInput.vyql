@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding httpInput42 {
+  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.literal contains "python_review:traceback_format_exc_pre_unescaped"
+  emit source code.HttpInput at call.result
+}

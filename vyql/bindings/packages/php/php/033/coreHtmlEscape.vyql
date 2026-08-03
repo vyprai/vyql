@@ -1,0 +1,14 @@
+module bindings.php.generated.mc5601031;
+
+binding htmlEscape33 {
+  requires {
+    dependency("twig/twig")
+  }
+  query pattern callExpr where callee.path ~= "twig_escape_filter"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

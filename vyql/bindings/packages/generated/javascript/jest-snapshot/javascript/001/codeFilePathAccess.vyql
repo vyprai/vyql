@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m0b7d9f96;
+
+binding filePathAccess1 {
+  requires {
+    dependency("jest-snapshot")
+  }
+  query pattern callExpr where callee.method == "jestWriteFile"
+  emit sink code.FilePathAccess at args[0]
+}

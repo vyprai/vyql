@@ -1,0 +1,10 @@
+module bindings.java.generated.m420f6b67;
+
+binding redirectAllowlist93 {
+  query pattern callExpr where callee.path ~= "Util.isSafeToRedirectTo"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

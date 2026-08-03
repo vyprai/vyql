@@ -1,0 +1,14 @@
+module bindings.elixir.generated.m5599724e;
+
+binding htmlEscape5 {
+  requires {
+    dependency("html_sanitize_ex")
+  }
+  query pattern callExpr where callee.method == "strip_tags"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,6 +1,0 @@
-adapter javascript {
-  package "clean-css" {
-    sink method "inlineRequestFrom" -> code.UrlFetch
-    source method "if" -> code.SecretValue
-  }
-}

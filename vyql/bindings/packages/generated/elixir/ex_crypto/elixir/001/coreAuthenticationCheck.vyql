@@ -1,0 +1,13 @@
+module bindings.elixir.generated.me81221c0;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("ex_crypto")
+  }
+  query pattern callExpr where callee.method == "ExCrypto.HMAC.verify_hmac"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding databaseRead112 {
+  query pattern callExpr where callee.method == "fetchall"
+  emit source code.DatabaseRead at call.result
+}

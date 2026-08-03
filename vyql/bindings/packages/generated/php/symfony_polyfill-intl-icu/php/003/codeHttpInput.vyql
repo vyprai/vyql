@@ -1,0 +1,9 @@
+module bindings.php.generated.mae4bb781;
+
+binding httpInput3 {
+  requires {
+    dependency("symfony/polyfill-intl-icu")
+  }
+  query pattern callExpr where callee.method == "acceptFromHttp"
+  emit source code.HttpInput at call.result
+}

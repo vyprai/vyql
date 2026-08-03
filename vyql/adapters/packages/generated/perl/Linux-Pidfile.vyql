@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-adapter perl {
-  package "Linux-Pidfile" {
-    sink method "create" -> code.FilePathAccess
-    sink method "_write" -> code.FilePathAccess
-    sink method "remove" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,6 @@
+module taint;
+
+concept PiiData : source {
+  coverageReservedSource: true
+  summary: "Data containing personally identifiable information."
+}

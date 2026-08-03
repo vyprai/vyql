@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m769267cd;
+
+binding userControlledData0 {
+  requires {
+    dependency("commanded")
+  }
+  query pattern callExpr where callee.method == "dispatch"
+  emit source core.UserControlledData at call.result
+}

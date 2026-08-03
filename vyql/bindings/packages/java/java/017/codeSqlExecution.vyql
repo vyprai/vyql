@@ -1,0 +1,9 @@
+module bindings.java.generated.m9ef49b0f;
+
+binding sqlExecution17 {
+  requires {
+    dependency("spring-jdbc")
+  }
+  query pattern callExpr where callee.method == "queryForList"
+  emit sink code.SqlExecution at args[0]
+}

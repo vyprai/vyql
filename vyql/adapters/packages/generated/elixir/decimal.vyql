@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "decimal" {
-    sink method "parse" -> code.Deserialization
-  }
-}

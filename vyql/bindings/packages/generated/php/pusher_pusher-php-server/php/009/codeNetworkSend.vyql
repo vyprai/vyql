@@ -1,0 +1,9 @@
+module bindings.php.generated.mde571bb4;
+
+binding networkSend9 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "triggerBatchAsync"
+  emit sink code.NetworkSend at args[0]
+}

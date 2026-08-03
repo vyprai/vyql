@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/phayes/checkstyle" {
-    sink method "ReadFile" -> code.Deserialization
-  }
-}

@@ -1,9 +1,0 @@
-import code.{UrlFetch}
-import core.{InputValidation, UserControlledData}
-
-adapter cpp {
-  package "opentelemetry-cpp" {
-    source method "UrlDecode" -> core.UserControlledData
-    control method "UrlEncode" -> core.InputValidation
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding composerGitBranchDiffCommandInjection126 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "getUnpushedChanges" and node.context.phpReview == "composer_git_branch_diff_command_injection"
+  emit issue code.ComposerGitBranchDiffCommandInjection at node
+}

@@ -1,8 +1,0 @@
-import code.{NetworkData, NetworkSend}
-
-adapter python {
-  package "wsproto" {
-    source method "receive_data" -> code.NetworkData
-    sink method "send" -> code.NetworkSend
-  }
-}

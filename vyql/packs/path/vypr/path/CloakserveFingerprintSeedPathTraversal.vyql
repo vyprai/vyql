@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule CloakserveFingerprintSeedPathTraversal {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22]
+    id: "VYQL-PATH-021"
+    severity: high
+  }
+  issue code.CloakserveFingerprintSeedPathTraversal as sink
+}

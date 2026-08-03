@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding authenticationRequiredOp149 {
+  query pattern presenceNode where node.path ~= "delete_account"
+  emit issue code.AuthenticationRequiredOp at node
+}

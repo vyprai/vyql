@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m05476c43;
+
+binding deserialization1 {
+  requires {
+    dependency("javax.activation:activation")
+  }
+  query pattern callExpr where callee.method == "setPrimaryType"
+  emit sink code.Deserialization at args[0]
+}

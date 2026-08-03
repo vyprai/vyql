@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding webViewLoad101 {
+  query pattern callExpr where callee.method == "loadUrl"
+  emit sink code.WebViewLoad at args[0]
+}

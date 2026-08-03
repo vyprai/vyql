@@ -1,0 +1,9 @@
+module bindings.ruby.generated.me382d2eb;
+
+binding weakHash2 {
+  requires {
+    dependency("akami")
+  }
+  query pattern callExpr where callee.method == "Akami::WSSE::VerifySignature.generate_digest"
+  emit issue code.WeakHash at call
+}

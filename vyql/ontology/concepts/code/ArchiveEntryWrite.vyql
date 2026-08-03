@@ -1,0 +1,12 @@
+module code;
+
+concept ArchiveEntryWrite : sink {
+  cwe: [CWE_22, CWE_59]
+  enabledBy: [taint.UntrustedData]
+  reviewAssumption: "the entry name is not normalized, confined, or symlink-safe before writing"
+  reviewCategory: path
+  reviewCondition: "attacker-controlled archive entry path reaches filesystem write/extraction"
+  reviewConfidence: medium
+  reviewEvidence: "archive extraction/write primitive {pattern} receives tainted input"
+  vulnerableTo: [path.PathTraversal, path.LinkFollowing]
+}

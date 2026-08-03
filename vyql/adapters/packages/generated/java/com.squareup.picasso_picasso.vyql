@@ -1,8 +1,0 @@
-import code.{UrlFetch, FilePathAccess}
-
-adapter java {
-  package "com.squareup.picasso:picasso" {
-    sink method "load" -> code.UrlFetch
-    sink method "load" -> code.FilePathAccess
-  }
-}

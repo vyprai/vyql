@@ -1,0 +1,10 @@
+module bindings.c.generated.mdfc1c7c8;
+
+binding privilegedOp0 {
+  requires {
+    dependency("kf5globalaccel")
+  }
+  query pattern callExpr where callee.method == "stealShortcutSystemwide"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.md518033e;
+
+binding networkConnect0 {
+  requires {
+    dependency("Persevere-Client")
+  }
+  query pattern callExpr where callee.method == "req"
+  emit sink code.NetworkConnectSink at args[0]
+}

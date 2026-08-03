@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding commandExecution225 {
+  query pattern callExpr where callee.path ~= "exec"
+  emit sink code.CommandExecution at args[0]
+}

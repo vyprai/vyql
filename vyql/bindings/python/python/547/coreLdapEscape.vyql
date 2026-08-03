@@ -1,0 +1,11 @@
+module bindings.python.generated.m21017d75;
+
+binding ldapEscape547 {
+  query pattern callExpr where callee.path ~= "ldap.filter.escape_filter_chars"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

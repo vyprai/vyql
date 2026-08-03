@@ -1,0 +1,6 @@
+module bindings.groovy.generated.m6eabb149;
+
+binding jwtUnverified65 {
+  query pattern presenceNode where node.path ~= "Algorithm.none"
+  emit issue code.JwtUnverified at node
+}

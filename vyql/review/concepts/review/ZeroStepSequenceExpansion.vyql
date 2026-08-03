@@ -1,0 +1,7 @@
+module code;
+
+review code.ZeroStepSequenceExpansion {
+  category: resource
+  kind: attention
+  text: "review sequence expansion loops for parsed zero steps that prevent loop progress"
+}

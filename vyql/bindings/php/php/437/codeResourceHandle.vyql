@@ -1,0 +1,7 @@
+module bindings.php.generated.mfbe84119;
+
+binding resourceHandle437 {
+  query pattern presenceNode where node.path ~= "fsockopen"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}

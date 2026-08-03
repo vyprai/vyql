@@ -1,7 +1,0 @@
-import code.{NetworkData}
-adapter objc {
-  package "AlamofireNetworkActivityIndicator" {
-    source method "requestDidStart" -> code.NetworkData
-    source method "requestDidStop" -> code.NetworkData
-  }
-}

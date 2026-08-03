@@ -1,9 +1,0 @@
-import code.{FilePathAccess, Deserialization}
-
-adapter php {
-  package "doctrine/persistence" {
-    sink method "findMappingFile" -> code.FilePathAccess
-    sink method "loadMappingFile" -> code.FilePathAccess
-    sink method "loadMetadataForClass" -> code.Deserialization
-  }
-}

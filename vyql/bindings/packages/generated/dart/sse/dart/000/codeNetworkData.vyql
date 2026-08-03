@@ -1,0 +1,9 @@
+module bindings.dart.generated.m673f9f94;
+
+binding networkData0 {
+  requires {
+    dependency("sse")
+  }
+  query pattern callExpr where callee.method == "SseClient._onIncomingMessage"
+  emit source code.NetworkData at call.result
+}

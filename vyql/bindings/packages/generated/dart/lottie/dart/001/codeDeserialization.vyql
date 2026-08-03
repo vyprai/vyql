@@ -1,0 +1,9 @@
+module bindings.dart.generated.m6e3fca00;
+
+binding deserialization1 {
+  requires {
+    dependency("lottie")
+  }
+  query pattern callExpr where callee.method == "decodeZip"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.me0c7bf86;
+
+binding cliArgument0 {
+  requires {
+    dependency("flutter_modular")
+  }
+  query pattern callExpr where callee.method == "getArguments"
+  emit source code.CliArgument at call.result
+}

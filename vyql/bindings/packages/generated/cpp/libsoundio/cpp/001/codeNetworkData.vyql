@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m26182671;
+
+binding networkData1 {
+  requires {
+    dependency("libsoundio")
+  }
+  query pattern callExpr where callee.method == "soundio_instream_begin_read"
+  emit source code.NetworkData at call.result
+}

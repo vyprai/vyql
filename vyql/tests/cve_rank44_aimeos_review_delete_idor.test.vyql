@@ -1,0 +1,34 @@
+test "rank44: Aimeos review deletion requires owner-scoped IDOR policy review"
+  lang php
+  expect_review code.IdorPolicyReview
+  code
+  ```
+  <?php
+  class Standard {
+    public function delete($ids) {
+      $ids = (array) $ids;
+      $filter = $this->manager->filter()->add(['review.id' => $ids]);
+      $this->manager->delete($this->manager->search($filter->slice(0, count($ids)))->toArray());
+      return $this;
+    }
+  }
+  ```
+
+test "rank44: Aimeos review deletion filters by owner"
+  lang php
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  <?php
+  class Standard {
+    public function delete($ids) {
+      $ids = (array) $ids;
+      $filter = $this->manager->filter()->add([
+        'review.customerid' => $this->context()->user(),
+        'review.id' => $ids
+      ]);
+      $this->manager->delete($this->manager->search($filter->slice(0, count($ids)))->toArray());
+      return $this;
+    }
+  }
+  ```

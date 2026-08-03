@@ -52,3 +52,30 @@ test "rank356: Ruby CGI escape_html uses array element type so allocator checks 
     return str;
   }
   ```
+
+test "rank356: Ruby CGI escape allocation generalizes across names"
+  lang c
+  expect VYQL-NUM-009
+  expect_review code.RubyCgiEscapeHtmlLengthOverflow
+  code
+  ```
+  #define HTML_ESCAPE_MAX_LEN 6
+  typedef unsigned long VALUE;
+  long RSTRING_LEN(VALUE obj);
+  char *RSTRING_PTR(VALUE obj);
+  char *ALLOCV_N(char kind, VALUE storage, long size);
+  void ALLOCV_END(VALUE storage);
+
+  static VALUE render_safe_html(VALUE source) {
+    VALUE scratch;
+    char *buffer = ALLOCV_N(char, scratch, RSTRING_LEN(source) * HTML_ESCAPE_MAX_LEN);
+    const char *cursor = RSTRING_PTR(source);
+    const char *limit = cursor + RSTRING_LEN(source);
+    char *write = buffer;
+    while (cursor < limit) {
+      *write++ = *cursor++;
+    }
+    ALLOCV_END(scratch);
+    return source;
+  }
+  ```

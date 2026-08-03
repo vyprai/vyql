@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mfba81dc5;
+
+binding httpInput0 {
+  requires {
+    dependency("prometheus_plugs")
+  }
+  query pattern callExpr where callee.method == "Prometheus.PlugExporter.call"
+  emit source code.HttpInput at call.result
+}

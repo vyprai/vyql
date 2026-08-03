@@ -1,0 +1,9 @@
+module bindings.objc.generated.ma606e784;
+
+binding filePathAccess3 {
+  requires {
+    dependency("SlateURLProtocol")
+  }
+  query pattern callExpr where callee.method == "readCacheWithURL:"
+  emit sink code.FilePathAccess at args[0]
+}

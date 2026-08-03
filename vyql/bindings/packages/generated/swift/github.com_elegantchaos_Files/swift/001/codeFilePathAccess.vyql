@@ -1,0 +1,9 @@
+module bindings.swift.generated.m24e2cc2e;
+
+binding filePathAccess1 {
+  requires {
+    dependency("github.com/elegantchaos/Files")
+  }
+  query pattern callExpr where callee.method == "asData"
+  emit sink code.FilePathAccess at args[0]
+}

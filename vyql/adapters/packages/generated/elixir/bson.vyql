@@ -1,8 +1,0 @@
-import code.{Deserialization, StoredDataWrite}
-adapter elixir {
-  package "bson" {
-    sink method "Bson.decode" -> code.Deserialization
-    sink method "Bson.Decoder.document" -> code.Deserialization
-    sink method "Bson.encode" -> code.StoredDataWrite
-  }
-}

@@ -1,0 +1,10 @@
+module bindings.python.generated.m21017d75;
+
+binding ownershipCheck717 {
+  query pattern callExpr where callee.method == "can_view"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

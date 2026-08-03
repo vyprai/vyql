@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m437ce122;
+
+binding archiveEntryWrite2 {
+  requires {
+    dependency("openexr")
+  }
+  query pattern callExpr where callee.method == "writePixels"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

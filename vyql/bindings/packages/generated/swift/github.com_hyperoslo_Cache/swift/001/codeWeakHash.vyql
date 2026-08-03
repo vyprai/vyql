@@ -1,0 +1,9 @@
+module bindings.swift.generated.m69209a18;
+
+binding weakHash1 {
+  requires {
+    dependency("github.com/hyperoslo/Cache")
+  }
+  query pattern callExpr where callee.method == "MD5"
+  emit issue code.WeakHash at call
+}

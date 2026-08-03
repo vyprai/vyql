@@ -1,0 +1,9 @@
+module bindings.java.generated.mccf4aed2;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-ie-driver")
+  }
+  query pattern callExpr where callee.method == "addCommandSwitches"
+  emit sink code.CommandExecution at args[0]
+}

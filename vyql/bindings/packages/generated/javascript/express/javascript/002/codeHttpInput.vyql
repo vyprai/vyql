@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m5103d1c9;
+
+binding httpInput2 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "req.body"
+  emit source code.HttpInput at call.result
+}

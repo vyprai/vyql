@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m3ec0d887;
+
+binding weakHash0 {
+  requires {
+    dependency("flow")
+  }
+  query pattern presenceNode where node.path ~= "flow.hash"
+  emit issue code.WeakHash at node
+}

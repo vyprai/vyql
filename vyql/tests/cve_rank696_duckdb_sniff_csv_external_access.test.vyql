@@ -42,3 +42,22 @@ test "rank696: sniff_csv bind rejects when external access is disabled"
       return std::move(result);
   }
   ```
+
+test "rank696: sniff_csv external access bypass generalizes across names"
+  lang cpp
+  file sniff_csv.cpp
+  expect VYQL-SEC-023
+  code
+  ```
+  static unique_ptr<FunctionData> BindSniffer(ClientContext &ctx, TableFunctionBindInput &bind_input,
+                                              vector<LogicalType> &types, vector<string> &columns) {
+      auto data = make_uniq<CSVSniffFunctionData>();
+      data->path = bind_input.inputs[0].ToString();
+      auto found = bind_input.named_parameters.find("auto_detect");
+      if (found != bind_input.named_parameters.end()) {
+          bind_input.named_parameters.erase("auto_detect");
+      }
+      data->options.FromNamedParameters(bind_input.named_parameters, ctx);
+      return std::move(data);
+  }
+  ```

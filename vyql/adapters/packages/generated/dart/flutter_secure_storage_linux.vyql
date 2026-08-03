@@ -1,8 +1,0 @@
-adapter dart {
-  package "flutter_secure_storage_linux" {
-    sink method "parse" -> code.Deserialization
-    flag code.WeakHash on any {
-      path "flutter_secure_storage_linux.hash"
-    }
-  }
-}

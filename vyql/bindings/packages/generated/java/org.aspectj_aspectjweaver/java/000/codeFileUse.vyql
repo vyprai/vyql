@@ -1,0 +1,9 @@
+module bindings.java.generated.mab1966f5;
+
+binding fileUse0 {
+  requires {
+    dependency("org.aspectj:aspectjweaver")
+  }
+  query pattern callExpr where callee.method == "FileUtil.write"
+  emit sink code.FileUseSink at args[0]
+}

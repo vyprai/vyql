@@ -1,0 +1,10 @@
+module bindings.php.generated.mfbe84119;
+
+binding authorizationCheck292 {
+  query pattern callExpr where callee.path ~= "groups_is_user_admin"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

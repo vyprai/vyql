@@ -1,0 +1,9 @@
+module bindings.c.generated.m6462e94f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("darts-clone")
+  }
+  query pattern callExpr where callee.method == "DoubleArrayImpl::open"
+  emit sink code.FilePathAccess at args[0]
+}

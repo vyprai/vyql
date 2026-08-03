@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule UnicodeNormalizationAfterFilterBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_176, CWE_74]
+    id: "VYQL-VAL-009"
+    severity: medium
+  }
+  issue code.UnicodeNormalizationAfterFilterBypass as normalizer
+}

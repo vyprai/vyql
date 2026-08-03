@@ -1,0 +1,10 @@
+module bindings.rust.generated.m52982397;
+
+binding privilegedOp12 {
+  requires {
+    dependency("fuchsia-zircon-sys")
+  }
+  query pattern callExpr where callee.method == "zx_resource_create"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

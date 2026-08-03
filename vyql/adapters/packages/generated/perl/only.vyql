@@ -1,8 +1,0 @@
-import code.{CodeEval}
-
-adapter perl {
-  package "only" {
-    sink method "import" -> code.CodeEval
-    sink method "search" -> code.CodeEval
-  }
-}

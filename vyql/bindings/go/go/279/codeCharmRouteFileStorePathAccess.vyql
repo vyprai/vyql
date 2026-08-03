@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding charmRouteFileStorePathAccess279 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "handleGetFile" and node.context.callPath contains "pattern.Path" and node.context.callPath contains "s.cfg.FileStore.Get" and not (node.context.callPath contains "filepath.Clean")
+  emit issue code.CharmRouteFileStorePathAccess at node
+}

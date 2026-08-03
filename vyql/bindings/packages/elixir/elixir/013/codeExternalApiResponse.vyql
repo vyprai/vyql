@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mf98b3aca;
+
+binding externalApiResponse13 {
+  requires {
+    dependency("httpoison")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source code.ExternalApiResponse at call.result
+}

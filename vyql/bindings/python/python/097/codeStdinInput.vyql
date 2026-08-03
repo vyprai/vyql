@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding stdinInput97 {
+  query pattern callExpr where callee.path ~= "sys.stdin"
+  emit source code.StdinInput at call.result
+}

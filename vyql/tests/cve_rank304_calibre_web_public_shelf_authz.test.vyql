@@ -4,6 +4,7 @@
 
 test "rank304: calibre-web public shelf creation is review-worthy without role check"
   lang python
+  expect VYQL-AUTH-080
   expect_review code.AccessPolicyReview
   code
   ```
@@ -16,6 +17,7 @@ test "rank304: calibre-web public shelf creation is review-worthy without role c
 
 test "rank304: calibre-web public shelf creation is guarded by role_edit_shelfs"
   lang python
+  reject VYQL-AUTH-080
   reject_review code.AccessPolicyReview
   code
   ```

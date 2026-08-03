@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m9ea019ea;
+
+binding deserialization2 {
+  requires {
+    dependency("grpcbox")
+  }
+  query pattern callExpr where callee.method == "grpcbox_utils:decode_header"
+  emit sink code.Deserialization at args[0]
+}

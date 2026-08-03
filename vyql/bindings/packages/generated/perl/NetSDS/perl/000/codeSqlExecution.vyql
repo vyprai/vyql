@@ -1,0 +1,9 @@
+module bindings.perl.generated.m2249bc7a;
+
+binding sqlExecution0 {
+  requires {
+    dependency("NetSDS")
+  }
+  query pattern callExpr where callee.method == "fetch_call"
+  emit sink code.SqlExecution at args[0]
+}

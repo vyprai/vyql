@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mac63cc12;
+
+binding deserialization0 {
+  requires {
+    dependency("postcss")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.kotlin.generated.m304d1620;
+
+binding insecurePermission115 {
+  query pattern callExpr where callee.path ~= "Files.setPosixFilePermissions" and args.any.literal contains "OTHERS_WRITE"
+  emit issue code.InsecurePermission at call
+}

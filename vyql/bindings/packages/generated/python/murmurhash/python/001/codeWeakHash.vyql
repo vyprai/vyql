@@ -1,0 +1,9 @@
+module bindings.python.generated.m92c9ed46;
+
+binding weakHash1 {
+  requires {
+    dependency("murmurhash")
+  }
+  query pattern callExpr where callee.method == "MurmurHash2A"
+  emit issue code.WeakHash at call
+}

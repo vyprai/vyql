@@ -1,0 +1,9 @@
+module bindings.python.generated.m3d9ccbad;
+
+binding regexCompile70 {
+  requires {
+    dependency("re")
+  }
+  query pattern callExpr where callee.path ~= "re.compile"
+  emit sink code.RegexCompileSink at args[0]
+}

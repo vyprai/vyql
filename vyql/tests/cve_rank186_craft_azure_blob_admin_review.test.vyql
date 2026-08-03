@@ -1,5 +1,6 @@
 test "rank186: Craft Azure Blob container loader lists containers without admin check"
   lang php
+  expect VYQL-AUTH-078
   expect_review code.CredentialedEndpointReview
   code
   ```
@@ -26,6 +27,7 @@ test "rank186: Craft Azure Blob container loader lists containers without admin 
 
 test "rank186: Craft Azure Blob container loader requires admin before listing containers"
   lang php
+  reject VYQL-AUTH-078
   reject_review code.CredentialedEndpointReview
   code
   ```

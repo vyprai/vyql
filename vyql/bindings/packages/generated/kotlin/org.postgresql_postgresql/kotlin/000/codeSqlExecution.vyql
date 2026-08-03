@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m240e9cec;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.postgresql:postgresql")
+  }
+  query pattern callExpr where callee.method == "getQueryTimeout"
+  emit sink code.SqlExecution at args[0]
+}

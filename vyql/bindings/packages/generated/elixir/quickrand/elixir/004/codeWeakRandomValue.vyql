@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mb6e60529;
+
+binding weakRandomValue4 {
+  requires {
+    dependency("quickrand")
+  }
+  query pattern callExpr where callee.method == "seed_algorithms"
+  emit issue code.WeakRandomValue at call
+}

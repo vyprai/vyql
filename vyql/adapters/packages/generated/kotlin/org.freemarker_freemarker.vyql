@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "org.freemarker:freemarker" {
-    sink method "exec" -> code.CommandExecution
-  }
-}

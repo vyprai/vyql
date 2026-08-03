@@ -1,0 +1,9 @@
+module bindings.objc.generated.m28275ec8;
+
+binding urlFetch0 {
+  requires {
+    dependency("Appirater")
+  }
+  query pattern callExpr where callee.method == "getRootViewController"
+  emit sink code.UrlFetch at args[0]
+}

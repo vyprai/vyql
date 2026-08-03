@@ -1,0 +1,8 @@
+module code;
+
+review code.GrpcGatewayCommonNameAuthenticationBypass {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review gRPC TLS CommonName authentication for a gRPC-gateway metadata guard before accepting certificate CommonName as the request user"
+}

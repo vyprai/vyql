@@ -1,0 +1,9 @@
+module bindings.python.generated.me11298ae;
+
+binding networkSend0 {
+  requires {
+    dependency("pysocks")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

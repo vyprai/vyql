@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-adapter java {
-  package "org.mariadb.jdbc:mariadb-java-client" {
-    sink method "prepareStatement" -> code.SqlExecution
-    sink method "prepareCall" -> code.SqlExecution
-    sink method "nativeSQL" -> code.SqlExecution
-  }
-}

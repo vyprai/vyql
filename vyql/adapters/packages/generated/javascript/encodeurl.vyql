@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter javascript {
-  package "encodeurl" {
-    control method "encodeUrl" -> core.InputValidation
-  }
-}

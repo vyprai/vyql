@@ -1,0 +1,9 @@
+module bindings.objc.generated.mde4307ef;
+
+binding filePathAccess0 {
+  requires {
+    dependency("ZipArchive")
+  }
+  query pattern callExpr where callee.method == "UnzipFileTo"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{ExpressionEval}
-adapter python {
-  package "colorlog" {
-    sink method "parse_colors" -> code.ExpressionEval
-  }
-}

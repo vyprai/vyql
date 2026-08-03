@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mc12e92cb;
+
+binding networkData3 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-remote-driver")
+  }
+  query pattern callExpr where callee.method == "addRequestHandler"
+  emit source code.NetworkData at call.result
+}

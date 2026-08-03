@@ -1,0 +1,9 @@
+module bindings.java.generated.m9fc3588b;
+
+binding userControlledData4 {
+  requires {
+    dependency("org.testcontainers:mysql")
+  }
+  query pattern callExpr where callee.method == "withDatabaseName"
+  emit source core.UserControlledData at call.result
+}

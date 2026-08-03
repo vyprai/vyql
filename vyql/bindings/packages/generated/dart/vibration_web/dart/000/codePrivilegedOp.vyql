@@ -1,0 +1,10 @@
+module bindings.dart.generated.m82aed6aa;
+
+binding privilegedOp0 {
+  requires {
+    dependency("vibration_web")
+  }
+  query pattern callExpr where callee.method == "VibrationWebPlugin.registerWith"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

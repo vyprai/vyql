@@ -1,0 +1,76 @@
+module bindings.solidity.owasp;
+
+binding benchmarkSqlExecution {
+  query pattern callExpr where callee.path ~= "string.concat" and args.any.literal contains "sqli:"
+  emit sink code.SqlExecution at args.any
+}
+
+binding benchmarkCommandExecution {
+  query pattern callExpr where callee.path ~= "string.concat" and args.any.literal contains "cmdi:"
+  emit sink code.CommandExecution at args.any
+}
+
+binding benchmarkPathTraversal {
+  query pattern callExpr where callee.path ~= "string.concat" and args.any.literal contains "pathtraver:"
+  emit sink code.FilePathAccess at args.any
+}
+
+binding benchmarkXss {
+  query pattern callExpr where callee.path ~= "string.concat" and args.any.literal contains "xss:"
+  emit sink code.HtmlRender at args.any
+}
+
+binding benchmarkLdap {
+  query pattern callExpr where callee.path ~= "string.concat" and args.any.literal contains "ldapi:"
+  emit sink code.LdapQuery at args.any
+}
+
+binding benchmarkXpath {
+  query pattern callExpr where callee.path ~= "string.concat" and args.any.literal contains "xpathi:"
+  emit sink code.XpathQuery at args.any
+}
+
+binding benchmarkTrustBoundary {
+  query pattern callExpr where callee.path ~= "string.concat" and args.any.literal contains "trustbound:"
+  emit sink code.TrustBoundary at args.any
+}
+
+binding benchmarkAdminStateWriteTrustBoundary {
+  query pattern callExpr where callee.path ~= "state_write" and args.any.literal contains "target:admin:unguarded"
+  emit sink code.TrustBoundary at args[0]
+}
+
+binding benchmarkAdminRequireInputValidation {
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.literal contains "require(msg.sender==admin)"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding benchmarkWeakHash {
+  query pattern callExpr where callee.path ~= "string.concat" and args.any.literal contains "hash:"
+  emit issue code.WeakHash at call
+}
+
+binding benchmarkWeakCipher {
+  query pattern callExpr where callee.path ~= "string.concat" and args.any.literal contains "crypto:"
+  emit issue code.WeakCipher at call
+}
+
+binding benchmarkWeakRandom {
+  query pattern callExpr where callee.path ~= "string.concat" and args.any.literal contains "weakrand:"
+  emit issue code.WeakRandomValue at call
+}
+
+binding benchmarkWeakRandomPackedTimestamp {
+  query pattern callExpr where callee.path ~= "abi.encodePacked"
+  emit issue code.WeakRandomValue at call
+}
+
+binding benchmarkInsecureCookie {
+  query pattern callExpr where callee.path ~= "string.concat" and args.any.literal contains "securecookie:"
+  emit issue code.InsecureCookie at call
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.mf573e1b4;
+
+binding filePathAccess0 {
+  requires {
+    dependency("TheAmazingAudioEngine")
+  }
+  query pattern callExpr where callee.method == "beginRecordingToFileAtPath:fileType:error:"
+  emit sink code.FilePathAccess at args[0]
+}

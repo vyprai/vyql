@@ -1,0 +1,9 @@
+module bindings.javascript.generated.me3be893c;
+
+binding networkSend1 {
+  requires {
+    dependency("node-fetch")
+  }
+  query pattern callExpr where callee.method == "fetch"
+  emit sink code.NetworkSend at args[0]
+}

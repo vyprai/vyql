@@ -1,0 +1,9 @@
+module bindings.php.generated.mf6bcc991;
+
+binding filePathAccess2 {
+  requires {
+    dependency("phploc/phploc")
+  }
+  query pattern callExpr where callee.method == "countFile"
+  emit sink code.FilePathAccess at args[0]
+}

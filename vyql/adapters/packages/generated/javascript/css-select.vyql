@@ -1,5 +1,0 @@
-adapter javascript {
-  package "css-select" {
-    sink method "compileNth" -> code.DynamicCodeLoad
-  }
-}

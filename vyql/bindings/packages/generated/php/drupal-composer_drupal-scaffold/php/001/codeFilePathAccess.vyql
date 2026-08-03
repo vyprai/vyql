@@ -1,0 +1,9 @@
+module bindings.php.generated.m8026eb5f;
+
+binding filePathAccess1 {
+  requires {
+    dependency("drupal-composer/drupal-scaffold")
+  }
+  query pattern callExpr where callee.method == "fetch"
+  emit sink code.FilePathAccess at args[0]
+}

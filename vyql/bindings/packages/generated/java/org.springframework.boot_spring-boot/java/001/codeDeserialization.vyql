@@ -1,0 +1,9 @@
+module bindings.java.generated.m943b1e54;
+
+binding deserialization1 {
+  requires {
+    dependency("org.springframework.boot:spring-boot")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

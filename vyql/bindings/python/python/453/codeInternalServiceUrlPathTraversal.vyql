@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding internalServiceUrlPathTraversal453 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "internal_service_url_path_traversal"
+  emit issue code.InternalServiceUrlPathTraversal at node
+}

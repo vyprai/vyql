@@ -1,0 +1,13 @@
+module bindings.elixir.generated.mf98b3aca;
+
+binding authenticationCheck31 {
+  requires {
+    dependency("guardian")
+  }
+  query pattern callExpr where callee.path ~= "Guardian.Plug.EnsureAuthenticated"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

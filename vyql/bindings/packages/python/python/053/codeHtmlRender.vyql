@@ -1,0 +1,9 @@
+module bindings.python.generated.m3d9ccbad;
+
+binding htmlRender53 {
+  requires {
+    dependency("jinja2")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.HtmlRender at args[0]
+}

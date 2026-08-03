@@ -1,0 +1,9 @@
+module bindings.swift.generated.mf185a2af;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/krzysztofzablocki/Inject")
+  }
+  query pattern callExpr where callee.path ~= "InjectConfiguration.bundlePath"
+  emit source core.UserControlledData at call.result
+}

@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "asttokens" {
-    sink method "ASTTokens.__init__" -> code.Deserialization
-    sink method "ASTTokens.mark_tokens" -> code.Deserialization
-  }
-}

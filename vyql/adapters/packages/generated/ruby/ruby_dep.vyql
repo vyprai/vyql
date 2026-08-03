@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "ruby_dep" {
-    sink path "RubyDep::Travis.version_constraint" -> code.Deserialization
-  }
-}

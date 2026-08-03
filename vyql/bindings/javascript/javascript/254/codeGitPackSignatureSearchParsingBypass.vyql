@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding gitPackSignatureSearchParsingBypass254 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.callPath, ["?.lastIndexOf", "req.body.lastIndexOf"]) and node.context.literal contains "PACK" and containsAny(node.context.callPath, ["?.slice", "req.body.slice"]) and node.context.callPath contains "getPackMeta" and not (node.context.identifier contains "packDataOffset") and not (node.context.literal contains "PACK_SIGNATURE")
+  emit issue code.GitPackSignatureSearchParsingBypass at node
+}

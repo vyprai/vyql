@@ -1,0 +1,9 @@
+module bindings.python.generated.mbcc9422d;
+
+binding deserialization0 {
+  requires {
+    dependency("jupyter-events")
+  }
+  query pattern callExpr where callee.method == "loads"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{NetworkConnect, NetworkSend}
-adapter swift {
-  package "github.com/apple/swift-openapi-urlsession" {
-    sink method "send" -> code.NetworkConnect
-    sink method "send" -> code.NetworkSend
-  }
-}

@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter dart {
-  package "launch_review" {
-    sink method "launch" -> code.CommandExecution
-  }
-}

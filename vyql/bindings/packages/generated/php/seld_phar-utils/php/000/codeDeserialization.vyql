@@ -1,0 +1,9 @@
+module bindings.php.generated.mf43b6afc;
+
+binding deserialization0 {
+  requires {
+    dependency("seld/phar-utils")
+  }
+  query pattern callExpr where callee.method == "SeldPharUtilsLinter::lint"
+  emit sink code.Deserialization at args[0]
+}

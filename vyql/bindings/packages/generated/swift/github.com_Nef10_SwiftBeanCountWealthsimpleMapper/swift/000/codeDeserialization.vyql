@@ -1,0 +1,9 @@
+module bindings.swift.generated.m03381501;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/Nef10/SwiftBeanCountWealthsimpleMapper")
+  }
+  query pattern callExpr where callee.method == "mapTransactionsToPriceAndTransactions"
+  emit sink code.Deserialization at args[0]
+}

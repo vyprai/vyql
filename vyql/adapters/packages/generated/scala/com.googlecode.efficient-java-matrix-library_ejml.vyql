@@ -1,8 +1,0 @@
-adapter scala {
-  package "com.googlecode.efficient-java-matrix-library:ejml" {
-    sink method "saveBin" -> code.FilePathAccess
-    sink method "loadBin" -> code.FilePathAccess
-    sink method "saveCSV" -> code.FilePathAccess
-    sink method "loadCSV" -> code.FilePathAccess
-  }
-}

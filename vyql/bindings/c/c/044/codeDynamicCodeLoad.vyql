@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding dynamicCodeLoad44 {
+  query pattern callExpr where callee.path ~= "dlopen"
+  emit sink code.DynamicCodeLoad at args[0]
+}

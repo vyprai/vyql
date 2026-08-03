@@ -1,0 +1,9 @@
+module bindings.go.generated.m7f38eaed;
+
+binding filePathAccess0 {
+  requires {
+    dependency("golang.org/x/exp")
+  }
+  query pattern callExpr where callee.method == "Open"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,13 @@
+module bindings.swift.generated.m98e3ffbb;
+
+binding authenticationCheck11 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "updateAuthentication"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

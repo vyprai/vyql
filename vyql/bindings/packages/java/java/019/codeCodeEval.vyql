@@ -1,0 +1,9 @@
+module bindings.java.generated.m9ef49b0f;
+
+binding codeEval19 {
+  requires {
+    dependency("javax.script")
+  }
+  query pattern callExpr where callee.path ~= "ScriptEngine.eval"
+  emit sink code.CodeEval at args[0]
+}

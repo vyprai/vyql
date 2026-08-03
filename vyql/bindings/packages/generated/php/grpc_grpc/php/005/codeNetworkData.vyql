@@ -1,0 +1,9 @@
+module bindings.php.generated.ma81f61c1;
+
+binding networkData5 {
+  requires {
+    dependency("grpc/grpc")
+  }
+  query pattern callExpr where callee.method == "ClientStreamingCall"
+  emit source code.NetworkData at call.result
+}

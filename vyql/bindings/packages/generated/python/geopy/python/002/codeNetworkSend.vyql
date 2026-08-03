@@ -1,0 +1,9 @@
+module bindings.python.generated.m38a0a2bc;
+
+binding networkSend2 {
+  requires {
+    dependency("geopy")
+  }
+  query pattern callExpr where callee.method == "geocode"
+  emit sink code.NetworkSend at args[0]
+}

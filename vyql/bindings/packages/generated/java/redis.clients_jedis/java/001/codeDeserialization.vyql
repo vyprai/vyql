@@ -1,0 +1,9 @@
+module bindings.java.generated.m70ebb5f3;
+
+binding deserialization1 {
+  requires {
+    dependency("redis.clients:jedis")
+  }
+  query pattern callExpr where callee.method == "restore"
+  emit sink code.Deserialization at args[0]
+}

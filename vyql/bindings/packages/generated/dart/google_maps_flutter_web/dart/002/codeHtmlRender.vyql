@@ -1,0 +1,9 @@
+module bindings.dart.generated.m1e58aba2;
+
+binding htmlRender2 {
+  requires {
+    dependency("google_maps_flutter_web")
+  }
+  query pattern callExpr where callee.method == "createHTMLNoArgs"
+  emit sink code.HtmlRender at args[0]
+}

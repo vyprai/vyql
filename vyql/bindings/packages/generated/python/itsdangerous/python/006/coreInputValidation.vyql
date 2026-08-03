@@ -1,0 +1,14 @@
+module bindings.python.generated.ma1e8986c;
+
+binding inputValidation6 {
+  requires {
+    dependency("itsdangerous")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

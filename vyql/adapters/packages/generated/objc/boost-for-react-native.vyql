@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter objc {
-  package "boost-for-react-native" {
-    sink method "load" -> code.Deserialization
-  }
-}

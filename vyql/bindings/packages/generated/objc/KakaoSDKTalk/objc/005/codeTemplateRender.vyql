@@ -1,0 +1,9 @@
+module bindings.objc.generated.m29559e25;
+
+binding templateRender5 {
+  requires {
+    dependency("KakaoSDKTalk")
+  }
+  query pattern callExpr where callee.method == "sendDefaultMessage"
+  emit sink code.TemplateRender at args[0]
+}

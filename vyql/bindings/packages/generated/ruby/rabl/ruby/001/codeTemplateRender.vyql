@@ -1,0 +1,9 @@
+module bindings.ruby.generated.maec902d9;
+
+binding templateRender1 {
+  requires {
+    dependency("rabl")
+  }
+  query pattern callExpr where callee.method == "extends"
+  emit sink code.TemplateRender at args[0]
+}

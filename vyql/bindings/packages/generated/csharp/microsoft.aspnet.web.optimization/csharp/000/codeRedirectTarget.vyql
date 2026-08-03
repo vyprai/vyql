@@ -1,0 +1,10 @@
+module bindings.csharp.generated.mc0c2b5ed;
+
+binding redirectTarget0 {
+  requires {
+    dependency("microsoft.aspnet.web.optimization")
+  }
+  query pattern callExpr where callee.method == "ResolveBundleUrl"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

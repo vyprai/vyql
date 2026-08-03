@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m711a0255;
+
+binding filePathAccess1 {
+  requires {
+    dependency("luerl")
+  }
+  query pattern callExpr where callee.method == "path_loadfile"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter elixir {
-  package "scrivener_html" {
-    source method "pagination_links" -> core.UserControlledData
-  }
-}

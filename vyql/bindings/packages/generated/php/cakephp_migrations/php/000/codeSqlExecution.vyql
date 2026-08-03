@@ -1,0 +1,9 @@
+module bindings.php.generated.mba691072;
+
+binding sqlExecution0 {
+  requires {
+    dependency("cakephp/migrations")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

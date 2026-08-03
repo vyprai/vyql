@@ -1,7 +1,0 @@
-import code.{SecretValue}
-
-adapter rust {
-  package "ecdsa" {
-    source method "to_pkcs8_der" -> code.SecretValue
-  }
-}

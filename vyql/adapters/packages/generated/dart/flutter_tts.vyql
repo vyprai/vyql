@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter dart {
-  package "flutter_tts" {
-    sink method "synthesizeToFile" -> code.FilePathAccess
-  }
-}

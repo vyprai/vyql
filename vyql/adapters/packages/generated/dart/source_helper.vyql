@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter dart {
-  package "source_helper" {
-    control method "escapeDartString" -> core.HtmlEscape
-  }
-}

@@ -13,6 +13,7 @@ import (
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/resultpolicy"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -38,7 +39,6 @@ func cmdTrace(args []string) error {
 	if err != nil {
 		return err
 	}
-	defer closeStore(g)
 	if g == nil {
 		fmt.Println("(no analyzable source)")
 		return nil
@@ -107,7 +107,7 @@ func shortestToSink(onto *ontology.Ontology, g usg.Store, src, to string) ([]str
 }
 
 // frontier returns the nodes where taint stopped: reachable Call nodes whose taint goes no
-// further toward a labelled node, plus any control (sanitizer/guard/assumption) that was hit.
+// further toward a labelled node, plus any control or advisory evidence that was hit.
 // These are the candidate "broken edges" — most often an unresolved or cross-package call.
 func frontier(onto *ontology.Ontology, g usg.Store, src string) []string {
 	seen := map[string]bool{src: true}
@@ -214,9 +214,9 @@ func ontologyConceptKind(onto *ontology.Ontology, c string) string {
 }
 
 // ── vyql explain ────────────────────────────────────────────────────────────────────
-// Run the rules and print each finding's FULL proof: source/sink bindings (with the adapter
+// Run the rules and print each finding's FULL proof: source/sink bindings (with the applicator
 // that labelled them), the witness path, and every negation-evidence clause (sanitizer/guard/
-// assumption notes) — the "why did this fire, and what almost stopped it" view.
+// advisory notes) — the "why did this fire, and what almost stopped it" view.
 
 func cmdExplain(args []string) error {
 	fs := flag.NewFlagSet("explain", flag.ExitOnError)
@@ -227,23 +227,22 @@ func cmdExplain(args []string) error {
 	if len(paths) == 0 {
 		return fmt.Errorf("usage: vyql explain [-rules ...] <path>...")
 	}
-	applyProfile(paths, *profileName)
-	src, err := loadRules(*rulesPath)
+	prof := applyProfile(paths, *profileName)
+	ruleSources, err := loadRules(*rulesPath)
 	if err != nil {
 		return err
 	}
-	all, _, g, err := scanPaths(paths, src)
+	all, _, _, err := scanPathsWithProfile(paths, ruleSources, prof.Name)
 	if err != nil {
 		return err
 	}
-	defer closeStore(g)
 	if len(all) == 0 {
 		fmt.Println("No findings.")
 		return nil
 	}
 	fmt.Printf("%d finding(s):\n", len(all))
 	for _, f := range all {
-		fmt.Printf("\n[%s] %s  (fp=%s)\n", f.Severity, f.RuleID, f.Fingerprint())
+		fmt.Printf("\n[%s] %s  (fp=%s)\n", f.Severity, f.RuleID, resultpolicy.Fingerprint(f))
 		for _, b := range f.Bindings {
 			fmt.Printf("  %-6s %-22s @ %s  ← %s\n", b.Name+":", b.Concept, b.Loc, b.LabelProvenance)
 		}
@@ -266,7 +265,7 @@ func cmdExplain(args []string) error {
 				fmt.Printf(" — evidence: %s", ec.Evidence)
 			}
 			if ec.Assumption != "" {
-				fmt.Printf(" — assumes: %s", ec.Assumption)
+				fmt.Printf(" — advisory: %s", ec.Assumption)
 			}
 			if ec.Confidence != "" {
 				fmt.Printf(" — conf=%s", ec.Confidence)
@@ -278,7 +277,7 @@ func cmdExplain(args []string) error {
 }
 
 // ── vyql match ──────────────────────────────────────────────────────────────────────
-// Show every node an adapter labelled — what matched which concept, and via which adapter.
+// Show every node a binding labelled — what matched which concept.
 // Groups by concept role (source/sink/control/other) so a missing concept label shows up
 // as absent.
 
@@ -295,7 +294,6 @@ func cmdMatch(args []string) error {
 	if err != nil {
 		return err
 	}
-	defer closeStore(g)
 	if g == nil {
 		fmt.Println("(no analyzable source)")
 		return nil
@@ -315,7 +313,7 @@ func cmdMatch(args []string) error {
 			case ontologyConceptKind(onto, l.Concept) == "sink":
 				role = "sink"
 			}
-			prov := l.Provenance.Adapter
+			prov := l.Provenance.Applicator
 			if prov == "" {
 				prov = "?"
 			}
@@ -370,7 +368,6 @@ func cmdResolve(args []string) error {
 	if err != nil {
 		return err
 	}
-	defer closeStore(g)
 	if g == nil {
 		fmt.Println("(no analyzable source)")
 		return nil
@@ -432,7 +429,6 @@ func cmdGraph(args []string) error {
 	if err != nil {
 		return err
 	}
-	defer closeStore(g)
 	if g == nil {
 		fmt.Println("(no analyzable source)")
 		return nil
@@ -443,38 +439,38 @@ func cmdGraph(args []string) error {
 	return printUSG(g)
 }
 
-// ── vyql adapters ───────────────────────────────────────────────────────────────────
-// List the source/sink/control/mark/filter/assume vocabulary an adapter recognizes, so you
+// ── vyql bindings ───────────────────────────────────────────────────────────────────
+// List the source/sink/check/issue/filter/advisory vocabulary a binding set recognizes, so you
 // don't have to grep the .vyql — and can see at a glance whether an API is modelled.
 
-func cmdAdapters(args []string) error {
-	fs := flag.NewFlagSet("adapters", flag.ExitOnError)
-	lang := fs.String("lang", "", "technology/adapter to list (e.g. go, javascript, java, python)")
+func cmdBindings(args []string) error {
+	fs := flag.NewFlagSet("bindings", flag.ExitOnError)
+	lang := fs.String("lang", "", "technology binding set to list (e.g. go, javascript, java, python)")
 	_ = fs.Parse(args)
 	if *lang == "" {
-		fmt.Println("usage: vyql adapters -lang <go|javascript|java|python|...>")
-		fmt.Println("available adapters:")
-		for _, n := range adapterNames() {
+		fmt.Println("usage: vyql bindings -lang <go|javascript|java|python|...>")
+		fmt.Println("available bindings:")
+		for _, n := range bindingNames() {
 			fmt.Println("  " + n)
 		}
 		return nil
 	}
-	data, err := datadir.Read("adapters/" + *lang + ".vyql")
+	sources, err := bindingDefinitionSources(*lang)
 	if err != nil {
-		return fmt.Errorf("no adapter for %q (%v)", *lang, err)
+		return fmt.Errorf("no binding set for %q (%v)", *lang, err)
 	}
-	decls, err := parser.Parse(string(data))
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(sources), lowerNonCoreV2DefinitionSource)
 	if err != nil {
-		return fmt.Errorf("adapter parse: %w", err)
+		return fmt.Errorf("binding parse: %w", err)
 	}
 	byKind := map[string][]string{}
 	for _, d := range decls {
-		ad, ok := d.(*parser.AdapterDecl)
+		ad, ok := d.(*parser.BindingSet)
 		if !ok {
 			continue
 		}
 		for _, m := range ad.Mappings {
-			kind := strings.SplitN(m.Kind, "_", 2)[0]
+			kind := bindingDisplayKind(m)
 			arrow := ""
 			if m.Concept != "" {
 				arrow = " → " + m.Concept
@@ -485,7 +481,7 @@ func cmdAdapters(args []string) error {
 			byKind[kind] = append(byKind[kind], fmt.Sprintf("    %q%s", m.Pattern, arrow))
 		}
 	}
-	for _, kind := range []string{"source", "sink", "control", "mark", "filter", "assume", "type"} {
+	for _, kind := range []string{"source", "sink", "check", "issue", "fact", "propagate", "filter", "advisory", "type"} {
 		rows := byKind[kind]
 		if len(rows) == 0 {
 			continue
@@ -499,23 +495,57 @@ func cmdAdapters(args []string) error {
 	return nil
 }
 
-func adapterNames() []string {
+func bindingDisplayKind(m parser.BindingAction) string {
+	mappingKind := m.Kind
+	if strings.HasPrefix(mappingKind, "presence_") {
+		return strings.TrimPrefix(mappingKind, "presence_")
+	}
+	if m.Advisory || strings.HasPrefix(mappingKind, "advisory_") {
+		return "advisory"
+	}
+	switch {
+	case strings.HasPrefix(mappingKind, "issue"):
+		return "issue"
+	case strings.HasPrefix(mappingKind, "fact"):
+		return "fact"
+	case strings.HasPrefix(mappingKind, "flow"):
+		return "propagate"
+	}
+	return strings.SplitN(mappingKind, "_", 2)[0]
+}
+
+func bindingNames() []string {
 	var out []string
 	for _, l := range []string{"go", "javascript", "java", "python", "ruby", "php", "csharp",
 		"rust", "kotlin", "scala", "swift", "c", "cpp"} {
-		if _, err := datadir.Read("adapters/" + l + ".vyql"); err == nil {
+		if _, err := datadir.ReadVYQLDir("bindings/" + l); err == nil {
 			out = append(out, l)
 		}
 	}
 	return out
 }
 
-// ── vyql validate-adapter ──────────────────────────────────────────────────────────
-// Parse an adapter file through the real VyQL parser and emit a compact public summary.
+func bindingDefinitionSources(lang string) ([]parser.V2DefinitionSource, error) {
+	files, err := datadir.ReadVYQLDir("bindings/" + lang)
+	if err != nil {
+		return nil, err
+	}
+	if extra, err := datadir.ReadVYQLDir("bindings/packages/" + lang); err == nil {
+		files = append(files, extra...)
+	}
+	sources := make([]parser.V2DefinitionSource, 0, len(files))
+	for _, file := range files {
+		sources = append(sources, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+	}
+	return sources, nil
+}
 
-func cmdValidateAdapter(args []string) error {
-	fs := flag.NewFlagSet("validate-adapter", flag.ExitOnError)
-	file := fs.String("file", "", "adapter .vyql file to parse; reads stdin when empty")
+// ── vyql validate-binding ──────────────────────────────────────────────────────────
+// Parse a binding file through the real VyQL parser and emit a compact public summary.
+
+func cmdValidateBinding(args []string) error {
+	fs := flag.NewFlagSet("validate-binding", flag.ExitOnError)
+	file := fs.String("file", "", "binding .vyql file to parse; reads stdin when empty")
 	_ = fs.Parse(args)
 	var data []byte
 	var err error
@@ -527,9 +557,9 @@ func cmdValidateAdapter(args []string) error {
 	if err != nil {
 		return err
 	}
-	decls, err := parser.Parse(string(data))
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(ruleSourcesFromText("binding.vyql", string(data))), lowerNonCoreV2DefinitionSource)
 	if err != nil {
-		return fmt.Errorf("adapter parse: %w", err)
+		return fmt.Errorf("binding parse: %w", err)
 	}
 	type mappingSummary struct {
 		Kind     string   `json:"kind"`
@@ -537,7 +567,7 @@ func cmdValidateAdapter(args []string) error {
 		Concept  string   `json:"concept,omitempty"`
 		Packages []string `json:"packages,omitempty"`
 	}
-	type adapterSummary struct {
+	type bindingSummary struct {
 		Name          string           `json:"name"`
 		MappingCount  int              `json:"mapping_count"`
 		PackageBlocks []string         `json:"package_blocks,omitempty"`
@@ -545,18 +575,18 @@ func cmdValidateAdapter(args []string) error {
 	}
 	summary := struct {
 		OK       bool             `json:"ok"`
-		Adapters []adapterSummary `json:"adapters"`
+		Bindings []bindingSummary `json:"bindings"`
 	}{OK: true}
 	for _, d := range decls {
-		ad, ok := d.(*parser.AdapterDecl)
+		ad, ok := d.(*parser.BindingSet)
 		if !ok {
 			continue
 		}
-		item := adapterSummary{Name: ad.Name, MappingCount: len(ad.Mappings)}
+		item := bindingSummary{Name: ad.Name, MappingCount: len(ad.Mappings)}
 		packageSeen := map[string]bool{}
 		for _, m := range ad.Mappings {
 			item.Mappings = append(item.Mappings, mappingSummary{
-				Kind:     m.Kind,
+				Kind:     bindingDisplayKind(m),
 				Pattern:  m.Pattern,
 				Concept:  m.Concept,
 				Packages: m.Packages,
@@ -569,10 +599,10 @@ func cmdValidateAdapter(args []string) error {
 			}
 		}
 		sort.Strings(item.PackageBlocks)
-		summary.Adapters = append(summary.Adapters, item)
+		summary.Bindings = append(summary.Bindings, item)
 	}
-	if len(summary.Adapters) == 0 {
-		return fmt.Errorf("adapter parse: no adapter declaration found")
+	if len(summary.Bindings) == 0 {
+		return fmt.Errorf("binding parse: no v2 binding set found")
 	}
 	out, err := json.MarshalIndent(summary, "", "  ")
 	if err != nil {
@@ -596,14 +626,14 @@ type jsonFinding struct {
 	Source           string                     `json:"source"`
 	Sink             string                     `json:"sink"`
 	Path             []string                   `json:"path,omitempty"`
-	Noted            bool                       `json:"assumption_noted"`
+	Noted            bool                       `json:"advisory_noted"`
 	ReviewConditions []findings.ReviewCondition `json:"review_conditions,omitempty"`
 }
 
 func findingsJSON(all []*findings.Finding) []jsonFinding {
 	out := make([]jsonFinding, 0, len(all))
 	for _, f := range all {
-		jf := jsonFinding{RuleID: f.RuleID, Severity: f.Severity, Confidence: f.Confidence, WitnessKind: f.WitnessKind, FP: f.Fingerprint()}
+		jf := jsonFinding{RuleID: f.RuleID, Severity: f.Severity, Confidence: f.Confidence, WitnessKind: f.WitnessKind, FP: resultpolicy.Fingerprint(f)}
 		for _, b := range f.Bindings {
 			if b.Name == "source" {
 				jf.Source = b.Loc
@@ -616,7 +646,7 @@ func findingsJSON(all []*findings.Finding) []jsonFinding {
 			jf.Sink = f.Bindings[0].Loc
 		}
 		for _, ne := range f.NegationEvidence {
-			if !ne.Satisfied && strings.Contains(ne.Clause, "assumption") {
+			if !ne.Satisfied && strings.Contains(ne.Clause, "advisory") {
 				jf.Noted = true
 			}
 		}
@@ -717,7 +747,6 @@ func cmdQuery(args []string) error {
 	if err != nil {
 		return err
 	}
-	defer closeStore(g)
 	if g == nil {
 		fmt.Println("(no analyzable source)")
 		return nil

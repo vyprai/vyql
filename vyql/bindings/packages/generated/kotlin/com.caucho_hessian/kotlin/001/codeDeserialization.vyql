@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mb840d269;
+
+binding deserialization1 {
+  requires {
+    dependency("com.caucho:hessian")
+  }
+  query pattern callExpr where callee.method == "readString"
+  emit sink code.Deserialization at args[0]
+}

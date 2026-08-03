@@ -1,0 +1,14 @@
+module bindings.php.generated.m2e4e2d62;
+
+binding inputValidation4 {
+  requires {
+    dependency("webmozart/path-util")
+  }
+  query pattern callExpr where callee.method == "isLocal"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

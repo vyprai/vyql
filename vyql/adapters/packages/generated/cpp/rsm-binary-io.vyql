@@ -1,8 +1,0 @@
-import code.{FileUse, FilePathAccess}
-adapter cpp {
-  package "rsm-binary-io" {
-    sink method "read_bytes" -> code.FileUse
-    sink method "write_bytes" -> code.FileUse
-    sink method "open" -> code.FilePathAccess
-  }
-}

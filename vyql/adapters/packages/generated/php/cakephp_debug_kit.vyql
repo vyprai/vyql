@@ -1,9 +1,0 @@
-import code.{SqlExecution}
-
-adapter php {
-  package "cakephp/debug_kit" {
-    sink method "DebugKit\DebugSql::sql" -> code.SqlExecution
-    sink method "DebugKit\DebugSql::sqld" -> code.SqlExecution
-    sink method "DebugKit\DebugSql::interpolate" -> code.SqlExecution
-  }
-}

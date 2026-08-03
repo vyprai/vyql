@@ -1,0 +1,9 @@
+module bindings.java.generated.mc913ba97;
+
+binding deserialization4 {
+  requires {
+    dependency("com.fasterxml.jackson.datatype:jackson-datatype-hppc")
+  }
+  query pattern callExpr where callee.method == "deserializeWithType"
+  emit sink code.Deserialization at args[0]
+}

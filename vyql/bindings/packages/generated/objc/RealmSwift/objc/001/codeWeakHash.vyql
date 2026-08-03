@@ -1,0 +1,9 @@
+module bindings.objc.generated.mbc1c1b4c;
+
+binding weakHash1 {
+  requires {
+    dependency("RealmSwift")
+  }
+  query pattern presenceNode where node.path ~= "realmswift.hash"
+  emit issue code.WeakHash at node
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m1b627199;
+
+binding deserialization1 {
+  requires {
+    dependency("elasticsearch-transport")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

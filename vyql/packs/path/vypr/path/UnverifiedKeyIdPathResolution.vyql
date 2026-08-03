@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule UnverifiedKeyIdPathResolution {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22]
+    id: "VYQL-PATH-058"
+    severity: high
+  }
+  issue code.UnverifiedKeyIdPathResolution as path
+}

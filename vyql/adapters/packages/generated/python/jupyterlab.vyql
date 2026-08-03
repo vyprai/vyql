@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter python {
-  package "jupyterlab" {
-    sink method "execvp" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding unvalidatedNumericSqlInterpolation60 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "actionUpload" and node.context.callPath contains "performReadValidation" and node.context.phpReview == "unvalidated_numeric_sql_interpolation_model_id"
+  emit issue code.UnvalidatedNumericSqlInterpolation at node
+}

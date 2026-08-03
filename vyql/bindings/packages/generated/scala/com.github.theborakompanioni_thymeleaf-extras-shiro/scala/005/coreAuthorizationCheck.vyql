@@ -1,0 +1,13 @@
+module bindings.scala.generated.m40e67106;
+
+binding authorizationCheck5 {
+  requires {
+    dependency("com.github.theborakompanioni:thymeleaf-extras-shiro")
+  }
+  query pattern callExpr where callee.method == "lacksPermission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

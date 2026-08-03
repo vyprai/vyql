@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding emailAttachmentFilenamePathTraversal93 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "email_attachment_filename_path_traversal"
+  emit issue code.EmailAttachmentFilenamePathTraversal at node
+}

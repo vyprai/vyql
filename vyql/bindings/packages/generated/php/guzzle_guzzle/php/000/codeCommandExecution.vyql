@@ -1,0 +1,9 @@
+module bindings.php.generated.m6da53433;
+
+binding commandExecution0 {
+  requires {
+    dependency("guzzle/guzzle")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

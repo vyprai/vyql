@@ -1,0 +1,9 @@
+module bindings.scala.generated.md4210067;
+
+binding sqlExecution2 {
+  requires {
+    dependency("org.apache.tomcat:tomcat-dbcp")
+  }
+  query pattern callExpr where callee.method == "setValidationQuery"
+  emit sink code.SqlExecution at args[0]
+}

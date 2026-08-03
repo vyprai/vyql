@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-
-adapter go {
-  package "github.com/alcortesm/tgz" {
-    sink method "Extract" -> code.FilePathAccess
-    sink method "makeFile" -> code.FilePathAccess
-    sink method "unTar" -> code.FilePathAccess
-  }
-}

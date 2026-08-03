@@ -1,6 +1,0 @@
-import code.{NetworkConnect}
-adapter swift {
-  package "github.com/vsanthanam/SafariUI" {
-    sink method "prewarmConnections" -> code.NetworkConnect
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding expressionEvaluatorPrototypeNameAccess589 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.expr contains "type===IVAR" and node.context.expr contains "type===IMEMBER" and node.context.expr contains "item.valueinexpr.functions" and node.context.selector contains "item.value" and node.context.selector contains "expr.functions" and node.context.indexBase contains "values" and node.context.indexKey contains "item.value" and not (node.context.prototypeNameGuard == "true")
+  emit issue code.ExpressionEvaluatorPrototypeNameAccess at node
+}

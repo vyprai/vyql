@@ -1,0 +1,9 @@
+module bindings.python.generated.m04882151;
+
+binding filePathAccess2 {
+  requires {
+    dependency("configargparse")
+  }
+  query pattern callExpr where callee.method == "write_config_file"
+  emit sink code.FilePathAccess at args[0]
+}

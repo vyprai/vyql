@@ -1,0 +1,9 @@
+module bindings.rust.generated.m9cc8a29f;
+
+binding deserialization1 {
+  requires {
+    dependency("uuid")
+  }
+  query pattern callExpr where callee.method == "try_parse"
+  emit sink code.Deserialization at args[0]
+}

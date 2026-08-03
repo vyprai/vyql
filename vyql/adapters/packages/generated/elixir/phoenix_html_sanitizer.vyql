@@ -1,5 +1,0 @@
-adapter elixir {
-  package "phoenix_html_sanitizer" {
-    control method "sanitize" -> core.HtmlEscape
-  }
-}

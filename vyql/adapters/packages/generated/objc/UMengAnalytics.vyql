@@ -1,7 +1,0 @@
-import code.{SecretValue}
-
-adapter objc {
-  package "UMengAnalytics" {
-    source method "profileSignInWithPUID" -> code.SecretValue
-  }
-}

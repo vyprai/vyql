@@ -1,0 +1,8 @@
+module code;
+
+review code.StateMutationBeforeOperationPreconditions {
+  category: lifecycle
+  expected: [core.AuthorizationCheck, core.InputValidation]
+  kind: attention
+  text: "review operation application ordering so durable state mutation happens only after all operation preconditions pass"
+}

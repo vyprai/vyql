@@ -1,0 +1,14 @@
+module bindings.powershell.generated.m92132a18;
+
+binding ldapEscape20 {
+  requires {
+    dependency("System.DirectoryServices")
+  }
+  query pattern callExpr where callee.path ~= "Escape-LdapFilter"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

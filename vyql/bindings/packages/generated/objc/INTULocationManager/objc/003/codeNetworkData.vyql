@@ -1,0 +1,9 @@
+module bindings.objc.generated.m438f99b0;
+
+binding networkData3 {
+  requires {
+    dependency("INTULocationManager")
+  }
+  query pattern callExpr where callee.method == "subscribeToSignificantLocationChangesWithBlock"
+  emit source code.NetworkData at call.result
+}

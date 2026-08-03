@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "erlex" {
-    sink method "lex" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-  }
-}

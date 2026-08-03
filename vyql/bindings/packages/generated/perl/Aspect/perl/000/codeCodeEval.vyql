@@ -1,0 +1,9 @@
+module bindings.perl.generated.mf90b4d01;
+
+binding codeEval0 {
+  requires {
+    dependency("Aspect")
+  }
+  query pattern callExpr where callee.method == "compile_weave"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.PhpWindowOpenerCallbackNameXss {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: target
+  text: "verify request-controlled callback names rendered into window.opener JavaScript are escaped or restricted to safe identifiers"
+}

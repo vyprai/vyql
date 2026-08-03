@@ -1,0 +1,11 @@
+module code;
+
+concept CodeceptionRunProcessDeserializationGadget : issue {
+  cwe: [CWE_502]
+  reviewAssumption: "attacker-controlled serialized data can instantiate or hydrate the RunProcess object graph"
+  reviewCategory: deserialization
+  reviewCondition: "Codeception RunProcess can be deserialized as a process-control gadget without serialization rejection hooks"
+  reviewConfidence: high
+  reviewEvidence: "RunProcess class context {pattern} starts shell commands and calls stopProcess from __destruct before __sleep/__wakeup blockers were added"
+  vulnerableTo: [deserialization.DeserializationAbuse, injection.CommandInjection]
+}

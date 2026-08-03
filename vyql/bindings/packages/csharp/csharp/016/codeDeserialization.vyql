@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m2a0e231a;
+
+binding deserialization16 {
+  requires {
+    dependency("System.Text.Json")
+  }
+  query pattern callExpr where callee.method == "Deserialize"
+  emit sink code.Deserialization at args[0]
+}

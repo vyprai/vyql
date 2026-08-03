@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m736e2978;
+
+binding networkSend2 {
+  requires {
+    dependency("libusb-win32")
+  }
+  query pattern callExpr where callee.method == "usb_interrupt_write"
+  emit sink code.NetworkSend at args[0]
+}

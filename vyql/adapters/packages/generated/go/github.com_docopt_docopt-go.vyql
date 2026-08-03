@@ -1,8 +1,0 @@
-import code.{CliArgument}
-
-adapter go {
-  package "github.com/docopt/docopt-go" {
-    source method "ParseDoc" -> code.CliArgument
-    source method "ParseArgs" -> code.CliArgument
-  }
-}

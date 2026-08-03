@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/apache/thrift" {
-    sink method "open" -> code.FilePathAccess
-  }
-}

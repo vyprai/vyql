@@ -1,0 +1,9 @@
+module bindings.c.generated.m9f19aa00;
+
+binding sqlExecution0 {
+  requires {
+    dependency("libmariadb")
+  }
+  query pattern callExpr where callee.method == "mysql_query"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.java.generated.m0efc5269;
+
+binding networkSend6 {
+  requires {
+    dependency("io.rest-assured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "options"
+  emit sink code.NetworkSend at args[0]
+}

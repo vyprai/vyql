@@ -1,0 +1,10 @@
+module vypr.request_forgery;
+
+rule IncompleteIpDenylist {
+  meta {
+    cwe: [CWE_918]
+    id: "VYQL-RF-004"
+    severity: high
+  }
+  issue code.IncompleteIpDenylist as guard
+}

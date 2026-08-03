@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule CiviCrmScientificNotationNumericValidationBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_89, CWE_20]
+    id: "VYQL-INJ-064"
+    severity: high
+  }
+  issue code.CiviCrmScientificNotationNumericValidationBypass as validator
+}

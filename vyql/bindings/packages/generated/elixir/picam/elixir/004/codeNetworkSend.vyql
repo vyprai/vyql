@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m9f998ed7;
+
+binding networkSend4 {
+  requires {
+    dependency("picam")
+  }
+  query pattern callExpr where callee.method == "output_jpeg"
+  emit sink code.NetworkSend at args[0]
+}

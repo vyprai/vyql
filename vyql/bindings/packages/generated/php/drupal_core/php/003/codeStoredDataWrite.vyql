@@ -1,0 +1,9 @@
+module bindings.php.generated.m5d32eb5a;
+
+binding storedDataWrite3 {
+  requires {
+    dependency("drupal/core")
+  }
+  query pattern callExpr where callee.method == "settings"
+  emit sink code.StoredDataWrite at args[0]
+}

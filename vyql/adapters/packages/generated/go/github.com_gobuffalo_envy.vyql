@@ -1,9 +1,0 @@
-import code.{FilePathAccess, SecretValue}
-
-adapter go {
-  package "github.com/gobuffalo/envy" {
-    sink method "Load" -> code.FilePathAccess
-    source method "Get" -> code.SecretValue
-    source method "MustGet" -> code.SecretValue
-  }
-}

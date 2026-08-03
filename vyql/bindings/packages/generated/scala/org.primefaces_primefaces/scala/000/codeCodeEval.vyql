@@ -1,0 +1,9 @@
+module bindings.scala.generated.m2a6b7dfd;
+
+binding codeEval0 {
+  requires {
+    dependency("org.primefaces:primefaces")
+  }
+  query pattern callExpr where callee.method == "PrimeFaces.executeScript"
+  emit sink code.CodeEval at args[0]
+}

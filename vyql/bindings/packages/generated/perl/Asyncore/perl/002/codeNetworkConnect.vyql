@@ -1,0 +1,9 @@
+module bindings.perl.generated.mbe1f0c81;
+
+binding networkConnect2 {
+  requires {
+    dependency("Asyncore")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

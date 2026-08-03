@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-
-adapter perl {
-  package "EntityModel" {
-    sink method "_run_query" -> code.SqlExecution
-  }
-}

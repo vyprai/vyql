@@ -1,0 +1,13 @@
+module bindings.elixir.generated.mcc5a44a6;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("kafka_protocol")
+  }
+  query pattern callExpr where callee.method == "sasl_authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

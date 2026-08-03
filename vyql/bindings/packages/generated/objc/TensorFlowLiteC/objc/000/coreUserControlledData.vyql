@@ -1,0 +1,9 @@
+module bindings.objc.generated.m5f786758;
+
+binding userControlledData0 {
+  requires {
+    dependency("TensorFlowLiteC")
+  }
+  query pattern callExpr where callee.method == "TfLiteTensorCopyFromBuffer"
+  emit source core.UserControlledData at call.result
+}

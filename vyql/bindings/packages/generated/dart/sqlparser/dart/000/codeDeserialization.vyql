@@ -1,0 +1,9 @@
+module bindings.dart.generated.mbb52906e;
+
+binding deserialization0 {
+  requires {
+    dependency("sqlparser")
+  }
+  query pattern callExpr where callee.method == "tokenize"
+  emit sink code.Deserialization at args[0]
+}

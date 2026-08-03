@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter swift {
-  package "github.com/OperatorFoundation/InternetProtocols" {
-    sink method "init" -> code.Deserialization
-  }
-}

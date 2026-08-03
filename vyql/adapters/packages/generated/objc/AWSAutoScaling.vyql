@@ -1,7 +1,0 @@
-adapter objc {
-  package "AWSAutoScaling" {
-    sink method "testInvokePathWithQueryString" -> code.NosqlQuery
-    sink method "setUp" -> code.StoredDataWrite
-    source path "awsautoscaling.key" -> code.SecretValue
-  }
-}

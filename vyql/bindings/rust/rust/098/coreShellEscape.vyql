@@ -1,0 +1,11 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding shellEscape98 {
+  query pattern callExpr where callee.path ~= "escape_shell"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

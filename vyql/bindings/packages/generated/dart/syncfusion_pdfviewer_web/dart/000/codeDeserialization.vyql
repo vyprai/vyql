@@ -1,0 +1,9 @@
+module bindings.dart.generated.m46216982;
+
+binding deserialization0 {
+  requires {
+    dependency("syncfusion_pdfviewer_web")
+  }
+  query pattern callExpr where callee.method == "getDocument"
+  emit sink code.Deserialization at args[0]
+}

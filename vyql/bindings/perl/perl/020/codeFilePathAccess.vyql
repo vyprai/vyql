@@ -1,0 +1,6 @@
+module bindings.perl.generated.mfca40a44;
+
+binding filePathAccess20 {
+  query pattern callExpr where callee.path ~= "opendir"
+  emit sink code.FilePathAccess at args.any
+}

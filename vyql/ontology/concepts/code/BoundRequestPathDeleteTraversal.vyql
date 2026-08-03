@@ -1,0 +1,11 @@
+module code;
+
+concept BoundRequestPathDeleteTraversal : issue {
+  cwe: [CWE_22]
+  reviewAssumption: "the binding helper populates params.Path from an HTTP request parameter and the storage resolver can be influenced by relative traversal segments"
+  reviewCategory: path
+  reviewCondition: "a bound request path is resolved into storage and deleted without a local-path check"
+  reviewConfidence: high
+  reviewEvidence: "delete handler context {pattern} validates request params, resolves params.Path with storage path helpers, and calls os.Remove without filepath.IsLocal and filepath.Clean"
+  vulnerableTo: [path.PathTraversal]
+}

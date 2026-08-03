@@ -1,9 +1,0 @@
-import code.{HttpInput}
-import core.{UserControlledData}
-
-adapter perl {
-  package "IRI" {
-    source method "query_form" -> code.HttpInput
-    source method "set_query_param" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.m63e2536e;
+
+binding httpInput0 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-frontend-jaxrs")
+  }
+  query pattern callExpr where callee.method == "cookie"
+  emit source code.HttpInput at call.result
+}

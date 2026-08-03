@@ -1,0 +1,9 @@
+module bindings.scala.generated.md90495fd;
+
+binding filePathAccess3 {
+  requires {
+    dependency("org.apache.ivy:ivy")
+  }
+  query pattern callExpr where callee.method == "resolve"
+  emit sink code.FilePathAccess at args[0]
+}

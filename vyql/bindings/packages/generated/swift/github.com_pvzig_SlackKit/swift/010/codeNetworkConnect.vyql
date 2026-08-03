@@ -1,0 +1,9 @@
+module bindings.swift.generated.m3180263b;
+
+binding networkConnect10 {
+  requires {
+    dependency("github.com/pvzig/SlackKit")
+  }
+  query pattern callExpr where callee.method == "searchFiles"
+  emit sink code.NetworkConnectSink at args[0]
+}

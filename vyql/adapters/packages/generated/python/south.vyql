@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-adapter python {
-  package "south" {
-    sink method "execute" -> code.SqlExecution
-    sink method "execute_many" -> code.SqlExecution
-  }
-}

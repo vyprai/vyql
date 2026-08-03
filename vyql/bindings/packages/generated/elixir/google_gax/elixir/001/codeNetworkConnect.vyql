@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m2c733a3b;
+
+binding networkConnect1 {
+  requires {
+    dependency("google_gax")
+  }
+  query pattern callExpr where callee.method == "GoogleApi.Gax.Connection.build_request"
+  emit sink code.NetworkConnectSink at args[0]
+}

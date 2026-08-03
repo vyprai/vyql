@@ -1,0 +1,9 @@
+module bindings.java.generated.me4890779;
+
+binding networkData3 {
+  requires {
+    dependency("com.google.inject.extensions:guice-servlet")
+  }
+  query pattern callExpr where callee.method == "serveRegex"
+  emit source code.NetworkData at call.result
+}

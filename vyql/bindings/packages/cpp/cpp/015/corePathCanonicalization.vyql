@@ -1,0 +1,14 @@
+module bindings.cpp.generated.m1c1357ee;
+
+binding pathCanonicalization15 {
+  requires {
+    dependency("boost")
+  }
+  query pattern callExpr where callee.path ~= "boost.filesystem.canonical"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

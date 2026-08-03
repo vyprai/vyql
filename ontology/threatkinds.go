@@ -58,9 +58,13 @@ func (t ThreatKind) CAPEC(cat *taxonomy.Catalog) []string {
 // weakness families.
 func ThreatKinds() []ThreatKind {
 	tkOnce.Do(func() {
-		decls, err := parser.Parse(string(datadir.MustRead("ontology/threatkinds.vyql")))
+		files, err := datadir.ReadVYQLDir("ontology/threatkinds")
 		if err != nil {
-			panic("ontology: invalid ontology/threatkinds.vyql: " + err.Error())
+			panic("ontology: read ontology/threatkinds: " + err.Error())
+		}
+		decls, err := parser.ParseV2DefinitionSources(v2DefinitionSources(files))
+		if err != nil {
+			panic("ontology: invalid threat-kind corpus: " + err.Error())
 		}
 		for _, d := range decls {
 			td, ok := d.(*parser.ThreatDecl)
@@ -77,6 +81,14 @@ func ThreatKinds() []ThreatKind {
 	return threatKinds
 }
 
+func v2DefinitionSources(files []datadir.Source) []parser.V2DefinitionSource {
+	out := make([]parser.V2DefinitionSource, 0, len(files))
+	for _, file := range files {
+		out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+	}
+	return out
+}
+
 // ThreatKindByName returns a threat kind by its qualified name (e.g.
 // injection.SqlInjection).
 func ThreatKindByName(name string) (ThreatKind, bool) {
@@ -87,4 +99,3 @@ func ThreatKindByName(name string) (ThreatKind, bool) {
 	}
 	return ThreatKind{}, false
 }
-

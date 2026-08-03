@@ -1,0 +1,9 @@
+module bindings.python.generated.m37bdfae0;
+
+binding networkSend11 {
+  requires {
+    dependency("openai")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter python {
-  package "webassets" {
-    sink method "exec_" -> code.CodeEval
-  }
-}

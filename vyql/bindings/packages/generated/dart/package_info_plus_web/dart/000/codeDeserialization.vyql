@@ -1,0 +1,9 @@
+module bindings.dart.generated.m28a2e27e;
+
+binding deserialization0 {
+  requires {
+    dependency("package_info_plus_web")
+  }
+  query pattern callExpr where callee.method == "jsonDecode"
+  emit sink code.Deserialization at args[0]
+}

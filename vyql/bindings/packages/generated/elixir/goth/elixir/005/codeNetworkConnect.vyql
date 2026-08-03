@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mfee61f79;
+
+binding networkConnect5 {
+  requires {
+    dependency("goth")
+  }
+  query pattern callExpr where callee.method == "Token.request_with_finch"
+  emit sink code.NetworkConnectSink at args[0]
+}

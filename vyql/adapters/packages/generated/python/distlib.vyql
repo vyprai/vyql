@@ -1,7 +1,0 @@
-import code.{NetworkConnect, StoredDataRead}
-adapter python {
-  package "distlib" {
-    source method "read" -> code.StoredDataRead
-    sink method "connect" -> code.NetworkConnect
-  }
-}

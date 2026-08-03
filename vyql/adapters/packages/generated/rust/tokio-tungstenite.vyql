@@ -1,7 +1,0 @@
-adapter rust {
-  package "tokio-tungstenite" {
-    source method "read" -> code.NetworkData
-    sink method "close" -> code.NetworkSend
-    sink method "connect" -> code.NetworkConnect
-  }
-}

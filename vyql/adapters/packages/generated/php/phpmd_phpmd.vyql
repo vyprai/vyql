@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter php {
-  package "phpmd/phpmd" {
-    source method "PHPMD\TextUI\Command::run" -> code.CliArgument
-  }
-}

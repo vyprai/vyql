@@ -1,0 +1,7 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding catastrophicRegex552 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.callPath contains "String" and node.context.callPath contains "validFunction" and node.context.callPath contains "String.match" and node.context.literal contains "([\\0-')-\\uffff]+)*" and node.context.literal contains "([\\0-(*-\\uffff]*)" and not (node.context.selector contains "this.name") and not (node.context.callPath contains "args.join")
+  emit issue code.CatastrophicRegex at node
+  emit sink code.CatastrophicRegexSink at node
+}

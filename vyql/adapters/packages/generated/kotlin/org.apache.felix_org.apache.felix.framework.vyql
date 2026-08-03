@@ -1,9 +1,0 @@
-import code.{ExpressionEval}
-
-adapter kotlin {
-  package "org.apache.felix:org.apache.felix.framework" {
-    sink method "match" -> code.ExpressionEval
-    sink method "matchCase" -> code.ExpressionEval
-    sink method "matches" -> code.ExpressionEval
-  }
-}

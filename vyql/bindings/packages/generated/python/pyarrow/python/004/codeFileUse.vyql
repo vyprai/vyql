@@ -1,0 +1,9 @@
+module bindings.python.generated.m4aa0977e;
+
+binding fileUse4 {
+  requires {
+    dependency("pyarrow")
+  }
+  query pattern callExpr where callee.method == "create_dir"
+  emit sink code.FileUseSink at args[0]
+}

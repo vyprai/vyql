@@ -1,0 +1,9 @@
+module bindings.rust.generated.mab271a08;
+
+binding networkConnect1 {
+  requires {
+    dependency("wayland-sys")
+  }
+  query pattern callExpr where callee.method == "wl_display_connect_to_fd"
+  emit sink code.NetworkConnectSink at args[0]
+}

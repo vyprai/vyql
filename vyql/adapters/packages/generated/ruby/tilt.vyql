@@ -1,8 +1,0 @@
-import code.{TemplateRender, CodeEval}
-adapter ruby {
-  package "tilt" {
-    sink method "render" -> code.TemplateRender
-    sink method "evaluate" -> code.TemplateRender
-    sink method "eval_compiled_method" -> code.CodeEval
-  }
-}

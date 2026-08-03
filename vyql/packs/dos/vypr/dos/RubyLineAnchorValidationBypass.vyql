@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule RubyLineAnchorValidationBypass {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_400]
+    id: "VYQL-DOS-010"
+    severity: medium
+  }
+  issue code.RubyLineAnchorValidationBypass as validator
+}

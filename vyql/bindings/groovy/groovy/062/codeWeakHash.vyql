@@ -1,0 +1,6 @@
+module bindings.groovy.generated.m6eabb149;
+
+binding weakHash62 {
+  query pattern callExpr where callee.path ~= "MessageDigest.getInstance" and args.any.literal contains "SHA-1"
+  emit issue code.WeakHash at call
+}

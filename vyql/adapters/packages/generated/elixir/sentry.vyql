@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "sentry" {
-    sink method "Sentry.Dsn.parse" -> code.Deserialization
-  }
-}

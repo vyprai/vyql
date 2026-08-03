@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m867b4b3b;
+
+binding userControlledData1 {
+  requires {
+    dependency("freeglut")
+  }
+  query pattern callExpr where callee.method == "parseCriteria"
+  emit source core.UserControlledData at call.result
+}

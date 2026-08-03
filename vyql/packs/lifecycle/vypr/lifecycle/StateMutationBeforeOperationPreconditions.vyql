@@ -1,0 +1,11 @@
+module vypr.lifecycle;
+
+rule StateMutationBeforeOperationPreconditions {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_696, CWE_460]
+    id: "VYQL-LIFE-004"
+    severity: high
+  }
+  issue code.StateMutationBeforeOperationPreconditions as op
+}

@@ -1,6 +1,0 @@
-adapter javascript {
-  package "jest-runner" {
-    sink method "runTestInternal" -> code.CodeEval
-    source method "sendMessageToJest" -> core.UserControlledData
-  }
-}

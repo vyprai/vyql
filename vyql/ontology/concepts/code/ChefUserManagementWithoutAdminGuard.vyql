@@ -1,0 +1,11 @@
+module code;
+
+concept ChefUserManagementWithoutAdminGuard : issue {
+  cwe: [CWE_862]
+  reviewAssumption: "authenticated non-admin API users can reach the /users create, update, or destroy routes"
+  reviewCategory: auth
+  reviewCondition: "Chef user-management API actions create, update, or destroy users without an admin-only controller guard"
+  reviewConfidence: high
+  reviewEvidence: "Users controller context {pattern} saves or destroys Chef::WebUIUser records without before :is_admin"
+  vulnerableTo: [access_control.MissingAuthorization]
+}

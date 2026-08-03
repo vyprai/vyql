@@ -1,0 +1,9 @@
+module bindings.go.generated.m7030a193;
+
+binding deserialization2 {
+  requires {
+    dependency("go.mozilla.org/pkcs7")
+  }
+  query pattern callExpr where callee.method == "parseEncryptedData"
+  emit sink code.Deserialization at args[0]
+}

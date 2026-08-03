@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkData, NetworkSend}
-adapter swift {
-  package "github.com/vapor/websocket-kit" {
-    sink method "send" -> code.NetworkSend
-    source method "onText" -> code.NetworkData
-    source method "onBinary" -> code.NetworkData
-    sink method "connect" -> code.NetworkConnect
-  }
-}

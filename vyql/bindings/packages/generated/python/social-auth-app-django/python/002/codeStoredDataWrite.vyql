@@ -1,0 +1,9 @@
+module bindings.python.generated.mf95c8770;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("social-auth-app-django")
+  }
+  query pattern callExpr where callee.method == "session"
+  emit sink code.StoredDataWrite at args[0]
+}

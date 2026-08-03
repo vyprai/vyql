@@ -1,0 +1,9 @@
+module bindings.objc.generated.m714c8f84;
+
+binding userControlledData1 {
+  requires {
+    dependency("GoogleAds-IMA-iOS-SDK")
+  }
+  query pattern callExpr where callee.method == "initWithAdTagUrl"
+  emit source core.UserControlledData at call.result
+}

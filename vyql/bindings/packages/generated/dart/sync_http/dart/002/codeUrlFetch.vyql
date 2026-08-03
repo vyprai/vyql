@@ -1,0 +1,9 @@
+module bindings.dart.generated.m1b328543;
+
+binding urlFetch2 {
+  requires {
+    dependency("sync_http")
+  }
+  query pattern callExpr where callee.method == "deleteUrl"
+  emit sink code.UrlFetch at args[0]
+}

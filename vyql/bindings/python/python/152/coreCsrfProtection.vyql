@@ -1,0 +1,10 @@
+module bindings.python.generated.m21017d75;
+
+binding csrfProtection152 {
+  query pattern callExpr where callee.path ~= "validate_csrf_token"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

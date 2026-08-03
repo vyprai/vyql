@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding unparameterizedSqlQueryParser122 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "function.return" and node.context.functionName contains "toString" and node.context.expr contains "::uuid"
+  emit issue code.UnparameterizedSqlQueryParser at node
+}

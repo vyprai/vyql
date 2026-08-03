@@ -1,0 +1,9 @@
+module bindings.dart.generated.m0ea56420;
+
+binding userControlledData0 {
+  requires {
+    dependency("retrofit")
+  }
+  query pattern callExpr where callee.method == "Path"
+  emit source core.UserControlledData at call.result
+}

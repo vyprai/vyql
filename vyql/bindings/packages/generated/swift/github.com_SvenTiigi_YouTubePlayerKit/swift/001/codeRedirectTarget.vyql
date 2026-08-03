@@ -1,0 +1,10 @@
+module bindings.swift.generated.m4806c3f7;
+
+binding redirectTarget1 {
+  requires {
+    dependency("github.com/SvenTiigi/YouTubePlayerKit")
+  }
+  query pattern callExpr where callee.method == "youTubePlayerEventCallbackURLScheme"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

@@ -1,0 +1,9 @@
+module bindings.java.generated.m676afa76;
+
+binding networkSend7 {
+  requires {
+    dependency("com.jayway.restassured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "patch"
+  emit sink code.NetworkSend at args[0]
+}

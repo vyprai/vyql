@@ -1,7 +1,0 @@
-import code.{NetworkConnect, NetworkSend}
-adapter php {
-  package "react/socket" {
-    sink method "connect" -> code.NetworkConnect
-    sink method "write" -> code.NetworkSend
-  }
-}

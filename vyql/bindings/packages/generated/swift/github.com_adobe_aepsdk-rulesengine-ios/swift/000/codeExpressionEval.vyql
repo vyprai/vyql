@@ -1,0 +1,9 @@
+module bindings.swift.generated.m39f995c6;
+
+binding expressionEval0 {
+  requires {
+    dependency("github.com/adobe/aepsdk-rulesengine-ios")
+  }
+  query pattern callExpr where callee.method == "evaluate"
+  emit sink code.ExpressionEval at args[0]
+}

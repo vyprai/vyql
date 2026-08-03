@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding weakCipher621 {
+  query pattern presenceNode where node.path ~= "DES3.new"
+  emit issue code.WeakCipher at node
+}

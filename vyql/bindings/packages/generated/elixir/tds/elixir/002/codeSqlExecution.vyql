@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m85a76522;
+
+binding sqlExecution2 {
+  requires {
+    dependency("tds")
+  }
+  query pattern callExpr where callee.method == "query_multi"
+  emit sink code.SqlExecution at args[0]
+}

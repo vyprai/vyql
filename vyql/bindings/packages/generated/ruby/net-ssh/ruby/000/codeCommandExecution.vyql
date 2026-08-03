@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m46b2b4d8;
+
+binding commandExecution0 {
+  requires {
+    dependency("net-ssh")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

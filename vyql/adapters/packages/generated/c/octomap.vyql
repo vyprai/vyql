@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter c {
-  package "octomap" {
-    sink method "read" -> code.Deserialization
-  }
-}

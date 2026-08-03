@@ -1,0 +1,9 @@
+module bindings.objc.generated.me3db4b97;
+
+binding deserialization1 {
+  requires {
+    dependency("Kanna")
+  }
+  query pattern callExpr where callee.method == "HTML"
+  emit sink code.Deserialization at args[0]
+}

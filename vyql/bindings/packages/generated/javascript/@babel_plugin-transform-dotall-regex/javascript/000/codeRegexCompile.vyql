@@ -1,0 +1,10 @@
+module bindings.javascript.generated.m6b4d1c69;
+
+binding regexCompile0 {
+  requires {
+    dependency("@babel/plugin-transform-dotall-regex")
+  }
+  query pattern callExpr where callee.method == "default"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

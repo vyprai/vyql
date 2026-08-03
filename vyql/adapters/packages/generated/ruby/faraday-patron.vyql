@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter ruby {
-  package "faraday-patron" {
-    sink method "call" -> code.NetworkSend
-  }
-}

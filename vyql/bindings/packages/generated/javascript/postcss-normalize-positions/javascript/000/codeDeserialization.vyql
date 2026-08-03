@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mdd0072eb;
+
+binding deserialization0 {
+  requires {
+    dependency("postcss-normalize-positions")
+  }
+  query pattern callExpr where callee.method == "transform"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m9a0b6a97;
+
+binding userControlledData0 {
+  requires {
+    dependency("infer-owner")
+  }
+  query pattern callExpr where callee.method == "inferOwner"
+  emit source core.UserControlledData at call.result
+}

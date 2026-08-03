@@ -1,0 +1,9 @@
+module bindings.bash.generated.mb6f991a5;
+
+binding archiveEntryWrite18 {
+  requires {
+    dependency("tar")
+  }
+  query pattern callExpr where callee.path ~= "tar"
+  emit sink code.ArchiveEntryWrite at args.any
+}

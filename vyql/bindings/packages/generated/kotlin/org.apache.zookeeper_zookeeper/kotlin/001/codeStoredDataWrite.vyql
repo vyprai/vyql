@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.me0df047c;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "setData"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding accessPolicyReview164 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "access_policy_public_shelf_without_role_check"
+  emit issue code.AccessPolicyReview at node
+}

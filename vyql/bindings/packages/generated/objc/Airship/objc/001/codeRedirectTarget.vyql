@@ -1,0 +1,10 @@
+module bindings.objc.generated.mc8c4bd54;
+
+binding redirectTarget1 {
+  requires {
+    dependency("Airship")
+  }
+  query pattern callExpr where callee.method == "handleAirshipDeeplink"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

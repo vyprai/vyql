@@ -1,0 +1,232 @@
+test "python html precision: direct html escape protects only its result"
+  lang python
+  reject VYQL-INJ-004
+  code
+  ```
+  import html
+  from flask import request, make_response
+
+  def page():
+      safe = html.escape(request.args.get("name", ""))
+      return make_response("<p>{}</p>".format(safe))
+  ```
+
+test "python html precision: imported Django escape protects its result"
+  lang python
+  reject VYQL-INJ-004
+  code
+  ```
+  from django.http import HttpResponse
+  from django.utils.html import escape
+
+  def page(request):
+      safe = escape(request.GET.get("name", ""))
+      return HttpResponse("<p>{}</p>".format(safe))
+  ```
+
+test "python html precision: escaped sibling does not hide unresolved raw helper"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  from django.http import HttpResponse
+  from django.utils.html import escape
+
+  def page(request):
+      raw = request.GET.get("name", "")
+      safe = escape(raw)
+      status = unresolved_check(safe, raw)
+      return HttpResponse("<p>{}</p>".format(status))
+  ```
+
+test "python html precision: imported MarkupSafe escape protects its result"
+  lang python
+  reject VYQL-INJ-004
+  code
+  ```
+  from flask import request, make_response
+  from markupsafe import escape
+
+  def page():
+      safe = escape(request.args.get("name", ""))
+      return make_response("<p>{}</p>".format(safe))
+  ```
+
+test "python html precision: rebinding an escaped alias to raw input clears protection"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  import html
+  from flask import request, make_response
+
+  def page():
+      raw = request.args.get("name", "")
+      safe = html.escape(raw)
+      safe = raw
+      return make_response("<p>{}</p>".format(safe))
+  ```
+
+test "python html precision: HTML escape does not neutralize SQL"
+  lang python
+  expect VYQL-INJ-001
+  code
+  ```
+  import html
+  import sqlite3
+  from flask import request
+
+  def page():
+      value = html.escape(request.args.get("name", ""))
+      return sqlite3.connect("app.db").execute("SELECT * FROM users WHERE name='" + value + "'")
+  ```
+
+test "python html precision: static template ignores an unused tainted context key"
+  lang python
+  reject VYQL-INJ-004
+  code
+  ```
+  from django.http import HttpResponse
+  from django.template import engines
+  from django.utils.html import escape
+
+  def page(request):
+      template = engines["django"].from_string("Hello {{ name }}")
+      name = escape(request.GET.get("name", ""))
+      unused = request.GET.get("unused", "")
+      return HttpResponse(template.render({"name": name, "unused": unused}, request))
+  ```
+
+test "python html precision: static template keeps a referenced file value"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  from django.http import HttpResponse
+  from django.template import engines
+
+  def page(request):
+      template = engines["django"].from_string("Profile {{ value }}")
+      value = open(request.GET.get("profile", "profile.txt")).read()
+      return HttpResponse(template.render({"value": value}, request))
+  ```
+
+test "python html precision: dynamic template keeps the whole context conservative"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  from django.http import HttpResponse
+  from django.template import engines
+
+  def page(request):
+      template = engines["django"].from_string(request.GET.get("template", ""))
+      return HttpResponse(template.render({"name": request.GET.get("name", "")}, request))
+  ```
+
+test "python html precision: render request metadata is not direct output"
+  lang python
+  reject VYQL-INJ-004
+  code
+  ```
+  from django.http import HttpResponse
+  from django.template import engines
+
+  def page(request):
+      template = engines["django"].from_string("Hello")
+      request.session["name"] = request.GET.get("name", "")
+      return HttpResponse(template.render({}, request))
+  ```
+
+test "python html precision: complete terminal character rejection is a scoped filter"
+  lang python
+  reject VYQL-INJ-004
+  code
+  ```
+  from flask import request, make_response
+
+  def page():
+      value = request.args.get("name", "")
+      rendered = "<p>{}</p>".format(value)
+      blocked = ["<", ">", "'", '"']
+      for char in blocked:
+          if char in value:
+              return ""
+      return make_response(rendered)
+  ```
+
+test "python html precision: incomplete terminal rejection remains vulnerable"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  from flask import request, make_response
+
+  def page():
+      value = request.args.get("name", "")
+      blocked = ["<", ">", "'"]
+      for char in blocked:
+          if char in value:
+              return ""
+      return make_response("<p>{}</p>".format(value))
+  ```
+
+test "python html precision: HTML breaker proof does not sanitize SQL"
+  lang python
+  expect VYQL-INJ-001
+  code
+  ```
+  import sqlite3
+  from flask import request
+
+  def page():
+      value = request.args.get("name", "")
+      for char in ["<", ">", "'", '"']:
+          if char in value:
+              return ""
+      return sqlite3.connect("app.db").execute("SELECT * FROM users WHERE name=" + value)
+  ```
+
+test "python html precision: post-sink rejection does not sanitize history"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  from flask import request, make_response
+
+  def page():
+      value = request.args.get("name", "")
+      response = make_response("<p>{}</p>".format(value))
+      for char in ["<", ">", "'", '"']:
+          if char in value:
+              return ""
+      return response
+  ```
+
+test "python html precision: true length guard makes later render unreachable"
+  lang python
+  reject VYQL-INJ-004
+  code
+  ```
+  from flask import request, make_response
+
+  def page():
+      value = request.args.get("name", "")
+      if len(value) >= 0:
+          return ""
+      return make_response("<p>{}</p>".format(value))
+  ```
+
+test "python html precision: arbitrary numeric guard may be false"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  from flask import request, make_response
+
+  def page(retries):
+      value = request.args.get("name", "")
+      if retries >= 0:
+          return ""
+      return make_response("<p>{}</p>".format(value))
+  ```

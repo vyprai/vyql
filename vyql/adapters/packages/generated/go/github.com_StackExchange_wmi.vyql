@@ -1,7 +1,0 @@
-adapter go {
-  package "github.com/StackExchange/wmi" {
-    sink method "Query" -> code.SqlExecution
-    sink method "QueryNamespace" -> code.SqlExecution
-    sink method "CreateQuery" -> code.SqlExecution
-  }
-}

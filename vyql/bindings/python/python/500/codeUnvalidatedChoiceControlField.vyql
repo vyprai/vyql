@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding unvalidatedChoiceControlField500 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unvalidated_choice_control_field"
+  emit issue code.UnvalidatedChoiceControlField at node
+}

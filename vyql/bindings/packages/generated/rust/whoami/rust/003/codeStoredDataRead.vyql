@@ -1,0 +1,9 @@
+module bindings.rust.generated.m8c380b71;
+
+binding storedDataRead3 {
+  requires {
+    dependency("whoami")
+  }
+  query pattern callExpr where callee.method == "username_os"
+  emit source code.StoredDataRead at call.result
+}

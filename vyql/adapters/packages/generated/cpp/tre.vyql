@@ -1,7 +1,0 @@
-adapter cpp {
-  package "tre" {
-    flag code.RegexCompile on any {
-      path "tre.compile"
-    }
-  }
-}

@@ -1,6 +1,0 @@
-adapter perl {
-  package "Lux-IO" {
-    sink method "btree_open" -> code.FilePathAccess
-    sink method "btree_put" -> code.StoredDataWrite
-  }
-}

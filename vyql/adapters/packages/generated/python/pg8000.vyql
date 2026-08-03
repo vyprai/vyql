@@ -1,9 +1,0 @@
-import code.{SqlExecution}
-adapter python {
-  package "pg8000" {
-    sink method "send_QUERY" -> code.SqlExecution
-    sink method "execute_simple" -> code.SqlExecution
-    sink method "execute_unnamed" -> code.SqlExecution
-    sink method "execute_named" -> code.SqlExecution
-  }
-}

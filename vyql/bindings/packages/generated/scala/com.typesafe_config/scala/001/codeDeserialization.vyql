@@ -1,0 +1,9 @@
+module bindings.scala.generated.m2e189199;
+
+binding deserialization1 {
+  requires {
+    dependency("com.typesafe:config")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

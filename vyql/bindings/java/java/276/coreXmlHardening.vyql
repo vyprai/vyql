@@ -1,0 +1,10 @@
+module bindings.java.generated.m420f6b67;
+
+binding xmlHardening276 {
+  query pattern callExpr where callee.method == "setFeaturesBySystemProperty"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}

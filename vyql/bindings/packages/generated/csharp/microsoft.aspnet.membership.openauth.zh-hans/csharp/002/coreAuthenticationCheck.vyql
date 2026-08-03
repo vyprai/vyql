@@ -1,0 +1,13 @@
+module bindings.csharp.generated.m75f290db;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("microsoft.aspnet.membership.openauth.zh-hans")
+  }
+  query pattern callExpr where callee.method == "CreateUser"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

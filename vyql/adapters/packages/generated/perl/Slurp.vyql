@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-
-adapter perl {
-  package "Slurp" {
-    sink method "slurp" -> code.FilePathAccess
-    sink method "to_array" -> code.FilePathAccess
-    sink method "to_scalar" -> code.FilePathAccess
-  }
-}

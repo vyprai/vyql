@@ -1,0 +1,10 @@
+module bindings.python.generated.m21017d75;
+
+binding authorizationCheck161 {
+  query pattern callExpr where callee.path ~= "permission_required"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

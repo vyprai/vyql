@@ -1,0 +1,6 @@
+module supply_chain;
+
+threat VulnerableDependency {
+  cwe: [CWE_1104]
+  desc: "Use of unmaintained/vulnerable third-party component"
+}

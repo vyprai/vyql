@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m65288840;
+
+binding filePathAccess0 {
+  requires {
+    dependency("lager")
+  }
+  query pattern callExpr where callee.method == "lager_file_backend:write"
+  emit sink code.FilePathAccess at args[0]
+}

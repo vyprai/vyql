@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding logWrite418 {
+  query pattern callExpr where callee.path ~= "logger.warn"
+  emit sink code.LogWriteSink at args.any
+}

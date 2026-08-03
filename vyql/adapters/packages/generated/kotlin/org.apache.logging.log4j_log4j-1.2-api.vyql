@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-
-adapter kotlin {
-  package "org.apache.logging.log4j:log4j-1.2-api" {
-    sink method "setFile" -> code.FilePathAccess
-    sink method "parse" -> code.Deserialization
-  }
-}

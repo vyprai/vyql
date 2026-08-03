@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule LeagueCommonMarkUnsafeHtmlMode {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-178"
+    severity: high
+  }
+  issue code.LeagueCommonMarkUnsafeHtmlMode as sink
+}

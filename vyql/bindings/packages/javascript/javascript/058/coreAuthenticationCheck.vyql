@@ -1,0 +1,13 @@
+module bindings.javascript.generated.m5c270092;
+
+binding authenticationCheck58 {
+  requires {
+    dependency("passport")
+  }
+  query pattern callExpr where callee.path ~= "passport.authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

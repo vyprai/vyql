@@ -116,6 +116,21 @@ func (s *BadgerStore) InEdges(dst, edgeType string) ([]Edge, error) {
 	return s.edges("ei"+sep+dst+sep, edgeType)
 }
 
+func (s *BadgerStore) RangeInEdges(dst, edgeType string, fn func(src string) bool) {
+	_ = s.scan("ei"+sep+dst+sep, func(_ string, v []byte) error {
+		var e Edge
+		if err := json.Unmarshal(v, &e); err != nil {
+			return err
+		}
+		if edgeType == "" || e.Type == edgeType {
+			if !fn(e.Src) {
+				return badger.ErrRejected
+			}
+		}
+		return nil
+	})
+}
+
 func (s *BadgerStore) NodesWithConcept(concept string) ([]string, error) {
 	prefix := "lc" + sep + concept + sep
 	var out []string

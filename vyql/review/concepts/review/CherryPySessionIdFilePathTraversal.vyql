@@ -1,0 +1,8 @@
+module code;
+
+review code.CherryPySessionIdFilePathTraversal {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: attention
+  text: "review CherryPy file-session path construction for canonical containment of cookie-supplied session ids"
+}

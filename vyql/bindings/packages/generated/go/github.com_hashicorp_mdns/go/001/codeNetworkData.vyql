@@ -1,0 +1,9 @@
+module bindings.go.generated.m176f0037;
+
+binding networkData1 {
+  requires {
+    dependency("github.com/hashicorp/mdns")
+  }
+  query pattern callExpr where callee.method == "QueryContext"
+  emit source code.NetworkData at call.result
+}

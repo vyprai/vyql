@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m0d5b4a27;
+
+binding filePathAccess0 {
+  requires {
+    dependency("com.squareup:javapoet")
+  }
+  query pattern callExpr where callee.method == "writeToPath"
+  emit sink code.FilePathAccess at args[0]
+}

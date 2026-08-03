@@ -1,8 +1,0 @@
-adapter python {
-  package "sphinx-rtd-theme" {
-    sink method "WebpackBuildCommand.run" -> code.CommandExecution
-    sink method "WebpackDevelopCommand.run" -> code.CommandExecution
-    sink method "UpdateTranslationsCommand.run" -> code.CommandExecution
-    sink method "TransifexCommand.run" -> code.CommandExecution
-  }
-}

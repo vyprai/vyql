@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding unescapedRequestGlobalTemplateVar75 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "unescaped_request_global_template_var"
+  emit issue code.UnescapedRequestGlobalTemplateVar at node
+}

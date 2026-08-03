@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m7ab87d2b;
+
+binding networkConnect9 {
+  requires {
+    dependency("tentacat")
+  }
+  query pattern callExpr where callee.method == "patch"
+  emit sink code.NetworkConnectSink at args[0]
+}

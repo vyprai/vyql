@@ -1,0 +1,9 @@
+module bindings.java.generated.m420f6b67;
+
+binding unsafeYamlConstructor140 {
+  requires {
+    dependency("org.yaml.snakeyaml")
+  }
+  query pattern presenceNode where node.path == "org.yaml.snakeyaml.constructor.Constructor"
+  emit issue code.UnsafeYamlConstructor at node
+}

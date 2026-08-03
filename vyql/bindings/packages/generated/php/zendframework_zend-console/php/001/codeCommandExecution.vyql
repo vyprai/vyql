@@ -1,0 +1,9 @@
+module bindings.php.generated.m22ea956d;
+
+binding commandExecution1 {
+  requires {
+    dependency("zendframework/zend-console")
+  }
+  query pattern callExpr where callee.method == "ZendConsoleAdapterPosix::shell_exec"
+  emit sink code.CommandExecution at args[0]
+}

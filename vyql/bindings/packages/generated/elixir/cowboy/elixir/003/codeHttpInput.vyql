@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mc8cf5d9a;
+
+binding httpInput3 {
+  requires {
+    dependency("cowboy")
+  }
+  query pattern callExpr where callee.method == "cowboy_req:read_part_body"
+  emit source code.HttpInput at call.result
+}

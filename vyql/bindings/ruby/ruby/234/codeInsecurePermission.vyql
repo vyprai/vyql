@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding insecurePermission234 {
+  query pattern callExpr where callee.path ~= "File.chmod" and args.any.literal contains "0666"
+  emit issue code.InsecurePermission at call
+}

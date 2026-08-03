@@ -1,0 +1,9 @@
+module bindings.cpp.generated.md2d6248c;
+
+binding deserialization0 {
+  requires {
+    dependency("spirv-cross")
+  }
+  query pattern callExpr where callee.method == "spvc_context_parse_spirv"
+  emit sink code.Deserialization at args[0]
+}

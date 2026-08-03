@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter cpp {
-  package "qtdoc" {
-    sink method "start" -> code.NetworkSend
-  }
-}

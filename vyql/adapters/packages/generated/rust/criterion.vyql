@@ -1,8 +1,0 @@
-import code.{NetworkData, NetworkSend}
-
-adapter rust {
-  package "criterion" {
-    source method "recv" -> code.NetworkData
-    sink method "send" -> code.NetworkSend
-  }
-}

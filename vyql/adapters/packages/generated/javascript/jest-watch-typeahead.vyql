@@ -1,6 +1,0 @@
-adapter javascript {
-  package "jest-watch-typeahead" {
-    sink method "run" -> code.FilePathAccess
-    source method "onKey" -> core.UserControlledData
-  }
-}

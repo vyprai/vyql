@@ -1,0 +1,9 @@
+module bindings.ruby.generated.me0f31a1d;
+
+binding filePathAccess4 {
+  requires {
+    dependency("refile")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

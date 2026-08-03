@@ -1,0 +1,9 @@
+module bindings.swift.generated.m252f3369;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/SwiftyContacts/SwiftyContacts")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

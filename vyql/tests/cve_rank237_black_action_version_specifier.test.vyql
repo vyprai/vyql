@@ -1,5 +1,6 @@
 test "rank237: Python action accepts arbitrary black package specifier suffix"
   lang python
+  expect VYQL-VAL-019
   expect_review code.PackageVersionSpecifierValidationReview
   code
   ```
@@ -17,6 +18,7 @@ test "rank237: Python action accepts arbitrary black package specifier suffix"
 
 test "rank237: Python action restricts black package specifier syntax"
   lang python
+  reject VYQL-VAL-019
   reject_review code.PackageVersionSpecifierValidationReview
   code
   ```

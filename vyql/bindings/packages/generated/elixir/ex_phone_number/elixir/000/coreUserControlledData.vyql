@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m92824e1f;
+
+binding userControlledData0 {
+  requires {
+    dependency("ex_phone_number")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}

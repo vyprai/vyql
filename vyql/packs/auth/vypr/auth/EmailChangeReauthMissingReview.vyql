@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule EmailChangeReauthMissingReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_306, CWE_287]
+    id: "VYQL-AUTH-090"
+    severity: high
+  }
+  issue code.EmailChangeReauthMissingReview as sink
+}

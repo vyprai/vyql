@@ -1,5 +1,0 @@
-adapter scala {
-  package "com.101tec:zkclient" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.c.generated.m1f236662;
+
+binding codeEval1 {
+  requires {
+    dependency("shiftmedia-libgpg-error")
+  }
+  query pattern callExpr where callee.method == "scheme_load_string"
+  emit sink code.CodeEval at args[0]
+}

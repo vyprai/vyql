@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m18ea75ce;
+
+binding archiveEntryWrite2 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "addFolder"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

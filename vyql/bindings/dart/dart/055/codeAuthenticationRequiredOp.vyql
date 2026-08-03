@@ -1,0 +1,6 @@
+module bindings.dart.generated.m1c398214;
+
+binding authenticationRequiredOp55 {
+  query pattern presenceNode where node.path ~= "transferFunds"
+  emit issue code.AuthenticationRequiredOp at node
+}

@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding permissiveCors401 {
+  query pattern presenceNode where node.context.language == "php" and node.context.phpReview == "permissive_cors_header"
+  emit issue code.PermissiveCors at node
+}

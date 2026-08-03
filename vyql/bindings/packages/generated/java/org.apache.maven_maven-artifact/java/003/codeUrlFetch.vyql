@@ -1,0 +1,9 @@
+module bindings.java.generated.m4c33c44c;
+
+binding urlFetch3 {
+  requires {
+    dependency("org.apache.maven:maven-artifact")
+  }
+  query pattern callExpr where callee.method == "setDownloadUrl"
+  emit sink code.UrlFetch at args[0]
+}

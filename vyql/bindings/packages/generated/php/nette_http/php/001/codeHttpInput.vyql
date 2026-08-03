@@ -1,0 +1,9 @@
+module bindings.php.generated.m3722870d;
+
+binding httpInput1 {
+  requires {
+    dependency("nette/http")
+  }
+  query pattern callExpr where callee.method == "getPost"
+  emit source code.HttpInput at call.result
+}

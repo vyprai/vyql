@@ -1,0 +1,10 @@
+module bindings.elixir.generated.m8ee75fb0;
+
+binding redirectTarget0 {
+  requires {
+    dependency("phoenix_live_dashboard")
+  }
+  query pattern callExpr where callee.method == "redirect_to_current_node"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

@@ -1,7 +1,0 @@
-import code.{HtmlRender}
-
-adapter dart {
-  package "webview_flutter_web" {
-    sink method "WebWebViewController.loadHtmlString" -> code.HtmlRender
-  }
-}

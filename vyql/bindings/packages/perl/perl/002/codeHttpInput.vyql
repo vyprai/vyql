@@ -1,0 +1,9 @@
+module bindings.perl.generated.ma164dcec;
+
+binding httpInput2 {
+  requires {
+    dependency("Mojolicious")
+  }
+  query pattern callExpr where callee.path ~= ".param"
+  emit source code.HttpInput at call.result
+}

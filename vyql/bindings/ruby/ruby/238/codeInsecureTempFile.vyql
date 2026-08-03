@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding insecureTempFile238 {
+  query pattern callExpr where callee.path ~= "File.open" and args.any.literal contains "/tmp/" and args.any.literal contains "w"
+  emit issue code.InsecureTempFile at call
+}

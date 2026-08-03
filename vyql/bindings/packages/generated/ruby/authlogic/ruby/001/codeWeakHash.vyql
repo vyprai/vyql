@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mede61e8c;
+
+binding weakHash1 {
+  requires {
+    dependency("authlogic")
+  }
+  query pattern callExpr where callee.method == "Authlogic::CryptoProviders::MD5.encrypt"
+  emit issue code.WeakHash at call
+}

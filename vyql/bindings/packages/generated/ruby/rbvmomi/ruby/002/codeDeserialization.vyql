@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m691da200;
+
+binding deserialization2 {
+  requires {
+    dependency("rbvmomi")
+  }
+  query pattern callExpr where callee.method == "load_x509"
+  emit sink code.Deserialization at args[0]
+}

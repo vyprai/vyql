@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m151b34d9;
+
+binding deserialization0 {
+  requires {
+    dependency("phoenix_swagger")
+  }
+  query pattern callExpr where callee.method == "PhoenixSwagger.Validator.parse_swagger_schema"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.go.generated.m39efcd29;
+
+binding httpInput4 {
+  requires {
+    dependency("github.com/gin-gonic/gin")
+  }
+  query pattern callExpr where callee.method == "Query" and callee.receiver.type == "gin.Context"
+  emit source code.HttpInput at call.result
+}

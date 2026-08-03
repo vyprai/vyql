@@ -1,0 +1,9 @@
+module bindings.scala.generated.m4212472c;
+
+binding xmlParse11 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getFloat"
+  emit sink code.XmlParse at args[0]
+}

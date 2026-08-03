@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	adapterapply "github.com/vyprai/vyql/adapters"
+	bindingapply "github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/extract/frontend"
@@ -20,7 +20,7 @@ import (
 // VyQL test specs (`vyql/tests/*.test.vyql`) are declarative, language-agnostic
 // behavior tests for the SHIPPED ruleset: a code snippet plus the rule ids it must
 // (expect) or must not (reject) produce. They live next to the VyQL data they test,
-// so adding a rule/adapter means adding a spec — no Go test code. This runner walks
+// so adding a rule/binding means adding a spec — no Go test code. This runner walks
 // them and scans each snippet through the real scan pipeline (all packs).
 //
 // Format (one or more `test` blocks per file; `#`/`//` comments, blank lines ignored):
@@ -29,13 +29,13 @@ import (
 //	  lang   java
 //	  expect RULE-ID      # repeatable — every listed rule MUST fire
 //	  reject RULE-ID      # repeatable — every listed rule must NOT fire
-//	  expect_evidence RULE-ID assumption  # rule must carry negation evidence text
+//	  expect_evidence RULE-ID advisory    # rule must carry advisory evidence text
 //	  reject_evidence RULE-ID char-filter # rule evidence must not contain text
 //	  expect_review some.Concept          # repeatable — review concept must appear
 //	  reject_review some.Concept          # repeatable — review concept must not appear
-//	  adapter python                     # optional graph adapter to apply before label checks
-//	  expect_label node-id custom.Source # graph adapter label assertion
-//	  reject_label node-id custom.Source # graph adapter negative label assertion
+//	  bindings python                    # optional binding set to apply before label checks
+//	  expect_label node-id custom.Source # graph binding label assertion
+//	  reject_label node-id custom.Source # graph binding negative label assertion
 //	  gitlink vendor/lib <sha>  # optional git submodule/gitlink fixture
 //	  code
 //	  ```
@@ -77,7 +77,7 @@ type vyqlSpec struct {
 	rejectEv     []evidenceSpec
 	expectReview []string
 	rejectReview []string
-	adapterTech  string
+	bindingsTech string
 	expectLabels []labelSpec
 	rejectLabels []labelSpec
 	profile      string     // optional threat-model profile (e.g. `profile library`); default = generic/auto
@@ -169,8 +169,8 @@ func parseSpecFile(t *testing.T, path string) []vyqlSpec {
 			cur.expectReview = append(cur.expectReview, rest)
 		case "reject_review":
 			cur.rejectReview = append(cur.rejectReview, rest)
-		case "adapter":
-			cur.adapterTech = rest
+		case "bindings":
+			cur.bindingsTech = rest
 		case "expect_label":
 			cur.expectLabels = append(cur.expectLabels, parseLabelSpec(t, rel, i+1, rest))
 		case "reject_label":
@@ -209,7 +209,7 @@ func TestVyqlSpecs(t *testing.T) {
 	// compile the shipped packs once — `graph` specs evaluate them over a synthetic
 	// asset/identity graph (the code specs scan source instead).
 	onto := ontology.Seed()
-	decls, err := parser.Parse(rules)
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(rules), lowerNonCoreV2DefinitionSource)
 	if err != nil {
 		t.Fatalf("parse packs: %v", err)
 	}
@@ -229,11 +229,13 @@ func TestVyqlSpecs(t *testing.T) {
 		t.Skip("no .test.vyql specs found")
 	}
 
+	specTempRoot := t.TempDir()
 	total := 0
 	for _, f := range files {
 		for _, s := range parseSpecFile(t, f) {
 			s := s
 			total++
+			specIndex := total
 			t.Run(s.src+"/"+s.name, func(t *testing.T) {
 				if len(s.expect) == 0 && len(s.reject) == 0 && len(s.expectEv) == 0 && len(s.rejectEv) == 0 &&
 					len(s.expectReview) == 0 && len(s.rejectReview) == 0 && len(s.expectLabels) == 0 && len(s.rejectLabels) == 0 {
@@ -246,9 +248,9 @@ func TestVyqlSpecs(t *testing.T) {
 				if s.graphSrc != "" {
 					// graph spec: build the asset/identity graph and evaluate the packs.
 					store := buildGraphStore(t, s)
-					if s.adapterTech != "" {
-						if _, _, err := adapterapply.Apply(store, frontend.AdaptersFor(s.adapterTech), nil); err != nil {
-							t.Fatalf("apply %s adapters: %v", s.adapterTech, err)
+					if s.bindingsTech != "" {
+						if _, _, err := bindingapply.Apply(store, frontend.BindingsFor(s.bindingsTech), nil); err != nil {
+							t.Fatalf("apply %s bindings: %v", s.bindingsTech, err)
 						}
 					}
 					eng := engine.New(onto, store)
@@ -284,7 +286,10 @@ func TestVyqlSpecs(t *testing.T) {
 					if len(s.files) == 0 {
 						t.Fatalf("%s:%d: spec %q has no code or graph block", s.src, s.line, s.name)
 					}
-					dir := t.TempDir()
+					dir := filepath.Join(specTempRoot, "spec-"+strconv.Itoa(specIndex))
+					if err := os.MkdirAll(dir, 0o755); err != nil {
+						t.Fatal(err)
+					}
 					for n, fl := range s.files {
 						name := fl.name
 						if name == "" {
@@ -310,11 +315,10 @@ func TestVyqlSpecs(t *testing.T) {
 						applyProfile([]string{dir}, s.profile)
 						defer frontend.SetActiveSources(nil)
 					}
-					found, _, store, err := scanPaths([]string{dir}, rules)
+					found, _, scanGraph, err := scanPaths([]string{dir}, rules)
 					if err != nil {
 						t.Fatalf("scan: %v", err)
 					}
-					defer closeStore(store) // 3k+ specs: an unclosed store per spec is a leak
 					for _, fnd := range found {
 						fired[fnd.RuleID] = true
 						confidence[fnd.RuleID] = fnd.Confidence
@@ -328,12 +332,7 @@ func TestVyqlSpecs(t *testing.T) {
 						}
 					}
 					if len(s.expectReview) > 0 || len(s.rejectReview) > 0 {
-						g, _, err := buildGraph([]string{dir})
-						if err != nil {
-							t.Fatalf("build graph for review: %v", err)
-						}
-						defer closeStore(g)
-						for _, row := range collectReviewItems(g) {
+						for _, row := range collectReviewItems(scanGraph) {
 							reviewed[row.Concept] = true
 						}
 					}
@@ -437,7 +436,11 @@ func parseEvidenceSpec(t *testing.T, src string, line int, rest string) evidence
 	if !ok || strings.TrimSpace(ruleID) == "" || strings.TrimSpace(text) == "" {
 		t.Fatalf("%s:%d: evidence assertion must be `expect_evidence <RULE> <text>`", src, line)
 	}
-	return evidenceSpec{ruleID: strings.TrimSpace(ruleID), text: strings.TrimSpace(text)}
+	return evidenceSpec{ruleID: strings.TrimSpace(ruleID), text: normalizeEvidenceExpectation(strings.TrimSpace(text))}
+}
+
+func normalizeEvidenceExpectation(text string) string {
+	return text
 }
 
 func parseConfidenceSpec(t *testing.T, src string, line int, rest string) confidenceSpec {

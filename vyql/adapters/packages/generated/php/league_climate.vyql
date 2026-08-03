@@ -1,9 +1,0 @@
-import code.{CommandExecution}
-import core.{UserControlledData}
-
-adapter php {
-  package "league/climate" {
-    source method "parse" -> core.UserControlledData
-    sink method "exec" -> code.CommandExecution
-  }
-}

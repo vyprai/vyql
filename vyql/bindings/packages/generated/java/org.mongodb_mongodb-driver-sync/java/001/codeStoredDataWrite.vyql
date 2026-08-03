@@ -1,0 +1,9 @@
+module bindings.java.generated.m4c0fe4dc;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("org.mongodb:mongodb-driver-sync")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.StoredDataWrite at args[0]
+}

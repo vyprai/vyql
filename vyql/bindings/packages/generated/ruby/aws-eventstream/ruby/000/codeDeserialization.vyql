@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m1fb9e63c;
+
+binding deserialization0 {
+  requires {
+    dependency("aws-eventstream")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter cpp {
-  package "rbdl" {
-    sink method "rbdl_loadmodel" -> code.Deserialization
-  }
-}

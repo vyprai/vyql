@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter dart {
-  package "photo_manager" {
-    sink method "setVerbose" -> code.FilePathAccess
-    sink method "deletePath" -> code.FilePathAccess
-  }
-}

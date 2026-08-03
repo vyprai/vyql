@@ -1,7 +1,0 @@
-import code.{CliArgument}
-
-adapter c {
-  package "cli11" {
-    source method "parse" -> code.CliArgument
-  }
-}

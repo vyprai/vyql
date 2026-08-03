@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mc7c52aa2;
+
+binding networkData5 {
+  requires {
+    dependency("brod")
+  }
+  query pattern callExpr where callee.method == "do_fetch"
+  emit source code.NetworkData at call.result
+}

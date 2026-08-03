@@ -1,0 +1,9 @@
+module bindings.java.generated.m676afa76;
+
+binding networkSend6 {
+  requires {
+    dependency("com.jayway.restassured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.NetworkSend at args[0]
+}

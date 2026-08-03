@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter rust {
-  package "vswhom" {
-    sink method "search" -> code.FilePathAccess
-  }
-}

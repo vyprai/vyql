@@ -15,6 +15,23 @@ type scConvScala struct {
 	file        string
 	key         string
 	currentFunc string
+	childCache  map[uintptr][]*tree_sitter.Node
+}
+
+func (c *scConvScala) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = make(map[uintptr][]*tree_sitter.Node)
+	}
+	key := uintptr(n.Id())
+	if kids, ok := c.childCache[key]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[key] = kids
+	return kids
 }
 
 // ExtractScala parses Scala files into one NIR Program (one module per file).
@@ -45,7 +62,7 @@ func (c *scConvScala) text(n *tree_sitter.Node) string {
 
 func (c *scConvScala) decls(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		out = append(out, c.stmt(ch)...)
 	}
 	return out
@@ -129,17 +146,38 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 func (c *scConvScala) conditionContextCall(cond *tree_sitter.Node, loc string) nir.Call {
 	raw := c.text(cond)
 	compact := strings.Join(strings.Fields(raw), "")
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: raw},
+		nir.Const{Loc: loc, Value: compact},
+		nir.Const{Loc: loc, Value: c.currentFunc},
+	}
+	if scHasIncompleteCsrfDoubleSubmit(raw, c.currentFunc) {
+		args = append(args, nir.Const{Loc: loc, Value: "csrf_validation:double_submit_missing_nonempty_guard"})
+	}
 	return nir.Call{
 		Callee: nir.Name{ID: "analysis.condition.if", Loc: loc},
-		Args: []nir.Expr{
-			nir.Const{Loc: loc, Value: raw},
-			nir.Const{Loc: loc, Value: compact},
-			nir.Const{Loc: loc, Value: c.currentFunc},
-		},
+		Args:   args,
 		Path:   "analysis.condition.if",
 		Method: "if",
 		Loc:    loc,
 	}
+}
+
+func scHasIncompleteCsrfDoubleSubmit(raw, fn string) bool {
+	compact := strings.Join(strings.Fields(raw), "")
+	lower := strings.ToLower(compact)
+	if !strings.Contains(strings.ToLower(fn), "csrf") {
+		return false
+	}
+	if !strings.Contains(lower, "submitted==cookie") && !strings.Contains(lower, "cookie==submitted") {
+		return false
+	}
+	for _, guard := range []string{".isempty", ".nonempty", "!=null", "!=''", "!=\"\""} {
+		if strings.Contains(lower, guard) {
+			return false
+		}
+	}
+	return true
 }
 
 // scMatch lowers a `x match { case … }` to a subject+labelled nir.Switch so a constant
@@ -151,7 +189,7 @@ func (c *scConvScala) scMatch(n *tree_sitter.Node) nir.Stmt {
 	if body == nil {
 		return sw
 	}
-	for _, cl := range namedChildren(body) {
+	for _, cl := range c.namedChildren(body) {
 		if cl.Kind() != "case_clause" {
 			continue
 		}
@@ -190,7 +228,7 @@ func (c *scConvScala) bodyStmts(body *tree_sitter.Node) []nir.Stmt {
 
 func (c *scConvScala) block(block *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, st := range namedChildren(block) {
+	for _, st := range c.namedChildren(block) {
 		out = append(out, c.stmt(st)...)
 	}
 	return out
@@ -225,7 +263,7 @@ func (c *scConvScala) params(params *tree_sitter.Node) []string {
 		return nil
 	}
 	var out []string
-	for _, ch := range namedChildren(params) {
+	for _, ch := range c.namedChildren(params) {
 		if ch.Kind() == "parameter" {
 			if nm := field(ch, "name"); nm != nil {
 				out = append(out, c.text(nm))
@@ -240,7 +278,7 @@ func (c *scConvScala) paramTypes(params *tree_sitter.Node) map[string]string {
 	if params == nil {
 		return out
 	}
-	for _, ch := range namedChildren(params) {
+	for _, ch := range c.namedChildren(params) {
 		if ch.Kind() == "parameter" {
 			if nm := field(ch, "name"); nm != nil {
 				putParamType(out, c.text(nm), paramTypeFromField(c, ch))
@@ -287,7 +325,7 @@ func (c *scConvScala) scFunctionContext(name string, body *tree_sitter.Node) []s
 				if m := lastSeg(path); m != "" {
 					add("call:" + m)
 				}
-				for _, arg := range namedChildren(field(n, "arguments")) {
+				for _, arg := range c.namedChildren(field(n, "arguments")) {
 					if a := scContextPath(c, arg); a != "" {
 						add("call_arg:" + path + ":" + a)
 					}
@@ -306,7 +344,7 @@ func (c *scConvScala) scFunctionContext(name string, body *tree_sitter.Node) []s
 				add("literal:" + lit)
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -344,7 +382,7 @@ func (c *scConvScala) patName(p *tree_sitter.Node) string {
 	case "identifier":
 		return c.text(p)
 	case "typed_pattern", "tuple_pattern":
-		if kids := namedChildren(p); len(kids) > 0 {
+		if kids := c.namedChildren(p); len(kids) > 0 {
 			return c.patName(kids[0])
 		}
 	}
@@ -356,7 +394,7 @@ func (c *scConvScala) callArgs(args *tree_sitter.Node) []nir.Expr {
 		return nil
 	}
 	var out []nir.Expr
-	for _, a := range namedChildren(args) {
+	for _, a := range c.namedChildren(args) {
 		out = append(out, c.expr(a))
 	}
 	return out
@@ -381,9 +419,9 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		if is := lastChildKind(n, "interpolated_string"); is != nil {
 			var walk func(m *tree_sitter.Node)
 			walk = func(m *tree_sitter.Node) {
-				for _, ch := range namedChildren(m) {
+				for _, ch := range c.namedChildren(m) {
 					if ch.Kind() == "interpolation" {
-						for _, e := range namedChildren(ch) {
+						for _, e := range c.namedChildren(ch) {
 							parts = append(parts, c.expr(e))
 						}
 					} else {
@@ -406,12 +444,12 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		// `new Type(args)` — model as a constructor call so type/arg sinks and marks match
 		// (e.g. new pkg.Widget(p), new pkg.Builder()). Grammar nests a call_expression
 		// (type applied to arguments) or carries the type + arguments directly.
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if k := ch.Kind(); k == "call_expression" || k == "generic_function" {
 				return c.expr(ch)
 			}
 		}
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) >= 1 {
 			// the type may be a stable_type_identifier (`pkg.Widget`) that c.dotted can't
 			// resolve (returns "?"); fall back to its source text for the constructor path.
@@ -435,13 +473,13 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "parenthesized_expression":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
 		}
 	case "prefix_expression", "unary_expression":
 		op := c.text(field(n, "operator"))
 		var operand nir.Expr = nir.Const{Loc: L}
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			operand = c.expr(kids[len(kids)-1])
 		}
 		return nir.Unary{Op: op, Operand: operand, Loc: L}
@@ -460,13 +498,13 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Seq{Parts: []nir.Expr{c.conditionContextCall(condNode, L), t}, Loc: L}
 	case "match_expression", "block":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Seq{Parts: parts, Loc: L}
 	}
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
@@ -479,7 +517,7 @@ func (c *scConvScala) blockTail(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: "?:0"}
 	}
 	if k := n.Kind(); k == "block" || k == "indented_block" {
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) == 0 {
 			return nir.Const{Loc: c.loc(n)}
 		}

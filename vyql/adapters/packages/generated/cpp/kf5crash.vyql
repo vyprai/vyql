@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter cpp {
-  package "kf5crash" {
-    sink method "startProcess" -> code.CommandExecution
-  }
-}

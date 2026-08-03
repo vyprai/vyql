@@ -1,6 +1,0 @@
-import code.{Deserialization, NetworkData, HttpInput}
-adapter python {
-  package "wadllib" {
-    sink method "bind" -> code.Deserialization
-  }
-}

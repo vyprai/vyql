@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "cssom" {
-    sink method "parse" -> code.Deserialization
-  }
-}

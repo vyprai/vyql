@@ -1,5 +1,0 @@
-adapter rust {
-  package "cpal" {
-    sink method "open_pcm" -> code.FilePathAccess
-  }
-}

@@ -1,7 +1,0 @@
-import code.{NetworkData}
-
-adapter elixir {
-  package "phoenix_integration" {
-    source method "request_path" -> code.NetworkData
-  }
-}

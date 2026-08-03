@@ -1,6 +1,0 @@
-adapter rust {
-  package "warp" {
-    sink method "read" -> code.FilePathAccess
-    sink method "read" -> code.Deserialization
-  }
-}

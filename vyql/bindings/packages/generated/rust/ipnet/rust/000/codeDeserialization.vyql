@@ -1,0 +1,9 @@
+module bindings.rust.generated.mabbda022;
+
+binding deserialization0 {
+  requires {
+    dependency("ipnet")
+  }
+  query pattern callExpr where callee.method == "from_str"
+  emit sink code.Deserialization at args[0]
+}

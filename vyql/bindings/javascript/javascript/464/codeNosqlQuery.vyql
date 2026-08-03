@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding nosqlQuery464 {
+  query pattern callExpr where callee.path ~= "Model.find"
+  emit sink code.NosqlQuery at args[0]
+}

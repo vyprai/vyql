@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter swift {
-  package "github.com/dn-m/MusicXML" {
-    sink method "init(from:)" -> code.Deserialization
-  }
-}

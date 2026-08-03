@@ -1,0 +1,9 @@
+module bindings.python.generated.mdd98ae45;
+
+binding commandExecution1 {
+  requires {
+    dependency("numba")
+  }
+  query pattern callExpr where callee.method == "run_command"
+  emit sink code.CommandExecution at args[0]
+}

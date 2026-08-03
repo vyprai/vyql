@@ -1,0 +1,9 @@
+module bindings.csharp.generated.mb289d269;
+
+binding filePathAccess1 {
+  requires {
+    dependency("ini-parser")
+  }
+  query pattern callExpr where callee.method == "IniParser.FileIniDataParser.SaveFile"
+  emit sink code.FilePathAccess at args[0]
+}

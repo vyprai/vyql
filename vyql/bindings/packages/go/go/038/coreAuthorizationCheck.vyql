@@ -1,0 +1,13 @@
+module bindings.go.generated.m39efcd29;
+
+binding authorizationCheck38 {
+  requires {
+    dependency("github.com/casbin/casbin")
+  }
+  query pattern callExpr where callee.method == "Can"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

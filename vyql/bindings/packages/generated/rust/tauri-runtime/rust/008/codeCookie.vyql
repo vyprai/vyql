@@ -1,0 +1,9 @@
+module bindings.rust.generated.m24cf5420;
+
+binding cookie8 {
+  requires {
+    dependency("tauri-runtime")
+  }
+  query pattern callExpr where callee.method == "cookies_for_url"
+  emit source code.Cookie at call.result
+}

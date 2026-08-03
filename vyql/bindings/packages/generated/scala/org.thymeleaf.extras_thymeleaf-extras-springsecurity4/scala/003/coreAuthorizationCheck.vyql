@@ -1,0 +1,13 @@
+module bindings.scala.generated.m11d754bc;
+
+binding authorizationCheck3 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity4")
+  }
+  query pattern callExpr where callee.method == "parsePermissionsString"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

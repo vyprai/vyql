@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding insecureTempFile435 {
+  query pattern callExpr where callee.path ~= "fopen" and args.any.literal contains "/tmp/" and args.any.literal contains "w"
+  emit issue code.InsecureTempFile at call
+}

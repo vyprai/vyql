@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mbc6ac631;
+
+binding deserialization1 {
+  requires {
+    dependency("qtimageformats")
+  }
+  query pattern callExpr where callee.method == "LogL16Decode"
+  emit sink code.Deserialization at args[0]
+}

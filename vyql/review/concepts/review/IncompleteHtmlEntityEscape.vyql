@@ -1,0 +1,8 @@
+module code;
+
+review code.IncompleteHtmlEntityEscape {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review strip_tags-only or partial entity escaping before browser-rendered HTML output"
+}

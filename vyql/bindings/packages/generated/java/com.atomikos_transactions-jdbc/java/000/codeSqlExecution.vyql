@@ -1,0 +1,9 @@
+module bindings.java.generated.mc0f55790;
+
+binding sqlExecution0 {
+  requires {
+    dependency("com.atomikos:transactions-jdbc")
+  }
+  query pattern callExpr where callee.method == "prepareStatement"
+  emit sink code.SqlExecution at args[0]
+}

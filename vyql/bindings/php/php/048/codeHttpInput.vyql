@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding httpInput48 {
+  query pattern callExpr where callee.path ~= "getenv" and args.any.literal contains "PATH_INFO"
+  emit source code.HttpInput at call.result
+}

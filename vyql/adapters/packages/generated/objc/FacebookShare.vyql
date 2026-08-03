@@ -1,8 +1,0 @@
-import code.{NetworkSend}
-
-adapter objc {
-  package "FacebookShare" {
-    sink method "sharer" -> code.NetworkSend
-    sink method "sharerDidCancel" -> code.NetworkSend
-  }
-}

@@ -1,9 +1,0 @@
-import code.{FileUse}
-
-adapter python {
-  package "autopep8" {
-    sink method "open_with_encoding" -> code.FileUse
-    sink method "detect_encoding" -> code.FileUse
-    sink method "readlines_from_file" -> code.FileUse
-  }
-}

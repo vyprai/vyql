@@ -1,5 +1,0 @@
-adapter php {
-  package "hoa/file" {
-    sink method "open" -> code.FilePathAccess
-  }
-}

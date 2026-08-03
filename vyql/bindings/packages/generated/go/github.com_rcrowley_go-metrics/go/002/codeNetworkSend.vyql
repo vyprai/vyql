@@ -1,0 +1,9 @@
+module bindings.go.generated.m38e46b57;
+
+binding networkSend2 {
+  requires {
+    dependency("github.com/rcrowley/go-metrics")
+  }
+  query pattern callExpr where callee.method == "ExpHandler"
+  emit sink code.NetworkSend at args[0]
+}

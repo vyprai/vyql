@@ -1,0 +1,13 @@
+module bindings.scala.generated.md2c7e9d5;
+
+binding pathAccessCheck0 {
+  requires {
+    dependency("org.aspectj:aspectjweaver")
+  }
+  query pattern callExpr where callee.method == "canReadDir"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

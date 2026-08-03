@@ -1,0 +1,9 @@
+module bindings.perl.generated.m652aade6;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Whitespace")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.FilePathAccess at args[0]
+}

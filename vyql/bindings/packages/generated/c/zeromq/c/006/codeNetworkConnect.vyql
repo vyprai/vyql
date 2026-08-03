@@ -1,0 +1,9 @@
+module bindings.c.generated.m7c6729a3;
+
+binding networkConnect6 {
+  requires {
+    dependency("zeromq")
+  }
+  query pattern callExpr where callee.method == "bind_to_device"
+  emit sink code.NetworkConnectSink at args[0]
+}

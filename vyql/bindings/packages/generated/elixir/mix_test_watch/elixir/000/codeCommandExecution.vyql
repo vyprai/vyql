@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m0fc68bb2;
+
+binding commandExecution0 {
+  requires {
+    dependency("mix_test_watch")
+  }
+  query pattern callExpr where callee.method == "build_tasks_cmds"
+  emit sink code.CommandExecution at args[0]
+}

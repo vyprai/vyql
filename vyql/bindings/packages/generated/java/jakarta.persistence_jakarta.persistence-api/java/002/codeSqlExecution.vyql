@@ -1,0 +1,9 @@
+module bindings.java.generated.m65200be6;
+
+binding sqlExecution2 {
+  requires {
+    dependency("jakarta.persistence:jakarta.persistence-api")
+  }
+  query pattern callExpr where callee.method == "executeUpdate"
+  emit sink code.SqlExecution at args[0]
+}

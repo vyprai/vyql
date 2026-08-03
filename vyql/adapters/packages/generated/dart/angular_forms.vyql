@@ -1,9 +1,0 @@
-import core.{InputValidation}
-adapter dart {
-  package "angular_forms" {
-    control method "required" -> core.InputValidation
-    control method "minLength" -> core.InputValidation
-    control method "maxLength" -> core.InputValidation
-    control method "pattern" -> core.InputValidation
-  }
-}

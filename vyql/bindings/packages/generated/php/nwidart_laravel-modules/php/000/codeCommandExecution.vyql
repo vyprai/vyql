@@ -1,0 +1,9 @@
+module bindings.php.generated.mf817f321;
+
+binding commandExecution0 {
+  requires {
+    dependency("nwidart/laravel-modules")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

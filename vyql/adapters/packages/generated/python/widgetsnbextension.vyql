@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter python {
-  package "widgetsnbextension" {
-    control method "escapeScript" -> core.HtmlEscape
-  }
-}

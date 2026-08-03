@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding codeEval105 {
+  query pattern callExpr where callee.path ~= "class_exec"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m55cad7ce;
+
+binding networkData2 {
+  requires {
+    dependency("eventsource")
+  }
+  query pattern callExpr where callee.method == "listener"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.DhcpOptionLengthUncheckedRead {
+  category: memory
+  expected: [core.InputValidation, core.MemoryBoundsCheck]
+  kind: target
+  text: "verify DHCP option parsing checks the option header and payload length before reading option data"
+}

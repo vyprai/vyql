@@ -60,3 +60,26 @@ test "rank236: C nullable file-transfer result is guarded before dereference"
       return 0;
   }
   ```
+
+test "rank236: nullable result deref generalizes across names"
+  lang c
+  expect VYQL-MEM-018
+  expect_review code.UncheckedNullableResultDeref
+  code
+  ```
+  struct transfer { void *data; };
+  struct holder { struct transfer *handle; };
+  struct request { void *account; char *name; char *path; int bytes; void *state; };
+
+  struct transfer *start_transfer(void *ic, char *who, char *filename, int size);
+
+  static int begin_send(void *data)
+  {
+      struct request *req = data;
+      struct holder *state = req->state;
+
+      state->handle = start_transfer(req->account, req->name, req->path, req->bytes);
+      state->handle->data = state;
+      return 0;
+  }
+  ```

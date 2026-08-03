@@ -1,5 +1,0 @@
-adapter php {
-  package "yiisoft/yii2" {
-    sink method "createObject" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m5adfe0b1;
+
+binding httpInput1 {
+  requires {
+    dependency("KTVCocoaHTTPServer")
+  }
+  query pattern callExpr where callee.method == "url"
+  emit source code.HttpInput at call.result
+}

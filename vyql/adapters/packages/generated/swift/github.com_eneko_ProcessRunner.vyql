@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-
-adapter swift {
-  package "github.com/eneko/ProcessRunner" {
-    sink method "system" -> code.CommandExecution
-    sink method "run" -> code.CommandExecution
-  }
-}

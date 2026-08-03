@@ -1,0 +1,9 @@
+module bindings.javascript.generated.me0548d23;
+
+binding filePathAccess0 {
+  requires {
+    dependency("make-dir")
+  }
+  query pattern callExpr where callee.method == "makeDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,8 +1,0 @@
-adapter swift {
-  package "github.com/airbnb/lottie-ios" {
-    sink method "mainThreadRenderingEngineShouldForceDisplayUpdateOnEachFrame" -> code.FilePathAccess
-    flag code.WeakHash on any {
-      method "hash"
-    }
-  }
-}

@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "javax.ws.rs:jsr311-api" {
-    source path "javax.ws.rs.jsr311.api.cookie" -> code.HttpInput
-  }
-}

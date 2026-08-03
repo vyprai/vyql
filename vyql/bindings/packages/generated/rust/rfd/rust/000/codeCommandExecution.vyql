@@ -1,0 +1,9 @@
+module bindings.rust.generated.mb7a130a2;
+
+binding commandExecution0 {
+  requires {
+    dependency("rfd")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

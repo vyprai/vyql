@@ -1,8 +1,0 @@
-import code.{CommandExecution, ExpressionEval}
-
-adapter groovy {
-  package "org.apache.hive:hive-exec" {
-    sink method "run" -> code.CommandExecution
-    sink method "parse" -> code.ExpressionEval
-  }
-}

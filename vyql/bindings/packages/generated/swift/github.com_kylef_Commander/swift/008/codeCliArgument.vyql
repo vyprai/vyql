@@ -1,0 +1,9 @@
+module bindings.swift.generated.m05efabc2;
+
+binding cliArgument8 {
+  requires {
+    dependency("github.com/kylef/Commander")
+  }
+  query pattern callExpr where callee.method == "CommandRunner.run"
+  emit source code.CliArgument at call.result
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter php {
-  package "m1/env" {
-    sink method "M1\\Env\\Parser::parse" -> code.Deserialization
-  }
-}

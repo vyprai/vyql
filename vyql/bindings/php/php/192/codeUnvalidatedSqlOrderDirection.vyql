@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding unvalidatedSqlOrderDirection192 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "processOrderBy" and node.context.phpReview == "unvalidated_sql_order_direction"
+  emit issue code.UnvalidatedSqlOrderDirection at node
+}

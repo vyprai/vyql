@@ -1,7 +1,0 @@
-adapter go {
-  package "github.com/VictoriaMetrics/fastcache" {
-    sink method "LoadFromFileMaxBytes" -> code.FilePathAccess
-    sink method "LoadFromFile" -> code.FilePathAccess
-    sink method "LoadFromFileOrNew" -> code.FilePathAccess
-  }
-}

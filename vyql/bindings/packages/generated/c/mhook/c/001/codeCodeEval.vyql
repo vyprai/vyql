@@ -1,0 +1,9 @@
+module bindings.c.generated.mef3cc9c1;
+
+binding codeEval1 {
+  requires {
+    dependency("mhook")
+  }
+  query pattern callExpr where callee.method == "Mhook_SetHookEx"
+  emit sink code.CodeEval at args[0]
+}

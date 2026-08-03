@@ -1,0 +1,13 @@
+module bindings.python.generated.m3d9ccbad;
+
+binding authorizationCheck9 {
+  requires {
+    dependency("django")
+  }
+  query pattern callExpr where callee.method == "permission_required"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

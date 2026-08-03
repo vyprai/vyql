@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m3b1624df;
+
+binding networkData3 {
+  requires {
+    dependency("gssapi")
+  }
+  query pattern callExpr where callee.method == "verify_mic"
+  emit source code.NetworkData at call.result
+}

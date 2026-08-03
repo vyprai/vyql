@@ -1,8 +1,0 @@
-import code.{CliArgument}
-
-adapter bash {
-  package "speedtest-cli" {
-    source path "speedtest" -> code.CliArgument
-    source path "speedtest-cli" -> code.CliArgument
-  }
-}

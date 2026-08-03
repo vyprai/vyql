@@ -1,0 +1,9 @@
+module bindings.go.generated.m4048a771;
+
+binding cliArgument1 {
+  requires {
+    dependency("github.com/docopt/docopt-go")
+  }
+  query pattern callExpr where callee.method == "ParseArgs"
+  emit source code.CliArgument at call.result
+}

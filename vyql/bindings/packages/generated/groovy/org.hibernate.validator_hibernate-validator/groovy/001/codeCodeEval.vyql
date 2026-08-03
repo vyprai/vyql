@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m15eda1e2;
+
+binding codeEval1 {
+  requires {
+    dependency("org.hibernate.validator:hibernate-validator")
+  }
+  query pattern callExpr where callee.method == "externalClassLoader"
+  emit sink code.CodeEval at args[0]
+}

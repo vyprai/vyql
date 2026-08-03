@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding commandExecution97 {
+  query pattern callExpr where callee.path ~= "Process.spawn"
+  emit sink code.CommandExecution at args[0]
+}

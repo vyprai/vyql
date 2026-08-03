@@ -1,0 +1,10 @@
+module bindings.php.generated.m5d32eb5a;
+
+binding regexCompile5 {
+  requires {
+    dependency("drupal/core")
+  }
+  query pattern callExpr where callee.method == "RegExp"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

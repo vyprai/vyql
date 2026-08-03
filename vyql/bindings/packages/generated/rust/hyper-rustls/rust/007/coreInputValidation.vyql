@@ -1,0 +1,14 @@
+module bindings.rust.generated.m3d5f2ee0;
+
+binding inputValidation7 {
+  requires {
+    dependency("hyper-rustls")
+  }
+  query pattern callExpr where callee.method == "enable_http1"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

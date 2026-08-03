@@ -1,8 +1,0 @@
-import code.{NetworkSend, NetworkConnect, Deserialization}
-adapter kotlin {
-  package "io.searchbox:jest" {
-    sink method "execute" -> code.NetworkSend
-    sink method "constructHttpMethod" -> code.NetworkConnect
-    sink method "deserializeResponse" -> code.Deserialization
-  }
-}

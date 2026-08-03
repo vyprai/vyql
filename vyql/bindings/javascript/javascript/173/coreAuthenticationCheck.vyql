@@ -1,0 +1,10 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding authenticationCheck173 {
+  query pattern callExpr where callee.path ~= "isAuthenticated"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

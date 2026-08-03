@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m8647f04f;
+
+binding codeEval0 {
+  requires {
+    dependency("org.javassist:javassist")
+  }
+  query pattern callExpr where callee.method == "toClass"
+  emit sink code.CodeEval at args[0]
+}

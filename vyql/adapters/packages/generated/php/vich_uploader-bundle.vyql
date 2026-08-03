@@ -1,6 +1,0 @@
-adapter php {
-  package "vich/uploader-bundle" {
-    sink method "getRandomString" -> code.UrlFetch
-    sink method "readProperty" -> code.FilePathAccess
-  }
-}

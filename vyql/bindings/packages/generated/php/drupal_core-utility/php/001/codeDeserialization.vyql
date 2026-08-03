@@ -1,0 +1,9 @@
+module bindings.php.generated.md7c84739;
+
+binding deserialization1 {
+  requires {
+    dependency("drupal/core-utility")
+  }
+  query pattern callExpr where callee.method == "Html::load"
+  emit sink code.Deserialization at args[0]
+}

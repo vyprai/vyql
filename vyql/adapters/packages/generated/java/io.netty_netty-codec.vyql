@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{InputValidation}
-
-adapter java {
-  package "io.netty:netty-codec" {
-    sink method "parse" -> code.Deserialization
-    control method "escape" -> core.InputValidation
-  }
-}

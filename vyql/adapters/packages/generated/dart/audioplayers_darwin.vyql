@@ -1,7 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter dart {
-  package "audioplayers_darwin" {
-    sink method "parse" -> code.Deserialization
-    sink method "setSourceUrl" -> code.FilePathAccess
-  }
-}

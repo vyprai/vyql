@@ -1,8 +1,0 @@
-import code.{HtmlRender, ResponseHeaderWrite}
-
-adapter cpp {
-  package "functions-framework-cpp" {
-    sink method "set_payload" -> code.HtmlRender
-    sink method "set_header" -> code.ResponseHeaderWrite
-  }
-}

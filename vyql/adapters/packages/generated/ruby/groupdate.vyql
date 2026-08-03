@@ -1,9 +1,0 @@
-import code.{SqlExecution}
-import core.{InputValidation}
-
-adapter ruby {
-  package "groupdate" {
-    sink method "group_by_period" -> code.SqlExecution
-    control method "Magic.validate_period" -> core.InputValidation
-  }
-}

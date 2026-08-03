@@ -1,0 +1,9 @@
+module bindings.perl.generated.me6857c0a;
+
+binding envVariable1 {
+  requires {
+    dependency("Env")
+  }
+  query pattern callExpr where callee.path ~= "Env"
+  emit source code.EnvVariable at call.result
+}

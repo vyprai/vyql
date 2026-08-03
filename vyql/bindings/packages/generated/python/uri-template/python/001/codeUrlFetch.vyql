@@ -1,0 +1,9 @@
+module bindings.python.generated.m9aa36b67;
+
+binding urlFetch1 {
+  requires {
+    dependency("uri-template")
+  }
+  query pattern callExpr where callee.method == "partial"
+  emit sink code.UrlFetch at args[0]
+}

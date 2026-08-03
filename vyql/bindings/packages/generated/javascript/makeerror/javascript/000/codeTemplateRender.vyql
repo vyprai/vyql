@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m858e6af1;
+
+binding templateRender0 {
+  requires {
+    dependency("makeerror")
+  }
+  query pattern callExpr where callee.method == "makeError"
+  emit sink code.TemplateRender at args[0]
+}

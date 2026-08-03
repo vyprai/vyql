@@ -1,8 +1,0 @@
-import code.{CliArgument, CommandExecution}
-
-adapter php {
-  package "hoa/console" {
-    sink method "Hoa\Console\Processus::run" -> code.CommandExecution
-    source method "Hoa\Console\Parser::parse" -> code.CliArgument
-  }
-}

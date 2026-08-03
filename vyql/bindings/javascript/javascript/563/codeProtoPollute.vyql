@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding protoPollute563 {
+  query pattern callExpr where callee.path ~= "$.extend"
+  emit sink code.ProtoPollute at args[2]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.m74f8d57f;
+
+binding deserialization0 {
+  requires {
+    dependency("flutter_parsed_text")
+  }
+  query pattern callExpr where callee.method == "MatchText.pattern"
+  emit sink code.Deserialization at args[0]
+}

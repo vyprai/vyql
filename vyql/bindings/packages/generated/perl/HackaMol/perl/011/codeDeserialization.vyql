@@ -1,0 +1,9 @@
+module bindings.perl.generated.md871dd99;
+
+binding deserialization11 {
+  requires {
+    dependency("HackaMol")
+  }
+  query pattern callExpr where callee.method == "read_cif_atoms"
+  emit sink code.Deserialization at args[0]
+}

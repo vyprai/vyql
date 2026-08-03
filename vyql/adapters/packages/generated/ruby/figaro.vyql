@@ -1,7 +1,0 @@
-import code.{CommandExecution, Deserialization}
-adapter ruby {
-  package "figaro" {
-    sink method "system" -> code.CommandExecution
-    sink method "parse" -> code.Deserialization
-  }
-}

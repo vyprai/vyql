@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding authenticodeSignaturePathBindingBypass244 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.literal contains "Get-AuthenticodeSignature" and node.context.literal contains "LiteralPath" and node.context.callPath contains "parseOut" and node.context.selector contains "data.SignerCertificate.Subject" and not (node.context.selector contains "data.Path") and not (node.context.callPath contains "path.normalize")
+  emit issue code.AuthenticodeSignaturePathBindingBypass at node
+}

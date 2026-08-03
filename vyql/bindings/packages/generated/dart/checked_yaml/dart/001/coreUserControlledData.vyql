@@ -1,0 +1,9 @@
+module bindings.dart.generated.m53b7d8f2;
+
+binding userControlledData1 {
+  requires {
+    dependency("checked_yaml")
+  }
+  query pattern callExpr where callee.method == "toParsedYamlException"
+  emit source core.UserControlledData at call.result
+}

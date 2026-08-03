@@ -1,0 +1,11 @@
+module code;
+
+concept RsaPkcs1DigestSuffixOnlyVerification : issue {
+  cwe: [CWE_347]
+  reviewAssumption: "an attacker can provide low-exponent RSA signatures and exploit lax PKCS#1 v1.5 padding validation"
+  reviewCategory: crypto
+  reviewCondition: "RSA PKCS#1 v1.5 signature verification accepts a recovered block when only its trailing digest matches"
+  reviewConfidence: high
+  reviewEvidence: "RSA verification context {pattern} recovers the signature block and compares SHA-1/SHA-256 data with the final digest bytes without validating leading bytes, padding, separator, or DigestInfo"
+  vulnerableTo: [crypto.ImproperSignatureCheck]
+}

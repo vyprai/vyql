@@ -29,7 +29,7 @@ func TestDeltaStableAndScoped(t *testing.T) {
 		{ID: "b.js\x1fCall#1", Type: "code.Call", Props: map[string]string{"loc": "b.js:1"}},
 	}
 	labels := map[string][]usg.Label{
-		"a.js\x1fCall#1": {{Concept: "code.WeakHash", Provenance: usg.Provenance{Adapter: "js.marks"}}},
+		"a.js\x1fCall#1": {{Concept: "code.WeakHash", Provenance: usg.Provenance{Applicator: "js.marks"}}},
 	}
 	g := memStore(nodes, labels)
 

@@ -1,0 +1,10 @@
+module bindings.ruby.generated.m8ad8dde5;
+
+binding redirectTarget1 {
+  requires {
+    dependency("responders")
+  }
+  query pattern callExpr where callee.method == "respond_with"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

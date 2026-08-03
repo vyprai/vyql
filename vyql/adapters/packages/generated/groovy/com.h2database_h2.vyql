@@ -1,7 +1,0 @@
-import code.{SqlExecution, DatabaseRead}
-adapter groovy {
-  package "com.h2database:h2" {
-    sink method "query" -> code.SqlExecution
-    sink method "connect" -> code.DatabaseRead
-  }
-}

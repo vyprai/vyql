@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding commandLineAssemblyReview248 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "command_line_assembly_review"
+  emit issue code.CommandLineAssemblyReview at node
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.maea7cb04;
+
+binding networkConnect0 {
+  requires {
+    dependency("amq-protocol")
+  }
+  query pattern callExpr where callee.method == "AMQ::URI.parse"
+  emit sink code.NetworkConnectSink at args[0]
+}

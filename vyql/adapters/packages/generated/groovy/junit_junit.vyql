@@ -1,5 +1,0 @@
-adapter groovy {
-  package "junit:junit" {
-    source method "JUnitCommandLineParseResult.parse" -> code.CliArgument
-  }
-}

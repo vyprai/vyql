@@ -1,0 +1,9 @@
+module bindings.php.generated.mb928c19c;
+
+binding sqlExecution0 {
+  requires {
+    dependency("topthink/framework")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.rust.generated.md4a5a880;
+
+binding deserialization1 {
+  requires {
+    dependency("untrusted")
+  }
+  query pattern callExpr where callee.method == "read_byte"
+  emit sink code.Deserialization at args[0]
+}

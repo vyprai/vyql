@@ -1,0 +1,14 @@
+module bindings.csharp.generated.m2a0e231a;
+
+binding htmlEscape30 {
+  requires {
+    dependency("System.Security")
+  }
+  query pattern callExpr where callee.path ~= "SecurityElement.Escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

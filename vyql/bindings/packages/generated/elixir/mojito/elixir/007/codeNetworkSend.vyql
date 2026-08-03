@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m7a8231df;
+
+binding networkSend7 {
+  requires {
+    dependency("mojito")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkSend at args[0]
+}

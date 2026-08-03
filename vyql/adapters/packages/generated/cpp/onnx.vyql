@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter cpp {
-  package "onnx" {
-    sink method "ParseProtoFromBytes" -> code.Deserialization
-    sink method "ParseProtoFromPyBytes" -> code.Deserialization
-  }
-}

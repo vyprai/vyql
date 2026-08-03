@@ -1,0 +1,9 @@
+module bindings.perl.generated.m01c752d3;
+
+binding userControlledData2 {
+  requires {
+    dependency("Jedi")
+  }
+  query pattern callExpr where callee.method == "uploads"
+  emit source core.UserControlledData at call.result
+}

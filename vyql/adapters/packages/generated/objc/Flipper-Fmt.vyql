@@ -1,8 +1,0 @@
-import code.{Deserialization, ExpressionEval}
-
-adapter objc {
-  package "Flipper-Fmt" {
-    sink method "parse" -> code.Deserialization
-    sink method "format" -> code.ExpressionEval
-  }
-}

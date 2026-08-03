@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter javascript {
-  package "wrap-ansi" {
-    control method "wrapAnsi" -> core.InputValidation
-  }
-}

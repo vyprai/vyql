@@ -1,7 +1,0 @@
-adapter rust {
-  package "proc-macro2" {
-    sink method "compile_probe_unstable" -> code.DynamicCodeLoad
-    source method "get" -> code.SecretValue
-    sink method "open" -> code.FilePathAccess
-  }
-}

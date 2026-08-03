@@ -1,0 +1,9 @@
+module bindings.swift.generated.mf1f83853;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/ChimeHQ/LanguageServerProtocol")
+  }
+  query pattern callExpr where callee.method == "parsePlaceholderValue"
+  emit sink code.Deserialization at args[0]
+}

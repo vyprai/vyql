@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "x509" {
-    sink method "try_der_decode" -> code.Deserialization
-  }
-}

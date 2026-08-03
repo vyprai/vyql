@@ -1,0 +1,10 @@
+module bindings.ruby.generated.mee840174;
+
+binding privilegedOp9 {
+  requires {
+    dependency("io-like")
+  }
+  query pattern callExpr where callee.method == "fcntl"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

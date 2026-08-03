@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding filePathAccess19 {
+  query pattern callExpr where callee.path ~= "ifstream"
+  emit sink code.FilePathAccess at args[0]
+}

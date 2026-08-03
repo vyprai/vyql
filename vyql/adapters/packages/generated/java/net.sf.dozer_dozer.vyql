@@ -1,6 +1,0 @@
-adapter java {
-  package "net.sf.dozer:dozer" {
-    sink method "addMapping" -> code.Deserialization
-    source method "map" -> core.UserControlledData
-  }
-}

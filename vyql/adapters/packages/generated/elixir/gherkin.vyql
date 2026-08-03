@@ -1,8 +1,0 @@
-import code.{Deserialization, FileUse, FilePathAccess}
-adapter elixir {
-  package "gherkin" {
-    sink method "parse" -> code.Deserialization
-    sink method "parse_file" -> code.Deserialization
-    sink method "parse_feature" -> code.Deserialization
-  }
-}

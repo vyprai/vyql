@@ -1,0 +1,9 @@
+module bindings.ruby.generated.ma96f0f9a;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("bson_ext")
+  }
+  query pattern callExpr where callee.method == "bson_buffer_set_max_size"
+  emit sink code.StoredDataWrite at args[0]
+}

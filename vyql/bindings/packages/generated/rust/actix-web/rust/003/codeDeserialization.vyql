@@ -1,0 +1,9 @@
+module bindings.rust.generated.mfcac2c50;
+
+binding deserialization3 {
+  requires {
+    dependency("actix-web")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m0ff32e60;
+
+binding htmlRender0 {
+  requires {
+    dependency("zendframework/zend-cache")
+  }
+  query pattern callExpr where callee.method == "ob_start"
+  emit sink code.HtmlRender at args[0]
+}

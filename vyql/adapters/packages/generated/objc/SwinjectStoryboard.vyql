@@ -1,7 +1,0 @@
-adapter objc {
-  package "SwinjectStoryboard" {
-    sink method "create" -> code.Deserialization
-    sink method "instantiateViewController" -> code.Deserialization
-    sink method "instantiateController" -> code.Deserialization
-  }
-}

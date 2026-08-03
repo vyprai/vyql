@@ -1,0 +1,14 @@
+module bindings.rust.generated.m88f10a47;
+
+binding inputValidation3 {
+  requires {
+    dependency("ucd-util")
+  }
+  query pattern callExpr where callee.method == "canonical_property_name"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,8 +1,0 @@
-import code.{NetworkData}
-
-adapter c {
-  package "qt5-multimedia" {
-    source method "gst_video_connector_chain" -> code.NetworkData
-    source method "on_need_data" -> code.NetworkData
-  }
-}

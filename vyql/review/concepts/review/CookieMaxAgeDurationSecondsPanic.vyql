@@ -1,0 +1,8 @@
+module code;
+
+review code.CookieMaxAgeDurationSecondsPanic {
+  category: resource
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review cookie Max-Age parsing for a maximum-duration clamp before constructing Duration::seconds"
+}

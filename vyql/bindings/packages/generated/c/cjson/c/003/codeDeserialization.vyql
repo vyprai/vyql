@@ -1,0 +1,9 @@
+module bindings.c.generated.m019e3560;
+
+binding deserialization3 {
+  requires {
+    dependency("cjson")
+  }
+  query pattern callExpr where callee.method == "cJSON_ParseWithLengthOpts"
+  emit sink code.Deserialization at args[0]
+}

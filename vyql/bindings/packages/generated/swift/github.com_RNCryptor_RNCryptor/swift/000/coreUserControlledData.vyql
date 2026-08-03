@@ -1,0 +1,9 @@
+module bindings.swift.generated.me825b0f1;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/RNCryptor/RNCryptor")
+  }
+  query pattern callExpr where callee.method == "decrypt"
+  emit source core.UserControlledData at call.result
+}

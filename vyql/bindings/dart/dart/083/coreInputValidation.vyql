@@ -1,0 +1,11 @@
+module bindings.dart.generated.m1c398214;
+
+binding inputValidation83 {
+  query pattern callExpr where callee.path ~= "validateRole"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

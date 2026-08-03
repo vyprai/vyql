@@ -1,0 +1,9 @@
+module bindings.scala.generated.mbe2382b7;
+
+binding nosqlQuery1 {
+  requires {
+    dependency("com.amazonaws:aws-java-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "batchWriteItem"
+  emit sink code.NosqlQuery at args[0]
+}

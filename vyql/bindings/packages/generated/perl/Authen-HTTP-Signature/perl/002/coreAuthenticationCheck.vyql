@@ -1,0 +1,13 @@
+module bindings.perl.generated.m5cdc92fa;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("Authen-HTTP-Signature")
+  }
+  query pattern callExpr where callee.method == "verify"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

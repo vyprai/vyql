@@ -1,0 +1,7 @@
+module code;
+
+review code.InsecurePermission {
+  category: permission
+  kind: target
+  text: "review broad permission assignment and surrounding privilege checks"
+}

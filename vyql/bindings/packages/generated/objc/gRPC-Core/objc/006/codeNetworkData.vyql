@@ -1,0 +1,9 @@
+module bindings.objc.generated.me76efafa;
+
+binding networkData6 {
+  requires {
+    dependency("gRPC-Core")
+  }
+  query pattern callExpr where callee.method == "grpc_server_start"
+  emit source code.NetworkData at call.result
+}

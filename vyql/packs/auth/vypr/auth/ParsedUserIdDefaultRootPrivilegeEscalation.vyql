@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule ParsedUserIdDefaultRootPrivilegeEscalation {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_269]
+    id: "VYQL-AUTH-031"
+    severity: high
+  }
+  issue code.ParsedUserIdDefaultRootPrivilegeEscalation as parser
+}

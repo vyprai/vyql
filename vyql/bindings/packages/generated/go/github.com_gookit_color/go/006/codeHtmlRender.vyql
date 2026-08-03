@@ -1,0 +1,9 @@
+module bindings.go.generated.m90840e9a;
+
+binding htmlRender6 {
+  requires {
+    dependency("github.com/gookit/color")
+  }
+  query pattern callExpr where callee.method == "ReplaceTag"
+  emit sink code.HtmlRender at args[0]
+}

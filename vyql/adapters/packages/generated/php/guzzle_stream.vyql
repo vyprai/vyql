@@ -1,6 +1,0 @@
-import code.{UrlFetch}
-adapter php {
-  package "guzzle/stream" {
-    sink method "fopen" -> code.UrlFetch
-  }
-}

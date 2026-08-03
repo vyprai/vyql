@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m5a46a91e;
+
+binding sqlExecution5 {
+  requires {
+    dependency("sqlite3")
+  }
+  query pattern callExpr where callee.method == "prepared_step"
+  emit sink code.SqlExecution at args[0]
+}

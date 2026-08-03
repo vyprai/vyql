@@ -1,0 +1,9 @@
+module bindings.objc.generated.m5f786758;
+
+binding expressionEval2 {
+  requires {
+    dependency("TensorFlowLiteC")
+  }
+  query pattern callExpr where callee.method == "TfLiteSignatureRunnerInvoke"
+  emit sink code.ExpressionEval at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding htmlRender96 {
+  query pattern callExpr where callee.path ~= "Response.Write"
+  emit sink code.HtmlRender at args[0]
+}

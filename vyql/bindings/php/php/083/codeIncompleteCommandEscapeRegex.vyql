@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding incompleteCommandEscapeRegex83 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "incomplete_command_escape_regex"
+  emit issue code.IncompleteCommandEscapeRegex at node
+}

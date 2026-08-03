@@ -1,0 +1,9 @@
+module bindings.dart.generated.m035612f2;
+
+binding userControlledData0 {
+  requires {
+    dependency("in_app_purchase")
+  }
+  query pattern callExpr where callee.method == "InAppPurchase.queryProductDetails"
+  emit source core.UserControlledData at call.result
+}

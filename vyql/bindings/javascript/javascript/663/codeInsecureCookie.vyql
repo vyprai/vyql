@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding insecureCookie663 {
+  query pattern presenceNode where node.context.language == "javascript" and node.context.callPath contains "res.cookie" and not (node.context.prop contains "secure=true")
+  emit issue code.InsecureCookie at node
+}

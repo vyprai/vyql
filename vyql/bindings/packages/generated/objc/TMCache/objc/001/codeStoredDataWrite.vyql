@@ -1,0 +1,9 @@
+module bindings.objc.generated.mbba532e7;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("TMCache")
+  }
+  query pattern callExpr where callee.method == "setObject:forKey:"
+  emit sink code.StoredDataWrite at args[0]
+}

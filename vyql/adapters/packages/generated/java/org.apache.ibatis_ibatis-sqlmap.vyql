@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter java {
-  package "org.apache.ibatis:ibatis-sqlmap" {
-    sink method "run" -> SqlExecution
-  }
-}

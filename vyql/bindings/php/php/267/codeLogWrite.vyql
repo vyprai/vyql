@@ -1,0 +1,7 @@
+module bindings.php.generated.mfbe84119;
+
+binding logWrite267 {
+  query pattern presenceNode where node.path ~= "error_log"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}

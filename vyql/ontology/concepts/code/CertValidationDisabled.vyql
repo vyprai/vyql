@@ -1,0 +1,6 @@
+module code;
+
+concept CertValidationDisabled : issue {
+  cwe: [CWE_295]
+  vulnerableTo: [crypto.ImproperCertValidation]
+}

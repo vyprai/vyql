@@ -1,0 +1,9 @@
+module bindings.swift.generated.me0ca856f;
+
+binding storedDataRead1 {
+  requires {
+    dependency("github.com/juliand665/UserDefault")
+  }
+  query pattern callExpr where callee.method == "loadValue"
+  emit source code.StoredDataRead at call.result
+}

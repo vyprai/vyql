@@ -1,0 +1,11 @@
+module code;
+
+concept TempPathJoinBeforeSeparatorCheck : issue {
+  cwe: [CWE_22]
+  reviewAssumption: "the joined filename can be influenced by a caller and the process account can access filesystem paths reached by the joined name"
+  reviewCategory: path
+  reviewCondition: "a temporary filename is joined with a temp directory before rejecting path separators or canonicalizing to a basename"
+  reviewConfidence: high
+  reviewEvidence: "function context {pattern} assigns from a temp-path provider, joins DIRECTORY_SEPARATOR, and records a global temp-file write without an earlier basename or separator check"
+  vulnerableTo: [path.PathTraversal]
+}

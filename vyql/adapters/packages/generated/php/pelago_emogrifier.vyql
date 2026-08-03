@@ -1,7 +1,0 @@
-import code.{HtmlRender}
-adapter php {
-  package "pelago/emogrifier" {
-    sink method "querySelectorAll" -> code.HtmlRender
-    sink method "parse" -> code.HtmlRender
-  }
-}

@@ -98,3 +98,25 @@ test "rank686: Dropbear scp rejects dot and empty remote filenames"
       open(np, O_WRONLY|O_CREAT, mode);
   }
   ```
+
+test "rank686: remote listing download path generalizes across names"
+  lang c
+  expect VYQL-PATH-006
+  code
+  ```
+  char *strchr(const char *s, int c);
+  int strcmp(const char *a, const char *b);
+  int snprintf(char *str, unsigned long size, const char *format, ...);
+  int open(const char *path, int flags, int mode);
+  #define O_WRONLY 1
+  #define O_CREAT 64
+  #define NULL ((void*)0)
+
+  void receive(char *remote_name, char *target_dir, char *joined) {
+    if (strchr(remote_name, '/') != NULL || strcmp(remote_name, "..") == 0) {
+      return;
+    }
+    snprintf(joined, 4096, "%s/%s", target_dir, remote_name);
+    open(joined, O_WRONLY|O_CREAT, 0644);
+  }
+  ```

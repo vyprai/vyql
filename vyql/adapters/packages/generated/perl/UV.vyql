@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter perl {
-  package "UV" {
-    sink method "spawn" -> code.CommandExecution
-  }
-}

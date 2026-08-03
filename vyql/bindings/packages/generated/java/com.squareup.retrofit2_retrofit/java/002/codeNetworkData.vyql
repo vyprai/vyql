@@ -1,0 +1,9 @@
+module bindings.java.generated.m6bf09d5c;
+
+binding networkData2 {
+  requires {
+    dependency("com.squareup.retrofit2:retrofit")
+  }
+  query pattern callExpr where callee.method == "Response.body"
+  emit source code.NetworkData at call.result
+}

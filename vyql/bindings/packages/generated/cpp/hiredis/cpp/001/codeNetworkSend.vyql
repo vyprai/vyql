@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m8937d91b;
+
+binding networkSend1 {
+  requires {
+    dependency("hiredis")
+  }
+  query pattern callExpr where callee.method == "redisNetWrite"
+  emit sink code.NetworkSend at args[0]
+}

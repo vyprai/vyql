@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m0cd3207a;
+
+binding cliArgument0 {
+  requires {
+    dependency("info.picocli:picocli")
+  }
+  query pattern callExpr where callee.method == "handleParseException"
+  emit source code.CliArgument at call.result
+}

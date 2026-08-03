@@ -1,0 +1,9 @@
+module bindings.php.generated.mf0404b66;
+
+binding cliArgument0 {
+  requires {
+    dependency("laravel/scout")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit source code.CliArgument at call.result
+}

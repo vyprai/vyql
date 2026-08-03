@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter kotlin {
-  package "org.scala-lang.modules:scala-xml_2.11" {
-    control method "escape" -> core.HtmlEscape
-  }
-}

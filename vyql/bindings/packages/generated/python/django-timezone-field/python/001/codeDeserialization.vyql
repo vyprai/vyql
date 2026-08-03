@@ -1,0 +1,9 @@
+module bindings.python.generated.maa6e8aae;
+
+binding deserialization1 {
+  requires {
+    dependency("django-timezone-field")
+  }
+  query pattern callExpr where callee.method == "to_python"
+  emit sink code.Deserialization at args[0]
+}

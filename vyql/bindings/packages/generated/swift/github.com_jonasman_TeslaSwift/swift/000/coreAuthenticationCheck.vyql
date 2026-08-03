@@ -1,0 +1,13 @@
+module bindings.swift.generated.mc6882f18;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("github.com/jonasman/TeslaSwift")
+  }
+  query pattern callExpr where callee.method == "authenticateWeb"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc6005d88;
+
+binding deserialization10 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "PropertyListDecoder.decode"
+  emit sink code.Deserialization at args[0]
+}

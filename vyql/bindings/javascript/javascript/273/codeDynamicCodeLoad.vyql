@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding dynamicCodeLoad273 {
+  query pattern callExpr where callee.path ~= "import"
+  emit sink code.DynamicCodeLoad at args[0]
+}

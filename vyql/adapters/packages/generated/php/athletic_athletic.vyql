@@ -1,5 +1,0 @@
-adapter php {
-  package "athletic/athletic" {
-    sink method "require_once" -> code.FilePathAccess
-  }
-}

@@ -1,9 +1,0 @@
-import code.{NetworkData, StoredDataWrite}
-
-adapter go {
-  package "go.opentelemetry.io/otel/sdk" {
-    source method "WithSyncer" -> code.NetworkData
-    source method "WithBatcher" -> code.NetworkData
-    source method "WithSpanProcessor" -> code.NetworkData
-  }
-}

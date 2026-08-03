@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m7983ff90;
+
+binding filePathAccess5 {
+  requires {
+    dependency("org.apache.tiles:tiles-servlet")
+  }
+  query pattern callExpr where callee.method == "getResourceAsStream"
+  emit sink code.FilePathAccess at args[0]
+}

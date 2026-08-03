@@ -1,7 +1,0 @@
-adapter java {
-  package "net.spy:spymemcached" {
-    flag code.WeakHash on any {
-      path "net.spy.spymemcached.hash"
-    }
-  }
-}

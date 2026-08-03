@@ -1,0 +1,9 @@
+module bindings.go.generated.m2aa6e558;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/aws/aws-sdk-go")
+  }
+  query pattern callExpr where callee.method == "ParseAST"
+  emit sink code.Deserialization at args[0]
+}

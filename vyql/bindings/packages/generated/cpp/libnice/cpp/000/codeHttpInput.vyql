@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m13455b6b;
+
+binding httpInput0 {
+  requires {
+    dependency("libnice")
+  }
+  query pattern callExpr where callee.method == "stun_message_has_cookie"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m3a5e7773;
+
+binding sqlExecution2 {
+  requires {
+    dependency("yajra/laravel-datatables-editor")
+  }
+  query pattern callExpr where callee.method == "edit"
+  emit sink code.SqlExecution at args[0]
+}

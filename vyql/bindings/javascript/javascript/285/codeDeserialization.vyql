@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding deserialization285 {
+  query pattern callExpr where callee.path ~= "jsyaml.load"
+  emit sink code.Deserialization at args[0]
+}

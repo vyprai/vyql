@@ -1,9 +1,0 @@
-import code.{Deserialization, NosqlQuery}
-
-adapter elixir {
-  package "eredis" {
-    sink method "parse" -> code.Deserialization
-    sink method "do_request" -> code.NosqlQuery
-    sink method "do_pipeline" -> code.NosqlQuery
-  }
-}

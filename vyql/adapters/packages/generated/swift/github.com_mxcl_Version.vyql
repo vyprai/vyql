@@ -1,7 +1,0 @@
-adapter swift {
-  package "github.com/mxcl/Version" {
-    flag code.WeakHash on any {
-      method "hash"
-    }
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.java.generated.md4870d71;
+
+binding filePathAccess5 {
+  requires {
+    dependency("com.amazonaws:aws-java-sdk-s3")
+  }
+  query pattern callExpr where callee.method == "deleteObject"
+  emit sink code.FilePathAccess at args[0]
+}

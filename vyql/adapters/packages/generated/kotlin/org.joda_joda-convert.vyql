@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "org.joda:joda-convert" {
-    sink method "parse" -> code.Deserialization
-    sink method "convertFromString" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.mc7c77879;
+
+binding networkConnect0 {
+  requires {
+    dependency("internet_connection_checker")
+  }
+  query pattern callExpr where callee.method == "checkConnectivity"
+  emit sink code.NetworkConnectSink at args[0]
+}

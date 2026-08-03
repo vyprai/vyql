@@ -1,0 +1,9 @@
+module bindings.java.generated.m2106962d;
+
+binding networkConnect3 {
+  requires {
+    dependency("org.eclipse.jgit:org.eclipse.jgit")
+  }
+  query pattern callExpr where callee.method == "push"
+  emit sink code.NetworkConnectSink at args[0]
+}

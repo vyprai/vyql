@@ -1,8 +1,7 @@
 // Package engine compiles and evaluates VyQL rules (docs/03, /05), ported from
 // poc/vyql/engine.py. The hard boundary enforced here: every concept a rule
 // references must resolve in the ontology, endpoints are kind-checked, and
-// `unless sanitized_by`/`guarded_by` are typed against control<->threat<->sink
-// typing at COMPILE time.
+// v2 coveredBy controls are typed against control<->threat<->sink at COMPILE time.
 package engine
 
 import (
@@ -24,28 +23,25 @@ func (e CompileError) Error() string { return e.Rule + ": " + e.Msg }
 type CompiledRule struct {
 	Rule               *parser.Rule
 	Severity           string
+	SourceConcepts     map[string]bool
+	SinkConcepts       map[string]bool
+	TaintKinds         map[string]bool
+	ExcludedChars      string
 	KillControls       map[string]bool // sanitizer concepts (+descendants) that kill taint
 	NeutralizedThreats map[string]bool
-}
-
-// allowed concept kinds per flow verb endpoint (docs/05 §safety conditions)
-var endpointKinds = map[string][2]map[string]bool{
-	"taint":  {{"source": true}, {"sink": true}},
-	"flow":   {{"source": true}, {"sink": true}},
-	"reach":  {{"exposure": true, "asset": true}, {"asset": true, "exposure": true}},
-	"assume": {{"principal": true}, {"privilege": true, "principal": true}},
 }
 
 // CompileRules compiles all rules; returns the compiled set and any errors.
 func CompileRules(decls []parser.Decl, onto *ontology.Ontology) ([]*CompiledRule, []CompileError) {
 	var compiled []*CompiledRule
 	var errs []CompileError
+	ruleVerbs := ruleVerbMechanicsFromDecls(decls)
 	for _, d := range decls {
 		r, ok := d.(*parser.Rule)
 		if !ok {
 			continue
 		}
-		cr, err := compileOne(r, onto)
+		cr, err := compileOne(r, onto, ruleVerbs)
 		if err != nil {
 			errs = append(errs, CompileError{Rule: r.QualifiedName(), Msg: err.Error()})
 			continue
@@ -65,7 +61,77 @@ func requireConcept(onto *ontology.Ontology, name, where string) error {
 	return nil
 }
 
-func compileOne(r *parser.Rule, onto *ontology.Ontology) (*CompiledRule, error) {
+type ruleVerbMechanicPolicy struct {
+	present bool
+	verbs   map[string]ruleVerbMechanic
+}
+
+type ruleVerbMechanic struct {
+	FromKinds map[string]bool
+	ToKinds   map[string]bool
+}
+
+func ruleVerbMechanicsFromDecls(decls []parser.Decl) ruleVerbMechanicPolicy {
+	out := builtinRuleVerbMechanics()
+	for _, d := range decls {
+		m, ok := d.(*parser.V2MechanicDecl)
+		if !ok || m.Kind != "ruleVerb" {
+			continue
+		}
+		if _, builtin := out.verbs[m.Name]; builtin {
+			continue
+		}
+		out.present = true
+		out.verbs[m.Name] = ruleVerbMechanic{
+			FromKinds: v2MechanicStringSet(m.Items, "fromKinds"),
+			ToKinds:   v2MechanicStringSet(m.Items, "toKinds"),
+		}
+	}
+	return out
+}
+
+func builtinRuleVerbMechanics() ruleVerbMechanicPolicy {
+	return ruleVerbMechanicPolicy{
+		present: true,
+		verbs: map[string]ruleVerbMechanic{
+			"taint": {FromKinds: map[string]bool{"source": true}, ToKinds: map[string]bool{"sink": true}},
+			"reach": {FromKinds: map[string]bool{"asset": true, "exposure": true}, ToKinds: map[string]bool{"asset": true, "exposure": true}},
+			"grant": {FromKinds: map[string]bool{"principal": true}, ToKinds: map[string]bool{"principal": true, "privilege": true}},
+			"issue": {FromKinds: map[string]bool{"issue": true}, ToKinds: nil},
+			"fact":  {FromKinds: map[string]bool{"fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true}, ToKinds: nil},
+			"query": {FromKinds: map[string]bool{"concept": true, "fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true}, ToKinds: nil},
+		},
+	}
+}
+
+func v2MechanicStringSet(items []parser.V2BlockItem, key string) map[string]bool {
+	out := map[string]bool{}
+	for _, item := range items {
+		if len(item.Key) != 1 || item.Key[0] != key {
+			continue
+		}
+		values, ok := item.Value.([]any)
+		if !ok {
+			return out
+		}
+		for _, value := range values {
+			switch x := value.(type) {
+			case string:
+				out[x] = true
+			case parser.V2RefExpr:
+				out[x.Name] = true
+			case parser.V2LiteralExpr:
+				if s, ok := x.Value.(string); ok {
+					out[s] = true
+				}
+			}
+		}
+		break
+	}
+	return out
+}
+
+func compileOne(r *parser.Rule, onto *ontology.Ontology, ruleVerbs ruleVerbMechanicPolicy) (*CompiledRule, error) {
 	sev := "medium"
 	if s, ok := r.Meta["severity"].(string); ok {
 		sev = s
@@ -81,16 +147,22 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology) (*CompiledRule, error) 
 		if err := requireConcept(onto, body.Dst.Concept, "sink/target of "+r.QualifiedName()); err != nil {
 			return nil, err
 		}
-		if err := checkEndpointKinds(onto, body, r.QualifiedName()); err != nil {
-			return nil, err
+		if !body.SemanticQuery {
+			if err := checkEndpointKinds(onto, body, r.QualifiedName(), ruleVerbs); err != nil {
+				return nil, err
+			}
 		}
-		if body.Verb == "taint" || body.Verb == "flow" {
+		if body.Verb == "taint" {
+			cr.SourceConcepts = onto.Descendants(body.Src.Concept)
+			cr.SinkConcepts = onto.Descendants(body.Dst.Concept)
+			cr.TaintKinds = taintKindsFor(onto, cr.SourceConcepts)
+			cr.ExcludedChars = excludedCharsFor(onto, cr.SinkConcepts)
 			for _, cl := range r.Clauses {
 				if cl.Kind != "unless" {
 					continue
 				}
 				switch ex := cl.Unless.(type) {
-				case parser.SanitizedBy:
+				case parser.PathCoveredBy:
 					if err := requireConcept(onto, ex.Concept, "sanitizer of "+r.QualifiedName()); err != nil {
 						return nil, err
 					}
@@ -102,9 +174,44 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology) (*CompiledRule, error) 
 						cr.KillControls[c] = true
 					}
 					cr.NeutralizedThreats[threat] = true
-				case parser.GuardedBy:
-					// guarded_by on a typed sink is threat-typed too (docs/06)
+				case parser.EndpointCoveredBy:
+					// Endpoint coverage on a typed sink is threat-typed too (docs/06).
 					if err := requireConcept(onto, ex.Concept, "guard of "+r.QualifiedName()); err != nil {
+						return nil, err
+					}
+					if _, err := onto.CheckSanitizerTyping(body.Src.Concept, body.Dst.Concept, ex.Concept); err != nil {
+						return nil, err
+					}
+				case parser.DominatesCoveredBy:
+					if err := requireConcept(onto, ex.Concept, "dominating guard of "+r.QualifiedName()); err != nil {
+						return nil, err
+					}
+					if _, err := onto.CheckSanitizerTyping(body.Src.Concept, body.Dst.Concept, ex.Concept); err != nil {
+						return nil, err
+					}
+				case parser.PostDominatesCoveredBy:
+					if err := requireConcept(onto, ex.Concept, "post-dominating guard of "+r.QualifiedName()); err != nil {
+						return nil, err
+					}
+					if _, err := onto.CheckSanitizerTyping(body.Src.Concept, body.Dst.Concept, ex.Concept); err != nil {
+						return nil, err
+					}
+				case parser.SameReceiverCoveredBy:
+					if err := requireConcept(onto, ex.Concept, "same-receiver guard of "+r.QualifiedName()); err != nil {
+						return nil, err
+					}
+					if _, err := onto.CheckSanitizerTyping(body.Src.Concept, body.Dst.Concept, ex.Concept); err != nil {
+						return nil, err
+					}
+				case parser.SameScopeCoveredBy:
+					if err := requireConcept(onto, ex.Concept, "same-scope guard of "+r.QualifiedName()); err != nil {
+						return nil, err
+					}
+					if _, err := onto.CheckSanitizerTyping(body.Src.Concept, body.Dst.Concept, ex.Concept); err != nil {
+						return nil, err
+					}
+				case parser.GlobalCoveredBy:
+					if err := requireConcept(onto, ex.Concept, "global guard of "+r.QualifiedName()); err != nil {
 						return nil, err
 					}
 					if _, err := onto.CheckSanitizerTyping(body.Src.Concept, body.Dst.Concept, ex.Concept); err != nil {
@@ -118,22 +225,43 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology) (*CompiledRule, error) 
 			if err := requireConcept(onto, body.Concept, "match target of "+r.QualifiedName()); err != nil {
 				return nil, err
 			}
+			if body.RelatedConcept != "" {
+				if err := requireConcept(onto, body.RelatedConcept, "match related concept of "+r.QualifiedName()); err != nil {
+					return nil, err
+				}
+			}
 		}
 		for _, cl := range r.Clauses {
 			if cl.Kind != "unless" {
 				continue
 			}
 			switch ex := cl.Unless.(type) {
-			case parser.SanitizedBy:
+			case parser.PathCoveredBy:
 				if err := requireConcept(onto, ex.Concept, "control of "+r.QualifiedName()); err != nil {
 					return nil, err
 				}
-			case parser.GuardedBy:
+			case parser.EndpointCoveredBy:
 				if err := requireConcept(onto, ex.Concept, "control of "+r.QualifiedName()); err != nil {
 					return nil, err
 				}
-			case parser.ClosedBy:
-				if err := requireConcept(onto, ex.Concept, "release of "+r.QualifiedName()); err != nil {
+			case parser.DominatesCoveredBy:
+				if err := requireConcept(onto, ex.Concept, "dominating control of "+r.QualifiedName()); err != nil {
+					return nil, err
+				}
+			case parser.PostDominatesCoveredBy:
+				if err := requireConcept(onto, ex.Concept, "post-dominating control of "+r.QualifiedName()); err != nil {
+					return nil, err
+				}
+			case parser.SameReceiverCoveredBy:
+				if err := requireConcept(onto, ex.Concept, "same-receiver control of "+r.QualifiedName()); err != nil {
+					return nil, err
+				}
+			case parser.SameScopeCoveredBy:
+				if err := requireConcept(onto, ex.Concept, "same-scope control of "+r.QualifiedName()); err != nil {
+					return nil, err
+				}
+			case parser.GlobalCoveredBy:
+				if err := requireConcept(onto, ex.Concept, "global control of "+r.QualifiedName()); err != nil {
 					return nil, err
 				}
 			}
@@ -149,22 +277,61 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology) (*CompiledRule, error) 
 	return cr, nil
 }
 
-func checkEndpointKinds(onto *ontology.Ontology, body *parser.FlowStmt, rule string) error {
-	allowed, ok := endpointKinds[body.Verb]
+func taintKindsFor(onto *ontology.Ontology, concepts map[string]bool) map[string]bool {
+	out := map[string]bool{}
+	for c := range concepts {
+		if cc, err := onto.Get(c); err == nil {
+			for _, t := range cc.Taint {
+				out[t] = true
+			}
+		}
+	}
+	return out
+}
+
+func excludedCharsFor(onto *ontology.Ontology, concepts map[string]bool) string {
+	seen := map[rune]bool{}
+	out := ""
+	for c := range concepts {
+		if cc, err := onto.Get(c); err == nil {
+			for _, r := range cc.ExcludedChars {
+				if !seen[r] {
+					seen[r] = true
+					out += string(r)
+				}
+			}
+		}
+	}
+	return out
+}
+
+func checkEndpointKinds(onto *ontology.Ontology, body *parser.FlowStmt, rule string, ruleVerbs ruleVerbMechanicPolicy) error {
+	if !ruleVerbs.present {
+		return fmt.Errorf("no built-in rule verb policy")
+	}
+	allowed, ok := endpointKindPolicy(body.Verb, ruleVerbs)
 	if !ok {
-		return nil
+		return fmt.Errorf("rule verb %q has no built-in rule verb policy", body.Verb)
 	}
 	src, _ := onto.Get(body.Src.Concept)
 	dst, _ := onto.Get(body.Dst.Concept)
-	if !allowed[0][src.Kind] {
+	if !allowed[0]["concept"] && !allowed[0][src.Kind] {
 		return fmt.Errorf("%s source '%s' is kind '%s', expected one of %v in %s (endpoints used in the wrong role)",
 			body.Verb, body.Src.Concept, src.Kind, keys(allowed[0]), rule)
 	}
-	if !allowed[1][dst.Kind] {
+	if !allowed[1]["concept"] && !allowed[1][dst.Kind] {
 		return fmt.Errorf("%s target '%s' is kind '%s', expected one of %v in %s (endpoints used in the wrong role)",
 			body.Verb, body.Dst.Concept, dst.Kind, keys(allowed[1]), rule)
 	}
 	return nil
+}
+
+func endpointKindPolicy(verb string, ruleVerbs ruleVerbMechanicPolicy) ([2]map[string]bool, bool) {
+	m, ok := ruleVerbs.verbs[verb]
+	if !ok {
+		return [2]map[string]bool{}, false
+	}
+	return [2]map[string]bool{m.FromKinds, m.ToKinds}, true
 }
 
 func keys(m map[string]bool) []string {

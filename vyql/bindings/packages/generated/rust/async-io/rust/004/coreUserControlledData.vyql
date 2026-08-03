@@ -1,0 +1,9 @@
+module bindings.rust.generated.med5b2857;
+
+binding userControlledData4 {
+  requires {
+    dependency("async-io")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source core.UserControlledData at call.result
+}

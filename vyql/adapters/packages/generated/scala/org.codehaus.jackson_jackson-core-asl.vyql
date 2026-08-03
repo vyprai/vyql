@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "org.codehaus.jackson:jackson-core-asl" {
-    sink method "createJsonParser" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.javascript.generated.me42c4159;
+
+binding httpInput1 {
+  requires {
+    dependency("cookie")
+  }
+  query pattern callExpr where callee.method == "parseCookie"
+  emit source code.HttpInput at call.result
+}

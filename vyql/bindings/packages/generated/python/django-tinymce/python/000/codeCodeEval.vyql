@@ -1,0 +1,9 @@
+module bindings.python.generated.m821ea8f3;
+
+binding codeEval0 {
+  requires {
+    dependency("django-tinymce")
+  }
+  query pattern callExpr where callee.method == "render_to_js_vardef"
+  emit sink code.CodeEval at args[0]
+}

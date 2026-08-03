@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule GitPackSignatureSearchParsingBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_20, CWE_115]
+    id: "VYQL-VAL-016"
+    severity: high
+  }
+  issue code.GitPackSignatureSearchParsingBypass as parser
+}

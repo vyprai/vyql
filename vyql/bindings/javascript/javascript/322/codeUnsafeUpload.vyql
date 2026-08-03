@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding unsafeUpload322 {
+  query pattern callExpr where callee.path ~= "fs.writeFileSync"
+  emit sink code.UnsafeUpload at args[0]
+}

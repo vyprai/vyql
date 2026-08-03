@@ -1,0 +1,9 @@
+module bindings.swift.generated.mf98b16d0;
+
+binding sqlExecution0 {
+  requires {
+    dependency("github.com/vapor/sqlite-nio")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

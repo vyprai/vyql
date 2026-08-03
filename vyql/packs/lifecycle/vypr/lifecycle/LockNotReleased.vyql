@@ -1,0 +1,11 @@
+module vypr.lifecycle;
+
+rule LockNotReleased {
+  meta {
+    cwe: [CWE_667]
+    id: "VYQL-LIFE-001"
+    severity: medium
+  }
+  issue code.LockAcquire as l
+  unless l.postDominates coveredBy core.LockRelease
+}

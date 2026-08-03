@@ -1,5 +1,0 @@
-adapter dart {
-  package "floor_annotation" {
-    sink method "Query" -> code.SqlExecution
-  }
-}

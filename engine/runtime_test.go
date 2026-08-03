@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/risk"
 	"github.com/vyprai/vyql/usg"
 )
@@ -13,7 +12,7 @@ import (
 func evalOne(t *testing.T, src string, s usg.Store) int {
 	t.Helper()
 	onto := runtimeTestOntology()
-	decls, err := parser.Parse(src)
+	decls, err := parseV2DefinitionsForTest(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -36,7 +35,7 @@ func runtimeTestOntology() *ontology.Ontology {
 	onto.Add(ontology.Concept{
 		Name:                    "ObservedLink",
 		Package:                 "custom",
-		Kind:                    "observation",
+		Kind:                    "fact",
 		ContextConfirmDstProp:   "dst",
 		ContextConfirmFlagProp:  "observed",
 		ContextConfirmFlagValue: "yes",
@@ -47,11 +46,12 @@ func runtimeTestOntology() *ontology.Ontology {
 
 func TestRuntimeLinkToLabeledTarget(t *testing.T) {
 	rule := `
-package test;
+module test;
 rule LinkToLabeledTarget {
   meta { id: "TEST-RUNTIME-004", severity: high }
-  match custom.Link as c
-  where c.dst labeled custom.Indicator
+  query concept as c where c.concept == custom.Link
+    references concept as dst where dst.concept == custom.Indicator and dst.id == c.dst
+    select c
 }
 `
 	s := usg.NewInMemStore()
@@ -70,10 +70,10 @@ rule LinkToLabeledTarget {
 
 func TestRuntimePropertyDrift(t *testing.T) {
 	rule := `
-package test;
+module test;
 rule PropertyDrift {
   meta { id: "TEST-RUNTIME-003", severity: high }
-  match custom.Process as p
+  issue custom.Process as p
   where p.image not in [expectedA, expectedB]
 }
 `
@@ -93,7 +93,7 @@ func TestRuntimeConfirmationEscalatesRisk(t *testing.T) {
 	if edge, err := onto.Get("custom.Edge"); err == nil {
 		edge.ContextReachLabel = "internet-reachable"
 	}
-	decls, _ := parser.Parse(flowRule)
+	decls, _ := parseV2DefinitionsForTest(flowRule)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)

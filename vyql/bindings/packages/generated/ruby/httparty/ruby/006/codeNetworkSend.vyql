@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m0005dd98;
+
+binding networkSend6 {
+  requires {
+    dependency("httparty")
+  }
+  query pattern callExpr where callee.method == "copy"
+  emit sink code.NetworkSend at args[0]
+}

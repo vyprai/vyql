@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding configurableCacheUnserializeWrapper68 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "unserialize" and node.context.paramType contains "string" and node.context.callPath contains "is_numeric" and node.context.callPath contains "$unserialize"
+  emit issue code.ConfigurableCacheUnserializeWrapper at node
+}

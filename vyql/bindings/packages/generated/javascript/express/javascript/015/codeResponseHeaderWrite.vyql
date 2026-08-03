@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m5103d1c9;
+
+binding responseHeaderWrite15 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "res.header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

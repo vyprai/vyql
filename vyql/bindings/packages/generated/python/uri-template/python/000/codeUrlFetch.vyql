@@ -1,0 +1,9 @@
+module bindings.python.generated.m9aa36b67;
+
+binding urlFetch0 {
+  requires {
+    dependency("uri-template")
+  }
+  query pattern callExpr where callee.method == "expand"
+  emit sink code.UrlFetch at args[0]
+}

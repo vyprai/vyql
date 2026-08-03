@@ -1,7 +1,0 @@
-import code.{CliArgument}
-
-adapter perl {
-  package "OptArgs" {
-    source method "GetOptionsFromArray" -> code.CliArgument
-  }
-}

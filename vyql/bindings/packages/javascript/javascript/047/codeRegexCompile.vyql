@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m5c270092;
+
+binding regexCompile47 {
+  requires {
+    dependency("regexp")
+  }
+  query pattern callExpr where callee.path ~= "RegExp"
+  emit sink code.RegexCompileSink at args[0]
+}

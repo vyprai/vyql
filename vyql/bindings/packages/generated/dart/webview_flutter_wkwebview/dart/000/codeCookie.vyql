@@ -1,0 +1,9 @@
+module bindings.dart.generated.m0d212f13;
+
+binding cookie0 {
+  requires {
+    dependency("webview_flutter_wkwebview")
+  }
+  query pattern callExpr where callee.method == "getAllCookies"
+  emit source code.Cookie at call.result
+}

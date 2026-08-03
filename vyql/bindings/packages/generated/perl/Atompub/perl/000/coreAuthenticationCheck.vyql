@@ -1,0 +1,13 @@
+module bindings.perl.generated.m662585c3;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("Atompub")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

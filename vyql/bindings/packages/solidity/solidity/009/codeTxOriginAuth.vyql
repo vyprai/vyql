@@ -1,0 +1,9 @@
+module bindings.solidity.generated.m72929a80;
+
+binding txOriginAuth9 {
+  requires {
+    dependency("solidity")
+  }
+  query pattern presenceNode where node.path ~= "tx.origin"
+  emit issue code.TxOriginAuth at node
+}

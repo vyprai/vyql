@@ -42,6 +42,28 @@ test "rank497: LibreOffice EMF alpha-blend DIB header delta underflows"
   }
   ```
 
+test "rank497: DIB header underflow generalizes across names"
+  lang cpp
+  file enhwmf.cxx
+  expect VYQL-MEM-029
+  expect_review code.LibreOfficeEnhwmfDibHeaderSizeUnderflow
+  code
+  ```
+  bool read_record() {
+    switch (kind) {
+      case EMR_ALPHABLEND: {
+        unsigned source_header = 0;
+        unsigned bits = 0;
+        unsigned delta = getDIBV5HeaderSize() - source_header;
+        unsigned target = source_header + delta + bits + 14;
+        char *buffer = new char[target];
+        reader->ReadBytes(buffer + 14, source_header);
+      }
+    }
+    return true;
+  }
+  ```
+
 test "rank497: LibreOffice EMF alpha-blend validates cbBmiSrc before delta"
   lang cpp
   file enhwmf.cxx

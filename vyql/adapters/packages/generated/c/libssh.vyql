@@ -1,7 +1,0 @@
-import core.{AuthenticationCheck}
-
-adapter c {
-  package "libssh" {
-    control method "ssh_userauth_agent_publickey" -> core.AuthenticationCheck
-  }
-}

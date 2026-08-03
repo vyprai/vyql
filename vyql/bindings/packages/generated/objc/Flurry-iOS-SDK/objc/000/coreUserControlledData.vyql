@@ -1,0 +1,9 @@
+module bindings.objc.generated.m50c3845d;
+
+binding userControlledData0 {
+  requires {
+    dependency("Flurry-iOS-SDK")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source core.UserControlledData at call.result
+}

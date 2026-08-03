@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding fullSizeMediaFileMissingViewFullAuthorization276 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and containsAny(node.context.selector, ["size"]) and node.context.literal contains "full" and node.context.literal contains "view" and node.context.callPath contains "access.required" and node.context.callPath contains "$item.file_path" and containsAny(node.context.callPath, ["readfile", "file_get_contents"]) and not (node.context.literal contains "view_full")
+  emit issue code.FullSizeMediaFileMissingViewFullAuthorization at node
+}

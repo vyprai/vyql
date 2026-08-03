@@ -1,0 +1,19 @@
+test "rank12: ACRN vPCI BAR bounds arithmetic requires index review"
+  lang c
+  expect_review code.IndexAccess
+  expect_review code.IntegerSizeArithmetic
+  code
+  ```
+  struct pci_bar { unsigned long addr; unsigned long size; int type; };
+  struct pci_vdev { struct pci_bar bar[6]; };
+
+  int pci_emul_mem_handler(unsigned long addr, int size, void *arg1, long arg2) {
+      struct pci_vdev *pdi = arg1;
+      int bidx = (int) arg2;
+      assert(bidx <= 5);
+      assert(pdi->bar[bidx].type == 1 || pdi->bar[bidx].type == 2);
+      assert(addr >= pdi->bar[bidx].addr &&
+             addr + size <= pdi->bar[bidx].addr + pdi->bar[bidx].size);
+      return addr - pdi->bar[bidx].addr;
+  }
+  ```

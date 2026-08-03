@@ -1,0 +1,9 @@
+module bindings.java.generated.m67b517a2;
+
+binding sqlExecution0 {
+  requires {
+    dependency("cn.hutool:hutool-all")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

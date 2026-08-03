@@ -1,0 +1,14 @@
+module bindings.python.generated.m9aa36b67;
+
+binding inputValidation2 {
+  requires {
+    dependency("uri-template")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

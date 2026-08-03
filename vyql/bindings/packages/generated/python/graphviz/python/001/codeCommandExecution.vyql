@@ -1,0 +1,9 @@
+module bindings.python.generated.m066a6f25;
+
+binding commandExecution1 {
+  requires {
+    dependency("graphviz")
+  }
+  query pattern callExpr where callee.method == "command"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "toml" {
-    sink method "parse" -> code.Deserialization
-  }
-}

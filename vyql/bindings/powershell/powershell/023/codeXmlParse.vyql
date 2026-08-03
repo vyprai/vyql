@@ -1,0 +1,6 @@
+module bindings.powershell.generated.m390f1180;
+
+binding xmlParse23 {
+  query pattern callExpr where callee.path ~= "Select-Xml"
+  emit sink code.XmlParse at args[0]
+}

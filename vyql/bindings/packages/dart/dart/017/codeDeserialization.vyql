@@ -1,0 +1,9 @@
+module bindings.dart.generated.m5342780c;
+
+binding deserialization17 {
+  requires {
+    dependency("yaml")
+  }
+  query pattern callExpr where callee.path ~= "YamlMap.wrap"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.generated.m65af29e3;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("google-cloud-firestore")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NosqlQuery at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.ma9a3f89e;
+
+binding filePathAccess2 {
+  requires {
+    dependency("build_runner_core")
+  }
+  query pattern callExpr where callee.method == "readAsBytesSync"
+  emit sink code.FilePathAccess at args[0]
+}

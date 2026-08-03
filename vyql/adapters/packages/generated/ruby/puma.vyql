@@ -1,7 +1,0 @@
-import code.{FilePathAccess, CommandExecution}
-adapter ruby {
-  package "puma" {
-    sink method "load" -> code.FilePathAccess
-    sink method "restart_command" -> code.CommandExecution
-  }
-}

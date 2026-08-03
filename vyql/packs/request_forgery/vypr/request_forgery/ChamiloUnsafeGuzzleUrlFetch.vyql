@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule ChamiloUnsafeGuzzleUrlFetch {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_918]
+    id: "VYQL-RF-014"
+    severity: high
+  }
+  issue code.ChamiloUnsafeGuzzleUrlFetch as fetch
+}

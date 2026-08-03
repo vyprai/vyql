@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding commandExecution6 {
+  query pattern callExpr where callee.path ~= "system"
+  emit sink code.CommandExecution at args[0]
+}

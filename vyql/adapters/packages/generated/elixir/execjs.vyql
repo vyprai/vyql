@@ -1,9 +1,0 @@
-import code.{CodeEval}
-
-adapter elixir {
-  package "execjs" {
-    sink method "eval" -> code.CodeEval
-    sink method "compile" -> code.CodeEval
-    sink method "call" -> code.CodeEval
-  }
-}

@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule PrefixWildcardKeyEnumeration {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22, CWE_200]
+    id: "VYQL-PATH-043"
+    severity: high
+  }
+  issue code.PrefixWildcardKeyEnumeration as sink
+}

@@ -1,0 +1,6 @@
+module bindings.elixir.generated.m728b8a72;
+
+binding objectLookupByUserInput19 {
+  query pattern callExpr where callee.method == "get_account"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}

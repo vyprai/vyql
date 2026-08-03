@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter ruby {
-  package "code_analyzer" {
-    sink method "parse" -> code.Deserialization
-  }
-}

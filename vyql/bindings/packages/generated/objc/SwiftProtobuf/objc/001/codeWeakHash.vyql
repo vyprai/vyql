@@ -1,0 +1,9 @@
+module bindings.objc.generated.m7af59fd2;
+
+binding weakHash1 {
+  requires {
+    dependency("SwiftProtobuf")
+  }
+  query pattern presenceNode where node.path ~= "swiftprotobuf.hash"
+  emit issue code.WeakHash at node
+}

@@ -1,5 +1,0 @@
-adapter go {
-  package "go.etcd.io/etcd/server/v3" {
-    sink method "ConfigFromFile" -> code.FilePathAccess
-  }
-}

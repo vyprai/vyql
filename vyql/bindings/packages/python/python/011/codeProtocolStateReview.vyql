@@ -1,0 +1,9 @@
+module bindings.python.generated.m3d9ccbad;
+
+binding protocolStateReview11 {
+  requires {
+    dependency("authentik")
+  }
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "__post_init_code" and node.context.selector contains "self.authorization_code.code_challenge" and node.context.selector contains "self.code_verifier" and node.context.expr contains "new_code_challenge!=self.authorization_code.code_challenge" and not (node.context.expr contains "notself.authorization_code.code_challengeandself.code_verifier")
+  emit issue code.ProtocolStateReview at node
+}

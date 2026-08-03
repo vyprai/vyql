@@ -65,6 +65,80 @@ unsafe impl<T: Send> Sync for QueueSender<T> {}
 	t.Fatalf("unsafe Sync impl metadata did not include bound:Send; nodes=%#v", nodes)
 }
 
+func TestRustUnsafeImplSpecificMissingBoundObservations(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "lib.rs")
+	src := []byte(`
+pub struct Boxed<T> {
+    value: *mut T,
+}
+
+unsafe impl<T: Sized> Sync for Boxed<T> {}
+unsafe impl<T: Sized> Send for Boxed<T> {}
+unsafe impl<T: Send> Sync for VecBox<T> {}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := ExtractRust([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasRustAnalysisNode(nodes, "analysis.rust.unsafe_sync_impl_missing_bound") {
+		t.Fatalf("missing unsafe Sync observation; nodes=%#v", nodes)
+	}
+	if !hasRustAnalysisNode(nodes, "analysis.rust.unsafe_send_impl_missing_bound") {
+		t.Fatalf("missing unsafe Send observation; nodes=%#v", nodes)
+	}
+	if countRustAnalysisNodes(nodes, "analysis.rust.unsafe_sync_impl_missing_bound") != 1 {
+		t.Fatalf("bounded Sync impl should not emit missing-bound observation; nodes=%#v", nodes)
+	}
+}
+
+func TestRustFfiEnumLayoutSpecificObservation(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "lib.rs")
+	src := []byte(`
+#[repr(C)]
+pub enum WireKind {
+    A = 0,
+    B = 1,
+}
+
+#[repr(u32)]
+pub enum StableKind {
+    A = 0,
+    B = 1,
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := ExtractRust([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countRustAnalysisNodes(nodes, "analysis.rust.ffi_enum_layout_risk") != 1 {
+		t.Fatalf("expected only repr(C) enum to emit FFI layout observation; nodes=%#v", nodes)
+	}
+}
+
 func TestRustFunctionContextIncludesAssignmentCallAndMatchTokens(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "lib.rs")
@@ -131,6 +205,75 @@ impl Config {
 	}
 	if strings.Contains(fixed, "assign:self.driver_status=value") {
 		t.Fatalf("fixed write function should not directly assign driver_status; context=%q", fixed)
+	}
+}
+
+func TestRustFunctionContextMarksRunTestsAutoApprovalExecutesCode(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test_runner.rs")
+	src := []byte(`
+pub enum ApprovalRequirement {
+    Auto,
+    Required,
+}
+
+pub enum ToolCapability {
+    ExecutesCode,
+    Sandboxable,
+}
+
+pub struct RunTestsTool;
+pub struct FixedRunTestsTool;
+
+impl RunTestsTool {
+    fn name(&self) -> &'static str {
+        "run_tests"
+    }
+
+    fn capabilities(&self) -> Vec<ToolCapability> {
+        vec![ToolCapability::ExecutesCode, ToolCapability::Sandboxable]
+    }
+
+    fn command(&self) -> &'static str {
+        "cargo test"
+    }
+}
+
+impl FixedRunTestsTool {
+    fn name(&self) -> &'static str {
+        "run_tests"
+    }
+
+    fn capabilities(&self) -> Vec<ToolCapability> {
+        vec![ToolCapability::ExecutesCode, ToolCapability::Sandboxable]
+    }
+
+    fn command(&self) -> &'static str {
+        "cargo test"
+    }
+
+    fn fixed_approval_requirement(&self) -> ApprovalRequirement {
+        ApprovalRequirement::Required
+    }
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := ExtractRust([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countRustAnalysisNodes(nodes, "analysis.rust.run_tests_auto_approval_executes_code") != 1 {
+		t.Fatalf("run_tests auto-approval observation missing: %#v", nodes)
 	}
 }
 
@@ -259,6 +402,9 @@ pub struct PackageConfig {
 	if strings.Contains(deps, "serde_attr:deserialize_with") {
 		t.Fatalf("vulnerable dependency field should not have deserialize_with token; context=%q", deps)
 	}
+	if countRustAnalysisNodes(nodes, "analysis.rust.unvalidated_dependency_map_key_deserialization") != 1 {
+		t.Fatalf("expected exactly one unvalidated dependency-map observation; nodes=%#v", nodes)
+	}
 	for _, want := range []string{
 		"field:dev_dependencies",
 		"serde_alias:dev-dependencies",
@@ -283,4 +429,18 @@ func rustFunctionContextArgs(nodes []usg.Node, name string) string {
 		}
 	}
 	return ""
+}
+
+func hasRustAnalysisNode(nodes []usg.Node, path string) bool {
+	return countRustAnalysisNodes(nodes, path) > 0
+}
+
+func countRustAnalysisNodes(nodes []usg.Node, path string) int {
+	count := 0
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == path {
+			count++
+		}
+	}
+	return count
 }

@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter kotlin {
-  package "wsdl4j:wsdl4j" {
-    sink method "readWSDL" -> code.Deserialization
-    sink method "readResolve" -> code.Deserialization
-  }
-}

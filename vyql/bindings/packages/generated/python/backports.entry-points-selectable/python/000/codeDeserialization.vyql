@@ -1,0 +1,9 @@
+module bindings.python.generated.ma8d00dea;
+
+binding deserialization0 {
+  requires {
+    dependency("backports.entry-points-selectable")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

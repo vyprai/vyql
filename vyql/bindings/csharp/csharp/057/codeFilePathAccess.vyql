@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding filePathAccess57 {
+  query pattern callExpr where callee.path ~= "File.ReadAllBytes"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.generated.m8d225ccd;
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("tornado")
+  }
+  query pattern callExpr where callee.path ~= "start_response"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

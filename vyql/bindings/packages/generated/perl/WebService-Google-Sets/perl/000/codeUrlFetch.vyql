@@ -1,0 +1,9 @@
+module bindings.perl.generated.m68a8959c;
+
+binding urlFetch0 {
+  requires {
+    dependency("WebService-Google-Sets")
+  }
+  query pattern callExpr where callee.method == "get_gset"
+  emit sink code.UrlFetch at args[0]
+}

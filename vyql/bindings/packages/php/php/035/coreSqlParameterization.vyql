@@ -1,0 +1,14 @@
+module bindings.php.generated.mc5601031;
+
+binding sqlParameterization35 {
+  requires {
+    dependency("pdo")
+  }
+  query pattern callExpr where callee.method == "prepare"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

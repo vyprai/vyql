@@ -1,5 +1,0 @@
-adapter python {
-  package "python-json-logger" {
-    sink method "parse" -> code.Deserialization
-  }
-}

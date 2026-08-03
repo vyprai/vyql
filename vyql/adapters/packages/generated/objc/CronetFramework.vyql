@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter objc {
-  package "CronetFramework" {
-    control method "setRequestFilterBlock" -> core.InputValidation
-  }
-}

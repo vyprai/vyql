@@ -1,6 +1,0 @@
-import code.{LogOutput}
-adapter php {
-  package "monolog/monolog" {
-    sink method "addRecord" -> code.LogOutput
-  }
-}

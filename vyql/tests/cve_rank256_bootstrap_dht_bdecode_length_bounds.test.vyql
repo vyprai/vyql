@@ -28,6 +28,30 @@ test "rank256: bencoded length pointer offset check is unsafe"
   }
   ```
 
+test "rank256: pointer offset remaining-size check generalizes across variable names"
+  lang cpp
+  expect VYQL-NUM-006
+  expect_review code.PointerOffsetBoundsCheck
+  code
+  ```
+  bool numeric(char c) { return c >= '0' && c <= '9'; }
+  char const* parse_int(char const* cursor, char const* limit, char delimiter, long long& amount, int& ec);
+
+  void decode(char const* cursor, char const* limit) {
+    char tag = *cursor;
+    ++cursor;
+    if (!numeric(tag)) return;
+    long long amount = tag - '0';
+    int ec = 0;
+    cursor = parse_int(cursor, limit, ':', amount, ec);
+    if (ec) return;
+    if (cursor + amount + 1 > limit)
+      return;
+    ++cursor;
+    cursor += amount;
+  }
+  ```
+
 test "rank256: bencoded length compared to remaining buffer is clean"
   lang cpp
   reject VYQL-NUM-006

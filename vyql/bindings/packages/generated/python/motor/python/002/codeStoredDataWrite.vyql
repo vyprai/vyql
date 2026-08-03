@@ -1,0 +1,9 @@
+module bindings.python.generated.mdb720e11;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("motor")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.StoredDataWrite at args[0]
+}

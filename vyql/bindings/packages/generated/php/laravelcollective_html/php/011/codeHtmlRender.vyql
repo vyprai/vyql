@@ -1,0 +1,9 @@
+module bindings.php.generated.m001c4b27;
+
+binding htmlRender11 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{LogOutput, FilePathAccess}
-adapter cpp {
-  package "console-bridge" {
-    sink method "log" -> code.LogOutput
-    sink method "OutputHandlerFile.log" -> code.LogOutput
-    sink method "OutputHandlerFile.OutputHandlerFile" -> code.FilePathAccess
-  }
-}

@@ -1,9 +1,0 @@
-import code.{UrlFetch, Deserialization, FilePathAccess, DatabaseRead}
-adapter swift {
-  package "github.com/mapbox/mapbox-maps-ios" {
-    sink method "loadStyleURI" -> code.UrlFetch
-    sink method "loadStyleJSON" -> code.Deserialization
-    sink method "queryRenderedFeatures" -> code.DatabaseRead
-    sink method "querySourceFeatures" -> code.DatabaseRead
-  }
-}

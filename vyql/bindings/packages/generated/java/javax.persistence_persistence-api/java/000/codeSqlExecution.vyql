@@ -1,0 +1,9 @@
+module bindings.java.generated.m40b813d8;
+
+binding sqlExecution0 {
+  requires {
+    dependency("javax.persistence:persistence-api")
+  }
+  query pattern callExpr where callee.method == "createNativeQuery"
+  emit sink code.SqlExecution at args[0]
+}

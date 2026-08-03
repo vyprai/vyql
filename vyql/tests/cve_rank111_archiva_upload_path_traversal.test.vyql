@@ -1,0 +1,12 @@
+# Rank 111 / CVE-2023-28158: Archiva route/path parameters reached
+# DefaultFileUploadService file operations without canonical containment.
+
+test "rank111: upload route parameter reaches file path access"
+  expect VYQL-PATH-001
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.FilePathAccess
+  edge FLOWS src -> sink
+  ```
+

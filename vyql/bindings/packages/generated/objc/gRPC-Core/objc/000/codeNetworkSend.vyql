@@ -1,0 +1,9 @@
+module bindings.objc.generated.me76efafa;
+
+binding networkSend0 {
+  requires {
+    dependency("gRPC-Core")
+  }
+  query pattern callExpr where callee.method == "grpc_call_start_batch"
+  emit sink code.NetworkSend at args[0]
+}

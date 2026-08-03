@@ -1,0 +1,9 @@
+module bindings.dart.generated.m92f3ed1f;
+
+binding userControlledData2 {
+  requires {
+    dependency("webdriver")
+  }
+  query pattern callExpr where callee.method == "sendKeys"
+  emit source core.UserControlledData at call.result
+}

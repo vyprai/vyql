@@ -1,7 +1,0 @@
-import code.{NetworkConnect, NetworkData}
-
-adapter rust {
-  package "hyper-tls" {
-    sink method "call" -> code.NetworkConnect
-  }
-}

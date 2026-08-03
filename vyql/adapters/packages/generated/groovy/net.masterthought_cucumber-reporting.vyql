@@ -1,6 +1,0 @@
-adapter groovy {
-  package "net.masterthought:cucumber-reporting" {
-    sink method "ReportParser.parseJsonFiles" -> code.Deserialization
-    sink method "ReportParser.parseForFeature" -> code.Deserialization
-  }
-}

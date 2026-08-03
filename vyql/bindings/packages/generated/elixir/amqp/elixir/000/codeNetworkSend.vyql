@@ -1,0 +1,9 @@
+module bindings.elixir.generated.meb41bfa2;
+
+binding networkSend0 {
+  requires {
+    dependency("amqp")
+  }
+  query pattern callExpr where callee.method == "publish"
+  emit sink code.NetworkSend at args[0]
+}

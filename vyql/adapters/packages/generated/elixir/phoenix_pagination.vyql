@@ -1,6 +1,0 @@
-adapter elixir {
-  package "phoenix_pagination" {
-    sink method "paginate" -> code.SqlExecution
-    sink method "get_primary_key" -> code.SqlExecution
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding debugEnabled676 {
+  query pattern callExpr where callee.analysis ~= "config.debug_on"
+  emit issue code.DebugEnabled at call
+}

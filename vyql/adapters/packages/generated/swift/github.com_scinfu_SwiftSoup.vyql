@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{HtmlEscape}
-
-adapter swift {
-  package "github.com/scinfu/SwiftSoup" {
-    sink method "parse" -> code.Deserialization
-    control method "escape" -> core.HtmlEscape
-  }
-}

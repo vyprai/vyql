@@ -1,7 +1,0 @@
-adapter perl {
-  package "Vcdiff" {
-    sink method "diff" -> code.Deserialization
-    sink method "patch" -> code.Deserialization
-    sink method "_load_backend" -> code.CodeEval
-  }
-}

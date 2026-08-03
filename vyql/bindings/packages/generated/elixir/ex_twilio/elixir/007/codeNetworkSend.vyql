@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mbfdf81eb;
+
+binding networkSend7 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.API.post"
+  emit sink code.NetworkSend at args[0]
+}

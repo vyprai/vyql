@@ -1,0 +1,9 @@
+module bindings.swift.generated.m7a39b48f;
+
+binding weakHash1 {
+  requires {
+    dependency("github.com/vapor/auth")
+  }
+  query pattern callExpr where callee.method == "hash"
+  emit issue code.WeakHash at call
+}

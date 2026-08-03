@@ -1,9 +1,0 @@
-import code.{Deserialization, CliArgument, FilePathAccess}
-
-adapter cpp {
-  package "jasper" {
-    sink method "jas_image_decode" -> code.Deserialization
-    source method "cmdopts_parse" -> code.CliArgument
-    sink method "jpc_bitstream_sopen" -> code.FilePathAccess
-  }
-}

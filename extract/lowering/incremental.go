@@ -37,11 +37,11 @@ type DeltaCache interface {
 // content (Module.Hash) AND the global resolution context (signature fingerprint) are
 // unchanged since a previous run — the heart of incremental dataflow. The global symbol tables
 // and signature/import nodes are always rebuilt (cheap); only the expensive per-module body
-// lowering is cached. The merged graph is byte-identical to LowerTyped's, so adapters, taint,
+// lowering is cached. The merged graph is byte-identical to LowerTyped's, so bindings, taint,
 // and rules run on it unchanged. Falls back to fresh body lowering for modules without a Hash.
 // LowerIncremental returns the lowered store plus the set of module keys that were freshly
 // lowered (cache miss or not content-addressed) — the caller uses it to drive incremental
-// adapter labeling (re-label only fresh modules; replay cached labels for the rest).
+// binding labeling (re-label only fresh modules; replay cached labels for the rest).
 func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[string]string, cache DeltaCache, sync *graphsync.Collector) (usg.Store, map[string]bool, error) {
 	l := newLowerer(prog, resolveImports, ctorTypes)
 	l.parseCache = cache
@@ -100,6 +100,7 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 		l.p1 = nil
 	}
 	batchPutRaw(cache, p1writes)
+	l.collectAddressTaken() // walks prog NIR (present for all modules, cached or not) → sound here too
 	sigFP := l.sigFingerprint()
 	t1 := nowNano()
 
@@ -177,29 +178,20 @@ func decodeInt(raw []byte) int { return (&bufReader{b: raw}).uvar() }
 var (
 	UseIntStore    bool
 	DiskStorePath  string
-	DiskCacheBytes int64 // badger's off-heap block+index cache
-	DiskDetailBuf  int64 // on-heap node-detail write-back buffer before it spills to badger
+	DiskCacheBytes int64
 )
 
-// newGraphStore creates the analysis graph store. BadgerDB is used ONLY when a RAM ceiling is
-// configured (DiskStorePath, cache=DiskCacheBytes): there the graph is the source of truth on
-// disk and RAM is bounded by badger's cache.
-//
-// Without a ceiling the graph is fully resident regardless — detCapByte is 0, so node detail
-// never spills and the badger instance ends up storing nothing — while still costing a 128MiB
-// memtable arena plus ristretto caches PER STORE at Open. That was pure overhead, and since
-// nothing closed the store its background goroutines rooted those arenas forever (a scan-per-
-// spec test run leaked ~128MiB each and reached tens of GB). The int-indexed in-RAM store keeps
-// the same usg.IntGraph solver fast path badger provided, at a fraction of the footprint.
-//
-// hint>0 presizes it. UseIntStore forces this store even when a ceiling is configured.
+// newGraphStore creates the analysis graph store. The normal hot path is the int-indexed in-RAM
+// store; when a RAM ceiling is configured, DiskStorePath switches to the badger-backed graph so
+// node details can spill to disk under the requested cache budget.
 func newGraphStore(hint int) usg.Store {
-	if !UseIntStore && DiskStorePath != "" {
-		if g, err := usg.OpenBadgerGraph(DiskStorePath, DiskCacheBytes, DiskDetailBuf); err == nil {
-			return g
-		}
-		// badger unavailable → fall through to the in-RAM store.
+	if UseIntStore || DiskStorePath == "" {
+		return usg.NewIntStore(hint)
 	}
+	if g, err := usg.OpenBadgerGraph(DiskStorePath, DiskCacheBytes); err == nil {
+		return g
+	}
+	// Badger unavailable → fall back to the in-RAM store so scans still work.
 	return usg.NewIntStore(hint)
 }
 
@@ -287,18 +279,9 @@ func (d *pass1Delta) replay(l *lowerer, base usg.Store, modkey, ns string) {
 	}
 	l.importTables[modkey] = tbl
 	for _, f := range d.Funcs {
-		// funcID is deterministic (sigID over ns + qualified name), so recompute it on replay
-		// rather than serializing it — it must match what makeFuncInfo minted, so a re-lowered
-		// body (pass 2) can stamp `func_id` on its nodes (the graph-json node→function map). The
-		// code.Function node itself is replayed from d.Nodes (captured during pass 1).
-		rel := f.Name
-		if f.Cls != "" {
-			rel = f.Cls + "." + f.Name
-		}
 		fi := &funcInfo{
 			paramNames: f.ParamNames, params: f.Params, paramTypes: f.ParamTypes, ret: f.Ret,
-			module: f.Module, cls: f.Cls, name: f.Name, funcID: sigID(ns, rel, "func", ""),
-			paramEntries:  f.ParamEntries,
+			module: f.Module, cls: f.Cls, name: f.Name, paramEntries: f.ParamEntries,
 			resultEntries: f.ResultEntries, abstract: f.Abstract,
 		}
 		l.funcQual[f.Qual] = fi
@@ -375,7 +358,7 @@ func batchPutRaw(cache DeltaCache, kv map[string][]byte) {
 
 // NodeModule returns the module key a node id belongs to (ids are "<modkey>\x1f..."), or ""
 // for nodes not minted by the module-namespacing lowerer (e.g. SBOM nodes). Lets the caller
-// attribute graph nodes to modules for incremental adapter labeling.
+// attribute graph nodes to modules for incremental binding labeling.
 func NodeModule(id string) (string, bool) {
 	if i := strings.IndexByte(id, '\x1f'); i >= 0 {
 		return id[:i], true

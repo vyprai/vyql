@@ -1,0 +1,9 @@
+module bindings.java.generated.m0ef62af2;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.avro:avro-ipc")
+  }
+  query pattern callExpr where callee.method == "readResponse"
+  emit sink code.Deserialization at args[0]
+}

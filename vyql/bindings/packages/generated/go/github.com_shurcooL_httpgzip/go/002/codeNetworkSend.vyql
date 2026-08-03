@@ -1,0 +1,9 @@
+module bindings.go.generated.maabc6139;
+
+binding networkSend2 {
+  requires {
+    dependency("github.com/shurcooL/httpgzip")
+  }
+  query pattern callExpr where callee.method == "ServeContent"
+  emit sink code.NetworkSend at args[0]
+}

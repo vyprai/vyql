@@ -1,5 +1,0 @@
-adapter python {
-  package "ujson" {
-    sink method "JSON_DecodeObject" -> code.Deserialization
-  }
-}

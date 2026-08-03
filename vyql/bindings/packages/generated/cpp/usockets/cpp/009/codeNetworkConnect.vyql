@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mbb7981ca;
+
+binding networkConnect9 {
+  requires {
+    dependency("usockets")
+  }
+  query pattern callExpr where callee.method == "us_quic_socket_context_listen"
+  emit sink code.NetworkConnectSink at args[0]
+}

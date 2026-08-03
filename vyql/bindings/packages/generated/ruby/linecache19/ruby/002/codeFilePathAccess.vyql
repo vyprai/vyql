@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mc82756da;
+
+binding filePathAccess2 {
+  requires {
+    dependency("linecache19")
+  }
+  query pattern callExpr where callee.method == "getline"
+  emit sink code.FilePathAccess at args[0]
+}

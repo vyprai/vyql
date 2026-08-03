@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter php {
-  package "overtrue/laravel-lang" {
-    sink method "addJsonPath" -> code.Deserialization
-  }
-}

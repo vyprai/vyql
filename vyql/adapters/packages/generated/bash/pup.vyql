@@ -1,5 +1,0 @@
-adapter bash {
-  package "pup" {
-    source path "pup.argv" -> code.CliArgument
-  }
-}

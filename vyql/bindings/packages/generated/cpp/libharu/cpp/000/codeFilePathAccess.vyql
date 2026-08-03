@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m70624a32;
+
+binding filePathAccess0 {
+  requires {
+    dependency("libharu")
+  }
+  query pattern callExpr where callee.method == "HPDF_SaveToFile"
+  emit sink code.FilePathAccess at args[0]
+}

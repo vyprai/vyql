@@ -1,0 +1,9 @@
+module bindings.perl.generated.md0ee70ef;
+
+binding deserialization2 {
+  requires {
+    dependency("Plugins")
+  }
+  query pattern callExpr where callee.method == "parseconfig"
+  emit sink code.Deserialization at args[0]
+}

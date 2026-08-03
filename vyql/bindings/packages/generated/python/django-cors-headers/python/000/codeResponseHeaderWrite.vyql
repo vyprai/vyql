@@ -1,0 +1,9 @@
+module bindings.python.generated.m3efd800e;
+
+binding responseHeaderWrite0 {
+  requires {
+    dependency("django-cors-headers")
+  }
+  query pattern callExpr where callee.method == "add_response_headers"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.m2555baf7;
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/vapor/console-kit")
+  }
+  query pattern callExpr where callee.method == "input"
+  emit source core.UserControlledData at call.result
+}

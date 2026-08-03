@@ -1,7 +1,0 @@
-adapter objc {
-  package "AWSCore" {
-    sink method "testInvokePathWithQueryString" -> code.NosqlQuery
-    sink method "setUp" -> code.StoredDataWrite
-    source path "awscore.key" -> code.SecretValue
-  }
-}

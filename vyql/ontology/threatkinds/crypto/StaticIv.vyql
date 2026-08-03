@@ -1,0 +1,6 @@
+module crypto;
+
+threat StaticIv {
+  cwe: [CWE_329]
+  desc: "Use of a static, predictable, or repeated IV/nonce in a mode that requires uniqueness"
+}

@@ -1,6 +1,0 @@
-adapter scala {
-  package "com.sun.jersey:jersey-json" {
-    sink method "createJSONUnmarshaller" -> code.Deserialization
-    sink method "createUnmarshaller" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.generated.m752c8a4a;
+
+binding userControlledData0 {
+  requires {
+    dependency("fire")
+  }
+  query pattern callExpr where callee.method == "Fire"
+  emit source core.UserControlledData at call.result
+}

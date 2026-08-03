@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding filePathAccess435 {
+  query pattern callExpr where callee.method == "iterdir"
+  emit sink code.FilePathAccess at callee.receiver
+}

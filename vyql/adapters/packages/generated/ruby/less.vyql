@@ -1,9 +1,0 @@
-import code.{CommandExecution, Deserialization}
-import core.{HtmlEscape}
-
-adapter ruby {
-  package "less" {
-    sink method "Less::Parser#parse" -> code.Deserialization
-    control method "Less::JavaScript.escape" -> core.HtmlEscape
-  }
-}

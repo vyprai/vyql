@@ -1,0 +1,9 @@
+module bindings.scala.generated.m78d3b242;
+
+binding deserialization0 {
+  requires {
+    dependency("org.scala-lang.modules:scala-xml_2.11")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

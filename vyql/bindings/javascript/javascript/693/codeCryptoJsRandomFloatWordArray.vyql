@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mcryptojsrandomfloatwordarray;
+
+binding cryptoJsRandomFloatWordArray693 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.cryptoJsRandomFloatWordArrayRisk == "true"
+  emit issue code.CryptoJsRandomFloatWordArray at node
+}

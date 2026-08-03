@@ -1,9 +1,0 @@
-import code.{LdapQuery, Deserialization}
-
-adapter kotlin {
-  package "org.springframework.ldap:spring-ldap-core" {
-    sink method "search" -> code.LdapQuery
-    sink method "query" -> code.LdapQuery
-    sink method "parse" -> code.Deserialization
-  }
-}

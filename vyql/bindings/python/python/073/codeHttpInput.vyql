@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding httpInput73 {
+  query pattern callExpr where callee.path ~= "self.request.query_arguments"
+  emit source code.HttpInput at call.result
+}

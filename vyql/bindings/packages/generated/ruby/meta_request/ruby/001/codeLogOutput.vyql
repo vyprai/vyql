@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m426fc52d;
+
+binding logOutput1 {
+  requires {
+    dependency("meta_request")
+  }
+  query pattern callExpr where callee.method == "info"
+  emit sink code.LogOutput at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.go.generated.me3d96327;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/jellevandenhooff/dkim")
+  }
+  query pattern callExpr where callee.method == "ParseAndVerify"
+  emit sink code.Deserialization at args[0]
+}

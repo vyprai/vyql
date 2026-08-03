@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "istanbul-lib-source-maps" {
-    sink method "registerURL" -> code.Deserialization
-    sink method "registerMap" -> code.Deserialization
-  }
-}

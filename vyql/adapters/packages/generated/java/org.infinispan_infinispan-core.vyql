@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter java {
-  package "org.infinispan:infinispan-core" {
-    sink method "readObject" -> code.Deserialization
-  }
-}

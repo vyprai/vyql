@@ -1,0 +1,9 @@
+module bindings.python.generated.m6175f4a2;
+
+binding deserialization2 {
+  requires {
+    dependency("execnet")
+  }
+  query pattern callExpr where callee.method == "loads"
+  emit sink code.Deserialization at args[0]
+}

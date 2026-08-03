@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding effectiveUidRootCheckBypass163 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "effective_uid_root_check_bypass"
+  emit issue code.EffectiveUidRootCheckBypass at node
+}

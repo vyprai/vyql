@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding ecdsaSignatureScalarBoundsMissing64 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "verify" and node.context.selector contains "signature.r" and node.context.selector contains "signature.s" and node.context.selector contains "publicKey.point" and node.context.callPath contains "Math.inv" and node.context.callPath contains "Math.multiply" and not (node.context.expr contains "r.compareTo(curve.N)>=0") and not (node.context.expr contains "s.compareTo(curve.N)>=0")
+  emit issue code.EcdsaSignatureScalarBoundsMissing at node
+}

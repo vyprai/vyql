@@ -1,0 +1,9 @@
+module bindings.javascript.generated.maf792af0;
+
+binding filePathAccess1 {
+  requires {
+    dependency("readdirp")
+  }
+  query pattern callExpr where callee.method == "readdirpPromise"
+  emit sink code.FilePathAccess at args[0]
+}

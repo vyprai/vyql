@@ -1,0 +1,9 @@
+module bindings.swift.generated.ma942ab79;
+
+binding networkSend0 {
+  requires {
+    dependency("github.com/maticzav/swift-graphql")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NetworkSend at args[0]
+}

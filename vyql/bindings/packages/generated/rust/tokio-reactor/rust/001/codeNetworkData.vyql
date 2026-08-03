@@ -1,0 +1,9 @@
+module bindings.rust.generated.m220b7195;
+
+binding networkData1 {
+  requires {
+    dependency("tokio-reactor")
+  }
+  query pattern callExpr where callee.method == "poll_write"
+  emit source code.NetworkData at call.result
+}

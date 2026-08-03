@@ -1,0 +1,9 @@
+module bindings.cpp.generated.ma68ef4f6;
+
+binding deserialization2 {
+  requires {
+    dependency("libwebp")
+  }
+  query pattern callExpr where callee.method == "ReadJPEG"
+  emit sink code.Deserialization at args[0]
+}

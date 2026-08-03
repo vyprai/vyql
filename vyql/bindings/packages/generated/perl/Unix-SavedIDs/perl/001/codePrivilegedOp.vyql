@@ -1,0 +1,10 @@
+module bindings.perl.generated.m61576ded;
+
+binding privilegedOp1 {
+  requires {
+    dependency("Unix-SavedIDs")
+  }
+  query pattern callExpr where callee.method == "setresgid"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

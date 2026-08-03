@@ -1,0 +1,7 @@
+module bindings.cpp.generated.m4e783366;
+
+binding resourceHandle70 {
+  query pattern callExpr where callee.path ~= "ucsdet_open"
+  emit sink code.ResourceHandleSink at args[0]
+  emit issue code.ResourceHandle at call
+}

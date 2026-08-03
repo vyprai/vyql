@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "state_machines-activerecord" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

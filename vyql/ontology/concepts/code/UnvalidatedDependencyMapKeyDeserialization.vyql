@@ -1,0 +1,11 @@
+module code;
+
+concept UnvalidatedDependencyMapKeyDeserialization : issue {
+  cwe: [CWE_20]
+  reviewAssumption: "the deserialized manifest or configuration keys select dependency, package, plugin, or module names that must obey an identifier policy before later resolution"
+  reviewCategory: supply_chain
+  reviewCondition: "dependency or package map keys are deserialized without a custom key validator"
+  reviewConfidence: high
+  reviewEvidence: "serde field metadata {pattern} marks a dependency/package-style map field in a Deserialize struct without deserialize_with key validation"
+  vulnerableTo: [validation.ImproperInputValidation]
+}

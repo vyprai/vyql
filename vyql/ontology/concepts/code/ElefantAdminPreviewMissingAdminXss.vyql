@@ -1,0 +1,11 @@
+module code;
+
+concept ElefantAdminPreviewMissingAdminXss : issue {
+  cwe: [CWE_79, CWE_862]
+  reviewAssumption: "the preview handler is reachable by unauthenticated or lower-privileged remote callers without the patched admin gate"
+  reviewCategory: xss
+  reviewCondition: "Elefant admin preview renders POST-controlled page fields without requiring an administrator session"
+  reviewConfidence: high
+  reviewEvidence: "admin preview context {pattern} builds a Webpage from POST data and renders POST body through run_includes before require_admin"
+  vulnerableTo: [injection.Xss, access_control.MissingAuthorization]
+}

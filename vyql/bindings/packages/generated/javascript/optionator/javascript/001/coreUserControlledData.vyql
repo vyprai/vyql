@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m86a9aea8;
+
+binding userControlledData1 {
+  requires {
+    dependency("optionator")
+  }
+  query pattern callExpr where callee.method == "parseString"
+  emit source core.UserControlledData at call.result
+}

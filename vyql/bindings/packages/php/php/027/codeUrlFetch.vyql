@@ -1,0 +1,9 @@
+module bindings.php.generated.mc5601031;
+
+binding urlFetch27 {
+  requires {
+    dependency("curl")
+  }
+  query pattern callExpr where callee.path ~= "curl_exec"
+  emit sink code.UrlFetch at args[0]
+}

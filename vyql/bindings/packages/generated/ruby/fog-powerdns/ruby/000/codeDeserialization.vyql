@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m62306d9d;
+
+binding deserialization0 {
+  requires {
+    dependency("fog-powerdns")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.Deserialization at args[0]
+}

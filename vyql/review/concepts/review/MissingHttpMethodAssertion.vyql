@@ -1,0 +1,8 @@
+module code;
+
+review code.MissingHttpMethodAssertion {
+  category: csrf
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  kind: attention
+  text: "review state-changing HTTP actions for explicit allowed-method assertions"
+}

@@ -1,5 +1,0 @@
-adapter javascript {
-  package "eslint-scope" {
-    sink method "analyze" -> code.ExpressionEval
-  }
-}

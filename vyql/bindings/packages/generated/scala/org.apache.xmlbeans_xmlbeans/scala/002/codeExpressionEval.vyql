@@ -1,0 +1,9 @@
+module bindings.scala.generated.m32a4f913;
+
+binding expressionEval2 {
+  requires {
+    dependency("org.apache.xmlbeans:xmlbeans")
+  }
+  query pattern callExpr where callee.method == "XmlBeans.compileQuery"
+  emit sink code.ExpressionEval at args[0]
+}

@@ -1,0 +1,13 @@
+module bindings.php.generated.m3625d3eb;
+
+binding authorizationCheck9 {
+  requires {
+    dependency("google/apiclient")
+  }
+  query pattern callExpr where callee.method == "authorize"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

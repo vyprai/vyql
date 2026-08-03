@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "github.com/aws/smithy-go" {
-    sink method "ReadUnion" -> code.Deserialization
-    sink method "ReadStruct" -> code.Deserialization
-    sink method "ReadList" -> code.Deserialization
-    sink method "ReadMap" -> code.Deserialization
-  }
-}

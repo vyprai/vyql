@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m6d13924b;
+
+binding templateRender0 {
+  requires {
+    dependency("org.apache.tiles:tiles-jsp")
+  }
+  query pattern callExpr where callee.method == "InsertTemplateTag.doTag"
+  emit sink code.TemplateRender at args[0]
+}

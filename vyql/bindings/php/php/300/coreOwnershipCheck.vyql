@@ -1,0 +1,10 @@
+module bindings.php.generated.mfbe84119;
+
+binding ownershipCheck300 {
+  query pattern callExpr where callee.path ~= "requireOwner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

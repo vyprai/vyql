@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding authenticationRequiredOp94 {
+  query pattern presenceNode where node.path ~= "GrantRole"
+  emit issue code.AuthenticationRequiredOp at node
+}

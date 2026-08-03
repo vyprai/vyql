@@ -1,0 +1,9 @@
+module bindings.objc.generated.meac4888f;
+
+binding httpInput2 {
+  requires {
+    dependency("KTVHTTPCache")
+  }
+  query pattern callExpr where callee.method == "cacheReaderWithRequest"
+  emit source code.HttpInput at call.result
+}

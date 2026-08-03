@@ -1,0 +1,9 @@
+module bindings.scala.generated.m7c794bbf;
+
+binding codeEval0 {
+  requires {
+    dependency("com.github.bumptech.glide:glide")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.CodeEval at args[0]
+}

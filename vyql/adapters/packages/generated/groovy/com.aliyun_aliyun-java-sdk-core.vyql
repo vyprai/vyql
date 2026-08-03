@@ -1,6 +1,0 @@
-import code.{XmlParse}
-adapter groovy {
-  package "com.aliyun:aliyun-java-sdk-core" {
-    sink method "read" -> code.XmlParse
-  }
-}

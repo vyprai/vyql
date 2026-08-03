@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m8caf9c63;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.apache.hadoop:hadoop-mapreduce-client-core")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

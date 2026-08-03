@@ -1,7 +1,0 @@
-import code.{LogOutput}
-
-adapter dart {
-  package "pretty_dio_logger" {
-    sink method "logPrint" -> code.LogOutput
-  }
-}

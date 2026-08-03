@@ -1,7 +1,0 @@
-import code.{UrlFetch, FilePathAccess}
-adapter php {
-  package "drupal-composer/drupal-scaffold" {
-    sink method "fetch" -> code.UrlFetch
-    sink method "fetch" -> code.FilePathAccess
-  }
-}

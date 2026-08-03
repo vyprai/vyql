@@ -1,8 +1,0 @@
-import code.{CliArgument, Deserialization}
-
-adapter python {
-  package "jsonschema" {
-    source method "run" -> code.CliArgument
-    sink method "validate" -> code.Deserialization
-  }
-}

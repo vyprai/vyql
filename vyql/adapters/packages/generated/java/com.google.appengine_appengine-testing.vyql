@@ -1,8 +1,0 @@
-import code.{HttpInput, HtmlRender}
-
-adapter java {
-  package "com.google.appengine:appengine-testing" {
-    source method "read" -> code.HttpInput
-    sink method "write" -> code.HtmlRender
-  }
-}

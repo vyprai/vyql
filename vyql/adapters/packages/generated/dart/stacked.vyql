@@ -1,8 +1,0 @@
-import code.{HttpInput}
-
-adapter dart {
-  package "stacked" {
-    source method "match" -> code.HttpInput
-    source method "Parameters" -> code.HttpInput
-  }
-}

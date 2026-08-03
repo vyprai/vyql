@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m0290c984;
+
+binding deserialization1 {
+  requires {
+    dependency("yard")
+  }
+  query pattern callExpr where callee.method == "YARD::Parser::SourceParser.parse_string"
+  emit sink code.Deserialization at args[0]
+}

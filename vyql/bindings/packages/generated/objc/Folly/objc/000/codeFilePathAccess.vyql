@@ -1,0 +1,9 @@
+module bindings.objc.generated.m1f5ec4c0;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Folly")
+  }
+  query pattern callExpr where callee.method == "File"
+  emit sink code.FilePathAccess at args[0]
+}

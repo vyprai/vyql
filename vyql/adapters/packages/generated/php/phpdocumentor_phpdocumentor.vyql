@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "phpdocumentor/phpdocumentor" {
-    sink method "parse" -> code.Deserialization
-  }
-}

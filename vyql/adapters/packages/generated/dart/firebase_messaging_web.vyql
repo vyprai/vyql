@@ -1,5 +1,0 @@
-adapter dart {
-  package "firebase_messaging_web" {
-    source method "registerBackgroundMessageHandler" -> code.NetworkData
-  }
-}

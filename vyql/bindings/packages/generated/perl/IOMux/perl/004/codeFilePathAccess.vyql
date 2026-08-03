@@ -1,0 +1,9 @@
+module bindings.perl.generated.m1fe87d91;
+
+binding filePathAccess4 {
+  requires {
+    dependency("IOMux")
+  }
+  query pattern callExpr where callee.method == "fileno"
+  emit sink code.FilePathAccess at args[0]
+}

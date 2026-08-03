@@ -1,0 +1,9 @@
+module bindings.java.generated.m7e0605b3;
+
+binding xmlParse2 {
+  requires {
+    dependency("org.codehaus.groovy:groovy-xml")
+  }
+  query pattern callExpr where callee.method == "newSAXParser"
+  emit sink code.XmlParse at args[0]
+}

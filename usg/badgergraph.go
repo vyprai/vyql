@@ -14,13 +14,13 @@ import (
 // Records are compact binary (no JSON/gob reflection) and INT-INDEXED — nodes are referenced by
 // a dense int32, so the taint hot loop (via usg.IntGraph) reads cached int adjacency blobs with
 // near-zero decode. String ids and payload are fetched only when emitting findings or matching
-// adapters. Key layout (\x00 separator, "g" graph namespace to coexist with the parse cache):
+// bindings. Key layout (\x00 separator, "g" graph namespace to coexist with the parse cache):
 //
 //	gI\0<id>          -> int32                 intern: id -> index
 //	gx\0<idx>         -> id string             reverse: index -> id
 //	gn\0<idx>         -> node detail blob       type/loc/region/order/scope/props
 //	go\0<idx>         -> out-adjacency blob     []{typeId, dstIdx[, props]}
-//	gr\0<idx>         -> in-adjacency blob      (only inIndexedTypes: PROTECTS/CHECKS)
+//	gr\0<idx>         -> in-adjacency blob      (only inIndexedTypes)
 //	gl\0<idx>         -> labels blob
 //	gc\0<concept>     -> []int32 (nodes w/ concept)
 //	gt\0<type>        -> []int32 (nodes of type)
@@ -41,6 +41,8 @@ type BadgerGraph struct {
 	ids        []string
 	out        [][]iedge
 	in         map[int32][]iedge
+	flowOut    [][]int32
+	flowIn     [][]int32
 	labels     [][]Label
 	byType     map[string][]int32
 	byConcept  map[string][]int32
@@ -62,14 +64,9 @@ type nodeDetail struct {
 	props                   map[string]string
 }
 
-// OpenBadgerGraph opens a graph store at path (":memory:" for an in-memory Badger).
-//
-// cacheBytes is badger's OFF-HEAP budget (block + index cache; 0 = badger defaults).
-// detailBufBytes is the separate ON-HEAP budget for the node-detail write-back buffer, which
-// spills to badger once it is exceeded (0 = unbounded, the in-memory-fast path). These are two
-// different pools in two different places; sizing both from one figure double-counted the
-// caller's budget, so they are passed independently.
-func OpenBadgerGraph(path string, cacheBytes, detailBufBytes int64) (*BadgerGraph, error) {
+// OpenBadgerGraph opens a graph store at path (":memory:" for an in-memory Badger) with a cache
+// budget in bytes (block + value cache; 0 = Badger defaults).
+func OpenBadgerGraph(path string, cacheBytes int64) (*BadgerGraph, error) {
 	var opts badger.Options
 	if path == ":memory:" {
 		opts = badger.DefaultOptions("").WithInMemory(true)
@@ -90,7 +87,7 @@ func OpenBadgerGraph(path string, cacheBytes, detailBufBytes int64) (*BadgerGrap
 		return nil, err
 	}
 	g := NewBadgerGraphDB(db, true)
-	g.detCapByte = detailBufBytes // 0 = unbounded; else spill detail to badger past this many bytes
+	g.detCapByte = cacheBytes // 0 = unbounded; else spill detail to badger past this many bytes
 	return g, nil
 }
 
@@ -112,6 +109,8 @@ func (g *BadgerGraph) intern(id string) int32 {
 	g.idx[id] = i
 	g.ids = append(g.ids, id)
 	g.out = append(g.out, nil)
+	g.flowOut = append(g.flowOut, nil)
+	g.flowIn = append(g.flowIn, nil)
 	g.labels = append(g.labels, nil)
 	return i
 }
@@ -157,11 +156,34 @@ func (g *BadgerGraph) AddEdge(e Edge) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	si, di := g.intern(e.Src), g.intern(e.Dst)
-	g.out[si] = append(g.out[si], iedge{typ: e.Type, dst: di, props: e.Props})
-	if inIndexedTypes[e.Type] {
-		g.in[di] = append(g.in[di], iedge{typ: e.Type, dst: si, props: e.Props})
+	typ := edgeTypeIDFor(e.Type)
+	if typ == edgeTypeFlows && len(e.Props) == 0 {
+		g.flowOut[si] = append(g.flowOut[si], di)
+		g.flowIn[di] = append(g.flowIn[di], si)
+		return nil
+	}
+	g.out[si] = append(g.out[si], iedge{typ: typ, dst: di, props: e.Props})
+	if edgeTypeInIndexed(typ) {
+		g.in[di] = append(g.in[di], iedge{typ: typ, dst: si, props: e.Props})
 	}
 	return nil
+}
+
+// AddFlowEdgeIfPresent appends a prop-less FLOWS edge only when both endpoints already exist.
+func (g *BadgerGraph) AddFlowEdgeIfPresent(src, dst string) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	si, ok := g.idx[src]
+	if !ok {
+		return false
+	}
+	di, ok := g.idx[dst]
+	if !ok {
+		return false
+	}
+	g.flowOut[si] = append(g.flowOut[si], di)
+	g.flowIn[di] = append(g.flowIn[di], si)
+	return true
 }
 
 func (g *BadgerGraph) AddLabel(nodeID string, l Label) error {
@@ -237,7 +259,7 @@ func (g *BadgerGraph) flushDet() {
 func detKey(i int32) []byte {
 	b := make([]byte, 6)
 	b[0], b[1] = 'g', 'n'
-	binary.LittleEndian.PutUint32(b[2:], uint32(i))
+	binary.BigEndian.PutUint32(b[2:], uint32(i))
 	return b
 }
 
@@ -259,9 +281,14 @@ func (g *BadgerGraph) OutEdges(src, edgeType string) ([]Edge, error) {
 		return nil, nil
 	}
 	var out []Edge
+	if edgeTypeMatches(edgeTypeFlows, edgeType) {
+		for _, dst := range g.flowOut[i] {
+			out = append(out, Edge{Type: "FLOWS", Src: src, Dst: g.ids[dst]})
+		}
+	}
 	for _, e := range g.out[i] {
-		if edgeType == "" || e.typ == edgeType {
-			out = append(out, Edge{Type: e.typ, Src: src, Dst: g.ids[e.dst], Props: e.props})
+		if edgeTypeMatches(e.typ, edgeType) {
+			out = append(out, Edge{Type: edgeTypeName(e.typ), Src: src, Dst: g.ids[e.dst], Props: e.props})
 		}
 	}
 	return out, nil
@@ -273,12 +300,38 @@ func (g *BadgerGraph) InEdges(dst, edgeType string) ([]Edge, error) {
 		return nil, nil
 	}
 	var out []Edge
+	if edgeTypeMatches(edgeTypeFlows, edgeType) {
+		for _, src := range g.flowIn[i] {
+			out = append(out, Edge{Type: "FLOWS", Src: g.ids[src], Dst: dst})
+		}
+	}
 	for _, e := range g.in[i] {
-		if edgeType == "" || e.typ == edgeType {
-			out = append(out, Edge{Type: e.typ, Src: g.ids[e.dst], Dst: dst, Props: e.props})
+		if edgeTypeMatches(e.typ, edgeType) {
+			out = append(out, Edge{Type: edgeTypeName(e.typ), Src: g.ids[e.dst], Dst: dst, Props: e.props})
 		}
 	}
 	return out, nil
+}
+
+func (g *BadgerGraph) RangeInEdges(dst, edgeType string, fn func(src string) bool) {
+	i, ok := g.idxOf(dst)
+	if !ok {
+		return
+	}
+	if edgeTypeMatches(edgeTypeFlows, edgeType) {
+		for _, src := range g.flowIn[i] {
+			if !fn(g.ids[src]) {
+				return
+			}
+		}
+	}
+	for _, e := range g.in[i] {
+		if edgeTypeMatches(e.typ, edgeType) {
+			if !fn(g.ids[e.dst]) {
+				return
+			}
+		}
+	}
 }
 
 func (g *BadgerGraph) NodesWithConcept(concept string) ([]string, error) {
@@ -287,6 +340,15 @@ func (g *BadgerGraph) NodesWithConcept(concept string) ([]string, error) {
 func (g *BadgerGraph) NodesOfType(nodeType string) ([]string, error) {
 	return g.idsOf(g.byType[nodeType]), nil
 }
+
+func (g *BadgerGraph) RangeNodesOfType(nodeType string, fn func(Node) bool) {
+	for _, i := range g.byType[nodeType] {
+		if !fn(g.nodeAt(i)) {
+			return
+		}
+	}
+}
+
 func (g *BadgerGraph) idsOf(idxs []int32) []string {
 	out := make([]string, len(idxs))
 	for k, i := range idxs {
@@ -413,8 +475,15 @@ func (g *BadgerGraph) RangeOut(src int32, edgeType string, fn func(dst int32) bo
 	if int(src) >= len(g.out) {
 		return
 	}
+	if edgeTypeMatches(edgeTypeFlows, edgeType) {
+		for _, dst := range g.flowOut[src] {
+			if !fn(dst) {
+				return
+			}
+		}
+	}
 	for _, e := range g.out[src] {
-		if edgeType == "" || e.typ == edgeType {
+		if edgeTypeMatches(e.typ, edgeType) {
 			if !fn(e.dst) {
 				return
 			}
@@ -427,8 +496,15 @@ func (g *BadgerGraph) RangeOutEdges(src, edgeType string, fn func(dst string) bo
 	if !ok {
 		return
 	}
+	if edgeTypeMatches(edgeTypeFlows, edgeType) {
+		for _, dst := range g.flowOut[i] {
+			if !fn(g.ids[dst]) {
+				return
+			}
+		}
+	}
 	for _, e := range g.out[i] {
-		if edgeType == "" || e.typ == edgeType {
+		if edgeTypeMatches(e.typ, edgeType) {
 			if !fn(g.ids[e.dst]) {
 				return
 			}
@@ -438,23 +514,35 @@ func (g *BadgerGraph) RangeOutEdges(src, edgeType string, fn func(dst string) bo
 
 // RangeNodes streams every node. It flushes the detail buffer, then reads detail via a single
 // SEQUENTIAL badger scan of the gn\0 prefix (cheap, cache-friendly) rather than a random Get per
-// node — the adapter passes iterate all nodes, and random Gets were the dominant disk-path cost.
+// node — the binding applicator passes iterate all nodes, and random Gets were the dominant disk-path cost.
 func (g *BadgerGraph) RangeNodes(fn func(Node) bool) {
 	emit := func(idx int32, b []byte) bool {
 		d := decDet(b)
 		return fn(Node{ID: g.ids[idx], Type: d.typ, Loc: d.loc, Region: d.region,
 			Order: d.order, HasOrder: d.hasOrder, Scope: d.scope, Props: d.props})
 	}
-	// in-RAM (unflushed) detail first — the only detail at all when unbounded (no ceiling).
-	for idx, b := range g.detBuf {
-		if !emit(idx, b) {
-			return
-		}
-	}
 	if len(g.detBuf) == len(g.ids) { // everything resident → no badger scan needed
+		for idx := range g.ids {
+			i := int32(idx)
+			if !emit(i, g.detBuf[i]) {
+				return
+			}
+		}
 		return
 	}
-	// spilled detail: one sequential prefix scan, skipping any index also held in RAM.
+	nextResidentScan := int32(0)
+	emitResidentBefore := func(limit int32) bool {
+		for nextResidentScan < limit {
+			if b, ok := g.detBuf[nextResidentScan]; ok {
+				if !emit(nextResidentScan, b) {
+					return false
+				}
+			}
+			nextResidentScan++
+		}
+		return true
+	}
+	// Spilled detail: one sequential prefix scan, merging any still-resident nodes.
 	pfx := []byte("gn")
 	stop := false
 	_ = g.db.View(func(txn *badger.Txn) error {
@@ -466,14 +554,30 @@ func (g *BadgerGraph) RangeNodes(fn func(Node) bool) {
 			if len(k) != 6 {
 				continue
 			}
-			idx := int32(binary.LittleEndian.Uint32(k[2:]))
-			if _, inRAM := g.detBuf[idx]; inRAM {
+			idx := int32(binary.BigEndian.Uint32(k[2:]))
+			if idx < 0 || int(idx) >= len(g.ids) {
+				continue
+			}
+			if idx < nextResidentScan {
+				continue
+			}
+			if !emitResidentBefore(idx) {
+				stop = true
+				return nil
+			}
+			if b, inRAM := g.detBuf[idx]; inRAM {
+				nextResidentScan = idx + 1
+				if !emit(idx, b) {
+					stop = true
+					return nil
+				}
 				continue
 			}
 			if err := item.Value(func(v []byte) error {
 				if !emit(idx, v) {
 					stop = true
 				}
+				nextResidentScan = idx + 1
 				return nil
 			}); err != nil {
 				return err
@@ -484,4 +588,15 @@ func (g *BadgerGraph) RangeNodes(fn func(Node) bool) {
 		}
 		return nil
 	})
+	if stop {
+		return
+	}
+	for nextResidentScan < int32(len(g.ids)) {
+		if b, ok := g.detBuf[nextResidentScan]; ok {
+			if !emit(nextResidentScan, b) {
+				return
+			}
+		}
+		nextResidentScan++
+	}
 }

@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mdf61aa55;
+
+binding networkConnect0 {
+  requires {
+    dependency("org.osgi:org.osgi.compendium")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.NetworkConnectSink at args[0]
+}

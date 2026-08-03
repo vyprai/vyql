@@ -1,9 +1,0 @@
-import code.{CodeEval}
-
-adapter perl {
-  package "Async-Util" {
-    sink method "amap" -> code.CodeEval
-    sink method "azipmap" -> code.CodeEval
-    sink method "achain" -> code.CodeEval
-  }
-}

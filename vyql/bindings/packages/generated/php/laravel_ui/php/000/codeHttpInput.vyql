@@ -1,0 +1,9 @@
+module bindings.php.generated.meb280da6;
+
+binding httpInput0 {
+  requires {
+    dependency("laravel/ui")
+  }
+  query pattern callExpr where callee.method == "AuthenticatesUsers::login"
+  emit source code.HttpInput at call.result
+}

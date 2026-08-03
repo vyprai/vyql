@@ -1,0 +1,9 @@
+module bindings.rust.generated.m4c35e160;
+
+binding filePathAccess12 {
+  requires {
+    dependency("tauri-build")
+  }
+  query pattern callExpr where callee.method == "config_path"
+  emit sink code.FilePathAccess at args[0]
+}

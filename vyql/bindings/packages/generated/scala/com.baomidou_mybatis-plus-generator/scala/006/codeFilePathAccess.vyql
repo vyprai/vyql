@@ -1,0 +1,9 @@
+module bindings.scala.generated.ma91ee222;
+
+binding filePathAccess6 {
+  requires {
+    dependency("com.baomidou:mybatis-plus-generator")
+  }
+  query pattern callExpr where callee.method == "openDir"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.m6e3fca00;
+
+binding urlFetch3 {
+  requires {
+    dependency("lottie")
+  }
+  query pattern callExpr where callee.method == "network"
+  emit sink code.UrlFetch at args[0]
+}

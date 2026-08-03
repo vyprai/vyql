@@ -1,0 +1,9 @@
+module bindings.rust.generated.m085231ca;
+
+binding userControlledData3 {
+  requires {
+    dependency("termion")
+  }
+  query pattern callExpr where callee.method == "async_stdin_until"
+  emit source core.UserControlledData at call.result
+}

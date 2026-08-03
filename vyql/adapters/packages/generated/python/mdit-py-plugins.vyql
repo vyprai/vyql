@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "mdit-py-plugins" {
-    sink method "mdit_py_plugins.attrs.parse.parse" -> code.Deserialization
-    sink method "mdit_py_plugins.attrs.parse.compile" -> code.Deserialization
-  }
-}

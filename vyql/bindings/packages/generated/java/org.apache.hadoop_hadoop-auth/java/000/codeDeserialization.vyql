@@ -1,0 +1,9 @@
+module bindings.java.generated.md88329fc;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.hadoop:hadoop-auth")
+  }
+  query pattern callExpr where callee.method == "AuthToken.parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter ruby {
-  package "git" {
-    sink method "run" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mc0281a92;
+
+binding userControlledData6 {
+  requires {
+    dependency("rack-test")
+  }
+  query pattern callExpr where callee.method == "parse_uri"
+  emit source core.UserControlledData at call.result
+}

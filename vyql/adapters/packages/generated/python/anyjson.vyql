@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "anyjson" {
-    sink method "loads" -> code.Deserialization
-  }
-}

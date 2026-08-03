@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding uncheckedPrototypeConfigKey572 {
+  query pattern presenceNode where node.scope == "function" and node.context.objectKeysForEach == "true" and node.context.dynamicPropertyWrite == "true" and node.context.callPath contains "mapifyExposeGlobals" and not (node.context.prototypeKeyGuard == "true")
+  emit issue code.UncheckedPrototypeConfigKey at node
+}

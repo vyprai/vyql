@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding underallocatedFormattedAddressList91 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.switchCase contains "D6_OPT_DNS_SERVERS" and node.context.callPath contains "xmalloc" and node.context.callPath contains "sprint_nip6" and node.context.callArgShape contains "xmalloc:NUM+ID*NUM-1" and node.context.callArgShape contains "sprint_nip6:ID+NUM+ID" and node.context.assignOpShape contains "ID+=NUM" and not (node.context.callArgShape contains "xmalloc:NUM+ID*NUM+1")
+  emit issue code.UnderallocatedFormattedAddressList at node
+}

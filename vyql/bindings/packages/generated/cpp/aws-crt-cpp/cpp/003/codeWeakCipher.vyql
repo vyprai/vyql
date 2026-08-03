@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m4fa6ca30;
+
+binding weakCipher3 {
+  requires {
+    dependency("aws-crt-cpp")
+  }
+  query pattern callExpr where callee.method == "SetBYOCryptoNewSHA256HMACCallback"
+  emit issue code.WeakCipher at call
+}

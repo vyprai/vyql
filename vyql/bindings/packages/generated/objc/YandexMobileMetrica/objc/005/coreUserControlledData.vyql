@@ -1,0 +1,9 @@
+module bindings.objc.generated.m6998ce18;
+
+binding userControlledData5 {
+  requires {
+    dependency("YandexMobileMetrica")
+  }
+  query pattern callExpr where callee.method == "reportUserProfile:"
+  emit source core.UserControlledData at call.result
+}

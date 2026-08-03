@@ -1,0 +1,9 @@
+module bindings.python.generated.m742487fe;
+
+binding networkConnect4 {
+  requires {
+    dependency("spotipy")
+  }
+  query pattern callExpr where callee.method == "start_local_http_server"
+  emit sink code.NetworkConnectSink at args[0]
+}

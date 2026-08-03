@@ -1,0 +1,9 @@
+module bindings.elixir.generated.me83d46b5;
+
+binding networkSend18 {
+  requires {
+    dependency("req")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkSend at args[0]
+}

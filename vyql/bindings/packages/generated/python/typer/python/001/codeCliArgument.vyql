@@ -1,0 +1,9 @@
+module bindings.python.generated.mcc8c2628;
+
+binding cliArgument1 {
+  requires {
+    dependency("typer")
+  }
+  query pattern callExpr where callee.method == "parse_args"
+  emit source code.CliArgument at call.result
+}

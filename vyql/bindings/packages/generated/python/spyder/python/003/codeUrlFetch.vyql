@@ -1,0 +1,9 @@
+module bindings.python.generated.m4c9086e1;
+
+binding urlFetch3 {
+  requires {
+    dependency("spyder")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.UrlFetch at args[0]
+}

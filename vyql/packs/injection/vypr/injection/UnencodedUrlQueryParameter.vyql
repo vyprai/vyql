@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnencodedUrlQueryParameter {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_116, CWE_20]
+    id: "VYQL-INJ-150"
+    severity: high
+  }
+  issue code.UnencodedUrlQueryParameter as sink
+}

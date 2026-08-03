@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter c {
-  package "mio" {
-    sink method "basic_mmap" -> code.FilePathAccess
-  }
-}

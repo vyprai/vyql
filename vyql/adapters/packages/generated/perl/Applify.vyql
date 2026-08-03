@@ -1,9 +1,0 @@
-import code.{CliArgument, CommandExecution}
-
-adapter perl {
-  package "Applify" {
-    source method "option_parser" -> code.CliArgument
-    source method "subcommand" -> code.CliArgument
-    sink method "_app_run" -> code.CommandExecution
-  }
-}

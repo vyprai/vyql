@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m2f9ad228;
+
+binding networkSend0 {
+  requires {
+    dependency("http")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}

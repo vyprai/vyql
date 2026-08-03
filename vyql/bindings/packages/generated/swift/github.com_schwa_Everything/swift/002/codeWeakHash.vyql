@@ -1,0 +1,9 @@
+module bindings.swift.generated.md370ab12;
+
+binding weakHash2 {
+  requires {
+    dependency("github.com/schwa/Everything")
+  }
+  query pattern callExpr where callee.method == "update"
+  emit issue code.WeakHash at call
+}

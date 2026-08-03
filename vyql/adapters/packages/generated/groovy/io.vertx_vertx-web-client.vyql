@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-adapter groovy {
-  package "io.vertx:vertx-web-client" {
-    sink method "send" -> code.NetworkSend
-    sink method "request" -> code.NetworkSend
-  }
-}

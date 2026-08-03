@@ -1,0 +1,8 @@
+module code;
+
+review code.ElectronPrivilegedUrlNodeIntegration {
+  category: desktop
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review Electron privileged URL handling for Node integration being disabled on chrome-devtools URLs"
+}

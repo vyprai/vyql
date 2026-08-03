@@ -1,0 +1,9 @@
+module bindings.scala.generated.mf29b8b95;
+
+binding fileUse1 {
+  requires {
+    dependency("org.apache.logging.log4j:log4j-1.2-api")
+  }
+  query pattern callExpr where callee.method == "RollingFileAppender.<init>"
+  emit sink code.FileUseSink at args[0]
+}

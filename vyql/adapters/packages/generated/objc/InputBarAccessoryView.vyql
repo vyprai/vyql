@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter objc {
-  package "InputBarAccessoryView" {
-    source method "inputBar:didPressSendButtonWith:" -> core.UserControlledData
-  }
-}

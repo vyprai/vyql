@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter ruby {
-  package "jekyll-coffeescript" {
-    sink method "convert" -> code.CodeEval
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m1ca6539f;
+
+binding userControlledData1 {
+  requires {
+    dependency("CrashlyticsFramework")
+  }
+  query pattern callExpr where callee.method == "setObjectValue"
+  emit source core.UserControlledData at call.result
+}

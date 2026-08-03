@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter c {
-  package "z4kn4fein-semver" {
-    sink method "parse" -> code.Deserialization
-  }
-}

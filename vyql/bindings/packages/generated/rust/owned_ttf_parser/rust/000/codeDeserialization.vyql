@@ -1,0 +1,9 @@
+module bindings.rust.generated.m4eccde00;
+
+binding deserialization0 {
+  requires {
+    dependency("owned_ttf_parser")
+  }
+  query pattern callExpr where callee.method == "from_vec"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mb9c3d8a9;
+
+binding networkSend3 {
+  requires {
+    dependency("com.sendgrid:sendgrid-java")
+  }
+  query pattern callExpr where callee.method == "makeCall"
+  emit sink code.NetworkSend at args[0]
+}

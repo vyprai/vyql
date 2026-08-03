@@ -1,0 +1,9 @@
+module bindings.python.generated.m9e9508d7;
+
+binding deserialization2 {
+  requires {
+    dependency("sqlparse")
+  }
+  query pattern callExpr where callee.method == "split"
+  emit sink code.Deserialization at args[0]
+}

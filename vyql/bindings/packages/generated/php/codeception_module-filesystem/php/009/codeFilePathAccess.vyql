@@ -1,0 +1,9 @@
+module bindings.php.generated.m23fc1340;
+
+binding filePathAccess9 {
+  requires {
+    dependency("codeception/module-filesystem")
+  }
+  query pattern callExpr where callee.method == "dontSeeInThisFile"
+  emit sink code.FilePathAccess at args[0]
+}

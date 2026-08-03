@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "rubocop-ast" {
-    sink method "ProcessedSource.parse" -> code.Deserialization
-    sink method "NodePattern::Compiler.compile" -> code.Deserialization
-  }
-}

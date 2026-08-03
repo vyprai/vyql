@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m2b97c258;
+
+binding networkSend1 {
+  requires {
+    dependency("org.eclipse.jetty.websocket:websocket-client")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

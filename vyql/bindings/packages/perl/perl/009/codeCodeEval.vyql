@@ -1,0 +1,9 @@
+module bindings.perl.generated.ma164dcec;
+
+binding codeEval9 {
+  requires {
+    dependency("perl")
+  }
+  query pattern callExpr where callee.path ~= "eval"
+  emit sink code.CodeEval at args[0]
+}

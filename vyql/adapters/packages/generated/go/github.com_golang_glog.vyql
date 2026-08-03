@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/golang/glog" {
-    sink method "create" -> code.FileUse
-  }
-}

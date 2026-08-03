@@ -1,0 +1,9 @@
+module bindings.perl.generated.mc27622f0;
+
+binding codeEval2 {
+  requires {
+    dependency("if")
+  }
+  query pattern callExpr where callee.method == "unimport"
+  emit sink code.CodeEval at args[0]
+}

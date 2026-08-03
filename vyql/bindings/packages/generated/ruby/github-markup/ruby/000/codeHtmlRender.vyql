@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m01a849b2;
+
+binding htmlRender0 {
+  requires {
+    dependency("github-markup")
+  }
+  query pattern callExpr where callee.method == "Github::Markup.render"
+  emit sink code.HtmlRender at args[0]
+}

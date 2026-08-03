@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m4434732a;
+
+binding userControlledData1 {
+  requires {
+    dependency("joda-time:joda-time")
+  }
+  query pattern callExpr where callee.method == "parseDays"
+  emit source core.UserControlledData at call.result
+}

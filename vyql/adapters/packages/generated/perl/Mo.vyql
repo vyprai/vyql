@@ -1,8 +1,0 @@
-import code.{CodeEval}
-
-adapter perl {
-  package "Mo" {
-    sink method "Mo::Inline::run" -> code.CodeEval
-    sink method "Mo::Inline::inline" -> code.CodeEval
-  }
-}

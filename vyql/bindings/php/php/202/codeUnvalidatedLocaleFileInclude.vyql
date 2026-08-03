@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding unvalidatedLocaleFileInclude202 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "resetMessages" and node.context.phpReview == "unvalidated_locale_file_include"
+  emit issue code.UnvalidatedLocaleFileInclude at node
+}

@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding phpNegativeOffsetStringSearchWarningDisclosure88 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "negative_offset_string_search_warning"
+  emit issue code.PhpNegativeOffsetStringSearchWarningDisclosure at node
+}

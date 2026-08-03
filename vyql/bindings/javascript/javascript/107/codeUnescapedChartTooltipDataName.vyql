@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding unescapedChartTooltipDataName107 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callArg contains "itemModel.get:name" and node.context.identifier contains "name" and node.context.callArg contains "createTooltipMarkup:nameValue" and not (node.context.prop contains "name=itemName") and not (node.context.callArg contains "encodeHTML:name") and not (node.context.callArg contains "escapeHTML:name") and not (node.context.callArg contains "escapeHtml:name")
+  emit issue code.UnescapedChartTooltipDataName at node
+}

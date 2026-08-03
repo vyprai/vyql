@@ -1,5 +1,0 @@
-adapter perl {
-  package "Padre-Plugin-LaTeX" {
-    sink method "get_command" -> code.CommandExecution
-  }
-}

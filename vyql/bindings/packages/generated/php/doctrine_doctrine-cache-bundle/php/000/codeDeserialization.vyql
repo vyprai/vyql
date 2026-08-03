@@ -1,0 +1,9 @@
+module bindings.php.generated.m9062dd79;
+
+binding deserialization0 {
+  requires {
+    dependency("doctrine/doctrine-cache-bundle")
+  }
+  query pattern callExpr where callee.method == "unserializeAcl"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,8 @@
+# Rank 98 / CVE-2020-4068: APNSwift BIO_puts unbounded copy smell.
+
+test "rank98: unbounded copy smell is a CVE anchor"
+  expect VYQL-MEM-002
+  graph
+  ```
+  node copy code.UnboundedCopySmell
+  ```

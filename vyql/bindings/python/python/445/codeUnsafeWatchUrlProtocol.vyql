@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding unsafeWatchUrlProtocol445 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unsafe_watch_url_protocol"
+  emit issue code.UnsafeWatchUrlProtocol at node
+}

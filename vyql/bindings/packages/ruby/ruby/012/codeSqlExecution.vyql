@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m5895bccf;
+
+binding sqlExecution12 {
+  requires {
+    dependency("pg")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m23fc1340;
+
+binding filePathAccess4 {
+  requires {
+    dependency("codeception/module-filesystem")
+  }
+  query pattern callExpr where callee.method == "deleteThisFile"
+  emit sink code.FilePathAccess at args[0]
+}

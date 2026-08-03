@@ -1,0 +1,9 @@
+module bindings.go.generated.mbcd2d56e;
+
+binding userControlledData6 {
+  requires {
+    dependency("github.com/joho/godotenv")
+  }
+  query pattern callExpr where callee.method == "UnmarshalBytes"
+  emit source core.UserControlledData at call.result
+}

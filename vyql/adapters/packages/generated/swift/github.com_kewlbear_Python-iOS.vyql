@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter swift {
-  package "github.com/kewlbear/Python-iOS" {
-    sink method "runSimpleString" -> code.CodeEval
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m5bdaa488;
+
+binding userControlledData0 {
+  requires {
+    dependency("org.apache.shiro:shiro-core")
+  }
+  query pattern callExpr where callee.method == "supports"
+  emit source core.UserControlledData at call.result
+}

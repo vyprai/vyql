@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding wordPressMediaMutationMissingObjectPermission161 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "wordpress_media_post_mutation_missing_object_permission"
+  emit issue code.WordPressMediaMutationMissingObjectPermission at node
+}

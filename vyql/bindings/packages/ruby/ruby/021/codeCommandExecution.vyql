@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m5895bccf;
+
+binding commandExecution21 {
+  requires {
+    dependency("open3")
+  }
+  query pattern callExpr where callee.path ~= "Open3.capture3"
+  emit sink code.CommandExecution at args[0]
+}

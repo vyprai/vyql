@@ -1,0 +1,12 @@
+module code;
+
+concept IndexAccessSink : sink {
+  cwe: [CWE_125, CWE_787]
+  enabledBy: [taint.UntrustedData]
+  reviewAssumption: "the index is not range-checked against the accessed object"
+  reviewCategory: memory
+  reviewCondition: "attacker-controlled index reaches an array/subscript access"
+  reviewConfidence: medium
+  reviewEvidence: "subscript index flows into {pattern}"
+  vulnerableTo: [memory.OobRead, memory.OobWrite]
+}

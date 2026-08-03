@@ -1,0 +1,9 @@
+module bindings.java.generated.mf438f5b2;
+
+binding networkSend1 {
+  requires {
+    dependency("io.searchbox:jest")
+  }
+  query pattern callExpr where callee.method == "executeAsync"
+  emit sink code.NetworkSend at args[0]
+}

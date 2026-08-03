@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding filePathAccess422 {
+  query pattern callExpr where callee.path ~= "os.scandir"
+  emit sink code.FilePathAccess at args[0]
+}

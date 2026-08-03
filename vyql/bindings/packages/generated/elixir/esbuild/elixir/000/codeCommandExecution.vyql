@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mbb3524f5;
+
+binding commandExecution0 {
+  requires {
+    dependency("esbuild")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

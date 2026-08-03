@@ -1,8 +1,0 @@
-import core.{CsrfProtection}
-
-adapter python {
-  package "wtforms" {
-    control method "generate_csrf_token" -> core.CsrfProtection
-    control method "validate_csrf_token" -> core.CsrfProtection
-  }
-}

@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter swift {
-  package "github.com/pusher/NWWebSocket" {
-    sink method "send" -> code.NetworkSend
-  }
-}

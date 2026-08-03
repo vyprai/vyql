@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "nelmio/alice" {
-    sink method "parse" -> code.Deserialization
-  }
-}

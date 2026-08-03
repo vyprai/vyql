@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m4f58409f;
+
+binding filePathAccess1 {
+  requires {
+    dependency("7-zip.commandline")
+  }
+  query pattern callExpr where callee.path ~= "7za.exe"
+  emit sink code.FilePathAccess at args.any
+}

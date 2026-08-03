@@ -1,0 +1,9 @@
+module bindings.objc.generated.m8ed02bed;
+
+binding networkSend0 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "logSignUpWithMethod"
+  emit sink code.NetworkSend at args[0]
+}

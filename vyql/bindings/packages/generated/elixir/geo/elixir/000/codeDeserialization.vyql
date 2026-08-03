@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mbcfbc88e;
+
+binding deserialization0 {
+  requires {
+    dependency("geo")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

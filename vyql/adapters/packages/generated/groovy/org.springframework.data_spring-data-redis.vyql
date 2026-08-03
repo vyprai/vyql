@@ -1,5 +1,0 @@
-adapter groovy {
-  package "org.springframework.data:spring-data-redis" {
-    sink method "deserializeCacheValue" -> code.Deserialization
-  }
-}

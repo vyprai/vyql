@@ -1,0 +1,7 @@
+module code;
+
+review code.FieldDerivedIndexAccess {
+  category: memory
+  kind: attention
+  text: "review field-derived array index access and the dominating upper-bound checks"
+}

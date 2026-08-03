@@ -1,6 +1,0 @@
-import code.{UrlFetch}
-adapter objc {
-  package "GoogleAPIClientForREST" {
-    sink method "initWithPathURITemplate" -> code.UrlFetch
-  }
-}

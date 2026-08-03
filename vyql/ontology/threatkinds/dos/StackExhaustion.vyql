@@ -1,0 +1,6 @@
+module dos;
+
+threat StackExhaustion {
+  cwe: [CWE_674]
+  desc: "Recursive or nested processing can exhaust the call stack"
+}

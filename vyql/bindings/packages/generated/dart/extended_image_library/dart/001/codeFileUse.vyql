@@ -1,0 +1,9 @@
+module bindings.dart.generated.m22d0a444;
+
+binding fileUse1 {
+  requires {
+    dependency("extended_image_library")
+  }
+  query pattern callExpr where callee.method == "clearDiskCachedImage"
+  emit sink code.FileUseSink at args[0]
+}

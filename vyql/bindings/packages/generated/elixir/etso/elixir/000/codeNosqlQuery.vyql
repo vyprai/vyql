@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m5341c5a6;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("etso")
+  }
+  query pattern callExpr where callee.method == "Etso.ETS.MatchSpecification.build"
+  emit sink code.NosqlQuery at args[0]
+}

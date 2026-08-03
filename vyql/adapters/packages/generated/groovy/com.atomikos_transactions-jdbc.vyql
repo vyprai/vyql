@@ -1,8 +1,0 @@
-adapter groovy {
-  package "com.atomikos:transactions-jdbc" {
-    sink method "setUrl" -> code.FilePathAccess
-    source method "setPassword" -> code.SecretValue
-    sink method "setTestQuery" -> code.SqlExecution
-    sink method "getConnection" -> code.SqlExecution
-  }
-}

@@ -1,6 +1,0 @@
-adapter scala {
-  package "com.google.zxing:core" {
-    sink method "decode" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-  }
-}

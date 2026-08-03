@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter javascript {
-  package "istanbul-reports" {
-    control method "customEscape" -> core.HtmlEscape
-  }
-}

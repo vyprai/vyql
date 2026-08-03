@@ -1,0 +1,9 @@
+module bindings.perl.generated.mc51f2d06;
+
+binding networkConnect0 {
+  requires {
+    dependency("CDDB")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

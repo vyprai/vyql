@@ -1,7 +1,0 @@
-import core.{AuthenticationCheck, InputValidation}
-
-adapter elixir {
-  package "apiac" {
-    control method "set_WWWauthenticate_challenge" -> core.AuthenticationCheck
-  }
-}

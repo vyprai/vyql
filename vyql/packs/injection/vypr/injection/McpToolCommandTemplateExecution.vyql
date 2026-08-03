@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule McpToolCommandTemplateExecution {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_77, CWE_78]
+    id: "VYQL-INJ-120"
+    severity: critical
+  }
+  issue code.McpToolCommandTemplateExecution as sink
+}

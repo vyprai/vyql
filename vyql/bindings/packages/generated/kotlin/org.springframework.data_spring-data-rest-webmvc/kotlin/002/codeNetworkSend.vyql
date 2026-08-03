@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m61f1e65b;
+
+binding networkSend2 {
+  requires {
+    dependency("org.springframework.data:spring-data-rest-webmvc")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

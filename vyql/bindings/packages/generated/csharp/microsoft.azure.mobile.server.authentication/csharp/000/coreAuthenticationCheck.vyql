@@ -1,0 +1,13 @@
+module bindings.csharp.generated.m2c78783d;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("microsoft.azure.mobile.server.authentication")
+  }
+  query pattern callExpr where callee.method == "ValidateIdentity"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m82c3cb7b;
+
+binding codeEval0 {
+  requires {
+    dependency("pirates")
+  }
+  query pattern callExpr where callee.method == "addHook"
+  emit sink code.CodeEval at args[0]
+}

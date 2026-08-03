@@ -1,0 +1,10 @@
+module bindings.go.generated.md6dcc4ff;
+
+binding redirectTarget7 {
+  requires {
+    dependency("google.golang.org/appengine")
+  }
+  query pattern callExpr where callee.method == "LogoutURL"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

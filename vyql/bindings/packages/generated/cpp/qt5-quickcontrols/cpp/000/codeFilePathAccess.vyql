@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mf67896f1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("qt5-quickcontrols")
+  }
+  query pattern callExpr where callee.method == "QQuickAndroid9Patch1.setSource"
+  emit sink code.FilePathAccess at args[0]
+}

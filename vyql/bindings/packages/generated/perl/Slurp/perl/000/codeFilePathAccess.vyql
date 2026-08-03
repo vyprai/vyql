@@ -1,0 +1,9 @@
+module bindings.perl.generated.mc23e939b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Slurp")
+  }
+  query pattern callExpr where callee.method == "slurp"
+  emit sink code.FilePathAccess at args[0]
+}

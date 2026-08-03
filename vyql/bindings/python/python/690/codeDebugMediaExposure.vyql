@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding debugMediaExposure690 {
+  query pattern callExpr where callee.analysis ~= "debug.media_exposure"
+  emit issue code.DebugMediaExposure at call
+}

@@ -1,6 +1,0 @@
-adapter dart {
-  package "camera_avfoundation" {
-    sink method "takePicture" -> code.FilePathAccess
-    sink method "stopVideoRecording" -> code.FilePathAccess
-  }
-}

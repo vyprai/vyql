@@ -1,0 +1,9 @@
+module bindings.python.generated.m37bdfae0;
+
+binding networkConnect3 {
+  requires {
+    dependency("openai")
+  }
+  query pattern callExpr where callee.method == "patch"
+  emit sink code.NetworkConnectSink at args[0]
+}

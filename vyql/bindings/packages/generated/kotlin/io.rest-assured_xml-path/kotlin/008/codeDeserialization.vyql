@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m36442869;
+
+binding deserialization8 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getString"
+  emit sink code.Deserialization at args[0]
+}

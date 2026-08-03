@@ -1,7 +1,0 @@
-import code.{NetworkConnect}
-adapter groovy {
-  package "org.eclipse.jetty:jetty-jmx" {
-    sink method "createServerSocket" -> code.NetworkConnect
-    sink method "startRegistry" -> code.NetworkConnect
-  }
-}

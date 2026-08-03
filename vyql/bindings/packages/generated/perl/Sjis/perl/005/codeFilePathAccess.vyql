@@ -1,0 +1,9 @@
+module bindings.perl.generated.m25682e96;
+
+binding filePathAccess5 {
+  requires {
+    dependency("Sjis")
+  }
+  query pattern callExpr where callee.method == "_open_r"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter ruby {
-  package "debug" {
-    source method "parse_argv" -> code.CliArgument
-  }
-}

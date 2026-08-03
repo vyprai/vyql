@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "sphinxcontrib-serializinghtml" {
-    sink method "load" -> code.Deserialization
-    sink method "loads" -> code.Deserialization
-  }
-}

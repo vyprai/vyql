@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter python {
-  package "static3" {
-    sink method "Cling.__init__" -> code.FilePathAccess
-  }
-}

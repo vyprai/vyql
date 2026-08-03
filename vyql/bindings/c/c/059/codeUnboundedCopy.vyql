@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding unboundedCopy59 {
+  query pattern callExpr where callee.path ~= "strcat"
+  emit sink code.UnboundedCopy at args[1]
+}

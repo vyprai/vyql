@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m21f5a70d;
+
+binding userControlledData2 {
+  requires {
+    dependency("pegtl")
+  }
+  query pattern callExpr where callee.method == "file_input"
+  emit source core.UserControlledData at call.result
+}

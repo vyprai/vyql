@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m844a02b5;
+
+binding deserialization3 {
+  requires {
+    dependency("wil")
+  }
+  query pattern callExpr where callee.method == "try_query_to"
+  emit sink code.Deserialization at args[0]
+}

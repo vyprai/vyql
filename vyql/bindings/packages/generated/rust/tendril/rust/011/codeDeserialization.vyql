@@ -1,0 +1,9 @@
+module bindings.rust.generated.mdf8e1b02;
+
+binding deserialization11 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "decode_koi8_u_encoding_rs"
+  emit sink code.Deserialization at args[0]
+}

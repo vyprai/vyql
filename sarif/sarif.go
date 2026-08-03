@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/resultpolicy"
 )
 
 const (
@@ -79,7 +80,7 @@ func findingToResult(f *findings.Finding) map[string]any {
 	for _, ec := range f.ReviewConditions {
 		review = append(review, map[string]any{
 			"category": ec.Category, "condition": ec.Condition, "evidence": ec.Evidence,
-			"assumption": ec.Assumption, "confidence": ec.Confidence,
+			"advisory": ec.Assumption, "confidence": ec.Confidence,
 		})
 	}
 
@@ -87,7 +88,7 @@ func findingToResult(f *findings.Finding) map[string]any {
 		"ruleId":              f.RuleID,
 		"level":               level,
 		"message":             map[string]any{"text": msg},
-		"partialFingerprints": map[string]any{"vyqlFingerprint/v1": f.Fingerprint()},
+		"partialFingerprints": map[string]any{"vyqlFingerprint/v2": resultpolicy.Fingerprint(f)},
 		"properties": map[string]any{
 			"vypr.confidence":       f.Confidence,
 			"vypr.witnessKind":      f.WitnessKind,

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m7594bf70;
+
+binding filePathAccess2 {
+  requires {
+    dependency("log4cxx")
+  }
+  query pattern callExpr where callee.method == "renameTo"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept UserIdentityMappingReview : issue {
+  cwe: [CWE_286, CWE_863]
+  reviewAssumption: "an attacker can influence the external username or identity data and local id collisions affect authorization"
+  reviewCategory: auth
+  reviewCondition: "external identity data determines local user or group identifiers without an observed uniqueness boundary"
+  reviewConfidence: possibility
+  reviewEvidence: "identity mapping context {pattern} derives local ids from broker-provided user data"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

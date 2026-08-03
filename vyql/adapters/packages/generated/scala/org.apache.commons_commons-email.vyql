@@ -1,8 +1,0 @@
-adapter scala {
-  package "org.apache.commons:commons-email" {
-    sink method "send" -> code.NetworkSend
-    sink method "sendMimeMessage" -> code.NetworkSend
-    source method "setAuthentication" -> code.SecretValue
-    source method "setPopPassword" -> code.SecretValue
-  }
-}

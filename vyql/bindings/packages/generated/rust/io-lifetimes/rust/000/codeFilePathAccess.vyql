@@ -1,0 +1,9 @@
+module bindings.rust.generated.m153a3999;
+
+binding filePathAccess0 {
+  requires {
+    dependency("io-lifetimes")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

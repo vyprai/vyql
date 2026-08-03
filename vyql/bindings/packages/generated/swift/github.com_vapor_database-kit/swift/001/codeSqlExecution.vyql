@@ -1,0 +1,9 @@
+module bindings.swift.generated.mef276195;
+
+binding sqlExecution1 {
+  requires {
+    dependency("github.com/vapor/database-kit")
+  }
+  query pattern callExpr where callee.method == "withConnection"
+  emit sink code.SqlExecution at args[0]
+}

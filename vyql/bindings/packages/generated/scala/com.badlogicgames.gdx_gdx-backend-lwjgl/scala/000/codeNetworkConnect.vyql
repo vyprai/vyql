@@ -1,0 +1,9 @@
+module bindings.scala.generated.mf833161e;
+
+binding networkConnect0 {
+  requires {
+    dependency("com.badlogicgames.gdx:gdx-backend-lwjgl")
+  }
+  query pattern callExpr where callee.method == "sendHttpRequest"
+  emit sink code.NetworkConnectSink at args[0]
+}

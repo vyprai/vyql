@@ -1,0 +1,9 @@
+module bindings.rust.generated.med5b2857;
+
+binding networkConnect2 {
+  requires {
+    dependency("async-io")
+  }
+  query pattern callExpr where callee.method == "incoming"
+  emit sink code.NetworkConnectSink at args[0]
+}

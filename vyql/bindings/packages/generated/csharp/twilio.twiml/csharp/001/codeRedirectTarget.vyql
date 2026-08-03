@@ -1,0 +1,10 @@
+module bindings.csharp.generated.m3e29ef3a;
+
+binding redirectTarget1 {
+  requires {
+    dependency("twilio.twiml")
+  }
+  query pattern callExpr where callee.method == "Redirect.ctor"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

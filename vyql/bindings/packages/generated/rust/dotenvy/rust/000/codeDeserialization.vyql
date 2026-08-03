@@ -1,0 +1,9 @@
+module bindings.rust.generated.m9fb2d9e9;
+
+binding deserialization0 {
+  requires {
+    dependency("dotenvy")
+  }
+  query pattern callExpr where callee.method == "parse_line"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,7 @@
+module bindings.go.generated.m48a985c1;
+
+binding countDerivedElementAccess285 {
+  query pattern callExpr where callee.method == "BranchPageElement" and args.any.literal contains "Count"
+  emit sink code.CountDerivedElementAccessSink at args[0]
+  emit issue code.CountDerivedElementAccess at call
+}

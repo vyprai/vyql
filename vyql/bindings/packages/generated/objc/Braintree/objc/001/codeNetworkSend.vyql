@@ -1,0 +1,9 @@
+module bindings.objc.generated.me97a2706;
+
+binding networkSend1 {
+  requires {
+    dependency("Braintree")
+  }
+  query pattern callExpr where callee.method == "httpRequest"
+  emit sink code.NetworkSend at args[0]
+}

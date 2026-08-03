@@ -1,0 +1,11 @@
+module code;
+
+concept ClearanceKitPolicyApplyBeforeAdapterStart : issue {
+  cwe: [CWE_269]
+  reviewAssumption: "managed or user-defined rules can be absent from the active interactor until a later XPC policy mutation"
+  reviewCategory: auth
+  reviewCondition: "file-access policy rules are applied before the EndpointSecurity adapter has created its client"
+  reviewConfidence: high
+  reviewEvidence: "ClearanceKit startup ordering {pattern} applies policy, allowlist, or jail rules before adapter.start(initialRules:...)"
+  vulnerableTo: [access_control.PrivilegeEscalation]
+}

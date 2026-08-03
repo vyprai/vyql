@@ -1,0 +1,9 @@
+module bindings.python.generated.mdb720e11;
+
+binding nosqlQuery1 {
+  requires {
+    dependency("motor")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}

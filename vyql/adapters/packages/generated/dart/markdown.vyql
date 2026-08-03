@@ -1,6 +1,0 @@
-adapter dart {
-  package "markdown" {
-    sink method "parse" -> code.Deserialization
-    control method "escapeHtml" -> core.HtmlEscape
-  }
-}

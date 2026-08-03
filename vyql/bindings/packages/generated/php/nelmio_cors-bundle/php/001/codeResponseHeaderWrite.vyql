@@ -1,0 +1,9 @@
+module bindings.php.generated.m7568bed9;
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("nelmio/cors-bundle")
+  }
+  query pattern callExpr where callee.method == "onKernelResponse"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

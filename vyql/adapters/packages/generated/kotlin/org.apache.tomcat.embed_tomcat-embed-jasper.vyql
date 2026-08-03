@@ -1,7 +1,0 @@
-import code.{CodeEval, ExpressionEval}
-adapter kotlin {
-  package "org.apache.tomcat.embed:tomcat-embed-jasper" {
-    sink method "compile" -> code.CodeEval
-    sink method "parse" -> code.ExpressionEval
-  }
-}

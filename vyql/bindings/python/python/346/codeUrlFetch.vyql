@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding urlFetch346 {
+  query pattern callExpr where callee.path ~= "session.request"
+  emit sink code.UrlFetch at args[0]
+}

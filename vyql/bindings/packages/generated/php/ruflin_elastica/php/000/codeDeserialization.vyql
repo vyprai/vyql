@@ -1,0 +1,9 @@
+module bindings.php.generated.m628c72ff;
+
+binding deserialization0 {
+  requires {
+    dependency("ruflin/elastica")
+  }
+  query pattern callExpr where callee.method == "ElasticaJSON::parse"
+  emit sink code.Deserialization at args[0]
+}

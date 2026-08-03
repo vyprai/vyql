@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mbfd454d1;
+
+binding nosqlQuery14 {
+  requires {
+    dependency("mongodb-driver-sync")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}

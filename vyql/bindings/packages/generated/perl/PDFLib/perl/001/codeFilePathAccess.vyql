@@ -1,0 +1,9 @@
+module bindings.perl.generated.mae86382a;
+
+binding filePathAccess1 {
+  requires {
+    dependency("PDFLib")
+  }
+  query pattern callExpr where callee.method == "load_image"
+  emit sink code.FilePathAccess at args[0]
+}

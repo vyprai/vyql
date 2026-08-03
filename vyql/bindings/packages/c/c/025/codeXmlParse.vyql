@@ -1,0 +1,9 @@
+module bindings.c.generated.m2816daee;
+
+binding xmlParse25 {
+  requires {
+    dependency("libxml2")
+  }
+  query pattern callExpr where callee.path ~= "xmlParseFile"
+  emit sink code.XmlParse at args[0]
+}

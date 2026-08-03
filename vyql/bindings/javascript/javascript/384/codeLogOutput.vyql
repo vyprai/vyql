@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding logOutput384 {
+  query pattern callExpr where callee.path ~= "logger.error"
+  emit sink code.LogOutput at args.any
+}

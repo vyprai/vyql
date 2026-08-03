@@ -1,0 +1,8 @@
+module code;
+
+review code.SharedOtaHandlerMissingAuthentication {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: target
+  text: "verify shared web-server handler registration wraps OTA upload handlers in the same authentication middleware as normal request handlers"
+}

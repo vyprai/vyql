@@ -1,0 +1,7 @@
+module code;
+
+concept Deserialization : sink {
+  cwe: [CWE_502]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [deserialization.DeserializationAbuse]
+}

@@ -1,0 +1,6 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding regexCompile65 {
+  query pattern callExpr where callee.path ~= "Regex.new"
+  emit sink code.RegexCompileSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mb0ab4d04;
+
+binding filePathAccess4 {
+  requires {
+    dependency("net.sourceforge.jexcelapi:jxl")
+  }
+  query pattern callExpr where callee.method == "getFile"
+  emit sink code.FilePathAccess at args[0]
+}

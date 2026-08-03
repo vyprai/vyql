@@ -1,6 +1,0 @@
-adapter kotlin {
-  package "org.apache.pig:pig" {
-    sink method "exec" -> code.CommandExecution
-    sink method "deserialize" -> code.Deserialization
-  }
-}

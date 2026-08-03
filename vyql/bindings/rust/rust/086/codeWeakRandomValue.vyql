@@ -1,0 +1,6 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding weakRandomValue86 {
+  query pattern presenceNode where node.path ~= "rand.random"
+  emit issue code.WeakRandomValue at node
+}

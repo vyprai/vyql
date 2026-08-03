@@ -1,0 +1,9 @@
+module bindings.swift.generated.m30c08141;
+
+binding weakHash1 {
+  requires {
+    dependency("github.com/vapor/open-crypto")
+  }
+  query pattern callExpr where callee.method == "Digest"
+  emit issue code.WeakHash at call
+}

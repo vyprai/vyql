@@ -1,0 +1,9 @@
+module bindings.php.generated.ma1c813a2;
+
+binding htmlRender5 {
+  requires {
+    dependency("consolidation/output-formatters")
+  }
+  query pattern callExpr where callee.method == "Consolidation\\OutputFormatters\\Formatters\\ListFormatter::write"
+  emit sink code.HtmlRender at args[0]
+}

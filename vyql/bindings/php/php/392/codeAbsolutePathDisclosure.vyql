@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding absolutePathDisclosure392 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "absolute_path_disclosure_unlink"
+  emit issue code.AbsolutePathDisclosure at node
+}

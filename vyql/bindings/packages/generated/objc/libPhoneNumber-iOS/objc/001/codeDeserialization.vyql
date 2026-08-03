@@ -1,0 +1,9 @@
+module bindings.objc.generated.mca1e1296;
+
+binding deserialization1 {
+  requires {
+    dependency("libPhoneNumber-iOS")
+  }
+  query pattern callExpr where callee.method == "parseResult"
+  emit sink code.Deserialization at args[0]
+}

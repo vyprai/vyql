@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding javaScriptTemplateHtmlEscapeMismatch87 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "renderContent" and node.context.callPath contains "request.getParameter" and node.context.callPath contains "vars.put" and node.context.callPath contains "Encode.forHtmlContent" and not (node.context.callPath contains "Encode.forJavaScript")
+  emit issue code.JavaScriptTemplateHtmlEscapeMismatch at node
+}

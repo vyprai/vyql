@@ -1,0 +1,9 @@
+module bindings.python.generated.mc77e5d4e;
+
+binding deserialization1 {
+  requires {
+    dependency("oauth2client")
+  }
+  query pattern callExpr where callee.path ~= "oauth2client.clientsecrets.loads"
+  emit sink code.Deserialization at args[0]
+}

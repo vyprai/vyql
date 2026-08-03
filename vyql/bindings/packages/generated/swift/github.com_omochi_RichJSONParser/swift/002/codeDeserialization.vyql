@@ -1,0 +1,9 @@
+module bindings.swift.generated.m6911f1ff;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/omochi/RichJSONParser")
+  }
+  query pattern callExpr where callee.method == "unescape"
+  emit sink code.Deserialization at args[0]
+}

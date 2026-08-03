@@ -1,0 +1,9 @@
+module bindings.groovy.generated.me7e3fd33;
+
+binding deserialization1 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "JsonPath"
+  emit sink code.Deserialization at args[0]
+}

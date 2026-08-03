@@ -1,0 +1,9 @@
+module bindings.php.generated.m3ec7f69b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("yiisoft/yii2")
+  }
+  query pattern callExpr where callee.method == "createObject"
+  emit sink code.FilePathAccess at args[0]
+}

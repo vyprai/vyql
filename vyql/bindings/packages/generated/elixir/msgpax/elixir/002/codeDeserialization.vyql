@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m64f270c9;
+
+binding deserialization2 {
+  requires {
+    dependency("msgpax")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

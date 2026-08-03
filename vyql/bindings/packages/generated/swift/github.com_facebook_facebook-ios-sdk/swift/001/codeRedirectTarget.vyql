@@ -1,0 +1,10 @@
+module bindings.swift.generated.m664d8be8;
+
+binding redirectTarget1 {
+  requires {
+    dependency("github.com/facebook/facebook-ios-sdk")
+  }
+  query pattern callExpr where callee.method == "openURLWithSafariViewController"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

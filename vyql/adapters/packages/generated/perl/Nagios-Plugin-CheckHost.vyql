@@ -1,6 +1,0 @@
-import code.{UrlFetch}
-adapter perl {
-  package "Nagios-Plugin-CheckHost" {
-    sink method "request" -> code.UrlFetch
-  }
-}

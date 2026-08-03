@@ -1,0 +1,9 @@
+module bindings.swift.generated.mf96bbfd8;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/maxsokolov/TableKit")
+  }
+  query pattern callExpr where callee.method == "invokeActionOn"
+  emit source core.UserControlledData at call.result
+}

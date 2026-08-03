@@ -1,0 +1,9 @@
+module bindings.rust.generated.m264fd2f1;
+
+binding deserialization2 {
+  requires {
+    dependency("percent-encoding")
+  }
+  query pattern callExpr where callee.method == "decode_utf8"
+  emit sink code.Deserialization at args[0]
+}

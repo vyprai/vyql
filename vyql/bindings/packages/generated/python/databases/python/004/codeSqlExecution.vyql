@@ -1,0 +1,9 @@
+module bindings.python.generated.mb74d5d6c;
+
+binding sqlExecution4 {
+  requires {
+    dependency("databases")
+  }
+  query pattern callExpr where callee.method == "execute_many"
+  emit sink code.SqlExecution at args[0]
+}

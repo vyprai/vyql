@@ -1,0 +1,14 @@
+module bindings.ruby.generated.m7f1577c5;
+
+binding inputValidation1 {
+  requires {
+    dependency("groupdate")
+  }
+  query pattern callExpr where callee.method == "Magic.validate_period"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

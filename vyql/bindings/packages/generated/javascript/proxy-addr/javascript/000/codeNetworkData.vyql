@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mb9dbbe0b;
+
+binding networkData0 {
+  requires {
+    dependency("proxy-addr")
+  }
+  query pattern callExpr where callee.method == "proxyaddr"
+  emit source code.NetworkData at call.result
+}

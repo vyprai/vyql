@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter ruby {
-  package "erubi" {
-    control method "h" -> core.HtmlEscape
-  }
-}

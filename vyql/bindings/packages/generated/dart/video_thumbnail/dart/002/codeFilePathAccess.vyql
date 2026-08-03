@@ -1,0 +1,9 @@
+module bindings.dart.generated.m2fc86b0f;
+
+binding filePathAccess2 {
+  requires {
+    dependency("video_thumbnail")
+  }
+  query pattern callExpr where callee.method == "thumbnailFile"
+  emit sink code.FilePathAccess at args[0]
+}

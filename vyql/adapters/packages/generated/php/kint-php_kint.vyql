@@ -1,5 +1,0 @@
-adapter php {
-  package "kint-php/kint" {
-    sink method "parse" -> code.Deserialization
-  }
-}

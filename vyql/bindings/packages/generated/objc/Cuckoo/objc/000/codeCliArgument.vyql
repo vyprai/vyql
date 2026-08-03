@@ -1,0 +1,9 @@
+module bindings.objc.generated.m78bf911a;
+
+binding cliArgument0 {
+  requires {
+    dependency("Cuckoo")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source code.CliArgument at call.result
+}

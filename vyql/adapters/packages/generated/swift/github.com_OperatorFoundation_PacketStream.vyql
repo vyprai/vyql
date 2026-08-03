@@ -1,7 +1,0 @@
-import code.{NetworkData}
-
-adapter swift {
-  package "github.com/OperatorFoundation/PacketStream" {
-    source method "payload" -> code.NetworkData
-  }
-}

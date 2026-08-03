@@ -1,0 +1,7 @@
+module bindings.objc.generated.mccadd221;
+
+binding rawMemoryCopySize35 {
+  query pattern callExpr where callee.path ~= "strncat"
+  emit sink code.RawMemoryCopySizeSink at args[2]
+  emit issue code.RawMemoryCopySize at call
+}

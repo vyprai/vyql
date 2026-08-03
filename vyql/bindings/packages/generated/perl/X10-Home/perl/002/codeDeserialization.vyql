@@ -1,0 +1,9 @@
+module bindings.perl.generated.m4c2fd2f4;
+
+binding deserialization2 {
+  requires {
+    dependency("X10-Home")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit sink code.Deserialization at args[0]
+}

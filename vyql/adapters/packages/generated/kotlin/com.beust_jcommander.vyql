@@ -1,7 +1,0 @@
-import code.{CliArgument}
-adapter kotlin {
-  package "com.beust:jcommander" {
-    source method "parse" -> code.CliArgument
-    source method "parseWithoutValidation" -> code.CliArgument
-  }
-}

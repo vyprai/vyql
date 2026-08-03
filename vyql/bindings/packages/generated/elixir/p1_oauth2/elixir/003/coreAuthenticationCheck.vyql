@@ -1,0 +1,13 @@
+module bindings.elixir.generated.m2447dec0;
+
+binding authenticationCheck3 {
+  requires {
+    dependency("p1_oauth2")
+  }
+  query pattern callExpr where callee.method == "authorize_code_request"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

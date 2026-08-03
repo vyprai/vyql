@@ -1,0 +1,9 @@
+module bindings.python.generated.m67b314f1;
+
+binding deserialization5 {
+  requires {
+    dependency("tiktoken")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

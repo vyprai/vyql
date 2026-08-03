@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-adapter perl {
-  package "Mojo-InfluxDB" {
-    sink method "query" -> code.SqlExecution
-    sink method "query_p" -> code.SqlExecution
-    sink method "raw_query_p" -> code.SqlExecution
-  }
-}

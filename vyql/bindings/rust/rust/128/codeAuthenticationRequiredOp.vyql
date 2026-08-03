@@ -1,0 +1,6 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding authenticationRequiredOp128 {
+  query pattern presenceNode where node.path ~= "make_admin"
+  emit issue code.AuthenticationRequiredOp at node
+}

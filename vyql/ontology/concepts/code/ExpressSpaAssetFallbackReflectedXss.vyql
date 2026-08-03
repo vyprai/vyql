@@ -1,0 +1,11 @@
+module code;
+
+concept ExpressSpaAssetFallbackReflectedXss : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "missing asset routes can reflect attacker-controlled path fragments or content type expectations through the SPA fallback response"
+  reviewCategory: xss
+  reviewCondition: "an Express SPA catch-all route serves index.html for asset-like paths without explicit 404 guards"
+  reviewConfidence: high
+  reviewEvidence: "Express routing context {pattern} registers a wildcard static index.html fallback without observed /js, /images, and /styles 404 handlers"
+  vulnerableTo: [injection.Xss]
+}

@@ -1,7 +1,0 @@
-import code.{NetworkConnect}
-adapter go {
-  package "github.com/hailocab/go-hostpool" {
-    sink method "New" -> code.NetworkConnect
-    sink method "NewEpsilonGreedy" -> code.NetworkConnect
-  }
-}

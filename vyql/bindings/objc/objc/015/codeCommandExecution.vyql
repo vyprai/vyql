@@ -1,0 +1,6 @@
+module bindings.objc.generated.mccadd221;
+
+binding commandExecution15 {
+  query pattern callExpr where callee.path ~= "popen"
+  emit sink code.CommandExecution at args[0]
+}

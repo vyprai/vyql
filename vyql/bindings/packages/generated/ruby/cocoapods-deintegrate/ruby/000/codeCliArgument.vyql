@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m312b2054;
+
+binding cliArgument0 {
+  requires {
+    dependency("cocoapods-deintegrate")
+  }
+  query pattern callExpr where callee.method == "initialize"
+  emit source code.CliArgument at call.result
+}

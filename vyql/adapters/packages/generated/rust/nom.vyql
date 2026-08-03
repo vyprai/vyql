@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "nom" {
-    sink method "parse" -> code.Deserialization
-  }
-}

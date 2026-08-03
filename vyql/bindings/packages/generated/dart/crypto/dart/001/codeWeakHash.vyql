@@ -1,0 +1,9 @@
+module bindings.dart.generated.m51bb94c6;
+
+binding weakHash1 {
+  requires {
+    dependency("crypto")
+  }
+  query pattern callExpr where callee.method == "Digest"
+  emit issue code.WeakHash at call
+}

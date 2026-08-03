@@ -1,0 +1,10 @@
+module bindings.scala.generated.maf6a4921;
+
+binding rawMemoryCopySize1 {
+  requires {
+    dependency("net.java.dev.jna:jna")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit issue code.RawMemoryCopySize at call
+  emit sink code.RawMemoryCopySizeSink at call
+}

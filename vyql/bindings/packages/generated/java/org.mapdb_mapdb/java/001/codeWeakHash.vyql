@@ -1,0 +1,9 @@
+module bindings.java.generated.mb3bb1fc9;
+
+binding weakHash1 {
+  requires {
+    dependency("org.mapdb:mapdb")
+  }
+  query pattern presenceNode where node.path ~= "org.mapdb.mapdb.hash"
+  emit issue code.WeakHash at node
+}

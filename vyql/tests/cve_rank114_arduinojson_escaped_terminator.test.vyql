@@ -1,0 +1,60 @@
+# verify_current_expected: skip-fresh-target
+# The fresh rank 114 checkout is a later fixed/noisy ArduinoJson snapshot; this
+# spec keeps the corrected v4.4 escaped-terminator mechanic covered.
+
+test "rank114: ArduinoJson quoted string escape terminator overflow"
+  lang cpp
+  expect VYQL-MEM-013
+  expect_review code.EscapedTerminatorWrite
+  code
+  ```
+  char unescapeChar(char c);
+
+  char *extractFrom(char *input) {
+      char *readPtr = input + 1;
+      char *writePtr = readPtr;
+      char c;
+
+      for (;;) {
+          c = *readPtr++;
+          if (c == '\0') return 0;
+          if (c == '"') break;
+          if (c == '\\') {
+              c = unescapeChar(*readPtr++);
+          }
+          *writePtr++ = c;
+      }
+
+      *writePtr = '\0';
+      return input + 1;
+  }
+  ```
+
+test "rank114: escaped terminator rejected before decoded buffer write"
+  lang cpp
+  reject VYQL-MEM-013
+  reject_review code.EscapedTerminatorWrite
+  code
+  ```
+  char unescapeChar(char c);
+
+  char *extractFrom(char *input) {
+      char *readPtr = input + 1;
+      char *writePtr = readPtr;
+      char c;
+
+      for (;;) {
+          c = *readPtr++;
+          if (c == '\0') return 0;
+          if (c == '"') break;
+          if (c == '\\') {
+              c = unescapeChar(*readPtr++);
+              if (c == '\0') return 0;
+          }
+          *writePtr++ = c;
+      }
+
+      *writePtr = '\0';
+      return input + 1;
+  }
+  ```

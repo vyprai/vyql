@@ -1,0 +1,9 @@
+module bindings.rust.generated.m222602a5;
+
+binding nosqlQuery15 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}

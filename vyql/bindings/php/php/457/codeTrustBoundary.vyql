@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding trustBoundary457 {
+  query pattern callExpr where callee.path ~= "$_SESSION"
+  emit sink code.TrustBoundary at args.any
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept PointerOffsetBoundsCheck : issue {
+  cwe: [CWE_20, CWE_125, CWE_190]
+  reviewAssumption: "a malformed serialized length can move the pointer outside the valid buffer before the check"
+  reviewCategory: numeric
+  reviewCondition: "a pointer is advanced by an encoded length before the bounds comparison is made"
+  reviewConfidence: medium
+  reviewEvidence: "pointer-offset bounds context {pattern} compares pointer+length against an end pointer"
+  vulnerableTo: [validation.ImproperInputValidation, memory.OobRead, memory.IntegerOverflow]
+}

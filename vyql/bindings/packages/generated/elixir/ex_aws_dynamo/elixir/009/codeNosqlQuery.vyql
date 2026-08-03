@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m40a3b1af;
+
+binding nosqlQuery9 {
+  requires {
+    dependency("ex_aws_dynamo")
+  }
+  query pattern callExpr where callee.method == "transact_write_items"
+  emit sink code.NosqlQuery at args[0]
+}

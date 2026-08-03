@@ -1,0 +1,10 @@
+module bindings.go.generated.m48a985c1;
+
+binding memoryBoundsCheck286 {
+  query pattern presenceNode where node.kind == "binop" and node.path ~= "__binop.ne" and node.arg contains "Count" and node.arg contains "0"
+  emit check core.MemoryBoundsCheck at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}

@@ -1,7 +1,0 @@
-import code.{FileUse}
-
-adapter php {
-  package "kylekatarnls/update-helper" {
-    sink method "write" -> code.FileUse
-  }
-}

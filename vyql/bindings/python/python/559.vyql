@@ -1,0 +1,13 @@
+module bindings.python.generated.m21017d75;
+
+binding binding559 {
+  query pattern callExpr where callee.path ~= "os.path.normpath"
+  emit check core.PathCanonicalization at call {
+    advisory: true
+    about: code.FilePathAccess
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

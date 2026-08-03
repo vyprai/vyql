@@ -1,0 +1,9 @@
+module bindings.php.generated.mc89264da;
+
+binding deserialization2 {
+  requires {
+    dependency("zendframework/zend-mime")
+  }
+  query pattern callExpr where callee.method == "ZendMimeDecode::splitHeaderField"
+  emit sink code.Deserialization at args[0]
+}

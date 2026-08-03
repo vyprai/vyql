@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m29423213;
+
+binding cliArgument1 {
+  requires {
+    dependency("qtbase")
+  }
+  query pattern callExpr where callee.method == "Option::parseCommandLine"
+  emit source code.CliArgument at call.result
+}

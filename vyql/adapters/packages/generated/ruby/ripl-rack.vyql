@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter ruby {
-  package "ripl-rack" {
-    sink method "initialize" -> code.CodeEval
-  }
-}

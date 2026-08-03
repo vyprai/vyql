@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "tiff" {
-    sink method "read" -> code.Deserialization
-  }
-}

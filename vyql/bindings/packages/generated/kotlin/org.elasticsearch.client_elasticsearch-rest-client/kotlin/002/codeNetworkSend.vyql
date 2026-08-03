@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m4c39035c;
+
+binding networkSend2 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-client")
+  }
+  query pattern callExpr where callee.method == "performRequest"
+  emit sink code.NetworkSend at args[0]
+}

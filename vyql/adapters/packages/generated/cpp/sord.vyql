@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "sord" {
-    sink method "sord_node_from_serd_node" -> code.Deserialization
-  }
-}

@@ -1,0 +1,13 @@
+module bindings.solidity.generated.m72929a80;
+
+binding ownershipCheck16 {
+  requires {
+    dependency("@openzeppelin/contracts")
+  }
+  query pattern callExpr where callee.path ~= "onlyOwner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding commandExecution238 {
+  query pattern callExpr where callee.path ~= "proc_open"
+  emit sink code.CommandExecution at args[0]
+}

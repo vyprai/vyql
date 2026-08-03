@@ -1,8 +1,0 @@
-import code.{WeakRandomValue}
-adapter c {
-  package "speex" {
-    flag code.WeakRandomValue on any {
-      method "speex_rand"
-    }
-  }
-}

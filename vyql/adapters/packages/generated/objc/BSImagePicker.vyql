@@ -1,8 +1,0 @@
-import core.{AuthorizationCheck}
-
-adapter objc {
-  package "BSImagePicker" {
-    control method "authorize" -> core.AuthorizationCheck
-    control method "requestAuthorization" -> core.AuthorizationCheck
-  }
-}

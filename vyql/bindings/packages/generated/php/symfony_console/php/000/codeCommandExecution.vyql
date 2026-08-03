@@ -1,0 +1,9 @@
+module bindings.php.generated.ma5f048d3;
+
+binding commandExecution0 {
+  requires {
+    dependency("symfony/console")
+  }
+  query pattern callExpr where callee.method == "shell_exec"
+  emit sink code.CommandExecution at args[0]
+}

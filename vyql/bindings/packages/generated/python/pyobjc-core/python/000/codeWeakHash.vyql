@@ -1,0 +1,9 @@
+module bindings.python.generated.m78ea425f;
+
+binding weakHash0 {
+  requires {
+    dependency("pyobjc-core")
+  }
+  query pattern presenceNode where node.path ~= "pyobjc.core.hash"
+  emit issue code.WeakHash at node
+}

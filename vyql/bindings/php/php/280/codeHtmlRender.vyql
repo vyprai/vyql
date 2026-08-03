@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding htmlRender280 {
+  query pattern callExpr where callee.path ~= "Html.rawElement"
+  emit sink code.HtmlRender at args[2]
+}

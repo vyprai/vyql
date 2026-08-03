@@ -1,0 +1,9 @@
+module bindings.go.generated.m860a1f2b;
+
+binding sqlExecution1 {
+  requires {
+    dependency("gorm.io/gorm")
+  }
+  query pattern callExpr where callee.method == "RawExec"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter java {
-  package "org.junit.jupiter:junit-jupiter-params" {
-    sink method "parse" -> code.Deserialization
-  }
-}

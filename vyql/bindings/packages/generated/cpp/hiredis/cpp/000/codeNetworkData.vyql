@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m8937d91b;
+
+binding networkData0 {
+  requires {
+    dependency("hiredis")
+  }
+  query pattern callExpr where callee.method == "redisReaderFeed"
+  emit source code.NetworkData at call.result
+}

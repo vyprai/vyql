@@ -1,6 +1,0 @@
-adapter objc {
-  package "FirebaseMessaging" {
-    source method "path" -> code.NetworkData
-    sink method "AddJUnitFailure" -> code.NetworkSend
-  }
-}

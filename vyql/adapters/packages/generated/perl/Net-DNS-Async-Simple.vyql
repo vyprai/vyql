@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter perl {
-  package "Net-DNS-Async-Simple" {
-    sink method "massDNSLookup" -> code.NetworkSend
-  }
-}

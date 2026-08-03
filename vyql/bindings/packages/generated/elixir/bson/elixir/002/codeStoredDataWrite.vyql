@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m4ca94955;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("bson")
+  }
+  query pattern callExpr where callee.method == "Bson.encode"
+  emit sink code.StoredDataWrite at args[0]
+}

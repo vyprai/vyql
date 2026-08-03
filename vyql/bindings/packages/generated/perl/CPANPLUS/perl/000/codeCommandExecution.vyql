@@ -1,0 +1,9 @@
+module bindings.perl.generated.m40478a89;
+
+binding commandExecution0 {
+  requires {
+    dependency("CPANPLUS")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

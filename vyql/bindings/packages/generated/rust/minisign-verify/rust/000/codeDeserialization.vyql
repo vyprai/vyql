@@ -1,0 +1,9 @@
+module bindings.rust.generated.m6625fb8a;
+
+binding deserialization0 {
+  requires {
+    dependency("minisign-verify")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,10 @@
+module bindings.rust.generated.m4907a169;
+
+binding regexCompile1 {
+  requires {
+    dependency("regex-syntax")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter groovy {
-  package "org.springframework.security:spring-security-oauth2-client" {
-    sink method "parse" -> code.Deserialization
-    sink method "convert" -> code.Deserialization
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding deserialization278 {
+  query pattern callExpr where callee.path ~= "serialize.unserialize"
+  emit sink code.Deserialization at args[0]
+}

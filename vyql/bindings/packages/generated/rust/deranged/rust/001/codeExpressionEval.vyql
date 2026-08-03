@@ -1,0 +1,9 @@
+module bindings.rust.generated.mb3c377ba;
+
+binding expressionEval1 {
+  requires {
+    dependency("deranged")
+  }
+  query pattern callExpr where callee.method == "unchecked_add"
+  emit sink code.ExpressionEval at args[0]
+}

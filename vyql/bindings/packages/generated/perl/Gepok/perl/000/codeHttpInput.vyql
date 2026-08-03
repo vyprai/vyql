@@ -1,0 +1,9 @@
+module bindings.perl.generated.m40f6fa45;
+
+binding httpInput0 {
+  requires {
+    dependency("Gepok")
+  }
+  query pattern callExpr where callee.method == "_prepare_env"
+  emit source code.HttpInput at call.result
+}

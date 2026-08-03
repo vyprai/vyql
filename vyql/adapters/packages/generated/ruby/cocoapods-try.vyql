@@ -1,5 +1,0 @@
-adapter ruby {
-  package "cocoapods-try" {
-    sink method "install_podfile" -> code.CommandExecution
-  }
-}

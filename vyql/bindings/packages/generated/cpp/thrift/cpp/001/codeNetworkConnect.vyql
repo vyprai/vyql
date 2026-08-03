@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m805fa6ba;
+
+binding networkConnect1 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.NetworkConnectSink at args[0]
+}

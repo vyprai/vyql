@@ -1,0 +1,6 @@
+module bindings.kotlin.generated.m304d1620;
+
+binding weakCipher65 {
+  query pattern callExpr where callee.path ~= "Cipher.getInstance" and args.any.literal contains "Blowfish"
+  emit issue code.WeakCipher at call
+}

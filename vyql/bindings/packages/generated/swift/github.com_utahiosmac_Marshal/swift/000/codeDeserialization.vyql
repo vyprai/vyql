@@ -1,0 +1,9 @@
+module bindings.swift.generated.m8cc4e3cb;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/utahiosmac/Marshal")
+  }
+  query pattern callExpr where callee.method == "JSONObjectWithData"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m18ea75ce;
+
+binding archiveEntryWrite3 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "addStream"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

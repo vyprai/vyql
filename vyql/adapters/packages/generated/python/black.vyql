@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "black" {
-    sink method "parse_pyproject_toml" -> code.Deserialization
-  }
-}

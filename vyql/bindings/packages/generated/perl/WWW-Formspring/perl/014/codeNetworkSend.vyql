@@ -1,0 +1,9 @@
+module bindings.perl.generated.mbe603286;
+
+binding networkSend14 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "inbox_block"
+  emit sink code.NetworkSend at args[0]
+}

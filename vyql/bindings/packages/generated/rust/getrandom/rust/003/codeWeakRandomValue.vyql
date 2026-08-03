@@ -1,0 +1,9 @@
+module bindings.rust.generated.m943bf737;
+
+binding weakRandomValue3 {
+  requires {
+    dependency("getrandom")
+  }
+  query pattern callExpr where callee.method == "u64"
+  emit issue code.WeakRandomValue at call
+}

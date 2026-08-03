@@ -1,5 +1,0 @@
-adapter java {
-  package "org.jdom:jdom" {
-    sink method "build" -> code.Deserialization
-  }
-}

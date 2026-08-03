@@ -1,0 +1,9 @@
+module bindings.go.generated.me658cb7a;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/julienschmidt/httprouter")
+  }
+  query pattern callExpr where callee.method == "ParamsFromContext"
+  emit source core.UserControlledData at call.result
+}

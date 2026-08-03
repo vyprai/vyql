@@ -1,7 +1,0 @@
-import code.{LogOutput}
-
-adapter csharp {
-  package "serilog.aspnetcore" {
-    sink method "SerilogApplicationBuilderExtensions.UseSerilogRequestLogging" -> code.LogOutput
-  }
-}

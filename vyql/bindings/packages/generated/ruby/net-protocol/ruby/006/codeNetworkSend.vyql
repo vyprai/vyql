@@ -1,0 +1,9 @@
+module bindings.ruby.generated.ma307151e;
+
+binding networkSend6 {
+  requires {
+    dependency("net-protocol")
+  }
+  query pattern callExpr where callee.method == "write_message_0"
+  emit sink code.NetworkSend at args[0]
+}

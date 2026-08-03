@@ -1,0 +1,10 @@
+module bindings.elixir.generated.m728b8a72;
+
+binding authenticationCheck90 {
+  query pattern callExpr where callee.path ~= "authenticated?"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

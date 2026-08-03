@@ -1,0 +1,9 @@
+module bindings.php.generated.mf8f59ec8;
+
+binding filePathAccess3 {
+  requires {
+    dependency("zetacomponents/base")
+  }
+  query pattern callExpr where callee.method == "ezcBase::loadExternalFile"
+  emit sink code.FilePathAccess at args[0]
+}

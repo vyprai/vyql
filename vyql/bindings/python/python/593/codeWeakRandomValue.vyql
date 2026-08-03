@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding weakRandomValue593 {
+  query pattern presenceNode where node.path ~= "random.getrandbits"
+  emit issue code.WeakRandomValue at node
+}

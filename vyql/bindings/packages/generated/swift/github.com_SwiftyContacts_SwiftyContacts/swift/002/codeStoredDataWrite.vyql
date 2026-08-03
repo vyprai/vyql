@@ -1,0 +1,9 @@
+module bindings.swift.generated.m252f3369;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("github.com/SwiftyContacts/SwiftyContacts")
+  }
+  query pattern callExpr where callee.method == "updateContact"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,5 +1,0 @@
-adapter java {
-  package "jaxen:jaxen" {
-    sink method "parse" -> code.Deserialization
-  }
-}

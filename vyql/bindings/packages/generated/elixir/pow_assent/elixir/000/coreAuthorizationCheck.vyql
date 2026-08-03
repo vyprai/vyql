@@ -1,0 +1,13 @@
+module bindings.elixir.generated.md564ea3c;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("pow_assent")
+  }
+  query pattern callExpr where callee.method == "authorize_url"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

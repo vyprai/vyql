@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding nextcloudFileDropShareScopeBypass167 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "addMetadataFileDrop" and node.context.phpReview == "nextcloud_file_drop_metadata_scope_bypass"
+  emit issue code.NextcloudFileDropShareScopeBypass at node
+}

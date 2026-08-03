@@ -1,0 +1,9 @@
+module bindings.python.generated.m28ea9d1b;
+
+binding sqlExecution0 {
+  requires {
+    dependency("django-mptt")
+  }
+  query pattern callExpr where callee.method == "move_to"
+  emit sink code.SqlExecution at args[0]
+}

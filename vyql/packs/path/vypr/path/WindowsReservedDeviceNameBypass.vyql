@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule WindowsReservedDeviceNameBypass {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_67, CWE_184]
+    id: "VYQL-PATH-010"
+    severity: high
+  }
+  issue code.WindowsReservedDeviceNameBypass as sink
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m29ce484f;
+
+binding deserialization0 {
+  requires {
+    dependency("nerves_firmware_ssh")
+  }
+  query pattern callExpr where callee.method == "Nerves.Firmware.SSH.Command.parse"
+  emit sink code.Deserialization at args[0]
+}

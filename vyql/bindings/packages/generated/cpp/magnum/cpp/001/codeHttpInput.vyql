@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m026eb1b8;
+
+binding httpInput1 {
+  requires {
+    dependency("magnum")
+  }
+  query pattern callExpr where callee.path ~= "requestedCount"
+  emit source code.HttpInput at call.result
+}

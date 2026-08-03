@@ -1,0 +1,9 @@
+module bindings.objc.generated.m143a4aae;
+
+binding deserialization0 {
+  requires {
+    dependency("DCKeyValueObjectMapping")
+  }
+  query pattern callExpr where callee.method == "parseDictionary"
+  emit sink code.Deserialization at args[0]
+}

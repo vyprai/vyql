@@ -1,0 +1,9 @@
+module bindings.objc.generated.m00ed25c5;
+
+binding networkData6 {
+  requires {
+    dependency("socket.IO")
+  }
+  query pattern callExpr where callee.method == "socketIO:didReceiveJSON:"
+  emit source code.NetworkData at call.result
+}

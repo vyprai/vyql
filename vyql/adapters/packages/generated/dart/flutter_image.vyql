@@ -1,7 +1,0 @@
-import code.{UrlFetch}
-
-adapter dart {
-  package "flutter_image" {
-    sink method "NetworkImageWithRetry" -> code.UrlFetch
-  }
-}

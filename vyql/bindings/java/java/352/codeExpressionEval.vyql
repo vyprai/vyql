@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding expressionEval352 {
+  query pattern callExpr where callee.path ~= "Ognl.setValue"
+  emit sink code.ExpressionEval at args[0]
+}

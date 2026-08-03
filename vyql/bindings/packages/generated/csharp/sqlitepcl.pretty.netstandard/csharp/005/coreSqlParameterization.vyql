@@ -1,0 +1,14 @@
+module bindings.csharp.generated.m11aa2dee;
+
+binding sqlParameterization5 {
+  requires {
+    dependency("sqlitepcl.pretty.netstandard")
+  }
+  query pattern callExpr where callee.method == "Bind"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

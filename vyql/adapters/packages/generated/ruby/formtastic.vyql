@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-
-adapter ruby {
-  package "formtastic" {
-    control method "escape_html_entities" -> core.HtmlEscape
-  }
-}

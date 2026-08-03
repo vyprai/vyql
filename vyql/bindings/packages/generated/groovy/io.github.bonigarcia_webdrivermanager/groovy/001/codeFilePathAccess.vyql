@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m9ee82fbe;
+
+binding filePathAccess1 {
+  requires {
+    dependency("io.github.bonigarcia:webdrivermanager")
+  }
+  query pattern callExpr where callee.method == "setCachePath"
+  emit sink code.FilePathAccess at args[0]
+}

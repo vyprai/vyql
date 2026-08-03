@@ -1,0 +1,9 @@
+module bindings.go.generated.m7b25c55c;
+
+binding sqlExecution0 {
+  requires {
+    dependency("github.com/Masterminds/squirrel")
+  }
+  query pattern callExpr where callee.method == "ExecWith"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,8 +1,0 @@
-import core.{AuthorizationCheck}
-adapter elixir {
-  package "bodyguard" {
-    control method "permit" -> core.AuthorizationCheck
-    control method "permit!" -> core.AuthorizationCheck
-    control method "authorize" -> core.AuthorizationCheck
-  }
-}

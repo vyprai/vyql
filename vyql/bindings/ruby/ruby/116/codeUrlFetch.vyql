@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding urlFetch116 {
+  query pattern callExpr where callee.path ~= "Net.HTTP.get_response"
+  emit sink code.UrlFetch at args[0]
+}

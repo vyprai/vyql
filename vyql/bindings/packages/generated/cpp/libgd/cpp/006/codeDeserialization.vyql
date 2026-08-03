@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m9eba5595;
+
+binding deserialization6 {
+  requires {
+    dependency("libgd")
+  }
+  query pattern callExpr where callee.method == "gdImageCreateFromJpegCtx"
+  emit sink code.Deserialization at args[0]
+}

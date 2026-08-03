@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m27371c81;
+
+binding filePathAccess1 {
+  requires {
+    dependency("dir_walker")
+  }
+  query pattern callExpr where callee.method == "next"
+  emit sink code.FilePathAccess at args[0]
+}

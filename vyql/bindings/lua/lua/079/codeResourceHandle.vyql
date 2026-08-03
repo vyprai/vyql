@@ -1,0 +1,7 @@
+module bindings.lua.generated.ma99d12f7;
+
+binding resourceHandle79 {
+  query pattern presenceNode where node.path ~= "socket.tcp"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}

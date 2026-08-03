@@ -1,7 +1,0 @@
-import code.{CommandExecution, HttpInput}
-adapter scala {
-  package "org.eclipse.jetty:jetty-servlets" {
-    sink method "exec" -> code.CommandExecution
-    source method "doFilter" -> code.HttpInput
-  }
-}

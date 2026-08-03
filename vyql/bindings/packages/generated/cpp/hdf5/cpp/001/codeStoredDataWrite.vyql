@@ -1,0 +1,9 @@
+module bindings.cpp.generated.me5d7f088;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("hdf5")
+  }
+  query pattern callExpr where callee.method == "H5A__write"
+  emit sink code.StoredDataWrite at args[0]
+}

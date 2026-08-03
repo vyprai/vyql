@@ -1,0 +1,9 @@
+module bindings.perl.generated.mc3b6ece2;
+
+binding commandExecution0 {
+  requires {
+    dependency("Alien-FLTK")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

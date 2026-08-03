@@ -1,7 +1,0 @@
-adapter rust {
-  package "async-std" {
-    flag code.WeakRandomValue on any {
-      path "async.std.random"
-    }
-  }
-}

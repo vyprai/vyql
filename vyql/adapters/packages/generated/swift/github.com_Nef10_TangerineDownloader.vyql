@@ -1,8 +1,0 @@
-import code.{SecretValue, NetworkConnect, NetworkSend}
-
-adapter swift {
-  package "github.com/Nef10/TangerineDownloader" {
-    sink method "downloadAccountTransactions" -> code.NetworkConnect
-    sink method "downloadAccountTransactions" -> code.NetworkSend
-  }
-}

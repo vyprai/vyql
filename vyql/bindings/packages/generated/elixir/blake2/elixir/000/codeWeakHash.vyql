@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m579a90dc;
+
+binding weakHash0 {
+  requires {
+    dependency("blake2")
+  }
+  query pattern presenceNode where node.path ~= "blake2.hash"
+  emit issue code.WeakHash at node
+}

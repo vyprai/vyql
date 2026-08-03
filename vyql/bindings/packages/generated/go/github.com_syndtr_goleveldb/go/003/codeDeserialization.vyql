@@ -1,0 +1,9 @@
+module bindings.go.generated.m72210262;
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/syndtr/goleveldb")
+  }
+  query pattern callExpr where callee.method == "decodeBatchToMem"
+  emit sink code.Deserialization at args[0]
+}

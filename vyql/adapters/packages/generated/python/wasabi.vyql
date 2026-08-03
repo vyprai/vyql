@@ -1,7 +1,0 @@
-import code.{StdinInput}
-
-adapter python {
-  package "wasabi" {
-    source method "get_raw_input" -> code.StdinInput
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.generated.mb6179e84;
+
+binding deserialization5 {
+  requires {
+    dependency("zendframework/zend-config")
+  }
+  query pattern callExpr where callee.method == "ZendConfigReaderXml::fromString"
+  emit sink code.Deserialization at args[0]
+}

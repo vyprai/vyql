@@ -1,0 +1,9 @@
+module bindings.c.generated.me6cbb240;
+
+binding networkSend0 {
+  requires {
+    dependency("tcp-pubsub")
+  }
+  query pattern callExpr where callee.method == "Publisher.publish"
+  emit sink code.NetworkSend at args[0]
+}

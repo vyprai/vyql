@@ -1,0 +1,13 @@
+module bindings.c.generated.m22971185;
+
+binding pathAccessCheck3 {
+  requires {
+    dependency("minizip-ng")
+  }
+  query pattern callExpr where callee.method == "mz_path_compare_wc"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

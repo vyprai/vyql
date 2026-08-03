@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "com.google.http-client:google-http-client" {
-    sink method "parse" -> code.Deserialization
-    sink method "deserialize" -> code.Deserialization
-  }
-}

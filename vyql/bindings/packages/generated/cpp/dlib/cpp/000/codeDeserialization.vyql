@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m936bc2ee;
+
+binding deserialization0 {
+  requires {
+    dependency("dlib")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

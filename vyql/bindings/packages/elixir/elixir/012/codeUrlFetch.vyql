@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mf98b3aca;
+
+binding urlFetch12 {
+  requires {
+    dependency("req")
+  }
+  query pattern callExpr where callee.path ~= "Req.get"
+  emit sink code.UrlFetch at args[0]
+}

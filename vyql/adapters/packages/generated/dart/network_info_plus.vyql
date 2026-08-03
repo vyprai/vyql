@@ -1,8 +1,0 @@
-import code.{NetworkData}
-adapter dart {
-  package "network_info_plus" {
-    source method "getWifiName" -> code.NetworkData
-    source method "getWifiBSSID" -> code.NetworkData
-    source method "getWifiIP" -> code.NetworkData
-  }
-}

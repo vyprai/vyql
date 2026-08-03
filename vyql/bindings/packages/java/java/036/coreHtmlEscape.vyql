@@ -1,0 +1,14 @@
+module bindings.java.generated.m9ef49b0f;
+
+binding htmlEscape36 {
+  requires {
+    dependency("owasp-java-encoder")
+  }
+  query pattern callExpr where callee.path ~= "Encode.forHtml"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

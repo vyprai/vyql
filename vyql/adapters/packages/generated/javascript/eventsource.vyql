@@ -1,8 +1,0 @@
-import code.{NetworkData, UrlFetch}
-adapter javascript {
-  package "eventsource" {
-    sink method "constructor" -> code.UrlFetch
-    source method "onmessage" -> code.NetworkData
-    source method "listener" -> code.NetworkData
-  }
-}

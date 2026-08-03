@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m0c8cbba4;
+
+binding deserialization0 {
+  requires {
+    dependency("url-parse-lax")
+  }
+  query pattern callExpr where callee.method == "urlParseLax"
+  emit sink code.Deserialization at args[0]
+}

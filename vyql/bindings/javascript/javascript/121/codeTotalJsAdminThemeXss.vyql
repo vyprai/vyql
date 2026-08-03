@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding totalJsAdminThemeXss121 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.callPath contains "COMPONENT" and node.context.literal contains "grid" and node.context.assign contains "m.value=column.template" and node.context.callPath contains "self.template" and node.context.callPath contains "builder.push" and not (node.context.callPath contains "Thelpers.encode")
+  emit issue code.TotalJsAdminThemeXss at node
+}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.mbd372e18;
+
+binding codeEval0 {
+  requires {
+    dependency("aliased")
+  }
+  query pattern callExpr where callee.method == "_load_alias"
+  emit sink code.CodeEval at args[0]
+}

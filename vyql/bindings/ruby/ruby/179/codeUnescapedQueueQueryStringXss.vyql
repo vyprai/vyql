@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding unescapedQueueQueryStringXss179 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.functionName == "url_path" and node.context.rubyReview == "unescaped_query_string_join_interpolation"
+  emit issue code.UnescapedQueueQueryStringXss at node
+}

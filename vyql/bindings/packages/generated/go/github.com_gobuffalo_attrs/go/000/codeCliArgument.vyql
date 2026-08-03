@@ -1,0 +1,9 @@
+module bindings.go.generated.m5d7f692f;
+
+binding cliArgument0 {
+  requires {
+    dependency("github.com/gobuffalo/attrs")
+  }
+  query pattern callExpr where callee.method == "Parse"
+  emit source code.CliArgument at call.result
+}

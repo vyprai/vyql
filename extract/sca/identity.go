@@ -15,10 +15,10 @@ func NormalizePackageName(s string) string {
 
 // importAlias maps a language IMPORT name to the distribution/package name(s) it actually
 // belongs to, for ecosystems where they differ — overwhelmingly Python (`import yaml` ships
-// in the `pyyaml` distribution). Without this, a package-gated adapter keyed by the
+// in the `pyyaml` distribution). Without this, a package-gated binding applicator keyed by the
 // distribution name never activates from an import alone (only via a manifest/SBOM). Keys and
-// values are lowercased. Conservative and curated: a wrong alias would wrongly activate an
-// adapter, so only well-known 1:1 (or near-1:1) mappings are listed.
+// values are lowercased. Conservative and curated: a wrong alias would wrongly activate a
+// binding applicator, so only well-known 1:1 (or near-1:1) mappings are listed.
 var importAlias = map[string][]string{
 	"yaml":     {"pyyaml"},
 	"sklearn":  {"scikit-learn"},
@@ -45,7 +45,7 @@ var importAlias = map[string][]string{
 
 // ImportAliases returns the distribution/package name(s) an import name resolves to when they
 // differ (e.g. "yaml" -> "pyyaml"), or nil. Used to expand a project's dependency evidence so
-// package-gated adapters activate from imports without requiring a manifest.
+// package-gated binding applicators activate from imports without requiring a manifest.
 func ImportAliases(name string) []string {
 	return importAlias[NormalizePackageName(name)]
 }

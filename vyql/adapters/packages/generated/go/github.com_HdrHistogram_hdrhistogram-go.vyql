@@ -1,6 +1,0 @@
-adapter go {
-  package "github.com/HdrHistogram/hdrhistogram-go" {
-    sink method "Decode" -> code.Deserialization
-    sink method "NewHistogramLogReader" -> code.Deserialization
-  }
-}

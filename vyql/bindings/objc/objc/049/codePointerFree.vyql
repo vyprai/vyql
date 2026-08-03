@@ -1,0 +1,6 @@
+module bindings.objc.generated.mccadd221;
+
+binding pointerFree49 {
+  query pattern presenceNode where node.path ~= "free"
+  emit issue code.PointerFree at node
+}

@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding csrfDisabled610 {
+  query pattern presenceNode where node.path ~= "csrf_exempt"
+  emit issue code.CsrfDisabled at node
+}

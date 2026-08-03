@@ -1,5 +1,0 @@
-adapter bash {
-  package "jump" {
-    sink path "jump" arg all -> code.FilePathAccess
-  }
-}

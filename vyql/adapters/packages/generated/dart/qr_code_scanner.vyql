@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter dart {
-  package "qr_code_scanner" {
-    sink method "jsQR" -> code.Deserialization
-  }
-}

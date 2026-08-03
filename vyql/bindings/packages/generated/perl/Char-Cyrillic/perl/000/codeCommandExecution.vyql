@@ -1,0 +1,9 @@
+module bindings.perl.generated.md5b2a6ed;
+
+binding commandExecution0 {
+  requires {
+    dependency("Char-Cyrillic")
+  }
+  query pattern callExpr where callee.method == "_systemx"
+  emit sink code.CommandExecution at args[0]
+}

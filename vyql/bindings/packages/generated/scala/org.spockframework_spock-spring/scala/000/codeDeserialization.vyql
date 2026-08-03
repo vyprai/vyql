@@ -1,0 +1,9 @@
+module bindings.scala.generated.m752a6a45;
+
+binding deserialization0 {
+  requires {
+    dependency("org.spockframework:spock-spring")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

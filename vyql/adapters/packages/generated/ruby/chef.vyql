@@ -1,8 +1,0 @@
-import code.{CommandExecution, Deserialization}
-
-adapter ruby {
-  package "chef" {
-    sink method "exec" -> code.CommandExecution
-    sink method "parse" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.m16772b5b;
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/SwiftGen/StencilSwiftKit")
+  }
+  query pattern callExpr where callee.method == "parseBool"
+  emit sink code.Deserialization at args[0]
+}

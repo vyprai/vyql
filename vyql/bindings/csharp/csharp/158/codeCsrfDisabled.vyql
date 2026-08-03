@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding csrfDisabled158 {
+  query pattern presenceNode where node.path ~= "IgnoreAntiforgeryToken"
+  emit issue code.CsrfDisabled at node
+}

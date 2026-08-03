@@ -1,0 +1,9 @@
+module bindings.go.generated.mbe0b1310;
+
+binding cliArgument4 {
+  requires {
+    dependency("github.com/spf13/cobra")
+  }
+  query pattern callExpr where callee.method == "MatchAll"
+  emit source code.CliArgument at call.result
+}

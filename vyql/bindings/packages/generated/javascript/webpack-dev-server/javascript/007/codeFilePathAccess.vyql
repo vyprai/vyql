@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m27cf45a6;
+
+binding filePathAccess7 {
+  requires {
+    dependency("webpack-dev-server")
+  }
+  query pattern callExpr where callee.method == "setupWatchStaticFiles"
+  emit sink code.FilePathAccess at args[0]
+}

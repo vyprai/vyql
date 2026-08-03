@@ -1,0 +1,9 @@
+module bindings.objc.generated.m8d44f2ec;
+
+binding httpInput2 {
+  requires {
+    dependency("GPPCore")
+  }
+  query pattern callExpr where callee.method == "source"
+  emit source code.HttpInput at call.result
+}

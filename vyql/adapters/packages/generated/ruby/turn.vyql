@@ -1,7 +1,0 @@
-import code.{CliArgument}
-
-adapter ruby {
-  package "turn" {
-    source method "main" -> code.CliArgument
-  }
-}

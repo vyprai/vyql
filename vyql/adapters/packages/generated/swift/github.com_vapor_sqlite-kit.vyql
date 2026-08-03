@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-
-adapter swift {
-  package "github.com/vapor/sqlite-kit" {
-    sink method "sql" -> code.SqlExecution
-  }
-}

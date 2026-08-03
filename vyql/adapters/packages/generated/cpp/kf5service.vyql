@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter cpp {
-  package "kf5service" {
-    sink method "exec" -> code.CommandExecution
-  }
-}

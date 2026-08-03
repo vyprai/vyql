@@ -1,0 +1,9 @@
+module bindings.rust.generated.m3e745044;
+
+binding filePathAccess6 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "runtime_dir"
+  emit sink code.FilePathAccess at args[0]
+}

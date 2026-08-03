@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m389ac90a;
+
+binding httpInput6 {
+  requires {
+    dependency("com.sparkjava:spark-core")
+  }
+  query pattern callExpr where callee.method == "Request.uri"
+  emit source code.HttpInput at call.result
+}

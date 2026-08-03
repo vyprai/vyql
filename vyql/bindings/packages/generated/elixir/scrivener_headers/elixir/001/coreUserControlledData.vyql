@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m47e38bbf;
+
+binding userControlledData1 {
+  requires {
+    dependency("scrivener_headers")
+  }
+  query pattern callExpr where callee.method == "generate_uri"
+  emit source core.UserControlledData at call.result
+}

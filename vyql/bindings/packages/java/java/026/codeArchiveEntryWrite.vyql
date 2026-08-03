@@ -1,0 +1,9 @@
+module bindings.java.generated.m9ef49b0f;
+
+binding archiveEntryWrite26 {
+  requires {
+    dependency("commons-compress")
+  }
+  query pattern callExpr where callee.method == "extractEntry"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

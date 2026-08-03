@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "com.fasterxml.jackson.datatype:jackson-datatype-joda" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

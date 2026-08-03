@@ -1,0 +1,10 @@
+module bindings.dart.generated.m1c398214;
+
+binding authenticationCheck84 {
+  query pattern callExpr where callee.path ~= "requireAuth"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

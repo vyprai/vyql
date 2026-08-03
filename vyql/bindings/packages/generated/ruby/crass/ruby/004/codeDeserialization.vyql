@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mf0e6fb26;
+
+binding deserialization4 {
+  requires {
+    dependency("crass")
+  }
+  query pattern callExpr where callee.method == "parse_properties"
+  emit sink code.Deserialization at args[0]
+}

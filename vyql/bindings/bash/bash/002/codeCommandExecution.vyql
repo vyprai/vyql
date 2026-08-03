@@ -1,0 +1,6 @@
+module bindings.bash.generated.m59952d5d;
+
+binding commandExecution2 {
+  query pattern callExpr where callee.path ~= "eval"
+  emit sink code.CommandExecution at args[0]
+}

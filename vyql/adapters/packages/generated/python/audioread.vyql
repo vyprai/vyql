@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter python {
-  package "audioread" {
-    sink method "popen_multiple" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.m91b5a0a7;
+
+binding deserialization4 {
+  requires {
+    dependency("org.mongodb:mongo-java-driver")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.swift.generated.m388f23d0;
+
+binding insecureCookie62 {
+  query pattern callExpr where callee.path ~= "setHttpOnly" and args.any.literal contains "false"
+  emit issue code.InsecureCookie at call
+}

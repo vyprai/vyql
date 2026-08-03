@@ -1,7 +1,0 @@
-import core.{PathCanonicalization}
-
-adapter php {
-  package "matthiasmullie/path-converter" {
-    control method "convert" -> core.PathCanonicalization
-  }
-}

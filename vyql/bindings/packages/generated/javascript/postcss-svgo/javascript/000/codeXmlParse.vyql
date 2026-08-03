@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mcb05be6e;
+
+binding xmlParse0 {
+  requires {
+    dependency("postcss-svgo")
+  }
+  query pattern callExpr where callee.method == "minifySVG"
+  emit sink code.XmlParse at args[0]
+}

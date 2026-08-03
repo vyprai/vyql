@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m2ac5a04d;
+
+binding deserialization0 {
+  requires {
+    dependency("toml11")
+  }
+  query pattern callExpr where callee.path ~= "toml11.parse"
+  emit sink code.Deserialization at args[0]
+}

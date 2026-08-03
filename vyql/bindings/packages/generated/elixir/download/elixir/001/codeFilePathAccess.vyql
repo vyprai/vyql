@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m84cbd2df;
+
+binding filePathAccess1 {
+  requires {
+    dependency("download")
+  }
+  query pattern callExpr where callee.method == "Download.from"
+  emit sink code.FilePathAccess at args[0]
+}

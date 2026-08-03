@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m1afc5a6b;
+
+binding networkData4 {
+  requires {
+    dependency("io.netty:netty-all")
+  }
+  query pattern callExpr where callee.method == "readShort"
+  emit source code.NetworkData at call.result
+}

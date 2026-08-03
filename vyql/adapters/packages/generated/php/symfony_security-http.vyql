@@ -1,8 +1,0 @@
-import code.{RedirectTarget}
-adapter php {
-  package "symfony/security-http" {
-    flag code.RedirectTarget on any {
-      method "createRedirectResponse"
-    }
-  }
-}

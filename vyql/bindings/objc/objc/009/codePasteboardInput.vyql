@@ -1,0 +1,6 @@
+module bindings.objc.generated.mccadd221;
+
+binding pasteboardInput9 {
+  query pattern callExpr where callee.path ~= "UIPasteboard.generalPasteboard.string"
+  emit source code.PasteboardInput at call.result
+}

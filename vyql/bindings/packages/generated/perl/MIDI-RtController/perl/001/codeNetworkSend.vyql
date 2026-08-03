@@ -1,0 +1,9 @@
+module bindings.perl.generated.m7a9742b9;
+
+binding networkSend1 {
+  requires {
+    dependency("MIDI-RtController")
+  }
+  query pattern callExpr where callee.method == "send_it"
+  emit sink code.NetworkSend at args[0]
+}

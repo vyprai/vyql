@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter cpp {
-  package "tinyexr" {
-    sink method "LoadEXRImageFromFile" -> code.FilePathAccess
-  }
-}

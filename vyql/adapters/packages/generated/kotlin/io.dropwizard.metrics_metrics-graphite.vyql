@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter kotlin {
-  package "io.dropwizard.metrics:metrics-graphite" {
-    sink method "send" -> code.NetworkSend
-  }
-}

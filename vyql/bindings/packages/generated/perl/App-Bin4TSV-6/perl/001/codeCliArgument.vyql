@@ -1,0 +1,9 @@
+module bindings.perl.generated.maac68e8c;
+
+binding cliArgument1 {
+  requires {
+    dependency("App-Bin4TSV-6")
+  }
+  query pattern callExpr where callee.path ~= "csel"
+  emit source code.CliArgument at call.result
+}

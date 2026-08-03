@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mbaac7fc5;
+
+binding filePathAccess3 {
+  requires {
+    dependency("org.apache.spark:spark-sql_2.11")
+  }
+  query pattern callExpr where callee.method == "parquet"
+  emit sink code.FilePathAccess at args[0]
+}

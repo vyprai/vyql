@@ -1,5 +1,0 @@
-adapter ruby {
-  package "jekyll-toc" {
-    sink method "Parser" -> code.Deserialization
-  }
-}

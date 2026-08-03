@@ -1,6 +1,0 @@
-import code.{FileUse}
-adapter ruby {
-  package "atomos" {
-    sink method "atomic_write" -> code.FileUse
-  }
-}

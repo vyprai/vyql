@@ -1,7 +1,0 @@
-import code.{ArchiveEntryWrite}
-
-adapter objc {
-  package "ZIPFoundation" {
-    sink method "extract" -> code.ArchiveEntryWrite
-  }
-}

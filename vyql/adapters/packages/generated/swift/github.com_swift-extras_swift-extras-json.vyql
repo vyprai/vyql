@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter swift {
-  package "github.com/swift-extras/swift-extras-json" {
-    sink method "parse" -> code.Deserialization
-    sink method "decode" -> code.Deserialization
-  }
-}

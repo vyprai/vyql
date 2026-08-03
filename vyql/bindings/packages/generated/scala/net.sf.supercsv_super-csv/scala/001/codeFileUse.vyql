@@ -1,0 +1,9 @@
+module bindings.scala.generated.m8f217434;
+
+binding fileUse1 {
+  requires {
+    dependency("net.sf.supercsv:super-csv")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

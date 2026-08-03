@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m6b02cad0;
+
+binding deserialization3 {
+  requires {
+    dependency("alsa")
+  }
+  query pattern callExpr where callee.method == "snd_pcm_chmap_parse_string"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.groovy.generated.m6eabb149;
+
+binding weakRandomValue59 {
+  query pattern presenceNode where node.path ~= "java.util.Random"
+  emit issue code.WeakRandomValue at node
+}

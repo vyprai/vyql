@@ -1,5 +1,0 @@
-adapter groovy {
-  package "commons-validator:commons-validator" {
-    control method "validate" -> core.InputValidation
-  }
-}

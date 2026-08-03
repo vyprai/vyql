@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter csharp {
-  package "elmah.corelibrary" {
-    sink method "ErrorXml.DecodeString" -> code.Deserialization
-    sink method "ErrorXml.Decode" -> code.Deserialization
-  }
-}

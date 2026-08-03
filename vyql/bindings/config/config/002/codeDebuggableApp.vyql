@@ -1,0 +1,6 @@
+module bindings.config.generated.m2b6375a9;
+
+binding debuggableApp2 {
+  query pattern presenceNode where node.analysis ~= "config.android.debuggable_enabled"
+  emit issue code.DebuggableApp at node
+}

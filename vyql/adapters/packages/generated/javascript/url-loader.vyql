@@ -1,9 +1,0 @@
-import code.{HttpInput, FilePathAccess, Deserialization, HtmlRender}
-import core.{UserControlledData}
-
-adapter javascript {
-  package "url-loader" {
-    sink method "loader" -> code.HtmlRender
-    source method "loader" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m211433d7;
+
+binding filePathAccess1 {
+  requires {
+    dependency("intervention/imagecache")
+  }
+  query pattern callExpr where callee.method == "getImagePath"
+  emit sink code.FilePathAccess at args[0]
+}

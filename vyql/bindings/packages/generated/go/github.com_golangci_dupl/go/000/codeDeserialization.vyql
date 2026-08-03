@@ -1,0 +1,9 @@
+module bindings.go.generated.m1ab28bdb;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/golangci/dupl")
+  }
+  query pattern callExpr where callee.method == "Parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding cleartextChannel448 {
+  query pattern callExpr where callee.path ~= "file_get_contents" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}

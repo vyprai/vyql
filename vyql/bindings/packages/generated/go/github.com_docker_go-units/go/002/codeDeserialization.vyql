@@ -1,0 +1,9 @@
+module bindings.go.generated.m9351e78c;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/docker/go-units")
+  }
+  query pattern callExpr where callee.method == "ParseUlimit"
+  emit sink code.Deserialization at args[0]
+}

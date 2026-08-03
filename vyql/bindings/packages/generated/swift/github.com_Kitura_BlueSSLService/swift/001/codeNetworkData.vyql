@@ -1,0 +1,9 @@
+module bindings.swift.generated.m74711c8a;
+
+binding networkData1 {
+  requires {
+    dependency("github.com/Kitura/BlueSSLService")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}

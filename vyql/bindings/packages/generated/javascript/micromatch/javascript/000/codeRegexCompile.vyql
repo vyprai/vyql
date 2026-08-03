@@ -1,0 +1,10 @@
+module bindings.javascript.generated.m8095b078;
+
+binding regexCompile0 {
+  requires {
+    dependency("micromatch")
+  }
+  query pattern callExpr where callee.method == "micromatch"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m6d9810a0;
+
+binding deserialization3 {
+  requires {
+    dependency("Ascii85")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.Deserialization at args[0]
+}

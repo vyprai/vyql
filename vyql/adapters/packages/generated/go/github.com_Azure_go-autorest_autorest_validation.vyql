@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/Azure/go-autorest/autorest/validation" {
-    control method "Validate" -> core.InputValidation
-  }
-}

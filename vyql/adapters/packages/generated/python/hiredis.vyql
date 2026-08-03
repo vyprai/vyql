@@ -1,8 +1,0 @@
-import code.{NetworkData, NetworkSend}
-
-adapter python {
-  package "hiredis" {
-    sink method "pack_command" -> code.NetworkSend
-    source method "redisReaderFeed" -> code.NetworkData
-  }
-}

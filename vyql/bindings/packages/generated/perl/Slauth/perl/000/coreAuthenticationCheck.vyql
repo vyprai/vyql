@@ -1,0 +1,13 @@
+module bindings.perl.generated.m6ddf5dfe;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("Slauth")
+  }
+  query pattern callExpr where callee.method == "Slauth::Storage::Session_DB::check_cookie"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

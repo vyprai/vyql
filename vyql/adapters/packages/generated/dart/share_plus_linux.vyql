@@ -1,8 +1,0 @@
-import code.{RedirectTarget}
-adapter dart {
-  package "share_plus_linux" {
-    flag code.RedirectTarget on any {
-      method "launchUrl"
-    }
-  }
-}

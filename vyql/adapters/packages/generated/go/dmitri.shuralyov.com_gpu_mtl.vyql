@@ -1,5 +1,0 @@
-adapter go {
-  package "dmitri.shuralyov.com/gpu/mtl" {
-    sink method "Device.MakeLibrary" -> code.CodeEval
-  }
-}

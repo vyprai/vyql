@@ -1,0 +1,9 @@
+module bindings.swift.generated.m27f1ccc0;
+
+binding networkSend0 {
+  requires {
+    dependency("github.com/nerzh/telegram-vapor-bot")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m1457a768;
+
+binding urlFetch22 {
+  requires {
+    dependency("ktor-client-core")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.UrlFetch at args[0]
+}

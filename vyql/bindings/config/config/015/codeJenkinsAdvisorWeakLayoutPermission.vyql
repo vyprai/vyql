@@ -1,0 +1,6 @@
+module bindings.config.generated.m2b6375a9;
+
+binding jenkinsAdvisorWeakLayoutPermission15 {
+  query pattern presenceNode where node.analysis ~= "config.jenkins_advisor_weak_layout_permission"
+  emit issue code.JenkinsAdvisorWeakLayoutPermission at node
+}

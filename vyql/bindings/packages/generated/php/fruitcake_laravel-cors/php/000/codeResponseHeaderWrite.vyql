@@ -1,0 +1,9 @@
+module bindings.php.generated.m7f8b1724;
+
+binding responseHeaderWrite0 {
+  requires {
+    dependency("fruitcake/laravel-cors")
+  }
+  query pattern callExpr where callee.method == "handle"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

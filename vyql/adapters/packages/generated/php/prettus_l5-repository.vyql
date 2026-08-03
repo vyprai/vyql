@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter php {
-  package "prettus/l5-repository" {
-    sink method "Prettus\Repository\Helpers\CacheKeys::file_put_contents" -> code.FilePathAccess
-    sink method "Prettus\Repository\Helpers\CacheKeys::putKey" -> code.FilePathAccess
-  }
-}

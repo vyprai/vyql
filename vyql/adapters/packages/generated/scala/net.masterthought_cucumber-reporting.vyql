@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-
-adapter scala {
-  package "net.masterthought:cucumber-reporting" {
-    sink method "parseJsonFiles" -> code.FilePathAccess
-    sink method "parseForFeature" -> code.Deserialization
-  }
-}

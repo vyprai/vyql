@@ -1,0 +1,12 @@
+module vypr.deserialization;
+
+rule Unsafe {
+  meta {
+    benchmark: deserialization
+    cwe: [CWE_502]
+    id: "VYQL-DESER-001"
+    severity: critical
+  }
+  taint core.UserControlledData -> code.Deserialization
+  unless path coveredBy core.SafeDeserialization
+}

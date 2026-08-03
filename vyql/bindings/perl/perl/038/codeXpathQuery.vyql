@@ -1,0 +1,6 @@
+module bindings.perl.generated.mfca40a44;
+
+binding xpathQuery38 {
+  query pattern callExpr where callee.method == "findnodes"
+  emit sink code.XpathQuery at args[0]
+}

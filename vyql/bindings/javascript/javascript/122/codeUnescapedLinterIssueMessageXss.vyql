@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding unescapedLinterIssueMessageXss122 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "issueTemplate" and node.context.prop contains "message=message.message" and not (node.context.callPath contains "_.escape")
+  emit issue code.UnescapedLinterIssueMessageXss at node
+}

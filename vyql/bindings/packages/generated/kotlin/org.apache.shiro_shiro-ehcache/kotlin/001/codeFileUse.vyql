@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mcf437d04;
+
+binding fileUse1 {
+  requires {
+    dependency("org.apache.shiro:shiro-ehcache")
+  }
+  query pattern callExpr where callee.method == "setCacheManagerConfigFile"
+  emit sink code.FileUseSink at args[0]
+}

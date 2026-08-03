@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter php {
-  package "tedivm/jshrink" {
-    sink method "minify" -> code.CodeEval
-  }
-}

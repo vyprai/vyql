@@ -1,0 +1,6 @@
+module access_control;
+
+threat Clickjacking {
+  cwe: [CWE_1021]
+  desc: "Improper restriction of rendered UI layers/frames — frame protection explicitly disabled (clickjacking)"
+}

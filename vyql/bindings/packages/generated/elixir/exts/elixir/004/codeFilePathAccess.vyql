@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m9e73db6f;
+
+binding filePathAccess4 {
+  requires {
+    dependency("exts")
+  }
+  query pattern callExpr where callee.method == "info"
+  emit sink code.FilePathAccess at args[0]
+}

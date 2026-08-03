@@ -1,0 +1,9 @@
+module bindings.php.generated.mc5601031;
+
+binding deserialization6 {
+  requires {
+    dependency("php")
+  }
+  query pattern callExpr where callee.path ~= "unserialize"
+  emit sink code.Deserialization at args[0]
+}

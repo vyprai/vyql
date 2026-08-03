@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m632c12eb;
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("@hapi/hoek")
+  }
+  query pattern callExpr where callee.method == "escapeHeaderAttribute"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

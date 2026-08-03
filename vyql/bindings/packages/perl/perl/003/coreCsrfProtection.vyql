@@ -1,0 +1,13 @@
+module bindings.perl.generated.ma164dcec;
+
+binding csrfProtection3 {
+  requires {
+    dependency("Mojolicious")
+  }
+  query pattern callExpr where callee.path ~= "csrf_token"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

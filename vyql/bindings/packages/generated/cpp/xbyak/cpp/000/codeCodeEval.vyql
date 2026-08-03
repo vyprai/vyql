@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mbbac806a;
+
+binding codeEval0 {
+  requires {
+    dependency("xbyak")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.CodeEval at args[0]
+}

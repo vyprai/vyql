@@ -1,0 +1,9 @@
+module bindings.python.generated.m4b74f36c;
+
+binding fileUse1 {
+  requires {
+    dependency("gitdb")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

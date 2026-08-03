@@ -1,7 +1,0 @@
-import code.{CommandExecution, CliArgument}
-
-adapter ruby {
-  package "fission" {
-    source method "Fission::CLI.initialize" -> code.CliArgument
-  }
-}

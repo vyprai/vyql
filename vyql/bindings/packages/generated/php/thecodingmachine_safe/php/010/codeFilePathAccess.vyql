@@ -1,0 +1,9 @@
+module bindings.php.generated.mdc1ba520;
+
+binding filePathAccess10 {
+  requires {
+    dependency("thecodingmachine/safe")
+  }
+  query pattern callExpr where callee.method == "eio_truncate"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{HtmlEscape}
-
-adapter python {
-  package "mako" {
-    sink method "parse" -> code.Deserialization
-    control method "escape" -> core.HtmlEscape
-  }
-}

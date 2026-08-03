@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m3bcc9343;
+
+binding networkConnect9 {
+  requires {
+    dependency("openid_connect")
+  }
+  query pattern callExpr where callee.method == "fetch_remote_resource"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.mb7bb0a0e;
+
+binding networkConnect0 {
+  requires {
+    dependency("io.vertx:vertx-web-client")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkConnectSink at args[0]
+}

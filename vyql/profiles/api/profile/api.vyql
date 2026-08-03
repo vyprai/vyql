@@ -1,0 +1,8 @@
+module profiles;
+
+profile api {
+  detect: [any(dependency("fastapi"), dependency("@nestjs/core"), dependency("gin-gonic/gin"), dependency("express"), dependency("grpc"), file("openapi.yaml"), file("openapi.json"), dependency("gorilla/mux"), dependency("go-chi/chi"), dependency("gofiber/fiber"), dependency("labstack/echo"))]
+  entrypoints: [code.HttpInput, code.HttpHeader, code.PatternOptionInput, code.SecretValue, code.ComputedSizeValue, code.ArchiveEntryName]
+  priority: 80
+  title: "HTTP API server"
+}

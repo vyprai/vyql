@@ -1,0 +1,9 @@
+module bindings.rust.generated.m578f71d7;
+
+binding networkData0 {
+  requires {
+    dependency("tokio-tungstenite")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

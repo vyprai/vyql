@@ -1,0 +1,9 @@
+module bindings.python.generated.m19a1ba9a;
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("pyramid")
+  }
+  query pattern callExpr where callee.path ~= "response"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

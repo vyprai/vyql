@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding permissiveCors655 {
+  query pattern callExpr where callee.path ~= "headers.add" and args.any.literal contains "Access-Control-Allow-Origin" and args.any.literal contains "*"
+  emit issue code.PermissiveCors at call
+}

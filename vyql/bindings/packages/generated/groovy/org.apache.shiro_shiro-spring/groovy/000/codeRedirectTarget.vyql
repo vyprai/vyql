@@ -1,0 +1,10 @@
+module bindings.groovy.generated.m1eb4e987;
+
+binding redirectTarget0 {
+  requires {
+    dependency("org.apache.shiro:shiro-spring")
+  }
+  query pattern callExpr where callee.method == "setLoginUrl"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

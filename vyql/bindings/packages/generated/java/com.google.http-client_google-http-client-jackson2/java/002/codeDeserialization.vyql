@@ -1,0 +1,9 @@
+module bindings.java.generated.mc57e4ba1;
+
+binding deserialization2 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "getText"
+  emit sink code.Deserialization at args[0]
+}

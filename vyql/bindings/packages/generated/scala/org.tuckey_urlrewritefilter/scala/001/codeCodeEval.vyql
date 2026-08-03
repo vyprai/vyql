@@ -1,0 +1,9 @@
+module bindings.scala.generated.m1b90a6e7;
+
+binding codeEval1 {
+  requires {
+    dependency("org.tuckey:urlrewritefilter")
+  }
+  query pattern callExpr where callee.method == "invokeRunMethod"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,6 +1,0 @@
-adapter perl {
-  package "LLEval" {
-    source path "LLEval.argv" -> code.CliArgument
-    sink method "run" -> code.CommandExecution
-  }
-}

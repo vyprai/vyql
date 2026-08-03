@@ -1,0 +1,9 @@
+module bindings.php.generated.m2c142896;
+
+binding htmlRender1 {
+  requires {
+    dependency("milon/barcode")
+  }
+  query pattern callExpr where callee.method == "getBarcodeHTML"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "string-theory" {
-    sink method "hex_decode" -> code.Deserialization
-    sink method "base64_decode" -> code.Deserialization
-  }
-}

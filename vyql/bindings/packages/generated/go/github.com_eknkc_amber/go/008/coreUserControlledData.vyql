@@ -1,0 +1,9 @@
+module bindings.go.generated.m24f722ab;
+
+binding userControlledData8 {
+  requires {
+    dependency("github.com/eknkc/amber")
+  }
+  query pattern callExpr where callee.method == "ByteParser"
+  emit source core.UserControlledData at call.result
+}

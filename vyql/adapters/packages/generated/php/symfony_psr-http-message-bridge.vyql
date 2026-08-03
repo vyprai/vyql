@@ -1,9 +1,0 @@
-import code.{HttpInput, FileUse, ResponseHeaderWrite}
-adapter php {
-  package "symfony/psr-http-message-bridge" {
-    source method "createRequest" -> code.HttpInput
-    source method "resolve" -> code.HttpInput
-    sink method "createUploadedFile" -> code.FileUse
-    sink method "createResponse" -> code.ResponseHeaderWrite
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.powershell.generated.m390f1180;
+
+binding commandExecution8 {
+  query pattern callExpr where callee.path ~= "cmd.exe"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,14 @@
+module bindings.dart.generated.mff0b60d2;
+
+binding inputValidation1 {
+  requires {
+    dependency("intl_phone_number_input")
+  }
+  query pattern callExpr where callee.method == "getRegionInfoFromPhoneNumber"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

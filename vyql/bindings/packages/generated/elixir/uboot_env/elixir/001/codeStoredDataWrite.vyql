@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m8b020c1c;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("uboot_env")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.StoredDataWrite at args[0]
+}

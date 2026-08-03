@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m6435333a;
+
+binding deserialization8 {
+  requires {
+    dependency("jose")
+  }
+  query pattern callExpr where callee.method == "uncompress"
+  emit sink code.Deserialization at args[0]
+}

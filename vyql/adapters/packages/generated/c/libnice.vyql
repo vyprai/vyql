@@ -1,7 +1,0 @@
-import code.{NetworkData}
-adapter c {
-  package "libnice" {
-    source method "nice_input_stream_read" -> code.NetworkData
-    source method "nice_input_stream_read_nonblocking" -> code.NetworkData
-  }
-}

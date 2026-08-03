@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mb3e7f5e9;
+
+binding networkSend1 {
+  requires {
+    dependency("faraday-multipart")
+  }
+  query pattern callExpr where callee.method == "Middleware.part"
+  emit sink code.NetworkSend at args[0]
+}

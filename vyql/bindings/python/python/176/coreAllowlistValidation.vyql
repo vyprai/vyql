@@ -1,0 +1,10 @@
+module bindings.python.generated.m21017d75;
+
+binding allowlistValidation176 {
+  query pattern callExpr where callee.path ~= "is_allowed_host"
+  emit check core.AllowlistValidation at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

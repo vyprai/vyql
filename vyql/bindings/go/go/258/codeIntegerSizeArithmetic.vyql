@@ -1,0 +1,8 @@
+module bindings.go.generated.m48a985c1;
+
+binding integerSizeArithmetic258 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "readBytes" and node.context.call contains "ReadLong" and node.context.call contains "int" and node.context.call contains "make" and not (node.context.selector contains "math.MaxInt")
+  emit issue code.IntegerSizeArithmetic at node
+  emit issue code.SizeSensitiveIntegerArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}

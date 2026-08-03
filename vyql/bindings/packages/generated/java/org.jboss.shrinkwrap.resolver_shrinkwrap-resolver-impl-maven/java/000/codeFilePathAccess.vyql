@@ -1,0 +1,9 @@
+module bindings.java.generated.mb5554c62;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.jboss.shrinkwrap.resolver:shrinkwrap-resolver-impl-maven")
+  }
+  query pattern callExpr where callee.method == "loadPomFromFile"
+  emit sink code.FilePathAccess at args[0]
+}

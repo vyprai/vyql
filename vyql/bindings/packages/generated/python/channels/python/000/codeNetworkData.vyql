@@ -1,0 +1,9 @@
+module bindings.python.generated.m9d30e79e;
+
+binding networkData0 {
+  requires {
+    dependency("channels")
+  }
+  query pattern callExpr where callee.method == "receive"
+  emit source code.NetworkData at call.result
+}

@@ -1,7 +1,0 @@
-adapter php {
-  package "symfony/expression-language" {
-    sink method "parse" -> code.Deserialization
-    sink method "compile" -> code.CodeEval
-    sink method "evaluate" -> code.CodeEval
-  }
-}

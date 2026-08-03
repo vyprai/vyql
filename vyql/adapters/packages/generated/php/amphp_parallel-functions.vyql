@@ -1,8 +1,0 @@
-adapter php {
-  package "amphp/parallel-functions" {
-    sink method "parallel" -> code.CodeEval
-    sink method "parallelMap" -> code.CodeEval
-    sink method "parallelFilter" -> code.CodeEval
-    sink method "run" -> code.CodeEval
-  }
-}

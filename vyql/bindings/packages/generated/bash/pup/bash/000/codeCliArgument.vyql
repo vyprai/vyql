@@ -1,0 +1,9 @@
+module bindings.bash.generated.ma17f88ad;
+
+binding cliArgument0 {
+  requires {
+    dependency("pup")
+  }
+  query pattern callExpr where callee.path ~= "pup.argv"
+  emit source code.CliArgument at call.result
+}

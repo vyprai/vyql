@@ -1,0 +1,9 @@
+module bindings.c.generated.m690a0f7e;
+
+binding userControlledData3 {
+  requires {
+    dependency("imgui")
+  }
+  query pattern callExpr where callee.method == "Platform_SetClipboardTextFn_DefaultImpl"
+  emit source core.UserControlledData at call.result
+}

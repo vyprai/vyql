@@ -1,0 +1,9 @@
+module bindings.perl.generated.m8a0a79e4;
+
+binding networkConnect1 {
+  requires {
+    dependency("Furl")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.groovy.generated.m6eabb149;
+
+binding commandExecution5 {
+  query pattern callExpr where callee.path ~= "sh"
+  emit sink code.CommandExecution at args[0]
+}

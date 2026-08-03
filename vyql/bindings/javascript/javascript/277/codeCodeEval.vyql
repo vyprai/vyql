@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding codeEval277 {
+  query pattern callExpr where callee.method == "toFunction"
+  emit sink code.CodeEval at args[0]
+}

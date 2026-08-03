@@ -1,0 +1,9 @@
+module bindings.python.generated.m2a5e00b5;
+
+binding commandExecution3 {
+  requires {
+    dependency("python-daemon")
+  }
+  query pattern callExpr where callee.method == "detach_process_context"
+  emit sink code.CommandExecution at args[0]
+}

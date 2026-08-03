@@ -1,0 +1,9 @@
+module bindings.c.generated.m8b5e3ed1;
+
+binding deserialization26 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_float_4"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter python {
-  package "ptyprocess" {
-    sink method "spawn" -> code.CommandExecution
-  }
-}

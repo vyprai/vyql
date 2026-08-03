@@ -1,8 +1,0 @@
-import code.{CliArgument, CommandExecution}
-adapter scala {
-  package "info.picocli:picocli" {
-    source method "parseArgs" -> code.CliArgument
-    source method "execute" -> code.CliArgument
-    sink method "run" -> code.CommandExecution
-  }
-}

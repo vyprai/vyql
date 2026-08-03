@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mda1e03c7;
+
+binding deserialization1 {
+  requires {
+    dependency("rubocop-ast")
+  }
+  query pattern callExpr where callee.method == "NodePattern::Compiler.compile"
+  emit sink code.Deserialization at args[0]
+}

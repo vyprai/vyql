@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m23653199;
+
+binding expressionEval0 {
+  requires {
+    dependency("exprtk")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.ExpressionEval at args[0]
+}

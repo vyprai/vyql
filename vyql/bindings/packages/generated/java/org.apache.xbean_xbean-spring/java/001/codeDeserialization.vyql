@@ -1,0 +1,9 @@
+module bindings.java.generated.m95895e1d;
+
+binding deserialization1 {
+  requires {
+    dependency("org.apache.xbean:xbean-spring")
+  }
+  query pattern callExpr where callee.method == "FileSystemXmlApplicationContext"
+  emit sink code.Deserialization at args[0]
+}

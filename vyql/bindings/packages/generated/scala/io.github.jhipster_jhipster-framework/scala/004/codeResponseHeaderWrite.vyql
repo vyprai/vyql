@@ -1,0 +1,9 @@
+module bindings.scala.generated.m29d7e993;
+
+binding responseHeaderWrite4 {
+  requires {
+    dependency("io.github.jhipster:jhipster-framework")
+  }
+  query pattern callExpr where callee.method == "createFailureAlert"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

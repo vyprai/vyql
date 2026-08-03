@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m489f4bc2;
+
+binding deserialization1 {
+  requires {
+    dependency("protobuf")
+  }
+  query pattern callExpr where callee.method == "Serialize"
+  emit sink code.Deserialization at args[0]
+}

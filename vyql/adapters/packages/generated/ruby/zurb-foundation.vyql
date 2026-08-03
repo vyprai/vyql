@@ -1,5 +1,0 @@
-adapter ruby {
-  package "zurb-foundation" {
-    control method "escape" -> core.InputValidation
-  }
-}

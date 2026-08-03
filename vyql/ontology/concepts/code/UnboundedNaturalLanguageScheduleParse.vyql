@@ -1,0 +1,11 @@
+module code;
+
+concept UnboundedNaturalLanguageScheduleParse : issue {
+  cwe: [CWE_400]
+  reviewAssumption: "attackers can pass very long schedule text through the public parser API and consume CPU in the grammar parser"
+  reviewCategory: resource
+  reviewCondition: "natural-language schedule parsing runs an internal grammar parser before bounding input length"
+  reviewConfidence: high
+  reviewEvidence: "natural-language schedule parse context {pattern} strips caller input, invokes Parser.parse, and converts parser slots to cron schedules without an observed string-length guard"
+  vulnerableTo: [dos.UncontrolledResourceConsumption]
+}

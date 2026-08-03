@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding certValidationDisabled321 {
+  query pattern presenceNode where node.path ~= "NoopHostnameVerifier"
+  emit issue code.CertValidationDisabled at node
+}

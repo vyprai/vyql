@@ -1,0 +1,9 @@
+module bindings.scala.generated.m3608f193;
+
+binding ldapQuery24 {
+  requires {
+    dependency("spring-ldap")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.LdapQuery at args[1]
+}

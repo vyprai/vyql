@@ -1,9 +1,0 @@
-import code.{SqlExecution}
-import core.{InputValidation}
-
-adapter java {
-  package "org.apache.cassandra:cassandra-all" {
-    sink method "process" -> code.SqlExecution
-    control method "escape" -> core.InputValidation
-  }
-}

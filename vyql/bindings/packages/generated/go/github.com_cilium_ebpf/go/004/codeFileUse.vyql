@@ -1,0 +1,9 @@
+module bindings.go.generated.m5818ebce;
+
+binding fileUse4 {
+  requires {
+    dependency("github.com/cilium/ebpf")
+  }
+  query pattern callExpr where callee.method == "LoadSpecAndExtInfosFromReader"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.mef2186dc;
+
+binding storedDataRead1 {
+  requires {
+    dependency("RHCategoryKit")
+  }
+  query pattern callExpr where callee.method == "AES256DecryptWithKey"
+  emit source code.StoredDataRead at call.result
+}

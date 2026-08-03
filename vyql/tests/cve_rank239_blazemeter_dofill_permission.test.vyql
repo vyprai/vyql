@@ -1,5 +1,6 @@
 test "rank239: BlazeMeter doFill endpoint without permission check is review-visible"
   lang java
+  expect VYQL-AUTH-078
   expect_review code.CredentialedEndpointReview
   code
   ```
@@ -19,6 +20,7 @@ test "rank239: BlazeMeter doFill endpoint without permission check is review-vis
 
 test "rank239: BlazeMeter doFill endpoint with permission check is clean"
   lang java
+  reject VYQL-AUTH-078
   reject_review code.CredentialedEndpointReview
   code
   ```

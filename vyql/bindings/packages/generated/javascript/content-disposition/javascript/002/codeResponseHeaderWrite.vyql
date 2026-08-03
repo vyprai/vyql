@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m96988d50;
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("content-disposition")
+  }
+  query pattern callExpr where callee.method == "format"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m4ae0f6f1;
+
+binding networkSend0 {
+  requires {
+    dependency("twilio-ruby")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

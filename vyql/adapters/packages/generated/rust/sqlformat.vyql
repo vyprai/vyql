@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "sqlformat" {
-    sink method "format" -> code.Deserialization
-  }
-}

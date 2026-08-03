@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mdf43a0d1;
+
+binding deserialization0 {
+  requires {
+    dependency("parser")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

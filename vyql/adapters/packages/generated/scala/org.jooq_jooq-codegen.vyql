@@ -1,7 +1,0 @@
-import code.{Deserialization, CodeEval}
-adapter scala {
-  package "org.jooq:jooq-codegen" {
-    sink method "GenerationTool.load" -> code.Deserialization
-    sink method "GenerationTool.compile" -> code.CodeEval
-  }
-}

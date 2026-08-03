@@ -1,0 +1,11 @@
+module code;
+
+concept OptionalClientSignatureVerification : issue {
+  cwe: [CWE_287, CWE_347]
+  reviewAssumption: "a missing client signature can reach the authentication path while other certificate or token checks still permit a user mapping"
+  reviewCategory: auth
+  reviewCondition: "client authentication verifies a signature only when a supplied signature value is non-null"
+  reviewConfidence: high
+  reviewEvidence: "authentication context {pattern} obtains a client signature and runs Signature.verify from a non-null signature branch without an observed fail-closed null-signature check"
+  vulnerableTo: [authentication.ImproperAuthentication, crypto.ImproperSignatureCheck]
+}

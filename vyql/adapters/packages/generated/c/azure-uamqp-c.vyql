@@ -1,6 +1,0 @@
-import code.{SecretValue}
-adapter c {
-  package "azure-uamqp-c" {
-    source method "cbs_put_token_async" -> code.SecretValue
-  }
-}

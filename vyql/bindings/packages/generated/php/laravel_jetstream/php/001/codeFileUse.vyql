@@ -1,0 +1,9 @@
+module bindings.php.generated.me7b7042d;
+
+binding fileUse1 {
+  requires {
+    dependency("laravel/jetstream")
+  }
+  query pattern callExpr where callee.method == "deleteProfilePhoto"
+  emit sink code.FileUseSink at args[0]
+}

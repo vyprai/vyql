@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mdf2aee91;
+
+binding deserialization1 {
+  requires {
+    dependency("org.jboss.resteasy:resteasy-jaxrs")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

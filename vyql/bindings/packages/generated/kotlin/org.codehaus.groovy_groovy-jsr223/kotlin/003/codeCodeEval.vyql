@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m05943947;
+
+binding codeEval3 {
+  requires {
+    dependency("org.codehaus.groovy:groovy-jsr223")
+  }
+  query pattern callExpr where callee.method == "invokeMethod"
+  emit sink code.CodeEval at args[0]
+}

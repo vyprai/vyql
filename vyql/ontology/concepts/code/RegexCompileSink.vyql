@@ -1,0 +1,7 @@
+module code;
+
+concept RegexCompileSink : sink {
+  cwe: [CWE_1333]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [dos.ReDoS]
+}

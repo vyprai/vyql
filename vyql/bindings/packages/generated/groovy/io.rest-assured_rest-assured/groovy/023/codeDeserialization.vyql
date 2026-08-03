@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m9ceef9fb;
+
+binding deserialization23 {
+  requires {
+    dependency("io.rest-assured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "registerParser"
+  emit sink code.Deserialization at args[0]
+}

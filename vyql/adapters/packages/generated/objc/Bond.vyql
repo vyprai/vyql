@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter objc {
-  package "Bond" {
-    sink method "setArgument:atIndex:" -> code.CodeEval
-  }
-}

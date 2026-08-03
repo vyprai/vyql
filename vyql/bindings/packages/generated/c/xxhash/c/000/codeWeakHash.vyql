@@ -1,0 +1,9 @@
+module bindings.c.generated.mf30cd3b3;
+
+binding weakHash0 {
+  requires {
+    dependency("xxhash")
+  }
+  query pattern callExpr where callee.method == "XXH32"
+  emit issue code.WeakHash at call
+}

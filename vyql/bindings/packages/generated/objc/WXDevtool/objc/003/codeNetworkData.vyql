@@ -1,0 +1,9 @@
+module bindings.objc.generated.mc71e0e8a;
+
+binding networkData3 {
+  requires {
+    dependency("WXDevtool")
+  }
+  query pattern callExpr where callee.method == "loadingFinishedWithRequestId"
+  emit source code.NetworkData at call.result
+}

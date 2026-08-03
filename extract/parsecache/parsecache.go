@@ -16,6 +16,7 @@ import (
 	"encoding/hex"
 	"os"
 	"strconv"
+	"sync"
 
 	badger "github.com/dgraph-io/badger/v4"
 
@@ -29,6 +30,11 @@ type Cache struct {
 	salt []byte
 }
 
+var shared struct {
+	mu sync.RWMutex
+	c  *Cache
+}
+
 // Open creates a Badger-backed cache in dir. CLI callers should prefer explicit command
 // flags over environment-variable configuration.
 func Open(dir string) (*Cache, error) {
@@ -40,11 +46,25 @@ func Open(dir string) (*Cache, error) {
 	return &Cache{db: db, salt: execSalt()}, nil
 }
 
-// Shared returns the process-wide cache. The CLI no longer opens a cache from
-// environment variables, so this is intentionally nil unless a future explicit
-// cache owner is wired in.
+// Shared returns the process-wide cache. Command owners wire this explicitly so
+// library/test callers do not pick up ambient filesystem state.
 func Shared() *Cache {
-	return nil
+	shared.mu.RLock()
+	defer shared.mu.RUnlock()
+	return shared.c
+}
+
+// SetShared installs the process-wide cache and returns a restore function.
+func SetShared(c *Cache) func() {
+	shared.mu.Lock()
+	prev := shared.c
+	shared.c = c
+	shared.mu.Unlock()
+	return func() {
+		shared.mu.Lock()
+		shared.c = prev
+		shared.mu.Unlock()
+	}
 }
 
 // execSalt derives a cache-busting salt from the running binary (path + size + mtime), so a
@@ -258,7 +278,7 @@ func (c *Cache) GetRaw(key string) ([]byte, bool) {
 }
 
 // GetManyRaw reads many keys in a SINGLE read transaction and returns the present ones. The
-// per-module adapter-label cache looks up thousands of keys per scan; one transaction instead
+// per-module binding-label cache looks up thousands of keys per scan; one transaction instead
 // of one-per-key turns an I/O-bound loop (the dominant cost of a large incremental scan) into a
 // single pass. Missing keys are simply absent from the result.
 func (c *Cache) GetManyRaw(keys []string) map[string][]byte {

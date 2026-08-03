@@ -1,0 +1,6 @@
+module bindings.kotlin.generated.m304d1620;
+
+binding authenticationRequiredOp41 {
+  query pattern presenceNode where node.path ~= "changeEmail"
+  emit issue code.AuthenticationRequiredOp at node
+}

@@ -1,0 +1,9 @@
+module bindings.java.generated.mcd3e9a8d;
+
+binding sqlExecution5 {
+  requires {
+    dependency("org.mybatis:mybatis-spring")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.SqlExecution at args[0]
+}

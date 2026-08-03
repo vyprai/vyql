@@ -1,5 +1,0 @@
-adapter dart {
-  package "route" {
-    sink method "parse" -> code.Deserialization
-  }
-}

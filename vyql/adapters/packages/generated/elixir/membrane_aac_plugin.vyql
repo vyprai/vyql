@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "membrane_aac_plugin" {
-    sink method "parse_adts" -> code.Deserialization
-  }
-}

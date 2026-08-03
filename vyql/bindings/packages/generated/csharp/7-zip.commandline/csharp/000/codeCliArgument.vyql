@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m4f58409f;
+
+binding cliArgument0 {
+  requires {
+    dependency("7-zip.commandline")
+  }
+  query pattern callExpr where callee.path ~= "7za.exe.argv"
+  emit source code.CliArgument at call.result
+}

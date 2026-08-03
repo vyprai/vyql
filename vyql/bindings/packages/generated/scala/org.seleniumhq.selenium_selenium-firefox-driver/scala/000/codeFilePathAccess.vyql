@@ -1,0 +1,9 @@
+module bindings.scala.generated.m872e5b83;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-firefox-driver")
+  }
+  query pattern callExpr where callee.method == "installExtension"
+  emit sink code.FilePathAccess at args[0]
+}

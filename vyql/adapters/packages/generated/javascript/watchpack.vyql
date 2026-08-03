@@ -1,7 +1,0 @@
-import code.{FilePathAccess, FileUse}
-adapter javascript {
-  package "watchpack" {
-    sink method "lstatWithRetry" -> code.FilePathAccess
-    sink method "watch" -> code.FileUse
-  }
-}

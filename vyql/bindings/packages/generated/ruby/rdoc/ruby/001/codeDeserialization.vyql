@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m6346798c;
+
+binding deserialization1 {
+  requires {
+    dependency("rdoc")
+  }
+  query pattern callExpr where callee.method == "tokenize"
+  emit sink code.Deserialization at args[0]
+}

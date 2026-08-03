@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "esquery" {
-    sink method "parse" -> code.Deserialization
-    sink method "query" -> code.Deserialization
-    sink method "match" -> code.Deserialization
-  }
-}

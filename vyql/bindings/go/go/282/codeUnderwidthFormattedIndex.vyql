@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding underwidthFormattedIndex282 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "fmt.Sprintf" and node.context.literal contains "%08b" and node.context.index contains "capabilities:8" and not (node.context.literal contains "%016b")
+  emit issue code.UnderwidthFormattedIndex at node
+}

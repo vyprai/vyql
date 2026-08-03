@@ -1,0 +1,10 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding authenticationCheck139 {
+  query pattern callExpr where callee.path ~= "require_auth"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

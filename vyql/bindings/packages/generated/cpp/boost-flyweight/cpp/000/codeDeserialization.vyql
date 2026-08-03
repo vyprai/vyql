@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m5fe2aafc;
+
+binding deserialization0 {
+  requires {
+    dependency("boost-flyweight")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

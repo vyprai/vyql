@@ -1,0 +1,10 @@
+module bindings.kotlin.generated.me41dc015;
+
+binding sessionId3 {
+  requires {
+    dependency("javax.servlet.jsp:javax.servlet.jsp-api")
+  }
+  query pattern callExpr where callee.method == "getSession"
+  emit issue code.SessionId at call
+  emit sink code.SessionIdSink at call
+}

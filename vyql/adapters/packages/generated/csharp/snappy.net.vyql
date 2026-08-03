@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter csharp {
-  package "snappy.net" {
-    sink method "Uncompress" -> code.Deserialization
-  }
-}

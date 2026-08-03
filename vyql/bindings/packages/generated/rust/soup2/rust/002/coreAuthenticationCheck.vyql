@@ -1,0 +1,13 @@
+module bindings.rust.generated.m4593e3b3;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("soup2")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.ma307151e;
+
+binding networkData2 {
+  requires {
+    dependency("net-protocol")
+  }
+  query pattern callExpr where callee.method == "rbuf_consume"
+  emit source code.NetworkData at call.result
+}

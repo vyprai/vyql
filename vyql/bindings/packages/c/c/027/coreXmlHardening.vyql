@@ -1,0 +1,13 @@
+module bindings.c.generated.m2816daee;
+
+binding xmlHardening27 {
+  requires {
+    dependency("libxml2")
+  }
+  query pattern callExpr where callee.path ~= "xmlReadMemory" and args.any.literal contains "XML_PARSE_NONET"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}

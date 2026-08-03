@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter ruby {
-  package "serverspec" {
-    sink method "command_result" -> code.CommandExecution
-  }
-}

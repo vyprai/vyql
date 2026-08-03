@@ -1,9 +1,0 @@
-import code.{FileUse, FilePathAccess}
-
-adapter scala {
-  package "org.apache.logging.log4j:log4j-1.2-api" {
-    sink method "FileAppender.<init>" -> code.FileUse
-    sink method "RollingFileAppender.<init>" -> code.FileUse
-    sink method "PropertyConfigurator.configure" -> code.FilePathAccess
-  }
-}

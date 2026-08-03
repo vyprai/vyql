@@ -1,5 +1,0 @@
-adapter elixir {
-  package "pbkdf2" {
-    control method "compare_secure" -> core.InputValidation
-  }
-}

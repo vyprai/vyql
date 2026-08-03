@@ -1,8 +1,0 @@
-import code.{NetworkData, NetworkSend}
-
-adapter scala {
-  package "org.springframework.batch:spring-batch-infrastructure" {
-    source method "JmsItemReader.read" -> code.NetworkData
-    sink method "JmsItemWriter.write" -> code.NetworkSend
-  }
-}

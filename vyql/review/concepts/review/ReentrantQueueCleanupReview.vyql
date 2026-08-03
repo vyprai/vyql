@@ -1,0 +1,7 @@
+module code;
+
+review code.ReentrantQueueCleanupReview {
+  category: memory
+  kind: attention
+  text: "review queue cleanup/cancel paths for reentrant lifetime ownership guards"
+}

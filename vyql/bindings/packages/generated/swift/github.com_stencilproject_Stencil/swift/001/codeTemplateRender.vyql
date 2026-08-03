@@ -1,0 +1,9 @@
+module bindings.swift.generated.md72cf702;
+
+binding templateRender1 {
+  requires {
+    dependency("github.com/stencilproject/Stencil")
+  }
+  query pattern callExpr where callee.method == "renderTemplate"
+  emit sink code.TemplateRender at args[0]
+}

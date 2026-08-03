@@ -1,0 +1,9 @@
+module bindings.dart.generated.mf2c48db6;
+
+binding filePathAccess3 {
+  requires {
+    dependency("change_app_package_name")
+  }
+  query pattern callExpr where callee.method == "readFileAsString"
+  emit sink code.FilePathAccess at args[0]
+}

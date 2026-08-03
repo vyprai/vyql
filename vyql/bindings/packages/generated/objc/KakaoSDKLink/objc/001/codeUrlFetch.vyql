@@ -1,0 +1,9 @@
+module bindings.objc.generated.m8d031327;
+
+binding urlFetch1 {
+  requires {
+    dependency("KakaoSDKLink")
+  }
+  query pattern callExpr where callee.method == "scrapLink"
+  emit sink code.UrlFetch at args[0]
+}

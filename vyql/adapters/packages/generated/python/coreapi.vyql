@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter python {
-  package "coreapi" {
-    sink method "send" -> code.NetworkSend
-  }
-}

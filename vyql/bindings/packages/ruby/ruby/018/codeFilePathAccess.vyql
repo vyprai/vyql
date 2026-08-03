@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m5895bccf;
+
+binding filePathAccess18 {
+  requires {
+    dependency("ruby")
+  }
+  query pattern callExpr where callee.path ~= "File.read"
+  emit sink code.FilePathAccess at args[0]
+}

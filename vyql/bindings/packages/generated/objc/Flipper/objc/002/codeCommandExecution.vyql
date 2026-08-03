@@ -1,0 +1,9 @@
+module bindings.objc.generated.ma56d37f0;
+
+binding commandExecution2 {
+  requires {
+    dependency("Flipper")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

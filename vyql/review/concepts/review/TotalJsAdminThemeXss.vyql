@@ -1,0 +1,8 @@
+module code;
+
+review code.TotalJsAdminThemeXss {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review Total.js admin theme grid and notification rendering for Thelpers.encode before HTML insertion"
+}

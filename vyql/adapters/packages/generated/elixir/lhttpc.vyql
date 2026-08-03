@@ -1,5 +1,0 @@
-adapter elixir {
-  package "lhttpc" {
-    sink method "send_request" -> code.UrlFetch
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.me41dc015;
+
+binding expressionEval4 {
+  requires {
+    dependency("javax.servlet.jsp:javax.servlet.jsp-api")
+  }
+  query pattern callExpr where callee.method == "getExpressionEvaluator"
+  emit sink code.ExpressionEval at args[0]
+}

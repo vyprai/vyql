@@ -1,7 +1,0 @@
-import code.{UrlFetch}
-adapter scala {
-  package "com.lowagie:itext" {
-    sink method "Image.getInstance" -> code.UrlFetch
-    sink method "Jpeg" -> code.UrlFetch
-  }
-}

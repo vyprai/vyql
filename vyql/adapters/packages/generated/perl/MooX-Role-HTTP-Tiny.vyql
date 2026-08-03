@@ -1,7 +1,0 @@
-import code.{UrlFetch}
-
-adapter perl {
-  package "MooX-Role-HTTP-Tiny" {
-    sink method "call" -> code.UrlFetch
-  }
-}

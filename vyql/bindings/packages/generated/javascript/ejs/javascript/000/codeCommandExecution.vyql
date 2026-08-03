@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mb674c45d;
+
+binding commandExecution0 {
+  requires {
+    dependency("ejs")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

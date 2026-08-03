@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m551b0762;
+
+binding deserialization1 {
+  requires {
+    dependency("net.sf.json-lib:json-lib")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

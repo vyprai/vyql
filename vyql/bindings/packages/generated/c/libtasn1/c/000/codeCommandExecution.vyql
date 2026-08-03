@@ -1,0 +1,9 @@
+module bindings.c.generated.m3416a873;
+
+binding commandExecution0 {
+  requires {
+    dependency("libtasn1")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.CommandExecution at args[0]
+}

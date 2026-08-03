@@ -1,0 +1,9 @@
+module bindings.php.generated.mc8f7d31b;
+
+binding networkSend0 {
+  requires {
+    dependency("omnipay/common")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

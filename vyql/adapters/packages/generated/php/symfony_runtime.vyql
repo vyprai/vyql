@@ -1,8 +1,0 @@
-import code.{FilePathAccess, FileUse}
-
-adapter php {
-  package "symfony/runtime" {
-    sink method "updateAutoloadFile" -> code.FilePathAccess
-    sink method "updateAutoloadFile" -> code.FileUse
-  }
-}

@@ -1,0 +1,10 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding csrfProtection66 {
+  query pattern callExpr where callee.path ~= "verify_authenticity_token"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

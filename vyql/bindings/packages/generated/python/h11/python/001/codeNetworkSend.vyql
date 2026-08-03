@@ -1,0 +1,9 @@
+module bindings.python.generated.m6b456488;
+
+binding networkSend1 {
+  requires {
+    dependency("h11")
+  }
+  query pattern callExpr where callee.method == "Connection.send"
+  emit sink code.NetworkSend at args[0]
+}

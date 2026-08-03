@@ -1,0 +1,9 @@
+module bindings.python.generated.md7a53420;
+
+binding networkSend0 {
+  requires {
+    dependency("requests-unixsocket")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}

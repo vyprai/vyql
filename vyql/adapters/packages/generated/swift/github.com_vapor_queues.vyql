@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter swift {
-  package "github.com/vapor/queues" {
-    sink method "parsePayload" -> code.Deserialization
-  }
-}

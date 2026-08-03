@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding stateChangingOp373 {
+  query pattern callExpr where callee.path ~= "queryDB" and args.any.literal contains "insert into"
+  emit sink code.StateChangingOpSink at args[0]
+}

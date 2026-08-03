@@ -1,0 +1,9 @@
+module bindings.perl.generated.m249b5ed3;
+
+binding commandExecution0 {
+  requires {
+    dependency("Tak")
+  }
+  query pattern callExpr where callee.method == "_fork_exec"
+  emit sink code.CommandExecution at args[0]
+}

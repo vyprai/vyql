@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding templateRender449 {
+  query pattern callExpr where callee.path ~= "nunjucks.compile"
+  emit sink code.TemplateRender at args[0]
+}

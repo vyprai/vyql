@@ -1,0 +1,9 @@
+module bindings.go.generated.mde69e382;
+
+binding userControlledData11 {
+  requires {
+    dependency("github.com/nats-io/nats-server/v2")
+  }
+  query pattern callExpr where callee.method == "parseEnv"
+  emit source core.UserControlledData at call.result
+}

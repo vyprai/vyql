@@ -1,0 +1,9 @@
+module bindings.php.generated.mdb8546c7;
+
+binding userControlledData1 {
+  requires {
+    dependency("composer/semver")
+  }
+  query pattern callExpr where callee.method == "parseConstraints"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,14 @@
+module bindings.kotlin.generated.m3d89f891;
+
+binding htmlEscape1 {
+  requires {
+    dependency("org.glassfish.jaxb:jaxb-runtime")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

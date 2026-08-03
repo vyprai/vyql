@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m11e43799;
+
+binding deserialization4 {
+  requires {
+    dependency("dnsruby")
+  }
+  query pattern callExpr where callee.method == "from_hash"
+  emit sink code.Deserialization at args[0]
+}

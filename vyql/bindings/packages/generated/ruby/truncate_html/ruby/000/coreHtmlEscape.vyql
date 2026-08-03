@@ -1,0 +1,14 @@
+module bindings.ruby.generated.mbb5d1c5a;
+
+binding htmlEscape0 {
+  requires {
+    dependency("truncate_html")
+  }
+  query pattern callExpr where callee.method == "truncate_html"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

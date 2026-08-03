@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter c {
-  package "qtquicktimeline" {
-    sink method "QQuickKeyframeGroupPrivate::loadKeyframes" -> code.FilePathAccess
-  }
-}

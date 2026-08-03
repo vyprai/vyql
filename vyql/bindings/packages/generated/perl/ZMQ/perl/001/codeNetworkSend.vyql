@@ -1,0 +1,9 @@
+module bindings.perl.generated.me1aa2d6f;
+
+binding networkSend1 {
+  requires {
+    dependency("ZMQ")
+  }
+  query pattern callExpr where callee.method == "send_multipart"
+  emit sink code.NetworkSend at args[0]
+}

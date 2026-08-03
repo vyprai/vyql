@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/lowering"
@@ -12,7 +12,6 @@ import (
 	"github.com/vyprai/vyql/extract/sca"
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -41,11 +40,11 @@ func methodCall(recv, method, loc string, args ...nir.Expr) nir.Call {
 func concat(parts ...nir.Expr) nir.Format { return nir.Format{Parts: parts, Loc: "?"} }
 
 const sqliRule = `
-package vypr.injection;
+module vypr.injection;
 rule Sql {
   meta { id: "VYQL-INJ-001", severity: high }
-  taint code.HttpInput -> code.SqlExecution
-  unless sanitized_by core.SqlParameterization
+  taint code.HttpInput -> code.SqlExecution as sink
+  unless sink.path coveredBy core.SqlParameterization
 }
 `
 
@@ -53,7 +52,7 @@ rule Sql {
 func runRule(t *testing.T, src string, g usg.Store) []*findings.Finding {
 	t.Helper()
 	onto := ontology.Seed()
-	decls, err := parser.Parse(src)
+	decls, err := parseV2DefinitionsForTest(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -113,7 +112,7 @@ func TestImportResolutionRemovesNameCollisionFP(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := adapters.Apply(g, frontend.PythonAdapters(), nil); err != nil {
+		if _, _, err := bindings.Apply(g, frontend.PythonBindings(), nil); err != nil {
 			t.Fatal(err)
 		}
 		fs := runRule(t, sqliRule, g)
@@ -151,18 +150,19 @@ func TestImportResolutionRemovesNameCollisionFP(t *testing.T) {
 }
 
 const scaGated = `
-package vypr.sca;
+module vypr.sca;
 rule ReachableVulnerableDependency {
   meta { id: "VYQL-SCA-002", severity: high }
-  match sbom.VulnerableDependency as p
-  where p has sbom.ReachableSymbol
+  query concept as p where p.concept == sbom.VulnerableDependency
+    labeledAs concept as reachable where reachable.concept == sbom.ReachableSymbol
+    select p
 }
 `
 const scaPlain = `
-package vypr.sca;
+module vypr.sca;
 rule VulnerableDependency {
   meta { id: "VYQL-SCA-001", severity: medium }
-  match sbom.VulnerableDependency as p
+  issue sbom.VulnerableDependency as p
 }
 `
 
@@ -199,7 +199,7 @@ func TestReachabilityGatedSCA(t *testing.T) {
 	if err := sca.LinkReachability(g); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := adapters.Apply(g, frontend.AutoAdapters(), nil); err != nil {
+	if _, _, err := bindings.Apply(g, frontend.AutoBindings(), nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -228,7 +228,7 @@ func TestReachabilityGatedSCA(t *testing.T) {
 }
 
 const scaExploitable = `
-package vypr.sca;
+module vypr.sca;
 rule ExploitableVulnerableDependency {
   meta { id: "VYQL-SCA-003", severity: high }
   taint code.HttpInput -> code.Deserialization
@@ -259,7 +259,7 @@ func TestVulnerableEntrypointExploitabilityFunnel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := adapters.Apply(g, frontend.PythonAdapters(), nil); err != nil {
+	if _, _, err := bindings.Apply(g, frontend.PythonBindings(), nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := sca.BuildSBOM(g, "pypi", []sca.Dep{{Name: "pyyaml", Version: "3.12"}}, ""); err != nil {
@@ -275,7 +275,7 @@ func TestVulnerableEntrypointExploitabilityFunnel(t *testing.T) {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := adapters.Apply(g, frontend.AutoAdapters(), nil); err != nil {
+	if _, _, err := bindings.Apply(g, frontend.AutoBindings(), nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -346,7 +346,7 @@ func TestTypeMapResolution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := adapters.Apply(g, frontend.PythonAdapters(), nil); err != nil {
+	if _, _, err := bindings.Apply(g, frontend.PythonBindings(), nil); err != nil {
 		t.Fatal(err)
 	}
 	fs := runRule(t, sqliRule, g)
@@ -401,7 +401,7 @@ func TestInterproceduralCrossFileSQLi(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := adapters.Apply(g, frontend.PythonAdapters(), nil); err != nil {
+	if _, _, err := bindings.Apply(g, frontend.PythonBindings(), nil); err != nil {
 		t.Fatal(err)
 	}
 

@@ -1,0 +1,9 @@
+module bindings.java.generated.maa48f2c3;
+
+binding networkSend3 {
+  requires {
+    dependency("io.netty:netty-transport")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

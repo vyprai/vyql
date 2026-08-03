@@ -1,0 +1,9 @@
+module bindings.dart.generated.m21ec09bd;
+
+binding storedDataRead2 {
+  requires {
+    dependency("flutter_facebook_auth")
+  }
+  query pattern callExpr where callee.method == "getUserData"
+  emit source code.StoredDataRead at call.result
+}

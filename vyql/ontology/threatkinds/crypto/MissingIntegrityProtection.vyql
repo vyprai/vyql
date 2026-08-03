@@ -1,0 +1,6 @@
+module crypto;
+
+threat MissingIntegrityProtection {
+  cwe: [CWE_665]
+  desc: "Cryptographic configuration omits required integrity/authentication initialization"
+}

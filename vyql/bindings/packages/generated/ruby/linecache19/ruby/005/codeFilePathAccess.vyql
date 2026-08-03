@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mc82756da;
+
+binding filePathAccess5 {
+  requires {
+    dependency("linecache19")
+  }
+  query pattern callExpr where callee.method == "remap_file_lines"
+  emit sink code.FilePathAccess at args[0]
+}

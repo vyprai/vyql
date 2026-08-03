@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter go {
-  package "sigs.k8s.io/controller-tools" {
-    sink method "typeToSchema" -> code.Deserialization
-    sink method "LoadRoots" -> code.FilePathAccess
-    sink method "LoadRootsWithConfig" -> code.FilePathAccess
-  }
-}

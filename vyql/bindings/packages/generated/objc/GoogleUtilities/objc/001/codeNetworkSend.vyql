@@ -1,0 +1,9 @@
+module bindings.objc.generated.m84615035;
+
+binding networkSend1 {
+  requires {
+    dependency("GoogleUtilities")
+  }
+  query pattern callExpr where callee.method == "getURL"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "css-what" {
-    sink method "parse" -> code.Deserialization
-  }
-}

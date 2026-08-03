@@ -1,0 +1,9 @@
+module bindings.dart.generated.m1d875bbd;
+
+binding htmlRender0 {
+  requires {
+    dependency("webview_flutter_platform_interface")
+  }
+  query pattern callExpr where callee.method == "loadHtmlString"
+  emit sink code.HtmlRender at args[0]
+}

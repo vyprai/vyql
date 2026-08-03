@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "pypdf" {
-    sink method "extract_text" -> code.Deserialization
-  }
-}

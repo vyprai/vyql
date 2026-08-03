@@ -1,0 +1,9 @@
+module bindings.python.generated.m406c28bc;
+
+binding filePathAccess5 {
+  requires {
+    dependency("qtpy")
+  }
+  query pattern callExpr where callee.method == "getsavefilename"
+  emit sink code.FilePathAccess at args[0]
+}

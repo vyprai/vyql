@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m6afa8a11;
+
+binding nosqlQuery1 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-spring-service-connector")
+  }
+  query pattern callExpr where callee.method == "doParse"
+  emit sink code.NosqlQuery at args[0]
+}

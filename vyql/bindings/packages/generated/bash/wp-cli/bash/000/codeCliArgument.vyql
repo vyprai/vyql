@@ -1,0 +1,9 @@
+module bindings.bash.generated.m52c7494e;
+
+binding cliArgument0 {
+  requires {
+    dependency("wp-cli")
+  }
+  query pattern callExpr where callee.path ~= "wp"
+  emit source code.CliArgument at call.result
+}

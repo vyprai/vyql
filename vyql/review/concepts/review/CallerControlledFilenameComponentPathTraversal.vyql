@@ -1,0 +1,8 @@
+module code;
+
+review code.CallerControlledFilenameComponentPathTraversal {
+  category: path
+  expected: [core.PathCanonicalization]
+  kind: attention
+  text: "review filename builders that concatenate caller-controlled name or version components without component encoding"
+}

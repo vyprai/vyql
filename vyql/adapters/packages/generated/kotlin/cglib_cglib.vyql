@@ -1,8 +1,0 @@
-import code.{CodeEval, Deserialization}
-adapter kotlin {
-  package "cglib:cglib" {
-    sink method "defineClass" -> code.CodeEval
-    sink method "create" -> code.CodeEval
-    sink method "convert" -> code.Deserialization
-  }
-}

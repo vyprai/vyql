@@ -1,7 +1,0 @@
-adapter groovy {
-  package "de.flapdoodle.embed:de.flapdoodle.embed.mongo" {
-    source method "password" -> code.SecretValue
-    source method "passwordAsString" -> code.SecretValue
-    control method "createUser" -> core.AuthenticationCheck
-  }
-}

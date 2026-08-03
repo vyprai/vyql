@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding urlFetch87 {
+  query pattern callExpr where callee.path ~= "http.NewRequestWithContext"
+  emit sink code.UrlFetch at args[0]
+}

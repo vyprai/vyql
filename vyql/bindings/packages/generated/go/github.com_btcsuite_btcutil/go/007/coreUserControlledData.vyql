@@ -1,0 +1,9 @@
+module bindings.go.generated.mca5e322a;
+
+binding userControlledData7 {
+  requires {
+    dependency("github.com/btcsuite/btcutil")
+  }
+  query pattern callExpr where callee.method == "NewAddressWitnessPubKeyHash"
+  emit source core.UserControlledData at call.result
+}

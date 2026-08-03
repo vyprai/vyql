@@ -1,9 +1,0 @@
-import code.{HttpInput}
-
-adapter kotlin {
-  package "org.springframework.cloud:spring-cloud-config-server" {
-    source method "encrypt" -> code.HttpInput
-    source method "decrypt" -> code.HttpInput
-    source method "getLocations" -> code.HttpInput
-  }
-}

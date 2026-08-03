@@ -1,0 +1,11 @@
+module code;
+
+concept TokenCacheAuthorizationBypass : issue {
+  cwe: [CWE_862, CWE_863]
+  reviewAssumption: "cached tokens may correspond to users, groups, scopes, or audiences that the current authenticated caller is not authorized to obtain"
+  reviewCategory: auth
+  reviewCondition: "a token endpoint returns cached access or refresh tokens before performing the requester's authorization check"
+  reviewConfidence: high
+  reviewEvidence: "token service context {pattern} looks up and returns a cached token ahead of the privilege/property validation branch"
+  vulnerableTo: [access_control.MissingAuthorization, access_control.IncorrectAuthorization]
+}

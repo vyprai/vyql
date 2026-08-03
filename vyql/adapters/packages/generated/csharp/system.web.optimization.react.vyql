@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter csharp {
-  package "system.web.optimization.react" {
-    sink method "BabelTransform.Process" -> code.CodeEval
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m530158b1;
+
+binding sqlExecution0 {
+  requires {
+    dependency("data_objects")
+  }
+  query pattern callExpr where callee.method == "execute_non_query"
+  emit sink code.SqlExecution at args[0]
+}

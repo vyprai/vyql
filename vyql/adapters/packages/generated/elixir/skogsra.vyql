@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "skogsra" {
-    sink method "Skogsra.Provider.JSON.load" -> code.Deserialization
-    sink method "Skogsra.Provider.YAML.load" -> code.Deserialization
-    sink method "Skogsra.Provider.YAML.parse" -> code.Deserialization
-  }
-}

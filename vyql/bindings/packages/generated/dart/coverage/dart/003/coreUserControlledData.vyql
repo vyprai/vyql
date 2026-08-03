@@ -1,0 +1,9 @@
+module bindings.dart.generated.mac6759df;
+
+binding userControlledData3 {
+  requires {
+    dependency("coverage")
+  }
+  query pattern callExpr where callee.method == "Options.parse"
+  emit source core.UserControlledData at call.result
+}

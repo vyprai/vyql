@@ -1,0 +1,9 @@
+module bindings.perl.generated.mfb3ee384;
+
+binding commandExecution0 {
+  requires {
+    dependency("Ubic")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

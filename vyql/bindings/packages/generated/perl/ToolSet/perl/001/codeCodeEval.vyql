@@ -1,0 +1,9 @@
+module bindings.perl.generated.m884d26a5;
+
+binding codeEval1 {
+  requires {
+    dependency("ToolSet")
+  }
+  query pattern callExpr where callee.method == "import"
+  emit sink code.CodeEval at args[0]
+}

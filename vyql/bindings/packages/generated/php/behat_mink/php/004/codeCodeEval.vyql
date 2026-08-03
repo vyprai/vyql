@@ -1,0 +1,9 @@
+module bindings.php.generated.m44f70df4;
+
+binding codeEval4 {
+  requires {
+    dependency("behat/mink")
+  }
+  query pattern callExpr where callee.method == "executeScript"
+  emit sink code.CodeEval at args[0]
+}

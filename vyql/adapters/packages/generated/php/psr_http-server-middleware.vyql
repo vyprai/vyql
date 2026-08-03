@@ -1,5 +1,0 @@
-adapter php {
-  package "psr/http-server-middleware" {
-    source method "process" -> code.HttpInput
-  }
-}

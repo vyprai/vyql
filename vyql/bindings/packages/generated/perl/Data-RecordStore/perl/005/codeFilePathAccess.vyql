@@ -1,0 +1,9 @@
+module bindings.perl.generated.m8be816f0;
+
+binding filePathAccess5 {
+  requires {
+    dependency("Data-RecordStore::Silo")
+  }
+  query pattern callExpr where callee.method == "syswrite"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mddd10154;
+
+binding weakHash0 {
+  requires {
+    dependency("mixlib-authentication")
+  }
+  query pattern callExpr where callee.method == "Mixlib::Authentication::Digester.hash_file"
+  emit issue code.WeakHash at call
+}

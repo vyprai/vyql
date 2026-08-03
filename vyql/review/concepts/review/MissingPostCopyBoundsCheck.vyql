@@ -1,0 +1,7 @@
+module code;
+
+review code.MissingPostCopyBoundsCheck {
+  category: memory
+  kind: attention
+  text: "review second-stage memory copy bounds after the destination offset has advanced"
+}

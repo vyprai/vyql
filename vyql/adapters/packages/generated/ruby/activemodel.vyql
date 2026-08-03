@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "activemodel" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

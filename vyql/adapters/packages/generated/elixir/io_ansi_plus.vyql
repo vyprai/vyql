@@ -1,7 +1,0 @@
-import core.{InputValidation}
-adapter elixir {
-  package "io_ansi_plus" {
-    control method "format" -> core.InputValidation
-    control method "format_fragment" -> core.InputValidation
-  }
-}

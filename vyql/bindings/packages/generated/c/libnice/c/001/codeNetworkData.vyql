@@ -1,0 +1,9 @@
+module bindings.c.generated.m9c988fbb;
+
+binding networkData1 {
+  requires {
+    dependency("libnice")
+  }
+  query pattern callExpr where callee.method == "nice_input_stream_read_nonblocking"
+  emit source code.NetworkData at call.result
+}

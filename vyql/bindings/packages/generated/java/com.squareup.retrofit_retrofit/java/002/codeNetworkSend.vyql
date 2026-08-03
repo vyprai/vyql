@@ -1,0 +1,9 @@
+module bindings.java.generated.md734fff2;
+
+binding networkSend2 {
+  requires {
+    dependency("com.squareup.retrofit:retrofit")
+  }
+  query pattern callExpr where callee.method == "enqueue"
+  emit sink code.NetworkSend at args[0]
+}

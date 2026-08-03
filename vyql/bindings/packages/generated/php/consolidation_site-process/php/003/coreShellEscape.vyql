@@ -1,0 +1,14 @@
+module bindings.php.generated.m3388e338;
+
+binding shellEscape3 {
+  requires {
+    dependency("consolidation/site-process")
+  }
+  query pattern callExpr where callee.method == "shellArg"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

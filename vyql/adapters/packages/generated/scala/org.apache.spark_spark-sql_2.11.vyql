@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.apache.spark:spark-sql_2.11" {
-    sink method "sql" -> code.SqlExecution
-  }
-}

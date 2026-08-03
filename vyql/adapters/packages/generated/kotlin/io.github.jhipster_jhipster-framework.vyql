@@ -1,9 +1,0 @@
-import code.{WeakRandomValue}
-
-adapter kotlin {
-  package "io.github.jhipster:jhipster-framework" {
-    flag code.WeakRandomValue on any {
-      method "generateRandomAlphanumericString"
-    }
-  }
-}

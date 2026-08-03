@@ -1,0 +1,13 @@
+module bindings.elixir.generated.mf526726a;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("plug_attack")
+  }
+  query pattern callExpr where callee.method == "allow_action"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

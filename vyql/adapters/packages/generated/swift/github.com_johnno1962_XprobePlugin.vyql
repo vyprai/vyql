@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter swift {
-  package "github.com/johnno1962/XprobePlugin" {
-    sink method "patch" -> code.CodeEval
-  }
-}

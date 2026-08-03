@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mdb3bb68d;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.springframework.data:spring-data-jpa")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

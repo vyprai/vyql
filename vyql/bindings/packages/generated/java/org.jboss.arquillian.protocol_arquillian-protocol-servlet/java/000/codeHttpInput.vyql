@@ -1,0 +1,9 @@
+module bindings.java.generated.ma0754ccd;
+
+binding httpInput0 {
+  requires {
+    dependency("org.jboss.arquillian.protocol:arquillian-protocol-servlet")
+  }
+  query pattern callExpr where callee.method == "doPost"
+  emit source code.HttpInput at call.result
+}

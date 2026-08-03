@@ -1,0 +1,9 @@
+module bindings.dart.generated.m4374607a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("record")
+  }
+  query pattern callExpr where callee.method == "start"
+  emit sink code.FilePathAccess at args[0]
+}

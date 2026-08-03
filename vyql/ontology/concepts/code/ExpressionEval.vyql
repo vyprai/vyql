@@ -1,0 +1,7 @@
+module code;
+
+concept ExpressionEval : sink {
+  cwe: [CWE_917]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [injection.ExpressionLanguageInjection]
+}

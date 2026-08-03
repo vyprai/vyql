@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding internalAssetRoutePathTraversal94 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "internal_asset_route_path_traversal"
+  emit issue code.InternalAssetRoutePathTraversal at node
+}

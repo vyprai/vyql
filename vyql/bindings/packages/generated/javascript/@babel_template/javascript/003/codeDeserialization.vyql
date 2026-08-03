@@ -1,0 +1,9 @@
+module bindings.javascript.generated.madf65cb8;
+
+binding deserialization3 {
+  requires {
+    dependency("@babel/template")
+  }
+  query pattern callExpr where callee.method == "literalTemplate"
+  emit sink code.Deserialization at args[0]
+}

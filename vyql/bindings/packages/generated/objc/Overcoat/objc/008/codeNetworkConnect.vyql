@@ -1,0 +1,9 @@
+module bindings.objc.generated.m57ebb34d;
+
+binding networkConnect8 {
+  requires {
+    dependency("Overcoat")
+  }
+  query pattern callExpr where callee.method == "DELETE:parameters:success:failure:"
+  emit sink code.NetworkConnectSink at args[0]
+}

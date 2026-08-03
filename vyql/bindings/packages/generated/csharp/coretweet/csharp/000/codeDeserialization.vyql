@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m39c3b7a9;
+
+binding deserialization0 {
+  requires {
+    dependency("coretweet")
+  }
+  query pattern callExpr where callee.method == "CoreTweet.AccountActivity.ActivityEvent.Parse"
+  emit sink code.Deserialization at args[0]
+}

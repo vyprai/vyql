@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter java {
-  package "com.badlogicgames.gdx:gdx" {
-    control method "validate" -> core.InputValidation
-  }
-}

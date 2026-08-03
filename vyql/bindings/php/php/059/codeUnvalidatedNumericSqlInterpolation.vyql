@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding unvalidatedNumericSqlInterpolation59 {
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.phpReview == "unvalidated_numeric_sql_interpolation_iid"
+  emit issue code.UnvalidatedNumericSqlInterpolation at node
+}

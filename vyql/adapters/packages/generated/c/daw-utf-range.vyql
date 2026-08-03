@@ -1,9 +1,0 @@
-import core.{InputValidation}
-
-adapter c {
-  package "daw-utf-range" {
-    control method "validate_next" -> core.InputValidation
-    control method "find_invalid" -> core.InputValidation
-    control method "is_valid" -> core.InputValidation
-  }
-}

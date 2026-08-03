@@ -1,0 +1,11 @@
+module code;
+
+concept ClamscanBinaryPathShellCommandInjection : issue {
+  cwe: [CWE_78]
+  reviewAssumption: "library callers can configure the scanner path and an attacker can arrange a matching filesystem entry so shell metacharacters survive the access check"
+  reviewCategory: command
+  reviewCondition: "Clamscan verifies a configured scanner binary path by interpolating it into a shell command"
+  reviewConfidence: high
+  reviewEvidence: "binary verification context {pattern} builds a --version command string from the configured scanner path and executes it through a shell"
+  vulnerableTo: [injection.CommandInjection]
+}

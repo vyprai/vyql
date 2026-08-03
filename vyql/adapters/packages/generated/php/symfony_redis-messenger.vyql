@@ -1,8 +1,0 @@
-import code.{StoredDataRead, StoredDataWrite}
-
-adapter php {
-  package "symfony/redis-messenger" {
-    sink method "add" -> code.StoredDataWrite
-    source method "get" -> code.StoredDataRead
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m1a2bd651;
+
+binding deserialization0 {
+  requires {
+    dependency("yasm")
+  }
+  query pattern callExpr where callee.method == "yasm_unescape_cstring"
+  emit sink code.Deserialization at args[0]
+}

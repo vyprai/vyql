@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter objc {
-  package "Folly" {
-    sink method "File" -> code.FilePathAccess
-    sink method "temporary" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.generated.mde571bb4;
+
+binding networkConnect13 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "postAsync"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.mea9a35c7;
+
+binding filePathAccess1 {
+  requires {
+    dependency("com.aventstack:extentreports")
+  }
+  query pattern callExpr where callee.method == "addVideoFromPath"
+  emit sink code.FilePathAccess at args[0]
+}

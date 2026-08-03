@@ -1,0 +1,9 @@
+module bindings.c.generated.m14390899;
+
+binding deserialization1 {
+  requires {
+    dependency("rapidjson")
+  }
+  query pattern callExpr where callee.method == "Decode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m55cad7ce;
+
+binding urlFetch0 {
+  requires {
+    dependency("eventsource")
+  }
+  query pattern callExpr where callee.method == "constructor"
+  emit sink code.UrlFetch at args[0]
+}

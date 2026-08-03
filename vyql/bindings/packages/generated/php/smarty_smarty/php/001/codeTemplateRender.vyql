@@ -1,0 +1,9 @@
+module bindings.php.generated.m9cc235f9;
+
+binding templateRender1 {
+  requires {
+    dependency("smarty/smarty")
+  }
+  query pattern callExpr where callee.method == "display"
+  emit sink code.TemplateRender at args[0]
+}

@@ -1,0 +1,10 @@
+module bindings.go.generated.m48a985c1;
+
+binding authenticationCheck185 {
+  query pattern callExpr where callee.method == "RequireAuth"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

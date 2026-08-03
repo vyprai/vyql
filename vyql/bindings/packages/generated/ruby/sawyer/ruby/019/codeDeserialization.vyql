@@ -1,0 +1,9 @@
+module bindings.ruby.generated.md6355825;
+
+binding deserialization19 {
+  requires {
+    dependency("sawyer")
+  }
+  query pattern callExpr where callee.method == "decode_object"
+  emit sink code.Deserialization at args[0]
+}

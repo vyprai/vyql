@@ -1,6 +1,0 @@
-import code.{NetworkSend}
-adapter perl {
-  package "YAHC" {
-    sink method "request" -> code.NetworkSend
-  }
-}

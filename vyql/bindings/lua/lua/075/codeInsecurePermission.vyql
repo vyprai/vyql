@@ -1,0 +1,6 @@
+module bindings.lua.generated.ma99d12f7;
+
+binding insecurePermission75 {
+  query pattern callExpr where callee.path ~= "lfs.chmod" and args.any.literal contains "777"
+  emit issue code.InsecurePermission at call
+}

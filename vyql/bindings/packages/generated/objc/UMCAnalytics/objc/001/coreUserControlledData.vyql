@@ -1,0 +1,9 @@
+module bindings.objc.generated.mbbfc7d71;
+
+binding userControlledData1 {
+  requires {
+    dependency("UMCAnalytics")
+  }
+  query pattern callExpr where callee.method == "onDeepLinkReceived:"
+  emit source core.UserControlledData at call.result
+}

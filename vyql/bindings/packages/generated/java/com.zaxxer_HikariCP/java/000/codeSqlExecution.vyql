@@ -1,0 +1,9 @@
+module bindings.java.generated.m9821984f;
+
+binding sqlExecution0 {
+  requires {
+    dependency("com.zaxxer:HikariCP")
+  }
+  query pattern callExpr where callee.method == "setConnectionTestQuery"
+  emit sink code.SqlExecution at args[0]
+}

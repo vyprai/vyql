@@ -1,5 +1,0 @@
-adapter scala {
-  package "io.netty:netty-codec-http" {
-    sink method "parse" -> code.Deserialization
-  }
-}

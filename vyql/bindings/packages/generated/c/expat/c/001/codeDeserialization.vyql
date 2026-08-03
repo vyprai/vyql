@@ -1,0 +1,9 @@
+module bindings.c.generated.m13ca74f7;
+
+binding deserialization1 {
+  requires {
+    dependency("expat")
+  }
+  query pattern callExpr where callee.method == "XML_ParseBuffer"
+  emit sink code.Deserialization at args[0]
+}

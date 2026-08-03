@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m7688ad65;
+
+binding weakCipher6 {
+  requires {
+    dependency("savon")
+  }
+  query pattern callExpr where callee.method == "ssl_ciphers"
+  emit issue code.WeakCipher at call
+}

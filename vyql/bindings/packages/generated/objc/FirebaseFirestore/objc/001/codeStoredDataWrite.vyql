@@ -1,0 +1,9 @@
+module bindings.objc.generated.m742074f4;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("FirebaseFirestore")
+  }
+  query pattern callExpr where callee.method == "Update"
+  emit sink code.StoredDataWrite at args[0]
+}

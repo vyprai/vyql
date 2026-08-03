@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m79d12f8c;
+
+binding fileUse1 {
+  requires {
+    dependency("rsm-binary-io")
+  }
+  query pattern callExpr where callee.method == "write_bytes"
+  emit sink code.FileUseSink at args[0]
+}

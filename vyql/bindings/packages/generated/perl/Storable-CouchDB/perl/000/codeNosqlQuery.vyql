@@ -1,0 +1,9 @@
+module bindings.perl.generated.m17989e44;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("Storable-CouchDB")
+  }
+  query pattern callExpr where callee.method == "store"
+  emit sink code.NosqlQuery at args[0]
+}

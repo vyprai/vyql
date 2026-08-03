@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m2a0e231a;
+
+binding filePathAccess17 {
+  requires {
+    dependency("System.IO")
+  }
+  query pattern callExpr where callee.path ~= "File.ReadAllText"
+  emit sink code.FilePathAccess at args[0]
+}

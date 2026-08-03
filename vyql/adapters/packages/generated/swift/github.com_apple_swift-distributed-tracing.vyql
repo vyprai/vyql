@@ -1,8 +1,0 @@
-import code.{NetworkData}
-
-adapter swift {
-  package "github.com/apple/swift-distributed-tracing" {
-    source method "extract" -> code.NetworkData
-    source method "inject" -> code.NetworkData
-  }
-}

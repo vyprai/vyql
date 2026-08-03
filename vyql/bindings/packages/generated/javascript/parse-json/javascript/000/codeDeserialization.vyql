@@ -1,0 +1,9 @@
+module bindings.javascript.generated.md8a52977;
+
+binding deserialization0 {
+  requires {
+    dependency("parse-json")
+  }
+  query pattern callExpr where callee.method == "parseJson"
+  emit sink code.Deserialization at args[0]
+}

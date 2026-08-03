@@ -1,0 +1,9 @@
+module bindings.perl.generated.m2c0f7743;
+
+binding sqlExecution3 {
+  requires {
+    dependency("ShardedKV")
+  }
+  query pattern callExpr where callee.method == "_make_set_query"
+  emit sink code.SqlExecution at args[0]
+}

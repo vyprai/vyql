@@ -1,0 +1,9 @@
+module bindings.php.generated.m9ac0a306;
+
+binding expressionEval3 {
+  requires {
+    dependency("zendframework/zend-dom")
+  }
+  query pattern callExpr where callee.method == "queryWithErrorException"
+  emit sink code.ExpressionEval at args[0]
+}

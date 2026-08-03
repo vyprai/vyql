@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter c {
-  package "exprtk" {
-    sink method "compile" -> code.Deserialization
-  }
-}

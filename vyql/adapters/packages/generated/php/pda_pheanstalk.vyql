@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "pda/pheanstalk" {
-    sink method "parse" -> code.Deserialization
-  }
-}

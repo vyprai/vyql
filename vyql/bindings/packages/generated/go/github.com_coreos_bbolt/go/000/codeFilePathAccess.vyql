@@ -1,0 +1,9 @@
+module bindings.go.generated.m94cddf44;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/coreos/bbolt")
+  }
+  query pattern callExpr where callee.method == "Open"
+  emit sink code.FilePathAccess at args[0]
+}

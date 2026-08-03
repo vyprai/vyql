@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding commandStringWrapperExecution250 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.callPath, ["utils.run", "run"]) and containsAny(node.context.callArg, ["utils.run:gitclone", "utils.run:git clone", "run:gitclone", "run:git clone"]) and not (containsAny(node.context.callPath, ["runWithSpawn", "spawn", "execFile"]))
+  emit issue code.CommandStringWrapperExecution at node
+}

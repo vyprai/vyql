@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter ruby {
-  package "vegas" {
-    sink method "launch!" -> code.CommandExecution
-  }
-}

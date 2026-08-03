@@ -1,0 +1,9 @@
+module bindings.swift.generated.m586c3899;
+
+binding deserialization10 {
+  requires {
+    dependency("github.com/RxSwiftCommunity/RxAlamofire")
+  }
+  query pattern callExpr where callee.method == "requestDecodable"
+  emit sink code.Deserialization at args[0]
+}

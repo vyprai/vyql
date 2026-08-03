@@ -1,0 +1,10 @@
+module bindings.elixir.generated.m59dae0ab;
+
+binding privilegedOp1 {
+  requires {
+    dependency("circuits_gpio")
+  }
+  query pattern callExpr where callee.method == "write_gpio"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

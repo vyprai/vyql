@@ -1,0 +1,9 @@
+module bindings.c.generated.m113f4c6b;
+
+binding commandExecution2 {
+  requires {
+    dependency("detours")
+  }
+  query pattern callExpr where callee.method == "DetourCreateProcessWithDllExA"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter python {
-  package "zict" {
-    sink path "zict.File" -> code.FilePathAccess
-  }
-}

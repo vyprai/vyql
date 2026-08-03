@@ -1,0 +1,13 @@
+module bindings.python.generated.mb0264bc8;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("bcrypt")
+  }
+  query pattern callExpr where callee.method == "checkpw"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

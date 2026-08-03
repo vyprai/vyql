@@ -1,12 +1,12 @@
-# 07 — Adapters and Patterns
+# 07 — Bindings and Patterns
 
 Status: `DRAFT`
 
-The adapter layer is where VyQL's universality claim is paid for. This
-document specifies the two technology-facing layers (patterns, adapters),
+The binding layer is where VyQL's universality claim is paid for. This
+document specifies the two technology-facing layers (patterns, bindings),
 their conflict/precedence model, and the content program that keeps them
 honest. Read [01](01-vision-and-scope.md) §"What VyQL actually claims" first:
-adapters are the relocated per-technology cost, and they are sized as a
+bindings are the relocated per-technology cost, and they are sized as a
 first-class product.
 
 ## Pattern layer
@@ -44,13 +44,13 @@ pattern terraform.s3_public_acl {
 }
 ```
 
-Patterns export named, typed match shapes (`property_access(receiver,
-method)`) that adapters consume. Patterns contain **zero security
+Patterns export named, typed match shapes (`callExpr`, `memberAccess`, and
+other normalized fact families) that bindings consume. Patterns contain **zero security
 vocabulary** — the compiler rejects concept references inside pattern blocks.
 
 ### Pattern fidelity levels
 
-A pattern declares what the matcher can actually see, because adapters
+A pattern declares what the matcher can actually see, because bindings
 inherit this as a confidence ceiling:
 
 - `syntactic` — shape only (tree-sitter without resolution).
@@ -62,50 +62,46 @@ inherit this as a confidence ceiling:
 variable named `req` that isn't a request. Fidelity is recorded in label
 provenance and consumable by `min_confidence` rule metadata.
 
-## Adapter layer
+## Binding layer
 
 ### Anatomy
 
 ```vyql
-adapter javascript.express {
-  meta {
-    version: "1.4.0"
-    targets: { package: "express", versions: ">=4 <6" }
-    fidelity: resolved
-    provenance {
-      author: "vypr.research"
-      origin: human          // human | ai_generated | ai_assisted | community
-      reviewed_by: ["..."]
-      evidence: ["docs:expressjs.com/api", "test:express_fixtures"]
-    }
+module bindings.javascript.express;
+
+binding requestBody {
+  requires {
+    dependency("express", range: ">=4 <6")
   }
 
-  requires pattern javascript.member_call
-  requires pattern javascript.route_definition
+  query pattern callExpr where callee.path ~= "req.body"
+  emit source code.HttpInput at call.result
+  fidelity: resolved
+  confidence: high
+}
 
-  map property_access(req, "body")   to HTTP_INPUT
-  map property_access(req, "query")  to HTTP_INPUT
-  map property_access(req, "params") to HTTP_INPUT
-
-  // Control binding: endpoint-scoped control attaches PROTECTS edges
-  map middleware_use("helmet")       to SECURITY_HEADERS  on routes_below
-  map middleware_use(authz_fn)       to AUTHORIZATION_CHECK on routes_below
+binding authMiddleware {
+  requires { dependency("express", range: ">=4 <6") }
+  query pattern callExpr where callee.method == "use" and args.any.path ~= "requireAuth"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint { anchor: call }
+  }
 }
 ```
 
 Key properties:
 
-- **Version-targeted.** Adapters declare which versions of the technology
-  they describe. Framework API changes ship as adapter updates, never rule
+- **Version-targeted.** Bindings declare which versions of the technology
+  they describe. Framework API changes ship as binding updates, never rule
   updates.
 - **Evidence-linked.** Every mapping cites why it's believed (docs, fixture
-  tests). Required for AI-generated adapters; required-by-review for human
+  tests). Required for AI-generated bindings; required-by-review for human
   ones.
-- **Control attachment.** Adapters are also how Class C edges
+- **Check attachment.** Bindings are also how coverage evidence
   (`PROTECTS`, `SANITIZES`, `CHECKS`) enter the graph — mapping a framework's
-  defense mechanisms onto control concepts with their `applies` scope.
+  defense mechanisms onto check concepts with explicit `coveredBy` coverage.
 
-- **Advisory adapters** are a distinct, high-leverage adapter class: they consume
+- **Advisory bindings** are a distinct, high-leverage binding class: they consume
   enriched vulnerability advisories (a `VulnerableEntrypoint` — package, affected
   versions, vulnerable symbol, vuln-class, tainted argument, precondition;
   [11](11-domain-supply-chain-runtime.md)) and, where the SBOM confirms the
@@ -114,7 +110,7 @@ Key properties:
   a typed sink so the standard taint rules decide exploitability. They depend on
   import/type resolution to map an advisory's symbol to real call sites, and they
   are the prime target for AI generation from advisory text
-  ([18](18-ai-integration.md)). Like all adapters they carry provenance and
+  ([18](18-ai-integration.md)). Like all bindings they carry provenance and
   precedence, and AI-drafted ones run subordinate until reviewed.
 
 - **Sink-argument precision.** A sink mapping must identify *which argument
@@ -123,13 +119,13 @@ Key properties:
   — and deliberately *not* the `params` tuple — means placeholder-parameterized
   queries produce no taint path to the sink and raise zero findings, with no
   sanitizer label required. Parameterization-by-placeholder is thus handled by
-  sink precision; `unless sanitized_by` remains for *explicit* escaping/
-  validation on the path. The two mechanisms compose. (Validated on real Flask/
+  sink precision; explicit escaping/validation is modeled as `emit check ...`
+  plus `unless sink.path coveredBy ...`. The two mechanisms compose. (Validated on real Flask/
   aiohttp code; see `poc/FINDINGS.md` §"Real-repo extraction" #1.)
 
-### Adapter tests are mandatory
+### Binding tests are mandatory
 
-An adapter ships with fixtures: minimal real inputs (code snippets, Terraform
+A binding ships with fixtures: minimal real inputs (code snippets, Terraform
 files, IAM policies) annotated with expected labels:
 
 ```javascript
@@ -141,24 +137,24 @@ app.post("/x", (req, res) => {
 ```
 
 The harness ([15](15-rule-lifecycle-governance.md)) runs extract → match →
-adapt and diffs labels. An adapter without fixtures does not merge. This is
+bind and diffs labels. A binding without fixtures does not merge. This is
 the Semgrep golden-test lesson applied one layer down.
 
 ## Conflict and precedence model
 
-With hundreds of adapters per concept, overlap is guaranteed: two adapters
+With hundreds of bindings per concept, overlap is guaranteed: two bindings
 label the same node differently, or one labels what another exempts.
 
 Resolution order (first match wins):
 
 1. **Tenant overrides** — explicit allow/deny/relabel entries a customer
    maintains (e.g., "our wrapper `db.safeQuery` is SQL_PARAMETERIZATION").
-2. **Specificity** — adapter targeting a narrower version range / more
+2. **Specificity** — binding targeting a narrower version range / more
    specific package beats a generic one (`javascript.express@>=5` beats
    `javascript.express`, which beats `javascript.http_generic`).
 3. **Fidelity** — `semantic` beats `resolved` beats `syntactic`.
 4. **Origin trust** — `human-reviewed` beats `ai_generated` unreviewed.
-5. **Tie** — both labels applied, conflict logged to the adapter quality
+5. **Tie** — both labels applied, conflict logged to the binding quality
    dashboard. Conflicting *control* labels (one says sanitizer, other says
    not) never tie-break silently: flagged for review, lower-confidence label
    suppressed in the interim.
@@ -167,20 +163,20 @@ All resolution decisions are recorded in label provenance — a finding's proof
 tree can show "labeled HTTP_INPUT by javascript.express@1.4.0 (won over
 javascript.http_generic by specificity)".
 
-## The adapter content program
+## The binding content program
 
 This is a product commitment, not an appendix:
 
 - **Coverage matrix** as a tracked artifact: concepts × technologies, with
   measured coverage (which of the top-N frameworks per language have
-  adapters, per concept). Gaps drive the content roadmap.
+  bindings, per concept). Gaps drive the content roadmap.
 - **Telemetry-driven prioritization:** extraction can detect frameworks in
-  customer code (package manifests) that have no adapter — an "unknown
+  customer code (package manifests) that have no binding — an "unknown
   framework" report ranks the backlog by real exposure.
 - **AI generation pipeline** ([18](18-ai-integration.md)): models draft
-  adapters from documentation and code corpora; drafts arrive with
+  bindings from documentation and code corpora; drafts arrive with
   `origin: ai_generated`, evidence links, and fixtures; human review promotes
-  them. Confidence and precedence rules above make unreviewed AI adapters
+  them. Confidence and precedence rules above make unreviewed AI bindings
   *usable but subordinate* — they can only add lower-trust labels, never
   override reviewed ones.
 - **Community/customer contribution** path with the same gates.
@@ -189,10 +185,10 @@ This is a product commitment, not an appendix:
 
 Order-of-magnitude estimate for Tier 2 code coverage: ~10 languages × ~15
 frameworks-worth-covering each × (sources, sinks, controls) ≈ **300–500
-adapter units**, each small (dozens of mappings) but each requiring fixtures
+binding units**, each small (dozens of mappings) but each requiring fixtures
 and review. At a sustainable pace this is a multi-quarter content program
 even with AI drafting — which is why Tier 1 (cloud/identity, ~a dozen
-adapters total for three providers + K8s) ships first and proves the
+bindings total for three providers + K8s) ships first and proves the
 architecture ([19](19-roadmap.md)).
 
 ## Open questions
@@ -200,9 +196,9 @@ architecture ([19](19-roadmap.md)).
 - **Pattern dialect for binaries/bytecode** (JVM, .NET, compiled Go) — needed
   for SCA reachability; likely a `semantic`-fidelity extractor problem more
   than a pattern problem. Deferred to SCA design.
-- **Adapter composition** — can an adapter extend another (Express adapter
+- **Binding composition** — can a binding extend another (Express binding
   reused by NestJS)? Proposal: `extends` with explicit mapping inheritance;
   needs prototyping before committing.
 - **Negative mappings** — "this looks like a sink but isn't" (e.g., an ORM's
   identifier-quoting API). Currently expressible as tenant overrides only;
-  probably needs first-class `exempt` mappings in adapters.
+  probably needs first-class `exempt` mappings in bindings.

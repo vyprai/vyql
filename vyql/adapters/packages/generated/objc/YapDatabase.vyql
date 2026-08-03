@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter objc {
-  package "YapDatabase" {
-    sink method "registerDeserializer:forCollection:" -> code.Deserialization
-    sink method "registerObjectDeserializer:forCollection:" -> code.Deserialization
-  }
-}

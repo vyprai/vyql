@@ -1,6 +1,0 @@
-adapter javascript {
-  package "jsonfile" {
-    sink method "readFileSync" -> code.FilePathAccess
-    sink method "writeFileSync" -> code.FilePathAccess
-  }
-}

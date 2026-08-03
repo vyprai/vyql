@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "org.springframework.cloud:spring-cloud-cloudfoundry-connector" {
-    sink method "CloudFoundryRawServiceData" -> code.Deserialization
-    sink method "ServiceDataPostProcessor.process" -> code.Deserialization
-  }
-}

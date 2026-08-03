@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mf50eb35c;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("mongo-c-driver")
+  }
+  query pattern callExpr where callee.method == "deflateSetHeader"
+  emit sink code.StoredDataWrite at args[0]
+}

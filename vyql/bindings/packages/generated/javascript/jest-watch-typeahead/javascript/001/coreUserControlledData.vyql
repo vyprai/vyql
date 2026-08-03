@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mac427ddf;
+
+binding userControlledData1 {
+  requires {
+    dependency("jest-watch-typeahead")
+  }
+  query pattern callExpr where callee.method == "onKey"
+  emit source core.UserControlledData at call.result
+}

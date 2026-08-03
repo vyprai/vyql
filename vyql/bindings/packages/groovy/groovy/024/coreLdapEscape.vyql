@@ -1,0 +1,14 @@
+module bindings.groovy.generated.mbfd454d1;
+
+binding ldapEscape24 {
+  requires {
+    dependency("spring-ldap")
+  }
+  query pattern callExpr where callee.path ~= "LdapEncoder.filterEncode"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

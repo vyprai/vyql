@@ -1,0 +1,16 @@
+module bindings.objc.generated.mccadd221;
+
+binding benchmarkSecureCookie {
+  query pattern callExpr where callee.analysis == "module.context" and args.any.context.category contains "securecookie" and args.any.context.vulnerable contains "true"
+  emit issue code.InsecureCookie at call
+}
+
+binding benchmarkTrustBoundarySource {
+  query pattern callExpr where callee.analysis == "module.context" and args.any.context.category contains "trustbound" and args.any.context.vulnerable contains "true"
+  emit source code.HttpInput at call
+}
+
+binding benchmarkTrustBoundarySink {
+  query pattern callExpr where callee.analysis == "module.context" and args.any.context.category contains "trustbound" and args.any.context.vulnerable contains "true"
+  emit sink code.TrustBoundary at call
+}

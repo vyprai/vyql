@@ -1,0 +1,8 @@
+module code;
+
+review code.CaptchaValidationTruthyReturnBypass {
+  category: auth
+  expected: [core.InputValidation, core.AuthenticationCheck]
+  kind: attention
+  text: "review captcha validators that return non-boolean falsey values for invalid input instead of explicit False"
+}

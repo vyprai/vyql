@@ -1,0 +1,9 @@
+module bindings.go.generated.m2550fd9e;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/gorilla/mux")
+  }
+  query pattern callExpr where callee.method == "Vars"
+  emit source core.UserControlledData at call.result
+}

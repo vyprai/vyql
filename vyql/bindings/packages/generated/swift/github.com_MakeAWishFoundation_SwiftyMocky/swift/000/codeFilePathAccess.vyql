@@ -1,0 +1,9 @@
+module bindings.swift.generated.mb190fccd;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/MakeAWishFoundation/SwiftyMocky")
+  }
+  query pattern callExpr where callee.method == "setup"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "rack-cache" {
-    sink method "parse" -> code.Deserialization
-  }
-}

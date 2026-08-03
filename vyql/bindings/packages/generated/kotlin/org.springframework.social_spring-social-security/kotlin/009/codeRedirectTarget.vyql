@@ -1,0 +1,10 @@
+module bindings.kotlin.generated.m1fdb3140;
+
+binding redirectTarget9 {
+  requires {
+    dependency("org.springframework.social:spring-social-security")
+  }
+  query pattern callExpr where callee.method == "defaultFailureUrl"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

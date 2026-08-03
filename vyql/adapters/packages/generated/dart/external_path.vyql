@@ -1,6 +1,0 @@
-adapter dart {
-  package "external_path" {
-    sink method "getExternalStorageDirectories" -> code.FilePathAccess
-    sink method "getExternalStoragePublicDirectory" -> code.FilePathAccess
-  }
-}

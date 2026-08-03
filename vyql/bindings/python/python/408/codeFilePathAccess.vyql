@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding filePathAccess408 {
+  query pattern callExpr where callee.path ~= "django.views.static.serve"
+  emit sink code.FilePathAccess at args[0]
+}

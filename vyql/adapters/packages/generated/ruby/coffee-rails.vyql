@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter ruby {
-  package "coffee-rails" {
-    sink method "TemplateHandler.call" -> code.CodeEval
-  }
-}

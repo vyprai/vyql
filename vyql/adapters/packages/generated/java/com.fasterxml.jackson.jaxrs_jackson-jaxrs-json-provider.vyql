@@ -1,5 +1,0 @@
-adapter java {
-  package "com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider" {
-    sink method "forReading" -> code.Deserialization
-  }
-}

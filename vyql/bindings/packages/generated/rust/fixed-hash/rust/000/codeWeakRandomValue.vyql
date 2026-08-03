@@ -1,0 +1,9 @@
+module bindings.rust.generated.md620d249;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("fixed-hash")
+  }
+  query pattern callExpr where callee.method == "randomize"
+  emit issue code.WeakRandomValue at call
+}

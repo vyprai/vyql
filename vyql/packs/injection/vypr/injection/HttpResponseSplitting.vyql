@@ -1,0 +1,10 @@
+module vypr.injection;
+
+rule HttpResponseSplitting {
+  meta {
+    cwe: [CWE_113]
+    id: "VYQL-INJ-010"
+    severity: medium
+  }
+  taint core.UserControlledData -> code.ResponseHeaderWrite
+}

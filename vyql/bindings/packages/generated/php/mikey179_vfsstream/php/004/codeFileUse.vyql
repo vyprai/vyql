@@ -1,0 +1,9 @@
+module bindings.php.generated.mf44fbe20;
+
+binding fileUse4 {
+  requires {
+    dependency("mikey179/vfsstream")
+  }
+  query pattern callExpr where callee.method == "newDirectory"
+  emit sink code.FileUseSink at args[0]
+}

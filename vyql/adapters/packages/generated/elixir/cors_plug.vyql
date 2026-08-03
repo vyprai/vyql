@@ -1,9 +1,0 @@
-import code.{HttpInput, ResponseHeaderWrite}
-
-adapter elixir {
-  package "cors_plug" {
-    sink method "call" -> code.ResponseHeaderWrite
-    sink method "add_cors_headers" -> code.ResponseHeaderWrite
-    source method "request_origin" -> code.HttpInput
-  }
-}

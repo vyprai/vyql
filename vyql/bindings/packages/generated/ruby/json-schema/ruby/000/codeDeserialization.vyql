@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m91009dd6;
+
+binding deserialization0 {
+  requires {
+    dependency("json-schema")
+  }
+  query pattern callExpr where callee.method == "validate_json"
+  emit sink code.Deserialization at args[0]
+}

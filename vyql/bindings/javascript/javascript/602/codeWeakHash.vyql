@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding weakHash602 {
+  query pattern callExpr where callee.path ~= "createHash" and args.any.literal contains "md5"
+  emit issue code.WeakHash at call
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "felixfbecker/advanced-json-rpc" {
-    sink method "parse" -> code.Deserialization
-  }
-}

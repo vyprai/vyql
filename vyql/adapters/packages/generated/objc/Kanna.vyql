@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter objc {
-  package "Kanna" {
-    sink method "XML" -> code.Deserialization
-    sink method "HTML" -> code.Deserialization
-  }
-}

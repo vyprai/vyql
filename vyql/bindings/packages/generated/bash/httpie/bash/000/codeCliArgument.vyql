@@ -1,0 +1,9 @@
+module bindings.bash.generated.mb0418fa4;
+
+binding cliArgument0 {
+  requires {
+    dependency("httpie")
+  }
+  query pattern callExpr where callee.path ~= "httpie.argv"
+  emit source code.CliArgument at call.result
+}

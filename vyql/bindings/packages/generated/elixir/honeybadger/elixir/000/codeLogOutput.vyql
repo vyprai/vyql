@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m2e141999;
+
+binding logOutput0 {
+  requires {
+    dependency("honeybadger")
+  }
+  query pattern callExpr where callee.method == "handle_errors"
+  emit sink code.LogOutput at args[0]
+}

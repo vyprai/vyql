@@ -1,6 +1,0 @@
-adapter elixir {
-  package "mdns_lite" {
-    sink method "decode" -> code.Deserialization
-    sink method "query" -> code.NetworkConnect
-  }
-}

@@ -1,0 +1,8 @@
+module code;
+
+review code.WeakRedirectUrlValidation {
+  category: request_forgery
+  expected: [core.RedirectAllowlist, core.InputValidation]
+  kind: attention
+  text: "review redirect URL validators for scheme/netloc parity, slash normalization, control-character rejection, and exact external-host matching"
+}

@@ -1,0 +1,6 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding htmlRender68 {
+  query pattern callExpr where callee.path ~= "PreEscaped"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{SecretValue}
-adapter groovy {
-  package "org.jasypt:jasypt" {
-    source method "setPassword" -> code.SecretValue
-  }
-}

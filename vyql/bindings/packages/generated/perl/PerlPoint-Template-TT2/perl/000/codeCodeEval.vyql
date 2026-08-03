@@ -1,0 +1,9 @@
+module bindings.perl.generated.md7c41e4a;
+
+binding codeEval0 {
+  requires {
+    dependency("PerlPoint-Template-TT2")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.CodeEval at args[0]
+}

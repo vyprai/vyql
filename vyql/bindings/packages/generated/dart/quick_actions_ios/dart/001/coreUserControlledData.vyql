@@ -1,0 +1,9 @@
+module bindings.dart.generated.meee85a98;
+
+binding userControlledData1 {
+  requires {
+    dependency("quick_actions_ios")
+  }
+  query pattern callExpr where callee.method == "IOSQuickActionsFlutterApi.launchAction"
+  emit source core.UserControlledData at call.result
+}

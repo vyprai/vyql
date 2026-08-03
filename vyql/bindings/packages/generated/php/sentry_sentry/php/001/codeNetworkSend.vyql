@@ -1,0 +1,9 @@
+module bindings.php.generated.me55ce013;
+
+binding networkSend1 {
+  requires {
+    dependency("sentry/sentry")
+  }
+  query pattern callExpr where callee.method == "HttpClient::sendRequest"
+  emit sink code.NetworkSend at args[0]
+}

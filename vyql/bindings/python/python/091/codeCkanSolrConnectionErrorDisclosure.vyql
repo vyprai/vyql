@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding ckanSolrConnectionErrorDisclosure91 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "ckan_solr_connection_error_disclosure"
+  emit issue code.CkanSolrConnectionErrorDisclosure at node
+}

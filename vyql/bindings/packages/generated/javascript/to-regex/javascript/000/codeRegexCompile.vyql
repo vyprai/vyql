@@ -1,0 +1,10 @@
+module bindings.javascript.generated.m2d49ab3e;
+
+binding regexCompile0 {
+  requires {
+    dependency("to-regex")
+  }
+  query pattern callExpr where callee.method == "module.exports"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

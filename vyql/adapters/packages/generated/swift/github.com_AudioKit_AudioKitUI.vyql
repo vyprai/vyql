@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter swift {
-  package "github.com/AudioKit/AudioKitUI" {
-    sink method "loadSequencerFile" -> code.FilePathAccess
-  }
-}

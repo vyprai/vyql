@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mbee64101;
+
+binding networkSend4 {
+  requires {
+    dependency("ueberauth_facebook")
+  }
+  query pattern callExpr where callee.method == "get_token!"
+  emit sink code.NetworkSend at args[0]
+}

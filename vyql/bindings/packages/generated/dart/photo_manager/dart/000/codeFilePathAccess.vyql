@@ -1,0 +1,9 @@
+module bindings.dart.generated.m8b71e5ff;
+
+binding filePathAccess0 {
+  requires {
+    dependency("photo_manager")
+  }
+  query pattern callExpr where callee.method == "setVerbose"
+  emit sink code.FilePathAccess at args[0]
+}

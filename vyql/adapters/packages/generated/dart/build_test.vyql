@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-adapter dart {
-  package "build_test" {
-    sink method "PackageAssetReader" -> code.FilePathAccess
-    sink method "currentIsolate" -> code.FilePathAccess
-    sink method "InternalTestReaderWriter" -> code.FilePathAccess
-    sink method "InMemoryAssetPathProvider" -> code.FilePathAccess
-  }
-}

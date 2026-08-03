@@ -1,7 +1,0 @@
-adapter elixir {
-  package "exmerl" {
-    sink method "parse" -> code.XmlParse
-    sink method "from_file" -> code.XmlParse
-    sink method "from_string" -> code.XmlParse
-  }
-}

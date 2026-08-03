@@ -1,0 +1,9 @@
+module bindings.perl.generated.m93ad5de5;
+
+binding codeEval0 {
+  requires {
+    dependency("Sorter-from_sortkey")
+  }
+  query pattern callExpr where callee.method == "gen_sorter"
+  emit sink code.CodeEval at args[0]
+}

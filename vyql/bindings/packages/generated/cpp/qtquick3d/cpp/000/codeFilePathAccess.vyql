@@ -1,0 +1,9 @@
+module bindings.cpp.generated.md5bab3bc;
+
+binding filePathAccess0 {
+  requires {
+    dependency("qtquick3d")
+  }
+  query pattern callExpr where callee.method == "import"
+  emit sink code.FilePathAccess at args[0]
+}

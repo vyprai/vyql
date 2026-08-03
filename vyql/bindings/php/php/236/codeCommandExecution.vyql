@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding commandExecution236 {
+  query pattern callExpr where callee.path ~= "passthru"
+  emit sink code.CommandExecution at args[0]
+}

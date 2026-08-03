@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/pascaldekloe/goe" {
-    sink method "eval" -> code.ExpressionEval
-  }
-}

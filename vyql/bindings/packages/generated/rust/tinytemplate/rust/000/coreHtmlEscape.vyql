@@ -1,0 +1,14 @@
+module bindings.rust.generated.m402d926e;
+
+binding htmlEscape0 {
+  requires {
+    dependency("tinytemplate")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

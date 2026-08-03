@@ -1,0 +1,7 @@
+module bindings.cpp.generated.m4e783366;
+
+binding integerSizeArithmetic98 {
+  query pattern presenceNode where node.path ~= "__binop.shl"
+  emit issue code.IntegerSizeArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}

@@ -1,6 +1,0 @@
-import code.{NetworkData}
-adapter cpp {
-  package "libuvc" {
-    source method "uvc_start_streaming" -> code.NetworkData
-  }
-}

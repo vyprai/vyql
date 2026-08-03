@@ -1,0 +1,9 @@
+module bindings.bash.generated.m40c1feb4;
+
+binding cliArgument0 {
+  requires {
+    dependency("aws-shell")
+  }
+  query pattern callExpr where callee.path ~= "aws-shell.argv"
+  emit source code.CliArgument at call.result
+}

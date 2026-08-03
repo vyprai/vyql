@@ -1,6 +1,0 @@
-import code.{HttpInput}
-adapter ruby {
-  package "airbrake" {
-    source method "Airbrake::Rack::HttpParamsFilter#call" -> code.HttpInput
-  }
-}

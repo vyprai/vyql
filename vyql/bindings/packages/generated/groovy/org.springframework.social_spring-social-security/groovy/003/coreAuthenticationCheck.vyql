@@ -1,0 +1,13 @@
+module bindings.groovy.generated.m046c5b4d;
+
+binding authenticationCheck3 {
+  requires {
+    dependency("org.springframework.social:spring-social-security")
+  }
+  query pattern callExpr where callee.method == "attemptAuthentication"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m7758ee8c;
+
+binding userControlledData2 {
+  requires {
+    dependency("json_web_token")
+  }
+  query pattern callExpr where callee.method == "verify"
+  emit source core.UserControlledData at call.result
+}

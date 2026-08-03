@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m12c6283d;
+
+binding commandExecution0 {
+  requires {
+    dependency("ratatouille")
+  }
+  query pattern callExpr where callee.method == "Ratatouille.Runtime.process_command_async"
+  emit sink code.CommandExecution at args[0]
+}

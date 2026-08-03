@@ -1,0 +1,9 @@
+module bindings.swift.generated.m4e45b835;
+
+binding expressionEval0 {
+  requires {
+    dependency("github.com/nerzh/swift-regular-expression")
+  }
+  query pattern callExpr where callee.method == "regexp"
+  emit sink code.ExpressionEval at args[0]
+}

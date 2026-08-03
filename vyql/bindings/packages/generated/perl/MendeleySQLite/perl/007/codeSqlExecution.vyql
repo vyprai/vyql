@@ -1,0 +1,9 @@
+module bindings.perl.generated.m1f45aed0;
+
+binding sqlExecution7 {
+  requires {
+    dependency("MendeleySQLite")
+  }
+  query pattern callExpr where callee.method == "set_keyword_for_document"
+  emit sink code.SqlExecution at args[0]
+}

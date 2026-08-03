@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding staticIv187 {
+  query pattern callExpr where callee.path ~= "EVP_DecryptInit_ex" and args.any.literal contains "0000000000000000"
+  emit issue code.StaticIv at call
+}

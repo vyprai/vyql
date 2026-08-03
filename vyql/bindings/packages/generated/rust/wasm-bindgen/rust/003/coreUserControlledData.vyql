@@ -1,0 +1,9 @@
+module bindings.rust.generated.me28a0fc4;
+
+binding userControlledData3 {
+  requires {
+    dependency("wasm-bindgen")
+  }
+  query pattern callExpr where callee.method == "as_f64"
+  emit source core.UserControlledData at call.result
+}

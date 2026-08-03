@@ -1,0 +1,9 @@
+module bindings.c.generated.m14390899;
+
+binding weakHash2 {
+  requires {
+    dependency("rapidjson")
+  }
+  query pattern callExpr where callee.method == "Hash"
+  emit issue code.WeakHash at call
+}

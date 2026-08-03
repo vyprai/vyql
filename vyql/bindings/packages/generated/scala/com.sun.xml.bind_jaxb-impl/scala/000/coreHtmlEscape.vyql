@@ -1,0 +1,14 @@
+module bindings.scala.generated.mb51b6eb8;
+
+binding htmlEscape0 {
+  requires {
+    dependency("com.sun.xml.bind:jaxb-impl")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

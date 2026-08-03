@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mbfd454d1;
+
+binding filePathAccess16 {
+  requires {
+    dependency("java.io")
+  }
+  query pattern callExpr where callee.path ~= "File"
+  emit sink code.FilePathAccess at args[0]
+}

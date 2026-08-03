@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m3b6d1ffe;
+
+binding deserialization0 {
+  requires {
+    dependency("org.jboss.resteasy:resteasy-jackson2-provider")
+  }
+  query pattern callExpr where callee.method == "readFrom"
+  emit sink code.Deserialization at args[0]
+}

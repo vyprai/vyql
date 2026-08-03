@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m7678701b;
+
+binding deserialization0 {
+  requires {
+    dependency("boost-locale")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

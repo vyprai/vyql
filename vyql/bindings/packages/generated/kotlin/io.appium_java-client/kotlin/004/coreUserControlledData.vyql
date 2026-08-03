@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mfab11f84;
+
+binding userControlledData4 {
+  requires {
+    dependency("io.appium:java-client")
+  }
+  query pattern callExpr where callee.method == "androidViewMatcher"
+  emit source core.UserControlledData at call.result
+}

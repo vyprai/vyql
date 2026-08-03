@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter scala {
-  package "io.netty:netty-handler" {
-    sink method "readCertificates" -> FilePathAccess
-    sink method "readPrivateKey" -> FilePathAccess
-  }
-}

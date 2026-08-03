@@ -1,0 +1,9 @@
+module bindings.python.generated.m3d9ccbad;
+
+binding externalApiResponse25 {
+  requires {
+    dependency("httpx")
+  }
+  query pattern callExpr where callee.method == "json"
+  emit source code.ExternalApiResponse at call.result
+}

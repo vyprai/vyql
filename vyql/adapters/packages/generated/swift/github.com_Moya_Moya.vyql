@@ -1,8 +1,0 @@
-import code.{NetworkSend, UrlFetch}
-
-adapter swift {
-  package "github.com/Moya/Moya" {
-    sink method "request" -> code.NetworkSend
-    sink method "init" -> code.UrlFetch
-  }
-}

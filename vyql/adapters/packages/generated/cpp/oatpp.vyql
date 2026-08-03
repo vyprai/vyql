@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-adapter cpp {
-  package "oatpp" {
-    sink method "oatpp::orm::DbClient::execute" -> code.SqlExecution
-    sink method "oatpp::orm::DbClient::executeQuery" -> code.SqlExecution
-  }
-}

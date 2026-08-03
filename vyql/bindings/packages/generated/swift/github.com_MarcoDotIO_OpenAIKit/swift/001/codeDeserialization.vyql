@@ -1,0 +1,9 @@
+module bindings.swift.generated.m61394e88;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/MarcoDotIO/OpenAIKit")
+  }
+  query pattern callExpr where callee.method == "parseWebVTT"
+  emit sink code.Deserialization at args[0]
+}

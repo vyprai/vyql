@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m742304df;
+
+binding commandExecution0 {
+  requires {
+    dependency("toolshed")
+  }
+  query pattern callExpr where callee.method == "cmd"
+  emit sink code.CommandExecution at args[0]
+}

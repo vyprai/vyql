@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m1a2bd651;
+
+binding filePathAccess2 {
+  requires {
+    dependency("yasm")
+  }
+  query pattern callExpr where callee.method == "yasm__splitpath_win"
+  emit sink code.FilePathAccess at args[0]
+}

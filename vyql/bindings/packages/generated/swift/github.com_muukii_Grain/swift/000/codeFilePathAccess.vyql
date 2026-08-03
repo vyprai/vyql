@@ -1,0 +1,9 @@
+module bindings.swift.generated.m37af1718;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/muukii/Grain")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FilePathAccess at args[0]
+}

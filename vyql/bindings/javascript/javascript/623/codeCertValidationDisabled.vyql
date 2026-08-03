@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding certValidationDisabled623 {
+  query pattern presenceNode where node.context.language == "javascript" and node.context.callPath contains "https.get" and node.context.prop contains "rejectUnauthorized=false"
+  emit issue code.CertValidationDisabled at node
+}

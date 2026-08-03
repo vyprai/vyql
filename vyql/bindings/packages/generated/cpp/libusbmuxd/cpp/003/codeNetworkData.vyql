@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m81559570;
+
+binding networkData3 {
+  requires {
+    dependency("libusbmuxd")
+  }
+  query pattern callExpr where callee.method == "usbmuxd_recv"
+  emit source code.NetworkData at call.result
+}

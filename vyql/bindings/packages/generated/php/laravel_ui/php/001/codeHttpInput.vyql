@@ -1,0 +1,9 @@
+module bindings.php.generated.meb280da6;
+
+binding httpInput1 {
+  requires {
+    dependency("laravel/ui")
+  }
+  query pattern callExpr where callee.method == "RegistersUsers::register"
+  emit source code.HttpInput at call.result
+}

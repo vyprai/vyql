@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter java {
-  package "net.logstash.logback:logstash-logback-encoder" {
-    control method "escapeJson" -> core.InputValidation
-  }
-}

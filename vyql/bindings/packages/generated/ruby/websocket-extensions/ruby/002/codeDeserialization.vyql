@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m551fc110;
+
+binding deserialization2 {
+  requires {
+    dependency("websocket-extensions")
+  }
+  query pattern callExpr where callee.method == "process_incoming_message"
+  emit sink code.Deserialization at args[0]
+}

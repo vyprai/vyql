@@ -1,0 +1,9 @@
+module bindings.go.generated.m8d30004a;
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/go-openapi/loads")
+  }
+  query pattern callExpr where callee.method == "Spec"
+  emit sink code.Deserialization at args[0]
+}

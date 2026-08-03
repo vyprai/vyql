@@ -1,0 +1,13 @@
+module bindings.groovy.generated.m717e9152;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("org.apache.hadoop:hadoop-auth")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

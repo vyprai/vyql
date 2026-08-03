@@ -1,0 +1,10 @@
+module bindings.groovy.generated.m4f20c1a4;
+
+binding sessionId4 {
+  requires {
+    dependency("javax.servlet:javax.servlet-api")
+  }
+  query pattern callExpr where callee.method == "getSession"
+  emit issue code.SessionId at call
+  emit sink code.SessionIdSink at call
+}

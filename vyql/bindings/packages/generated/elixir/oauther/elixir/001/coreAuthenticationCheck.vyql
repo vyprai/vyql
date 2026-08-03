@@ -1,0 +1,13 @@
+module bindings.elixir.generated.mda408d91;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("oauther")
+  }
+  query pattern callExpr where callee.method == "sign"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

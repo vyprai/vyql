@@ -1,8 +1,0 @@
-import code.{CodeEval}
-adapter dart {
-  package "android_alarm_manager_plus" {
-    sink method "oneShot" -> code.CodeEval
-    sink method "oneShotAt" -> code.CodeEval
-    sink method "periodic" -> code.CodeEval
-  }
-}

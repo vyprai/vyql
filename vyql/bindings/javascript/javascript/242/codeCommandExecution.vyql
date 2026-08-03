@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding commandExecution242 {
+  query pattern callExpr where callee.path ~= "WebpackShellPlugin"
+  emit sink code.CommandExecution at args[0]
+}

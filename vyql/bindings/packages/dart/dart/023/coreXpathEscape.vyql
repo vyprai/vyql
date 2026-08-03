@@ -1,0 +1,14 @@
+module bindings.dart.generated.m5342780c;
+
+binding xpathEscape23 {
+  requires {
+    dependency("xpath_selector")
+  }
+  query pattern callExpr where callee.path ~= "escapeXPath"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

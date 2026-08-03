@@ -1,0 +1,9 @@
+module bindings.rust.generated.mdb8da629;
+
+binding userControlledData2 {
+  requires {
+    dependency("multer")
+  }
+  query pattern callExpr where callee.method == "chunk"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,6 @@
+module authentication;
+
+threat ImproperAuthentication {
+  cwe: [CWE_287]
+  desc: "Improper authentication"
+}

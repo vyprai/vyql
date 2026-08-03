@@ -1,0 +1,11 @@
+module code;
+
+concept SharedOtaHandlerMissingAuthentication : issue {
+  cwe: [CWE_306, CWE_862]
+  reviewAssumption: "the OTA endpoint is reachable over the device web server when web authentication is configured for other handlers"
+  reviewCategory: auth
+  reviewCondition: "a shared web handler registry exposes an OTA upload handler without an observed authentication middleware"
+  reviewConfidence: high
+  reviewEvidence: "web-handler registry context {pattern} stores raw AsyncWebHandler instances while declaring an OTA upload handler"
+  vulnerableTo: [authentication.MissingAuthentication, access_control.MissingAuthorization]
+}

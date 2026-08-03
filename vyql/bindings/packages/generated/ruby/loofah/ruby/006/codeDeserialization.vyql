@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m441454db;
+
+binding deserialization6 {
+  requires {
+    dependency("loofah")
+  }
+  query pattern callExpr where callee.method == "xml_fragment"
+  emit sink code.Deserialization at args[0]
+}

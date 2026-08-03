@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding commandExecution74 {
+  query pattern callExpr where callee.path ~= "exec.CommandContext"
+  emit sink code.CommandExecution at args[0]
+}

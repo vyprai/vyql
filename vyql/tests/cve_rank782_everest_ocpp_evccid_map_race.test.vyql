@@ -24,6 +24,25 @@ test "rank782: OCPP EVCCID raw shared map is racy"
   };
   ```
 
+test "rank782: OCPP shared map race generalizes across names"
+  lang cpp
+  expect VYQL-RACE-007
+  code
+  ```
+  #include <map>
+  #include <string>
+
+  class ChargePoint {
+      std::map<int32_t, std::string> ids_by_evse;
+      void on_ev_info(int evse, const std::string& evcc) {
+          ids_by_evse[evse] = evcc;
+      }
+      void on_transaction(int evse, IdToken& token) {
+          update_evcc_id_token(token, ids_by_evse[evse], ocpp_protocol_version);
+      }
+  };
+  ```
+
 test "rank782: OCPP EVCCID map is guarded by monitor handles"
   lang cpp
   reject VYQL-RACE-007

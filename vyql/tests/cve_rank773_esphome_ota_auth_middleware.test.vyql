@@ -87,3 +87,29 @@ test "rank773: shared OTA handler registry is wrapped by auth middleware"
     }
   };
   ```
+
+test "rank773: shared OTA handler registry generalizes across names"
+  lang cpp
+  file web_server_base.h
+  expect VYQL-AUTH-051
+  code
+  ```
+  class AsyncWebHandler {};
+  class AsyncWebServerRequest {};
+
+  class DeviceWeb {
+   public:
+    void add_handler(AsyncWebHandler *next_handler) {
+      active_handlers.push_back(next_handler);
+    }
+
+   private:
+    std::vector<AsyncWebHandler *> active_handlers;
+  };
+
+  class OTARequestHandler : public AsyncWebHandler {
+   public:
+    void handleUpload(AsyncWebServerRequest *request, const String &filename, size_t index, uint8_t *data, size_t len,
+                      bool final);
+  };
+  ```

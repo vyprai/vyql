@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "squizlabs/php_codesniffer" {
-    sink method "parse" -> code.Deserialization
-  }
-}

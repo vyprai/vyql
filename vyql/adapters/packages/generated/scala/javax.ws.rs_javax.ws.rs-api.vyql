@@ -1,8 +1,0 @@
-import code.{HttpInput}
-
-adapter scala {
-  package "javax.ws.rs:javax.ws.rs-api" {
-    source method "getQueryParameters" -> code.HttpInput
-    source method "getPathParameters" -> code.HttpInput
-  }
-}

@@ -1,0 +1,13 @@
+module bindings.go.generated.m39efcd29;
+
+binding xmlHardening24 {
+  requires {
+    dependency("encoding/xml")
+  }
+  query pattern callExpr where callee.path ~= "xml.NewDecoder"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}

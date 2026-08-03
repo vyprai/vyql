@@ -1,0 +1,15 @@
+module bindings.powershell.generated.m390f1180;
+
+pattern bindingMetadata {
+  binding: {
+    name: "powershell"
+    meta: {
+      fidelity: "resolved"
+      source_var_case: "upper"
+      source_var_event: "shell_input"
+      source_var_exact: ["QUERY_STRING"]
+      source_var_prefix: ["HTTP_", "REQUEST_", "CONTENT_", "PATH_INFO", "REMOTE_"]
+      source_var_strip_prefix: ["ENV:"]
+    }
+  }
+}

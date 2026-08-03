@@ -1,6 +1,0 @@
-adapter ruby {
-  package "sequel" {
-    sink method "execute" -> code.SqlExecution
-    control method "prepare" -> core.SqlParameterization
-  }
-}

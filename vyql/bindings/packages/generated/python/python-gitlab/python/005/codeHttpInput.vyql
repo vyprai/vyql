@@ -1,0 +1,9 @@
+module bindings.python.generated.m0a3bbddc;
+
+binding httpInput5 {
+  requires {
+    dependency("python-gitlab")
+  }
+  query pattern callExpr where callee.method == "http_head"
+  emit source code.HttpInput at call.result
+}

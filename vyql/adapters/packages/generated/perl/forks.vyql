@@ -1,5 +1,0 @@
-adapter perl {
-  package "forks" {
-    sink method "_fork" -> code.CommandExecution
-  }
-}

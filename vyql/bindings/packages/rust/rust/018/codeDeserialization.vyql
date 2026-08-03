@@ -1,0 +1,9 @@
+module bindings.rust.generated.m222602a5;
+
+binding deserialization18 {
+  requires {
+    dependency("serde_json")
+  }
+  query pattern callExpr where callee.path ~= "serde_json.from_str"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.generated.mf746e5f4;
+
+binding deserialization1 {
+  requires {
+    dependency("astroid")
+  }
+  query pattern callExpr where callee.method == "parse_function_type_comment"
+  emit sink code.Deserialization at args[0]
+}

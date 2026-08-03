@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m8d992d37;
+
+binding cliArgument1 {
+  requires {
+    dependency("gflags")
+  }
+  query pattern callExpr where callee.method == "TryParseLocked"
+  emit source code.CliArgument at call.result
+}

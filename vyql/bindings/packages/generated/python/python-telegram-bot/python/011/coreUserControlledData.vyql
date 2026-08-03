@@ -1,0 +1,9 @@
+module bindings.python.generated.mc2f95844;
+
+binding userControlledData11 {
+  requires {
+    dependency("python-telegram-bot")
+  }
+  query pattern callExpr where callee.method == "send_venue"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.ma3c1f569;
+
+binding urlFetch0 {
+  requires {
+    dependency("vin_decoder")
+  }
+  query pattern callExpr where callee.method == "getExtendedVehicleInfo"
+  emit sink code.UrlFetch at args[0]
+}

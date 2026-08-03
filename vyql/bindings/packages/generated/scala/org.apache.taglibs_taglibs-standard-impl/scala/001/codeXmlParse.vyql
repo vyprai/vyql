@@ -1,0 +1,9 @@
+module bindings.scala.generated.m1e854f50;
+
+binding xmlParse1 {
+  requires {
+    dependency("org.apache.taglibs:taglibs-standard-impl")
+  }
+  query pattern callExpr where callee.method == "newSAXSource"
+  emit sink code.XmlParse at args[0]
+}

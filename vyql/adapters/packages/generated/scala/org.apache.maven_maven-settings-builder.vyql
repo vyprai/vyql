@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter scala {
-  package "org.apache.maven:maven-settings-builder" {
-    source method "read" -> core.UserControlledData
-  }
-}

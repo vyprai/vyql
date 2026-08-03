@@ -1,8 +1,0 @@
-import core.{AuthorizationCheck}
-
-adapter swift {
-  package "github.com/jevonmao/PermissionsSwiftUI" {
-    control method "requestPermission" -> core.AuthorizationCheck
-    control method "locationManager(_:didChangeAuthorization:)" -> core.AuthorizationCheck
-  }
-}

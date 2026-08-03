@@ -1,6 +1,0 @@
-import code.{NetworkSend}
-adapter perl {
-  package "Emailesque" {
-    sink method "send" -> code.NetworkSend
-  }
-}

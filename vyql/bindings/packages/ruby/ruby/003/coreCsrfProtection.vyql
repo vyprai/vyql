@@ -1,0 +1,13 @@
+module bindings.ruby.generated.m5895bccf;
+
+binding csrfProtection3 {
+  requires {
+    dependency("rails")
+  }
+  query pattern callExpr where callee.path ~= "protect_from_forgery"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

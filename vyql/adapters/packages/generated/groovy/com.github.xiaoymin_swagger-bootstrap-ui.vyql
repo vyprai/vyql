@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter groovy {
-  package "com.github.xiaoymin:swagger-bootstrap-ui" {
-    sink method "load" -> code.CodeEval
-  }
-}

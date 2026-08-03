@@ -1,0 +1,14 @@
+module bindings.groovy.generated.mec774d33;
+
+binding sqlParameterization1 {
+  requires {
+    dependency("org.jooq:jooq")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,7 +1,0 @@
-adapter javascript {
-  package "to-regex-range" {
-    flag code.RegexCompile on any {
-      method "toRegexRange"
-    }
-  }
-}

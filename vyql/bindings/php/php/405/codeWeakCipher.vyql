@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding weakCipher405 {
+  query pattern callExpr where callee.path ~= "openssl_encrypt" and args.any.literal contains "rc4"
+  emit issue code.WeakCipher at call
+}

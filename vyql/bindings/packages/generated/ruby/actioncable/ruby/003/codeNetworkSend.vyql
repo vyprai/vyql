@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m765c6045;
+
+binding networkSend3 {
+  requires {
+    dependency("actioncable")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

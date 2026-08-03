@@ -1,0 +1,13 @@
+module bindings.rust.generated.m222602a5;
+
+binding csrfProtection44 {
+  requires {
+    dependency("actix-csrf")
+  }
+  query pattern callExpr where callee.path ~= "CsrfToken"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m15019051;
+
+binding databaseRead7 {
+  requires {
+    dependency("geoip2/geoip2")
+  }
+  query pattern callExpr where callee.method == "enterprise"
+  emit sink code.DatabaseReadSink at args[0]
+}

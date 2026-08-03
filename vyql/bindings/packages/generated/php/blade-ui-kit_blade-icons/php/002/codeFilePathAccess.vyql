@@ -1,0 +1,9 @@
+module bindings.php.generated.m856f3b76;
+
+binding filePathAccess2 {
+  requires {
+    dependency("blade-ui-kit/blade-icons")
+  }
+  query pattern callExpr where callee.method == "scanDisk"
+  emit sink code.FilePathAccess at args[0]
+}

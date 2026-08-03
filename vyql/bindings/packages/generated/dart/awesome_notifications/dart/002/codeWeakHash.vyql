@@ -1,0 +1,9 @@
+module bindings.dart.generated.me014437f;
+
+binding weakHash2 {
+  requires {
+    dependency("awesome_notifications")
+  }
+  query pattern callExpr where callee.method == "rstr_md5"
+  emit issue code.WeakHash at call
+}

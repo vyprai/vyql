@@ -1,8 +1,0 @@
-import code.{NetworkSend}
-
-adapter php {
-  package "sentry/sentry" {
-    sink method "AgentClient::sendRequest" -> code.NetworkSend
-    sink method "HttpClient::sendRequest" -> code.NetworkSend
-  }
-}

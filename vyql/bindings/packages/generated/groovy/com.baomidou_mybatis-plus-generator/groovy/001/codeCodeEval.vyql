@@ -1,0 +1,9 @@
+module bindings.groovy.generated.me757db40;
+
+binding codeEval1 {
+  requires {
+    dependency("com.baomidou:mybatis-plus-generator")
+  }
+  query pattern callExpr where callee.method == "FastAutoGenerator.execute"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter php {
-  package "guzzlehttp/uri-template" {
-    source method "expand" -> core.UserControlledData
-  }
-}

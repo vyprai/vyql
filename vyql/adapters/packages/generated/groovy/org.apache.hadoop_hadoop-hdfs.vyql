@@ -1,6 +1,0 @@
-adapter groovy {
-  package "org.apache.hadoop:hadoop-hdfs" {
-    source method "read" -> code.NetworkData
-    sink method "getAddressOfActive" -> code.NetworkSend
-  }
-}

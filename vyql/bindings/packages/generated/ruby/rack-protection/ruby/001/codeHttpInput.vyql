@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mb421e707;
+
+binding httpInput1 {
+  requires {
+    dependency("rack-protection")
+  }
+  query pattern callExpr where callee.method == "remove_bad_cookies"
+  emit source code.HttpInput at call.result
+}

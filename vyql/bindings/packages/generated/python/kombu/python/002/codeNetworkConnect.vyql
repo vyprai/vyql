@@ -1,0 +1,9 @@
+module bindings.python.generated.m0d6f79f6;
+
+binding networkConnect2 {
+  requires {
+    dependency("kombu")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

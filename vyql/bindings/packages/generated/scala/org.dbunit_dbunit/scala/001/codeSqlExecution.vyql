@@ -1,0 +1,9 @@
+module bindings.scala.generated.m6557b527;
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.dbunit:dbunit")
+  }
+  query pattern callExpr where callee.method == "setSql"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "textblob" {
-    sink method "parse" -> code.Deserialization
-  }
-}

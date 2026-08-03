@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m4cc9b78f;
+
+binding filePathAccess1 {
+  requires {
+    dependency("pnp-webpack-plugin")
+  }
+  query pattern callExpr where callee.method == "resolveTypeReferenceDirective"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mfaf9adc6;
+
+binding xmlParse0 {
+  requires {
+    dependency("org.jooq:jooq-codegen")
+  }
+  query pattern callExpr where callee.method == "GenerationTool.load"
+  emit sink code.XmlParse at args[0]
+}

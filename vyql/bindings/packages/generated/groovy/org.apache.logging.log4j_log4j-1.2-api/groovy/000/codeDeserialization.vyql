@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m818b34cf;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.logging.log4j:log4j-1.2-api")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

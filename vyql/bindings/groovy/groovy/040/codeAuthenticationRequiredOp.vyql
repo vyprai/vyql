@@ -1,0 +1,6 @@
+module bindings.groovy.generated.m6eabb149;
+
+binding authenticationRequiredOp40 {
+  query pattern presenceNode where node.path ~= "resetPassword"
+  emit issue code.AuthenticationRequiredOp at node
+}

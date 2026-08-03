@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{InputValidation}
-
-adapter rust {
-  package "regex" {
-    sink method "new" -> code.Deserialization
-    control method "escape" -> core.InputValidation
-  }
-}

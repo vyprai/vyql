@@ -1,5 +1,0 @@
-adapter groovy {
-  package "org.jdom:jdom2" {
-    sink method "DTDParser.parse" -> code.Deserialization
-  }
-}

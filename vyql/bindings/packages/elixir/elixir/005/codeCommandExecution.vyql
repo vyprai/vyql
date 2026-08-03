@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mf98b3aca;
+
+binding commandExecution5 {
+  requires {
+    dependency("elixir")
+  }
+  query pattern callExpr where callee.path ~= "System.cmd"
+  emit sink code.CommandExecution at args[0]
+}

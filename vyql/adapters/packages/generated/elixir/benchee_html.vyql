@@ -1,7 +1,0 @@
-import code.{HtmlRender}
-adapter elixir {
-  package "benchee_html" {
-    sink method "format" -> code.HtmlRender
-    sink method "write" -> code.HtmlRender
-  }
-}

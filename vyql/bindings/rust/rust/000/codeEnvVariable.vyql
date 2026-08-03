@@ -1,0 +1,6 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding envVariable0 {
+  query pattern callExpr where callee.path ~= "env.var"
+  emit source code.EnvVariable at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.mff1027ea;
+
+binding networkData1 {
+  requires {
+    dependency("AlamofireNetworkActivityIndicator")
+  }
+  query pattern callExpr where callee.method == "requestDidStop"
+  emit source code.NetworkData at call.result
+}

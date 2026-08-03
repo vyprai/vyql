@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-
-adapter dart {
-  package "floor_generator" {
-    sink method "QueryProcessor" -> code.SqlExecution
-    sink method "findVariables" -> code.SqlExecution
-  }
-}

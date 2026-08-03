@@ -1,8 +1,0 @@
-adapter go {
-  package "github.com/olekukonko/tablewriter" {
-    sink method "NewTable" -> code.LogOutput
-    sink method "NewCSV" -> code.LogOutput
-    sink method "NewCSV" -> code.FilePathAccess
-    sink method "NewCSVReader" -> code.LogOutput
-  }
-}

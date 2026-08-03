@@ -1,0 +1,9 @@
+module bindings.swift.generated.m0b81ba3c;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("github.com/leif-ibsen/BigInt")
+  }
+  query pattern callExpr where callee.method == "randomLessThan"
+  emit issue code.WeakRandomValue at call
+}

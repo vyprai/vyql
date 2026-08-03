@@ -106,6 +106,22 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 	if len(srcs) == 0 {
 		return nil, nil
 	}
+	sinkSet := map[string]bool{}
+	for c := range sinkConcepts {
+		ids, _ := store.NodesWithConcept(c)
+		for _, id := range ids {
+			sinkSet[id] = true
+		}
+	}
+	if len(sinkSet) == 0 {
+		return nil, nil
+	}
+	sinks := make([]string, 0, len(sinkSet))
+	for s := range sinkSet {
+		sinks = append(sinks, s)
+	}
+	sort.Strings(sinks)
+
 	// isKill: a node neutralizes taint if it carries a kill control, or a char-filter whose
 	// bounded output alphabet provably excludes the sink's excluded chars. killOf also returns
 	// the concept for near-miss detail. Memoized — each node's labels are scanned once.
@@ -119,6 +135,9 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 			return false, ""
 		}
 		for _, l := range labelsOf(id) {
+			if l.Detail["advisory"] == "true" {
+				continue
+			}
 			if killControls[l.Concept] {
 				killMemo[id], killConcept[id] = 1, l.Concept
 				return true, l.Concept
@@ -159,11 +178,27 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 	// rule's source concept), which is all a per-(rule,sink) finding needs.
 	tainted := make(map[string]bool, len(srcs)*8)
 	pred := make(map[string]string, len(srcs)*8)
+	// srcFid mirrors the int path: the fidelity rank of the source rooting each
+	// node's witness path, so a higher-fidelity source can re-relax the witness
+	// (presentation-only; the tainted set — and thus recall — is unchanged).
+	srcFid := make(map[string]int, len(srcs)*8)
+	nodeSrcFid := func(id string) int {
+		best := 0
+		for _, l := range labelsOf(id) {
+			if sourceConcepts[l.Concept] {
+				if r := fidelityWitnessRank(l.Provenance.Fidelity); r > best {
+					best = r
+				}
+			}
+		}
+		return best
+	}
 	var nearMiss [][2]string
 	queue := make([]string, 0, len(srcs)*4)
 	for _, s := range srcs {
 		if !tainted[s] {
 			tainted[s] = true
+			srcFid[s] = nodeSrcFid(s)
 			queue = append(queue, s)
 		}
 	}
@@ -174,10 +209,17 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 			nearMiss = append(nearMiss, [2]string{node, c})
 			continue
 		}
+		nodeFid := srcFid[node]
 		forEachSucc(node, func(dst string) {
-			if !tainted[dst] {
+			switch {
+			case !tainted[dst]:
 				tainted[dst] = true
 				pred[dst] = node
+				srcFid[dst] = nodeFid
+				queue = append(queue, dst)
+			case nodeFid > srcFid[dst]:
+				pred[dst] = node
+				srcFid[dst] = nodeFid
 				queue = append(queue, dst)
 			}
 		})
@@ -202,19 +244,7 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 	}
 
 	// emit one flow per tainted live sink (findings dedup to one per (rule, sink) anyway);
-	// sinks sorted for determinism, witness source = the recorded path's root.
-	sinkSet := map[string]bool{}
-	for c := range sinkConcepts {
-		ids, _ := store.NodesWithConcept(c)
-		for _, id := range ids {
-			sinkSet[id] = true
-		}
-	}
-	sinks := make([]string, 0, len(sinkSet))
-	for s := range sinkSet {
-		sinks = append(sinks, s)
-	}
-	sort.Strings(sinks)
+	// witness source = the recorded path's root.
 	nm := dedupPairs(nearMiss)
 	for _, sink := range sinks {
 		if !tainted[sink] {
@@ -254,6 +284,22 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 	}
 	sort.Slice(srcs, func(a, b int) bool { return srcs[a] < srcs[b] })
 
+	// sink indices (sorted, deduped). No sink means no possible finding, so avoid the fixpoint.
+	sinkSet := map[int32]bool{}
+	for c := range sinkConcepts {
+		for _, i := range g.ConceptNodes(c) {
+			sinkSet[i] = true
+		}
+	}
+	if len(sinkSet) == 0 {
+		return nil
+	}
+	sinks := make([]int32, 0, len(sinkSet))
+	for i := range sinkSet {
+		sinks = append(sinks, i)
+	}
+	sort.Slice(sinks, func(a, b int) bool { return sinks[a] < sinks[b] })
+
 	// memoized kill check on a node index.
 	killMemo := make([]int8, n) // 0 unknown, 1 kill, 2 not-kill
 	killConcept := map[int32]string{}
@@ -265,6 +311,9 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 			return false, ""
 		}
 		for _, l := range g.LabelsAt(i) {
+			if l.Detail["advisory"] == "true" {
+				continue
+			}
 			if killControls[l.Concept] {
 				killMemo[i] = 1
 				killConcept[i] = l.Concept
@@ -292,11 +341,32 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 	for i := range pred {
 		pred[i] = -1
 	}
+	// srcFid[i] is the fidelity rank of the source rooting node i's witness path.
+	// The witness path (pred chain) is presentation-only and does not affect which
+	// sinks are tainted (recall), but WHICH source is reported matters: a resolved
+	// HttpInput read is a truer witness than the syntactic per-parameter
+	// ExternalEntryInput fallback that labels every function param and often sits
+	// fewer hops from the sink. We let a higher-fidelity source route re-relax a
+	// node's witness even after it is first tainted; fidelity only increases and is
+	// bounded, so each node is re-queued at most a couple of times.
+	srcFid := make([]int, n)
+	nodeSrcFid := func(i int32) int {
+		best := 0
+		for _, l := range g.LabelsAt(i) {
+			if sourceConcepts[l.Concept] {
+				if r := fidelityWitnessRank(l.Provenance.Fidelity); r > best {
+					best = r
+				}
+			}
+		}
+		return best
+	}
 	var nearMiss [][2]string
 	queue := make([]int32, 0, len(srcs)*4)
 	for _, s := range srcs {
 		if !tainted[s] {
 			tainted[s] = true
+			srcFid[s] = nodeSrcFid(s)
 			queue = append(queue, s)
 		}
 	}
@@ -307,10 +377,20 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 			nearMiss = append(nearMiss, [2]string{g.NodeID(node), c})
 			continue
 		}
+		nodeFid := srcFid[node]
 		g.RangeOut(node, "FLOWS", func(dst int32) bool {
-			if !tainted[dst] {
+			switch {
+			case !tainted[dst]:
 				tainted[dst] = true
 				pred[dst] = node
+				srcFid[dst] = nodeFid
+				queue = append(queue, dst)
+			case nodeFid > srcFid[dst]:
+				// a higher-fidelity source route reaches an already-tainted node —
+				// prefer it as the witness and re-propagate so the improvement flows
+				// on to the sink.
+				pred[dst] = node
+				srcFid[dst] = nodeFid
 				queue = append(queue, dst)
 			}
 			return true
@@ -329,18 +409,7 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 		return out
 	}
 
-	// sinks (sorted) → one flow per tainted live sink.
-	sinkSet := map[int32]bool{}
-	for c := range sinkConcepts {
-		for _, i := range g.ConceptNodes(c) {
-			sinkSet[i] = true
-		}
-	}
-	sinks := make([]int32, 0, len(sinkSet))
-	for i := range sinkSet {
-		sinks = append(sinks, i)
-	}
-	sort.Slice(sinks, func(a, b int) bool { return sinks[a] < sinks[b] })
+	// one flow per tainted live sink.
 	nm := dedupPairs(nearMiss)
 	var out []TaintFlow
 	for _, sink := range sinks {
@@ -354,6 +423,22 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 		out = append(out, TaintFlow{SourceID: path[0], SinkID: g.NodeID(sink), Kind: kind, Path: path, NearMiss: nm})
 	}
 	return out
+}
+
+// fidelityWitnessRank ranks a label's match fidelity for witness selection: a
+// higher rank is a more trustworthy source to report. An empty/unknown fidelity
+// is treated as resolved (docs/07), matching the confidence machinery, so only
+// an explicitly syntactic source (e.g. the cross-language ExternalEntryInput
+// param fallback) ranks below a resolved read.
+func fidelityWitnessRank(fid string) int {
+	switch fid {
+	case "syntactic":
+		return 1
+	case "semantic":
+		return 3
+	default: // "resolved" and unknown
+		return 2
+	}
 }
 
 func dedupPairs(ps [][2]string) [][2]string {

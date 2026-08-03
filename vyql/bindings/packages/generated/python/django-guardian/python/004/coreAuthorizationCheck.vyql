@@ -1,0 +1,13 @@
+module bindings.python.generated.mfe65b901;
+
+binding authorizationCheck4 {
+  requires {
+    dependency("django-guardian")
+  }
+  query pattern callExpr where callee.method == "has_change_permission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

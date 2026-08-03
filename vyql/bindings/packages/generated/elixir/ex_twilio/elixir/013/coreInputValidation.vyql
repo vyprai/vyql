@@ -1,0 +1,14 @@
+module bindings.elixir.generated.mbfdf81eb;
+
+binding inputValidation13 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.RequestValidator.validate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

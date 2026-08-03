@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m7bd69ab9;
+
+binding htmlRender2 {
+  requires {
+    dependency("webrobots")
+  }
+  query pattern callExpr where callee.method == "parse_meta_robots"
+  emit sink code.HtmlRender at args[0]
+}

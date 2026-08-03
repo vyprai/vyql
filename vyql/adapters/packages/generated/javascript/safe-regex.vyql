@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter javascript {
-  package "safe-regex" {
-    sink method "safeRegex" -> code.Deserialization
-  }
-}

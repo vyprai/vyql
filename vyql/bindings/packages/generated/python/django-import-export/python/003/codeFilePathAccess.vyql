@@ -1,0 +1,9 @@
+module bindings.python.generated.md92dbb22;
+
+binding filePathAccess3 {
+  requires {
+    dependency("django-import-export")
+  }
+  query pattern callExpr where callee.method == "write_to_tmp_storage"
+  emit sink code.FilePathAccess at args[0]
+}

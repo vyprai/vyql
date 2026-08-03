@@ -1,0 +1,10 @@
+module bindings.python.generated.m45dd8f7b;
+
+binding fileUpload1 {
+  requires {
+    dependency("boto3")
+  }
+  query pattern callExpr where callee.method == "upload_fileobj"
+  emit issue code.FileUpload at call
+  emit source code.FileUploadSource at call
+}

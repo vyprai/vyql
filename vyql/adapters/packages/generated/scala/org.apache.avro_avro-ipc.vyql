@@ -1,9 +1,0 @@
-import code.{NetworkData, NetworkSend}
-
-adapter scala {
-  package "org.apache.avro:avro-ipc" {
-    source method "org.apache.avro.ipc.SocketTransceiver.readBuffers" -> code.NetworkData
-    sink method "org.apache.avro.ipc.SocketTransceiver.writeBuffers" -> code.NetworkSend
-    source method "org.apache.avro.ipc.Responder.respond" -> code.NetworkData
-  }
-}

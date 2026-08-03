@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter kotlin {
-  package "org.apache.hbase:hbase-server" {
-    sink method "parseFrom" -> code.Deserialization
-    sink method "writeMyEphemeralNodeOnDisk" -> code.FilePathAccess
-    sink method "readMyEphemeralNodeOnDisk" -> code.FilePathAccess
-  }
-}

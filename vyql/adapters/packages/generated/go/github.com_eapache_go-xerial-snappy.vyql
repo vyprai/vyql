@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "github.com/eapache/go-xerial-snappy" {
-    sink method "Decode" -> code.Deserialization
-    sink method "DecodeInto" -> code.Deserialization
-  }
-}

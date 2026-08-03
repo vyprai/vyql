@@ -1,0 +1,9 @@
+module bindings.perl.generated.made1002a;
+
+binding filePathAccess2 {
+  requires {
+    dependency("Tiffany")
+  }
+  query pattern callExpr where callee.method == "slurp"
+  emit sink code.FilePathAccess at args[0]
+}

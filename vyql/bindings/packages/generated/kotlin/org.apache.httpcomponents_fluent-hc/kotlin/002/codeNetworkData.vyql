@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m8ba09f12;
+
+binding networkData2 {
+  requires {
+    dependency("org.apache.httpcomponents:fluent-hc")
+  }
+  query pattern callExpr where callee.method == "Content"
+  emit source code.NetworkData at call.result
+}

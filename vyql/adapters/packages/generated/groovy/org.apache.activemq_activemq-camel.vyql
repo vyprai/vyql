@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter groovy {
-  package "org.apache.activemq:activemq-camel" {
-    sink method "send" -> code.NetworkSend
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.mfea80497;
+
+binding codeEval1 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-htmlunit-driver")
+  }
+  query pattern callExpr where callee.method == "executeAsyncScript"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.m0fc475b4;
+
+binding deserialization0 {
+  requires {
+    dependency("hive_flutter")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

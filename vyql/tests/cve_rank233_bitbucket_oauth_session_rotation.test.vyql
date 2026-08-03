@@ -1,5 +1,6 @@
 test "rank233: Java OAuth login sets authentication without rotating the HTTP session"
   lang java
+  expect VYQL-AUTH-074
   expect_review code.MissingSessionRotationAfterAuthentication
   code
   ```
@@ -21,6 +22,7 @@ test "rank233: Java OAuth login sets authentication without rotating the HTTP se
 
 test "rank233: Java OAuth login rotates the HTTP session before authentication"
   lang java
+  reject VYQL-AUTH-074
   reject_review code.MissingSessionRotationAfterAuthentication
   code
   ```

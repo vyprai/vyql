@@ -1,5 +1,0 @@
-adapter python {
-  package "lxml" {
-    sink method "load" -> code.XmlParse
-  }
-}

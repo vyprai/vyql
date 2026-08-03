@@ -1,0 +1,9 @@
+module bindings.scala.generated.mf9b36ce7;
+
+binding weakRandomValue5 {
+  requires {
+    dependency("org.apache.activemq:activemq-spring")
+  }
+  query pattern callExpr where callee.method == "setSecureRandomAlgorithm"
+  emit issue code.WeakRandomValue at call
+}

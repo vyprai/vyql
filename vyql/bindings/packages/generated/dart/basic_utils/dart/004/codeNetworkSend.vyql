@@ -1,0 +1,9 @@
+module bindings.dart.generated.m8bc63517;
+
+binding networkSend4 {
+  requires {
+    dependency("basic_utils")
+  }
+  query pattern callExpr where callee.method == "postForJson"
+  emit sink code.NetworkSend at args[0]
+}

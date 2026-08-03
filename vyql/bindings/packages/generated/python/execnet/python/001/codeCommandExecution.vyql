@@ -1,0 +1,9 @@
+module bindings.python.generated.m6175f4a2;
+
+binding commandExecution1 {
+  requires {
+    dependency("execnet")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.CommandExecution at args[0]
+}

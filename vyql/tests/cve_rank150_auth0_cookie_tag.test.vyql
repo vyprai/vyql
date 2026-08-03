@@ -3,6 +3,7 @@
 
 test "rank150: php authenticated decrypt without tag length check is review attention"
   lang php
+  expect VYQL-CRY-028
   expect_review code.AuthenticatedDecryptionTagReview
   code
   ```
@@ -33,6 +34,7 @@ test "rank150: php authenticated decrypt without tag length check is review atte
 
 test "rank150: php authenticated decrypt with tag length check is clean"
   lang php
+  reject VYQL-CRY-028
   reject_review code.AuthenticatedDecryptionTagReview
   code
   ```

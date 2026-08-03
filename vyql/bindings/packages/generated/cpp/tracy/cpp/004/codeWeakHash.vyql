@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m8f316b0e;
+
+binding weakHash4 {
+  requires {
+    dependency("tracy")
+  }
+  query pattern callExpr where callee.method == "XXH32_digest"
+  emit issue code.WeakHash at call
+}

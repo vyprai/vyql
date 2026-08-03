@@ -1,0 +1,10 @@
+module bindings.swift.generated.m24b0008a;
+
+binding regexCompile0 {
+  requires {
+    dependency("github.com/crossroadlabs/Regex")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.m5f6df47b;
+
+binding userControlledData2 {
+  requires {
+    dependency("WebDAO")
+  }
+  query pattern callExpr where callee.method == "get_body"
+  emit source core.UserControlledData at call.result
+}

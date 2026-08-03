@@ -1,0 +1,9 @@
+module bindings.scala.generated.m3275f5d1;
+
+binding storedDataRead4 {
+  requires {
+    dependency("com.amazonaws:aws-java-sdk-s3")
+  }
+  query pattern callExpr where callee.method == "getObject"
+  emit source code.StoredDataRead at call.result
+}

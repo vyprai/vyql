@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m5b2c6913;
+
+binding databaseRead9 {
+  requires {
+    dependency("amnesia")
+  }
+  query pattern callExpr where callee.method == "match!"
+  emit sink code.DatabaseReadSink at args[0]
+}

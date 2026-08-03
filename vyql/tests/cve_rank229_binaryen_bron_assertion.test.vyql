@@ -1,5 +1,6 @@
 test "rank229: BrOn parser validates type immediates but not popped ref operands"
   lang cpp
+  expect VYQL-DOS-040
   expect_review code.ReachableAssertionReview
   code
   ```
@@ -47,6 +48,7 @@ test "rank229: BrOn parser validates type immediates but not popped ref operands
 
 test "rank229: BrOn parser rejects non-ref popped operands before finalize"
   lang cpp
+  reject VYQL-DOS-040
   reject_review code.ReachableAssertionReview
   code
   ```

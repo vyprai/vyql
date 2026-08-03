@@ -1,0 +1,9 @@
+module bindings.swift.generated.ma512ad40;
+
+binding databaseRead0 {
+  requires {
+    dependency("github.com/mongodb/mongo-swift-driver")
+  }
+  query pattern callExpr where callee.method == "runCommand"
+  emit sink code.DatabaseReadSink at args[0]
+}

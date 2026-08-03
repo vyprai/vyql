@@ -1,0 +1,8 @@
+module bindings.java.generated.m420f6b67;
+
+binding integerSizeArithmetic56 {
+  query pattern presenceNode where node.scope == "function" and node.context.expr contains "offset+length>b.length" and node.context.callPath contains "write" and not (node.context.expr contains "offset>b.length-length")
+  emit issue code.IntegerSizeArithmetic at node
+  emit issue code.SizeSensitiveIntegerArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}

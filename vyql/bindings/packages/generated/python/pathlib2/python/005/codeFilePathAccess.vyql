@@ -1,0 +1,9 @@
+module bindings.python.generated.m9de101ea;
+
+binding filePathAccess5 {
+  requires {
+    dependency("pathlib2")
+  }
+  query pattern callExpr where callee.method == "rename"
+  emit sink code.FilePathAccess at args[0]
+}

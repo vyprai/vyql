@@ -1,0 +1,9 @@
+module bindings.python.generated.m290ddb74;
+
+binding networkSend3 {
+  requires {
+    dependency("python-keystoneclient")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkSend at args[0]
+}

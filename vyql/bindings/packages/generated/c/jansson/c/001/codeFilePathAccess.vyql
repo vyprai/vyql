@@ -1,0 +1,9 @@
+module bindings.c.generated.mc9fceeff;
+
+binding filePathAccess1 {
+  requires {
+    dependency("jansson")
+  }
+  query pattern callExpr where callee.method == "json_dump_file"
+  emit sink code.FilePathAccess at args[0]
+}

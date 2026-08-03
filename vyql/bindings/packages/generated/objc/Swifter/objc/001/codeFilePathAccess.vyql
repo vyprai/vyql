@@ -1,0 +1,9 @@
+module bindings.objc.generated.mdb713232;
+
+binding filePathAccess1 {
+  requires {
+    dependency("Swifter")
+  }
+  query pattern callExpr where callee.method == "shareFilesFromDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

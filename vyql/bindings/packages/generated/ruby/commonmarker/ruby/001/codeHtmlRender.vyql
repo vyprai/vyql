@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m8debb1c5;
+
+binding htmlRender1 {
+  requires {
+    dependency("commonmarker")
+  }
+  query pattern callExpr where callee.method == "to_html"
+  emit sink code.HtmlRender at args[0]
+}

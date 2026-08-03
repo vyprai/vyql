@@ -1,0 +1,9 @@
+module bindings.php.generated.md5cd8e9a;
+
+binding deserialization0 {
+  requires {
+    dependency("masterminds/html5")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

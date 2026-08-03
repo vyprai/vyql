@@ -1,0 +1,9 @@
+module bindings.python.generated.mf9b32afd;
+
+binding userControlledData1 {
+  requires {
+    dependency("tensorflow-datasets")
+  }
+  query pattern callExpr where callee.method == "load_dataset"
+  emit source core.UserControlledData at call.result
+}

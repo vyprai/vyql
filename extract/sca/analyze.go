@@ -12,7 +12,7 @@ import (
 	"github.com/vyprai/vyql/usg"
 )
 
-// Reputation categories are recorded as neutral package tokens; VyQL adapter data
+// Reputation categories are recorded as neutral package tokens; VyQL binding data
 // maps them to concrete concepts.
 // A version listed in trusted.json is verified-good and short-circuits the name scans.
 
@@ -21,33 +21,30 @@ import (
 func Analyze(g usg.Store, eco string) (vuln, malicious, suspicious int, err error) {
 	d := data()
 	popular := d.popularSet(eco)
-	nodes, err := g.AllNodes()
-	if err != nil {
-		return 0, 0, 0, err
+	type tokenUpdate struct {
+		id     string
+		tokens []string
 	}
-	for _, nd := range nodes {
+	var updates []tokenUpdate
+	err = rangeStoreNodes(g, func(nd usg.Node) bool {
 		if nd.Type != "sbom.PackageVersion" {
-			continue
+			return true
 		}
 		// process only this ecosystem's nodes (a project may have both pypi and npm).
 		if e := nd.Prop("eco"); e != "" && e != eco {
-			continue
+			return true
 		}
 		name, version, specifier := nd.Prop("name"), nd.Prop("version"), nd.Prop("specifier")
 		if name == "" {
-			continue
+			return true
 		}
 		trusted := isTrusted(d, eco, name, version)
 
 		// 1. known-vulnerable version (CVE feed)
 		if adv, ok := matchAdvisory(d, eco, name, version, specifier); ok {
-			if e := addPackageTokens(g, nd.ID, "status=vulnerable", "advisory="+adv.ID); e != nil {
-				return vuln, malicious, suspicious, e
-			}
+			updates = append(updates, tokenUpdate{nd.ID, []string{"status=vulnerable", "advisory=" + adv.ID}})
 			for _, cwe := range adv.CWE {
-				if e := addPackageTokens(g, nd.ID, "advisory_cwe="+cwe); e != nil {
-					return vuln, malicious, suspicious, e
-				}
+				updates = append(updates, tokenUpdate{nd.ID, []string{"advisory_cwe=" + cwe}})
 			}
 			vuln++
 		}
@@ -55,33 +52,36 @@ func Analyze(g usg.Store, eco string) (vuln, malicious, suspicious int, err erro
 		// 2./3. malware name-intelligence — runs even with no advisory data, but a
 		// version explicitly trusted is taken at its word and skipped.
 		if trusted {
-			continue
+			return true
 		}
 		badVersions, hasMalwareHistory := d.malware[eco][name]
 		switch {
 		case hasMalwareHistory && versionMatch(badVersions, version):
 			// this exact version (or all versions, "*") is known-malicious.
-			if e := addPackageTokens(g, nd.ID, "status=malicious", "reason=known-malware", "malware_version="+version); e != nil {
-				return vuln, malicious, suspicious, e
-			}
+			updates = append(updates, tokenUpdate{nd.ID, []string{"status=malicious", "reason=known-malware", "malware_version=" + version}})
 			malicious++
 		case hasMalwareHistory:
 			// the package HAS malicious releases but this version isn't on the list and
 			// isn't trusted → unreviewed/unverified → scan-flag as suspicious.
-			if e := addPackageTokens(g, nd.ID, "status=suspicious", "reason=unverified-version"); e != nil {
-				return vuln, malicious, suspicious, e
-			}
+			updates = append(updates, tokenUpdate{nd.ID, []string{"status=suspicious", "reason=unverified-version"}})
 			suspicious++
 		default:
 			// 3b. typosquat of a popular package.
 			if !popular[name] {
 				if target := nearestPopular(name, popular); target != "" {
-					if e := addPackageTokens(g, nd.ID, "status=suspicious", "reason=typosquat", "squats="+target); e != nil {
-						return vuln, malicious, suspicious, e
-					}
+					updates = append(updates, tokenUpdate{nd.ID, []string{"status=suspicious", "reason=typosquat", "squats=" + target}})
 					suspicious++
 				}
 			}
+		}
+		return true
+	})
+	if err != nil {
+		return vuln, malicious, suspicious, err
+	}
+	for _, update := range updates {
+		if err := addPackageTokens(g, update.id, update.tokens...); err != nil {
+			return vuln, malicious, suspicious, err
 		}
 	}
 	return vuln, malicious, suspicious, nil

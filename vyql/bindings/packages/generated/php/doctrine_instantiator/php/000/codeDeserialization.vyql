@@ -1,0 +1,9 @@
+module bindings.php.generated.m7ecc09fb;
+
+binding deserialization0 {
+  requires {
+    dependency("doctrine/instantiator")
+  }
+  query pattern callExpr where callee.method == "instantiate"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding centreonMyAccountContactXss82 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "centreon_contact_html_entity_decode_xss"
+  emit issue code.CentreonMyAccountContactXss at node
+}

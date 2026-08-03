@@ -1,0 +1,9 @@
+module bindings.go.generated.mb7a09f08;
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/naoina/toml")
+  }
+  query pattern callExpr where callee.method == "UnmarshalTable"
+  emit sink code.Deserialization at args[0]
+}

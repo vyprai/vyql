@@ -1,9 +1,0 @@
-import code.{Deserialization, CodeEval}
-adapter perl {
-  package "WebDyne" {
-    sink method "WebDyne::Compile::compile" -> code.Deserialization
-    sink method "WebDyne::Compile::parse" -> code.Deserialization
-    sink method "WebDyne::eval_require" -> code.CodeEval
-    sink method "WebDyne::eval_cr" -> code.CodeEval
-  }
-}

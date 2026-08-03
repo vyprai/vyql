@@ -1,0 +1,9 @@
+module bindings.php.generated.mf3409925;
+
+binding userControlledData1 {
+  requires {
+    dependency("kylekatarnls/multi-tester")
+  }
+  query pattern callExpr where callee.method == "MultiTester\\MultiTester::run"
+  emit source core.UserControlledData at call.result
+}

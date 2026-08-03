@@ -1,0 +1,9 @@
+module bindings.scala.generated.mcbc57de5;
+
+binding storedDataWrite3 {
+  requires {
+    dependency("org.fusesource.leveldbjni:leveldbjni-all")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.StoredDataWrite at args[0]
+}

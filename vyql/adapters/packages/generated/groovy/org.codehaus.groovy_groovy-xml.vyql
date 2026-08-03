@@ -1,7 +1,0 @@
-import code.{XmlParse}
-adapter groovy {
-  package "org.codehaus.groovy:groovy-xml" {
-    sink method "parse" -> code.XmlParse
-    sink method "parseText" -> code.XmlParse
-  }
-}

@@ -1,8 +1,0 @@
-import code.{NetworkData, NetworkSend}
-adapter javascript {
-  package "workbox-background-sync" {
-    source method "pushRequest" -> code.NetworkData
-    source method "unshiftRequest" -> code.NetworkData
-    sink method "replayRequests" -> code.NetworkSend
-  }
-}

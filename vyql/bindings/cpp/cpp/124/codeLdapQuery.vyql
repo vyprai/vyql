@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding ldapQuery124 {
+  query pattern callExpr where callee.path ~= "ldap_search_s"
+  emit sink code.LdapQuery at args[3]
+}

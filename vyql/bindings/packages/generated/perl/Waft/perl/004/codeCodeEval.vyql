@@ -1,0 +1,9 @@
+module bindings.perl.generated.m4b50f0fb;
+
+binding codeEval4 {
+  requires {
+    dependency("Waft")
+  }
+  query pattern callExpr where callee.method == "compile_template"
+  emit sink code.CodeEval at args[0]
+}

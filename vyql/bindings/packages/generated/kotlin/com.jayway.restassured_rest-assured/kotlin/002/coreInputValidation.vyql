@@ -1,0 +1,14 @@
+module bindings.kotlin.generated.m89730995;
+
+binding inputValidation2 {
+  requires {
+    dependency("com.jayway.restassured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "disableLoadingOfExternalDtd"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

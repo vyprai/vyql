@@ -1,0 +1,9 @@
+module bindings.swift.generated.mcc549ed8;
+
+binding expressionEval1 {
+  requires {
+    dependency("github.com/nicklockwood/Expression")
+  }
+  query pattern callExpr where callee.method == "evaluate"
+  emit sink code.ExpressionEval at args[0]
+}

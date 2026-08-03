@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding authenticationRequiredOp159 {
+  query pattern presenceNode where node.path ~= "resetPassword"
+  emit issue code.AuthenticationRequiredOp at node
+}

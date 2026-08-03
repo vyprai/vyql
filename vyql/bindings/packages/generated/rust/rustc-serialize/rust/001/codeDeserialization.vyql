@@ -1,0 +1,9 @@
+module bindings.rust.generated.m8dce55b2;
+
+binding deserialization1 {
+  requires {
+    dependency("rustc-serialize")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

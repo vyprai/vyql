@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m5f7fe048;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.jooq:jooq-meta")
+  }
+  query pattern callExpr where callee.method == "setExcludeSql"
+  emit sink code.SqlExecution at args[0]
+}

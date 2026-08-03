@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m9d136887;
+
+binding deserialization1 {
+  requires {
+    dependency("elastix")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

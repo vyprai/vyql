@@ -1,0 +1,9 @@
+module bindings.swift.generated.m4abc4f0a;
+
+binding sqlExecution2 {
+  requires {
+    dependency("github.com/groue/GRDBQuery")
+  }
+  query pattern callExpr where callee.method == "deleteAllPlayer"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mff1f856c;
+
+binding commandExecution3 {
+  requires {
+    dependency("kitchen-vagrant")
+  }
+  query pattern callExpr where callee.method == "run_ps"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-adapter scala {
-  package "com.github.pagehelper:pagehelper" {
-    sink method "parse" -> code.SqlExecution
-    sink method "getCountSql" -> code.SqlExecution
-    sink method "getPageSql" -> code.SqlExecution
-  }
-}

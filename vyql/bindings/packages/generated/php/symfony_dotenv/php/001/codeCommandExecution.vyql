@@ -1,0 +1,9 @@
+module bindings.php.generated.m338caa5a;
+
+binding commandExecution1 {
+  requires {
+    dependency("symfony/dotenv")
+  }
+  query pattern callExpr where callee.method == "resolveCommands"
+  emit sink code.CommandExecution at args[0]
+}

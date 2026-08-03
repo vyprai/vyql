@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m8f844ab2;
+
+binding networkData1 {
+  requires {
+    dependency("github-pages-health-check")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.NetworkData at call.result
+}

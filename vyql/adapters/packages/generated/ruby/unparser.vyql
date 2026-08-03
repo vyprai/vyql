@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "unparser" {
-    sink method "parse" -> code.Deserialization
-    sink method "parse_ast_either" -> code.Deserialization
-    sink method "parse_ast" -> code.Deserialization
-  }
-}

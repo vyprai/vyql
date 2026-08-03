@@ -1,0 +1,9 @@
+module bindings.javascript.generated.md23dcc69;
+
+binding deserialization1 {
+  requires {
+    dependency("ignore-walk")
+  }
+  query pattern callExpr where callee.method == "onReadIgnoreFile"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnescapedMysqlDsnDatabaseName {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_89, CWE_20]
+    id: "VYQL-INJ-191"
+    severity: high
+  }
+  issue code.UnescapedMysqlDsnDatabaseName as sink
+}

@@ -1,0 +1,9 @@
+module bindings.rust.generated.m60571e14;
+
+binding deserialization0 {
+  requires {
+    dependency("actix-codec")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.CkeditorRawElementLiveDocumentRenderXss {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review CKEditor RawElement clipboard conversion for detached-document rendering before extracting plain text"
+}

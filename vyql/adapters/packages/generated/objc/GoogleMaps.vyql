@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter objc {
-  package "GoogleMaps" {
-    sink method "styleWithContentsOfFileURL:error:" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.generated.m085a0ecd;
+
+binding deserialization0 {
+  requires {
+    dependency("ujson")
+  }
+  query pattern callExpr where callee.method == "JSON_DecodeObject"
+  emit sink code.Deserialization at args[0]
+}

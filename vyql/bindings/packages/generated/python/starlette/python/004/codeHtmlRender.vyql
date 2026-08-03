@@ -1,0 +1,9 @@
+module bindings.python.generated.m46906d4c;
+
+binding htmlRender4 {
+  requires {
+    dependency("starlette")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.HtmlRender at args[0]
+}

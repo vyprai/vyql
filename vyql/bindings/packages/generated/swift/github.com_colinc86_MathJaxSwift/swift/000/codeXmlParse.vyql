@@ -1,0 +1,9 @@
+module bindings.swift.generated.m767579b3;
+
+binding xmlParse0 {
+  requires {
+    dependency("github.com/colinc86/MathJaxSwift")
+  }
+  query pattern callExpr where callee.method == "defaultParseAs"
+  emit sink code.XmlParse at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mb6fc7893;
+
+binding storedDataWrite3 {
+  requires {
+    dependency("org.springframework.boot:spring-boot-configuration-processor")
+  }
+  query pattern callExpr where callee.method == "JSONObject"
+  emit sink code.StoredDataWrite at args[0]
+}

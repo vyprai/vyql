@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter php {
-  package "typo3/phar-stream-wrapper" {
-    sink method "deserializeMetaData" -> code.Deserialization
-    sink method "stream_open" -> code.FilePathAccess
-    sink method "dir_opendir" -> code.FilePathAccess
-  }
-}

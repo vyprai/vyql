@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m5c270092;
+
+binding domInput11 {
+  requires {
+    dependency("react")
+  }
+  query pattern callExpr where callee.path ~= "location.search"
+  emit source code.DomInput at call.result
+}

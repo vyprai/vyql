@@ -1,0 +1,11 @@
+module bindings.groovy.generated.m6eabb149;
+
+binding htmlEscape79 {
+  query pattern callExpr where callee.path ~= "app.markupFormatter.translate"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

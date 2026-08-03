@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "opt-einsum" {
-    sink method "parse_einsum_input" -> code.Deserialization
-  }
-}

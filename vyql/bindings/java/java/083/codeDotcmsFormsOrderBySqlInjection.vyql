@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding dotcmsFormsOrderBySqlInjection83 {
+  query pattern presenceNode where node.scope == "function" and node.context.className contains "ViewFormHandlerAction" and node.context.functionName contains "_loadStructures" and node.context.callPath contains "req.getParameter" and node.context.callPath contains "StructureFactory.getStructuresByUser" and not (node.context.callPath contains "SQLUtil.sanitizeSortBy")
+  emit issue code.DotcmsFormsOrderBySqlInjection at node
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "com.fasterxml.jackson.module:jackson-module-kotlin" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mce11883d;
+
+binding weakHash6 {
+  requires {
+    dependency("ockam_vault_software")
+  }
+  query pattern callExpr where callee.method == "ecdh"
+  emit issue code.WeakHash at call
+}

@@ -1,0 +1,6 @@
+module bindings.perl.generated.mfca40a44;
+
+binding weakHash55 {
+  query pattern presenceNode where node.path ~= "md5_base64"
+  emit issue code.WeakHash at node
+}

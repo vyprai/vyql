@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding protocolStateReview333 {
+  query pattern presenceNode where node.scope == "function" and node.context.call contains "getType" and node.context.selector contains "FEDERATION_DOWNSTREAM_CONNECT" and node.context.call contains "deploy" and not (node.context.scopeCall contains "getSubject")
+  emit issue code.ProtocolStateReview at node
+}

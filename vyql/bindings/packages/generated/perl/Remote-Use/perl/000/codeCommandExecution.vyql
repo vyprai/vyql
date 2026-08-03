@@ -1,0 +1,9 @@
+module bindings.perl.generated.mbcbed08d;
+
+binding commandExecution0 {
+  requires {
+    dependency("Remote-Use")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

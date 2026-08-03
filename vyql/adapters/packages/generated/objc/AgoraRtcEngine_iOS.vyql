@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter objc {
-  package "AgoraRtcEngine_iOS" {
-    sink method "setAgoraSdkExternalSymbolLoader" -> code.CodeEval
-  }
-}

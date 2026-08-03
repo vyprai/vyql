@@ -1,0 +1,9 @@
+module bindings.perl.generated.m4b50f0fb;
+
+binding userControlledData0 {
+  requires {
+    dependency("Waft")
+  }
+  query pattern callExpr where callee.method == "create_query_obj"
+  emit source core.UserControlledData at call.result
+}

@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter ruby {
-  package "mixlib-cli" {
-    source method "parse_options" -> code.CliArgument
-  }
-}

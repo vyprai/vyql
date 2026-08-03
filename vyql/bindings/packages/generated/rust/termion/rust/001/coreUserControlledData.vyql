@@ -1,0 +1,9 @@
+module bindings.rust.generated.m085231ca;
+
+binding userControlledData1 {
+  requires {
+    dependency("termion")
+  }
+  query pattern callExpr where callee.method == "read_line"
+  emit source core.UserControlledData at call.result
+}

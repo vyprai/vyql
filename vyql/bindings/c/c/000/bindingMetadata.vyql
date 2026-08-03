@@ -1,0 +1,10 @@
+module bindings.c.generated.mce54b166;
+
+pattern bindingMetadata {
+  binding: {
+    name: "c"
+    meta: {
+      fidelity: "resolved"
+    }
+  }
+}

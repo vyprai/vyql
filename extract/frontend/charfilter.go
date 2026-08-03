@@ -26,7 +26,7 @@ func replaceCharEffects(pattern, repl string, forceGlobal bool) (alphabet string
 	pattern = normalizeLit(pattern)
 	inner, flags, hadDelim := stripRegexDelims(pattern)
 	// Global? An always-global filter (gsub / replaceAll / re.sub / preg_replace —
-	// declared `global` in the adapter) replaces every match. Otherwise, only a delimited
+	// declared `global` in the binding) replaces every match. Otherwise, only a delimited
 	// literal carrying the `g` flag (JS .replace(/…/g)) is global; without it just the
 	// first match is replaced and the tail of the string is unbounded.
 	if !forceGlobal && hadDelim && !strings.Contains(flags, "g") {

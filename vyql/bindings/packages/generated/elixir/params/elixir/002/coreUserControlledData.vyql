@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m35de3585;
+
+binding userControlledData2 {
+  requires {
+    dependency("params")
+  }
+  query pattern callExpr where callee.method == "from"
+  emit source core.UserControlledData at call.result
+}

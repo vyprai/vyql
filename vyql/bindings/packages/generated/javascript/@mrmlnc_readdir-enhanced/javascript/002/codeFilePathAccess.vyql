@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m045cda79;
+
+binding filePathAccess2 {
+  requires {
+    dependency("@mrmlnc/readdir-enhanced")
+  }
+  query pattern callExpr where callee.method == "readdirStreamPath"
+  emit sink code.FilePathAccess at args[0]
+}

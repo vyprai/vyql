@@ -1,0 +1,13 @@
+module bindings.ruby.generated.mddd10154;
+
+binding authenticationCheck3 {
+  requires {
+    dependency("mixlib-authentication")
+  }
+  query pattern callExpr where callee.method == "Mixlib::Authentication::SignatureVerification.authenticate_request"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

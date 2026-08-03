@@ -1,6 +1,0 @@
-import code.{DatabaseRead}
-adapter groovy {
-  package "org.apache.kafka:kafka-streams" {
-    sink method "query" -> code.DatabaseRead
-  }
-}

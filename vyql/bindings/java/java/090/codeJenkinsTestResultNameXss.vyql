@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding jenkinsTestResultNameXss90 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "getName" and node.context.classBase contains "TestResult" and node.context.returnIdentifier contains "name" and not (containsAny(node.context.returnCallPath, ["hudson.Util.escape", "Util.escape", "StringEscapeUtils.escapeHtml", "StringEscapeUtils.escapeHtml4"]))
+  emit issue code.JenkinsTestResultNameXss at node
+}

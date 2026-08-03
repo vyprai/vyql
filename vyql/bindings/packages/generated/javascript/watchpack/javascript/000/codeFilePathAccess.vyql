@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m728d77d3;
+
+binding filePathAccess0 {
+  requires {
+    dependency("watchpack")
+  }
+  query pattern callExpr where callee.method == "lstatWithRetry"
+  emit sink code.FilePathAccess at args[0]
+}

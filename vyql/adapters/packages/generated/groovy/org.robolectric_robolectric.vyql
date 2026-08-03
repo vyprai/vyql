@@ -1,7 +1,0 @@
-import code.{XmlParse}
-
-adapter groovy {
-  package "org.robolectric:robolectric" {
-    sink method "parse" -> code.XmlParse
-  }
-}

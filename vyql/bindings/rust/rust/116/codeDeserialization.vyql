@@ -1,0 +1,6 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding deserialization116 {
+  query pattern callExpr where callee.path ~= "serde_yaml.from_str"
+  emit sink code.Deserialization at args[0]
+}

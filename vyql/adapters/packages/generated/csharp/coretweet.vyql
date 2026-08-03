@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter csharp {
-  package "coretweet" {
-    sink method "CoreTweet.AccountActivity.ActivityEvent.Parse" -> code.Deserialization
-    sink method "CoreTweet.Streaming.StreamingMessage.Parse" -> code.Deserialization
-  }
-}

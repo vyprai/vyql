@@ -1,0 +1,9 @@
+module bindings.perl.generated.ma50a59da;
+
+binding deserialization0 {
+  requires {
+    dependency("PPI")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

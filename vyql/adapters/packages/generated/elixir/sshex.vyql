@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-
-adapter elixir {
-  package "sshex" {
-    sink method "run" -> code.CommandExecution
-    sink method "cmd!" -> code.CommandExecution
-  }
-}

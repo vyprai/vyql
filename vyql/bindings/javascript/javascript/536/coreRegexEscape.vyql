@@ -1,0 +1,11 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding regexEscape536 {
+  query pattern callExpr where callee.method == "escapeRegExp"
+  emit check core.RegexEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m71dd539d;
+
+binding filePathAccess0 {
+  requires {
+    dependency("@nodelib/fs.walk")
+  }
+  query pattern callExpr where callee.method == "walk"
+  emit sink code.FilePathAccess at args[0]
+}

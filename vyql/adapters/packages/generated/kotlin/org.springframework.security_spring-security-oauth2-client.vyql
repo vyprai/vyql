@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "org.springframework.security:spring-security-oauth2-client" {
-    control method "validate" -> core.InputValidation
-  }
-}

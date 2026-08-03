@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m9e3329fe;
+
+binding networkConnect1 {
+  requires {
+    dependency("chrome_remote_interface")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.NetworkConnectSink at args[0]
+}

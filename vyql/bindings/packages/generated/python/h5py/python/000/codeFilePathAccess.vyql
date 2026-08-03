@@ -1,0 +1,9 @@
+module bindings.python.generated.m5c20c8c2;
+
+binding filePathAccess0 {
+  requires {
+    dependency("h5py")
+  }
+  query pattern callExpr where callee.method == "copy"
+  emit sink code.FilePathAccess at args[0]
+}

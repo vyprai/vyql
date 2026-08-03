@@ -1,7 +1,0 @@
-import code.{HtmlRender}
-
-adapter swift {
-  package "github.com/vapor-community/markdown" {
-    sink method "markdownToHTML" -> code.HtmlRender
-  }
-}

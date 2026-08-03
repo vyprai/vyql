@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter c {
-  package "litehtml" {
-    sink method "document::createFromString" -> code.Deserialization
-  }
-}

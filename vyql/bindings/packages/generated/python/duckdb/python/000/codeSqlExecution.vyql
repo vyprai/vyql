@@ -1,0 +1,9 @@
+module bindings.python.generated.m0f9e9c43;
+
+binding sqlExecution0 {
+  requires {
+    dependency("duckdb")
+  }
+  query pattern callExpr where callee.method == "Query"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.c.generated.m07b93be2;
+
+binding filePathAccess0 {
+  requires {
+    dependency("tinyply")
+  }
+  query pattern callExpr where callee.method == "PlyFile::read"
+  emit sink code.FilePathAccess at args[0]
+}

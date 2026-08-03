@@ -1,0 +1,9 @@
+module bindings.java.generated.m9fc3588b;
+
+binding storedDataRead0 {
+  requires {
+    dependency("org.testcontainers:mysql")
+  }
+  query pattern callExpr where callee.method == "getJdbcUrl"
+  emit source code.StoredDataRead at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mcbd93549;
+
+binding commandExecution1 {
+  requires {
+    dependency("specinfra")
+  }
+  query pattern callExpr where callee.method == "spawn_command"
+  emit sink code.CommandExecution at args[0]
+}

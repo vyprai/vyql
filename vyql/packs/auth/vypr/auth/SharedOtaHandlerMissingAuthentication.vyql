@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule SharedOtaHandlerMissingAuthentication {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_306, CWE_862]
+    id: "VYQL-AUTH-051"
+    severity: high
+  }
+  issue code.SharedOtaHandlerMissingAuthentication as handler
+}

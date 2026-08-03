@@ -1,0 +1,11 @@
+module code;
+
+concept FlaskEntityDetailMissingAuthorization : issue {
+  cwe: [CWE_862, CWE_200]
+  reviewAssumption: "callers can directly request the entity-detail route for another user or group"
+  reviewCategory: access_control
+  reviewCondition: "a Flask entity-detail route returns user or group metadata without an observed authorization guard"
+  reviewConfidence: high
+  reviewEvidence: "Flask route context {pattern} loads an entity by route id and returns permissions, membership, or request details as JSON before an admin/permission check"
+  vulnerableTo: [access_control.MissingAuthorization, secrets.SecretLeak]
+}

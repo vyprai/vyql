@@ -1,0 +1,9 @@
+module bindings.rust.generated.m01c97515;
+
+binding filePathAccess8 {
+  requires {
+    dependency("pkcs8")
+  }
+  query pattern callExpr where callee.method == "write_pkcs8_der_file"
+  emit sink code.FilePathAccess at args[0]
+}

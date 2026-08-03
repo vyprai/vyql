@@ -1,0 +1,9 @@
+module bindings.java.generated.m7b173373;
+
+binding filePathAccess0 {
+  requires {
+    dependency("com.google.gwt:gwt-dev")
+  }
+  query pattern callExpr where callee.method == "getSaveSourceOutput"
+  emit sink code.FilePathAccess at args[0]
+}

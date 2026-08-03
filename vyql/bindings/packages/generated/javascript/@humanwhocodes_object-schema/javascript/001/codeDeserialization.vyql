@@ -1,0 +1,9 @@
+module bindings.javascript.generated.md45f0878;
+
+binding deserialization1 {
+  requires {
+    dependency("@humanwhocodes/object-schema")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit sink code.Deserialization at args[0]
+}

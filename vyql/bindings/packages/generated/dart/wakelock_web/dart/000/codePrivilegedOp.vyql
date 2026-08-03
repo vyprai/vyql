@@ -1,0 +1,10 @@
+module bindings.dart.generated.mc83fef43;
+
+binding privilegedOp0 {
+  requires {
+    dependency("wakelock_web")
+  }
+  query pattern callExpr where callee.method == "toggle"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

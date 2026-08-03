@@ -1,5 +1,0 @@
-adapter javascript {
-  package "strip-comments" {
-    sink method "parse" -> code.Deserialization
-  }
-}

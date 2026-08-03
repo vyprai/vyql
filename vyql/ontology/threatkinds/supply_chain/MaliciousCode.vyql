@@ -1,0 +1,6 @@
+module supply_chain;
+
+threat MaliciousCode {
+  cwe: [CWE_506]
+  desc: "Embedded malicious code"
+}

@@ -8,9 +8,9 @@
 //
 // Why per-module, creator-attributed: an edge (e.g. a cross-module return flow) may have its
 // Src in one module but be CREATED by another's lowering. Attributing rows to the module that
-// produced them — which is exactly what the incremental lowering/adapter deltas record — keeps
-// the "replace module M's rows" operation sound. Attributing by Src would strand such edges
-// when their creator changes but their Src module does not.
+// produced them — which is exactly what the incremental lowering/binding-applicator deltas
+// record — keeps the "replace module M's rows" operation sound. Attributing by Src would strand
+// such edges when their creator changes but their Src module does not.
 package graphsync
 
 import (
@@ -86,7 +86,7 @@ type SyncLabel struct {
 	Module      string            `json:"module"`
 	Node        string            `json:"node"` // hashed node key the label attaches to
 	Concept     string            `json:"concept"`
-	Adapter     string            `json:"adapter,omitempty"`
+	Applicator  string            `json:"applicator,omitempty"`
 	Detail      map[string]string `json:"detail,omitempty"`
 	Fingerprint string            `json:"fp"`
 }
@@ -128,11 +128,11 @@ func edgeRow(modID string, e usg.Edge) SyncEdge {
 func labelRow(modID string, lr usg.LabelRec) SyncLabel {
 	node := NodeKey(lr.NodeID)
 	dh := mapHash(lr.Label.Detail)
-	key := hashID("label", node, lr.Label.Concept, lr.Label.Provenance.Adapter, dh)
-	fp := hashID(lr.Label.Concept, lr.Label.Provenance.Adapter, lr.Label.Provenance.Fidelity,
+	key := hashID("label", node, lr.Label.Concept, lr.Label.Provenance.Applicator, dh)
+	fp := hashID(lr.Label.Concept, lr.Label.Provenance.Applicator, lr.Label.Provenance.Fidelity,
 		lr.Label.Provenance.Confidence, dh)
 	return SyncLabel{Key: key, Module: modID, Node: node, Concept: lr.Label.Concept,
-		Adapter: lr.Label.Provenance.Adapter, Detail: lr.Label.Detail, Fingerprint: fp}
+		Applicator: lr.Label.Provenance.Applicator, Detail: lr.Label.Detail, Fingerprint: fp}
 }
 
 // Delta is one scan's change-feed. For each module key present in a *Mods map the client should
@@ -147,9 +147,9 @@ type Delta struct {
 }
 
 // Collector accumulates per-module rows during a scan and produces the Delta. It is fed by the
-// incremental lowering pass (nodes/edges/lowering-labels of changed modules) and the adapter
-// pass (adapter labels of relabeled modules); both are creator-attributed. A nil *Collector is a
-// safe no-op so the sync path is fully opt-in.
+// incremental lowering pass (nodes/edges/lowering-labels of changed modules) and the binding
+// applicator pass (labels of relabeled modules); both are creator-attributed. A nil *Collector is
+// a safe no-op so the sync path is fully opt-in.
 type Collector struct {
 	nodes     map[string][]SyncNode
 	edges     map[string][]SyncEdge
@@ -189,8 +189,9 @@ func (c *Collector) MarkFresh(ns string) {
 	c.presentNS[ns] = true
 }
 
-// MarkRelabel records that a module's labels were recomputed this scan (the adapter `relabel`
-// set) — so it appears in LabelMods even if it now has zero labels (client deletes the old ones).
+// MarkRelabel records that a module's labels were recomputed this scan (the applicator
+// `relabel` set) — so it appears in LabelMods even if it now has zero labels (client deletes the
+// old ones).
 func (c *Collector) MarkRelabel(ns string) {
 	if c == nil {
 		return
@@ -220,8 +221,8 @@ func (c *Collector) AddEdges(ns string, edges []usg.Edge) {
 // CollectGraph does ONE pass over the merged graph: emit node rows for nodes in a fresh module
 // (node-dirty), and label rows for nodes in a relabel module (label-dirty). Node and label
 // attribution is the labeled/owning node's module — unambiguous, unlike edges. labelDirtyNS is
-// the adapter `relabel` set (a sigFP-only change makes a module fresh-but-not-relabel, and its
-// labels are genuinely unchanged, so they need not re-sync).
+// the applicator `relabel` set (a sigFP-only change makes a module fresh-but-not-relabel, and
+// its labels are genuinely unchanged, so they need not re-sync).
 func (c *Collector) CollectGraph(g usg.Store, labelDirtyNS map[string]bool) error {
 	if c == nil {
 		return nil

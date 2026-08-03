@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mfe9b686c;
+
+binding sqlExecution0 {
+  requires {
+    dependency("javax.jcr:jcr")
+  }
+  query pattern callExpr where callee.method == "createQuery"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,10 @@
+module bindings.php.generated.m23fc3e07;
+
+binding redirectTarget2 {
+  requires {
+    dependency("symfony-cmf/routing")
+  }
+  query pattern callExpr where callee.method == "generate"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

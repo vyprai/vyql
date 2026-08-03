@@ -1,0 +1,7 @@
+module bindings.c.generated.mce54b166;
+
+binding zeroSizeReallocation75 {
+  query pattern presenceNode where node.path ~= "reallocarray"
+  emit issue code.ZeroSizeReallocation at node
+  emit sink code.ZeroSizeReallocationSink at node
+}

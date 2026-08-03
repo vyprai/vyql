@@ -1,0 +1,9 @@
+module bindings.objc.generated.me0ac8fde;
+
+binding networkSend1 {
+  requires {
+    dependency("CapacitorPushNotifications")
+  }
+  query pattern callExpr where callee.method == "sendPending"
+  emit sink code.NetworkSend at args[0]
+}

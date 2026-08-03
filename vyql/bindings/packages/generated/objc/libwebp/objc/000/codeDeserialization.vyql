@@ -1,0 +1,9 @@
+module bindings.objc.generated.m484e8ca1;
+
+binding deserialization0 {
+  requires {
+    dependency("libwebp")
+  }
+  query pattern callExpr where callee.method == "ReadPNG"
+  emit sink code.Deserialization at args[0]
+}

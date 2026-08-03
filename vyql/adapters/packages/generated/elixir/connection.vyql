@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkData, NetworkSend}
-
-adapter elixir {
-  package "connection" {
-    sink method "send" -> code.NetworkSend
-    source method "recv" -> code.NetworkData
-    sink method "connect" -> code.NetworkConnect
-  }
-}

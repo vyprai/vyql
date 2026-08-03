@@ -1,0 +1,9 @@
+module bindings.go.generated.m38d2593a;
+
+binding commandExecution1 {
+  requires {
+    dependency("github.com/docker/docker-credential-helpers")
+  }
+  query pattern callExpr where callee.method == "NewShellProgramFuncWithEnv"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m27222475;
+
+binding codeEval3 {
+  requires {
+    dependency("org.mongodb:mongo-java-driver")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}

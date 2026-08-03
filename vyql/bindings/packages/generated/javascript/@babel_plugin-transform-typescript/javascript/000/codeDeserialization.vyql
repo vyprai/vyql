@@ -1,0 +1,9 @@
+module bindings.javascript.generated.ma53c5438;
+
+binding deserialization0 {
+  requires {
+    dependency("@babel/plugin-transform-typescript")
+  }
+  query pattern callExpr where callee.method == "transpileEnum"
+  emit sink code.Deserialization at args[0]
+}

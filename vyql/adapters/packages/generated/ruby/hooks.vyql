@@ -1,9 +1,0 @@
-adapter ruby {
-  package "hooks" {
-    sink method "run_hook" -> code.CodeEval
-    sink method "run_hook_for" -> code.CodeEval
-    sink method "run" -> code.CodeEval
-    sink method "execute_callback" -> code.CodeEval
-    sink method "evaluate_callback" -> code.CodeEval
-  }
-}

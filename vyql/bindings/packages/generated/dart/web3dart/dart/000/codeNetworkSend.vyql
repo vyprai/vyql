@@ -1,0 +1,9 @@
+module bindings.dart.generated.m808e7a0f;
+
+binding networkSend0 {
+  requires {
+    dependency("web3dart")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.NetworkSend at args[0]
+}

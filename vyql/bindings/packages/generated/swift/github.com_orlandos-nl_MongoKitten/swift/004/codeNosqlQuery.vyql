@@ -1,0 +1,9 @@
+module bindings.swift.generated.m64cf68f9;
+
+binding nosqlQuery4 {
+  requires {
+    dependency("github.com/orlandos-nl/MongoKitten")
+  }
+  query pattern callExpr where callee.method == "findOne"
+  emit sink code.NosqlQuery at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m5a80fee5;
+
+binding sqlExecution0 {
+  requires {
+    dependency("oatpp")
+  }
+  query pattern callExpr where callee.method == "oatpp::orm::DbClient::execute"
+  emit sink code.SqlExecution at args[0]
+}

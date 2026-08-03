@@ -1,0 +1,6 @@
+module bindings.powershell.generated.m390f1180;
+
+binding filePathAccess30 {
+  query pattern callExpr where callee.path ~= "Copy-Item"
+  emit sink code.FilePathAccess at args[0]
+}

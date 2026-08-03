@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "exjson" {
-    sink method "ExJSON.parse" -> code.Deserialization
-    sink method "JSON.parse" -> code.Deserialization
-  }
-}

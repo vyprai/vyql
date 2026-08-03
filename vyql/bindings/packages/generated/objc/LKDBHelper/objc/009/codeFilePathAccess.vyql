@@ -1,0 +1,9 @@
+module bindings.objc.generated.mcf19b29f;
+
+binding filePathAccess9 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "restoreDBFilesFromDirectory:"
+  emit sink code.FilePathAccess at args[0]
+}

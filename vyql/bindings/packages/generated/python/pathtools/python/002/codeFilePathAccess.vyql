@@ -1,0 +1,9 @@
+module bindings.python.generated.ma6552fc8;
+
+binding filePathAccess2 {
+  requires {
+    dependency("pathtools")
+  }
+  query pattern callExpr where callee.method == "list_directories"
+  emit sink code.FilePathAccess at args[0]
+}

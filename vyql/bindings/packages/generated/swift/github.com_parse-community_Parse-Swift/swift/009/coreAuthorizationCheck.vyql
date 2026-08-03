@@ -1,0 +1,13 @@
+module bindings.swift.generated.m98e3ffbb;
+
+binding authorizationCheck9 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "getReadAccess"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

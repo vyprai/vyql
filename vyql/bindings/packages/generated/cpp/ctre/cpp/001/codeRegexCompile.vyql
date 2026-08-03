@@ -1,0 +1,10 @@
+module bindings.cpp.generated.m8748d7e9;
+
+binding regexCompile1 {
+  requires {
+    dependency("ctre")
+  }
+  query pattern callExpr where callee.method == "match"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

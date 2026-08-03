@@ -1,0 +1,9 @@
+module bindings.perl.generated.mcba1ed5b;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("Text-DeLoreanIpsum")
+  }
+  query pattern callExpr where callee.method == "get_character"
+  emit issue code.WeakRandomValue at call
+}

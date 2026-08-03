@@ -1,0 +1,9 @@
+module bindings.swift.generated.m0397b173;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("github.com/vapor/fluent-mongo-driver")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}

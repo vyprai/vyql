@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding absolutePathDisclosure87 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "wordpress_plugin_direct_access_path_disclosure"
+  emit issue code.AbsolutePathDisclosure at node
+}

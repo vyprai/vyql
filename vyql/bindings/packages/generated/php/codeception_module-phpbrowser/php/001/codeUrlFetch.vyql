@@ -1,0 +1,9 @@
+module bindings.php.generated.m5ffd3c39;
+
+binding urlFetch1 {
+  requires {
+    dependency("codeception/module-phpbrowser")
+  }
+  query pattern callExpr where callee.method == "amOnUrl"
+  emit sink code.UrlFetch at args[0]
+}

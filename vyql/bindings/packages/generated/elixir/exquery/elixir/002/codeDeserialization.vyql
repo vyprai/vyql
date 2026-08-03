@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mbfb08350;
+
+binding deserialization2 {
+  requires {
+    dependency("exquery")
+  }
+  query pattern callExpr where callee.method == "tree"
+  emit sink code.Deserialization at args[0]
+}

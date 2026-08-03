@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m691da200;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("rbvmomi")
+  }
+  query pattern callExpr where callee.method == "findByUuid"
+  emit sink code.NosqlQuery at args[0]
+}

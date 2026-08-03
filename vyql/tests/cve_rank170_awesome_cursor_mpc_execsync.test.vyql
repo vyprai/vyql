@@ -1,0 +1,39 @@
+# Rank 170 / CVE-2026-7629: awesome-cursor-mpc-server interpolated the
+# code-review tool folderPath argument into a git shell command before the
+# patch switched to execFileSync argv execution.
+
+test "rank170: MCP code review folderPath reaches execSync command string"
+  lang javascript
+  profile library
+  file src/tools/codeReview.ts
+  expect VYQL-INJ-002
+  code
+  ```
+  import { execSync } from "child_process";
+
+  export async function runCodeReviewTool(args) {
+    const { folderPath } = args;
+    const diffOutput = execSync(`git -C "${folderPath}" diff`, {
+      encoding: "utf-8",
+    });
+    return diffOutput;
+  }
+  ```
+
+test "rank170: MCP code review uses execFileSync argv for folderPath"
+  lang javascript
+  profile library
+  file src/tools/codeReview.ts
+  reject VYQL-INJ-002
+  code
+  ```
+  import { execFileSync } from "child_process";
+
+  export async function runCodeReviewTool(args) {
+    const { folderPath } = args;
+    const diffOutput = execFileSync("git", ["-C", folderPath, "diff"], {
+      encoding: "utf-8",
+    });
+    return diffOutput;
+  }
+  ```

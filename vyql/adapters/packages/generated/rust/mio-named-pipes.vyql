@@ -1,9 +1,0 @@
-import code.{NetworkData, NetworkConnect, NetworkSend}
-
-adapter rust {
-  package "mio-named-pipes" {
-    source method "read" -> code.NetworkData
-    sink method "connect" -> code.NetworkConnect
-    sink method "write" -> code.NetworkSend
-  }
-}

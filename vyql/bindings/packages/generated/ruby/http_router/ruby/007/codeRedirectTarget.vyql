@@ -1,0 +1,10 @@
+module bindings.ruby.generated.m02e745e0;
+
+binding redirectTarget7 {
+  requires {
+    dependency("http_router")
+  }
+  query pattern callExpr where callee.method == "raw_path"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

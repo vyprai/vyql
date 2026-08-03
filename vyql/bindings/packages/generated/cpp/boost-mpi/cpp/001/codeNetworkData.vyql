@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m915ee8a7;
+
+binding networkData1 {
+  requires {
+    dependency("boost-mpi")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}

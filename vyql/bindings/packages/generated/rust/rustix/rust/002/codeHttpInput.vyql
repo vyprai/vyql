@@ -1,0 +1,9 @@
+module bindings.rust.generated.m49bea96b;
+
+binding httpInput2 {
+  requires {
+    dependency("rustix")
+  }
+  query pattern callExpr where callee.method == "cookie"
+  emit source code.HttpInput at call.result
+}

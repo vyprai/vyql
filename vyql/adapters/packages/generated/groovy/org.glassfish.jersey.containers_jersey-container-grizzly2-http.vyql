@@ -1,5 +1,0 @@
-adapter groovy {
-  package "org.glassfish.jersey.containers:jersey-container-grizzly2-http" {
-    sink method "writeResponseStatusAndHeaders" -> code.ResponseHeaderWrite
-  }
-}

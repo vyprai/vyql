@@ -1,0 +1,10 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding ownershipCheck77 {
+  query pattern callExpr where callee.path ~= "owns_resource?"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

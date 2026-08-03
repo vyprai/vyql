@@ -1,0 +1,11 @@
+module bindings.cpp.generated.m4e783366;
+
+binding lockRelease116 {
+  query pattern callExpr where callee.path ~= "mtx_unlock"
+  emit check core.LockRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}

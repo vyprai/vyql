@@ -1,0 +1,12 @@
+module vypr.injection;
+
+rule Xpath {
+  meta {
+    benchmark: xpathi
+    cwe: [CWE_643]
+    id: "VYQL-INJ-006"
+    severity: high
+  }
+  taint core.UserControlledData -> code.XpathQuery
+  unless path coveredBy core.XpathEscape
+}

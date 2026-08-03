@@ -1,0 +1,9 @@
+module bindings.c.generated.m2816daee;
+
+binding weakCipher34 {
+  requires {
+    dependency("openssl")
+  }
+  query pattern presenceNode where node.path ~= "EVP_des_ede3_cbc"
+  emit issue code.WeakCipher at node
+}

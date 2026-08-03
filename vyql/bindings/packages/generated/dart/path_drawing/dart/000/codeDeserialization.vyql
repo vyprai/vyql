@@ -1,0 +1,9 @@
+module bindings.dart.generated.mf38f74e3;
+
+binding deserialization0 {
+  requires {
+    dependency("path_drawing")
+  }
+  query pattern callExpr where callee.method == "parseSvgPathData"
+  emit sink code.Deserialization at args[0]
+}

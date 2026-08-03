@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m2127f2c1;
+
+binding networkSend1 {
+  requires {
+    dependency("aws-sdk-sns")
+  }
+  query pattern callExpr where callee.method == "publish_batch"
+  emit sink code.NetworkSend at args[0]
+}

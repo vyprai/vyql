@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m4fae70a9;
+
+binding fileUse2 {
+  requires {
+    dependency("activestorage")
+  }
+  query pattern callExpr where callee.method == "download_chunk"
+  emit sink code.FileUseSink at args[0]
+}

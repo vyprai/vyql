@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "nx" {
-    sink method "deserialize" -> code.Deserialization
-    sink method "load_numpy!" -> code.Deserialization
-  }
-}

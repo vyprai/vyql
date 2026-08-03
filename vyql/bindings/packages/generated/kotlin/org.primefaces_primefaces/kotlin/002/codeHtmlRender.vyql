@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m04e8861e;
+
+binding htmlRender2 {
+  requires {
+    dependency("org.primefaces:primefaces")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.HtmlRender at args[0]
+}

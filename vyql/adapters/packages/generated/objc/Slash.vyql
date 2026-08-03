@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter objc {
-  package "Slash" {
-    sink method "attributedStringWithMarkup:style:error:" -> code.Deserialization
-    sink method "attributedStringWithMarkup:error:" -> code.Deserialization
-    sink method "parseMarkup:error:" -> code.Deserialization
-  }
-}

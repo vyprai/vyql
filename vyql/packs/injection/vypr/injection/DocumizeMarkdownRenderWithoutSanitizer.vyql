@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule DocumizeMarkdownRenderWithoutSanitizer {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-093"
+    severity: high
+  }
+  issue code.DocumizeMarkdownRenderWithoutSanitizer as sink
+}

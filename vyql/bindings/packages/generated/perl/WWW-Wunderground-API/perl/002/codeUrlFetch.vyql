@@ -1,0 +1,9 @@
+module bindings.perl.generated.m95a7fa86;
+
+binding urlFetch2 {
+  requires {
+    dependency("WWW-Wunderground-API")
+  }
+  query pattern callExpr where callee.method == "api_call"
+  emit sink code.UrlFetch at args[0]
+}

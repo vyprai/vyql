@@ -1,7 +1,0 @@
-adapter swift {
-  package "github.com/vapor/postgres-kit" {
-    sink method "array" -> code.SqlExecution
-    source method "init" -> code.SecretValue
-    sink method "decode" -> code.XmlParse
-  }
-}

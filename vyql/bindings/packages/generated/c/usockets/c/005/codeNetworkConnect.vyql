@@ -1,0 +1,9 @@
+module bindings.c.generated.mc5f1cd3a;
+
+binding networkConnect5 {
+  requires {
+    dependency("usockets")
+  }
+  query pattern callExpr where callee.method == "us_socket_context_connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

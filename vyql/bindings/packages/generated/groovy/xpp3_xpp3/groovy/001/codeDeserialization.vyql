@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m3235423b;
+
+binding deserialization1 {
+  requires {
+    dependency("xpp3:xpp3")
+  }
+  query pattern callExpr where callee.method == "nextText"
+  emit sink code.Deserialization at args[0]
+}

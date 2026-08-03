@@ -1,8 +1,0 @@
-import code.{TemplateRender}
-import core.{HtmlEscape}
-adapter swift {
-  package "github.com/vapor/leaf-kit" {
-    sink method "render" -> code.TemplateRender
-    control method "htmlEscaped" -> core.HtmlEscape
-  }
-}

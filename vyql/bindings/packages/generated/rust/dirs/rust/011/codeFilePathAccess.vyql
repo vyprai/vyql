@@ -1,0 +1,9 @@
+module bindings.rust.generated.mff40dc02;
+
+binding filePathAccess11 {
+  requires {
+    dependency("dirs")
+  }
+  query pattern callExpr where callee.method == "desktop_dir"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.generated.ma59c71e1;
+
+binding deserialization0 {
+  requires {
+    dependency("django-reversion")
+  }
+  query pattern callExpr where callee.method == "revert"
+  emit sink code.Deserialization at args[0]
+}

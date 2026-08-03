@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding httpInput11 {
+  query pattern callExpr where callee.path ~= "$HTTP_POST_FILES"
+  emit source code.HttpInput at call.result
+}

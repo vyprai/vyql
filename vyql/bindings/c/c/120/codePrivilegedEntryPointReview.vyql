@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding privilegedEntryPointReview120 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "privileged.entrypoint_missing_uid_gate"
+  emit issue code.PrivilegedEntryPointReview at node
+}

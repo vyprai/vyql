@@ -1,8 +1,0 @@
-import code.{RegexCompile}
-adapter c {
-  package "boost-xpressive" {
-    flag code.RegexCompile on any {
-      method "compile"
-    }
-  }
-}

@@ -1,8 +1,0 @@
-import code.{FilePathAccess, UrlFetch}
-
-adapter dart {
-  package "intro_slider" {
-    sink method "IntroSliderTab.pathImage" -> code.FilePathAccess
-    sink method "IntroSliderTab.backgroundNetworkImage" -> code.UrlFetch
-  }
-}

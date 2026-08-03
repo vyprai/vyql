@@ -1,0 +1,9 @@
+module bindings.rust.generated.m8aef9d2f;
+
+binding networkConnect0 {
+  requires {
+    dependency("tauri-runtime-wry")
+  }
+  query pattern callExpr where callee.method == "parse_proxy_url"
+  emit sink code.NetworkConnectSink at args[0]
+}

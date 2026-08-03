@@ -1,0 +1,8 @@
+module code;
+
+review code.PickleUnsafeImportBlocklistGap {
+  category: deserialization
+  expected: [core.SafeDeserialization]
+  kind: target
+  text: "verify pickle safety analyzers blocklist dangerous import modules such as ctypes and pydoc before trusting analysis results"
+}

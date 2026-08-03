@@ -1,0 +1,9 @@
+module bindings.java.generated.m352af055;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-cloudfoundry-connector")
+  }
+  query pattern callExpr where callee.method == "CloudFoundryRawServiceData"
+  emit sink code.Deserialization at args[0]
+}

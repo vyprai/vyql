@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "org.mortbay.jetty:jetty" {
-    sink method "org.mortbay.jetty.HttpURI.parse" -> code.Deserialization
-  }
-}

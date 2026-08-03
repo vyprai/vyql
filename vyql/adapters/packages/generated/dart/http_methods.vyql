@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter dart {
-  package "http_methods" {
-    control method "isHttpMethod" -> core.InputValidation
-  }
-}

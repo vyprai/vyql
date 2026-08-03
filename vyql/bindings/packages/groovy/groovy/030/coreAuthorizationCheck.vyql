@@ -1,0 +1,13 @@
+module bindings.groovy.generated.mbfd454d1;
+
+binding authorizationCheck30 {
+  requires {
+    dependency("grails-spring-security-core")
+  }
+  query pattern callExpr where callee.path ~= "SpringSecurityUtils.ifAllGranted"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

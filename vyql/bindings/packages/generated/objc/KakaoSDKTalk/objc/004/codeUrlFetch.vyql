@@ -1,0 +1,9 @@
+module bindings.objc.generated.m29559e25;
+
+binding urlFetch4 {
+  requires {
+    dependency("KakaoSDKTalk")
+  }
+  query pattern callExpr where callee.method == "sendScrapMemo"
+  emit sink code.UrlFetch at args[0]
+}

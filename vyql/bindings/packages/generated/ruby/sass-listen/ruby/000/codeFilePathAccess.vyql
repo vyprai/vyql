@@ -1,0 +1,9 @@
+module bindings.ruby.generated.meeac2e76;
+
+binding filePathAccess0 {
+  requires {
+    dependency("sass-listen")
+  }
+  query pattern callExpr where callee.method == "File"
+  emit sink code.FilePathAccess at args[0]
+}

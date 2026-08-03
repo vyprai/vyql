@@ -1,8 +1,0 @@
-import code.{NetworkData, NetworkSend}
-
-adapter cpp {
-  package "rtmidi" {
-    source method "getMessage" -> code.NetworkData
-    sink method "sendMessage" -> code.NetworkSend
-  }
-}

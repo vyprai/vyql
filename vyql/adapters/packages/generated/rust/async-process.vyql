@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter rust {
-  package "async-process" {
-    sink method "spawn" -> code.CommandExecution
-  }
-}

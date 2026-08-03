@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule UnboundAuthorizationTarget {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_639, CWE_862, CWE_863]
+    id: "VYQL-AUTH-095"
+    severity: high
+  }
+  issue code.UnboundAuthorizationTarget as access
+}

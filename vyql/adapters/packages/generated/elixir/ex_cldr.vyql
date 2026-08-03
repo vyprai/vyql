@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter elixir {
-  package "ex_cldr" {
-    source method "Cldr.LanguageTag.parse" -> core.UserControlledData
-  }
-}

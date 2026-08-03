@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter dart {
-  package "chopper_generator" {
-    source method "getMethodPath" -> core.UserControlledData
-    source method "getMethodName" -> core.UserControlledData
-  }
-}

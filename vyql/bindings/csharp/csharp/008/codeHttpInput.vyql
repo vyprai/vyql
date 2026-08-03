@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding httpInput8 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.methodAttribute contains "Route"
+  emit source code.HttpInput at call.result
+}

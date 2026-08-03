@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding powerShellCommandStringWrapperEnv339 {
+  query pattern presenceNode where node.analysis == "go.powershell_command_string_wrapper_env"
+  emit issue code.CommandStringWrapperExecution at node
+}

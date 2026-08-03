@@ -1,0 +1,9 @@
+module bindings.python.generated.m15148587;
+
+binding deserialization1 {
+  requires {
+    dependency("partd")
+  }
+  query pattern callExpr where callee.method == "parse_dtype"
+  emit sink code.Deserialization at args[0]
+}

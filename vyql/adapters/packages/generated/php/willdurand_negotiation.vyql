@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter php {
-  package "willdurand/negotiation" {
-    source method "Negotiation\AbstractNegotiator::getBest" -> core.UserControlledData
-  }
-}

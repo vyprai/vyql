@@ -1,0 +1,9 @@
+module bindings.objc.generated.m44a4d7ec;
+
+binding deserialization2 {
+  requires {
+    dependency("ObjectMapper")
+  }
+  query pattern callExpr where callee.method == "map"
+  emit sink code.Deserialization at args[0]
+}

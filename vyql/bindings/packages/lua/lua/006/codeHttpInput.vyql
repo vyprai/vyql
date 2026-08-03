@@ -1,0 +1,9 @@
+module bindings.lua.generated.m49b0a04f;
+
+binding httpInput6 {
+  requires {
+    dependency("lapis")
+  }
+  query pattern callExpr where callee.path ~= "lapis.params"
+  emit source code.HttpInput at call.result
+}

@@ -1,7 +1,0 @@
-adapter java {
-  package "org.apache.hadoop:hadoop-yarn-client" {
-    source method "SCMAdmin.run" -> core.UserControlledData
-    source method "LogsCLI.run" -> core.UserControlledData
-    source method "LogsCLI.runCommand" -> core.UserControlledData
-  }
-}

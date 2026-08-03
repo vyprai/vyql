@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "uuid" {
-    sink method "parse_str" -> code.Deserialization
-    sink method "try_parse" -> code.Deserialization
-    sink method "try_parse_ascii" -> code.Deserialization
-  }
-}

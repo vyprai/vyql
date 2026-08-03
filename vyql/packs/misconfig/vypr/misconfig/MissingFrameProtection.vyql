@@ -1,0 +1,10 @@
+module vypr.misconfig;
+
+rule MissingFrameProtection {
+  meta {
+    cwe: [CWE_1021]
+    id: "VYQL-CFG-009"
+    severity: medium
+  }
+  issue code.MissingFrameProtection as f
+}

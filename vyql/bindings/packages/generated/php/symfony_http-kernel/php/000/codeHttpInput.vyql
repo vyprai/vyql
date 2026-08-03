@@ -1,0 +1,9 @@
+module bindings.php.generated.mb634193a;
+
+binding httpInput0 {
+  requires {
+    dependency("symfony/http-kernel")
+  }
+  query pattern callExpr where callee.method == "handle"
+  emit source code.HttpInput at call.result
+}

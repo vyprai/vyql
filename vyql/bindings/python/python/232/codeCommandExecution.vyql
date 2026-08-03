@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding commandExecution232 {
+  query pattern callExpr where callee.path ~= "subprocess.run" and args.any.literal contains "-c"
+  emit sink code.CommandExecution at args[0].collection[2]
+}

@@ -1,5 +1,0 @@
-adapter perl {
-  package "rlib" {
-    sink method "import" -> code.FilePathAccess
-  }
-}

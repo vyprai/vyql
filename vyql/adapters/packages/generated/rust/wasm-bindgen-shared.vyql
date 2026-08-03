@@ -1,7 +1,0 @@
-import core.{InputValidation, HtmlEscape}
-adapter rust {
-  package "wasm-bindgen-shared" {
-    control method "escape_string" -> core.InputValidation
-    control method "escape_string" -> core.HtmlEscape
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m3f0ad31e;
+
+binding filePathAccess1 {
+  requires {
+    dependency("sensio/generator-bundle")
+  }
+  query pattern callExpr where callee.method == "dump"
+  emit sink code.FilePathAccess at args[0]
+}

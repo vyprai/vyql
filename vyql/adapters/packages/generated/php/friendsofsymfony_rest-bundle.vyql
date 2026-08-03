@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{UserControlledData}
-
-adapter php {
-  package "friendsofsymfony/rest-bundle" {
-    source method "read" -> core.UserControlledData
-    sink method "decode" -> code.Deserialization
-  }
-}

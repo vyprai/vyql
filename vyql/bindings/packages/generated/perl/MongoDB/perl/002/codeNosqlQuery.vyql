@@ -1,0 +1,9 @@
+module bindings.perl.generated.m38b82529;
+
+binding nosqlQuery2 {
+  requires {
+    dependency("MongoDB")
+  }
+  query pattern callExpr where callee.method == "write_insert"
+  emit sink code.NosqlQuery at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "ipnet" {
-    sink method "from_str" -> code.Deserialization
-  }
-}

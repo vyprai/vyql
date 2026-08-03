@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m2e984f7b;
+
+binding userControlledData1 {
+  requires {
+    dependency("com.aliyun:aliyun-java-sdk-core")
+  }
+  query pattern callExpr where callee.method == "getBodyParameters"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,7 @@
+module bindings.kotlin.generated.m304d1620;
+
+binding resourceHandle119 {
+  query pattern presenceNode where node.path ~= "FileOutputStream"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}

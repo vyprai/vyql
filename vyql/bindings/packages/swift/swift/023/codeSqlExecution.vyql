@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc6005d88;
+
+binding sqlExecution23 {
+  requires {
+    dependency("postgres-nio")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

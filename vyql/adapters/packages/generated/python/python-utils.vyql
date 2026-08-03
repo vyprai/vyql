@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter python {
-  package "python-utils" {
-    sink method "import_global" -> code.CodeEval
-  }
-}

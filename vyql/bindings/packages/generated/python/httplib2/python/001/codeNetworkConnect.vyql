@@ -1,0 +1,9 @@
+module bindings.python.generated.m5d2093cb;
+
+binding networkConnect1 {
+  requires {
+    dependency("httplib2")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

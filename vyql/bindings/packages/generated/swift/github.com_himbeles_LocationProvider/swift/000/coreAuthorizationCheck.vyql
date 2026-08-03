@@ -1,0 +1,13 @@
+module bindings.swift.generated.me1e0c650;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("github.com/himbeles/LocationProvider")
+  }
+  query pattern callExpr where callee.method == "requestAuthorization"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

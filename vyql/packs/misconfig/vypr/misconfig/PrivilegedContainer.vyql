@@ -1,0 +1,10 @@
+module vypr.misconfig;
+
+rule PrivilegedContainer {
+  meta {
+    cwe: [CWE_250]
+    id: "VYQL-CFG-010"
+    severity: high
+  }
+  issue code.PrivilegedContainer as c
+}

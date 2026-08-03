@@ -1,0 +1,9 @@
+module bindings.php.generated.m5e085d6c;
+
+binding httpInput0 {
+  requires {
+    dependency("symfony/http-client")
+  }
+  query pattern callExpr where callee.method == "setQuery"
+  emit source code.HttpInput at call.result
+}

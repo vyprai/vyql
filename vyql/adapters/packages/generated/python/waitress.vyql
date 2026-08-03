@@ -1,8 +1,0 @@
-import code.{Deserialization, HttpInput}
-
-adapter python {
-  package "waitress" {
-    sink method "parse_header" -> code.Deserialization
-    source method "get_header_lines" -> code.HttpInput
-  }
-}

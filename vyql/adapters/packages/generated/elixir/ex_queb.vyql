@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter elixir {
-  package "ex_queb" {
-    sink method "filter" -> code.SqlExecution
-  }
-}

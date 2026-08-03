@@ -1,0 +1,9 @@
+module bindings.elixir.generated.meeee040d;
+
+binding networkSend0 {
+  requires {
+    dependency("telemetry_influxdb")
+  }
+  query pattern callExpr where callee.method == "TelemetryInfluxDB.UDP.Socket.send"
+  emit sink code.NetworkSend at args[0]
+}

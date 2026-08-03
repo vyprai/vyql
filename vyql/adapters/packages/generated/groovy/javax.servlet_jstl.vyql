@@ -1,5 +1,0 @@
-adapter groovy {
-  package "javax.servlet:jstl" {
-    control method "addSQLParameter" -> core.SqlParameterization
-  }
-}

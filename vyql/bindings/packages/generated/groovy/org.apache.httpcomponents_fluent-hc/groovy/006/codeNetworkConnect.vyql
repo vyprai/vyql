@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m909dd0fb;
+
+binding networkConnect6 {
+  requires {
+    dependency("org.apache.httpcomponents:fluent-hc")
+  }
+  query pattern callExpr where callee.method == "Delete"
+  emit sink code.NetworkConnectSink at args[0]
+}

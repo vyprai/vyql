@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter go {
-  package "github.com/hashicorp/go.net" {
-    control method "escape" -> core.HtmlEscape
-  }
-}

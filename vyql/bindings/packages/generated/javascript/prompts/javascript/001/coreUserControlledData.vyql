@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m34c08b24;
+
+binding userControlledData1 {
+  requires {
+    dependency("prompts")
+  }
+  query pattern callExpr where callee.method == "NumberPrompt.parse"
+  emit source core.UserControlledData at call.result
+}

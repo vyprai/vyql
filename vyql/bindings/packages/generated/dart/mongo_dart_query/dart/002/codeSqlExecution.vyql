@@ -1,0 +1,9 @@
+module bindings.dart.generated.m1ec4b138;
+
+binding sqlExecution2 {
+  requires {
+    dependency("mongo_dart_query")
+  }
+  query pattern callExpr where callee.method == "Match"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.mc84d0226;
+
+binding networkSend1 {
+  requires {
+    dependency("SwiftNIOFoundationCompat")
+  }
+  query pattern callExpr where callee.method == "close"
+  emit sink code.NetworkSend at args[0]
+}

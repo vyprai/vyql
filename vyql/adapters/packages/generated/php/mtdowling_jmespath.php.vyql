@@ -1,6 +1,0 @@
-adapter php {
-  package "mtdowling/jmespath.php" {
-    sink method "search" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-  }
-}

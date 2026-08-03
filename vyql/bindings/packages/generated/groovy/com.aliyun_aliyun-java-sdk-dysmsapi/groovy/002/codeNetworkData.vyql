@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mefcfcfd3;
+
+binding networkData2 {
+  requires {
+    dependency("com.aliyun:aliyun-java-sdk-dysmsapi")
+  }
+  query pattern callExpr where callee.method == "setTemplateCode"
+  emit source code.NetworkData at call.result
+}

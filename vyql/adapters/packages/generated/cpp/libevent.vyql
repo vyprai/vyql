@@ -1,8 +1,0 @@
-import code.{Deserialization, NetworkConnect}
-adapter cpp {
-  package "libevent" {
-    sink method "evhttp_parse_firstline_" -> code.Deserialization
-    sink method "evhttp_parse_headers_" -> code.Deserialization
-    sink method "bufferevent_ssl_new_impl" -> code.NetworkConnect
-  }
-}

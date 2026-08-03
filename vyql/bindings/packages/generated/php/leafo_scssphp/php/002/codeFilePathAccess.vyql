@@ -1,0 +1,9 @@
+module bindings.php.generated.m1909c948;
+
+binding filePathAccess2 {
+  requires {
+    dependency("leafo/scssphp")
+  }
+  query pattern callExpr where callee.method == "LeafoScssPhpCache::unlink"
+  emit sink code.FilePathAccess at args[0]
+}

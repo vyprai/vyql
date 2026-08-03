@@ -1,0 +1,9 @@
+module bindings.java.generated.m08e621be;
+
+binding deserialization1 {
+  requires {
+    dependency("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
+  }
+  query pattern callExpr where callee.method == "readBinaryValue"
+  emit sink code.Deserialization at args[0]
+}

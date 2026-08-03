@@ -1,0 +1,9 @@
+module bindings.cpp.generated.ma70876e4;
+
+binding networkData1 {
+  requires {
+    dependency("libpcap")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}

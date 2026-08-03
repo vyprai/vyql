@@ -1,8 +1,0 @@
-import core.{AuthenticationCheck}
-
-adapter dart {
-  package "flutter_facebook_login" {
-    control method "logIn" -> core.AuthenticationCheck
-    source method "loginBehaviorFromString" -> core.UserControlledData
-  }
-}

@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter java {
-  package "com.github.spullara.mustache.java:compiler" {
-    control method "escape" -> core.HtmlEscape
-  }
-}

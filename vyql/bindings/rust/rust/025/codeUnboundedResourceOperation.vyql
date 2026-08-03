@@ -1,0 +1,6 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding unboundedResourceOperation25 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "unbounded_next_await"
+  emit issue code.UnboundedResourceOperation at node
+}

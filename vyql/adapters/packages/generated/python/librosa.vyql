@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter python {
-  package "librosa" {
-    sink method "load" -> code.FilePathAccess
-  }
-}

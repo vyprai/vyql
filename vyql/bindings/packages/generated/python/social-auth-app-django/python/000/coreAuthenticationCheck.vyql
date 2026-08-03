@@ -1,0 +1,13 @@
+module bindings.python.generated.mf95c8770;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("social-auth-app-django")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

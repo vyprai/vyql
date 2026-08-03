@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-
-adapter scala {
-  package "org.springframework.social:spring-social-web" {
-    control method "escape" -> core.HtmlEscape
-  }
-}

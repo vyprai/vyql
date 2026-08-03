@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m992cc637;
+
+binding expressionEval0 {
+  requires {
+    dependency("corrade")
+  }
+  query pattern callExpr where callee.method == "format"
+  emit sink code.ExpressionEval at args[0]
+}

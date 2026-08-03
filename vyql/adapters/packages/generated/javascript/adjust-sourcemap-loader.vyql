@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter javascript {
-  package "adjust-sourcemap-loader" {
-    sink method "loader" -> code.Deserialization
-    sink method "decodeSourcesWith" -> code.Deserialization
-  }
-}

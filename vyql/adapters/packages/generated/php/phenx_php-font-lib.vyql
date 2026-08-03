@@ -1,5 +1,0 @@
-adapter php {
-  package "phenx/php-font-lib" {
-    sink method "open" -> code.FilePathAccess
-  }
-}

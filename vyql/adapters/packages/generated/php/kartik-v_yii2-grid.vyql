@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter php {
-  package "kartik-v/yii2-grid" {
-    sink method "parseValue" -> code.CodeEval
-  }
-}

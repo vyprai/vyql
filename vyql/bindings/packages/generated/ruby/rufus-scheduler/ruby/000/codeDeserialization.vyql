@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mbde5da47;
+
+binding deserialization0 {
+  requires {
+    dependency("rufus-scheduler")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

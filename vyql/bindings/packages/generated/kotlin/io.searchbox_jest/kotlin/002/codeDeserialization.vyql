@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m0c858cd1;
+
+binding deserialization2 {
+  requires {
+    dependency("io.searchbox:jest")
+  }
+  query pattern callExpr where callee.method == "deserializeResponse"
+  emit sink code.Deserialization at args[0]
+}

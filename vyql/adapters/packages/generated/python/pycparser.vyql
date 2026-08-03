@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "pycparser" {
-    sink method "parse" -> code.Deserialization
-  }
-}

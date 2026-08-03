@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mc96d3753;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.apache.logging.log4j:log4j-core")
+  }
+  query pattern callExpr where callee.method == "FileManager.write"
+  emit sink code.FilePathAccess at args[0]
+}

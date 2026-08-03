@@ -1,0 +1,9 @@
+module bindings.perl.generated.m3314d2bf;
+
+binding deserialization0 {
+  requires {
+    dependency("Petal")
+  }
+  query pattern callExpr where callee.method == "input"
+  emit sink code.Deserialization at args[0]
+}

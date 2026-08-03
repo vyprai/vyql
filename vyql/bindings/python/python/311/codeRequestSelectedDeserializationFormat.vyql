@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding requestSelectedDeserializationFormat311 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "request_selected_deserialization_format"
+  emit issue code.RequestSelectedDeserializationFormat at node
+}

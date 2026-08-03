@@ -1,0 +1,9 @@
+module bindings.python.generated.m98a05381;
+
+binding userControlledData4 {
+  requires {
+    dependency("soundfile")
+  }
+  query pattern callExpr where callee.method == "buffer_read"
+  emit source core.UserControlledData at call.result
+}

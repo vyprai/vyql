@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m7bdd805f;
+
+binding networkData3 {
+  requires {
+    dependency("finch")
+  }
+  query pattern callExpr where callee.method == "stream_while"
+  emit source code.NetworkData at call.result
+}

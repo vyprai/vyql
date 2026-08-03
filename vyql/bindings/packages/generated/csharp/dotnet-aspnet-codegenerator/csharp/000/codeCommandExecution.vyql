@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m5333e552;
+
+binding commandExecution0 {
+  requires {
+    dependency("dotnet-aspnet-codegenerator")
+  }
+  query pattern callExpr where callee.method == "GetProjectDependencyCommandArgs"
+  emit sink code.CommandExecution at args[0]
+}

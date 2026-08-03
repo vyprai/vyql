@@ -1,7 +1,0 @@
-import code.{UrlFetch}
-
-adapter dart {
-  package "audioplayers_android" {
-    sink method "downloadUrl" -> code.UrlFetch
-  }
-}

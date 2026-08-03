@@ -1,0 +1,6 @@
+module bindings.scala.generated.m06d0685b;
+
+binding csrfDisabled40 {
+  query pattern presenceNode where node.path ~= "csrf.disable"
+  emit issue code.CsrfDisabled at node
+}

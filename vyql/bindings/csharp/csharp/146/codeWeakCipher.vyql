@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding weakCipher146 {
+  query pattern presenceNode where node.path ~= "RC2.Create"
+  emit issue code.WeakCipher at node
+}

@@ -1,0 +1,11 @@
+module bindings.perl.generated.mfca40a44;
+
+pattern bindingMetadata {
+  binding: {
+    name: "perl"
+    meta: {
+      fidelity: "resolved"
+      match: "contains"
+    }
+  }
+}

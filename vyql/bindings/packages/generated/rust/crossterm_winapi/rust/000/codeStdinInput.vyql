@@ -1,0 +1,9 @@
+module bindings.rust.generated.mce19a97d;
+
+binding stdinInput0 {
+  requires {
+    dependency("crossterm_winapi")
+  }
+  query pattern callExpr where callee.method == "read_single_input_event"
+  emit source code.StdinInput at call.result
+}

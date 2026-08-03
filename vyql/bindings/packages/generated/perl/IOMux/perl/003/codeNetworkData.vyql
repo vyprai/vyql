@@ -1,0 +1,9 @@
+module bindings.perl.generated.m1fe87d91;
+
+binding networkData3 {
+  requires {
+    dependency("IOMux")
+  }
+  query pattern callExpr where callee.method == "muxConnection"
+  emit source code.NetworkData at call.result
+}

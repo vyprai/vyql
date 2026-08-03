@@ -1,7 +1,0 @@
-import code.{NetworkData}
-adapter python {
-  package "ipaddr" {
-    source method "IPNetwork" -> code.NetworkData
-    source method "IPAddress" -> code.NetworkData
-  }
-}

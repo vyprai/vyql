@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m2ca3c897;
+
+binding fileUse4 {
+  requires {
+    dependency("spring.social.dropbox")
+  }
+  query pattern callExpr where callee.method == "UploadFile"
+  emit sink code.FileUseSink at args[0]
+}

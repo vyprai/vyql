@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding incompleteIpDenylist189 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "parseInt" and node.context.expr contains "first===10" and node.context.expr contains "first===127" and node.context.expr contains "first===169&&second===254" and node.context.expr contains "first===172&&second>=16&&second<=31" and node.context.expr contains "first===192&&second===168"
+  emit issue code.IncompleteIpDenylist at node
+}

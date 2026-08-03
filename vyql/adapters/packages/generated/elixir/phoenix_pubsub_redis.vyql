@@ -1,8 +1,0 @@
-import code.{NetworkSend}
-
-adapter elixir {
-  package "phoenix_pubsub_redis" {
-    sink method "broadcast" -> code.NetworkSend
-    sink method "direct_broadcast" -> code.NetworkSend
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.m14546802;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Autodia")
+  }
+  query pattern callExpr where callee.method == "add_inputfile"
+  emit sink code.FilePathAccess at args[0]
+}

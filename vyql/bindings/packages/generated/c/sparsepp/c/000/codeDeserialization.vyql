@@ -1,0 +1,9 @@
+module bindings.c.generated.m16c042af;
+
+binding deserialization0 {
+  requires {
+    dependency("sparsepp")
+  }
+  query pattern callExpr where callee.method == "read_data"
+  emit sink code.Deserialization at args[0]
+}

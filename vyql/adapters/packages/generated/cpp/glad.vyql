@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "glad" {
-    sink method "xml_fromstring" -> code.Deserialization
-    sink method "xml_parse" -> code.Deserialization
-  }
-}

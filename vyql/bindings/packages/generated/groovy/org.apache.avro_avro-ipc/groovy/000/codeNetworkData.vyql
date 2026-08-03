@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m0630ced0;
+
+binding networkData0 {
+  requires {
+    dependency("org.apache.avro:avro-ipc")
+  }
+  query pattern callExpr where callee.method == "HttpTransceiver.readBuffers"
+  emit source code.NetworkData at call.result
+}

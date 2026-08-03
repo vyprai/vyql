@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mc091c291;
+
+binding sqlExecution0 {
+  requires {
+    dependency("com.atomikos:transactions-jdbc")
+  }
+  query pattern callExpr where callee.method == "getTestQuery"
+  emit sink code.SqlExecution at args[0]
+}

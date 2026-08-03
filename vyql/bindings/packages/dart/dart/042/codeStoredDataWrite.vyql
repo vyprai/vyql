@@ -1,0 +1,9 @@
+module bindings.dart.generated.m5342780c;
+
+binding storedDataWrite42 {
+  requires {
+    dependency("shared_preferences_web")
+  }
+  query pattern callExpr where callee.method == "remove"
+  emit sink code.StoredDataWrite at args[0]
+}

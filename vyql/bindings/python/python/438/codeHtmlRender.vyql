@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding htmlRender438 {
+  query pattern callExpr where callee.path ~= "flask.render_template_string"
+  emit sink code.HtmlRender at args[0]
+}

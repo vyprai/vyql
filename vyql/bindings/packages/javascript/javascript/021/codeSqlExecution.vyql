@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m5c270092;
+
+binding sqlExecution21 {
+  requires {
+    dependency("pg")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

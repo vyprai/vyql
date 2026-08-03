@@ -1,0 +1,9 @@
+module bindings.go.generated.me292c376;
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/pierrec/lz4")
+  }
+  query pattern callExpr where callee.method == "NewWriter"
+  emit sink code.Deserialization at args[0]
+}

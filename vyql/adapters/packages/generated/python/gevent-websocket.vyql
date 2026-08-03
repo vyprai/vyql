@@ -1,9 +1,0 @@
-import code.{NetworkData, NetworkSend}
-
-adapter python {
-  package "gevent-websocket" {
-    source method "read_message" -> code.NetworkData
-    sink method "send" -> code.NetworkSend
-    control method "validate" -> core.InputValidation
-  }
-}

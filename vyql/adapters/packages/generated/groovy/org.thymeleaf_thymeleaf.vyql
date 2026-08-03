@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-
-adapter groovy {
-  package "org.thymeleaf:thymeleaf" {
-    source method "getQueryString" -> core.UserControlledData
-    source method "getHeaderValue" -> core.UserControlledData
-    source method "getCookieValue" -> core.UserControlledData
-  }
-}

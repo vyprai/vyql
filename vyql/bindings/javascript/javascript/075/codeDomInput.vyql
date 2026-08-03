@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding domInput75 {
+  query pattern callExpr where callee.path ~= "document.location"
+  emit source code.DomInput at call.result
+}

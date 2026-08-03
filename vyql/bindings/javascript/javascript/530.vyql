@@ -1,0 +1,13 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding binding530 {
+  query pattern callExpr where callee.path ~= "ldap.escapeFilter"
+  emit check core.LdapEscape at call {
+    advisory: true
+    about: code.LdapQuery
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

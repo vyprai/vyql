@@ -1,9 +1,0 @@
-import code.{CodeEval}
-
-adapter ruby {
-  package "capybara" {
-    sink method "execute_script" -> code.CodeEval
-    sink method "evaluate_script" -> code.CodeEval
-    sink method "evaluate_async_script" -> code.CodeEval
-  }
-}

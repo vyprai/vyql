@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mf98b3aca;
+
+binding xmlParse21 {
+  requires {
+    dependency("sweet_xml")
+  }
+  query pattern callExpr where callee.path ~= "SweetXml.parse"
+  emit sink code.XmlParse at args[0]
+}

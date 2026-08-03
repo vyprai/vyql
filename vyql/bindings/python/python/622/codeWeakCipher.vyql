@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding weakCipher622 {
+  query pattern callExpr where callee.path == "AES.new" and not args.any.literal contains "MODE_"
+  emit issue code.WeakCipher at call
+}

@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding xmlParse132 {
+  query pattern callExpr where callee.path ~= "xmlReadMemory"
+  emit sink code.XmlParse at args[0]
+}

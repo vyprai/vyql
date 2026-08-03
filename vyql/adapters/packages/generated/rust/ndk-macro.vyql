@@ -1,9 +1,0 @@
-import code.{EnvVariable}
-
-adapter rust {
-  package "ndk-macro" {
-    source method "main_with_backtrace_on" -> code.EnvVariable
-    source method "main_with_backtrace_full" -> code.EnvVariable
-    source method "main_with_backtrace_on_and_logger_with_tag" -> code.EnvVariable
-  }
-}

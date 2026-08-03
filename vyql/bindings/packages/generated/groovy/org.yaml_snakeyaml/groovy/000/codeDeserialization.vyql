@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mdb6641db;
+
+binding deserialization0 {
+  requires {
+    dependency("org.yaml:snakeyaml")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

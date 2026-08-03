@@ -1,9 +1,0 @@
-import code.{NetworkSend}
-import core.{UserControlledData}
-
-adapter ruby {
-  package "faraday-multipart" {
-    source method "CompositeReadIO.read" -> core.UserControlledData
-    sink method "Middleware.part" -> code.NetworkSend
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.java.generated.m2e09998c;
+
+binding httpInput0 {
+  requires {
+    dependency("com.squareup.okhttp:okhttp")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.HttpInput at call.result
+}

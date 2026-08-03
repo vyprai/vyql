@@ -1,9 +1,0 @@
-import code.{SqlExecution}
-
-adapter kotlin {
-  package "com.datastax.cassandra:cassandra-driver-mapping" {
-    sink method "saveQuery" -> code.SqlExecution
-    sink method "getQuery" -> code.SqlExecution
-    sink method "deleteQuery" -> code.SqlExecution
-  }
-}

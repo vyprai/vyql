@@ -1,9 +1,0 @@
-import code.{WeakRandomValue}
-
-adapter cpp {
-  package "kuku" {
-    flag code.WeakRandomValue on any {
-      method "MakeRandomItem"
-    }
-  }
-}

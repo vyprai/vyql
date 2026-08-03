@@ -1,0 +1,13 @@
+module bindings.ruby.generated.m40df21f5;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("rack-openid")
+  }
+  query pattern callExpr where callee.method == "authenticate_session"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

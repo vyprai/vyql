@@ -1,9 +1,0 @@
-adapter ruby {
-  package "rufus-scheduler" {
-    sink method "parse" -> code.Deserialization
-    sink method "parse_cron" -> code.Deserialization
-    sink method "parse_in" -> code.Deserialization
-    sink method "parse_at" -> code.Deserialization
-    sink method "parse_duration" -> code.Deserialization
-  }
-}

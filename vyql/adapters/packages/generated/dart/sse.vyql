@@ -1,9 +1,0 @@
-import code.{NetworkData, NetworkSend}
-
-adapter dart {
-  package "sse" {
-    source method "SseClient._onIncomingMessage" -> code.NetworkData
-    sink method "SseClient.sink" -> code.NetworkSend
-    sink method "SseConnection.sink" -> code.NetworkSend
-  }
-}

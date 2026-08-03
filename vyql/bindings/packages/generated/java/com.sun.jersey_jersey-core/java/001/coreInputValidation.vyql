@@ -1,0 +1,14 @@
+module bindings.java.generated.m6daec676;
+
+binding inputValidation1 {
+  requires {
+    dependency("com.sun.jersey:jersey-core")
+  }
+  query pattern callExpr where callee.method == "UriComponent.decode"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding hostExpandedUrlSanitizedBeforeExpansionSsti92 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "safeCanonicalUrl" and node.context.phpReview == "host_expanded_url_sanitized_before_expansion"
+  emit issue code.HostExpandedUrlSanitizedBeforeExpansionSsti at node
+}

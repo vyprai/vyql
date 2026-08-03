@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m2661708c;
+
+binding filePathAccess2 {
+  requires {
+    dependency("cocoyaxi")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

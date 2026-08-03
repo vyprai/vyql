@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.md572087c;
+
+binding networkData3 {
+  requires {
+    dependency("org.apache.activemq:activemq-broker")
+  }
+  query pattern callExpr where callee.method == "messageConsumed"
+  emit source code.NetworkData at call.result
+}

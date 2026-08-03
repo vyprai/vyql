@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mc34f9126;
+
+binding filePathAccess7 {
+  requires {
+    dependency("flann")
+  }
+  query pattern callExpr where callee.method == "load_from_file"
+  emit sink code.FilePathAccess at args[0]
+}

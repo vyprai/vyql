@@ -1,0 +1,11 @@
+module vypr.memory;
+
+rule LibreOfficeEnhwmfDibHeaderSizeUnderflow {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_190, CWE_787]
+    id: "VYQL-MEM-029"
+    severity: high
+  }
+  issue code.LibreOfficeEnhwmfDibHeaderSizeUnderflow as c
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter scala {
-  package "net.sourceforge.nekohtml:nekohtml" {
-    sink method "parse" -> code.Deserialization
-  }
-}

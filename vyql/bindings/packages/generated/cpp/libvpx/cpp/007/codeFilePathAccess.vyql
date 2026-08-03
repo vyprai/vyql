@@ -1,0 +1,9 @@
+module bindings.cpp.generated.md0e9ae1e;
+
+binding filePathAccess7 {
+  requires {
+    dependency("libvpx")
+  }
+  query pattern callExpr where callee.method == "vpx_video_reader_get_frame"
+  emit sink code.FilePathAccess at args[0]
+}

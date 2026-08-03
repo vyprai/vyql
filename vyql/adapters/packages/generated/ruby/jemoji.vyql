@@ -1,7 +1,0 @@
-import code.{HtmlRender}
-
-adapter ruby {
-  package "jemoji" {
-    sink method "emojify" -> code.HtmlRender
-  }
-}

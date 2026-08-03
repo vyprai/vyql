@@ -1,7 +1,0 @@
-import code.{NetworkConnect, SecretValue}
-adapter dart {
-  package "flutter_google_places" {
-    sink method "PlacesAutocomplete.show" -> code.NetworkConnect
-    source method "PlacesAutocomplete.show.apiKey" -> code.SecretValue
-  }
-}

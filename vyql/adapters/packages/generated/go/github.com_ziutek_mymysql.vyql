@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter go {
-  package "github.com/ziutek/mymysql" {
-    sink method "Query" -> code.SqlExecution
-  }
-}

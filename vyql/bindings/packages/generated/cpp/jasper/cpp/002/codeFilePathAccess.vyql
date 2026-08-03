@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mb21b01b4;
+
+binding filePathAccess2 {
+  requires {
+    dependency("jasper")
+  }
+  query pattern callExpr where callee.method == "jpc_bitstream_sopen"
+  emit sink code.FilePathAccess at args[0]
+}

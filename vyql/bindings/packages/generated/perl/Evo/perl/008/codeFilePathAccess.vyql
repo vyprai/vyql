@@ -1,0 +1,9 @@
+module bindings.perl.generated.m21559073;
+
+binding filePathAccess8 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "unlink"
+  emit sink code.FilePathAccess at args[0]
+}

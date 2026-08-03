@@ -1,8 +1,0 @@
-adapter kotlin {
-  package "org.springframework.amqp:spring-amqp" {
-    sink method "deserialize" -> code.Deserialization
-    flag code.WeakRandomValue on any {
-      path "org.springframework.amqp.spring.amqp.random"
-    }
-  }
-}

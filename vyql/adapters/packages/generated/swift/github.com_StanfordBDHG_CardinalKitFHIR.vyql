@@ -1,5 +1,0 @@
-adapter swift {
-  package "github.com/StanfordBDHG/CardinalKitFHIR" {
-    sink method "load" -> code.Deserialization
-  }
-}

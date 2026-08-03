@@ -1,0 +1,10 @@
+module bindings.kotlin.generated.m089379ee;
+
+binding sessionId2 {
+  requires {
+    dependency("org.apache.struts:struts2-core")
+  }
+  query pattern callExpr where callee.method == "withSession"
+  emit issue code.SessionId at call
+  emit sink code.SessionIdSink at call
+}

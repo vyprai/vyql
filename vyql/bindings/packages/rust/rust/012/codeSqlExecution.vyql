@@ -1,0 +1,9 @@
+module bindings.rust.generated.m222602a5;
+
+binding sqlExecution12 {
+  requires {
+    dependency("diesel")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.mf5e68596;
+
+binding networkSend4 {
+  requires {
+    dependency("react/http")
+  }
+  query pattern callExpr where callee.method == "ReactHttpBrowser.request"
+  emit sink code.NetworkSend at args[0]
+}

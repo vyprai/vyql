@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m01ea10e7;
+
+binding filePathAccess2 {
+  requires {
+    dependency("dirent")
+  }
+  query pattern callExpr where callee.method == "scandir"
+  emit sink code.FilePathAccess at args[0]
+}

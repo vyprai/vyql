@@ -1,0 +1,9 @@
+module bindings.php.generated.md3b5d498;
+
+binding xmlParse2 {
+  requires {
+    dependency("tijsverkoyen/css-to-inline-styles")
+  }
+  query pattern callExpr where callee.method == "createDomDocumentFromHtml"
+  emit sink code.XmlParse at args[0]
+}

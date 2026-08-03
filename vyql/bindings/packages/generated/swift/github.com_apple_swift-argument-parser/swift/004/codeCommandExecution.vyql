@@ -1,0 +1,9 @@
+module bindings.swift.generated.ma9d2693c;
+
+binding commandExecution4 {
+  requires {
+    dependency("github.com/apple/swift-argument-parser")
+  }
+  query pattern callExpr where callee.method == "shellCommand"
+  emit sink code.CommandExecution at args[0]
+}

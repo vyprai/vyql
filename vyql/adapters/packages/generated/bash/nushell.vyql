@@ -1,5 +1,0 @@
-adapter bash {
-  package "nushell" {
-    sink path "nushell.exec" -> code.CommandExecution
-  }
-}

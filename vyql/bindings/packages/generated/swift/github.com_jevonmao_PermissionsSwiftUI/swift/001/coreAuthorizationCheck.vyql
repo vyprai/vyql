@@ -1,0 +1,13 @@
+module bindings.swift.generated.m6811125b;
+
+binding authorizationCheck1 {
+  requires {
+    dependency("github.com/jevonmao/PermissionsSwiftUI")
+  }
+  query pattern callExpr where callee.method == "locationManager(_:didChangeAuthorization:)"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

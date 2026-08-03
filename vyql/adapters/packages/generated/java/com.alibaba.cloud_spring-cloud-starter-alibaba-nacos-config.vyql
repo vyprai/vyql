@@ -1,5 +1,0 @@
-adapter java {
-  package "com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-config" {
-    source method "locate" -> code.StoredDataRead
-  }
-}

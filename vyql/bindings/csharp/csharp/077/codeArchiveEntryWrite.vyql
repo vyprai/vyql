@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding archiveEntryWrite77 {
+  query pattern callExpr where callee.path ~= "ExtractToFile"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

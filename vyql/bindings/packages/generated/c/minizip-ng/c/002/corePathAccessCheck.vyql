@@ -1,0 +1,13 @@
+module bindings.c.generated.m22971185;
+
+binding pathAccessCheck2 {
+  requires {
+    dependency("minizip-ng")
+  }
+  query pattern callExpr where callee.method == "mz_dir_has_unsafe_symlink"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

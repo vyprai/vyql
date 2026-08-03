@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mb9a56453;
+
+binding fileUse1 {
+  requires {
+    dependency("sratom")
+  }
+  query pattern callExpr where callee.method == "sratom_set_sink"
+  emit sink code.FileUseSink at args[0]
+}

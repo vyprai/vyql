@@ -1,0 +1,9 @@
+module bindings.go.generated.m5cd9864d;
+
+binding logOutput3 {
+  requires {
+    dependency("github.com/olekukonko/tablewriter")
+  }
+  query pattern callExpr where callee.method == "NewCSVReader"
+  emit sink code.LogOutput at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.generated.mfedb9024;
+
+binding filePathAccess2 {
+  requires {
+    dependency("comtypes")
+  }
+  query pattern callExpr where callee.method == "persist.Save"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,14 @@
+module bindings.solidity.generated.m72929a80;
+
+binding rateLimit19 {
+  requires {
+    dependency("@openzeppelin/contracts")
+  }
+  query pattern callExpr where callee.path ~= "nonReentrant"
+  emit check core.RateLimit at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

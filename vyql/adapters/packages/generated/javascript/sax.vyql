@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter javascript {
-  package "sax" {
-    sink method "write" -> code.Deserialization
-    sink method "SAXParser" -> code.Deserialization
-  }
-}

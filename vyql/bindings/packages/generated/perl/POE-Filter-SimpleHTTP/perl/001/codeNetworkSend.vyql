@@ -1,0 +1,9 @@
+module bindings.perl.generated.m2894cebd;
+
+binding networkSend1 {
+  requires {
+    dependency("POE-Filter-SimpleHTTP")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkSend at args[0]
+}

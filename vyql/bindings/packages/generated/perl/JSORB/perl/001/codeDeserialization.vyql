@@ -1,0 +1,9 @@
+module bindings.perl.generated.meecde81b;
+
+binding deserialization1 {
+  requires {
+    dependency("JSORB")
+  }
+  query pattern callExpr where callee.method == "JSORB::Client::Compiler::compile"
+  emit sink code.Deserialization at args[0]
+}

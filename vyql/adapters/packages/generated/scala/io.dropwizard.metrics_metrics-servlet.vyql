@@ -1,9 +1,0 @@
-import code.{HttpInput, ResponseHeaderWrite}
-
-adapter scala {
-  package "io.dropwizard.metrics:metrics-servlet" {
-    source method "doFilter" -> code.HttpInput
-    sink method "sendError" -> code.ResponseHeaderWrite
-    sink method "setStatus" -> code.ResponseHeaderWrite
-  }
-}

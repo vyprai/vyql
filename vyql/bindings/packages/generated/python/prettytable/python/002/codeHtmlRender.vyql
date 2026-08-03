@@ -1,0 +1,9 @@
+module bindings.python.generated.ma604efd2;
+
+binding htmlRender2 {
+  requires {
+    dependency("prettytable")
+  }
+  query pattern callExpr where callee.method == "get_html_string"
+  emit sink code.HtmlRender at args[0]
+}

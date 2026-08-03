@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m0ae6896b;
+
+binding deserialization1 {
+  requires {
+    dependency("com.google.code.gson:gson")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

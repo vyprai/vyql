@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc6005d88;
+
+binding codeEval25 {
+  requires {
+    dependency("JavaScriptCore")
+  }
+  query pattern callExpr where callee.method == "evaluateScript"
+  emit sink code.CodeEval at args[0]
+}

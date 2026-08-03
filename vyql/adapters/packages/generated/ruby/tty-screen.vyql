@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter ruby {
-  package "tty-screen" {
-    sink method "run_command" -> code.CommandExecution
-  }
-}

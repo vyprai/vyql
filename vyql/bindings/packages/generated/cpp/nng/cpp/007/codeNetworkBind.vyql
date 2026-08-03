@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m5ac66786;
+
+binding networkBind7 {
+  requires {
+    dependency("nng")
+  }
+  query pattern callExpr where callee.method == "nni_tcp_listener_alloc"
+  emit sink code.NetworkBind at args[0]
+}

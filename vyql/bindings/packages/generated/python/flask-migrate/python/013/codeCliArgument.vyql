@@ -1,0 +1,9 @@
+module bindings.python.generated.m87404f83;
+
+binding cliArgument13 {
+  requires {
+    dependency("flask-migrate")
+  }
+  query pattern callExpr where callee.method == "check"
+  emit source code.CliArgument at call.result
+}

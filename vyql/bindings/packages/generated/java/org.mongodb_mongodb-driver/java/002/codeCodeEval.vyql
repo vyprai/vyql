@@ -1,0 +1,9 @@
+module bindings.java.generated.m04edae14;
+
+binding codeEval2 {
+  requires {
+    dependency("org.mongodb:mongodb-driver")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}

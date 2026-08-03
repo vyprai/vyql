@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "org.spockframework:spock-spring" {
-    sink method "parse" -> code.Deserialization
-  }
-}

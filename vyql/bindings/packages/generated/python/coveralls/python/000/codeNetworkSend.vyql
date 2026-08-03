@@ -1,0 +1,9 @@
+module bindings.python.generated.m3f03d843;
+
+binding networkSend0 {
+  requires {
+    dependency("coveralls")
+  }
+  query pattern callExpr where callee.method == "submit_report"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{SqlExecution, CodeEval}
-adapter java {
-  package "org.apache.kafka:kafka-streams" {
-    sink method "query" -> code.SqlExecution
-    sink method "connectProcessorAndStateStores" -> code.CodeEval
-  }
-}

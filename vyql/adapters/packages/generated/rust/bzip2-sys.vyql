@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "bzip2-sys" {
-    sink method "BZ2_bzDecompressInit" -> code.Deserialization
-    sink method "BZ2_bzDecompress" -> code.Deserialization
-  }
-}

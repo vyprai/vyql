@@ -1,0 +1,11 @@
+module code;
+
+concept GitDirShellCommandStringExecution : issue {
+  cwe: [CWE_78]
+  reviewAssumption: "the repository path, ref, or object path can be influenced by the caller"
+  reviewCategory: command
+  reviewCondition: "git repository paths are interpolated into a shell command string before execution"
+  reviewConfidence: high
+  reviewEvidence: "git command helper context {pattern} builds git --git-dir=... with joined arguments and sends the result to child_process.exec"
+  vulnerableTo: [injection.CommandInjection]
+}

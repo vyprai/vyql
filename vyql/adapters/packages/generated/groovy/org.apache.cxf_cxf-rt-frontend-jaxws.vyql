@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "org.apache.cxf:cxf-rt-frontend-jaxws" {
-    sink method "invoke" -> code.Deserialization
-  }
-}

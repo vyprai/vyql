@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter php {
-  package "arcanedev/support" {
-    source method "handle" -> core.UserControlledData
-  }
-}

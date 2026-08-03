@@ -1,0 +1,9 @@
+module bindings.c.generated.m0f68b8eb;
+
+binding codeEval0 {
+  requires {
+    dependency("sol2")
+  }
+  query pattern callExpr where callee.method == "script_file"
+  emit sink code.CodeEval at args[0]
+}

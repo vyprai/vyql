@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule CommandAllowlistBeforeParsing {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_863, CWE_78]
+    id: "VYQL-AUTH-057"
+    severity: high
+  }
+  issue code.CommandAllowlistBeforeParsing as command
+}

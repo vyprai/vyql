@@ -1,0 +1,9 @@
+module bindings.java.generated.m465a50f5;
+
+binding weakHash0 {
+  requires {
+    dependency("com.google.guava:guava")
+  }
+  query pattern presenceNode where node.path ~= "com.google.guava.guava.hash"
+  emit issue code.WeakHash at node
+}

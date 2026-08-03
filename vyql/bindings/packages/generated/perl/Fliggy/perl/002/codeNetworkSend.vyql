@@ -1,0 +1,9 @@
+module bindings.perl.generated.m89d86a1f;
+
+binding networkSend2 {
+  requires {
+    dependency("Fliggy")
+  }
+  query pattern callExpr where callee.method == "_write_flash_policy_response"
+  emit sink code.NetworkSend at args[0]
+}

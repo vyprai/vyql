@@ -1,0 +1,10 @@
+module vypr.auth;
+
+rule SmellBusinessLogic {
+  meta {
+    cwe: [CWE_840]
+    id: "VYQL-SMELL-LOGIC"
+    severity: info
+  }
+  issue code.BusinessLogicSmell as s
+}

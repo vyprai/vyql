@@ -1,7 +1,0 @@
-import code.{NetworkConnect, UrlFetch}
-adapter objc {
-  package "FBAEMKit" {
-    sink method "startGraphRequestWithGraphPath:parameters:tokenString:HTTPMethod:completion:" -> code.NetworkConnect
-    sink method "handle:" -> code.UrlFetch
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.rust.generated.m8d948af7;
+
+binding fileUse4 {
+  requires {
+    dependency("fs2")
+  }
+  query pattern callExpr where callee.method == "try_lock_exclusive"
+  emit sink code.FileUseSink at args[0]
+}

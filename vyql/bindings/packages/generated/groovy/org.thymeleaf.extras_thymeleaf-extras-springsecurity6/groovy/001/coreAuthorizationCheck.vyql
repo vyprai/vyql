@@ -1,0 +1,13 @@
+module bindings.groovy.generated.m416a4aa4;
+
+binding authorizationCheck1 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
+  }
+  query pattern callExpr where callee.method == "AuthUtils.authorizeUsingUrlCheck"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

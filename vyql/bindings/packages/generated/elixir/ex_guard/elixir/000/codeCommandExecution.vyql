@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m1f30acc2;
+
+binding commandExecution0 {
+  requires {
+    dependency("ex_guard")
+  }
+  query pattern callExpr where callee.method == "command"
+  emit sink code.CommandExecution at args[0]
+}

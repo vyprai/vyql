@@ -1,0 +1,13 @@
+module bindings.scala.generated.m3608f193;
+
+binding csrfProtection4 {
+  requires {
+    dependency("playframework")
+  }
+  query pattern callExpr where callee.path ~= "CSRFCheck"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

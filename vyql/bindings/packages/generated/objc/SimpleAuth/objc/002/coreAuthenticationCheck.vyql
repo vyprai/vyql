@@ -1,0 +1,13 @@
+module bindings.objc.generated.m05317bca;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("SimpleAuth")
+  }
+  query pattern callExpr where callee.method == "handleCallback"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

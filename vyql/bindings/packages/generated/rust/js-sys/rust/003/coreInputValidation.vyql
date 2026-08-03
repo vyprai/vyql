@@ -1,0 +1,14 @@
+module bindings.rust.generated.mb94f3e97;
+
+binding inputValidation3 {
+  requires {
+    dependency("js-sys")
+  }
+  query pattern callExpr where callee.method == "decode_uri_component"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

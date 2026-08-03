@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m2bbdf3c1;
+
+binding userControlledData1 {
+  requires {
+    dependency("io.cucumber:cucumber-testng")
+  }
+  query pattern callExpr where callee.method == "TestNGCucumberRunner"
+  emit source core.UserControlledData at call.result
+}

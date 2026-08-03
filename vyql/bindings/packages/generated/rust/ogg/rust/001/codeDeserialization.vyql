@@ -1,0 +1,9 @@
+module bindings.rust.generated.m04ce0a6f;
+
+binding deserialization1 {
+  requires {
+    dependency("ogg")
+  }
+  query pattern callExpr where callee.method == "PageParser.parse_packet_data"
+  emit sink code.Deserialization at args[0]
+}

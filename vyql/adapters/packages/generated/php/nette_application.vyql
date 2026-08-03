@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-adapter php {
-  package "nette/application" {
-    source method "Nette\Application\Request::setParameters" -> core.UserControlledData
-    source method "Nette\Application\Request::setPost" -> core.UserControlledData
-    source method "Nette\Application\Request::setFiles" -> core.UserControlledData
-  }
-}

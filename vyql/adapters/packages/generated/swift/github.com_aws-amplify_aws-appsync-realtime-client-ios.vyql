@@ -1,7 +1,0 @@
-adapter swift {
-  package "github.com/aws-amplify/aws-appsync-realtime-client-ios" {
-    source method "connect" -> code.NetworkData
-    sink method "add" -> code.NetworkSend
-    sink method "connect" -> code.NetworkConnect
-  }
-}

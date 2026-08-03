@@ -1,0 +1,9 @@
+module bindings.scala.generated.m3608f193;
+
+binding nosqlQuery14 {
+  requires {
+    dependency("mongodb-scala-driver")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m7e5863c0;
+
+binding htmlRender6 {
+  requires {
+    dependency("lazziya.expresslocalization")
+  }
+  query pattern callExpr where callee.method == "GetHtmlString"
+  emit sink code.HtmlRender at args[0]
+}

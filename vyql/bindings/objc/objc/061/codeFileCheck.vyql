@@ -1,0 +1,6 @@
+module bindings.objc.generated.mccadd221;
+
+binding fileCheck61 {
+  query pattern presenceNode where node.path ~= "fileExistsAtPath"
+  emit issue code.FileCheck at node
+}

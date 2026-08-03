@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m1afc5a6b;
+
+binding networkConnect1 {
+  requires {
+    dependency("io.netty:netty-all")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit sink code.NetworkConnectSink at args[0]
+}

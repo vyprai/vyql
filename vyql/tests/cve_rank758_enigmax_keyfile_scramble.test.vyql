@@ -90,3 +90,30 @@ test "rank758: keyfile bytes are mixed with generated table state"
     }
   }
   ```
+
+test "rank758: keyfile substitution table reuse generalizes across names"
+  lang c
+  file main.c
+  expect VYQL-CRY-023
+  expect_review code.RepeatedKeyfileSubstitutionTables
+  code
+  ```
+  #define BUFFER_SIZE 256
+  static unsigned char tables[8][256];
+
+  void apply_key(FILE *input_key) {
+    if (input_key != NULL) {
+      int n;
+      char block[BUFFER_SIZE];
+      while ((n = fread(block, 1, BUFFER_SIZE, input_key)) > 0) {
+        for (int row = 0; row < 8; ++row) {
+          for (int pos = 0; pos < n; ++pos) {
+            unsigned char tmp = tables[row][pos % 256];
+            tables[row][pos % 256] = tables[row][(unsigned char)(block[pos])];
+            tables[row][(unsigned char)(block[pos])] = tmp;
+          }
+        }
+      }
+    }
+  }
+  ```

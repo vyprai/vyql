@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m33b16fb8;
+
+binding deserialization1 {
+  requires {
+    dependency("org.springframework.boot:spring-boot-configuration-processor")
+  }
+  query pattern callExpr where callee.method == "readMetadata"
+  emit sink code.Deserialization at args[0]
+}

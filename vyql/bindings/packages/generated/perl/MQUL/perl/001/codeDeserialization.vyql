@@ -1,0 +1,9 @@
+module bindings.perl.generated.m2f9416cc;
+
+binding deserialization1 {
+  requires {
+    dependency("MQUL")
+  }
+  query pattern callExpr where callee.method == "update_doc"
+  emit sink code.Deserialization at args[0]
+}

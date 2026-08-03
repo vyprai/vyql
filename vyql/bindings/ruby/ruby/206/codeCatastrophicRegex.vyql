@@ -1,0 +1,7 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding catastrophicRegex206 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "ruby" and containsAny(node.context.literal, ["(?:[^\\\"]|\\\\.)*?", "(?:[^\\\"]|\\\\.)*)"]) and not (containsAny(node.context.literal, ["(?:[^\\\"]|\\\\\")*?", "(?:[^\\\"]|\\\\\")*)"]))
+  emit issue code.CatastrophicRegex at node
+  emit sink code.CatastrophicRegexSink at node
+}

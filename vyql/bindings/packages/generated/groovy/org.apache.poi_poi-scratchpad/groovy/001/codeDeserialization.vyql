@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mef84130d;
+
+binding deserialization1 {
+  requires {
+    dependency("org.apache.poi:poi-scratchpad")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

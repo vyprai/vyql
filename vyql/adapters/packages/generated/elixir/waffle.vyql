@@ -1,7 +1,0 @@
-import code.{UrlFetch}
-
-adapter elixir {
-  package "waffle" {
-    sink method "Waffle.File.new" -> code.UrlFetch
-  }
-}

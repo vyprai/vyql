@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mf3924679;
+
+binding weakHash3 {
+  requires {
+    dependency("hash-library")
+  }
+  query pattern callExpr where callee.method == "SHA1.getHash"
+  emit issue code.WeakHash at call
+}

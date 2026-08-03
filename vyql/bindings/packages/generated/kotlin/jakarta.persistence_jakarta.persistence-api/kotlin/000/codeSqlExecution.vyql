@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mcabb5f49;
+
+binding sqlExecution0 {
+  requires {
+    dependency("jakarta.persistence:jakarta.persistence-api")
+  }
+  query pattern callExpr where callee.method == "createQuery"
+  emit sink code.SqlExecution at args[0]
+}

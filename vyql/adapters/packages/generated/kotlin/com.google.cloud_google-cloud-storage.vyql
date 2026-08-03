@@ -1,9 +1,0 @@
-import code.{FilePathAccess, SecretValue, StoredDataRead, StoredDataWrite}
-adapter kotlin {
-  package "com.google.cloud:google-cloud-storage" {
-    source method "read" -> code.StoredDataRead
-    sink method "write" -> code.StoredDataWrite
-    sink method "downloadTo" -> code.FilePathAccess
-    source method "signUrl" -> code.SecretValue
-  }
-}

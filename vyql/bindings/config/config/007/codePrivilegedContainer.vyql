@@ -1,0 +1,6 @@
+module bindings.config.generated.m2b6375a9;
+
+binding privilegedContainer7 {
+  query pattern presenceNode where node.analysis ~= "config.container.privileged_mode"
+  emit issue code.PrivilegedContainer at node
+}

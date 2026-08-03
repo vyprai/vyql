@@ -1,7 +1,0 @@
-import code.{UrlFetch}
-
-adapter elixir {
-  package "ibrowse" {
-    sink method "send_req_1" -> code.UrlFetch
-  }
-}

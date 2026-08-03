@@ -1,0 +1,10 @@
+module bindings.ruby.generated.m5a48bf47;
+
+pattern bindingMetadata {
+  binding: {
+    name: "ruby"
+    meta: {
+      fidelity: "resolved"
+    }
+  }
+}

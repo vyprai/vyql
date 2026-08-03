@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m426fc52d;
+
+binding fileUse6 {
+  requires {
+    dependency("meta_request")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

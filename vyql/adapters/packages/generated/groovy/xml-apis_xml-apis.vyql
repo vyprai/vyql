@@ -1,7 +1,0 @@
-import code.{XmlParse}
-adapter groovy {
-  package "xml-apis:xml-apis" {
-    sink method "parse" -> code.XmlParse
-    sink method "resolveEntity" -> code.XmlParse
-  }
-}

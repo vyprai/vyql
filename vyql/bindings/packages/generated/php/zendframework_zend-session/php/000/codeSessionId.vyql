@@ -1,0 +1,10 @@
+module bindings.php.generated.m95a22b16;
+
+binding sessionId0 {
+  requires {
+    dependency("zendframework/zend-session")
+  }
+  query pattern callExpr where callee.method == "sessionExists"
+  emit issue code.SessionId at call
+  emit sink code.SessionIdSink at call
+}

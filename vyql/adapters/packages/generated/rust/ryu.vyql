@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "ryu" {
-    sink method "s2d" -> code.Deserialization
-    sink method "s2f" -> code.Deserialization
-  }
-}

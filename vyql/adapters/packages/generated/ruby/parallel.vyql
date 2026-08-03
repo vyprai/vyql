@@ -1,8 +1,0 @@
-import code.{CommandExecution, Deserialization}
-
-adapter ruby {
-  package "parallel" {
-    sink method "run" -> code.CommandExecution
-    sink method "load" -> code.Deserialization
-  }
-}

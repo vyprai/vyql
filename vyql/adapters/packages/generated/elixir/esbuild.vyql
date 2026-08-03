@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-
-adapter elixir {
-  package "esbuild" {
-    sink method "run" -> code.CommandExecution
-    sink method "install_and_run" -> code.CommandExecution
-  }
-}

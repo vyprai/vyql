@@ -1,0 +1,9 @@
+module bindings.scala.generated.mdf5c9fa9;
+
+binding networkData14 {
+  requires {
+    dependency("io.netty:netty-all")
+  }
+  query pattern callExpr where callee.method == "readUnsignedShort"
+  emit source code.NetworkData at call.result
+}

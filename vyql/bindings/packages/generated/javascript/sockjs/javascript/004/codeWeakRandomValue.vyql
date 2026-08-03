@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m77236a9a;
+
+binding weakRandomValue4 {
+  requires {
+    dependency("sockjs")
+  }
+  query pattern callExpr where callee.method == "random32"
+  emit issue code.WeakRandomValue at call
+}

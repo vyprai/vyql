@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule UrlDecodedTraversalCheckExceptionBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22, CWE_184]
+    id: "VYQL-PATH-048"
+    severity: high
+  }
+  issue code.UrlDecodedTraversalCheckExceptionBypass as sink
+}

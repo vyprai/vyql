@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mdf2ffe22;
+
+binding codeEval1 {
+  requires {
+    dependency("apr")
+  }
+  query pattern callExpr where callee.method == "apr_dso_load"
+  emit sink code.CodeEval at args[0]
+}

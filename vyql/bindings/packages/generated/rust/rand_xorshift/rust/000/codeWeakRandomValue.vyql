@@ -1,0 +1,9 @@
+module bindings.rust.generated.m3bf2a163;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("rand_xorshift")
+  }
+  query pattern callExpr where callee.method == "from_seed"
+  emit issue code.WeakRandomValue at call
+}

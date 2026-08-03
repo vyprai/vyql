@@ -1,0 +1,9 @@
+module bindings.rust.generated.m452b2d24;
+
+binding deserialization0 {
+  requires {
+    dependency("simple_asn1")
+  }
+  query pattern callExpr where callee.method == "from_der"
+  emit sink code.Deserialization at args[0]
+}

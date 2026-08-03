@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "org.mapdb:mapdb" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

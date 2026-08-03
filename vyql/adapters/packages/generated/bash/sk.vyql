@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter bash {
-  package "sk" {
-    sink path "sk-tmux" -> code.CommandExecution
-  }
-}

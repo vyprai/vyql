@@ -1,0 +1,9 @@
+module bindings.go.generated.m8f12d5a0;
+
+binding fileUse1 {
+  requires {
+    dependency("github.com/otiai10/copy")
+  }
+  query pattern callExpr where callee.method == "Copy"
+  emit sink code.FileUseSink at args[0]
+}

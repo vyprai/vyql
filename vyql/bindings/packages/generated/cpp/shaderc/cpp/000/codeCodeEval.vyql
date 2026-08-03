@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m0644515f;
+
+binding codeEval0 {
+  requires {
+    dependency("shaderc")
+  }
+  query pattern callExpr where callee.method == "CompileShaderFile"
+  emit sink code.CodeEval at args[0]
+}

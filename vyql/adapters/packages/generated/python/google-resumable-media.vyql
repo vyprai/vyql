@@ -1,6 +1,0 @@
-import code.{NetworkConnect}
-adapter python {
-  package "google-resumable-media" {
-    sink method "http_request" -> code.NetworkConnect
-  }
-}

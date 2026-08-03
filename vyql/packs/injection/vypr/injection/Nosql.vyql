@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule Nosql {
+  meta {
+    cwe: [CWE_943]
+    id: "VYQL-INJ-007"
+    severity: high
+  }
+  taint core.UserControlledData -> code.NosqlQuery
+  unless path coveredBy core.NosqlParameterization
+}

@@ -1,0 +1,9 @@
+module bindings.c.generated.mbb741b84;
+
+binding weakRandomValue2 {
+  requires {
+    dependency("mbedtls")
+  }
+  query pattern callExpr where callee.method == "mbedtls_mpi_core_random"
+  emit issue code.WeakRandomValue at call
+}

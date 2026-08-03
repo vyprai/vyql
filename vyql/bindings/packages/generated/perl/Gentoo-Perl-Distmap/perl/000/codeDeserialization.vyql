@@ -1,0 +1,9 @@
+module bindings.perl.generated.mf4425ed0;
+
+binding deserialization0 {
+  requires {
+    dependency("Gentoo-Perl-Distmap")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

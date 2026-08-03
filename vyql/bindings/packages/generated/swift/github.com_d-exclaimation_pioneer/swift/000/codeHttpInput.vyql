@@ -1,0 +1,9 @@
+module bindings.swift.generated.ma110b9ca;
+
+binding httpInput0 {
+  requires {
+    dependency("github.com/d-exclaimation/pioneer")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.HttpInput at call.result
+}

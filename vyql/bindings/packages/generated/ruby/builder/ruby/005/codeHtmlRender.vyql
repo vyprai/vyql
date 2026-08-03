@@ -1,0 +1,9 @@
+module bindings.ruby.generated.md7f97319;
+
+binding htmlRender5 {
+  requires {
+    dependency("builder")
+  }
+  query pattern callExpr where callee.method == "cdata!"
+  emit sink code.HtmlRender at args[0]
+}

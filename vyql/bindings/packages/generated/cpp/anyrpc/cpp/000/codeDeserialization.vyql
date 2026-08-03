@@ -1,0 +1,9 @@
+module bindings.cpp.generated.ma8ca005c;
+
+binding deserialization0 {
+  requires {
+    dependency("anyrpc")
+  }
+  query pattern callExpr where callee.method == "ParseStream"
+  emit sink code.Deserialization at args[0]
+}

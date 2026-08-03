@@ -1,8 +1,0 @@
-adapter go {
-  package "github.com/karrick/godirwalk" {
-    sink method "Walk" -> code.FilePathAccess
-    sink method "NewDirent" -> code.FilePathAccess
-    sink method "ReadDirents" -> code.FilePathAccess
-    sink method "ReadDirnames" -> code.FilePathAccess
-  }
-}

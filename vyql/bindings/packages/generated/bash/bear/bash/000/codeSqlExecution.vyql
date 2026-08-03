@@ -1,0 +1,9 @@
+module bindings.bash.generated.ma340b778;
+
+binding sqlExecution0 {
+  requires {
+    dependency("bear")
+  }
+  query pattern callExpr where callee.path ~= "bear"
+  emit sink code.SqlExecution at args.any
+}

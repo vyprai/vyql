@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m6cfc2941;
+
+binding sqlExecution0 {
+  requires {
+    dependency("dm-migrations")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

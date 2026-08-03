@@ -1,7 +1,7 @@
 # A6 — PII / GDPR data exposure (CWE-532, VYQL-PII-001). A taint flow from a high-signal
 # PII field/getter (ssn, credit_card, passport…) into a log sink. Non-PII fields and
 # ordinary identifiers (username) are clean — the taxonomy is deliberately narrow.
-# The PII taxonomy is a CONFIGURABLE cross-language list (adapters/pii.vyql), so it fires
+# The PII taxonomy is a CONFIGURABLE cross-language list (bindings/pii.vyql), so it fires
 # in any language, not just python.
 
 test "pii: ssn field logged is flagged (python)"

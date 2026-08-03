@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mfc9e6f05;
+
+binding deserialization0 {
+  requires {
+    dependency("npm-bundled")
+  }
+  query pattern callExpr where callee.method == "readPackageJson"
+  emit sink code.Deserialization at args[0]
+}

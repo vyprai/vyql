@@ -1,0 +1,9 @@
+module bindings.go.generated.mbe2da18e;
+
+binding commandExecution1 {
+  requires {
+    dependency("github.com/aws/aws-sdk-go-v2/credentials")
+  }
+  query pattern callExpr where callee.method == "NewProviderCommand"
+  emit sink code.CommandExecution at args[0]
+}

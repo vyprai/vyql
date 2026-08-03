@@ -1,0 +1,9 @@
+module bindings.swift.generated.m586c3899;
+
+binding httpInput0 {
+  requires {
+    dependency("github.com/RxSwiftCommunity/RxAlamofire")
+  }
+  query pattern callExpr where callee.method == "urlRequest"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.python.generated.m63329b55;
+
+binding deserialization0 {
+  requires {
+    dependency("msgpack-python")
+  }
+  query pattern callExpr where callee.method == "PyEval_InitThreads"
+  emit sink code.Deserialization at args[0]
+}

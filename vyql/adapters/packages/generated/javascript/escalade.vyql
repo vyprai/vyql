@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter javascript {
-  package "escalade" {
-    sink method "escalade" -> code.FilePathAccess
-  }
-}

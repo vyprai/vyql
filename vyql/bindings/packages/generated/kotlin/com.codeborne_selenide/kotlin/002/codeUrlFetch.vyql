@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m065a2d13;
+
+binding urlFetch2 {
+  requires {
+    dependency("com.codeborne:selenide")
+  }
+  query pattern callExpr where callee.method == "download"
+  emit sink code.UrlFetch at args[0]
+}

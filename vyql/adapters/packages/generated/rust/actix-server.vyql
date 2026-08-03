@@ -1,8 +1,0 @@
-import code.{NetworkData, NetworkBind, NetworkConnect}
-adapter rust {
-  package "actix-server" {
-    source method "MioListener::accept" -> code.NetworkData
-    sink method "Server::run" -> code.NetworkBind
-    sink method "TestServer::connect" -> code.NetworkConnect
-  }
-}

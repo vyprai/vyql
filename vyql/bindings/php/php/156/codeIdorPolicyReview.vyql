@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding idorPolicyReview156 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "audioigniter_playlist_idor"
+  emit issue code.IdorPolicyReview at node
+}

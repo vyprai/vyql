@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter dart {
-  package "gallery_saver" {
-    sink method "GallerySaver.saveVideo" -> code.FilePathAccess
-    sink method "GallerySaver.saveImage" -> code.FilePathAccess
-  }
-}

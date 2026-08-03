@@ -1,8 +1,0 @@
-import code.{StoredDataRead}
-
-adapter python {
-  package "s3fs" {
-    source method "open_async" -> code.StoredDataRead
-    source method "read" -> code.StoredDataRead
-  }
-}

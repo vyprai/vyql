@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m23fe5458;
+
+binding deserialization7 {
+  requires {
+    dependency("ftgl")
+  }
+  query pattern callExpr where callee.method == "ftglCreateBufferFont"
+  emit sink code.Deserialization at args[0]
+}

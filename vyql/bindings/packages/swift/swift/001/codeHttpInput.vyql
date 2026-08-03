@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc6005d88;
+
+binding httpInput1 {
+  requires {
+    dependency("vapor")
+  }
+  query pattern callExpr where callee.method == "content" and callee.receiver.type == "Request"
+  emit source code.HttpInput at call.result
+}

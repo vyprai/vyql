@@ -1,0 +1,9 @@
+module bindings.java.generated.m2a68de2a;
+
+binding userControlledData6 {
+  requires {
+    dependency("com.sun.mail:javax.mail")
+  }
+  query pattern callExpr where callee.method == "getNonMatchingHeaders"
+  emit source core.UserControlledData at call.result
+}

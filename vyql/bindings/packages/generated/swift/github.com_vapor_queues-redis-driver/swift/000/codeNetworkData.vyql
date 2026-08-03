@@ -1,0 +1,9 @@
+module bindings.swift.generated.mbfe64c2a;
+
+binding networkData0 {
+  requires {
+    dependency("github.com/vapor/queues-redis-driver")
+  }
+  query pattern callExpr where callee.method == "redis"
+  emit source code.NetworkData at call.result
+}

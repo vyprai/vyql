@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mc5818523;
+
+binding filePathAccess0 {
+  requires {
+    dependency("shapelib")
+  }
+  query pattern callExpr where callee.method == "SHPOpen"
+  emit sink code.FilePathAccess at args[0]
+}

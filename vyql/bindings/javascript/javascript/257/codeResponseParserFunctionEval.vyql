@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding responseParserFunctionEval257 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "Function" and node.context.callPath contains "parsedResponse.push" and containsAny(node.context.literal, ["return ", "\"use strict\"; return "]) and node.context.identifier contains "data" and not (node.context.callPath contains "JSON.parse")
+  emit issue code.ResponseParserFunctionEval at node
+}

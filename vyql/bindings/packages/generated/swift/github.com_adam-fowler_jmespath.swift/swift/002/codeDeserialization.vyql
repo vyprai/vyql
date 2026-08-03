@@ -1,0 +1,9 @@
+module bindings.swift.generated.m7c290bbb;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/adam-fowler/jmespath.swift")
+  }
+  query pattern callExpr where callee.method == "fromJson"
+  emit sink code.Deserialization at args[0]
+}

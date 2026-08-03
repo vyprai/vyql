@@ -1,9 +1,0 @@
-import code.{CommandExecution, Deserialization}
-import core.{InputValidation}
-
-adapter scala {
-  package "org.springframework.batch:spring-batch-core" {
-    sink method "parse" -> code.Deserialization
-    control method "validate" -> core.InputValidation
-  }
-}

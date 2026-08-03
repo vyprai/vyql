@@ -1,0 +1,9 @@
+module bindings.java.generated.m46698493;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.spark:spark-streaming_2.11")
+  }
+  query pattern callExpr where callee.method == "Checkpoint.read"
+  emit sink code.Deserialization at args[0]
+}

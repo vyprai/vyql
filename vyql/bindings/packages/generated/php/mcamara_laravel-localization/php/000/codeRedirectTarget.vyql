@@ -1,0 +1,10 @@
+module bindings.php.generated.m5fd067ea;
+
+binding redirectTarget0 {
+  requires {
+    dependency("mcamara/laravel-localization")
+  }
+  query pattern callExpr where callee.method == "localizeURL"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

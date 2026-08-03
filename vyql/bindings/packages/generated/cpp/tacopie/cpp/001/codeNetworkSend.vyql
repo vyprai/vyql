@@ -1,0 +1,9 @@
+module bindings.cpp.generated.me3a92c4e;
+
+binding networkSend1 {
+  requires {
+    dependency("tacopie")
+  }
+  query pattern callExpr where callee.method == "async_write"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.java.generated.mde0c0649;
+
+binding deserialization7 {
+  requires {
+    dependency("rome:rome")
+  }
+  query pattern callExpr where callee.method == "createParser"
+  emit sink code.Deserialization at args[0]
+}

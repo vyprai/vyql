@@ -1,0 +1,14 @@
+module bindings.kotlin.generated.m697c2941;
+
+binding inputValidation4 {
+  requires {
+    dependency("net.masterthought:cucumber-reporting")
+  }
+  query pattern callExpr where callee.method == "toValidFileName"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

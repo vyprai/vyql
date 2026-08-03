@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding httpInput21 {
+  query pattern callExpr where callee.path ~= "$_SERVER" and args.any.literal contains "PHP_SELF"
+  emit source code.HttpInput at call.result
+}

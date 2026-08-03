@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "hyperlink" {
-    sink method "parse" -> code.Deserialization
-    sink method "from_text" -> code.Deserialization
-  }
-}

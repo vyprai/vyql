@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "org.zeroturnaround:zt-zip" {
-    sink method "parse" -> code.Deserialization
-  }
-}

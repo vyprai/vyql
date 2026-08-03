@@ -1,0 +1,9 @@
+module bindings.objc.generated.m992ec3ab;
+
+binding deserialization0 {
+  requires {
+    dependency("LookinServer")
+  }
+  query pattern callExpr where callee.method == "instanceWithObject:"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m1b58bb9c;
+
+binding codeEval0 {
+  requires {
+    dependency("Highlightr")
+  }
+  query pattern callExpr where callee.method == "highlight"
+  emit sink code.CodeEval at args[0]
+}

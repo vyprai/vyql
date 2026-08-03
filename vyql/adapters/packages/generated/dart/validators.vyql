@@ -1,7 +1,0 @@
-adapter dart {
-  package "validators" {
-    flag code.RegexCompile on any {
-      method "RegExp"
-    }
-  }
-}

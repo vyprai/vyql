@@ -1,8 +1,0 @@
-import code.{Deserialization, NetworkSend}
-adapter kotlin {
-  package "javax:javaee-api" {
-    sink method "read" -> code.Deserialization
-    sink method "createParser" -> code.Deserialization
-    sink method "send" -> code.NetworkSend
-  }
-}

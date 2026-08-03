@@ -1,0 +1,9 @@
+module bindings.dart.generated.m83fcc655;
+
+binding userControlledData0 {
+  requires {
+    dependency("mime")
+  }
+  query pattern callExpr where callee.method == "MimeTypeResolver.lookup"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m9edfab65;
+
+binding userControlledData1 {
+  requires {
+    dependency("Bugly")
+  }
+  query pattern callExpr where callee.method == "setUserValue"
+  emit source core.UserControlledData at call.result
+}

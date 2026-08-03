@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m42ababd7;
+
+binding networkSend3 {
+  requires {
+    dependency("coverex")
+  }
+  query pattern callExpr where callee.method == "send_http"
+  emit sink code.NetworkSend at args[0]
+}

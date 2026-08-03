@@ -1,6 +1,10 @@
 package ontology
 
-import "github.com/vyprai/vyql/parser"
+import (
+	"strconv"
+
+	"github.com/vyprai/vyql/parser"
+)
 
 // ConceptFromDecl converts a parsed textual concept declaration
 // (`concept <Name> : <kind> { … }`, docs/06) into a Concept. The kind is the
@@ -29,13 +33,11 @@ func ConceptFromDecl(d *parser.ConceptDecl) Concept {
 		ReviewEvidence:          str(d.Fields, "review_evidence"),
 		ReviewAssumption:        str(d.Fields, "review_assumption"),
 		ReviewConfidence:        str(d.Fields, "review_confidence"),
-		SourcePolicy:            str(d.Fields, "source_policy"),
 		SourceConditionCategory: str(d.Fields, "source_condition_category"),
 		SourceCondition:         str(d.Fields, "source_condition"),
 		SourceAssumption:        str(d.Fields, "source_assumption"),
 		SourceConfidence:        str(d.Fields, "source_confidence"),
-		AssumeMinLevel:          str(d.Fields, "assume_min_level"),
-		AnalysisRole:            str(d.Fields, "analysis_role"),
+		GrantMinLevel:           str(d.Fields, "grantMinLevel"),
 		ContextReachSource:      str(d.Fields, "context_reach_source"),
 		ContextReachLabel:       str(d.Fields, "context_reach_label"),
 		ContextReachTargetProp:  str(d.Fields, "context_reach_target_prop"),
@@ -45,6 +47,7 @@ func ConceptFromDecl(d *parser.ConceptDecl) Concept {
 		ContextConfirmFlagProp:  str(d.Fields, "context_confirm_flag_prop"),
 		ContextConfirmFlagValue: str(d.Fields, "context_confirm_flag_value"),
 		ContextConfirmLabel:     str(d.Fields, "context_confirm_label"),
+		InternalRoles:           list(d.Fields, "internal_roles"),
 		ExcludedChars:           str(d.Fields, "excluded_chars"),
 	}
 	return c
@@ -54,22 +57,32 @@ func ConceptFromDecl(d *parser.ConceptDecl) Concept {
 // `package` declarations) into Concepts. Non-concept declarations are ignored,
 // so a file may mix concepts with rules.
 func LoadConceptText(src string) ([]Concept, error) {
-	decls, err := parser.Parse(src)
-	if err != nil {
-		return nil, err
-	}
 	var out []Concept
-	for _, d := range decls {
-		if cd, ok := d.(*parser.ConceptDecl); ok {
-			out = append(out, ConceptFromDecl(cd))
+	for _, source := range parser.V2DefinitionSourcesFromText("concepts", src) {
+		prog, err := parser.ParseV2(source.Source)
+		if err != nil {
+			return nil, err
+		}
+		for _, decl := range prog.Decls {
+			if cd, ok := decl.(*parser.V2ConceptDecl); ok {
+				out = append(out, ConceptFromDecl(&parser.ConceptDecl{
+					Name:    cd.Name,
+					Package: cd.Module,
+					Kind:    cd.Kind,
+					Fields:  parser.LowerV2FieldNames(cd.Fields),
+				}))
+			}
 		}
 	}
 	return out, nil
 }
 
 func str(fields map[string]any, key string) string {
-	if v, ok := fields[key].(string); ok {
+	switch v := fields[key].(type) {
+	case string:
 		return v
+	case bool:
+		return strconv.FormatBool(v)
 	}
 	return ""
 }

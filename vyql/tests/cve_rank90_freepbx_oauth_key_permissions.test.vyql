@@ -1,0 +1,6 @@
+test "rank90: FreePBX OAuth key generation requires secret-file permission review"
+  expect_review code.SecretFilePermissionReview
+  graph
+  ```
+  node op code.SecretFilePermissionReview
+  ```

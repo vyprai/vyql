@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m10ff4845;
+
+binding networkConnect0 {
+  requires {
+    dependency("ueberauth_auth0")
+  }
+  query pattern callExpr where callee.method == "authorize_url!"
+  emit sink code.NetworkConnectSink at args[0]
+}

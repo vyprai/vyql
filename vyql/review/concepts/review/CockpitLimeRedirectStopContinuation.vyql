@@ -1,0 +1,8 @@
+module code;
+
+review code.CockpitLimeRedirectStopContinuation {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review Cockpit Lime redirect/stop handling so expired or unauthenticated sessions cannot continue protected request execution"
+}

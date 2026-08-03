@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding incompleteMassAssignmentIdUnset341 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "mass_assignment_id_unset_before_input_massage"
+  emit issue code.IncompleteMassAssignmentIdUnset at node
+}

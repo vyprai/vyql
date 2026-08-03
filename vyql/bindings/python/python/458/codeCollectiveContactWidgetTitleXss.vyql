@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding collectiveContactWidgetTitleXss458 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "collective_contact_widget_title_xss"
+  emit issue code.CollectiveContactWidgetTitleXss at node
+}

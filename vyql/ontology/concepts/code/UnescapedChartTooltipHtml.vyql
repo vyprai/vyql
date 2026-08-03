@@ -1,0 +1,11 @@
+module code;
+
+concept UnescapedChartTooltipHtml : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "tooltip labels or legends can contain stored project data controlled by an editor"
+  reviewCategory: xss
+  reviewCondition: "chart tooltip model data is interpolated into HTML and assigned with innerHTML"
+  reviewConfidence: high
+  reviewEvidence: "chart tooltip renderer {pattern} builds HTML from tooltip title/body lines"
+  vulnerableTo: [injection.Xss]
+}

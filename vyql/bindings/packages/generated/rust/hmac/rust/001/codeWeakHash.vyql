@@ -1,0 +1,9 @@
+module bindings.rust.generated.ma5bae377;
+
+binding weakHash1 {
+  requires {
+    dependency("hmac")
+  }
+  query pattern callExpr where callee.method == "finalize_fixed_core"
+  emit issue code.WeakHash at call
+}

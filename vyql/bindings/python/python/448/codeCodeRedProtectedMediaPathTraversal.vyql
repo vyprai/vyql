@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding codeRedProtectedMediaPathTraversal448 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "codered_protected_media_path_traversal"
+  emit issue code.CodeRedProtectedMediaPathTraversal at node
+}

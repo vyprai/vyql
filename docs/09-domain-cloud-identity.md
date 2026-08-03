@@ -78,9 +78,9 @@ findings *actionable*: the fix is the named rule.
 - Identity-based network controls (e.g. SG-references-SG) handled natively;
   IP allowlists evaluated against known org CIDRs.
 
-## The `assume` solver (privilege closure)
+## The `grant` solver (privilege closure)
 
-`assume P -> Q` answers: can principal P obtain privileges of/act as Q?
+`grant P -> Q` answers: can principal P obtain privileges of/act as Q?
 
 **Inputs:** identity facts normalized per provider into a common policy
 algebra: principals, policy statements (effect, action, resource, condition),
@@ -112,7 +112,7 @@ witness as "via assumed role X").
 ```vyql
 rule vypr.identity.external_to_admin {
   meta { id: "VYQL-IDN-002", severity: critical, attack: ["TA0004"] }
-  assume EXTERNAL_PRINCIPAL -> ADMIN_PRIVILEGE
+  grant EXTERNAL_PRINCIPAL -> ADMIN_PRIVILEGE
 }
 
 rule vypr.identity.ci_can_touch_prod_data {

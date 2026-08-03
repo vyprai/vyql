@@ -1,6 +1,0 @@
-import code.{SecretValue}
-adapter java {
-  package "io.grpc:grpc-netty" {
-    source method "forServer" -> code.SecretValue
-  }
-}

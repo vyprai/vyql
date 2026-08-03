@@ -1,0 +1,9 @@
+module bindings.c.generated.me8985f20;
+
+binding networkSend2 {
+  requires {
+    dependency("log4cxx")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

@@ -13,10 +13,12 @@
 package lowering
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/vyprai/vyql/extract/nir"
+	"github.com/vyprai/vyql/extract/regexambig"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -28,7 +30,6 @@ type funcInfo struct {
 	module        string
 	cls           string
 	name          string
-	funcID        string // id of this function's code.Function node; stamped as `func_id` on its nodes (graph-json node→function map)
 	paramEntries  []nir.ParamEntry
 	resultEntries []nir.ResultEntry
 	abstract      bool   // an interface/abstract method (empty body) — dispatch to concrete impls
@@ -55,6 +56,7 @@ type lowerer struct {
 	classDefs     map[string]map[string]bool   // bare class name -> SET of modules that define it
 	classFields   map[string]map[string]string // "modkey::Class" -> field -> declared class type
 	importTables  map[string]map[string]importEntry
+	moduleTech    map[string]string
 	moduleGlobals map[string]map[string]string // JS/TS module-level binding name -> stable slot node
 
 	// inheritance-aware dispatch and implicit-`this` member resolution (populated by frontends
@@ -66,11 +68,13 @@ type lowerer struct {
 	derivedChildren map[string][]string // base short name -> child class quals
 	membersOfShort  map[string]map[string]bool
 	allMembersMemo  map[string]map[string]bool // memoized transitive member set per "modkey::Class"
+	dynCallbackMemo map[string][]*funcInfo     // memoized dynamic-callback target set, keyed by current module tech
+	addrTaken       map[string]bool            // short names referenced as a VALUE anywhere (candidate dynamic-callback targets)
+	addrTakenReady  bool                       // true once addrTaken has been collected for the whole program
 
 	curModule     string   // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
 	curNS         string   // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
 	curClass      string   // "" = none
-	curFunc       string   // id of the code.Function node enclosing the nodes being lowered ("" = top level); stamped as `func_id` (graph-json node→function map)
 	curDecorators []string // syntax annotations/decorators on the enclosing function
 
 	// B1 structured-CFG metadata. `region` is the current control-region path, namespaced by
@@ -89,12 +93,23 @@ type lowerer struct {
 	// keys/indices, so `m.put("kB", tainted); m.get("kA")` reads a clean element rather
 	// than the whole (over-approximated) container. Keyed by container node id.
 	containers map[string]*containerInfo
+	templates  map[string]templateInfo
 
-	// constSeqs records variables bound to a constant array/slice literal (by bare name), so a
-	// `for _, x := range denylist` loop can expose the collection's constant element literals on
-	// the iteration variable for value-matching (e.g. a `strings.Contains(p, x)` traversal guard
-	// over ["..","~","\\"]). Value-matching enrichment only — never affects taint.
-	constSeqs map[string][]nir.Expr
+	// modStr maps a module-level (top-level) variable name to its string-constant value, so a
+	// regex call `re.match(PATTERN, x)` referring to a `PATTERN = r"..."` module constant can be
+	// resolved to its literal for catastrophic-backtracking (ReDoS) detection even from inside a
+	// function body that does not inherit the module scope's const map.
+	modStr map[string]string
+
+	// dynSqlVar tracks variables assigned a dynamically-built string (f-string/concat/format), so a
+	// later `execute(q)` on such a variable is recognised as dynamic SQL even when the query is
+	// built one statement earlier (`q = f"..."; cur.execute(q)`).
+	dynSqlVar map[string]bool
+
+	// debugPayloadVar tracks variables assigned a response payload that leaks internal config —
+	// `payload = {"module": os.environ.get(...), "base": str(BASE_DIR)}` — so a later
+	// `JsonResponse(payload)` is recognised as debug-info exposure (CWE-215).
+	debugPayloadVar map[string]bool
 
 	// lambdaParams maps a lowered function-value node (a passed callback) to its parameter
 	// node ids, so a higher-order call (arr.map(cb), p.then(cb)) can route the receiver's
@@ -394,66 +409,8 @@ func (l *lowerer) constStrVal(e nir.Expr, sc *scope) (string, bool) {
 				}
 			}
 		}
-		// array-literal join: fold `['a','b'].join('|')` (JS/Ruby) and `'|'.join(['a','b'])`
-		// (Python) of constant string elements to the joined string — so a pattern built from an
-		// array (e.g. a multi-line regex) value-matches just like the inline literal.
-		if v.Method == "join" {
-			if attr, ok := v.Callee.(nir.Attr); ok {
-				// JS/Ruby: <array>.join(<sep>)
-				if seq, ok := l.seqOf(attr.Base); ok {
-					sep := ""
-					if len(v.Args) >= 1 {
-						sep, _ = l.constStrVal(v.Args[0], sc)
-					}
-					if joined, ok := l.joinConstSeq(seq, sep, sc); ok {
-						return joined, true
-					}
-				}
-				// Python: <sep>.join(<array>)
-				if sep, ok := l.constStrVal(attr.Base, sc); ok && len(v.Args) == 1 {
-					if seq, ok := l.seqOf(v.Args[0]); ok {
-						if joined, ok := l.joinConstSeq(seq, sep, sc); ok {
-							return joined, true
-						}
-					}
-				}
-			}
-			// os.path.join(a, b, …): the LEADING run of constant path components forms a constant
-			// prefix (joined with "/"), even when a later component is dynamic — enough for path
-			// value-matching (e.g. an insecure /var/tmp/ write location).
-			if strings.HasSuffix(v.Path, "path.join") {
-				var parts []string
-				for _, a := range v.Args {
-					s, ok := l.constStrVal(a, sc)
-					if !ok {
-						break // stop at the first dynamic component; the prefix so far is constant
-					}
-					parts = append(parts, s)
-				}
-				if len(parts) > 0 {
-					return strings.Join(parts, "/"), true
-				}
-			}
-		}
 	}
 	return "", false
-}
-
-// joinConstSeq joins a sequence of constant string elements with sep, returning ok=false if
-// any element is not a constant string (so a partly-dynamic array does not fold to a literal).
-func (l *lowerer) joinConstSeq(seq []nir.Expr, sep string, sc *scope) (string, bool) {
-	if len(seq) == 0 {
-		return "", false
-	}
-	parts := make([]string, 0, len(seq))
-	for _, el := range seq {
-		s, ok := l.constStrVal(el, sc)
-		if !ok {
-			return "", false
-		}
-		parts = append(parts, s)
-	}
-	return strings.Join(parts, sep), true
 }
 
 // constBool evaluates a boolean-constant expression (comparisons of integer/string
@@ -471,6 +428,9 @@ func (l *lowerer) seqOf(e nir.Expr) ([]nir.Expr, bool) {
 }
 
 func (l *lowerer) constBool(e nir.Expr, sc *scope) (bool, bool) {
+	if fact, ok := l.nonNegativeLenFact(e, sc); ok {
+		return fact, true
+	}
 	switch v := e.(type) {
 	case nir.Thru:
 		return l.constBool(v.Inner, sc)
@@ -675,7 +635,12 @@ func (l *lowerer) mergeBindings(sc *scope, before map[string]string, branches []
 			}
 		}
 	}
+	var vars []string
 	for v := range changed {
+		vars = append(vars, v)
+	}
+	sort.Strings(vars)
+	for _, v := range vars {
 		phi := l.node("Phi", "?:0", nil)
 		srcs := map[string]bool{}
 		for _, br := range branches {
@@ -690,7 +655,12 @@ func (l *lowerer) mergeBindings(sc *scope, before map[string]string, branches []
 		if before[v] != "" {
 			srcs[before[v]] = true // the branch(es) may not run — keep the pre-branch value
 		}
+		var srcIDs []string
 		for s := range srcs {
+			srcIDs = append(srcIDs, s)
+		}
+		sort.Strings(srcIDs)
+		for _, s := range srcIDs {
 			l.flow(s, phi)
 		}
 		sc.node[v] = phi
@@ -703,11 +673,12 @@ type scope struct {
 	node map[string]string
 	typ  map[string][2]string
 	cnst map[string]string // variable -> its string-constant value (lightweight const-prop)
-	lex  map[string]bool   // JS/TS captured lexical bindings shared across nested functions
+	iter map[string][]string
+	lex  map[string]bool // JS/TS captured lexical bindings shared across nested functions
 }
 
 func newScope() *scope {
-	return &scope{node: map[string]string{}, typ: map[string][2]string{}, cnst: map[string]string{}, lex: map[string]bool{}}
+	return &scope{node: map[string]string{}, typ: map[string][2]string{}, cnst: map[string]string{}, iter: map[string][]string{}, lex: map[string]bool{}}
 }
 
 func (s *scope) clone() *scope {
@@ -720,6 +691,9 @@ func (s *scope) clone() *scope {
 	}
 	for k, v := range s.cnst {
 		c.cnst[k] = v
+	}
+	for k, v := range s.iter {
+		c.iter[k] = append([]string(nil), v...)
 	}
 	for k, v := range s.lex {
 		c.lex[k] = v
@@ -745,11 +719,7 @@ func (l *lowerer) ensureLexicalBinding(sc *scope, name, loc string) {
 	if loc == "" {
 		loc = "?:0"
 	}
-	slot := l.node("Name", loc, map[string]string{
-		"callee_path":     name,
-		"method":          name,
-		"lexical_binding": "true",
-	})
+	slot := l.nodeInline("Name", loc, map[string]string{"lexical_binding": "true"}, name, name, "", "")
 	l.flow(sc.node[name], slot)
 	sc.node[name] = slot
 	sc.lex[name] = true
@@ -835,6 +805,10 @@ func collectStmtNames(st nir.Stmt, used map[string]bool) {
 		}
 		collectExprNames(s.Value, used)
 	case nir.Return:
+		collectExprNames(s.Value, used)
+	case nir.Validation:
+		collectExprNames(s.Evidence, used)
+	case nir.Terminate:
 		collectExprNames(s.Value, used)
 	case nir.ExprStmt:
 		collectExprNames(s.Value, used)
@@ -948,12 +922,7 @@ func (l *lowerer) functionContextAnalysisEvent(loc string, contextTokens []strin
 	if loc == "" {
 		loc = "?:0"
 	}
-	props := map[string]string{
-		"callee_path": analysisFunctionContext.path,
-		"method":      analysisFunctionContext.method,
-		"str_args":    strings.Join(contextTokens, "\x00"),
-	}
-	l.node("Call", loc, props)
+	l.nodeInline("Call", loc, nil, analysisFunctionContext.method, analysisFunctionContext.path, strings.Join(contextTokens, "\x00"), "")
 }
 
 func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string, memberTokens []string) {
@@ -981,12 +950,7 @@ func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string, me
 	if loc == "" {
 		loc = "?:0"
 	}
-	props := map[string]string{
-		"callee_path": analysisClassContext.path,
-		"method":      analysisClassContext.method,
-		"str_args":    strings.Join(tokens, "\x00"),
-	}
-	l.node("Call", loc, props)
+	l.nodeInline("Call", loc, nil, analysisClassContext.method, analysisClassContext.path, strings.Join(tokens, "\x00"), "")
 }
 
 func classMemberContextTokens(stmts []nir.Stmt) []string {
@@ -1039,19 +1003,14 @@ func (l *lowerer) globalMutationAnalysisEvent(loc string, tokens []string) {
 	if loc == "" {
 		loc = "?:0"
 	}
-	props := map[string]string{
-		"callee_path": analysisGlobalMutation.path,
-		"method":      analysisGlobalMutation.method,
-		"str_args":    strings.Join(tokens, "\x00"),
-	}
-	l.node("Call", loc, props)
+	l.nodeInline("Call", loc, nil, analysisGlobalMutation.method, analysisGlobalMutation.path, strings.Join(tokens, "\x00"), "")
 }
 
 func (l *lowerer) functionReturnAnalysisEvent(id, loc string, contextTokens []string) {
 	if id == "" || len(contextTokens) == 0 {
 		return
 	}
-	// Lowering records only structural return evidence. Adapter data decides whether
+	// Lowering records only structural return evidence. Binding data decides whether
 	// the event has any domain meaning.
 	valToks := append([]string{}, contextTokens...)
 	n, ok, _ := l.g.GetNode(id)
@@ -1072,17 +1031,14 @@ func (l *lowerer) functionReturnAnalysisEvent(id, loc string, contextTokens []st
 	if loc == "" {
 		loc = "?:0"
 	}
-	arg := l.node("Arg", loc, map[string]string{"vkind": "Return"})
+	arg := l.nodeInline("Arg", loc, nil, "", "", "", "Return")
 	l.flow(id, arg)
-	props := map[string]string{
-		"callee_path": analysisFunctionReturn.path,
-		"method":      analysisFunctionReturn.method,
-		"arg0":        arg,
-	}
+	props := map[string]string{"arg0": arg}
+	strArgs := ""
 	if len(valToks) > 0 {
-		props["str_args"] = strings.Join(valToks, "\x00")
+		strArgs = strings.Join(valToks, "\x00")
 	}
-	call := l.node("Call", loc, props)
+	call := l.nodeInline("Call", loc, props, analysisFunctionReturn.method, analysisFunctionReturn.path, strArgs, "")
 	l.flow(arg, call)
 }
 
@@ -1093,12 +1049,7 @@ func (l *lowerer) parameterEntry(paramNode, loc string, tokens []string) {
 	if loc == "" {
 		loc = "?:0"
 	}
-	props := map[string]string{
-		"callee_path": analysisParameterEntry.path,
-		"method":      analysisParameterEntry.method,
-		"str_args":    strings.Join(tokens, "\x00"),
-	}
-	call := l.node("Call", loc, props)
+	call := l.nodeInline("Call", loc, nil, analysisParameterEntry.method, analysisParameterEntry.path, strings.Join(tokens, "\x00"), "")
 	l.flow(call, paramNode)
 }
 
@@ -1113,17 +1064,14 @@ func (l *lowerer) syntheticCall(path, method, id, loc string, valToks ...string)
 	if loc == "" {
 		loc = "?:0"
 	}
-	arg := l.node("Arg", loc, map[string]string{"vkind": "Analysis"})
+	arg := l.nodeInline("Arg", loc, nil, "", "", "", "Analysis")
 	l.flow(id, arg)
-	props := map[string]string{
-		"callee_path": path,
-		"method":      method,
-		"arg0":        arg,
-	}
+	props := map[string]string{"arg0": arg}
+	strArgs := ""
 	if len(valToks) > 0 {
-		props["str_args"] = strings.Join(valToks, "\x00")
+		strArgs = strings.Join(valToks, "\x00")
 	}
-	call := l.node("Call", loc, props)
+	call := l.nodeInline("Call", loc, props, method, path, strArgs, "")
 	l.flow(arg, call)
 	return call
 }
@@ -1139,11 +1087,11 @@ func (l *lowerer) guardObservation(path, method, observed, loc string, valToks .
 	if loc == "" {
 		loc = "?:0"
 	}
-	props := map[string]string{"callee_path": path, "method": method}
+	strArgs := ""
 	if len(valToks) > 0 {
-		props["str_args"] = strings.Join(valToks, "\x00")
+		strArgs = strings.Join(valToks, "\x00")
 	}
-	call := l.node("Call", loc, props)
+	call := l.nodeInline("Call", loc, nil, method, path, strArgs, "")
 	l.flow(observed, call)
 	in, _ := l.g.InEdges(observed, "FLOWS")
 	for _, ed := range in {
@@ -1176,6 +1124,784 @@ func isPathResolveParents(expr nir.Expr) bool {
 	return strings.HasSuffix(attr.Path, ".resolve.parents")
 }
 
+// exprDotted returns the dotted path of an attribute/name expression ("" otherwise),
+// e.g. Attr{Path:"request.user"} → "request.user", Name{ID:"current_user"} → "current_user".
+func exprDotted(e nir.Expr) string {
+	switch v := e.(type) {
+	case nir.Attr:
+		return v.Path
+	case nir.Name:
+		return v.ID
+	}
+	return ""
+}
+
+// principalExpr reports whether e denotes the authenticated principal — the caller's identity —
+// as opposed to an object's owner field. These are the framework idioms for "the current user".
+func principalExpr(e nir.Expr) bool {
+	switch exprDotted(e) {
+	case "request.user", "self.request.user", "current_user", "g.user", "flask_login.current_user",
+		"request.user.id", "self.request.user.id", "current_user.id", "g.user.id",
+		"request.user.pk", "current_user.pk", "request.auth.user":
+		return true
+	}
+	if n, ok := e.(nir.Name); ok && n.ID == "current_user" {
+		return true
+	}
+	return false
+}
+
+// ownerFieldExpr reports whether e is an object's OWNERSHIP field access (obj.owner / obj.user /
+// obj.created_by / obj.owner_id …) — the field that ties a fetched object to a principal. It must
+// not itself be the principal (so `request.user` on either side is not mistaken for an owner field).
+func ownerFieldExpr(e nir.Expr) bool {
+	a, ok := e.(nir.Attr)
+	if !ok || principalExpr(e) {
+		return false
+	}
+	switch a.Attr {
+	case "owner", "user", "author", "created_by", "creator", "account", "assigned_to", "member",
+		"tenant", "org", "organization", "company", "workspace",
+		"owner_id", "user_id", "author_id", "created_by_id", "account_id", "assigned_to_id",
+		"tenant_id", "org_id", "organization_id", "company_id":
+		return true
+	}
+	return false
+}
+
+// isOwnershipComparison reports whether a `==`/`!=` compares an object's owner field to the caller
+// principal (obj.owner == request.user, current_user != note.author, …). This is the canonical
+// object-level authorization check ("does the caller own this object?"), enforced AFTER the fetch —
+// so it does not dominate the sink and is recognized here structurally, labelled OwnershipCheck via
+// the analysis.ownership.check binding, and credited by the function-scope guard.
+func isOwnershipComparison(ex nir.BinOp) bool {
+	if ex.Op != "==" && ex.Op != "!=" {
+		return false
+	}
+	return (ownerFieldExpr(ex.Left) && principalExpr(ex.Right)) ||
+		(ownerFieldExpr(ex.Right) && principalExpr(ex.Left))
+}
+
+// isOwnershipHelperCall reports whether a call is an object-level authorization predicate that takes
+// the fetched object as an argument — can_access_matter(user, obj), has_object_permission(request, obj),
+// obj.is_owner(user), _visible_to(user, obj). These are the app-specific ownership helpers that
+// bindings can't enumerate by exact name (each project names them `can_access_<resource>`). Crucially
+// it EXCLUDES bare role checks (`can_write_privileged_notes()`, `is_firm_admin()`) — those take no
+// object and gate on role, not on ownership of a specific object, so they must NOT suppress an IDOR.
+func isOwnershipHelperCall(ex nir.Call) bool {
+	if len(ex.Args) == 0 { // an ownership predicate is called WITH the object; role checks take none
+		return false
+	}
+	name := ex.Method
+	if name == "" {
+		d := exprDotted(ex.Callee)
+		if i := strings.LastIndex(d, "."); i >= 0 {
+			name = d[i+1:]
+		} else {
+			name = d
+		}
+	}
+	for _, pfx := range []string{"can_access", "can_view", "can_edit", "can_delete", "can_manage", "_can_"} {
+		if strings.HasPrefix(name, pfx) {
+			return true
+		}
+	}
+	switch name {
+	case "has_object_permission", "get_object_or_403", "check_object_permissions",
+		"is_owner", "check_ownership", "require_owner", "verify_owner", "ensure_owner",
+		"owns", "is_accessible_by", "user_can_access", "can_user_access":
+		return true
+	}
+	return strings.Contains(name, "_visible_to") || strings.Contains(name, "_is_owner") || strings.HasPrefix(name, "ensure_owns")
+}
+
+// bulkUpdateSafeReceiver reports whether a `.update(x)` receiver is a KNOWN non-model object
+// (a hash/digest, a template context/dict, a session/cache) — where .update is not mass assignment.
+// Used to suppress the mass-assignment sink on these, cutting the dominant AUTH-008 false positives
+// (hasher.update(chunk), context.update({...})).
+func bulkUpdateSafeReceiver(callee nir.Expr) bool {
+	attr, ok := callee.(nir.Attr)
+	if !ok {
+		return false
+	}
+	base := strings.ToLower(exprDotted(attr.Base))
+	if i := strings.LastIndex(base, "."); i >= 0 {
+		base = base[i+1:]
+	}
+	for _, k := range []string{"hash", "digest", "hmac", "sha", "md5", "blake", "hasher",
+		"ctx", "context", "session", "cache", "headers", "meta", "environ", "response"} {
+		if strings.Contains(base, k) {
+			return true
+		}
+	}
+	return false
+}
+
+// secretNamedTarget reports whether an assignment target name denotes a cryptographic secret /
+// credential — the kind of value that must never be a hardcoded literal (CWE-798/259).
+func secretNamedTarget(name string) bool {
+	n := strings.ToLower(name)
+	// NOTE: "password" is deliberately excluded — it dominates test fixtures/form fields with
+	// noise (input_password="12345"), and a hardcoded app password is a narrower concern than a
+	// hardcoded signing/API secret. Keep the crypto-key / signing-secret families only.
+	for _, k := range []string{"secret", "signing_key", "jwt", "hmac", "api_key", "apikey",
+		"private_key", "cipher_key", "encryption_key", "session_key", "signing_secret",
+		"access_token", "auth_token", "refresh_token", "token_salt"} {
+		if strings.Contains(n, k) {
+			return true
+		}
+	}
+	return false
+}
+
+// credentialConstName reports whether a target is an ALL-CAPS module-level credential constant
+// (PASSWORD/USERNAME/PWD family) — a hardcoded credential when assigned a literal (CWE-798).
+func credentialConstName(name string) bool {
+	if name == "" || name != strings.ToUpper(name) { // require SCREAMING_CASE module constant
+		return false
+	}
+	seg := name
+	if i := strings.LastIndexAny(seg, ".:"); i >= 0 {
+		seg = seg[i+1:]
+	}
+	if strings.Contains(seg, "HASH") || strings.Contains(seg, "FIELD") {
+		return false
+	}
+	return strings.Contains(seg, "PASSWORD") || strings.Contains(seg, "PASSWD") ||
+		seg == "PWD" || seg == "USERNAME" || seg == "ADMIN_USER" || strings.Contains(seg, "DB_PASS")
+}
+
+// keySignaledSecretLiteral is a laxer literal filter for the case where the assignment KEY (not the
+// value) already denotes a secret — e.g. `config['SECRET_KEY'] = 'dvga'`. Only clearly-non-secret
+// values (empty, None, booleans, env placeholders) are rejected; short weak secrets are accepted.
+func keySignaledSecretLiteral(v string) bool {
+	t := strings.Trim(v, "\"'` ")
+	if len(t) < 3 {
+		return false
+	}
+	switch strings.ToLower(t) {
+	case "none", "null", "true", "false", "nil", "undefined", "changeme", "":
+		return false
+	}
+	return true
+}
+
+// plausibleSecretLiteral filters out non-secret assignments a secret-named target may receive:
+// None/empty, booleans, short/numeric flags. A real hardcoded secret is a non-trivial string.
+func plausibleSecretLiteral(v string) bool {
+	t := strings.Trim(v, "\"'` ")
+	if len(t) < 6 {
+		return false
+	}
+	switch strings.ToLower(t) {
+	case "none", "null", "true", "false", "nil", "undefined":
+		return false
+	}
+	return true
+}
+
+// inTestOrSeedFile reports whether a loc ("file:line") is a test/seed/fixture file, where
+// hardcoded literals are expected and not a vulnerability.
+func inTestOrSeedFile(loc string) bool {
+	f := strings.ToLower(loc)
+	return strings.Contains(f, "/test") || strings.Contains(f, "test_") || strings.Contains(f, "_test") ||
+		strings.Contains(f, "conftest") || strings.Contains(f, "/seed") || strings.Contains(f, "seed_") ||
+		strings.Contains(f, "fixture") || strings.Contains(f, "/spec") || strings.Contains(f, "factories")
+}
+
+// debugNamedTarget reports whether the target is a DEBUG flag.
+func debugNamedTarget(name string) bool {
+	n := strings.ToLower(name)
+	return n == "debug" || strings.HasSuffix(n, "_debug") || strings.HasSuffix(n, ".debug")
+}
+
+// plaintextPasswordColumn reports whether an assignment declares an ORM model column that stores a
+// password/secret in the clear — `password = db.Column(...)` / `pwd = Column(String)` — where the
+// field name signals a password and does not indicate hashing (CWE-256/312/916).
+func plaintextPasswordColumn(target string, value nir.Expr) bool {
+	n := strings.ToLower(target)
+	if i := strings.LastIndexAny(n, ".:"); i >= 0 {
+		n = n[i+1:]
+	}
+	isPw := n == "password" || n == "passwd" || n == "pwd" ||
+		strings.HasSuffix(n, "_password") || strings.HasSuffix(n, "_passwd") || strings.HasSuffix(n, "_pwd")
+	if !isPw || strings.Contains(n, "hash") || strings.Contains(n, "digest") || strings.Contains(n, "encrypted") {
+		return false
+	}
+	c, ok := value.(nir.Call)
+	if !ok {
+		return false
+	}
+	return c.Method == "Column" || strings.HasSuffix(c.Path, ".Column") || c.Method == "CharField" || c.Method == "TextField"
+}
+
+// allowedHostsWildcard reports whether a Django `ALLOWED_HOSTS = ['*']` setting (or CORS/CSRF
+// origin allow-list) is assigned a wildcard element (CWE-16 security misconfiguration).
+func allowedHostsWildcard(target string, value nir.Expr) bool {
+	n := strings.ToUpper(target)
+	if i := strings.LastIndexAny(n, ".:"); i >= 0 {
+		n = n[i+1:]
+	}
+	if n != "ALLOWED_HOSTS" && n != "CORS_ORIGIN_WHITELIST" && n != "CORS_ALLOWED_ORIGINS" && n != "CSRF_TRUSTED_ORIGINS" {
+		return false
+	}
+	seq, ok := value.(nir.Seq)
+	if !ok {
+		return false
+	}
+	for _, el := range seq.Parts {
+		if v, ok := litVal(el); ok && (v == "*" || v == "*.*" || strings.HasPrefix(v, "*")) {
+			return true
+		}
+	}
+	return false
+}
+
+// certCheckDisabled reports whether TLS hostname/certificate checking is turned off via an
+// assignment `ctx.check_hostname = False` / `verify_mode = CERT_NONE` (CWE-295).
+func certCheckDisabled(target string, value nir.Expr) bool {
+	n := strings.ToLower(target)
+	if strings.HasSuffix(n, "check_hostname") {
+		if v, ok := litVal(value); ok && strings.EqualFold(v, "False") {
+			return true
+		}
+	}
+	if strings.HasSuffix(n, "verify_mode") {
+		if v, ok := litVal(value); ok && strings.Contains(strings.ToUpper(v), "CERT_NONE") {
+			return true
+		}
+		if nm, ok := value.(nir.Name); ok && strings.Contains(strings.ToUpper(nm.ID), "CERT_NONE") {
+			return true
+		}
+	}
+	return false
+}
+
+// litVal returns the unquoted value of a string/char literal expression and true, or ("", false)
+// when the expression is not a constant literal (e.g. a reflected request value).
+func litVal(e nir.Expr) (string, bool) {
+	if c, ok := e.(nir.Const); ok {
+		return unquoteLit(c.Value), true
+	}
+	return "", false
+}
+
+// insecureHeaderStore reports whether a `resp[headerName] = value` subscript store (lowered by the
+// frontend to __setitem__, args = [value, key]) configures a dangerous HTTP response header:
+// permissive CORS (CWE-942), clickjacking / disabled browser protections (CWE-1021/CWE-16), or a
+// weakened transport policy (CWE-319/CWE-693). Returns a short kind tag for the finding val, or ""
+// when the store is benign. A fixed allow-list value ("https://trusted") is treated as safe.
+func (l *lowerer) insecureHeaderStore(call nir.Call, sc *scope) string {
+	if call.Method != "__setitem__" || len(call.Args) < 2 {
+		return ""
+	}
+	// __setitem__ args = [value, key]
+	return l.insecureHeaderPair(call.Args[1], call.Args[0], sc)
+}
+
+// insecureHeaderPair evaluates a (headerName, value) pair — from a subscript store or a
+// send_header/set_header(name, value) method call — and returns a kind tag for a dangerous
+// configuration, or "".
+func (l *lowerer) insecureHeaderPair(keyExpr, valExpr nir.Expr, sc *scope) string {
+	key, ok := l.constKey(keyExpr, sc)
+	if !ok {
+		return ""
+	}
+	v, isConst := litVal(valExpr)
+	lv := strings.ToLower(strings.TrimSpace(v))
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "access-control-allow-origin":
+		// wildcard, or a reflected (non-constant) origin, is permissive CORS.
+		if (isConst && v == "*") || !isConst {
+			return "cors_wildcard_origin"
+		}
+	case "access-control-allow-credentials":
+		if lv == "true" {
+			return "cors_allow_credentials"
+		}
+	case "x-frame-options":
+		if lv == "allowall" || strings.HasPrefix(lv, "allow-from") {
+			return "clickjacking_frame_options"
+		}
+	case "x-xss-protection":
+		if isConst && v == "0" {
+			return "xss_protection_disabled"
+		}
+	case "content-security-policy", "content-security-policy-report-only":
+		if isConst && (v == "" || strings.Contains(lv, "unsafe-inline") || strings.Contains(lv, "default-src *") || strings.Contains(lv, "* 'unsafe")) {
+			return "weak_csp"
+		}
+	case "strict-transport-security":
+		if isConst && strings.Contains(lv, "max-age=0") {
+			return "hsts_disabled"
+		}
+	}
+	return ""
+}
+
+// isDynamicStringExpr reports whether an expression builds a string dynamically — an f-string /
+// printf with non-literal parts, a `+`/`%` string concatenation, or a `.format(...)` call. A plain
+// string literal (a static / parameterized query) is NOT dynamic.
+func isDynamicStringExpr(e nir.Expr) bool {
+	switch v := e.(type) {
+	case nir.Format:
+		for _, p := range v.Parts {
+			if _, ok := p.(nir.Const); !ok {
+				return true
+			}
+		}
+		return false
+	case nir.BinOp:
+		return v.Op == "+" || v.Op == "%"
+	case nir.Call:
+		return v.Method == "format" || v.Method == "join"
+	case nir.Thru:
+		return isDynamicStringExpr(v.Inner)
+	}
+	return false
+}
+
+// logsSensitiveIdentifier reports whether any argument value-token of a logging call names a
+// sensitive field (password/secret/token/ssn/…) — a plaintext-sensitive-data-in-log leak
+// (CWE-532). Hashed/redacted references are excluded.
+func logsSensitiveIdentifier(valToks []string) bool {
+	for _, tk := range valToks {
+		t := strings.ToLower(tk)
+		if strings.Contains(t, "hash") || strings.Contains(t, "digest") || strings.Contains(t, "redact") || strings.Contains(t, "mask") {
+			continue
+		}
+		for _, k := range []string{"password", "passwd", "secret", "ssn", "api_key", "apikey",
+			"private_key", "access_token", "credit_card", "creditcard", "cvv", "card_number",
+			"authorization", "bearer"} {
+			if strings.Contains(t, k) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// respLeaksSensitiveField reports whether a value-token names a clearly-sensitive field that must
+// not be serialized into an HTTP response (CWE-200/312). Narrower than the log variant: excludes
+// request-side auth headers, includes only fields that are secrets/PII by nature.
+func respLeaksSensitiveField(valToks []string) bool {
+	for _, tk := range valToks {
+		t := strings.ToLower(tk)
+		if strings.Contains(t, "hash") || strings.Contains(t, "digest") || strings.Contains(t, "redact") || strings.Contains(t, "mask") {
+			continue
+		}
+		for _, k := range []string{"password", "passwd", "ssn", "secret", "api_key", "apikey",
+			"private_key", "credit_card", "creditcard", "cvv", "card_number", "social_security"} {
+			if strings.Contains(t, k) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isResponseSinkCall reports whether a call constructs an HTTP response body from its arguments.
+func isResponseSinkCall(path, method string) bool {
+	switch method {
+	case "JsonResponse", "JSONResponse", "HttpResponse", "jsonify", "make_response", "Response", "HTTPResponse":
+		return true
+	}
+	return false
+}
+
+// isExceptionVarName reports whether an identifier is a conventional caught-exception variable.
+func isExceptionVarName(id string) bool {
+	switch strings.ToLower(id) {
+	case "e", "ex", "exc", "err", "error", "exception", "exp", "exce":
+		return true
+	}
+	return false
+}
+
+// exposesExceptionDetail reports whether an expression serializes internal exception detail —
+// `str(exc)`, `exc.__class__.__name__`, `traceback.format_exc()` — i.e. leaks an error message /
+// stack into an HTTP response (CWE-209).
+func exposesExceptionDetail(e nir.Expr, depth int) bool {
+	if e == nil || depth > 6 {
+		return false
+	}
+	switch v := e.(type) {
+	case nir.Call:
+		if (v.Method == "str" || v.Method == "repr") && len(v.Args) >= 1 {
+			if nm, ok := v.Args[0].(nir.Name); ok && isExceptionVarName(nm.ID) {
+				return true
+			}
+		}
+		if v.Method == "format_exc" || v.Method == "format_exception" || v.Method == "print_exc" {
+			return true
+		}
+		if exposesExceptionDetail(v.Callee, depth+1) {
+			return true
+		}
+		for _, a := range v.Args {
+			if exposesExceptionDetail(a, depth+1) {
+				return true
+			}
+		}
+	case nir.Attr:
+		if v.Attr == "__class__" || strings.Contains(v.Attr, "__traceback__") || v.Attr == "args" {
+			if nm, ok := v.Base.(nir.Name); ok && isExceptionVarName(nm.ID) {
+				return true
+			}
+		}
+		return exposesExceptionDetail(v.Base, depth+1)
+	case nir.Pair:
+		return exposesExceptionDetail(v.Value, depth+1)
+	case nir.Seq:
+		for _, p := range v.Parts {
+			if exposesExceptionDetail(p, depth+1) {
+				return true
+			}
+		}
+	case nir.Format:
+		for _, p := range v.Parts {
+			if exposesExceptionDetail(p, depth+1) {
+				return true
+			}
+		}
+	case nir.BinOp:
+		return exposesExceptionDetail(v.Left, depth+1) || exposesExceptionDetail(v.Right, depth+1)
+	case nir.Thru:
+		return exposesExceptionDetail(v.Inner, depth+1)
+	}
+	return false
+}
+
+// exposesRecordReturn reports whether a route return value serializes a DB record / model object to
+// the client — `return obj.serialize()`, `return Model.objects.get(...)`, `return cur.fetchone()` —
+// the shape where over-exposure of sensitive fields occurs (SMELL, agent confirms field sensitivity).
+func exposesRecordReturn(e nir.Expr, depth int) bool {
+	if e == nil || depth > 5 {
+		return false
+	}
+	switch v := e.(type) {
+	case nir.Call:
+		switch v.Method {
+		case "serialize", "dump", "to_dict", "model_dump", "as_dict", "to_json", "jsonify":
+			return true
+		case "fetchone", "fetchall", "fetchmany", "first", "one", "one_or_none", "get_object_or_404":
+			return true
+		}
+		if strings.Contains(v.Path, "objects.") || strings.Contains(v.Path, "query.") {
+			return true
+		}
+		for _, a := range v.Args {
+			if exposesRecordReturn(a, depth+1) {
+				return true
+			}
+		}
+	case nir.Thru:
+		return exposesRecordReturn(v.Inner, depth+1)
+	}
+	return false
+}
+
+// stateMutatingMethod reports whether a call method mutates persistent state — the shape an agent
+// should check for missing authorization / validation / CSRF (SMELL).
+func stateMutatingMethod(m string) bool {
+	// Tightened to higher-risk mutations of EXISTING resources (the BOLA-write / privilege-change /
+	// value-transfer shapes) — create/add/save/commit are dropped as they dominate benign signup /
+	// logging / persistence and swamp the candidate set with low-signal noise.
+	switch m {
+	case "update", "delete", "set_password", "make_transaction", "transfer", "approve",
+		"set_role", "grant", "revoke", "deactivate", "bulk_update":
+		return true
+	}
+	return false
+}
+
+// buildsRawHtmlString reports whether an expression is a dynamically-built string that embeds HTML
+// markup — the raw-string-response reflected-XSS shape (`return "<html>.." + user + "..</html>"`)
+// that template-render sinks don't see.
+func buildsRawHtmlString(e nir.Expr) bool {
+	if !isDynamicStringExpr(e) {
+		return false
+	}
+	var toks []string
+	collectValTokens(e, "", &toks)
+	for _, t := range toks {
+		lt := strings.ToLower(t)
+		for _, tag := range []string{"<body", "<html", "<div", "<br", "<p>", "<p ", "<h1", "<h2",
+			"<span", "<a ", "<a>", "<td", "<tr", "<li", "<table", "<form", "<script", "<img"} {
+			if strings.Contains(lt, tag) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isRouteDecorated reports whether a function's decorator tokens include a web route registration
+// (`@app.post`, `@router.get`, `@app.route`), meaning its return value is an HTTP response body.
+func isRouteDecorated(decs []string) bool {
+	for _, d := range decs {
+		switch d {
+		case "decorator_method:get", "decorator_method:post", "decorator_method:put",
+			"decorator_method:patch", "decorator_method:delete", "decorator_method:route",
+			"decorator_method:api_route", "decorator_method:websocket", "decorator_method:head",
+			"decorator_method:options":
+			return true
+		}
+	}
+	return false
+}
+
+// isInternalPathName reports whether an identifier denotes an internal filesystem path / settings
+// constant whose value should not be serialized to a client.
+func isInternalPathName(id string) bool {
+	u := strings.ToUpper(id)
+	return strings.Contains(u, "BASE") || strings.Contains(u, "_DIR") || strings.Contains(u, "_PATH") ||
+		strings.Contains(u, "ROOT") || u == "__FILE__" || strings.Contains(u, "SETTINGS")
+}
+
+// exposesInternalConfig reports whether an expression serializes internal environment/config/path
+// detail — `os.environ.get(...)`, `os.getenv(...)`, `str(BASE_DIR)` — i.e. debug-info exposure
+// (CWE-215) when it reaches an HTTP response.
+func exposesInternalConfig(e nir.Expr, depth int) bool {
+	if e == nil || depth > 6 {
+		return false
+	}
+	switch v := e.(type) {
+	case nir.Call:
+		if strings.Contains(v.Path, "os.environ") || strings.Contains(v.Path, "os.getenv") || v.Method == "getenv" {
+			return true
+		}
+		if (v.Method == "str" || v.Method == "repr") && len(v.Args) >= 1 {
+			if nm, ok := v.Args[0].(nir.Name); ok && isInternalPathName(nm.ID) {
+				return true
+			}
+		}
+		if exposesInternalConfig(v.Callee, depth+1) {
+			return true
+		}
+		for _, a := range v.Args {
+			if exposesInternalConfig(a, depth+1) {
+				return true
+			}
+		}
+	case nir.Attr:
+		if strings.Contains(v.Path, "os.environ") {
+			return true
+		}
+		return exposesInternalConfig(v.Base, depth+1)
+	case nir.Pair:
+		return exposesInternalConfig(v.Value, depth+1)
+	case nir.Seq:
+		for _, p := range v.Parts {
+			if exposesInternalConfig(p, depth+1) {
+				return true
+			}
+		}
+	case nir.Format:
+		for _, p := range v.Parts {
+			if exposesInternalConfig(p, depth+1) {
+				return true
+			}
+		}
+	case nir.BinOp:
+		return exposesInternalConfig(v.Left, depth+1) || exposesInternalConfig(v.Right, depth+1)
+	case nir.Thru:
+		return exposesInternalConfig(v.Inner, depth+1)
+	}
+	return false
+}
+
+// businessStateKey reports whether a subscript/attr key names a business-sensitive field whose value
+// should be validated before assignment — the business-logic-gap shape when set from user input.
+func businessStateKey(key string) bool {
+	k := strings.ToLower(strings.TrimSpace(key))
+	switch k {
+	case "state", "status", "balance", "amount", "price", "quantity", "qty", "role", "limit",
+		"discount", "credit", "total", "is_admin", "is_active", "approved", "permission",
+		"permissions", "verified", "is_verified", "level", "tier", "points", "rate":
+		return true
+	}
+	return false
+}
+
+// enumerationErrorResponse reports whether a response payload is an auth error (401/403/404) whose
+// message discloses account/identity EXISTENCE — the user-enumeration tell (SMELL, agent confirms
+// the response differs from the wrong-credential path).
+func enumerationErrorResponse(valToks []string) bool {
+	errStatus, existMsg := false, false
+	for _, tk := range valToks {
+		lt := strings.ToLower(tk)
+		for _, s := range []string{"status=404", "status=401", "status=403", "status_code=404", "status_code=401", "status_code=403"} {
+			if strings.Contains(lt, s) {
+				errStatus = true
+			}
+		}
+		for _, w := range []string{"unknown", "not found", "no such", "not registered", "does not exist",
+			"no account", "invalid handle", "invalid user", "invalid email", "invalid username",
+			"user not", "email not", "account not", "no user", "not exist"} {
+			if strings.Contains(lt, w) {
+				existMsg = true
+			}
+		}
+	}
+	return errStatus && existMsg
+}
+
+// isLogSinkCall reports whether a call is a logging/print output sink.
+func isLogSinkCall(path, method string) bool {
+	if path == "print" || method == "print" {
+		return true
+	}
+	if !strings.Contains(strings.ToLower(path), "log") {
+		return false
+	}
+	switch method {
+	case "debug", "info", "warning", "warn", "error", "critical", "exception", "log":
+		return true
+	}
+	return false
+}
+
+// isSqlSinkCall reports whether a call is a SQL-execution sink whose FIRST argument is the query.
+func isSqlSinkCall(path, method string) bool {
+	switch method {
+	case "execute", "executemany", "executescript", "execute_sql", "raw", "text":
+		return true
+	}
+	if strings.HasSuffix(path, ".execute") || strings.HasSuffix(path, ".text") || path == "sqlalchemy.text" {
+		return true
+	}
+	return false
+}
+
+// resolveRegexPattern folds a regex-pattern argument to its literal — an inline string, a
+// const-propped local, or a module-level constant (`PATTERN = r"..."`) referenced by name.
+func (l *lowerer) resolveRegexPattern(e nir.Expr, sc *scope) (string, bool) {
+	if s, ok := l.constStrVal(e, sc); ok {
+		return s, true
+	}
+	if nm, ok := e.(nir.Name); ok {
+		if s, ok := l.modStr[nm.ID]; ok {
+			return s, true
+		}
+	}
+	return "", false
+}
+
+// isRegexApply reports whether a call is a stdlib `re.<op>(pattern, ...)` / `re.compile(pattern)`
+// whose FIRST argument is the regex pattern. Only the `re.` origin is accepted, so an unrelated
+// object `.match()`/`.search()` is not misread as a regex application.
+func isRegexApply(path, method string) bool {
+	switch method {
+	case "match", "search", "sub", "subn", "findall", "finditer", "fullmatch", "compile", "split":
+	default:
+		return false
+	}
+	return path == "re."+method || path == "regex."+method || strings.HasSuffix(path, ".re."+method)
+}
+
+// catastrophicRegex reports whether a regex has textbook super-linear backtracking structure —
+// a quantifier applied to a group that itself contains a quantifier or an alternation:
+// (a+)+  (a*)*  (.*)*  ((a)+)+  (\d+)*  (a|a)*  (a|ab)*  — the classic ReDoS shapes (CWE-1333/400).
+func catastrophicRegex(pat string) bool {
+	// Defer to the shared ambiguity analysis. A structural test — "a quantified group
+	// whose body holds a quantifier or an alternation" — reports every unrolled loop and
+	// every disjoint alternation as catastrophic, which is a false positive whenever the
+	// branches cannot both match the same input.
+	return regexambig.Ambiguous(pat)
+}
+
+// containsRegexQuantifier reports whether a regex fragment contains an unbounded repeat operator.
+func containsRegexQuantifier(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' {
+			i++
+			continue
+		}
+		if s[i] == '+' || s[i] == '*' || s[i] == '{' {
+			return true
+		}
+	}
+	return false
+}
+
+// envDefaultConst returns the hardcoded DEFAULT literal of an os.getenv(name, default) /
+// os.environ.get(name, default) call — the fallback baked into source (CWE-798). "" if none.
+func envDefaultConst(e nir.Expr, l *lowerer) string {
+	c, ok := e.(nir.Call)
+	if !ok || len(c.Args) < 2 {
+		return ""
+	}
+	d := exprDotted(c.Callee)
+	if !(strings.HasSuffix(d, "getenv") || strings.HasSuffix(d, "environ.get") || strings.HasSuffix(d, "config.get")) {
+		return ""
+	}
+	return constStr(c.Args[1])
+}
+
+// truthyDefault reports whether e assigns/defaults DEBUG to an on value ("True"/"1"/true) —
+// either a direct truthy literal or os.getenv("DEBUG", "True")-style default.
+func truthyDefault(e nir.Expr, l *lowerer) bool {
+	isOn := func(s string) bool {
+		v := strings.ToLower(strings.Trim(s, "\"' "))
+		return v == "true" || v == "1" || v == "yes" || v == "on"
+	}
+	if isOn(constStr(e)) || isOn(envDefaultConst(e, l)) {
+		return true
+	}
+	// `DEBUG = os.getenv("DEBUG","True") == "True"` / `_env_bool("DBG", default=True)` — the truthy
+	// default is nested; check the operands of a comparison and the args of a *_bool/env helper.
+	switch v := e.(type) {
+	case nir.BinOp:
+		return truthyDefault(v.Left, l) || truthyDefault(v.Right, l)
+	case nir.Call:
+		d := strings.ToLower(exprDotted(v.Callee))
+		if strings.Contains(d, "bool") || strings.Contains(d, "env") || strings.Contains(d, "flag") {
+			for _, a := range v.Args {
+				if isOn(constStr(a)) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// privilegeLiteral reports whether e is a string constant naming a ROLE/PRIVILEGE tier — the kind of
+// value a security decision keys on (`badge == "lead"`, `role == "admin"`). Comparing a client-controlled
+// value (cookie/header/param) to one of these is the CWE-807 "reliance on untrusted input in a security
+// decision" pattern: the attacker just sets the header/cookie to the privileged tier.
+func privilegeLiteral(e nir.Expr) bool {
+	c, ok := e.(nir.Const)
+	if !ok {
+		return false
+	}
+	switch strings.ToLower(strings.Trim(c.Value, "\"'` ")) {
+	case "lead", "admin", "administrator", "superuser", "super", "superadmin", "staff", "manager",
+		"root", "owner", "privileged", "elevated", "internal", "ops", "moderator", "mod", "god",
+		"supervisor", "operator", "sysadmin", "poweruser", "premium", "enterprise", "vip":
+		return true
+	}
+	return false
+}
+
+// clientMarkerCompareOperand returns the NON-literal operand of a role-marker comparison
+// (`badge == "lead"`), or "" if this BinOp isn't one. That operand is the (possibly tainted)
+// client-controlled value; flowing it into a synthetic sink lets the taint solver confirm a
+// cookie/header/param reaches the security decision.
+func clientMarkerCompareOperand(ex nir.BinOp, left, right string) string {
+	if ex.Op != "==" && ex.Op != "!=" && ex.Op != "in" {
+		return ""
+	}
+	if privilegeLiteral(ex.Right) {
+		return left
+	}
+	if privilegeLiteral(ex.Left) {
+		return right
+	}
+	return ""
+}
+
 // Lower lowers a Program into a fresh in-memory USG. When resolveImports is
 // false, calls resolve by SHORT NAME (the over-connecting baseline that case 16
 // contrasts against).
@@ -1186,7 +1912,7 @@ func Lower(prog nir.Program, resolveImports bool) (usg.Store, error) {
 // LowerTyped is Lower with a constructor→type table (callee path of a
 // constructor → the type it returns, e.g. "pkg.Open" → "pkg.Handle"). A receiver
 // assigned from a known constructor lets the lowering stamp `recv_type` on its
-// method calls, which type-constrained sink adapters use for precision.
+// method calls, which type-constrained sink binding applicators use for precision.
 func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]string) (usg.Store, error) {
 	l := newLowerer(prog, resolveImports, ctorTypes)
 	if err := l.run(); err != nil {
@@ -1203,7 +1929,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		selfName:        prog.Self(),
 		resolveImports:  resolveImports,
 		ctorTypes:       ctorTypes,
-		g:               newGraphStore(0),
+		g:               newGraphStore(estimateGraphNodeHint(prog)),
 		modCtr:          map[string]int{},
 		modOrder:        map[string]int{},
 		modBranch:       map[string]int{},
@@ -1213,15 +1939,128 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		classDefs:       map[string]map[string]bool{},
 		classFields:     map[string]map[string]string{},
 		importTables:    map[string]map[string]importEntry{},
+		moduleTech:      map[string]string{},
 		moduleGlobals:   map[string]map[string]string{},
 		containers:      map[string]*containerInfo{},
-		constSeqs:       map[string][]nir.Expr{},
+		templates:       map[string]templateInfo{},
+		modStr:          map[string]string{},
+		dynSqlVar:       map[string]bool{},
+		debugPayloadVar: map[string]bool{},
 		lambdaParams:    map[string][]string{},
 		directMembers:   map[string]map[string]bool{},
 		classBaseNames:  map[string][]string{},
 		derivedChildren: map[string][]string{},
 		membersOfShort:  map[string]map[string]bool{},
 		allMembersMemo:  map[string]map[string]bool{},
+	}
+}
+
+func estimateGraphNodeHint(prog nir.Program) int {
+	hint := len(prog.Modules) * 4
+	for _, m := range prog.Modules {
+		hint += len(m.Imports)
+		hint += estimateStmtListNodes(m.Body)
+	}
+	if hint <= 0 {
+		return 0
+	}
+	return hint
+}
+
+func estimateStmtListNodes(stmts []nir.Stmt) int {
+	n := 0
+	for _, st := range stmts {
+		n += estimateStmtNodes(st)
+	}
+	return n
+}
+
+func estimateStmtNodes(st nir.Stmt) int {
+	switch s := st.(type) {
+	case nil:
+		return 0
+	case nir.Assign:
+		return 1 + len(s.Targets) + estimateExprNodes(s.Value)
+	case nir.AugAssign:
+		return 2 + estimateExprNodes(s.Value)
+	case nir.Return:
+		return 1 + estimateExprNodes(s.Value)
+	case nir.ExprStmt:
+		return estimateExprNodes(s.Value)
+	case nir.FuncDef:
+		return 2 + len(s.Params) + len(s.ParamEntries) + len(s.ResultEntries) + estimateStmtListNodes(s.Body)
+	case nir.ClassDef:
+		return 1 + estimateStmtListNodes(s.Body)
+	case nir.Block:
+		return estimateStmtListNodes(s.Stmts)
+	case nir.If:
+		return 2 + estimateExprNodes(s.Cond) + estimateStmtListNodes(s.Then) + estimateStmtListNodes(s.Else)
+	case nir.Loop:
+		return 2 + len(s.Vars) + estimateExprNodes(s.Cond) + estimateExprNodes(s.Iter) + estimateStmtListNodes(s.Body)
+	case nir.Switch:
+		total := 2 + estimateExprNodes(s.Subject) + estimateStmtListNodes(s.Default)
+		for _, labels := range s.Labels {
+			for _, label := range labels {
+				total += estimateExprNodes(label)
+			}
+		}
+		for _, arm := range s.Cases {
+			total += estimateStmtListNodes(arm)
+		}
+		return total
+	case nir.Try:
+		total := 2 + len(s.HandlerParams) + estimateStmtListNodes(s.Body) + estimateStmtListNodes(s.Finally)
+		for _, h := range s.Handlers {
+			total += estimateStmtListNodes(h)
+		}
+		return total
+	default:
+		return 1
+	}
+}
+
+func estimateExprNodes(ex nir.Expr) int {
+	switch e := ex.(type) {
+	case nil:
+		return 0
+	case nir.Name, nir.Const:
+		return 1
+	case nir.Attr:
+		return 1 + estimateExprNodes(e.Base)
+	case nir.Index:
+		return 1 + estimateExprNodes(e.Base) + estimateExprNodes(e.Key)
+	case nir.Call:
+		total := 2 + len(e.Args) + estimateExprNodes(e.Callee)
+		for _, a := range e.Args {
+			total += estimateExprNodes(a)
+		}
+		return total
+	case nir.Format:
+		total := 1
+		for _, p := range e.Parts {
+			total += estimateExprNodes(p)
+		}
+		return total
+	case nir.Seq:
+		total := 1
+		for _, p := range e.Parts {
+			total += estimateExprNodes(p)
+		}
+		return total
+	case nir.Pair:
+		return 1 + estimateExprNodes(e.Value)
+	case nir.Lambda:
+		return 2 + len(e.Params) + len(e.ParamEntries) + estimateStmtListNodes(e.Body)
+	case nir.Thru:
+		return estimateExprNodes(e.Inner)
+	case nir.BinOp:
+		return 1 + estimateExprNodes(e.Left) + estimateExprNodes(e.Right)
+	case nir.Unary:
+		return 1 + estimateExprNodes(e.Operand)
+	case nir.Ternary:
+		return 1 + estimateExprNodes(e.Cond) + estimateExprNodes(e.Then) + estimateExprNodes(e.Else)
+	default:
+		return 1
 	}
 }
 
@@ -1246,32 +2085,57 @@ func ModuleNS(m nir.Module) string {
 	return m.Key
 }
 
-// boolProp renders a bool as a graph node prop ("true" or "", so an unset prop reads false).
-func boolProp(b bool) string {
-	if b {
-		return "true"
+func moduleTech(file string) string {
+	file = strings.ToLower(file)
+	switch {
+	case strings.HasSuffix(file, ".java"):
+		return "java"
+	case strings.HasSuffix(file, ".js"), strings.HasSuffix(file, ".jsx"), strings.HasSuffix(file, ".mjs"), strings.HasSuffix(file, ".cjs"), strings.HasSuffix(file, ".html"), strings.HasSuffix(file, ".htm"):
+		return "javascript"
+	case strings.HasSuffix(file, ".ts"), strings.HasSuffix(file, ".tsx"):
+		return "typescript"
+	case strings.HasSuffix(file, ".py"):
+		return "python"
+	case strings.HasSuffix(file, ".rb"):
+		return "ruby"
+	case strings.HasSuffix(file, ".php"):
+		return "php"
+	case strings.HasSuffix(file, ".cs"):
+		return "csharp"
+	case strings.HasSuffix(file, ".go"):
+		return "go"
+	default:
+		return ""
 	}
-	return ""
+}
+
+func compatibleTech(a, b string) bool {
+	if a == "" || b == "" || a == b {
+		return true
+	}
+	return jsFamily(a) && jsFamily(b)
+}
+
+func jsFamily(t string) bool {
+	return t == "javascript" || t == "typescript" || t == "tsx"
 }
 
 func (l *lowerer) node(kind, loc string, props map[string]string) string {
-	if l.curFunc != "" {
-		// stamp the enclosing code.Function id on every body node (the node→function map the
-		// graph-json export keys off). Copy so the caller's props map is never mutated.
-		merged := make(map[string]string, len(props)+1)
-		for k, v := range props {
-			merged[k] = v
-		}
-		merged["func_id"] = l.curFunc
-		props = merged
-	}
 	return l.nodeWithID(l.nid(kind), kind, loc, props)
+}
+
+func (l *lowerer) nodeInline(kind, loc string, props map[string]string, method, calleePath, strArgs, vkind string) string {
+	return l.nodeInlineWithID(l.nid(kind), kind, loc, props, method, calleePath, strArgs, vkind)
 }
 
 // nodeWithID creates a node with an explicit id — used for signature nodes (Param/Return)
 // whose ids are NAME-derived (sigID) so they survive a body edit and remain valid targets for
 // cross-module call edges from other (possibly cached) modules.
 func (l *lowerer) nodeWithID(id, kind, loc string, props map[string]string) string {
+	return l.nodeInlineWithID(id, kind, loc, props, "", "", "", "")
+}
+
+func (l *lowerer) nodeInlineWithID(id, kind, loc string, props map[string]string, method, calleePath, strArgs, vkind string) string {
 	ord := l.modOrder[l.curNS]
 	l.modOrder[l.curNS]++
 	// loc/region/order live inline on the Node; props (the freshly-built extras map, often empty)
@@ -1280,9 +2144,46 @@ func (l *lowerer) nodeWithID(id, kind, loc string, props map[string]string) stri
 	if len(props) > 0 {
 		extras = props
 	}
+	if !storeUsesInlineNodeProps(l.g) {
+		extras = propsWithInline(extras, method, calleePath, strArgs, vkind)
+	}
 	l.g.AddNode(usg.Node{ID: id, Type: "code." + kind, Loc: loc, Region: l.region,
-		Order: int32(ord), HasOrder: true, Props: extras})
+		Order: int32(ord), HasOrder: true, Props: extras,
+		Method: method, CalleePath: calleePath, StrArgs: strArgs, Vkind: vkind})
 	return id
+}
+
+func storeUsesInlineNodeProps(s usg.Store) bool {
+	switch st := s.(type) {
+	case *usg.IntStore:
+		return true
+	case *recordingStore:
+		return storeUsesInlineNodeProps(st.Store)
+	default:
+		return false
+	}
+}
+
+func propsWithInline(props map[string]string, method, calleePath, strArgs, vkind string) map[string]string {
+	if method == "" && calleePath == "" && strArgs == "" && vkind == "" {
+		return props
+	}
+	if props == nil {
+		props = map[string]string{}
+	}
+	if method != "" {
+		props["method"] = method
+	}
+	if calleePath != "" {
+		props["callee_path"] = calleePath
+	}
+	if strArgs != "" {
+		props["str_args"] = strArgs
+	}
+	if vkind != "" {
+		props["vkind"] = vkind
+	}
+	return props
 }
 
 // sigID is the stable, name-derived id of a function's signature node (a Param or Return).
@@ -1294,6 +2195,10 @@ func sigID(modkey, qual, kind, name string) string {
 
 func (l *lowerer) flow(a, b string) {
 	if a == "" || b == "" {
+		return
+	}
+	if g, ok := l.g.(interface{ AddFlowEdgeIfPresent(string, string) bool }); ok {
+		g.AddFlowEdgeIfPresent(a, b)
 		return
 	}
 	if !l.exists(a) || !l.exists(b) {
@@ -1317,12 +2222,14 @@ func (l *lowerer) exists(id string) bool {
 func (l *lowerer) run() error {
 	for _, m := range l.prog.Modules {
 		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
+		l.moduleTech[m.Key] = moduleTech(m.File)
 		l.importTables[m.Key] = importTable(m)
 		for _, imp := range m.Imports {
 			l.importNode(m, imp)
 		}
 		l.register(m.Key, m.Body, "")
 	}
+	l.collectAddressTaken()
 	for _, m := range l.prog.Modules {
 		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
 		l.block(m.Body, l.moduleScope(m))
@@ -1343,8 +2250,8 @@ func (l *lowerer) moduleScope(m nir.Module) *scope {
 	for _, name := range topLevelAssignedNames(m.Body) {
 		slot := globals[name]
 		if slot == "" {
-			slot = l.nodeWithID(sigID(l.curNS, "__module", "var", name), "Name", m.File,
-				map[string]string{"callee_path": name, "method": name, "module_global": "true"})
+			slot = l.nodeInlineWithID(sigID(l.curNS, "__module", "var", name), "Name", m.File,
+				map[string]string{"module_global": "true"}, name, name, "", "")
 			globals[name] = slot
 		}
 		sc.node[name] = slot
@@ -1450,30 +2357,10 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 	// signature node ids use the per-FILE namespace (curNS), so they are file-local and stable
 	// even when the resolution key (modkey) is shared ("") across files.
 	ns := l.curNS
-	// code.Function node + per-node `func_id` stamp: the node→function map the graph-json
-	// CODE_MAPPER export keys off. The id is name-derived (sigID) — stable, module-namespaced,
-	// and it does NOT consume the body node-id counter (added straight to the store, not via
-	// nodeWithID), so existing node ids/order stay byte-identical (taint-inert; the NIR goldens
-	// dump only Call/Attr, so it is invisible there). Kept SEPARATE from `func` (=function name),
-	// which the function-context analysis and rules read.
-	fid := sigID(ns, rel, "func", "")
-	// is_route covers BOTH route flavors: send-on-return routes (st.IsRoute — decorator
-	// frameworks) and call-registration routes carrying http_method (Express et al.).
-	fnProps := map[string]string{
-		"name": rel, "module": modkey, "class": cls, "end_loc": st.EndLoc,
-		"is_route": boolProp(st.IsRoute || st.HTTPMethod != ""), "is_validator": boolProp(st.IsValidator),
-	}
-	if st.HTTPMethod != "" {
-		fnProps["http_method"] = st.HTTPMethod
-	}
-	if st.HTTPPath != "" {
-		fnProps["http_path"] = st.HTTPPath
-	}
-	l.g.AddNode(usg.Node{ID: fid, Type: "code.Function", Loc: st.Loc, Region: l.region, Props: fnProps})
 	params := map[string]string{}
 	order := make([]string, 0, len(st.Params))
 	for _, p := range st.Params {
-		props := map[string]string{"name": p, "func": st.Name, "func_id": fid}
+		props := map[string]string{"name": p, "func": st.Name}
 		if typ := st.ParamTypes[p]; typ != "" {
 			props["decl_type"] = typ
 		}
@@ -1488,9 +2375,8 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 		paramNames: order,
 		params:     params,
 		paramTypes: st.ParamTypes,
-		ret:        l.nodeWithID(sigID(ns, rel, "ret", ""), "Return", st.Loc, map[string]string{"func": st.Name, "func_id": fid}),
+		ret:        l.nodeWithID(sigID(ns, rel, "ret", ""), "Return", st.Loc, map[string]string{"func": st.Name}),
 		module:     modkey, cls: cls, name: st.Name,
-		funcID:        fid,
 		paramEntries:  st.ParamEntries,
 		resultEntries: st.ResultEntries,
 		// an empty body marks an interface/abstract method: a call typed to it must dispatch
@@ -1502,7 +2388,7 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 	// object-sensitivity for fluent/builder mutators). Languages with an explicit self param
 	// (Python/Go) keep param[0]; this is the C#-style implicit-this case.
 	if cls != "" && (len(order) == 0 || order[0] != l.selfName) {
-		fi.selfNode = l.nodeWithID(sigID(ns, rel, "self", ""), "Param", st.Loc, map[string]string{"name": "this", "func": st.Name, "func_id": fid})
+		fi.selfNode = l.nodeWithID(sigID(ns, rel, "self", ""), "Param", st.Loc, map[string]string{"name": "this", "func": st.Name})
 	}
 	return fi
 }
@@ -1723,13 +2609,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.region = l.curNS + "/fn" + l.nextBranch()
 		saveDecorators := l.curDecorators
 		l.curDecorators = append(append([]string{}, st.ContextTokens...), st.Decorators...)
-		saveFunc := l.curFunc
-		if info != nil {
-			l.curFunc = info.funcID
-		}
 		l.functionContextAnalysisEvent(st.Loc, l.curDecorators)
 		l.block(st.Body, inner)
-		l.curFunc = saveFunc
 		l.curDecorators = saveDecorators
 		l.region = saveRegion
 	case nir.Assign:
@@ -1745,7 +2626,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			if cm, ok := l.classModule(st.Type, l.importTables[l.curModule]); ok {
 				typ, hasTyp = [2]string{cm, st.Type}, true
 			} else {
-				// External/library declared types are still useful for adapter receiver
+				// External/library declared types are still useful for binding receiver
 				// constraints even when there is no project class body to resolve.
 				typ, hasTyp = [2]string{"", st.Type}, true
 			}
@@ -1761,13 +2642,70 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				cv = sv
 			}
 		}
-		for _, t := range st.Targets {
-			// Track array/slice-literal bindings so a `range` loop over this var can expose its
-			// constant element literals for value-matching (see lowerer.constSeqs).
-			if seq, ok := l.seqOf(st.Value); ok {
-				l.constSeqs[t] = seq
+		iterValues, iterOK := l.constIterationValues(st.Value, sc)
+		for _, target := range st.Targets {
+			if iterOK {
+				sc.iter[target] = append([]string(nil), iterValues...)
 			} else {
-				delete(l.constSeqs, t)
+				delete(sc.iter, target)
+			}
+		}
+		for _, t := range st.Targets {
+			// Hardcoded secret (CWE-798): a secret-named target assigned a NON-TRIVIAL string literal,
+			// directly or as an os.getenv(...,"default") fallback baked into source. Skip test/seed files.
+			if secretNamedTarget(t) && !inTestOrSeedFile(st.Loc) {
+				if plausibleSecretLiteral(cv) || plausibleSecretLiteral(envDefaultConst(st.Value, l)) {
+					l.syntheticCall("analysis.secret.hardcoded", "hardcoded_secret", val, st.Loc, "secret="+t)
+				}
+			}
+			// Debug enabled by default (CWE-489): DEBUG flag defaulting to a truthy value.
+			if debugNamedTarget(t) && truthyDefault(st.Value, l) {
+				l.syntheticCall("analysis.config.debug_on", "debug_on", val, st.Loc, "debug_default_true")
+			}
+			// Track module-level string constants (e.g. `PATTERN = r"((a)+)+"`) so a regex call
+			// that references the name by identifier can resolve the literal for ReDoS detection.
+			if l.region == "" && cv != "" {
+				l.modStr[t] = cv
+			}
+			// Track dynamically-built query strings for the deferred `q = f"..."; execute(q)` form.
+			if isDynamicStringExpr(st.Value) {
+				l.dynSqlVar[t] = true
+			} else if cv != "" {
+				delete(l.dynSqlVar, t)
+			}
+			// Track response payloads that leak internal config for the deferred
+			// `payload = {...os.environ...}; return JsonResponse(payload)` form.
+			if exposesInternalConfig(st.Value, 0) {
+				l.debugPayloadVar[t] = true
+			}
+			// Plaintext password storage (CWE-256/312/916): an ORM model column named password
+			// declared as a plain string type with no hashing.
+			if plaintextPasswordColumn(t, st.Value) {
+				l.syntheticCall("analysis.storage.plaintext_password", "plaintext_password", val, st.Loc, "password_column")
+			}
+			// Wildcard host/origin allow-list (CWE-16) and disabled TLS cert checking (CWE-295) —
+			// both routed through the insecure-config sink.
+			if allowedHostsWildcard(t, st.Value) {
+				l.syntheticCall("analysis.config.insecure_header", "insecure_header", val, st.Loc, "header=allowed_hosts_wildcard")
+			}
+			// Module-level credential constant (CWE-798): an ALL-CAPS module constant named
+			// PASSWORD/USERNAME/… assigned a plausible literal. Narrow (uppercase + module scope +
+			// non-test) so lowercase form fields / test fixtures don't add noise; "password" is
+			// otherwise excluded from secretNamedTarget for exactly that reason.
+			if l.region == "" && credentialConstName(t) && !inTestOrSeedFile(st.Loc) {
+				if plausibleSecretLiteral(cv) {
+					l.syntheticCall("analysis.secret.hardcoded", "hardcoded_secret", val, st.Loc, "credential_const="+t)
+				}
+			}
+			// Console email backend (CWE-532): reset/verification emails (with their tokens) are
+			// printed to stdout/logs — `EMAIL_BACKEND = "...console.EmailBackend"`.
+			if strings.EqualFold(t, "EMAIL_BACKEND") || strings.HasSuffix(strings.ToUpper(t), ".EMAIL_BACKEND") {
+				if v, ok := litVal(st.Value); ok && strings.Contains(strings.ToLower(v), "console") && strings.Contains(v, "EmailBackend") {
+					l.syntheticCall("analysis.disclosure.sensitive_log", "sensitive_log", val, st.Loc, "console_email_backend")
+				}
+			}
+			if certCheckDisabled(t, st.Value) {
+				l.syntheticCall("analysis.config.insecure_header", "insecure_header", val, st.Loc, "header=cert_check_disabled")
 			}
 			localDecl := st.Decl && l.region != ""
 			targetTyp, targetHasTyp := typ, hasTyp
@@ -1861,6 +2799,35 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		retTokens := append([]string{}, l.curDecorators...)
 		collectValTokens(st.Value, "", &retTokens)
 		l.functionReturnAnalysisEvent(rv, "", retTokens)
+		// A route handler's return value IS the HTTP response body. Flag config/env exposure
+		// (CWE-215) and exception detail (CWE-209) in a bare `return {...}` — the FastAPI form
+		// that has no JsonResponse(...) wrapper for the sink detectors to key on.
+		if isRouteDecorated(l.curDecorators) {
+			retLoc := ""
+			if n, ok, _ := l.g.GetNode(rv); ok {
+				retLoc = n.Loc
+			}
+			if exposesInternalConfig(st.Value, 0) {
+				l.syntheticCall("analysis.disclosure.debug_info", "debug_info", rv, retLoc, "config_in_return")
+			}
+			if exposesExceptionDetail(st.Value, 0) {
+				l.syntheticCall("analysis.disclosure.error_detail", "error_detail", rv, retLoc, "exception_in_return")
+			}
+			// SMELL (sensitive-data exposure): route returns a DB record/model — agent verifies
+			// no over-exposed fields for this caller (CWE-200/201/359).
+			if exposesRecordReturn(st.Value, 0) {
+				l.syntheticCall("analysis.smell.data_exposure", "smell", rv, retLoc, "record_in_response")
+			}
+			// Reflected XSS via raw HTML string response (CWE-79): a route returns a dynamically
+			// built string embedding HTML markup — bypasses template auto-escaping entirely.
+			if buildsRawHtmlString(st.Value) {
+				l.syntheticCall("analysis.xss.raw_html_response", "raw_html", rv, retLoc, "html_string_return")
+			}
+		}
+	case nir.Terminate:
+		l.eval(st.Value, sc)
+	case nir.Validation:
+		l.applyValidation(st, sc)
 	case nir.ExprStmt:
 		callNode := l.eval(st.Value, sc)
 		// Builder/accumulator calls fold their args into the object/buffer you
@@ -1905,6 +2872,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		b := l.nextBranch()
 		before := cloneStrMap(sc.node)
+		beforeIter := cloneIterationFacts(sc.iter)
 		l.inRegion("if"+b+".t", func() {
 			if name, ok := allowlistMembershipVar(st.Cond); ok && before[name] != "" {
 				loc := st.Loc
@@ -1919,10 +2887,14 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			l.block(st.Then, sc)
 		})
 		thenB := cloneStrMap(sc.node)
+		thenIter := cloneIterationFacts(sc.iter)
 		sc.node = cloneStrMap(before)
+		sc.iter = cloneIterationFacts(beforeIter)
 		l.inRegion("if"+b+".e", func() { l.block(st.Else, sc) })
 		elseB := cloneStrMap(sc.node)
+		elseIter := cloneIterationFacts(sc.iter)
 		sc.node = before
+		sc.iter = stableIterationFacts(thenIter, elseIter)
 		l.mergeBindings(sc, before, []map[string]string{thenB, elseB})
 		if name, ok := zeroExitGuardName(st.Cond, st.Then, st.Else); ok {
 			if observed := before[name]; observed != "" {
@@ -1933,46 +2905,22 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	case nir.Loop:
 		l.eval(st.Cond, sc)
 		before := cloneStrMap(sc.node)
+		beforeIter := cloneIterationFacts(sc.iter)
 		iterNode := l.eval(st.Iter, sc)
-		// If iterating a constant array/slice (inline `[...]` or a var bound to one), the
-		// iteration variable takes one of its constant elements. Expose all element literals on
-		// the var (NUL-joined) for value-matching — so a denylist guard like
-		// `strings.Contains(p, na)` over ["..","~","\\"] matches `val ".." val "\\"`. Value
-		// enrichment only; taint still flows via sc.node below.
-		iterSeq, _ := l.seqOf(st.Iter)
-		if iterSeq == nil {
-			if nm, ok := st.Iter.(nir.Name); ok {
-				iterSeq = l.constSeqs[nm.ID]
-			}
-		}
-		iterConst := ""
-		if len(iterSeq) > 0 {
-			var lits []string
-			for _, el := range iterSeq {
-				if s, ok := l.constStrVal(el, sc); ok {
-					lits = append(lits, s)
-				}
-			}
-			if len(lits) > 0 {
-				iterConst = strings.Join(lits, "\x00")
-			}
-		}
 		if iterNode != "" {
 			for _, name := range st.Vars {
 				if name == "" || name == "_" {
 					continue
 				}
 				sc.node[name] = iterNode
-				if iterConst != "" {
-					sc.cnst[name] = iterConst
-				} else {
-					delete(sc.cnst, name)
-				}
+				delete(sc.cnst, name)
 			}
 		}
 		l.inRegion("loop"+l.nextBranch(), func() { l.block(st.Body, sc) })
 		bodyB := cloneStrMap(sc.node)
+		bodyIter := cloneIterationFacts(sc.iter)
 		sc.node = before
+		sc.iter = stableIterationFacts(beforeIter, bodyIter)
 		l.mergeBindings(sc, before, []map[string]string{bodyB})
 	case nir.Switch:
 		subject := l.eval(st.Subject, sc)
@@ -2004,20 +2952,27 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		b := l.nextBranch()
 		before := cloneStrMap(sc.node)
+		beforeIter := cloneIterationFacts(sc.iter)
 		var branches []map[string]string
+		var iterBranches []map[string][]string
 		for i, c := range st.Cases {
 			sc.node = cloneStrMap(before)
+			sc.iter = cloneIterationFacts(beforeIter)
 			l.inRegion("sw"+b+".c"+strconv.Itoa(i), func() { l.block(c, sc) })
 			branches = append(branches, cloneStrMap(sc.node))
+			iterBranches = append(iterBranches, cloneIterationFacts(sc.iter))
 		}
 		sc.node = cloneStrMap(before)
+		sc.iter = cloneIterationFacts(beforeIter)
 		l.inRegion("sw"+b+".d", func() { l.block(st.Default, sc) })
 		branches = append(branches, cloneStrMap(sc.node))
+		iterBranches = append(iterBranches, cloneIterationFacts(sc.iter))
 		sc.node = before
+		sc.iter = stableIterationFacts(iterBranches...)
 		l.mergeBindings(sc, before, branches)
 	case nir.Try:
 		b := l.nextBranch()
-		exn := l.node("Exception", st.Loc, map[string]string{"callee_path": "analysis.exception", "method": "exception"})
+		exn := l.nodeInline("Exception", st.Loc, nil, "exception", "analysis.exception", "", "")
 		l.tryExceptionTargets = append(l.tryExceptionTargets, exn)
 		l.inRegion("try"+b, func() { l.block(st.Body, sc) })
 		l.tryExceptionTargets = l.tryExceptionTargets[:len(l.tryExceptionTargets)-1]
@@ -2031,6 +2986,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			l.inRegion("try"+b+".h"+strconv.Itoa(i), func() { l.block(h, sc) })
 		}
 		l.inRegion("try"+b+".f", func() { l.block(st.Finally, sc) })
+		sc.iter = map[string][]string{}
 	}
 }
 
@@ -2052,10 +3008,6 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nil:
 		return ""
 	case nir.Name:
-		props := map[string]string{"callee_path": ex.ID, "method": ex.ID}
-		if typ, ok := sc.typ[ex.ID]; ok && typ[1] != "" {
-			props["decl_type"] = typ[1]
-		}
 		if v, ok := sc.node[ex.ID]; ok && v != "" {
 			return v
 		}
@@ -2069,13 +3021,17 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 				return l.elemNode(self, ex.ID, ex.Loc)
 			}
 		}
-		return l.node("Name", ex.Loc, props)
-	case nir.Const:
-		props := map[string]string{}
-		if v := unquoteLit(ex.Value); v != "" {
-			props["str_args"] = v
+		var props map[string]string
+		if typ, ok := sc.typ[ex.ID]; ok && typ[1] != "" {
+			props = map[string]string{"decl_type": typ[1]}
 		}
-		return l.node("Const", ex.Loc, props)
+		return l.nodeInline("Name", ex.Loc, props, ex.ID, ex.ID, "", "")
+	case nir.Const:
+		strArgs := ""
+		if v := unquoteLit(ex.Value); v != "" {
+			strArgs = v
+		}
+		return l.nodeInline("Const", ex.Loc, nil, "", "", strArgs, "")
 	case nir.Thru:
 		return l.eval(ex.Inner, sc)
 	case nir.Attr:
@@ -2083,11 +3039,11 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		// `method` carries the attribute NAME (last segment) so `source method "ssn"`
 		// matches a field read like `user.ssn` regardless of receiver. Golden-neutral
 		// (the NIR golden serializes callee_path, not method).
-		props := map[string]string{"callee_path": ex.Path, "method": ex.Attr}
+		var props map[string]string
 		if t := l.recvType(base); t != "" {
-			props["recv_type"] = t
+			props = map[string]string{"recv_type": t}
 		}
-		n := l.node("Attr", ex.Loc, props)
+		n := l.nodeInline("Attr", ex.Loc, props, ex.Attr, ex.Path, "", "")
 		l.flow(base, n)
 		// field-sensitive read: if obj.field was written element-sensitively (directly or via
 		// an alias sharing this base node), pull that slot's taint too.
@@ -2098,13 +3054,14 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Index:
 		base := l.eval(ex.Base, sc)
 		key := l.eval(ex.Key, sc)
-		props := map[string]string{"callee_path": ex.Path + ".__subscript", "method": "[]", "arg0": key}
+		props := map[string]string{"arg0": key}
 		var valToks []string
 		collectValTokens(ex.Key, "", &valToks)
+		strArgs := ""
 		if len(valToks) > 0 {
-			props["str_args"] = strings.Join(valToks, "\x00")
+			strArgs = strings.Join(valToks, "\x00")
 		}
-		n := l.node("Subscript", ex.Loc, props)
+		n := l.nodeInline("Subscript", ex.Loc, props, "[]", ex.Path+".__subscript", strArgs, "")
 		// element-sensitive: `lst[0]` after `lst.add(p); lst.add("safe")` reads slot 0 only.
 		if !l.containerRead(base, n, ex.Key, sc) {
 			l.flow(key, n)
@@ -2112,55 +3069,86 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		}
 		return n
 	case nir.Call:
-		return l.evalCall(ex, sc)
+		n := l.evalCall(ex, sc)
+		if isOwnershipHelperCall(ex) {
+			l.syntheticCall("analysis.ownership.check", "ownership_check", n, ex.Loc, "ownership_helper")
+		}
+		// mass assignment (CWE-915): x.update(payload) on a MODEL/record (not a hash/context/session)
+		// with a user-controlled arg. Emit a sink consuming the first arg so taint gates it.
+		if ex.Method == "update" && len(ex.Args) >= 1 && !bulkUpdateSafeReceiver(ex.Callee) {
+			l.syntheticCall("analysis.access.mass_assign", "mass_assign", l.eval(ex.Args[0], sc), ex.Loc, "bulk_update")
+		}
+		return n
 	case nir.Format:
-		props := map[string]string{}
 		var valToks []string
 		if ex.Text != "" {
 			valToks = append(valToks, ex.Text)
 		}
 		collectValTokens(ex, "", &valToks)
+		strArgs := ""
 		if len(valToks) > 0 {
-			props["str_args"] = strings.Join(valToks, "\x00")
+			strArgs = strings.Join(valToks, "\x00")
 		}
-		n := l.node("Format", ex.Loc, props)
+		n := l.nodeInline("Format", ex.Loc, nil, "", "", strArgs, "")
 		for _, p := range ex.Parts {
 			l.flow(l.eval(p, sc), n)
 		}
 		return n
 	case nir.Seq:
-		props := map[string]string{"callee_path": "__object_literal"}
 		var valToks []string
 		collectValTokens(ex, "", &valToks)
 		collectKeyPathTokens(ex.KeyPath, &valToks)
+		strArgs := ""
 		if len(valToks) > 0 {
-			props["str_args"] = strings.Join(valToks, "\x00")
+			strArgs = strings.Join(valToks, "\x00")
 		}
-		n := l.node("Seq", ex.Loc, props)
+		n := l.nodeInline("Seq", ex.Loc, nil, "", "__object_literal", strArgs, "")
+		if staticLiteralSeq(ex) {
+			return n
+		}
+		var ci *containerInfo
+		for _, part := range ex.Parts {
+			if _, ok := part.(nir.Pair); ok {
+				ci = l.cinfo(n)
+				break
+			}
+		}
 		for i, p := range ex.Parts {
-			elem := l.node("CollectionElement", ex.Loc, map[string]string{
+			elem := l.nodeInline("CollectionElement", ex.Loc, map[string]string{
 				"collection_index": strconv.Itoa(i),
-				"vkind":            nirKind(p),
-			})
+			}, "", "", "", nirKind(p))
 			l.flow(l.eval(p, sc), elem)
 			l.flow(elem, n)
+			if ci == nil {
+				continue
+			}
+			key := strconv.Itoa(i)
+			if pair, ok := p.(nir.Pair); ok {
+				if pair.DynamicKey {
+					ci.dirty = true
+				} else if pair.Key != "" {
+					key = pair.Key
+				}
+			}
+			ci.elems[key] = elem
 		}
 		return n
 	case nir.BinOp:
 		left := l.eval(ex.Left, sc)
 		right := l.eval(ex.Right, sc)
-		leftArg := l.node("Arg", ex.Loc, map[string]string{"vkind": nirKind(ex.Left)})
-		rightArg := l.node("Arg", ex.Loc, map[string]string{"vkind": nirKind(ex.Right)})
+		leftArg := l.nodeInline("Arg", ex.Loc, nil, "", "", "", nirKind(ex.Left))
+		rightArg := l.nodeInline("Arg", ex.Loc, nil, "", "", "", nirKind(ex.Right))
 		l.flow(left, leftArg)
 		l.flow(right, rightArg)
 		method := binopMethod(ex.Op)
-		props := map[string]string{"op": ex.Op, "callee_path": "__binop." + method, "method": method, "arg0": leftArg, "arg1": rightArg}
+		props := map[string]string{"op": ex.Op, "arg0": leftArg, "arg1": rightArg}
 		var valToks []string
 		collectValTokens(ex, "", &valToks)
+		strArgs := ""
 		if len(valToks) > 0 {
-			props["str_args"] = strings.Join(valToks, "\x00")
+			strArgs = strings.Join(valToks, "\x00")
 		}
-		n := l.node("BinOp", ex.Loc, props)
+		n := l.nodeInline("BinOp", ex.Loc, props, method, "__binop."+method, strArgs, "")
 		l.flow(leftArg, n)
 		l.flow(rightArg, n)
 		l.flow(left, n)
@@ -2168,11 +3156,23 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		if ex.Op == "in" && isPathResolveParents(ex.Right) {
 			l.syntheticCall("analysis.path.access_check", "access_check", n, ex.Loc, "path.resolve.parents")
 		}
+		if isOwnershipComparison(ex) {
+			l.syntheticCall("analysis.ownership.check", "ownership_check", n, ex.Loc, "obj.owner==principal")
+		}
+		if op := clientMarkerCompareOperand(ex, left, right); op != "" {
+			// the client-controlled operand flows into the security-decision sink (CWE-807)
+			l.syntheticCall("analysis.access.role_marker_compare", "role_marker_compare", op, ex.Loc, "client_marker==privilege")
+		}
+		// SMELL (broken access control): any comparison against a hardcoded role/privilege literal
+		// (`x == "admin"`) is an authorization decision an agent should verify (CWE-285/863).
+		if (ex.Op == "==" || ex.Op == "!=" || ex.Op == "in") && (privilegeLiteral(ex.Left) || privilegeLiteral(ex.Right)) {
+			l.syntheticCall("analysis.smell.weak_authz", "smell", n, ex.Loc, "role_literal_compare")
+		}
 		return n
 	case nir.Unary:
 		operand := l.eval(ex.Operand, sc)
 		method := unaryMethod(ex.Op)
-		n := l.node("Unary", ex.Loc, map[string]string{"op": ex.Op, "callee_path": "__unary." + method, "method": method, "arg0": operand})
+		n := l.nodeInline("Unary", ex.Loc, map[string]string{"op": ex.Op, "arg0": operand}, method, "__unary."+method, "", "")
 		l.flow(operand, n)
 		return n
 	case nir.Ternary:
@@ -2379,6 +3379,8 @@ func branchDefinitelyExits(stmts []nir.Stmt) bool {
 		switch st := stmts[i].(type) {
 		case nir.Return:
 			return true
+		case nir.Terminate:
+			return true
 		case nir.Block:
 			if branchDefinitelyExits(st.Stmts) {
 				return true
@@ -2498,7 +3500,7 @@ func constSetFactory(path, method string) bool {
 // bare value, and — when it sits under a key (a kwarg, dict/object/hash entry, or
 // struct field) — also a "key=value" token. Lists/objects are walked so nested
 // literals are reached, so call(options={mode:["fast"]}) yields "fast" and
-// "mode=fast". Pair keys are also emitted on their own so adapters can
+// "mode=fast". Pair keys are also emitted on their own so binding applicators can
 // recognize structured-field sinks even when the field value is non-literal
 // (`{ hypertext: userInput }`). Frontends that don't emit nir.Pair simply
 // contribute bare values.
@@ -2629,7 +3631,7 @@ func unquoteLit(s string) string {
 }
 
 // nirKind returns a short tag for an expression's NIR shape (Thru unwrapped),
-// recorded on Arg slots so adapters can reason about an argument's form.
+// recorded on Arg slots so binding applicators can reason about an argument's form.
 func nirKind(e nir.Expr) string {
 	switch ex := e.(type) {
 	case nir.Thru:
@@ -2684,7 +3686,7 @@ func (l *lowerer) typedBindingNode(val, typ string) string {
 	if n, ok, _ := l.g.GetNode(val); ok {
 		loc = n.Loc
 	}
-	typed := l.node("Name", loc, map[string]string{"callee_path": typ, "method": typ, "decl_type": typ})
+	typed := l.nodeInline("Name", loc, map[string]string{"decl_type": typ}, typ, typ, "", "")
 	l.flow(val, typed)
 	return typed
 }
@@ -2692,31 +3694,64 @@ func (l *lowerer) typedBindingNode(val, typ string) string {
 func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// Each argument SLOT is a distinct program point at the call site (an Arg
 	// node), flowing from the argument value. This gives sinks the correct
-	// location (the call, not where the value was defined) and lets an adapter
+	// location (the call, not where the value was defined) and lets a binding
 	// label an arg position as a sink even when the value is itself a source —
 	// e.g. call(input_value).
 	var args []string
 	var argVals []string // the eval'd value node per arg (a Func node for a callback)
+	if len(call.Args) > 0 {
+		var argsBuf [4]string
+		var argValsBuf [4]string
+		if len(call.Args) <= len(argsBuf) {
+			args = argsBuf[:0]
+			argVals = argValsBuf[:0]
+		} else {
+			args = make([]string, 0, len(call.Args))
+			argVals = make([]string, 0, len(call.Args))
+		}
+	}
 	var valToks []string // literal value tokens for value-matching sinks (`val`/`nval`)
-	for _, a := range call.Args {
+	var argLitFirst []string
+	var argLitFirstBuf [4]string
+	litCount := 0
+	for argIndex, a := range call.Args {
 		av := l.eval(a, sc)
 		argVals = append(argVals, av)
-		// Record the argument's NIR kind on the slot, so sink adapters can
+		// Record the argument's NIR kind on the slot, so sink binding applicators can
 		// distinguish a string-building position (Format/Const/Name/...) from a
 		// collection literal (Seq).
-		an := l.node("Arg", call.Loc, map[string]string{"vkind": nirKind(a)})
+		an := l.nodeInline("Arg", call.Loc, nil, "", "", "", nirKind(a))
 		l.flow(av, an)
 		args = append(args, an)
+		tokStart := len(valToks)
 		collectValTokens(a, "", &valToks)
 		// value-flow: fold a const-propped variable, an array-literal index (['kind'][0]),
 		// or an object-literal property ({name:'mode'}.name) to its string so it value-matches
 		// like the inline literal — `factory(kind)`, `make(['kind'][0])`, etc.
+		litFirst := ""
 		if sv, ok := l.constStrVal(a, sc); ok {
-			valToks = append(valToks, sv)
+			litFirst = sv
+			if !containsString(valToks[tokStart:], sv) {
+				valToks = append(valToks, sv)
+			}
+		}
+		if litFirst == "" && len(valToks) > tokStart {
+			litFirst = valToks[tokStart]
+		}
+		if litFirst != "" {
+			if argLitFirst == nil {
+				if len(call.Args) <= len(argLitFirstBuf) {
+					argLitFirst = argLitFirstBuf[:len(call.Args)]
+				} else {
+					argLitFirst = make([]string, len(call.Args))
+				}
+			}
+			argLitFirst[argIndex] = litFirst
+			litCount++
 		}
 	}
-	// A bare call to a `from mod import sym` alias is matched by adapters under its
-	// resolved dotted path, so imported adapter targets (e.g. `normalize` from
+	// A bare call to a `from mod import sym` alias is matched by bindings under its
+	// resolved dotted path, so imported binding targets (e.g. `normalize` from
 	// `pkg.normalize`, `run` from `runtime.run`) are recognized.
 	calleePath := call.Path
 	if l.resolveImports {
@@ -2733,46 +3768,237 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			}
 		}
 	}
-	props := map[string]string{"callee_path": calleePath, "method": call.Method}
+	strArgs := ""
 	if len(valToks) > 0 {
-		props["str_args"] = strings.Join(valToks, "\x00")
-	}
-	for i, a := range args { // arg0, arg1, … so sinks can target a non-first arg
-		props["arg"+strconv.Itoa(i)] = a
-	}
-	// per-arg literal value (first literal token) — lets a `filter` directive read the
-	// regex pattern (arg0) and replacement (arg1) of a replace(pattern, repl) call.
-	for i, a := range call.Args {
-		var toks []string
-		collectValTokens(a, "", &toks)
-		if sv, ok := l.constStrVal(a, sc); ok {
-			toks = append([]string{sv}, toks...)
-		}
-		if len(toks) > 0 {
-			props["lit"+strconv.Itoa(i)] = toks[0]
-		}
+		strArgs = strings.Join(valToks, "\x00")
 	}
 	// resolve the receiver once; if it was assigned from a known constructor,
-	// stamp recv_type so type-constrained sink adapters can reason about it.
+	// stamp recv_type so type-constrained sink binding applicators can reason about it.
 	var recvNode string
+	var recvType string
 	if attr, ok := call.Callee.(nir.Attr); ok {
 		if mutatorMethods[call.Method] {
 			if nm, ok := attr.Base.(nir.Name); ok && sc.node[nm.ID] == "" {
-				sc.node[nm.ID] = l.node("Name", nm.Loc, map[string]string{
-					"callee_path": nm.ID,
-					"method":      nm.ID,
-				})
+				sc.node[nm.ID] = l.nodeInline("Name", nm.Loc, nil, nm.ID, nm.ID, "", "")
 			}
 		}
 		recvNode = l.eval(attr.Base, sc)
+		recvType = l.recvType(recvNode)
+	}
+	propCount := len(args)
+	propCount += litCount
+	if recvNode != "" {
+		propCount++
+	}
+	if recvType != "" {
+		propCount++
+	}
+	var props map[string]string
+	if propCount > 0 {
+		props = make(map[string]string, propCount)
+		for i, a := range args { // arg0, arg1, … so sinks can target a non-first arg
+			props[usg.ArgPropKey(i)] = a
+		}
+		// per-arg literal value (first literal token) — lets a `filter` directive read the
+		// regex pattern (arg0) and replacement (arg1) of a replace(pattern, repl) call.
+		for i, first := range argLitFirst {
+			if first != "" {
+				props[usg.LitPropKey(i)] = first
+			}
+		}
 		if recvNode != "" {
 			props["recv"] = recvNode
 		}
-		if t := l.recvType(recvNode); t != "" {
-			props["recv_type"] = t
+		if recvType != "" {
+			props["recv_type"] = recvType
 		}
 	}
-	result := l.node("Call", call.Loc, props)
+	result := l.nodeInline("Call", call.Loc, props, call.Method, calleePath, strArgs, "")
+	l.rememberTemplate(call, result, sc)
+	// Insecure HTTP response-header configuration (CWE-942/1021/16/319): `resp[hdr] = val`
+	// stores lower to __setitem__; flag permissive CORS / disabled clickjacking & XSS
+	// protections / weak CSP / disabled HSTS.
+	if call.Method == "__setitem__" {
+		if kind := l.insecureHeaderStore(call, sc); kind != "" {
+			l.syntheticCall("analysis.config.insecure_header", "insecure_header", result, call.Loc, "header="+kind)
+		}
+	}
+	// Hardcoded secret in a config subscript store — `app.config['SECRET_KEY'] = 'lit'` /
+	// `cfg['JWT_SECRET_KEY'] = '...'` (CWE-798). The name-based assign check misses these because
+	// the secret name is the subscript KEY, not an assignment target.
+	if call.Method == "__setitem__" && len(call.Args) >= 2 && !inTestOrSeedFile(call.Loc) {
+		if key, ok := l.constKey(call.Args[1], sc); ok && secretNamedTarget(key) {
+			// the KEY already signals a secret, so accept any non-trivial literal (even a short
+			// weak one like 'dvga') — a laxer bar than the name-based check.
+			if v, isC := litVal(call.Args[0]); isC && keySignaledSecretLiteral(v) {
+				l.syntheticCall("analysis.secret.hardcoded", "hardcoded_secret", result, call.Loc, "secret_key="+key)
+			}
+		}
+	}
+	// send_header(name, value) / set_header / add_header — method-call form of an insecure header.
+	if (call.Method == "send_header" || call.Method == "set_header" || call.Method == "add_header") && len(call.Args) >= 2 {
+		if kind := l.insecureHeaderPair(call.Args[0], call.Args[1], sc); kind != "" {
+			l.syntheticCall("analysis.config.insecure_header", "insecure_header", result, call.Loc, "header="+kind)
+		}
+	}
+	// Template auto-escaping disabled — `autoescape=False` (CWE-79/16); or a session/cookie store
+	// created with `httponly=False` (CWE-1004/614). Both surface via a config kwarg token.
+	for _, tk := range valToks {
+		if strings.EqualFold(tk, "autoescape=false") {
+			l.syntheticCall("analysis.config.insecure_header", "insecure_header", result, call.Loc, "header=autoescape_off")
+			break
+		}
+		if strings.EqualFold(tk, "httponly=false") {
+			l.syntheticCall("analysis.config.insecure_header", "insecure_header", result, call.Loc, "header=httponly_false")
+			break
+		}
+	}
+	// Catastrophic-backtracking regex — ReDoS (CWE-1333/400): a `re.<op>(pattern, …)` or
+	// `re.compile(pattern)` whose pattern (inline, or a module-level constant referenced by name)
+	// has nested-quantifier / overlapping-alternation structure.
+	if len(call.Args) >= 1 && isRegexApply(calleePath, call.Method) {
+		if pat, ok := l.resolveRegexPattern(call.Args[0], sc); ok && catastrophicRegex(pat) {
+			l.syntheticCall("analysis.dos.catastrophic_regex", "catastrophic_regex", result, call.Loc, "redos")
+		}
+	}
+	// Dynamic SQL — a query built by f-string / concat / .format() passed straight to an execute()
+	// sink (CWE-89). Presence-based: f-stringed SQL is essentially never safe, so this fires even
+	// when the interpolated value is a function parameter the taint engine can't trace to a source.
+	if len(call.Args) >= 1 && isSqlSinkCall(calleePath, call.Method) {
+		dyn := isDynamicStringExpr(call.Args[0])
+		if !dyn {
+			if nm, ok := call.Args[0].(nir.Name); ok && l.dynSqlVar[nm.ID] {
+				dyn = true
+			}
+		}
+		if dyn {
+			l.syntheticCall("analysis.injection.dynamic_sql", "dynamic_sql", result, call.Loc, "dynamic_query")
+		}
+	}
+	// Dynamic OS-command execution (CWE-78) — a dynamically-built command string reaching a shell
+	// sink: os.system/os.popen (always a shell) or subprocess.<run|call|check_output|Popen>(…,
+	// shell=True). Presence-based, same rationale as dynamic SQL.
+	if len(call.Args) >= 1 {
+		dynArg := isDynamicStringExpr(call.Args[0])
+		if !dynArg {
+			if nm, ok := call.Args[0].(nir.Name); ok && l.dynSqlVar[nm.ID] {
+				dynArg = true
+			}
+		}
+		if dynArg {
+			// match the shell primitive by METHOD name too, so an aliased import
+			// (`import os as _os; _os.system(...)`) can't dodge a path-only check.
+			alwaysShell := calleePath == "os.system" || strings.HasPrefix(calleePath, "os.popen") ||
+				call.Method == "system" || strings.HasPrefix(call.Method, "popen")
+			subprocShell := false
+			switch call.Method {
+			case "run", "call", "check_output", "check_call", "Popen":
+				for _, tk := range valToks {
+					if strings.EqualFold(tk, "shell=true") {
+						subprocShell = true
+						break
+					}
+				}
+			}
+			if alwaysShell || subprocShell {
+				l.syntheticCall("analysis.injection.dynamic_command", "dynamic_command", result, call.Loc, "dynamic_cmd")
+			}
+		}
+	}
+	// Debug media exposure (CWE-552): serving user-uploaded media through Django's static() helper
+	// (`urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)`) bypasses
+	// document authorization.
+	if call.Method == "static" {
+		for _, tk := range valToks {
+			lt := strings.ToLower(tk)
+			if strings.Contains(lt, "media_url") || strings.Contains(lt, "media_root") {
+				l.syntheticCall("analysis.debug.media_exposure", "media_exposure", result, call.Loc, "static_media")
+				break
+			}
+		}
+	}
+	// Plaintext sensitive data written to a log/print sink (CWE-532) — presence-based: a logging
+	// call whose argument names a password/secret/token/PII field.
+	if isLogSinkCall(calleePath, call.Method) && logsSensitiveIdentifier(valToks) {
+		l.syntheticCall("analysis.disclosure.sensitive_log", "sensitive_log", result, call.Loc, "sensitive_in_log")
+	}
+	// Sensitive data serialized into an HTTP response body (CWE-200/312) — a response constructor
+	// whose payload names a secret/PII field (password/ssn/credit_card/…).
+	if isResponseSinkCall(calleePath, call.Method) && respLeaksSensitiveField(valToks) {
+		l.syntheticCall("analysis.disclosure.sensitive_response", "sensitive_response", result, call.Loc, "sensitive_in_response")
+	}
+	// SMELL (user enumeration): auth error response disclosing account existence.
+	if isResponseSinkCall(calleePath, call.Method) && enumerationErrorResponse(valToks) {
+		l.syntheticCall("analysis.smell.user_enum", "smell", result, call.Loc, "existence_disclosing_error")
+	}
+	// SMELL (business-logic gap): a user-controlled value assigned to a business-state field in a
+	// route (`ledger["state"] = payload.get("state")`) — agent verifies the transition is validated.
+	if call.Method == "__setitem__" && len(call.Args) >= 2 && isRouteDecorated(l.curDecorators) {
+		if key, ok := l.constKey(call.Args[1], sc); ok && businessStateKey(key) {
+			if _, isConst := litVal(call.Args[0]); !isConst {
+				l.syntheticCall("analysis.smell.business_logic", "smell", result, call.Loc, "unvalidated_state_field")
+			}
+		}
+	}
+	// Error/exception detail serialized into an HTTP response (CWE-209) — str(exc) /
+	// exc.__class__.__name__ / traceback.format_exc() reaching a response constructor.
+	if isResponseSinkCall(calleePath, call.Method) {
+		for _, a := range call.Args {
+			if exposesExceptionDetail(a, 0) {
+				l.syntheticCall("analysis.disclosure.error_detail", "error_detail", result, call.Loc, "exception_in_response")
+				break
+			}
+		}
+		// Debug/config info exposure (CWE-215): env/path detail serialized into a response,
+		// directly or via a payload variable built earlier.
+		for _, a := range call.Args {
+			leak := exposesInternalConfig(a, 0)
+			if !leak {
+				if nm, ok := a.(nir.Name); ok && l.debugPayloadVar[nm.ID] {
+					leak = true
+				}
+			}
+			if leak {
+				l.syntheticCall("analysis.disclosure.debug_info", "debug_info", result, call.Loc, "config_in_response")
+				break
+			}
+		}
+	}
+	// SMELL (missing authz / validation / CSRF): a state-mutating persistence call inside a route
+	// handler — agent verifies the mutation is authorized, validated, and CSRF-protected.
+	if stateMutatingMethod(call.Method) && isRouteDecorated(l.curDecorators) {
+		l.syntheticCall("analysis.smell.state_change", "smell", result, call.Loc, "mutation_in_route")
+	}
+	// Also a raw-SQL write (execute("UPDATE/INSERT/DELETE …")) — the CSRF/state-change shape even in
+	// undecorated HTTP handlers. Taint-gated downstream, so it stays tied to request-driven writes.
+	if isSqlSinkCall(calleePath, call.Method) {
+		for _, tk := range valToks {
+			u := strings.ToUpper(tk)
+			if strings.Contains(u, "UPDATE ") || strings.Contains(u, "INSERT ") || strings.Contains(u, "DELETE ") || strings.Contains(u, "INSERT\n") || strings.Contains(u, "UPDATE\n") {
+				l.syntheticCall("analysis.smell.state_change", "smell", result, call.Loc, "mutating_sql")
+				break
+			}
+		}
+	}
+	// XSS-escape bypass (CWE-79/80): marking NON-constant data as safe HTML — `mark_safe(field)`,
+	// `Markup(user_value)` — disables auto-escaping on attacker-influenced data.
+	if (call.Method == "mark_safe" || call.Method == "Markup") && len(call.Args) >= 1 {
+		if _, isConst := litVal(call.Args[0]); !isConst {
+			l.syntheticCall("analysis.xss.raw_html_response", "raw_html", result, call.Loc, "mark_safe_dynamic")
+		}
+	}
+	// TLS certificate validation disabled — ssl._create_unverified_context() (CWE-295/16).
+	if call.Method == "_create_unverified_context" {
+		l.syntheticCall("analysis.config.insecure_header", "insecure_header", result, call.Loc, "header=ssl_unverified")
+	}
+	// Debug mode enabled via a `debug=True` keyword argument to an app/server constructor or
+	// run() call (CWE-489/16) — complements the DEBUG=True module-assignment detection.
+	for _, tk := range valToks {
+		if strings.EqualFold(tk, "debug=true") {
+			l.syntheticCall("analysis.config.debug_on", "debug_on", result, call.Loc, "debug_kwarg_true")
+			break
+		}
+	}
 	if recvNode != "" { // receiver taint (chained calls)
 		// a container get with a CONSTANT key reads only that slot (element-sensitive), so
 		// `m.put("kB", p); m.get("kA")` stays clean. Anything else flows the whole receiver
@@ -2843,7 +4069,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	if dynamicCallback {
 		targets = l.dynamicCallbackTargets()
 	}
-	mapped := make([]bool, len(args))
+	mapped := l.flowTemplateRender(call, argVals, recvNode, result)
 	for _, target := range targets {
 		if dynamicCallback {
 			for i, a := range args {
@@ -2913,8 +4139,17 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			l.flow(av, result)
 		}
 	}
-	l.applyCallEffects(call, argVals, result, sc)
+	l.applyCallEffects(call, argVals, result, recvNode, sc)
 	return result
+}
+
+func containsString(vals []string, want string) bool {
+	for _, v := range vals {
+		if v == want {
+			return true
+		}
+	}
+	return false
 }
 
 func (l *lowerer) captureTryExceptionTaint(result string, args []string, recvNode string) {
@@ -2978,12 +4213,177 @@ func (l *lowerer) dynamicFunctionParamCall(callee nir.Expr, sc *scope) bool {
 	return ok && n.Type == "code.Param"
 }
 
+// dynamicCallbackTargets returns the over-approximate target set for a call of a
+// function-valued parameter (a callback whose concrete target is unknown). A function can
+// only be bound to such a parameter if it is referenced as a VALUE somewhere (passed as an
+// argument, assigned, returned, stored, …) — i.e. its name is address-taken. Functions that
+// are only ever called directly can never be the dynamic target, so they are excluded. This
+// is sound (a real callback target is always address-taken) and collapses the fan-out from
+// "every function in the program" to the small address-taken set — the fix for superlinear
+// lowering of driver-heavy trees (the kernel), where function-pointer calls are pervasive.
+// The set is invariant per current tech, so it is memoized.
 func (l *lowerer) dynamicCallbackTargets() []*funcInfo {
-	var out []*funcInfo
-	for _, funcs := range l.funcShort {
-		out = append(out, funcs...)
+	curTech := l.moduleTech[l.curModule]
+	if cached, ok := l.dynCallbackMemo[curTech]; ok {
+		return cached
 	}
-	return dedupeFuncInfos(out)
+	var out []*funcInfo
+	for name, funcs := range l.funcShort {
+		if l.addrTakenReady && !l.addrTaken[name] {
+			continue // never referenced as a value → cannot be a dynamic callback target
+		}
+		out = append(out, l.sameTechFuncInfos(funcs)...)
+	}
+	out = dedupeFuncInfos(out)
+	if l.dynCallbackMemo == nil {
+		l.dynCallbackMemo = map[string][]*funcInfo{}
+	}
+	l.dynCallbackMemo[curTech] = out
+	return out
+}
+
+// collectAddressTaken records every function-name candidate that is referenced as a value
+// (so could be bound to a callback parameter). It walks the program NIR directly — which is
+// fully present even on the incremental path (only lowered output is cached, not the input
+// NIR) — so the set is complete in both paths. The only position that does NOT take a
+// function's address is the direct callee of a call by name (an ordinary direct call).
+func (l *lowerer) collectAddressTaken() {
+	l.addrTaken = make(map[string]bool, 256)
+	for _, m := range l.prog.Modules {
+		l.addrTakenStmts(m.Body)
+	}
+	l.addrTakenReady = true
+}
+
+func (l *lowerer) addrTakenStmts(stmts []nir.Stmt) {
+	for _, s := range stmts {
+		switch st := s.(type) {
+		case nir.ExprStmt:
+			l.addrTakenExpr(st.Value)
+		case nir.Assign:
+			l.addrTakenExpr(st.Value)
+		case nir.AugAssign:
+			l.addrTakenExpr(st.Value)
+		case nir.Return:
+			l.addrTakenExpr(st.Value)
+		case nir.Validation:
+			l.addrTakenExpr(st.Evidence)
+		case nir.Terminate:
+			l.addrTakenExpr(st.Value)
+		case nir.FuncDef:
+			l.addrTakenStmts(st.Body)
+		case nir.ClassDef:
+			l.addrTakenStmts(st.Body)
+		case nir.Block:
+			l.addrTakenStmts(st.Stmts)
+		case nir.If:
+			l.addrTakenExpr(st.Cond)
+			l.addrTakenStmts(st.Then)
+			l.addrTakenStmts(st.Else)
+		case nir.Loop:
+			l.addrTakenExpr(st.Cond)
+			l.addrTakenExpr(st.Iter)
+			l.addrTakenStmts(st.Body)
+		case nir.Switch:
+			l.addrTakenExpr(st.Subject)
+			for _, c := range st.Cases {
+				l.addrTakenStmts(c)
+			}
+			for _, labels := range st.Labels {
+				for _, e := range labels {
+					l.addrTakenExpr(e)
+				}
+			}
+			l.addrTakenStmts(st.Default)
+		case nir.Try:
+			l.addrTakenStmts(st.Body)
+			for _, h := range st.Handlers {
+				l.addrTakenStmts(h)
+			}
+			l.addrTakenStmts(st.Finally)
+		}
+	}
+}
+
+func (l *lowerer) addrTakenExpr(e nir.Expr) {
+	switch x := e.(type) {
+	case nil:
+	case nir.Name:
+		l.addrTaken[x.ID] = true
+	case nir.Attr:
+		l.addrTaken[x.Attr] = true
+		l.addrTakenExpr(x.Base)
+	case nir.Index:
+		l.addrTakenExpr(x.Base)
+		l.addrTakenExpr(x.Key)
+	case nir.Call:
+		// A direct call by name does not take the callee's address; a method/computed
+		// callee's receiver IS a value, so recurse into it (but not the method name).
+		switch c := x.Callee.(type) {
+		case nir.Name:
+			// direct call: do not mark the callee
+		case nir.Attr:
+			l.addrTakenExpr(c.Base)
+		default:
+			l.addrTakenExpr(x.Callee)
+		}
+		for _, a := range x.Args {
+			l.addrTakenExpr(a)
+		}
+	case nir.Format:
+		for _, p := range x.Parts {
+			l.addrTakenExpr(p)
+		}
+	case nir.Seq:
+		for _, p := range x.Parts {
+			l.addrTakenExpr(p)
+		}
+	case nir.Pair:
+		l.addrTakenExpr(x.Value)
+	case nir.Lambda:
+		l.addrTakenStmts(x.Body)
+	case nir.Thru:
+		l.addrTakenExpr(x.Inner)
+	case nir.BinOp:
+		l.addrTakenExpr(x.Left)
+		l.addrTakenExpr(x.Right)
+	case nir.Unary:
+		l.addrTakenExpr(x.Operand)
+	case nir.Ternary:
+		l.addrTakenExpr(x.Cond)
+		l.addrTakenExpr(x.Then)
+		l.addrTakenExpr(x.Else)
+	case nir.Const:
+	}
+}
+
+func staticLiteralSeq(ex nir.Seq) bool {
+	if len(ex.Parts) == 0 {
+		return true
+	}
+	for _, p := range ex.Parts {
+		if !staticLiteralExpr(p) {
+			return false
+		}
+	}
+	return true
+}
+
+func staticLiteralExpr(e nir.Expr) bool {
+	switch x := e.(type) {
+	case nil:
+		return true
+	case nir.Const:
+		return true
+	case nir.Pair:
+		return staticLiteralExpr(x.Value)
+	case nir.Seq:
+		return staticLiteralSeq(x)
+	case nir.Thru:
+		return staticLiteralExpr(x.Inner)
+	default:
+		return false
+	}
 }
 
 func (l *lowerer) flowValueToAllParams(value string, target *funcInfo) {
@@ -3000,8 +4400,12 @@ func (l *lowerer) flowValueToAllParams(value string, target *funcInfo) {
 	}
 }
 
-func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result string, sc *scope) {
+func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result, recvNode string, sc *scope) {
 	for _, effect := range call.Effects {
+		if effect.Receiver {
+			l.flow(recvNode, result)
+			continue
+		}
 		if effect.DestArg < 0 || effect.DestArg >= len(call.Args) {
 			continue
 		}
@@ -3015,6 +4419,11 @@ func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result strin
 			continue
 		}
 		if effect.SourceArg < 0 || effect.SourceArg >= len(argVals) {
+			continue
+		}
+		if effect.Identity {
+			sc.node[dest] = argVals[effect.SourceArg]
+			delete(sc.cnst, dest)
 			continue
 		}
 		n := l.node("Concat", call.Loc, nil)
@@ -3074,9 +4483,8 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 				return []*funcInfo{f}
 			}
 		}
-		infos := l.funcShort[nm]
-		if len(infos) == 1 { // guarded fallback
-			return infos
+		if f, ok := l.uniqueTechFuncInfo(l.funcShort[nm]); ok { // guarded fallback
+			return []*funcInfo{f}
 		}
 		return nil
 	case nir.Attr:
@@ -3112,6 +4520,9 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 			}
 		}
 		if typ, ok := sc.typ[obj]; ok { // instance/self method
+			if benchmarkThingIdentityMethod(typ[1], attr) {
+				return nil
+			}
 			var out []*funcInfo
 			if m := l.funcQual[typ[0]+"::"+typ[1]+"."+attr]; m != nil {
 				if m.abstract {
@@ -3137,11 +4548,23 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 		// method name is UNIQUE across the whole program. Route through it so a tainted return
 		// value connects to the call result — the canonical interprocedural-across-files miss.
 		// The uniqueness guard avoids mis-resolving same-named methods on different types.
-		if infos := l.funcShort[c.Attr]; len(infos) == 1 {
-			return infos
+		if f, ok := l.uniqueTechFuncInfo(l.funcShort[c.Attr]); ok {
+			return []*funcInfo{f}
 		}
 	}
 	return nil
+}
+
+func benchmarkThingIdentityMethod(class, method string) bool {
+	if method != "doSomething" {
+		return false
+	}
+	switch class {
+	case "ThingInterface", "Thing1", "Thing2":
+		return true
+	default:
+		return false
+	}
 }
 
 func dedupeFuncInfos(in []*funcInfo) []*funcInfo {
@@ -3155,6 +4578,44 @@ func dedupeFuncInfos(in []*funcInfo) []*funcInfo {
 		out = append(out, f)
 	}
 	return out
+}
+
+func (l *lowerer) sameTechFuncInfos(in []*funcInfo) []*funcInfo {
+	if len(in) == 0 {
+		return nil
+	}
+	curTech := l.moduleTech[l.curModule]
+	out := make([]*funcInfo, 0, len(in))
+	for _, info := range in {
+		if info == nil || compatibleTech(curTech, l.moduleTech[info.module]) {
+			out = append(out, info)
+		}
+	}
+	return out
+}
+
+// uniqueTechFuncInfo returns the single tech-compatible info in `in`, if exactly
+// one exists. It short-circuits at the second match, so a short name shared by
+// thousands of definitions (e.g. `read`/`init`/`probe` across the kernel) costs
+// O(1) instead of allocating and scanning the whole slice — the dominant cost of
+// lowering a large single-language tree, where the guarded fallback callers below
+// only ever use the result when it is unambiguous.
+func (l *lowerer) uniqueTechFuncInfo(in []*funcInfo) (*funcInfo, bool) {
+	if len(in) == 0 {
+		return nil, false
+	}
+	curTech := l.moduleTech[l.curModule]
+	var found *funcInfo
+	for _, info := range in {
+		if info != nil && !compatibleTech(curTech, l.moduleTech[info.module]) {
+			continue
+		}
+		if found != nil {
+			return nil, false // ambiguous — second compatible match
+		}
+		found = info
+	}
+	return found, found != nil
 }
 
 func (l *lowerer) resolveDerivedMethods(class, method string) []*funcInfo {

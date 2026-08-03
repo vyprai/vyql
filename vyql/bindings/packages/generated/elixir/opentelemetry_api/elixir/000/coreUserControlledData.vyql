@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m623e1be9;
+
+binding userControlledData0 {
+  requires {
+    dependency("opentelemetry_api")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit source core.UserControlledData at call.result
+}

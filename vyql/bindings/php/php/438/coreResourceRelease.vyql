@@ -1,0 +1,11 @@
+module bindings.php.generated.mfbe84119;
+
+binding resourceRelease438 {
+  query pattern callExpr where callee.path ~= "fclose"
+  emit check core.ResourceRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mf98b3aca;
+
+binding archiveEntryWrite20 {
+  requires {
+    dependency("erl_tar")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

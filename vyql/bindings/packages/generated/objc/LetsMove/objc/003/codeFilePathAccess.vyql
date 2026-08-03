@@ -1,0 +1,9 @@
+module bindings.objc.generated.m6e3df7af;
+
+binding filePathAccess3 {
+  requires {
+    dependency("LetsMove")
+  }
+  query pattern callExpr where callee.method == "CopyBundle"
+  emit sink code.FilePathAccess at args[0]
+}

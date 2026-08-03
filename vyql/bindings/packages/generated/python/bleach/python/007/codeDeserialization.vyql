@@ -1,0 +1,9 @@
+module bindings.python.generated.m19b4666f;
+
+binding deserialization7 {
+  requires {
+    dependency("bleach")
+  }
+  query pattern callExpr where callee.path ~= "bleach._vendor.html5lib.html5parser.parseFragment"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding templateRender170 {
+  query pattern callExpr where callee.path ~= "Liquid.Template.parse"
+  emit sink code.TemplateRender at args[0]
+}

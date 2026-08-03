@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m4cd96b0a;
+
+binding networkSend13 {
+  requires {
+    dependency("activeresource")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}

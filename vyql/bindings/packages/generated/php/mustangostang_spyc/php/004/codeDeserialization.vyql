@@ -1,0 +1,9 @@
+module bindings.php.generated.m2992b839;
+
+binding deserialization4 {
+  requires {
+    dependency("mustangostang/spyc")
+  }
+  query pattern callExpr where callee.method == "spyc_load"
+  emit sink code.Deserialization at args[0]
+}

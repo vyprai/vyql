@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mb2a8287e;
+
+binding deserialization0 {
+  requires {
+    dependency("com.fasterxml.jackson.datatype:jackson-datatype-jdk8")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

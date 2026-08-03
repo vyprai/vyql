@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule CommandStringWrapperInputValidation {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_20]
+    id: "VYQL-VAL-005"
+    severity: high
+  }
+  issue code.CommandStringWrapperExecution as command
+}

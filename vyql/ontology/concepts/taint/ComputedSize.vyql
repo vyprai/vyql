@@ -1,0 +1,6 @@
+module taint;
+
+concept ComputedSize : source {
+  coverageReservedSource: true
+  summary: "Data used as a computed allocation, copy, index, or buffer size."
+}

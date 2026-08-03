@@ -1,6 +1,0 @@
-adapter python {
-  package "flask-bcrypt" {
-    control method "generate_password_hash" -> core.AuthenticationCheck
-    control method "check_password_hash" -> core.AuthenticationCheck
-  }
-}

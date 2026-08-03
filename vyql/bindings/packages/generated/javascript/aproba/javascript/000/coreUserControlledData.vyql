@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m04ec7156;
+
+binding userControlledData0 {
+  requires {
+    dependency("aproba")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit source core.UserControlledData at call.result
+}

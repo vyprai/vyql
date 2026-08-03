@@ -1,0 +1,11 @@
+module code;
+
+concept EmbeddedDotSegmentFilenameWrite : issue {
+  cwe: [CWE_22, CWE_184]
+  reviewAssumption: "the filename can contain embedded parent-directory segments that survive the storage path construction"
+  reviewCategory: path
+  reviewCondition: "a caller-provided filename is written under a storage directory after rejecting exact '..' but not embedded dot segments"
+  reviewConfidence: high
+  reviewEvidence: "filename storage context {pattern} checks the exact parent-directory token but lacks a contains/segment rejection before writing the filename"
+  vulnerableTo: [path.PathTraversal]
+}

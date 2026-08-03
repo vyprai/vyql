@@ -1,0 +1,9 @@
+module bindings.php.generated.md98ce9fb;
+
+binding expressionEval0 {
+  requires {
+    dependency("chi-teck/drupal-code-generator")
+  }
+  query pattern callExpr where callee.method == "replaceTokens"
+  emit sink code.ExpressionEval at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m0e26dbfb;
+
+binding networkSend5 {
+  requires {
+    dependency("abraham/twitteroauth")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkSend at args[0]
+}

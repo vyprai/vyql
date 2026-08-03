@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter groovy {
-  package "org.hibernate:hibernate-validator" {
-    control method "isValid" -> core.InputValidation
-  }
-}

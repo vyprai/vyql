@@ -1,5 +1,0 @@
-adapter scala {
-  package "com.sun.jersey:jersey-server" {
-    source method "cookie" -> code.HttpInput
-  }
-}

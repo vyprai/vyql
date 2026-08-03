@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter objc {
-  package "TSMessages" {
-    sink method "addCustomDesignFromFileWithName:" -> code.FilePathAccess
-    sink method "addNotificationDesignFromFile:" -> code.FilePathAccess
-  }
-}

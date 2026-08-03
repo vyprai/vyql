@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "org.springframework:spring-context" {
-    control method "validate" -> core.InputValidation
-  }
-}

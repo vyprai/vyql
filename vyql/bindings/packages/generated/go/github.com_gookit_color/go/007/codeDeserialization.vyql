@@ -1,0 +1,9 @@
+module bindings.go.generated.m90840e9a;
+
+binding deserialization7 {
+  requires {
+    dependency("github.com/gookit/color")
+  }
+  query pattern callExpr where callee.method == "ParseCodeFromAttr"
+  emit sink code.Deserialization at args[0]
+}

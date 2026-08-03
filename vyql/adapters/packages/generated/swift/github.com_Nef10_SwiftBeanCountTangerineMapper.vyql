@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter swift {
-  package "github.com/Nef10/SwiftBeanCountTangerineMapper" {
-    sink method "createTransactions" -> code.Deserialization
-  }
-}

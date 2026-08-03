@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m8e564aef;
+
+binding urlFetch0 {
+  requires {
+    dependency("com.lowagie:itext")
+  }
+  query pattern callExpr where callee.method == "Jpeg.<init>(java.net.URL)"
+  emit sink code.UrlFetch at args[0]
+}

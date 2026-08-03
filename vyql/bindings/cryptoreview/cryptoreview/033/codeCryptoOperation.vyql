@@ -1,0 +1,6 @@
+module bindings.cryptoreview.generated.m4f475b34;
+
+binding cryptoOperation33 {
+  query pattern presenceNode where node.path ~= "CryptoStream"
+  emit issue code.CryptoOperation at node
+}

@@ -1,0 +1,14 @@
+module bindings.python.generated.m1891bbe2;
+
+binding inputValidation2 {
+  requires {
+    dependency("babel")
+  }
+  query pattern callExpr where callee.method == "babel.messages.pofile.escape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

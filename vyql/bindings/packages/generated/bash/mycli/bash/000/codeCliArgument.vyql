@@ -1,0 +1,9 @@
+module bindings.bash.generated.m1cfd78d2;
+
+binding cliArgument0 {
+  requires {
+    dependency("mycli")
+  }
+  query pattern callExpr where callee.path ~= "mycli.argv"
+  emit source code.CliArgument at call.result
+}

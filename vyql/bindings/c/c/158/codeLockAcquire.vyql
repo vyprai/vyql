@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding lockAcquire158 {
+  query pattern presenceNode where node.path ~= "pthread_mutex_lock"
+  emit issue code.LockAcquire at node
+}

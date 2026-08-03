@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule UrlPathParameterCaseNormalizationBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_178, CWE_863]
+    id: "VYQL-VAL-013"
+    severity: high
+  }
+  issue code.UrlPathParameterCaseNormalizationBypass as params
+}

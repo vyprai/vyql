@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m76529595;
+
+binding networkSend4 {
+  requires {
+    dependency("algoliasearch")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkSend at args[0]
+}

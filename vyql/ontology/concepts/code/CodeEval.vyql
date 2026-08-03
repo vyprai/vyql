@@ -1,0 +1,7 @@
+module code;
+
+concept CodeEval : sink {
+  cwe: [CWE_94]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [injection.CodeInjection]
+}

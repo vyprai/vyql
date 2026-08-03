@@ -1,0 +1,9 @@
+module bindings.perl.generated.ma2ec5935;
+
+binding fileUse1 {
+  requires {
+    dependency("Kwiki-AuthorOnlyPageEditing")
+  }
+  query pattern callExpr where callee.method == "Kwiki::AuthorOnlyPageEditing::associate"
+  emit sink code.FileUseSink at args[0]
+}

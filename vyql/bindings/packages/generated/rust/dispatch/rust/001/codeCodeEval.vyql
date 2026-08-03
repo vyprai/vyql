@@ -1,0 +1,9 @@
+module bindings.rust.generated.m074e875c;
+
+binding codeEval1 {
+  requires {
+    dependency("dispatch")
+  }
+  query pattern callExpr where callee.method == "dispatch_sync_f"
+  emit sink code.CodeEval at args[0]
+}

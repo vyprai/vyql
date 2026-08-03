@@ -1,0 +1,9 @@
+module bindings.c.generated.me6cbb240;
+
+binding networkConnect3 {
+  requires {
+    dependency("tcp-pubsub")
+  }
+  query pattern callExpr where callee.method == "Subscriber.Subscriber"
+  emit sink code.NetworkConnectSink at args[0]
+}

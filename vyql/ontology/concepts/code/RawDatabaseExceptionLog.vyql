@@ -1,0 +1,11 @@
+module code;
+
+concept RawDatabaseExceptionLog : issue {
+  cwe: [CWE_532]
+  reviewAssumption: "database exception messages or traces can contain connection usernames, passwords, DSNs, or SQL credential material"
+  reviewCategory: secret
+  reviewCondition: "database exception messages or traces are written to logs before credential redaction"
+  reviewConfidence: high
+  reviewEvidence: "database error handler context {pattern} passes raw exception getMessage/getTraceAsString values to a file log"
+  vulnerableTo: [secrets.SecretLeak]
+}

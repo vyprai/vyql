@@ -1,0 +1,9 @@
+module bindings.objc.generated.mc241a9f8;
+
+binding deserialization6 {
+  requires {
+    dependency("SVGKit")
+  }
+  query pattern callExpr where callee.method == "newParserWithDefaultSVGKParserExtensions"
+  emit sink code.Deserialization at args[0]
+}

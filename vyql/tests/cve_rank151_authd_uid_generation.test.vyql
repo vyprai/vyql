@@ -3,6 +3,7 @@
 
 test "rank151: go authd username-derived UID and GID requires identity review"
   lang go
+  expect VYQL-AUTH-083
   expect_review code.UserIdentityMappingReview
   code
   ```
@@ -48,6 +49,7 @@ test "rank151: go authd username-derived UID and GID requires identity review"
 
 test "rank151: go authd pre-auth registration is clean"
   lang go
+  reject VYQL-AUTH-083
   reject_review code.UserIdentityMappingReview
   code
   ```

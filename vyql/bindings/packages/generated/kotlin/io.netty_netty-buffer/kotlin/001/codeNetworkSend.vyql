@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m19ec740d;
+
+binding networkSend1 {
+  requires {
+    dependency("io.netty:netty-buffer")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

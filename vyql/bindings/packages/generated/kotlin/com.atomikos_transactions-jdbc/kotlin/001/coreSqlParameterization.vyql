@@ -1,0 +1,14 @@
+module bindings.kotlin.generated.mc091c291;
+
+binding sqlParameterization1 {
+  requires {
+    dependency("com.atomikos:transactions-jdbc")
+  }
+  query pattern callExpr where callee.method == "prepare"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

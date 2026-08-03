@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding protocolFrameBindingReview116 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "protocol.frame_binding_missing_destination"
+  emit issue code.ProtocolFrameBindingReview at node
+}

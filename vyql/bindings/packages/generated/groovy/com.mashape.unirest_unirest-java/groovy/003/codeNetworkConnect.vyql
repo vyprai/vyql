@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m26e194b2;
+
+binding networkConnect3 {
+  requires {
+    dependency("com.mashape.unirest:unirest-java")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkConnectSink at args[0]
+}

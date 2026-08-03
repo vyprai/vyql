@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m8853afe5;
+
+binding deserialization1 {
+  requires {
+    dependency("makeup_eex")
+  }
+  query pattern callExpr where callee.method == "Makeup.Lexers.EExLexer.postprocess"
+  emit sink code.Deserialization at args[0]
+}

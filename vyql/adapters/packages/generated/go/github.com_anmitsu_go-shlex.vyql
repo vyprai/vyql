@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "github.com/anmitsu/go-shlex" {
-    sink method "NewLexer" -> code.Deserialization
-    sink method "NewLexerString" -> code.Deserialization
-    sink method "Split" -> code.Deserialization
-  }
-}

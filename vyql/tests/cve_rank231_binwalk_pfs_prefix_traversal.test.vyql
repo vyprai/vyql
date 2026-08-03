@@ -1,0 +1,65 @@
+# Rank 231 / CVE-2022-4510: Binwalk's PFS extractor joined filesystem-image
+# entry names under the extraction directory, then used raw startswith(out_dir)
+# containment before creating directories and writing extracted files.
+
+test "rank231: PFS extractor uses raw prefix containment for entry filenames"
+  lang python
+  file unpfs.py
+  expect VYQL-PATH-056
+  expect_review code.ArchiveEntryRawPrefixContainment
+  code
+  ```
+  import os
+  import binwalk.core.common
+
+  class PFSExtractor:
+      def _create_dir_from_fname(self, fname):
+          os.makedirs(os.path.dirname(fname))
+
+      def extractor(self, fname):
+          fname = os.path.abspath(fname)
+          out_dir = binwalk.core.common.unique_file_name(os.path.join(os.path.dirname(fname), "pfs-root"))
+
+          with PFS(fname) as fs:
+              data = binwalk.core.common.BlockFile(fname, "rb")
+              for entry in fs.entries():
+                  outfile_path = os.path.join(out_dir, entry.fname)
+                  if not outfile_path.startswith(out_dir):
+                      binwalk.core.common.warning("Refusing traversal")
+                  else:
+                      self._create_dir_from_fname(outfile_path)
+                      outfile = binwalk.core.common.BlockFile(outfile_path, "wb")
+                      outfile.write(data.read(entry.fsize))
+                      outfile.close()
+  ```
+
+test "rank231: PFS extractor uses canonical separator-aware containment"
+  lang python
+  file unpfs.py
+  reject VYQL-PATH-056
+  reject_review code.ArchiveEntryRawPrefixContainment
+  code
+  ```
+  import os
+  import binwalk.core.common
+
+  class PFSExtractor:
+      def _create_dir_from_fname(self, fname):
+          os.makedirs(os.path.dirname(fname))
+
+      def extractor(self, fname):
+          fname = os.path.abspath(fname)
+          out_dir = os.path.realpath(binwalk.core.common.unique_file_name(os.path.join(os.path.dirname(fname), "pfs-root")))
+
+          with PFS(fname) as fs:
+              data = binwalk.core.common.BlockFile(fname, "rb")
+              for entry in fs.entries():
+                  outfile_path = os.path.realpath(os.path.join(out_dir, entry.fname))
+                  if not (outfile_path == out_dir or outfile_path.startswith(out_dir + os.sep)):
+                      binwalk.core.common.warning("Refusing traversal")
+                  else:
+                      self._create_dir_from_fname(outfile_path)
+                      outfile = binwalk.core.common.BlockFile(outfile_path, "wb")
+                      outfile.write(data.read(entry.fsize))
+                      outfile.close()
+  ```

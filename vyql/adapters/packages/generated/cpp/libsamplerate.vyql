@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-
-adapter cpp {
-  package "libsamplerate" {
-    source method "src_process" -> core.UserControlledData
-    source method "src_simple" -> core.UserControlledData
-  }
-}

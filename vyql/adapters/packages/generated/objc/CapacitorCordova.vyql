@@ -1,6 +1,0 @@
-import core.{AuthenticationCheck}
-adapter objc {
-  package "CapacitorCordova" {
-    control method "handleWKWebViewURLAuthenticationChallenge:completionHandler:" -> core.AuthenticationCheck
-  }
-}

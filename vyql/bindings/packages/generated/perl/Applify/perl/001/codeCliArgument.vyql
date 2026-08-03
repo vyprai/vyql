@@ -1,0 +1,9 @@
+module bindings.perl.generated.mfd44b194;
+
+binding cliArgument1 {
+  requires {
+    dependency("Applify")
+  }
+  query pattern callExpr where callee.method == "subcommand"
+  emit source code.CliArgument at call.result
+}

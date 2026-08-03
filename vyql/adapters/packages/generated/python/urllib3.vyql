@@ -1,7 +1,0 @@
-import code.{HttpInput, NetworkSend}
-adapter python {
-  package "urllib3" {
-    sink method "send" -> code.NetworkSend
-    source method "request" -> code.HttpInput
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.javascript.generated.me42c4159;
+
+binding responseHeaderWrite3 {
+  requires {
+    dependency("cookie")
+  }
+  query pattern callExpr where callee.method == "stringifySetCookie"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

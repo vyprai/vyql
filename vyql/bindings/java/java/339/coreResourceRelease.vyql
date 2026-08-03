@@ -1,0 +1,11 @@
+module bindings.java.generated.m420f6b67;
+
+binding resourceRelease339 {
+  query pattern callExpr where callee.method == "close"
+  emit check core.ResourceRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}

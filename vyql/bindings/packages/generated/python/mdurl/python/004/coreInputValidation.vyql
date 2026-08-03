@@ -1,0 +1,14 @@
+module bindings.python.generated.m61021244;
+
+binding inputValidation4 {
+  requires {
+    dependency("mdurl")
+  }
+  query pattern callExpr where callee.method == "format"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

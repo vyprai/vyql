@@ -1,0 +1,10 @@
+module bindings.php.generated.mb76847d9;
+
+binding redirectTarget2 {
+  requires {
+    dependency("drupal/drupal-extension")
+  }
+  query pattern callExpr where callee.method == "iFollowLinkInMail"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

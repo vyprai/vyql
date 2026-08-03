@@ -1,0 +1,13 @@
+module bindings.csharp.generated.m2a0e231a;
+
+binding redirectAllowlist31 {
+  requires {
+    dependency("Microsoft.AspNetCore.Mvc")
+  }
+  query pattern callExpr where callee.path ~= "Url.IsLocalUrl"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

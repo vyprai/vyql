@@ -1,0 +1,9 @@
+module bindings.scala.generated.m3608f193;
+
+binding regexCompile7 {
+  requires {
+    dependency("scala-library")
+  }
+  query pattern callExpr where callee.path ~= "Regex"
+  emit sink code.RegexCompileSink at args[0]
+}

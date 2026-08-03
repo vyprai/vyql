@@ -1,0 +1,9 @@
+module bindings.python.generated.m65d9ea34;
+
+binding deserialization0 {
+  requires {
+    dependency("rsa")
+  }
+  query pattern callExpr where callee.method == "decrypt"
+  emit sink code.Deserialization at args[0]
+}

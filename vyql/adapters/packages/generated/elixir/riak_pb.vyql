@@ -1,5 +1,0 @@
-adapter elixir {
-  package "riak_pb" {
-    sink method "decode_counter_op" -> code.Deserialization
-  }
-}

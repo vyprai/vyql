@@ -1,0 +1,6 @@
+module bindings.objc.generated.mccadd221;
+
+binding weakHash88 {
+  query pattern presenceNode where node.path ~= "CC_SHA1"
+  emit issue code.WeakHash at node
+}

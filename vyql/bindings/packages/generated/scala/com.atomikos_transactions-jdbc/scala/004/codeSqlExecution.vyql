@@ -1,0 +1,9 @@
+module bindings.scala.generated.m1e2b2f70;
+
+binding sqlExecution4 {
+  requires {
+    dependency("com.atomikos:transactions-jdbc")
+  }
+  query pattern callExpr where callee.method == "setTestQuery"
+  emit sink code.SqlExecution at args[0]
+}

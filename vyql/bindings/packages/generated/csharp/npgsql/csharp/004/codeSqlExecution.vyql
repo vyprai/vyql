@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m66eeeae8;
+
+binding sqlExecution4 {
+  requires {
+    dependency("npgsql")
+  }
+  query pattern callExpr where callee.method == "Npgsql.NpgsqlCommand.ExecuteReader"
+  emit sink code.SqlExecution at args[0]
+}

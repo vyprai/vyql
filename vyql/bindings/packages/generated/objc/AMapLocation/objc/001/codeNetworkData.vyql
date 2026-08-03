@@ -1,0 +1,9 @@
+module bindings.objc.generated.ma83f1bde;
+
+binding networkData1 {
+  requires {
+    dependency("AMapLocation")
+  }
+  query pattern callExpr where callee.method == "startUpdatingLocation"
+  emit source code.NetworkData at call.result
+}

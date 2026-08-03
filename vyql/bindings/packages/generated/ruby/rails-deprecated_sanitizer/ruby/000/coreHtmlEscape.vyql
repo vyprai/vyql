@@ -1,0 +1,14 @@
+module bindings.ruby.generated.mc2171ef7;
+
+binding htmlEscape0 {
+  requires {
+    dependency("rails-deprecated_sanitizer")
+  }
+  query pattern callExpr where callee.method == "sanitize"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

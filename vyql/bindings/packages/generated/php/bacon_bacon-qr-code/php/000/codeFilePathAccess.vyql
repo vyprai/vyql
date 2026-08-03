@@ -1,0 +1,9 @@
+module bindings.php.generated.ma202305d;
+
+binding filePathAccess0 {
+  requires {
+    dependency("bacon/bacon-qr-code")
+  }
+  query pattern callExpr where callee.method == "writeFile"
+  emit sink code.FilePathAccess at args[0]
+}

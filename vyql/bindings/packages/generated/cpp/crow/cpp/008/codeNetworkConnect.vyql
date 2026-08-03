@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m03268d36;
+
+binding networkConnect8 {
+  requires {
+    dependency("crow")
+  }
+  query pattern callExpr where callee.method == "add_websocket"
+  emit sink code.NetworkConnectSink at args[0]
+}

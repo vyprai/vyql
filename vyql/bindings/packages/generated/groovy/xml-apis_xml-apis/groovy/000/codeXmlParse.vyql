@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mace9a0d3;
+
+binding xmlParse0 {
+  requires {
+    dependency("xml-apis:xml-apis")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}

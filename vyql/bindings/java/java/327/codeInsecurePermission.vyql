@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding insecurePermission327 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "createTempFile" and node.context.callPath contains "File.createTempFile" and not (node.context.callPath contains "setWritable") and not (node.context.callPath contains "Files.setPosixFilePermissions")
+  emit issue code.InsecurePermission at node
+}

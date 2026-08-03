@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding formatString129 {
+  query pattern callExpr where callee.path ~= "syslog"
+  emit sink code.FormatString at args[1]
+}

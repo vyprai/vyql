@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding incompleteGeneratedJsIdentifierReservedWords268 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.incompleteGeneratedJsIdentifierReservedWords == "true"
+  emit issue code.IncompleteGeneratedJsIdentifierReservedWords at node
+}

@@ -1,0 +1,14 @@
+module bindings.python.generated.ma604efd2;
+
+binding htmlEscape0 {
+  requires {
+    dependency("prettytable")
+  }
+  query pattern callExpr where callee.method == "escape_header"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

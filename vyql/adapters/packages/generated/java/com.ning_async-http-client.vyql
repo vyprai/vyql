@@ -1,5 +1,0 @@
-adapter java {
-  package "com.ning:async-http-client" {
-    sink method "get" -> code.UrlFetch
-  }
-}

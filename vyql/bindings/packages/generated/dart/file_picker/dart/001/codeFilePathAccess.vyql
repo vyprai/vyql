@@ -1,0 +1,9 @@
+module bindings.dart.generated.ma4094cd0;
+
+binding filePathAccess1 {
+  requires {
+    dependency("file_picker")
+  }
+  query pattern callExpr where callee.method == "pickFileAndDirectoryPaths"
+  emit sink code.FilePathAccess at args[0]
+}

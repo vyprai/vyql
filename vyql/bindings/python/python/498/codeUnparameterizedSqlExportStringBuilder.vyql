@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding unparameterizedSqlExportStringBuilder498 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.callPath contains "cur.execute" and containsAny(node.context.identifier, ["creation_list", "values_list", "insert_list", "insert_query"]) and containsAny(node.context.identifier, ["plugin", "table", "col_names", "columns"]) and not (containsAny(node.context.callPath, ["sql.Identifier", "sql.Literal", "sql.Placeholder"])) and not (containsAny(node.context.callPath, ["cur.executemany", "execute_values", "execute_batch"]))
+  emit issue code.UnparameterizedSqlExportStringBuilder at node
+}

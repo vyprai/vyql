@@ -1,0 +1,9 @@
+module bindings.python.generated.ma2b95db9;
+
+binding userControlledData3 {
+  requires {
+    dependency("flask-wtf")
+  }
+  query pattern callExpr where callee.method == "process_formdata"
+  emit source core.UserControlledData at call.result
+}

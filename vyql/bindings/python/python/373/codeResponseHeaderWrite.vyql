@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding responseHeaderWrite373 {
+  query pattern callExpr where callee.path ~= "headers.setdefault"
+  emit sink code.ResponseHeaderWrite at args[1]
+}

@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m4c477ebd;
+
+binding sqlExecution20 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orLessThan"
+  emit sink code.SqlExecution at args[0]
+}

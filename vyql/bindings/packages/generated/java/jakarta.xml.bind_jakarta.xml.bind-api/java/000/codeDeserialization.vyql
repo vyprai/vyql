@@ -1,0 +1,9 @@
+module bindings.java.generated.m2bc78188;
+
+binding deserialization0 {
+  requires {
+    dependency("jakarta.xml.bind:jakarta.xml.bind-api")
+  }
+  query pattern callExpr where callee.method == "unmarshal"
+  emit sink code.Deserialization at args[0]
+}

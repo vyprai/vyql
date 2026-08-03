@@ -1,9 +1,0 @@
-import code.{FilePathAccess, Deserialization}
-
-adapter ruby {
-  package "xcodeproj" {
-    sink method "Xcodeproj::Plist.read_from_path" -> code.FilePathAccess
-    sink method "Xcodeproj::Plist.write_to_path" -> code.FilePathAccess
-    sink method "Xcodeproj::Config.hash_from_file_content" -> code.Deserialization
-  }
-}

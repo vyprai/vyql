@@ -1,9 +1,0 @@
-import code.{CliArgument, FilePathAccess}
-adapter php {
-  package "phploc/phploc" {
-    source method "run" -> code.CliArgument
-    sink method "printResult" -> code.FilePathAccess
-    sink method "countFile" -> code.FilePathAccess
-    sink method "preProcessFile" -> code.FilePathAccess
-  }
-}

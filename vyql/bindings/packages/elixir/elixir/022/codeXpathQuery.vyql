@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mf98b3aca;
+
+binding xpathQuery22 {
+  requires {
+    dependency("sweet_xml")
+  }
+  query pattern callExpr where callee.path ~= "SweetXml.xpath"
+  emit sink code.XpathQuery at args[1]
+}

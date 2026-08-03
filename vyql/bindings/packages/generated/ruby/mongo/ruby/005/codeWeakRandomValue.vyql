@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mb1fc3a64;
+
+binding weakRandomValue5 {
+  requires {
+    dependency("mongo")
+  }
+  query pattern presenceNode where node.path ~= "mongo.random"
+  emit issue code.WeakRandomValue at node
+}

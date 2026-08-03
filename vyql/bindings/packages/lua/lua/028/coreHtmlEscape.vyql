@@ -1,0 +1,14 @@
+module bindings.lua.generated.m49b0a04f;
+
+binding htmlEscape28 {
+  requires {
+    dependency("lua-htmlparser")
+  }
+  query pattern callExpr where callee.path ~= "html.escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

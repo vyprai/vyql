@@ -1,0 +1,9 @@
+module bindings.go.generated.m0323219b;
+
+binding deserialization7 {
+  requires {
+    dependency("github.com/mitchellh/mapstructure")
+  }
+  query pattern callExpr where callee.method == "TextUnmarshallerHookFunc"
+  emit sink code.Deserialization at args[0]
+}

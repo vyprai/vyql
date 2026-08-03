@@ -1,0 +1,9 @@
+module bindings.php.generated.maf4c6ea9;
+
+binding filePathAccess2 {
+  requires {
+    dependency("nette/robot-loader")
+  }
+  query pattern callExpr where callee.method == "setTempDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

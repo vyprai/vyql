@@ -1,0 +1,10 @@
+module bindings.perl.generated.m9d72423c;
+
+binding redirectTarget0 {
+  requires {
+    dependency("OX")
+  }
+  query pattern callExpr where callee.method == "uri_for"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

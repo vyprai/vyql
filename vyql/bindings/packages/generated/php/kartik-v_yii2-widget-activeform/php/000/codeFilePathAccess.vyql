@@ -1,0 +1,9 @@
+module bindings.php.generated.m5efefac1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("kartik-v/yii2-widget-activeform")
+  }
+  query pattern callExpr where callee.method == "fileInput"
+  emit sink code.FilePathAccess at args[0]
+}

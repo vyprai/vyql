@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding httpInput54 {
+  query pattern callExpr where callee.path ~= "event.headers"
+  emit source code.HttpInput at call.result
+}

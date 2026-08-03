@@ -1,7 +1,0 @@
-import code.{XmlParse}
-
-adapter scala {
-  package "org.apache.maven:maven-project" {
-    sink method "read" -> code.XmlParse
-  }
-}

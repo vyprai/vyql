@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter ruby {
-  package "bond" {
-    sink method "current_eval" -> code.CodeEval
-  }
-}

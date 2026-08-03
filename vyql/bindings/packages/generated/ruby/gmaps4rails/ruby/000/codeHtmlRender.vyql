@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m2f557c6d;
+
+binding htmlRender0 {
+  requires {
+    dependency("gmaps4rails")
+  }
+  query pattern callExpr where callee.method == "infowindow"
+  emit sink code.HtmlRender at args[0]
+}

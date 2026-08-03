@@ -1,0 +1,4 @@
+module business;
+
+concept PaymentSystem : asset {
+}

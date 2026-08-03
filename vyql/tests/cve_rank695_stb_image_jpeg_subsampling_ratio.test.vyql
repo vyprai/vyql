@@ -59,3 +59,47 @@ test "rank695: JPEG frame header rejects non-integer sampling ratios"
       return 1;
   }
   ```
+
+test "rank695: JPEG subsampling ratio validation generalizes across names"
+  lang c
+  file stb_image.h
+  expect VYQL-MEM-035
+  code
+  ```
+  static int parse_jpeg_header(jpeg_state *jpeg, image_context *ctx) {
+      int c, max_h = 1, max_v = 1;
+      for (c = 0; c < ctx->img_n; ++c) {
+          if (jpeg->img_comp[c].h > max_h) max_h = jpeg->img_comp[c].h;
+          if (jpeg->img_comp[c].v > max_v) max_v = jpeg->img_comp[c].v;
+      }
+      for (c = 0; c < ctx->img_n; ++c) {
+          jpeg->img_comp[c].x = (ctx->img_x * jpeg->img_comp[c].h + max_h - 1) / max_h;
+          jpeg->img_comp[c].y = (ctx->img_y * jpeg->img_comp[c].v + max_v - 1) / max_v;
+          jpeg->img_comp[c].raw_data = stbi__malloc_mad2(jpeg->img_comp[c].w2, jpeg->img_comp[c].h2, 15);
+      }
+      return 1;
+  }
+  ```
+
+test "rank695: JPEG subsampling ratio validation labels cpp-routed headers"
+  lang cpp
+  file stb_image.hpp
+  expect VYQL-MEM-035
+  code
+  ```
+  namespace image {
+  static int parse_jpeg_header(jpeg_state *jpeg, image_context *ctx) {
+      int c, max_h = 1, max_v = 1;
+      for (c = 0; c < ctx->img_n; ++c) {
+          if (jpeg->img_comp[c].h > max_h) max_h = jpeg->img_comp[c].h;
+          if (jpeg->img_comp[c].v > max_v) max_v = jpeg->img_comp[c].v;
+      }
+      for (c = 0; c < ctx->img_n; ++c) {
+          jpeg->img_comp[c].x = (ctx->img_x * jpeg->img_comp[c].h + max_h - 1) / max_h;
+          jpeg->img_comp[c].y = (ctx->img_y * jpeg->img_comp[c].v + max_v - 1) / max_v;
+          jpeg->img_comp[c].raw_data = stbi__malloc_mad2(jpeg->img_comp[c].w2, jpeg->img_comp[c].h2, 15);
+      }
+      return 1;
+  }
+  }
+  ```

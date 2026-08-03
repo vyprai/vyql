@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter swift {
-  package "github.com/realm/SwiftLint" {
-    sink method "write(toPath:)" -> code.FilePathAccess
-  }
-}

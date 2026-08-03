@@ -1,0 +1,9 @@
+module bindings.rust.generated.m35bdeb12;
+
+binding stdinInput0 {
+  requires {
+    dependency("redox_termios")
+  }
+  query pattern callExpr where callee.method == "make_raw"
+  emit source code.StdinInput at call.result
+}

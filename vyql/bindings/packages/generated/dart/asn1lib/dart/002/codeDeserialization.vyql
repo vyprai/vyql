@@ -1,0 +1,9 @@
+module bindings.dart.generated.m02e6465b;
+
+binding deserialization2 {
+  requires {
+    dependency("asn1lib")
+  }
+  query pattern callExpr where callee.method == "decodeOctetString"
+  emit sink code.Deserialization at args[0]
+}

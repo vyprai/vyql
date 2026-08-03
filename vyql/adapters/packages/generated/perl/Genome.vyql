@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter perl {
-  package "Genome" {
-    sink method "shellcmd" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,7 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding logWrite115 {
+  query pattern presenceNode where node.path ~= "LogInformation"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}

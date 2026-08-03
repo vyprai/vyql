@@ -1,8 +1,0 @@
-import code.{FilePathAccess, Deserialization}
-adapter scala {
-  package "org.apache.pdfbox:pdfbox" {
-    sink method "loadFDF" -> code.FilePathAccess
-    sink method "loadXFDF" -> code.FilePathAccess
-    sink method "parseHex" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m4e17a62f;
+
+binding urlFetch2 {
+  requires {
+    dependency("vega_lite")
+  }
+  query pattern callExpr where callee.method == "data_from_url"
+  emit sink code.UrlFetch at args[0]
+}

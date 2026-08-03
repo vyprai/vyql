@@ -1,0 +1,11 @@
+module code;
+
+concept CoreMqttSubackRemainingLengthBoundary : issue {
+  cwe: [CWE_20]
+  reviewAssumption: "a peer can send a SUBACK or UNSUBACK packet whose remaining length is exactly the minimum property boundary"
+  reviewCategory: validation
+  reviewCondition: "SUB/UNSUB ACK property parsing is skipped when remainingLength is exactly 4, so malformed properties are not rejected"
+  reviewConfidence: high
+  reviewEvidence: "deserializeSubUnsubAck context {pattern} calls deserializeSubUnsubAckProperties only under an incomingPacket->remainingLength > 4U guard instead of >= 4U"
+  vulnerableTo: [validation.ImproperInputValidation]
+}

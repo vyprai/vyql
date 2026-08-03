@@ -1,0 +1,6 @@
+module bindings.cryptoreview.generated.m4f475b34;
+
+binding cryptoOperation45 {
+  query pattern presenceNode where node.path ~= "RSA_sign"
+  emit issue code.CryptoOperation at node
+}

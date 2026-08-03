@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m6a6c0a69;
+
+binding networkData0 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-transports-http-jetty")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

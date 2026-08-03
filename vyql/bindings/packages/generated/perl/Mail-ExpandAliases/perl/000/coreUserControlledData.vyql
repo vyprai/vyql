@@ -1,0 +1,9 @@
+module bindings.perl.generated.m1f899d53;
+
+binding userControlledData0 {
+  requires {
+    dependency("Mail-ExpandAliases")
+  }
+  query pattern callExpr where callee.method == "expand"
+  emit source core.UserControlledData at call.result
+}

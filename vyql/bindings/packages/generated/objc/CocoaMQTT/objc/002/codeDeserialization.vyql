@@ -1,0 +1,9 @@
+module bindings.objc.generated.m4a9e94d9;
+
+binding deserialization2 {
+  requires {
+    dependency("CocoaMQTT")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

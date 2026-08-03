@@ -100,3 +100,40 @@ test "rank315: Capstone X86_insn_reg_intel range-checks id before binary search"
       return 0;
   }
   ```
+
+test "rank315: binary-search endpoint guard bypass generalizes across names"
+  lang c
+  expect VYQL-MEM-022
+  expect_review code.BinarySearchTableIndexGuardBypass
+  code
+  ```
+  struct row {
+      unsigned int key;
+      int value;
+  };
+
+  static struct row sorted_rows[8];
+
+  int lookup(unsigned int wanted)
+  {
+      unsigned int low = 0;
+      unsigned int high = 7;
+      unsigned int center = 3;
+
+      while (low <= high) {
+          if (sorted_rows[center].key < wanted) {
+              low = center + 1;
+          } else if (sorted_rows[center].key == wanted) {
+              return sorted_rows[center].value;
+          } else {
+              if (center == 0) {
+                  break;
+              }
+              high = center - 1;
+          }
+          center = (low + high) / 2;
+      }
+
+      return -1;
+  }
+  ```

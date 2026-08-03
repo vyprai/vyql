@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m05a06ab6;
+
+binding sqlExecution0 {
+  requires {
+    dependency("p1_pgsql")
+  }
+  query pattern callExpr where callee.method == "process_squery"
+  emit sink code.SqlExecution at args[0]
+}

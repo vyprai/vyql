@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m8b020c1c;
+
+binding userControlledData0 {
+  requires {
+    dependency("uboot_env")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}

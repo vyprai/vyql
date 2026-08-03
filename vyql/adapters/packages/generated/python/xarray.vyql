@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter python {
-  package "xarray" {
-    sink method "open_dataset" -> code.FilePathAccess
-  }
-}

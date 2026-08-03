@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding httpInput12 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.classBase contains "Controller" and args.any.context.functionVisibility contains "public" and not args.any.context.methodAttribute contains "NonAction"
+  emit source code.HttpInput at call.result
+}

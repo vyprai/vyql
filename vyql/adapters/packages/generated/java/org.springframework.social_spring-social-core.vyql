@@ -1,8 +1,0 @@
-import code.{HttpInput, NetworkData}
-
-adapter java {
-  package "org.springframework.social:spring-social-core" {
-    source method "read" -> code.HttpInput
-    source method "write" -> code.NetworkData
-  }
-}

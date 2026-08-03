@@ -1,0 +1,9 @@
+module bindings.python.generated.mad97f1d3;
+
+binding networkConnect0 {
+  requires {
+    dependency("requests-mock")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkConnectSink at args[0]
+}

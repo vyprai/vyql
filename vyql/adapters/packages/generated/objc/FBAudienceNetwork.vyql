@@ -1,6 +1,0 @@
-import code.{UrlFetch}
-adapter objc {
-  package "FBAudienceNetwork" {
-    sink method "setUrlPrefix" -> code.UrlFetch
-  }
-}

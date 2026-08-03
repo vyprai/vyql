@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m9b427b95;
+
+binding codeEval2 {
+  requires {
+    dependency("org.apache.xmlbeans:xmlbeans")
+  }
+  query pattern callExpr where callee.method == "compileQuery"
+  emit sink code.CodeEval at args[0]
+}

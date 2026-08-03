@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding weakCipher362 {
+  query pattern callExpr where callee.path ~= "Cipher.getInstance" and args.any.literal contains "Blowfish"
+  emit issue code.WeakCipher at call
+}

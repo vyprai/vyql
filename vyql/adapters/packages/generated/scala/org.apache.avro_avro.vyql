@@ -1,6 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter scala {
-  package "org.apache.avro:avro" {
-    sink method "parse" -> code.Deserialization
-  }
-}

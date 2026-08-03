@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding jenkinsRemoteValidationMissingPostPermission230 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doTest" and node.context.call contains "testConnection" and node.context.call contains "CrowdConfigurationService" and not (node.context.annotation contains "POST") and not (node.context.scopeCall contains "checkPermission") and not (node.context.scopeCall contains "hasPermission")
+  emit issue code.JenkinsRemoteValidationMissingPostPermission at node
+}

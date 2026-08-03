@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m9d11b122;
+
+binding commandExecution1 {
+  requires {
+    dependency("byebug")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.CommandExecution at args[0]
+}

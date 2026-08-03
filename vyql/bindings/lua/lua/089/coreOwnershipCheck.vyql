@@ -1,0 +1,10 @@
+module bindings.lua.generated.ma99d12f7;
+
+binding ownershipCheck89 {
+  query pattern callExpr where callee.path ~= "check_ownership"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

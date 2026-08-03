@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/oklog/oklog" {
-    source method "parseAddr" -> core.UserControlledData
-  }
-}

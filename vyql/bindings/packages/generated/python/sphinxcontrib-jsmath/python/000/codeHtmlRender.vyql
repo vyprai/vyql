@@ -1,0 +1,9 @@
+module bindings.python.generated.m7dba1fd7;
+
+binding htmlRender0 {
+  requires {
+    dependency("sphinxcontrib-jsmath")
+  }
+  query pattern callExpr where callee.method == "html_visit_math"
+  emit sink code.HtmlRender at args[0]
+}

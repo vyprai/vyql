@@ -1,8 +1,0 @@
-import code.{NetworkSend}
-
-adapter cpp {
-  package "qtwebsockets" {
-    sink method "sendTextMessage" -> code.NetworkSend
-    sink method "sendBinaryMessage" -> code.NetworkSend
-  }
-}

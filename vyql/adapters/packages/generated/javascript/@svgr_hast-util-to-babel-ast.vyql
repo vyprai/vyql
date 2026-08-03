@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter javascript {
-  package "@svgr/hast-util-to-babel-ast" {
-    sink method "toBabelAST" -> code.Deserialization
-  }
-}

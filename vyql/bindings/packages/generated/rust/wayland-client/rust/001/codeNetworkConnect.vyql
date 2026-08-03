@@ -1,0 +1,9 @@
+module bindings.rust.generated.mbc8ea658;
+
+binding networkConnect1 {
+  requires {
+    dependency("wayland-client")
+  }
+  query pattern callExpr where callee.method == "from_socket"
+  emit sink code.NetworkConnectSink at args[0]
+}

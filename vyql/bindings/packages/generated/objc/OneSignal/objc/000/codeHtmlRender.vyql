@@ -1,0 +1,9 @@
+module bindings.objc.generated.m8098c78a;
+
+binding htmlRender0 {
+  requires {
+    dependency("OneSignal")
+  }
+  query pattern callExpr where callee.method == "displayWebView:"
+  emit sink code.HtmlRender at args[0]
+}

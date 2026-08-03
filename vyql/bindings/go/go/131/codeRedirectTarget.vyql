@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding redirectTarget131 {
+  query pattern callExpr where callee.path ~= "ctx.Redirect"
+  emit sink code.RedirectTargetSink at args[0]
+}

@@ -1,5 +1,6 @@
 test "rank168: Avo polymorphic association type is selected from request params"
   lang ruby
+  expect VYQL-DESER-021
   expect_review code.PolymorphicTypeSelectionReview
   code
   ```
@@ -28,6 +29,7 @@ test "rank168: Avo polymorphic association type is selected from request params"
 
 test "rank168: Avo polymorphic association type is constrained to configured types"
   lang ruby
+  reject VYQL-DESER-021
   reject_review code.PolymorphicTypeSelectionReview
   code
   ```

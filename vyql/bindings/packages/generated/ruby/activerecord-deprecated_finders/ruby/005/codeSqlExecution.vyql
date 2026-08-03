@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m049b7543;
+
+binding sqlExecution5 {
+  requires {
+    dependency("activerecord-deprecated_finders")
+  }
+  query pattern callExpr where callee.method == "update_all_with_deprecated_options"
+  emit sink code.SqlExecution at args[0]
+}

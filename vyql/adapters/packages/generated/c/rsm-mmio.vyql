@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter c {
-  package "rsm-mmio" {
-    sink method "mapped_file.mapped_file" -> code.FilePathAccess
-  }
-}

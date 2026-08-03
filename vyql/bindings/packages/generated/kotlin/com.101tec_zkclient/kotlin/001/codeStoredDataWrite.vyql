@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m348ae5bd;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("com.101tec:zkclient")
+  }
+  query pattern callExpr where callee.method == "writeData"
+  emit sink code.StoredDataWrite at args[0]
+}

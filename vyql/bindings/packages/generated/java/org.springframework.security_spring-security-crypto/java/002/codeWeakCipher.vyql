@@ -1,0 +1,9 @@
+module bindings.java.generated.me48c3402;
+
+binding weakCipher2 {
+  requires {
+    dependency("org.springframework.security:spring-security-crypto")
+  }
+  query pattern callExpr where callee.method == "BytesEncryptor.encrypt"
+  emit issue code.WeakCipher at call
+}

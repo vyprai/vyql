@@ -1,0 +1,9 @@
+module bindings.java.generated.ma7737bbb;
+
+binding deserialization0 {
+  requires {
+    dependency("org.junit.platform:junit-platform-launcher")
+  }
+  query pattern callExpr where callee.method == "TagFilter.parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-adapter elixir {
-  package "telemetry_metrics_prometheus_core" {
-    control method "escape" -> core.HtmlEscape
-    control method "escape_help" -> core.HtmlEscape
-  }
-}

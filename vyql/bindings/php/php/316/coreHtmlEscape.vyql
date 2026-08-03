@@ -1,0 +1,11 @@
+module bindings.php.generated.mfbe84119;
+
+binding htmlEscape316 {
+  query pattern callExpr where callee.path ~= "wp_kses"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

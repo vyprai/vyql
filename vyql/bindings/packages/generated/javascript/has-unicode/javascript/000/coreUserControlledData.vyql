@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m32c6b127;
+
+binding userControlledData0 {
+  requires {
+    dependency("has-unicode")
+  }
+  query pattern callExpr where callee.method == "module.exports"
+  emit source core.UserControlledData at call.result
+}

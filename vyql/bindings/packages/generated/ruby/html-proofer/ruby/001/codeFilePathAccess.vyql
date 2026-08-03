@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m925b957f;
+
+binding filePathAccess1 {
+  requires {
+    dependency("html-proofer")
+  }
+  query pattern callExpr where callee.method == "check_file"
+  emit sink code.FilePathAccess at args[0]
+}

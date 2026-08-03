@@ -1,0 +1,11 @@
+module code;
+
+concept CanonicalPathStringPrefixContainment : issue {
+  cwe: [CWE_22, CWE_184]
+  reviewAssumption: "an attacker-controlled path can share the parent path string prefix while residing outside the intended parent directory"
+  reviewCategory: path
+  reviewCondition: "canonical paths are compared with string-prefix containment instead of filesystem path containment"
+  reviewConfidence: high
+  reviewEvidence: "path containment context {pattern} calls getCanonicalPath().startsWith(...) before the patched getCanonicalFile().toPath().startsWith(...) form"
+  vulnerableTo: [path.PathTraversal, validation.ImproperInputValidation]
+}

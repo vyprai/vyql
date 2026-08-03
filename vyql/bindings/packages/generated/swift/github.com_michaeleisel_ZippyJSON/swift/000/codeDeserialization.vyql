@@ -1,0 +1,9 @@
+module bindings.swift.generated.m1c03e148;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/michaeleisel/ZippyJSON")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

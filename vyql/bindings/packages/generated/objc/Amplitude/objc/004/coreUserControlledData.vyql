@@ -1,0 +1,9 @@
+module bindings.objc.generated.ma3a84a11;
+
+binding userControlledData4 {
+  requires {
+    dependency("Amplitude")
+  }
+  query pattern callExpr where callee.method == "logEvent:withEventProperties:outOfSession:"
+  emit source core.UserControlledData at call.result
+}

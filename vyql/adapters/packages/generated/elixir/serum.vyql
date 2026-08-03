@@ -1,8 +1,0 @@
-import code.{FilePathAccess, FileUse}
-
-adapter elixir {
-  package "serum" {
-    sink method "Serum.File.read" -> code.FilePathAccess
-    sink method "Serum.File.write" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.maaadbc42;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/emma-k-alexandra/GTFS")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit sink code.FilePathAccess at args[0]
+}

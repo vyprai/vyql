@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mcb38769b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("folly")
+  }
+  query pattern callExpr where callee.method == "File"
+  emit sink code.FilePathAccess at args[0]
+}

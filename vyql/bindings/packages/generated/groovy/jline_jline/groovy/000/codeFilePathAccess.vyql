@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m7e18dae7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("jline:jline")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.FilePathAccess at args[0]
+}

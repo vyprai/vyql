@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "flatbuffers" {
-    sink method "UnPack" -> code.Deserialization
-  }
-}

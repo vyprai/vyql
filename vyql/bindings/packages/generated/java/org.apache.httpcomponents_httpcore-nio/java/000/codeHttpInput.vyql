@@ -1,0 +1,9 @@
+module bindings.java.generated.m9e05fe53;
+
+binding httpInput0 {
+  requires {
+    dependency("org.apache.httpcomponents:httpcore-nio")
+  }
+  query pattern callExpr where callee.method == "requestReady"
+  emit source code.HttpInput at call.result
+}

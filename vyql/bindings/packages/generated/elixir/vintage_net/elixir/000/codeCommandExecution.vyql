@@ -1,0 +1,9 @@
+module bindings.elixir.generated.md6aa846f;
+
+binding commandExecution0 {
+  requires {
+    dependency("vintage_net")
+  }
+  query pattern callExpr where callee.method == "VintageNet.Interface.CommandRunner.run"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m677ccd89;
+
+binding networkSend0 {
+  requires {
+    dependency("bamboo_ses")
+  }
+  query pattern callExpr where callee.method == "deliver"
+  emit sink code.NetworkSend at args[0]
+}

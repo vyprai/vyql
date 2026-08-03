@@ -1,0 +1,9 @@
+module bindings.objc.generated.me2026543;
+
+binding deserialization0 {
+  requires {
+    dependency("YYModel")
+  }
+  query pattern callExpr where callee.method == "yy_modelWithJSON"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "github.com/golangci/dupl" {
-    sink method "Parse" -> code.Deserialization
-  }
-}

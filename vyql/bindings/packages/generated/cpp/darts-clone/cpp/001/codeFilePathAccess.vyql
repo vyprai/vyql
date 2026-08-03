@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m0415c59f;
+
+binding filePathAccess1 {
+  requires {
+    dependency("darts-clone")
+  }
+  query pattern callExpr where callee.method == "save"
+  emit sink code.FilePathAccess at args[0]
+}

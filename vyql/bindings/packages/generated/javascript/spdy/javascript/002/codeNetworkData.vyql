@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mf932fff7;
+
+binding networkData2 {
+  requires {
+    dependency("spdy")
+  }
+  query pattern callExpr where callee.method == "Handle"
+  emit source code.NetworkData at call.result
+}

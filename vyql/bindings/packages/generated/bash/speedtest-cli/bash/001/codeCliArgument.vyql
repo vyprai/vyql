@@ -1,0 +1,9 @@
+module bindings.bash.generated.m9410651e;
+
+binding cliArgument1 {
+  requires {
+    dependency("speedtest-cli")
+  }
+  query pattern callExpr where callee.path ~= "speedtest-cli"
+  emit source code.CliArgument at call.result
+}

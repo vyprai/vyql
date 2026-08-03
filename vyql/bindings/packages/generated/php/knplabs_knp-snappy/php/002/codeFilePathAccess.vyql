@@ -1,0 +1,9 @@
+module bindings.php.generated.me6ca38bd;
+
+binding filePathAccess2 {
+  requires {
+    dependency("knplabs/knp-snappy")
+  }
+  query pattern callExpr where callee.method == "generateFromHtml"
+  emit sink code.FilePathAccess at args[0]
+}

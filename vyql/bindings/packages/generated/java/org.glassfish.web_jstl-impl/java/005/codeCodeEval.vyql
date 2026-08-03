@@ -1,0 +1,9 @@
+module bindings.java.generated.mddb29b43;
+
+binding codeEval5 {
+  requires {
+    dependency("org.glassfish.web:jstl-impl")
+  }
+  query pattern callExpr where callee.method == "parseAndRender"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,13 @@
+module bindings.swift.generated.mc6005d88;
+
+binding authenticationCheck3 {
+  requires {
+    dependency("vapor")
+  }
+  query pattern callExpr where callee.method == "requireAuthenticated"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

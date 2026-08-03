@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m60088840;
+
+binding sqlExecution6 {
+  requires {
+    dependency("org.apache.ibatis:ibatis-sqlmap")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.SqlExecution at args[0]
+}

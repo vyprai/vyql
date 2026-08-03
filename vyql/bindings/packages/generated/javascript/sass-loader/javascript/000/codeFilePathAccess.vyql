@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m161cae8f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("sass-loader")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.FilePathAccess at args[0]
+}

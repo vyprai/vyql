@@ -1,9 +1,0 @@
-import core.{HtmlEscape, CsrfProtection, AuthorizationCheck}
-
-adapter kotlin {
-  package "org.springframework.security:spring-security-taglibs" {
-    control method "writeMessage" -> core.HtmlEscape
-    control method "handleToken" -> core.CsrfProtection
-    control method "authorizeUsingUrlCheck" -> core.AuthorizationCheck
-  }
-}

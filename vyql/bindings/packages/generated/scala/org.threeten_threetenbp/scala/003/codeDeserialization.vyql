@@ -1,0 +1,9 @@
+module bindings.scala.generated.m012bfd53;
+
+binding deserialization3 {
+  requires {
+    dependency("org.threeten:threetenbp")
+  }
+  query pattern callExpr where callee.method == "readResolve"
+  emit sink code.Deserialization at args[0]
+}

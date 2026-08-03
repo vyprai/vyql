@@ -1,5 +1,6 @@
 test "rank187: Jenkins Azure VM attach public IP endpoint lacks permission check"
   lang java
+  expect VYQL-AUTH-079
   expect_review code.SensitiveOperation
   code
   ```
@@ -20,6 +21,7 @@ test "rank187: Jenkins Azure VM attach public IP endpoint lacks permission check
 
 test "rank187: Jenkins Azure VM attach public IP endpoint checks configure permission"
   lang java
+  reject VYQL-AUTH-079
   reject_review code.SensitiveOperation
   code
   ```

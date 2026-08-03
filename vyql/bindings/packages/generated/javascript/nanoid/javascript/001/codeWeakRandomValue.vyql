@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mfde5fd96;
+
+binding weakRandomValue1 {
+  requires {
+    dependency("nanoid")
+  }
+  query pattern presenceNode where node.path ~= "non-secure.customRandom"
+  emit issue code.WeakRandomValue at node
+}

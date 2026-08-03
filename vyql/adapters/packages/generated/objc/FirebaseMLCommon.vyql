@@ -1,8 +1,0 @@
-import code.{NetworkConnect, UrlFetch}
-
-adapter objc {
-  package "FirebaseMLCommon" {
-    sink method "downloadModel" -> code.NetworkConnect
-    sink method "downloadModel" -> code.UrlFetch
-  }
-}

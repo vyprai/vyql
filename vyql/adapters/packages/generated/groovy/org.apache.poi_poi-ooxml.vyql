@@ -1,7 +1,0 @@
-import code.{Deserialization, XmlParse}
-adapter groovy {
-  package "org.apache.poi:poi-ooxml" {
-    sink method "parse" -> code.Deserialization
-    sink method "newXMLReader" -> code.XmlParse
-  }
-}

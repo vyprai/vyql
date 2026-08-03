@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m10af8ed3;
+
+binding expressionEval0 {
+  requires {
+    dependency("org.apache.solr:solr-core")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.ExpressionEval at args[0]
+}

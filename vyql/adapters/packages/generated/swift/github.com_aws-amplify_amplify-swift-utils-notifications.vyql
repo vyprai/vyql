@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{AuthorizationCheck}
-
-adapter swift {
-  package "github.com/aws-amplify/amplify-swift-utils-notifications" {
-    control method "request" -> core.AuthorizationCheck
-    control method "registerForRemoteNotifications" -> core.AuthorizationCheck
-  }
-}

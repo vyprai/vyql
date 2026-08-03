@@ -1,0 +1,9 @@
+module bindings.scala.generated.m68f24c15;
+
+binding filePathAccess1 {
+  requires {
+    dependency("org.apache.maven.plugins:maven-surefire-plugin")
+  }
+  query pattern callExpr where callee.method == "setSystemPropertiesFile"
+  emit sink code.FilePathAccess at args[0]
+}

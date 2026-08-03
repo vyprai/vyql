@@ -1,7 +1,0 @@
-adapter elixir {
-  package "gun" {
-    sink method "headers_frame_inform" -> code.UrlFetch
-    source method "handle" -> code.NetworkData
-    sink method "ws_send" -> code.NetworkSend
-  }
-}

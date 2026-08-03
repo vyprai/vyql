@@ -1,9 +1,0 @@
-adapter go {
-  package "github.com/spf13/cobra" {
-    source method "NoArgs" -> code.CliArgument
-    source method "OnlyValidArgs" -> code.CliArgument
-    source method "ArbitraryArgs" -> code.CliArgument
-    source method "ExactArgs" -> code.CliArgument
-    source method "MatchAll" -> code.CliArgument
-  }
-}

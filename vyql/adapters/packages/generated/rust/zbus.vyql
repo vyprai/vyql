@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter rust {
-  package "zbus" {
-    sink method "spawn" -> code.CommandExecution
-  }
-}

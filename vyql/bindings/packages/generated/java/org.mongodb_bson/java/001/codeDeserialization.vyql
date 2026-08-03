@@ -1,0 +1,9 @@
+module bindings.java.generated.mfc16f61f;
+
+binding deserialization1 {
+  requires {
+    dependency("org.mongodb:bson")
+  }
+  query pattern callExpr where callee.method == "BsonDocument.parse"
+  emit sink code.Deserialization at args[0]
+}

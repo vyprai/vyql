@@ -1,0 +1,9 @@
+module bindings.perl.generated.mb1af140d;
+
+binding weakHash2 {
+  requires {
+    dependency("Catalyst-Plugin-Authentication-Store-RDBO")
+  }
+  query pattern callExpr where callee.method == "hash_algorithm"
+  emit issue code.WeakHash at call
+}

@@ -1,5 +1,0 @@
-adapter perl {
-  package "JSON-JQ" {
-    sink method "new" -> code.Deserialization
-  }
-}

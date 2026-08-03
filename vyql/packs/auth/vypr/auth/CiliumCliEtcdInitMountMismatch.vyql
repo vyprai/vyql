@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule CiliumCliEtcdInitMountMismatch {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_280, CWE_755]
+    id: "VYQL-AUTH-018"
+    severity: medium
+  }
+  issue code.CiliumCliEtcdInitMountMismatch as mount
+}

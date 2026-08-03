@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mf89e9829;
+
+binding filePathAccess4 {
+  requires {
+    dependency("glob")
+  }
+  query pattern callExpr where callee.method == "globIterate"
+  emit sink code.FilePathAccess at args[0]
+}

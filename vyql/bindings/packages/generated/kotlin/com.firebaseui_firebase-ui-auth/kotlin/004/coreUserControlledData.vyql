@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.ma17503b3;
+
+binding userControlledData4 {
+  requires {
+    dependency("com.firebaseui:firebase-ui-auth")
+  }
+  query pattern callExpr where callee.method == "setLockOrientation"
+  emit source core.UserControlledData at call.result
+}

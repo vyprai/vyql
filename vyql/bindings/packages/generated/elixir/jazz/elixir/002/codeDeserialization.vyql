@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mc1267790;
+
+binding deserialization2 {
+  requires {
+    dependency("jazz")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

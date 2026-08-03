@@ -173,6 +173,15 @@ test "bash exhaustive: constant filesystem paths are clean"
   tar -xf "./archive.tar"
   ```
 
+test "bash exhaustive: basename suppresses traversal into file utilities"
+  lang bash
+  reject VYQL-PATH-001
+  code
+  ```
+  payload="${QUERY_STRING}"
+  cat "./testfiles/$(basename -- "$payload")"
+  ```
+
 test "bash exhaustive: SQL clients execute tainted queries"
   lang bash
   expect VYQL-INJ-001
@@ -209,6 +218,22 @@ test "bash exhaustive: sha256sum is clean for weak hash"
   code
   ```
   sha256sum package.tar
+  ```
+
+test "bash exhaustive: RANDOM is weak randomness"
+  lang bash
+  expect VYQL-CRY-003
+  code
+  ```
+  echo "$RANDOM"
+  ```
+
+test "bash exhaustive: openssl rand is clean for weak randomness"
+  lang bash
+  reject VYQL-CRY-003
+  code
+  ```
+  echo "$(openssl rand -hex 16)"
   ```
 
 test "bash exhaustive: world-writable chmod modes are reported"

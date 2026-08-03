@@ -1,0 +1,9 @@
+module bindings.swift.generated.m7292326d;
+
+binding networkSend12 {
+  requires {
+    dependency("github.com/dduan/Just")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.NetworkSend at args[0]
+}

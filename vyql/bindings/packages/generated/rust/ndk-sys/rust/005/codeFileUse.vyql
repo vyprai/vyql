@@ -1,0 +1,9 @@
+module bindings.rust.generated.m7c64ffc3;
+
+binding fileUse5 {
+  requires {
+    dependency("ndk-sys")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

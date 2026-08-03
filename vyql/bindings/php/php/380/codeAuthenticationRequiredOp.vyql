@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding authenticationRequiredOp380 {
+  query pattern presenceNode where node.path ~= "changeEmail"
+  emit issue code.AuthenticationRequiredOp at node
+}

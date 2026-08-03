@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{HtmlEscape}
-
-adapter perl {
-  package "STD" {
-    control method "escape" -> core.HtmlEscape
-    sink method "parse" -> code.Deserialization
-  }
-}

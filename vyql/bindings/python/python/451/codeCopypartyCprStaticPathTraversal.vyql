@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding copypartyCprStaticPathTraversal451 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "copyparty_cpr_static_path_traversal"
+  emit issue code.CopypartyCprStaticPathTraversal at node
+}

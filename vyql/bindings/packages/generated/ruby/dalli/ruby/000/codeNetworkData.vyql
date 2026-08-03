@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mbe96c352;
+
+binding networkData0 {
+  requires {
+    dependency("dalli")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

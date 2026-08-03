@@ -1,0 +1,9 @@
+module bindings.objc.generated.m719324f4;
+
+binding userControlledData1 {
+  requires {
+    dependency("CTMediator")
+  }
+  query pattern callExpr where callee.method == "performTarget"
+  emit source core.UserControlledData at call.result
+}

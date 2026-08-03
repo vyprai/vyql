@@ -1,0 +1,6 @@
+module bindings.perl.generated.mfca40a44;
+
+binding archiveEntryWrite23 {
+  query pattern callExpr where callee.path ~= "Archive.Extract.extract"
+  emit sink code.ArchiveEntryWrite at args.any
+}

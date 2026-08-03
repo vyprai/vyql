@@ -1,0 +1,6 @@
+module injection;
+
+threat ConfigurationInjection {
+  cwe: [CWE_74]
+  desc: "Untrusted data injected into generated configuration syntax"
+}

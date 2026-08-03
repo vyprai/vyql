@@ -1,6 +1,0 @@
-import code.{ExpressionEval}
-adapter elixir {
-  package "exometer_core" {
-    sink method "eval_exprs" -> code.ExpressionEval
-  }
-}

@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter kotlin {
-  package "com.googlecode.efficient-java-matrix-library:ejml" {
-    sink method "parseMatrix" -> code.Deserialization
-    sink method "read" -> code.Deserialization
-    sink method "parseWords" -> code.Deserialization
-  }
-}

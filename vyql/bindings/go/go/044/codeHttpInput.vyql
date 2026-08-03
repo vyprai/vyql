@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding httpInput44 {
+  query pattern callExpr where callee.path ~= ".BindWith"
+  emit source code.HttpInput at call.result
+}

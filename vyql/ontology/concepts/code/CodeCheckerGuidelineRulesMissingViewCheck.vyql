@@ -1,0 +1,11 @@
+module code;
+
+concept CodeCheckerGuidelineRulesMissingViewCheck : issue {
+  cwe: [CWE_290, CWE_863]
+  reviewAssumption: "the API method is externally reachable through the report server and should require product VIEW permission like neighboring report methods"
+  reviewCategory: auth
+  reviewCondition: "CodeChecker report-server guideline rule lookup is reachable without the expected VIEW permission gate"
+  reviewConfidence: high
+  reviewEvidence: "Thrift handler context {pattern} expands guideline rules and checker labels without calling __require_view"
+  vulnerableTo: [authentication.AuthenticationBypass, access_control.MissingAuthorization]
+}

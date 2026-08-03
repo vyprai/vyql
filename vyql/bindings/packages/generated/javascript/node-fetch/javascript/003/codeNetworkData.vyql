@@ -1,0 +1,9 @@
+module bindings.javascript.generated.me3be893c;
+
+binding networkData3 {
+  requires {
+    dependency("node-fetch")
+  }
+  query pattern callExpr where callee.method == "json"
+  emit source code.NetworkData at call.result
+}

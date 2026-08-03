@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m220f41eb;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("moped")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NosqlQuery at args[0]
+}

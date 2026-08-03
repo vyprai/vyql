@@ -1,8 +1,0 @@
-import code.{SqlExecution, NetworkConnect, NetworkSend}
-adapter swift {
-  package "github.com/vapor/postgres-nio" {
-    sink method "query" -> code.SqlExecution
-    sink method "connect" -> code.NetworkConnect
-    sink method "send" -> code.NetworkSend
-  }
-}

@@ -1,8 +1,0 @@
-import code.{HttpInput, NetworkConnect, NetworkData}
-
-adapter groovy {
-  package "org.glassfish.jersey.core:jersey-client" {
-    sink method "connect" -> code.NetworkConnect
-    source method "read" -> code.NetworkData
-  }
-}

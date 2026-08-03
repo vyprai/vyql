@@ -1,0 +1,9 @@
+module bindings.java.generated.mcf337d65;
+
+binding codeEval2 {
+  requires {
+    dependency("org.jooq:jooq-codegen")
+  }
+  query pattern callExpr where callee.method == "GenerationTool.compile"
+  emit sink code.CodeEval at args[0]
+}

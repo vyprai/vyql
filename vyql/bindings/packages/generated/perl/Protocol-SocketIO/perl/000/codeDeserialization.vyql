@@ -1,0 +1,9 @@
+module bindings.perl.generated.mf9f4964d;
+
+binding deserialization0 {
+  requires {
+    dependency("Protocol-SocketIO")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

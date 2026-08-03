@@ -1,0 +1,9 @@
+module bindings.lua.generated.m49b0a04f;
+
+binding deserialization21 {
+  requires {
+    dependency("lyaml")
+  }
+  query pattern callExpr where callee.path ~= "lyaml.load"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "org.jolokia:jolokia-core" {
-    control method "escape" -> core.InputValidation
-  }
-}

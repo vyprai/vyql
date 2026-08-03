@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-adapter objc {
-  package "PLCrashReporter" {
-    sink method "crashReportPath" -> code.FilePathAccess
-    sink method "loadPendingCrashReportData" -> code.FilePathAccess
-    sink method "loadPendingCrashReportDataAndReturnError" -> code.FilePathAccess
-  }
-}

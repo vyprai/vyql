@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m1457a768;
+
+binding deserialization18 {
+  requires {
+    dependency("jackson-module-kotlin")
+  }
+  query pattern callExpr where callee.method == "readValue"
+  emit sink code.Deserialization at args[0]
+}

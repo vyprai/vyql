@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding reallocFailurePathInputFree45 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "lifetime.realloc_failure_input_free"
+  emit issue code.ReallocFailurePathInputFree at node
+}

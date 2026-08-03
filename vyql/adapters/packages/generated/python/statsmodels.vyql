@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "statsmodels" {
-    sink method "load" -> code.Deserialization
-  }
-}

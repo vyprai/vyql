@@ -1,0 +1,6 @@
+module bindings.config.generated.m2b6375a9;
+
+binding comrakDangerousUrlCaseSensitiveGrammar18 {
+  query pattern presenceNode where node.analysis ~= "config.comrak_dangerous_url_case_sensitive"
+  emit issue code.ComrakDangerousUrlCaseSensitiveGrammar at node
+}

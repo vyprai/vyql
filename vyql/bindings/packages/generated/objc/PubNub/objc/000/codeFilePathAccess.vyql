@@ -1,0 +1,9 @@
+module bindings.objc.generated.mda1db932;
+
+binding filePathAccess0 {
+  requires {
+    dependency("PubNub")
+  }
+  query pattern callExpr where callee.method == "encryptFileAtURL"
+  emit sink code.FilePathAccess at args[0]
+}

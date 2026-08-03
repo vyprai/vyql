@@ -1,0 +1,9 @@
+module bindings.swift.generated.mde09ad90;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/gcharita/XMLMapper")
+  }
+  query pattern callExpr where callee.method == "parseXMLStringIntoDictionary"
+  emit sink code.Deserialization at args[0]
+}

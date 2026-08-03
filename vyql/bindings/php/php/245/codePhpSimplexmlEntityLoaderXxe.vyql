@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding phpSimplexmlEntityLoaderXxe245 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.callPath contains "simplexml_load_string" and not (node.context.callPath contains "libxml_disable_entity_loader")
+  emit issue code.PhpSimplexmlEntityLoaderXxe at node
+}

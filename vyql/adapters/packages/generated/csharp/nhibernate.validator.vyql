@@ -1,9 +1,0 @@
-import core.{InputValidation}
-adapter csharp {
-  package "nhibernate.validator" {
-    control method "AssertValid" -> core.InputValidation
-    control method "Validate" -> core.InputValidation
-    control method "ValidatePropertyValue" -> core.InputValidation
-    control method "CheckOib" -> core.InputValidation
-  }
-}

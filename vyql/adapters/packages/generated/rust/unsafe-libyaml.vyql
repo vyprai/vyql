@@ -1,9 +1,0 @@
-import code.{Deserialization, StdinInput}
-
-adapter rust {
-  package "unsafe-libyaml" {
-    sink method "yaml_parser_parse" -> code.Deserialization
-    source method "yaml_parser_set_input_string" -> code.StdinInput
-    source method "yaml_parser_set_input" -> code.StdinInput
-  }
-}

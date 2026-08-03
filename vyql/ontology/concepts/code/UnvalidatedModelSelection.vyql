@@ -1,0 +1,11 @@
+module code;
+
+concept UnvalidatedModelSelection : issue {
+  cwe: [CWE_20, CWE_863]
+  reviewAssumption: "remote callers can request unavailable or unauthorized model names and trigger an unauthorized or exceptional path"
+  reviewCategory: auth
+  reviewCondition: "request-selected model or classifier names are used before membership/existence validation"
+  reviewConfidence: high
+  reviewEvidence: "model-selection context {pattern} reads a request classifier and uses it in model lookup/output before the validated model binding"
+  vulnerableTo: [access_control.IncorrectAuthorization, validation.ImproperInputValidation]
+}

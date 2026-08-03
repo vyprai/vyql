@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding timeBoundAccessTokenReview169 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.callPath contains "BlobSasBuilder" and node.context.identifier contains "ExpiresOn" and node.context.callPath contains "AddHours" and node.context.literal contains "1" and node.context.callPath contains "GenerateSasUri" and not (node.context.callPath contains "AddMinutes")
+  emit issue code.TimeBoundAccessTokenReview at node
+}

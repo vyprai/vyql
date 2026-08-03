@@ -1,6 +1,0 @@
-adapter ruby {
-  package "pygments.rb" {
-    sink method "popen4" -> code.CommandExecution
-    source method "highlight" -> core.UserControlledData
-  }
-}

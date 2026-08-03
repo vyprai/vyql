@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter ruby {
-  package "react-rails" {
-    sink method "exec" -> code.CodeEval
-  }
-}

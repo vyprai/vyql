@@ -1,7 +1,0 @@
-import code.{NetworkConnect, NetworkSend}
-adapter python {
-  package "httpcore" {
-    sink method "request" -> code.NetworkConnect
-    sink method "stream" -> code.NetworkSend
-  }
-}

@@ -1,5 +1,0 @@
-adapter dart {
-  package "route_hierarchical" {
-    sink method "getRoute" -> code.UrlFetch
-  }
-}

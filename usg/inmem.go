@@ -10,7 +10,11 @@ type InMemStore struct {
 	byConcpt   map[string][]string
 	conceptHas map[string]map[string]bool // concept -> set of node ids (O(1) dedup for byConcpt)
 	labels     map[string][]Label
+	epoch      uint64 // structural epoch (see usg/epoch.go); bumped on AddNode/AddEdge
 }
+
+// StructEpoch reports the store's structural epoch. See usg/epoch.go.
+func (s *InMemStore) StructEpoch() uint64 { return s.epoch }
 
 func NewInMemStore() *InMemStore { return NewInMemStoreSized(0) }
 
@@ -41,25 +45,27 @@ func (s *InMemStore) AddNode(n Node) error {
 		s.byType[n.Type] = append(s.byType[n.Type], n.ID)
 	}
 	s.nodes[n.ID] = n
+	s.epoch = nextStructEpoch()
 	return nil
 }
 
-// inIndexedTypes are the only edge types ever queried by InEdges (endpoint-guard resolution).
-// Reverse-indexing only these — instead of every edge — roughly halves edge memory on large
-// graphs, where FLOWS/STEP/NET edges dominate and are never traversed backwards.
-var inIndexedTypes = map[string]bool{"PROTECTS": true, "CHECKS": true}
+// inIndexedTypes are the only edge types queried by InEdges. Keep this sparse: STEP/NET and
+// other high-volume edges are forward-only, while FLOWS is needed for bounded upstream binding
+// predicates and is cheaper to index once in the store than to rebuild later per scan phase.
+var inIndexedTypes = map[string]bool{"PROTECTS": true, "CHECKS": true, "FLOWS": true}
 
 func (s *InMemStore) AddEdge(e Edge) error {
 	s.out[e.Src] = append(s.out[e.Src], e)
 	if inIndexedTypes[e.Type] {
 		s.in[e.Dst] = append(s.in[e.Dst], e)
 	}
+	s.epoch = nextStructEpoch()
 	return nil
 }
 
 func (s *InMemStore) AddLabel(nodeID string, l Label) error {
 	s.labels[nodeID] = append(s.labels[nodeID], l)
-	// keep the concept index a SET of node ids: two adapters may label the same node with the
+	// keep the concept index a SET of node ids: two bindings may label the same node with the
 	// same concept (different provenance), but it is one node. A membership set makes the dedup
 	// O(1) — a linear scan here was O(n²) on large graphs where a concept labels many nodes.
 	seen := s.conceptHas[l.Concept]
@@ -90,6 +96,16 @@ func (s *InMemStore) InEdges(dst, edgeType string) ([]Edge, error) {
 	return filterEdges(s.in[dst], edgeType), nil
 }
 
+func (s *InMemStore) RangeInEdges(dst, edgeType string, fn func(src string) bool) {
+	for _, e := range s.in[dst] {
+		if edgeType == "" || e.Type == edgeType {
+			if !fn(e.Src) {
+				return
+			}
+		}
+	}
+}
+
 func (s *InMemStore) NodesWithConcept(concept string) ([]string, error) {
 	out := make([]string, len(s.byConcpt[concept]))
 	copy(out, s.byConcpt[concept])
@@ -103,16 +119,9 @@ func (s *InMemStore) NodesOfType(nodeType string) ([]string, error) {
 	return out, nil
 }
 
-// RangeNodesOfType streams every node of nodeType to fn (stop early by returning false) WITHOUT
-// NodesOfType's []string copy — the hot-path complement to NodesOfType (see the IntStore twin).
-// fn must not retain the Node.
 func (s *InMemStore) RangeNodesOfType(nodeType string, fn func(Node) bool) {
 	for _, id := range s.byType[nodeType] {
-		n, ok := s.nodes[id]
-		if !ok {
-			continue
-		}
-		if !fn(n) {
+		if !fn(s.nodes[id]) {
 			return
 		}
 	}
@@ -127,7 +136,7 @@ func (s *InMemStore) AllNodes() ([]Node, error) {
 }
 
 // RangeNodes streams every node to fn (stop early by returning false) WITHOUT materializing a
-// full []Node copy. Adapters and SCA iterate all nodes once per pass; AllNodes' slice copy was a
+// full []Node copy. Bindings and SCA iterate all nodes once per pass; AllNodes' slice copy was a
 // multi-GB transient allocation (and GC churn) on large graphs. fn must not retain the Node.
 func (s *InMemStore) RangeNodes(fn func(Node) bool) {
 	for _, n := range s.nodes {

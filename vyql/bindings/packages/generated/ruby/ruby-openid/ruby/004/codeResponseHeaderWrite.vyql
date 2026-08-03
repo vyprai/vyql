@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m96bbc96e;
+
+binding responseHeaderWrite4 {
+  requires {
+    dependency("ruby-openid")
+  }
+  query pattern callExpr where callee.method == "encode_response"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

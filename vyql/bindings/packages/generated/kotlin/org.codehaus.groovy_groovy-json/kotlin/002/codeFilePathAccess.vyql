@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.md0965109;
+
+binding filePathAccess2 {
+  requires {
+    dependency("org.codehaus.groovy:groovy-json")
+  }
+  query pattern callExpr where callee.method == "parseFile"
+  emit sink code.FilePathAccess at args[0]
+}

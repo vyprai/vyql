@@ -1,8 +1,0 @@
-import code.{HttpInput}
-adapter go {
-  package "github.com/google/martian" {
-    source method "NewContext" -> code.HttpInput
-    sink method "NewRequest" -> code.UrlFetch
-    sink method "NewResponse" -> code.UrlFetch
-  }
-}

@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter ruby {
-  package "net-dns" {
-    sink method "query" -> code.NetworkSend
-  }
-}

@@ -1,5 +1,0 @@
-adapter go {
-  package "gorm.io/driver/mysql" {
-    sink method "Open" -> code.SqlExecution
-  }
-}

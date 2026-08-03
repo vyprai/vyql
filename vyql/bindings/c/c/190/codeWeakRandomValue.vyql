@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding weakRandomValue190 {
+  query pattern presenceNode where node.path ~= "rand"
+  emit issue code.WeakRandomValue at node
+}

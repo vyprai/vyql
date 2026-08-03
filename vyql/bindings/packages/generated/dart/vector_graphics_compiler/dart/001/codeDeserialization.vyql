@@ -1,0 +1,9 @@
+module bindings.dart.generated.m8b6c6084;
+
+binding deserialization1 {
+  requires {
+    dependency("vector_graphics_compiler")
+  }
+  query pattern callExpr where callee.method == "parseCssRgb"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter javascript {
-  package "is-absolute-url" {
-    control method "isAbsoluteUrl" -> core.InputValidation
-  }
-}

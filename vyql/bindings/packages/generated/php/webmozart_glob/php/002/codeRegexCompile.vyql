@@ -1,0 +1,10 @@
+module bindings.php.generated.m121e19aa;
+
+binding regexCompile2 {
+  requires {
+    dependency("webmozart/glob")
+  }
+  query pattern callExpr where callee.method == "Webmozart\\Glob\\Glob::filter"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

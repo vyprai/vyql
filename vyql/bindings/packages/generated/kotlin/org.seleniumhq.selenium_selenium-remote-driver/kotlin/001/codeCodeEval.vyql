@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mc12e92cb;
+
+binding codeEval1 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-remote-driver")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.CodeEval at args[0]
+}

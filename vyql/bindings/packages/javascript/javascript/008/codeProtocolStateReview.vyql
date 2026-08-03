@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m5c270092;
+
+binding protocolStateReview8 {
+  requires {
+    dependency("next")
+  }
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "updateSession" and node.context.selector contains "request.headers" and node.context.callPath contains "getSessionFromCookie" and node.context.callPath contains "verifyAccessToken" and node.context.callPath contains "newRequestHeaders.set" and node.context.callPath contains "NextResponse.next" and not (node.context.callPath contains "newRequestHeaders.delete")
+  emit issue code.ProtocolStateReview at node
+}

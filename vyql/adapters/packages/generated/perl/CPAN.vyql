@@ -1,8 +1,0 @@
-import code.{CommandExecution, Deserialization}
-
-adapter perl {
-  package "CPAN" {
-    sink method "_yaml_loadfile" -> code.Deserialization
-    sink method "system" -> code.CommandExecution
-  }
-}

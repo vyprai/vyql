@@ -1,9 +1,0 @@
-import code.{FilePathAccess, StoredDataRead, StoredDataWrite}
-
-adapter java {
-  package "com.google.cloud:google-cloud-storage" {
-    source method "read" -> code.StoredDataRead
-    sink method "write" -> code.StoredDataWrite
-    sink method "downloadTo" -> code.FilePathAccess
-  }
-}

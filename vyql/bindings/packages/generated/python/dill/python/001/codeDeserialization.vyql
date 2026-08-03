@@ -1,0 +1,9 @@
+module bindings.python.generated.m3fd8d673;
+
+binding deserialization1 {
+  requires {
+    dependency("dill")
+  }
+  query pattern callExpr where callee.method == "loads"
+  emit sink code.Deserialization at args[0]
+}

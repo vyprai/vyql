@@ -1,0 +1,9 @@
+module bindings.elixir.generated.md3359d57;
+
+binding nosqlQuery22 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "update_many"
+  emit sink code.NosqlQuery at args[0]
+}

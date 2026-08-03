@@ -1,8 +1,0 @@
-import code.{NetworkConnect, NetworkSend, NetworkBind}
-adapter swift {
-  package "github.com/apple/swift-nio-transport-services" {
-    sink method "connect" -> code.NetworkConnect
-    sink method "write" -> code.NetworkSend
-    sink method "bind" -> code.NetworkBind
-  }
-}

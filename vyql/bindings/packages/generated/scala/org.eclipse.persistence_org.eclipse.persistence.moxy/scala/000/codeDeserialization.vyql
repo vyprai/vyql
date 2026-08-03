@@ -1,0 +1,9 @@
+module bindings.scala.generated.m396817f0;
+
+binding deserialization0 {
+  requires {
+    dependency("org.eclipse.persistence:org.eclipse.persistence.moxy")
+  }
+  query pattern callExpr where callee.method == "unmarshal"
+  emit sink code.Deserialization at args[0]
+}

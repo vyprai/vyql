@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding craftAnonymousTemplateRenderActionXss90 {
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.className contains "TemplatesController" and node.context.phpReview == "craft_anonymous_template_render_xss"
+  emit issue code.CraftAnonymousTemplateRenderActionXss at node
+}

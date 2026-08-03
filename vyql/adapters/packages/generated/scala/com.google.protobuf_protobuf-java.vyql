@@ -1,5 +1,0 @@
-adapter scala {
-  package "com.google.protobuf:protobuf-java" {
-    sink method "read" -> code.Deserialization
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding archiveEntryRawPrefixContainment663 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "archive_entry_raw_prefix_containment"
+  emit issue code.ArchiveEntryRawPrefixContainment at node
+}

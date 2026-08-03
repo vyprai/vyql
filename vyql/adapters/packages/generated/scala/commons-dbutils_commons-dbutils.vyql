@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-adapter scala {
-  package "commons-dbutils:commons-dbutils" {
-    sink method "batch" -> code.SqlExecution
-    sink method "query" -> code.SqlExecution
-    sink method "update" -> code.SqlExecution
-  }
-}

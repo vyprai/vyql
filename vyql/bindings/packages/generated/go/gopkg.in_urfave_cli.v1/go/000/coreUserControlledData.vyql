@@ -1,0 +1,9 @@
+module bindings.go.generated.m47455ae7;
+
+binding userControlledData0 {
+  requires {
+    dependency("gopkg.in/urfave/cli.v1")
+  }
+  query pattern callExpr where callee.method == "Run"
+  emit source core.UserControlledData at call.result
+}

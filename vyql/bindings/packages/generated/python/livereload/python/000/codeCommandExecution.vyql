@@ -1,0 +1,9 @@
+module bindings.python.generated.m92a3bfcb;
+
+binding commandExecution0 {
+  requires {
+    dependency("livereload")
+  }
+  query pattern callExpr where callee.method == "shell"
+  emit sink code.CommandExecution at args[0]
+}

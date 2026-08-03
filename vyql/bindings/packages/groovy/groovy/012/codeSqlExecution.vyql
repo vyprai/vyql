@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mbfd454d1;
+
+binding sqlExecution12 {
+  requires {
+    dependency("java.sql")
+  }
+  query pattern callExpr where callee.method == "executeQuery"
+  emit sink code.SqlExecution at args[0]
+}

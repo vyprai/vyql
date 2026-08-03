@@ -1,6 +1,0 @@
-adapter objc {
-  package "EVReflection" {
-    sink method "write" -> code.FilePathAccess
-    sink method "download" -> code.XmlParse
-  }
-}

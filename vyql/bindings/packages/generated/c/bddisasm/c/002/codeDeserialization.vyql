@@ -1,0 +1,9 @@
+module bindings.c.generated.mb980b818;
+
+binding deserialization2 {
+  requires {
+    dependency("bddisasm")
+  }
+  query pattern callExpr where callee.method == "nd_decode_ex2"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.generated.m31949ba5;
+
+binding sqlExecution0 {
+  requires {
+    dependency("peewee")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

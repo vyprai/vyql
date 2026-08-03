@@ -1,5 +1,6 @@
 test "rank171: Aurora PostgreSQL dialect uses unqualified catalog routines"
   lang go
+  expect VYQL-PATH-057
   expect_review code.UnqualifiedDatabaseRoutineReview
   code
   ```
@@ -23,6 +24,7 @@ test "rank171: Aurora PostgreSQL dialect uses unqualified catalog routines"
 
 test "rank171: Aurora PostgreSQL dialect qualifies catalog routines"
   lang go
+  reject VYQL-PATH-057
   reject_review code.UnqualifiedDatabaseRoutineReview
   code
   ```

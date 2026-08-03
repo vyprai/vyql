@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.md7c66dcc;
+
+binding httpInput1 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-config-server")
+  }
+  query pattern callExpr where callee.method == "decrypt"
+  emit source code.HttpInput at call.result
+}

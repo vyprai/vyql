@@ -1,0 +1,11 @@
+module code;
+
+concept ExternalResourceIntegrityReview : issue {
+  cwe: [CWE_345, CWE_829]
+  reviewAssumption: "the HTML/resource reference may be attacker-controlled or may point at an untrusted external origin"
+  reviewCategory: supply_chain
+  reviewCondition: "external script or style integrity metadata can register an unapproved resource as trusted"
+  reviewConfidence: possibility
+  reviewEvidence: "resource integrity context {pattern} accepts provided integrity metadata without an observed allowlist decision"
+  vulnerableTo: [injection.UnsafeDynamicLoading]
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m38ab1c67;
+
+binding networkSend1 {
+  requires {
+    dependency("raven/raven")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

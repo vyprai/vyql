@@ -1,0 +1,9 @@
+module bindings.swift.generated.m49bc2eb2;
+
+binding storedDataRead7 {
+  requires {
+    dependency("github.com/auth0/Auth0.swift")
+  }
+  query pattern callExpr where callee.method == "getEntry"
+  emit source code.StoredDataRead at call.result
+}

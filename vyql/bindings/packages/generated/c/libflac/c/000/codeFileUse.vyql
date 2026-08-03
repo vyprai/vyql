@@ -1,0 +1,9 @@
+module bindings.c.generated.m16c74daa;
+
+binding fileUse0 {
+  requires {
+    dependency("libflac")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FileUseSink at args[0]
+}

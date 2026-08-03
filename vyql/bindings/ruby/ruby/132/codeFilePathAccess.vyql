@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding filePathAccess132 {
+  query pattern callExpr where callee.path ~= "File.open"
+  emit sink code.FilePathAccess at args[0]
+}

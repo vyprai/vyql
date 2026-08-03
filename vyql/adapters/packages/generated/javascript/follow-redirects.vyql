@@ -1,7 +1,0 @@
-import code.{NetworkConnect, NetworkSend}
-adapter javascript {
-  package "follow-redirects" {
-    sink method "request" -> code.NetworkConnect
-    sink method "get" -> code.NetworkSend
-  }
-}

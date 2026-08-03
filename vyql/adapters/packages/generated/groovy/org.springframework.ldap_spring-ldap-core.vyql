@@ -1,7 +1,0 @@
-import code.{LdapQuery}
-adapter groovy {
-  package "org.springframework.ldap:spring-ldap-core" {
-    sink method "search" -> code.LdapQuery
-    sink method "query" -> code.LdapQuery
-  }
-}

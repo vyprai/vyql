@@ -1,0 +1,9 @@
+module bindings.objc.generated.m37087380;
+
+binding networkData0 {
+  requires {
+    dependency("DVAssetLoaderDelegate")
+  }
+  query pattern callExpr where callee.method == "initWithURL"
+  emit source code.NetworkData at call.result
+}

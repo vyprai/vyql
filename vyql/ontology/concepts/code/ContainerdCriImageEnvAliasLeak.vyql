@@ -1,0 +1,11 @@
+module code;
+
+concept ContainerdCriImageEnvAliasLeak : issue {
+  cwe: [CWE_200, CWE_668]
+  reviewAssumption: "multiple CRI containers can be created from the same image config with different environment variables"
+  reviewCategory: secret
+  reviewCondition: "containerd CRI derives per-container environment variables from a shared image-config slice without copying it first"
+  reviewConfidence: high
+  reviewEvidence: "CRI containerSpec context {pattern} assigns imageConfig.Env directly, appends container config envs, and passes the result to oci.WithEnv"
+  vulnerableTo: [secrets.SecretLeak]
+}

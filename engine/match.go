@@ -1,38 +1,52 @@
 package engine
 
 import (
+	"strconv"
+
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/resultpolicy"
 	"github.com/vyprai/vyql/solvers"
 )
 
-// evalMatch evaluates `match <concept> as id where <expr> unless guarded_by C`.
+// evalMatch evaluates concept/transition match rules with v2 where and coveredBy clauses.
 // Composes solver calls in `where` through the engine.
 func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.MatchStmt)
 	if body.TargetKind == "transition" {
 		return e.evalTransition(cr)
 	}
-	candidates, _ := e.Store.NodesWithConcept(body.Concept)
+	candidates := e.nodesWithConcept(body.Concept)
 
 	var where parser.Expr
-	var guards, closers []string
+	var guards, dominanceGuards, postDominanceGuards, sameReceiverGuards, sameScopeGuards, globalGuards []string
 	for _, cl := range cr.Rule.Clauses {
 		switch cl.Kind {
 		case "where":
-			where = cl.Where
+			where = mergeWhere(where, cl.Where)
 		case "unless":
 			switch ex := cl.Unless.(type) {
-			case parser.GuardedBy:
+			case parser.EndpointCoveredBy:
 				guards = append(guards, ex.Concept)
-			case parser.ClosedBy:
-				closers = append(closers, ex.Concept)
+			case parser.DominatesCoveredBy:
+				dominanceGuards = append(dominanceGuards, ex.Concept)
+			case parser.PostDominatesCoveredBy:
+				postDominanceGuards = append(postDominanceGuards, ex.Concept)
+			case parser.SameReceiverCoveredBy:
+				sameReceiverGuards = append(sameReceiverGuards, ex.Concept)
+			case parser.SameScopeCoveredBy:
+				sameScopeGuards = append(sameScopeGuards, ex.Concept)
+			case parser.GlobalCoveredBy:
+				globalGuards = append(globalGuards, ex.Concept)
 			}
 		}
 	}
 
 	var out []*findings.Finding
 	for _, node := range candidates {
+		if !e.matchRelationSatisfied(body, node) {
+			continue
+		}
 		env := map[string]string{body.Binding: node}
 		ctx := []string{}
 		if where != nil {
@@ -46,12 +60,32 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 		var ne []findings.NegationEvidence
 		for _, g := range guards {
 			ok := e.endpointGuarded(node, g)
-			ne = append(ne, findings.NegationEvidence{Clause: "guarded_by " + g, Satisfied: ok})
+			ne = append(ne, findings.NegationEvidence{Clause: "endpoint coveredBy " + g, Satisfied: ok})
 			suppressed = suppressed || ok
 		}
-		for _, rel := range closers {
-			ok := e.endpointClosed(node, rel)
-			ne = append(ne, findings.NegationEvidence{Clause: "closed_by " + rel, Satisfied: ok})
+		for _, g := range dominanceGuards {
+			ok := e.dominatesGuarded(node, g)
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("dominates", g), Satisfied: ok})
+			suppressed = suppressed || ok
+		}
+		for _, g := range postDominanceGuards {
+			ok := e.postDominatesCovered(node, g)
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("postDominates", g), Satisfied: ok})
+			suppressed = suppressed || ok
+		}
+		for _, g := range sameReceiverGuards {
+			ok := e.sameReceiverGuarded(node, g)
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("sameReceiver", g), Satisfied: ok})
+			suppressed = suppressed || ok
+		}
+		for _, g := range sameScopeGuards {
+			ok := e.sameScopeGuarded(node, g)
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("sameScope", g), Satisfied: ok})
+			suppressed = suppressed || ok
+		}
+		for _, g := range globalGuards {
+			ok := e.globalGuarded(g)
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("global", g), Satisfied: ok})
 			suppressed = suppressed || ok
 		}
 		if suppressed {
@@ -67,6 +101,31 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 		})
 	}
 	return out, nil
+}
+
+func v2CoverageClause(part, concept string) string {
+	return part + " coveredBy " + concept
+}
+
+func (e *Engine) matchRelationSatisfied(body *parser.MatchStmt, node string) bool {
+	switch body.Relation {
+	case "":
+		return true
+	case "labeledAs":
+		return body.RelatedConcept != "" && e.nodeHasConcept(node, body.RelatedConcept)
+	case "references":
+		if body.RelatedConcept == "" || body.RelationProp == "" {
+			return false
+		}
+		n, ok, _ := e.Store.GetNode(node)
+		if !ok {
+			return false
+		}
+		target := n.Prop(body.RelationProp)
+		return target != "" && e.nodeHasConcept(target, body.RelatedConcept)
+	default:
+		return false
+	}
 }
 
 // evalTransition evaluates `match transition F -> T on M as t unless <expr>`.
@@ -100,7 +159,7 @@ func (e *Engine) evalTransition(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 		out = append(out, &findings.Finding{
 			RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "match",
-			NegationEvidence: ne, Confidence: "high",
+			NegationEvidence: ne, Confidence: resultpolicy.ConfidenceName(resultpolicy.MaxConfidenceRank()),
 			Bindings: []findings.Binding{
 				{Name: body.Binding, NodeID: id, Concept: "transition", Loc: n.Prop("from") + "->" + n.Prop("to")},
 			},
@@ -130,6 +189,16 @@ func (e *Engine) evalAtom(atom parser.Expr, env map[string]string) (bool, []stri
 		return !ok, nil
 	case parser.And:
 		return e.evalWhere(a, env)
+	case parser.Or:
+		var witnesses []string
+		for _, part := range flattenOr(a) {
+			ok, w := e.evalAtom(part, env)
+			if ok {
+				witnesses = append(witnesses, w...)
+				return true, witnesses
+			}
+		}
+		return false, nil
 	case parser.SolverCall:
 		return e.evalSolverCall(a, env)
 	case parser.HoldsAssetKind:
@@ -139,9 +208,6 @@ func (e *Engine) evalAtom(atom parser.Expr, env map[string]string) (bool, []stri
 			req[k] = true
 		}
 		return id != "" && intersect(e.assetKinds(id), req), nil
-	case parser.Has:
-		id := e.resolveRef(a.Ref, env)
-		return id != "" && e.nodeHasConcept(id, a.Concept), nil
 	case parser.Is:
 		return e.resolveScalar(a.Ref, env) == a.Concept, nil
 	case parser.NotIn:
@@ -158,16 +224,49 @@ func (e *Engine) evalAtom(atom parser.Expr, env map[string]string) (bool, []stri
 		}
 		return in, nil
 	case parser.Cmp:
-		val := e.resolveScalar(a.Ref, env)
-		want, _ := a.Value.(string)
-		if a.Op == "!=" {
-			return val != want, nil
-		}
-		return val == want, nil
+		return e.evalCmp(a, env), nil
 	case parser.Ref:
 		return e.resolveRef(a, env) != "", nil
 	}
 	return false, nil
+}
+
+func (e *Engine) evalCmp(cmp parser.Cmp, env map[string]string) bool {
+	val := e.resolveScalar(cmp.Ref, env)
+	switch want := cmp.Value.(type) {
+	case int:
+		got, err := strconv.Atoi(val)
+		if err != nil {
+			return false
+		}
+		switch cmp.Op {
+		case "==":
+			return got == want
+		case "!=":
+			return got != want
+		case ">=":
+			return got >= want
+		case "<=":
+			return got <= want
+		case ">":
+			return got > want
+		case "<":
+			return got < want
+		default:
+			return false
+		}
+	case string:
+		switch cmp.Op {
+		case "==":
+			return val == want
+		case "!=":
+			return val != want
+		default:
+			return false
+		}
+	default:
+		return false
+	}
 }
 
 func (e *Engine) evalSolverCall(call parser.SolverCall, env map[string]string) (bool, []string) {
@@ -186,14 +285,14 @@ func (e *Engine) evalSolverCall(call parser.SolverCall, env map[string]string) (
 			}
 			return true, w
 		}
-	case "assume":
+	case "grant":
 		bConcept := call.Args[1].Ref.String()
 		bIDs := e.resolveArg(call.Args[1], env)
-		paths, _ := solvers.FindAssume(e.Store, aIDs, bIDs, e.assumeMinLevel(bConcept))
+		paths, _ := solvers.FindAssume(e.Store, aIDs, bIDs, e.grantMinLevel(bConcept))
 		if len(paths) > 0 {
 			var w []string
 			for _, s := range paths[0].Steps {
-				w = append(w, "assume "+s.From+"->"+s.To+" ["+s.Ability+"]")
+				w = append(w, call.Verb+" "+s.From+"->"+s.To+" ["+s.Ability+"]")
 			}
 			return true, w
 		}
@@ -214,8 +313,7 @@ func (e *Engine) evalSolverCall(call parser.SolverCall, env map[string]string) (
 // expands to its labeled nodes; a binding ref resolves to a single node.
 func (e *Engine) resolveArg(arg parser.Arg, env map[string]string) []string {
 	if e.Onto.Exists(arg.Ref.String()) {
-		ids, _ := e.Store.NodesWithConcept(arg.Ref.String())
-		return ids
+		return e.nodesWithConcept(arg.Ref.String())
 	}
 	if id := e.resolveRef(arg.Ref, env); id != "" {
 		return []string{id}
@@ -229,7 +327,7 @@ func (e *Engine) resolveRef(ref parser.Ref, env map[string]string) string {
 	head := ref.Parts[0]
 	id := env[head]
 	if id == "" && e.Onto.Exists(ref.String()) {
-		if ids, _ := e.Store.NodesWithConcept(ref.String()); len(ids) > 0 {
+		if ids := e.nodesWithConcept(ref.String()); len(ids) > 0 {
 			return ids[0]
 		}
 		return ""

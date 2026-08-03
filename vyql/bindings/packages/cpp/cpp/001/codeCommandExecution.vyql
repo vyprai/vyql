@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m1c1357ee;
+
+binding commandExecution1 {
+  requires {
+    dependency("libc")
+  }
+  query pattern callExpr where callee.path ~= "std.system"
+  emit sink code.CommandExecution at args[0]
+}

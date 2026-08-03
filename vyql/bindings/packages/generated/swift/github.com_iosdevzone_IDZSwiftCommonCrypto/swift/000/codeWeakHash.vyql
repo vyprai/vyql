@@ -1,0 +1,9 @@
+module bindings.swift.generated.mb0e718b5;
+
+binding weakHash0 {
+  requires {
+    dependency("github.com/iosdevzone/IDZSwiftCommonCrypto")
+  }
+  query pattern callExpr where callee.method == "MD5"
+  emit issue code.WeakHash at call
+}

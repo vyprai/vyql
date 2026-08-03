@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding fileCheck103 {
+  query pattern presenceNode where node.path ~= "std.filesystem.exists"
+  emit issue code.FileCheck at node
+}

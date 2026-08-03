@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding unfilteredSearchWhereColumns198 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "scopeSearch" and node.context.phpReview == "unfiltered_search_where_columns"
+  emit issue code.UnfilteredSearchWhereColumns at node
+}

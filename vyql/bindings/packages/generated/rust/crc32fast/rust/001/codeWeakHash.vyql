@@ -1,0 +1,9 @@
+module bindings.rust.generated.mdaef6e21;
+
+binding weakHash1 {
+  requires {
+    dependency("crc32fast")
+  }
+  query pattern callExpr where callee.method == "update"
+  emit issue code.WeakHash at call
+}

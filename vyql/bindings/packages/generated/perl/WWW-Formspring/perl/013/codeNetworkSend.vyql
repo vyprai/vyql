@@ -1,0 +1,9 @@
+module bindings.perl.generated.mbe603286;
+
+binding networkSend13 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "get_access_token"
+  emit sink code.NetworkSend at args[0]
+}

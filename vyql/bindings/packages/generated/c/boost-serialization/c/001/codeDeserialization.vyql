@@ -1,0 +1,9 @@
+module bindings.c.generated.mfd531f33;
+
+binding deserialization1 {
+  requires {
+    dependency("boost-serialization")
+  }
+  query pattern callExpr where callee.method == "serialize"
+  emit sink code.Deserialization at args[0]
+}

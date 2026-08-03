@@ -1,7 +1,0 @@
-import code.{XmlParse}
-
-adapter python {
-  package "et-xmlfile" {
-    sink method "xmlfile.element" -> code.XmlParse
-  }
-}

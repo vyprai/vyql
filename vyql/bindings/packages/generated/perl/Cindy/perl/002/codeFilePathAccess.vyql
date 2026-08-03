@@ -1,0 +1,9 @@
+module bindings.perl.generated.mc0f0dde0;
+
+binding filePathAccess2 {
+  requires {
+    dependency("Cindy")
+  }
+  query pattern callExpr where callee.method == "get_html_doc"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -30,6 +30,28 @@ test "rank274: bsdiff4 extra block copy misses advanced destination bound"
   }
   ```
 
+test "rank274: post-copy bounds check generalizes across renamed variables"
+  lang c
+  expect VYQL-MEM-020
+  expect_review code.MissingPostCopyBoundsCheck
+  code
+  ```
+  void *memcpy(void *dest, const void *src, unsigned long n);
+
+  void apply_blocks(char *out, long out_len, char *left, char *right) {
+    long cursor = 0;
+    long first = 4;
+    long second = 9;
+
+    if (cursor + first > out_len) {
+      return;
+    }
+    memcpy(out + cursor, left, first);
+    cursor += first;
+    memcpy(out + cursor, right, second);
+  }
+  ```
+
 test "rank274: bsdiff4 extra block copy checks advanced destination bound"
   lang c
   reject VYQL-MEM-020

@@ -1,0 +1,9 @@
+module bindings.perl.generated.m2f5cafad;
+
+binding filePathAccess4 {
+  requires {
+    dependency("ZooKeeper")
+  }
+  query pattern callExpr where callee.method == "get_children"
+  emit sink code.FilePathAccess at args[0]
+}

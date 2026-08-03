@@ -1,0 +1,13 @@
+module bindings.swift.generated.mc6005d88;
+
+binding csrfProtection5 {
+  requires {
+    dependency("vapor")
+  }
+  query pattern callExpr where callee.path ~= "CSRF"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

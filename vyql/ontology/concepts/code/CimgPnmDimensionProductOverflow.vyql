@@ -1,0 +1,11 @@
+module code;
+
+concept CimgPnmDimensionProductOverflow : issue {
+  cwe: [CWE_190, CWE_787]
+  reviewAssumption: "a crafted PNM header can provide large dimensions that wrap the product before allocation and pixel loading"
+  reviewCategory: numeric
+  reviewCondition: "CImg PNM loading compares width-height-depth product to file size before widening the multiplication"
+  reviewConfidence: high
+  reviewEvidence: "get_load_pnm context {pattern} checks W * H * D against the file size"
+  vulnerableTo: [memory.IntegerOverflow, memory.OobWrite]
+}

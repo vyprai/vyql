@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding weakCipher626 {
+  query pattern presenceNode where node.path ~= "modes.ECB"
+  emit issue code.WeakCipher at node
+}

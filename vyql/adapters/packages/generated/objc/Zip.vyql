@@ -1,7 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter objc {
-  package "Zip" {
-    sink method "unzipFile" -> code.Deserialization
-    sink method "unzipFile" -> code.FilePathAccess
-  }
-}

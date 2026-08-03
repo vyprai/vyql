@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding documizeMarkdownRenderWithoutSanitizer126 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "Render" and node.context.callPath contains "blackfriday.Run" and node.context.call contains "string" and not (node.context.callPath contains "bluemonday.UGCPolicy") and not (node.context.scopeCall contains "SanitizeBytes")
+  emit issue code.DocumizeMarkdownRenderWithoutSanitizer at node
+}

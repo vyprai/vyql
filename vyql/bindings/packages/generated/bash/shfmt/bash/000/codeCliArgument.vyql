@@ -1,0 +1,9 @@
+module bindings.bash.generated.m469413a8;
+
+binding cliArgument0 {
+  requires {
+    dependency("shfmt")
+  }
+  query pattern callExpr where callee.path ~= "shfmt.argv"
+  emit source code.CliArgument at call.result
+}

@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m8e46e9c1;
+
+binding proxyRedirectCertVerificationBypass163 {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "analysis.tls.proxy_redirect_cert_verification_bypass"
+  emit issue code.ProxyRedirectCertVerificationBypass at node
+}

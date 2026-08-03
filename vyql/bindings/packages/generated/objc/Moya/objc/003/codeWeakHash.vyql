@@ -1,0 +1,9 @@
+module bindings.objc.generated.m5d49181c;
+
+binding weakHash3 {
+  requires {
+    dependency("Moya")
+  }
+  query pattern presenceNode where node.path ~= "moya.hash"
+  emit issue code.WeakHash at node
+}

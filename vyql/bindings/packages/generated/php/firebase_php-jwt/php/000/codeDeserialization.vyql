@@ -1,0 +1,9 @@
+module bindings.php.generated.m183ef2d4;
+
+binding deserialization0 {
+  requires {
+    dependency("firebase/php-jwt")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

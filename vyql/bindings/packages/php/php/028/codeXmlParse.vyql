@@ -1,0 +1,9 @@
+module bindings.php.generated.mc5601031;
+
+binding xmlParse28 {
+  requires {
+    dependency("simplexml")
+  }
+  query pattern callExpr where callee.path ~= "simplexml_load_string"
+  emit sink code.XmlParse at args[0]
+}

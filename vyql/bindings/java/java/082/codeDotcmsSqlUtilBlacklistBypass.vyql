@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding dotcmsSqlUtilBlacklistBypass82 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "sanitizeParameter" and node.context.callPath contains "StringEscapeUtils.escapeSql" and node.context.identifier contains "EVIL_SQL_WORDS" and node.context.call contains "isValidSQLCharacter" and not (node.context.scopeCall contains "sanitizeSQL") and not (node.context.identifier contains "EVIL_SQL_CONDITION_WORDS")
+  emit issue code.DotcmsSqlUtilBlacklistBypass at node
+}

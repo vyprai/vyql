@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m5b2c6913;
+
+binding sqlExecution7 {
+  requires {
+    dependency("amnesia")
+  }
+  query pattern callExpr where callee.method == "write!"
+  emit sink code.SqlExecution at args[0]
+}

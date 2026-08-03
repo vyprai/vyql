@@ -1,0 +1,9 @@
+module bindings.rust.generated.m712e7f6b;
+
+binding deserialization1 {
+  requires {
+    dependency("zvariant_derive")
+  }
+  query pattern callExpr where callee.method == "expand_deserialize_derive"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{FilePathAccess, SecretValue}
-adapter dart {
-  package "syncfusion_pdfviewer_macos" {
-    sink method "loadPdfFromFile" -> code.FilePathAccess
-    sink method "initializePdfRenderer" -> code.FilePathAccess
-    source method "initializePdfRenderer" -> code.SecretValue
-  }
-}

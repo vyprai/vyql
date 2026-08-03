@@ -1,7 +1,0 @@
-import code.{NetworkConnect}
-
-adapter dart {
-  package "puppeteer" {
-    sink method "connect" -> code.NetworkConnect
-  }
-}

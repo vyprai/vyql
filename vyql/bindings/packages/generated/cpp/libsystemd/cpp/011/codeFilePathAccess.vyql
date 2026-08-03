@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m3e3aad71;
+
+binding filePathAccess11 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_openat"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{NetworkData}
-
-adapter javascript {
-  package "sockjs-client" {
-    source method "SockJS" -> code.NetworkData
-  }
-}

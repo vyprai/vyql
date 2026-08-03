@@ -1,6 +1,0 @@
-import code.{XmlParse}
-adapter groovy {
-  package "com.relevantcodes:extentreports" {
-    sink method "Configuration.parse" -> code.XmlParse
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.powershell.generated.m92132a18;
+
+binding sqlExecution13 {
+  requires {
+    dependency("SqlServer")
+  }
+  query pattern callExpr where callee.path ~= "Invoke-Sqlcmd"
+  emit sink code.SqlExecution at args[0]
+}

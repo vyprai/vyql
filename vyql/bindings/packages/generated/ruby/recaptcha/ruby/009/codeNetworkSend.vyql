@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mdeee483b;
+
+binding networkSend9 {
+  requires {
+    dependency("recaptcha")
+  }
+  query pattern callExpr where callee.method == "api_verification_free"
+  emit sink code.NetworkSend at args[0]
+}

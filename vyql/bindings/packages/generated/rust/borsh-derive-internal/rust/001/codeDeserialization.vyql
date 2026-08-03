@@ -1,0 +1,9 @@
+module bindings.rust.generated.m7686c0d0;
+
+binding deserialization1 {
+  requires {
+    dependency("borsh-derive-internal")
+  }
+  query pattern callExpr where callee.method == "struct_de"
+  emit sink code.Deserialization at args[0]
+}

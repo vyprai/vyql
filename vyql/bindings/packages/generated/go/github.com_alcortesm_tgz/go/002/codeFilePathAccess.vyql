@@ -1,0 +1,9 @@
+module bindings.go.generated.m49b686b5;
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/alcortesm/tgz")
+  }
+  query pattern callExpr where callee.method == "unTar"
+  emit sink code.FilePathAccess at args[0]
+}

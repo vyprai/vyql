@@ -1,0 +1,9 @@
+module bindings.objc.generated.ma308764a;
+
+binding deserialization4 {
+  requires {
+    dependency("SwiftSoup")
+  }
+  query pattern callExpr where callee.method == "parseBodyFragmentRelaxed"
+  emit sink code.Deserialization at args[0]
+}

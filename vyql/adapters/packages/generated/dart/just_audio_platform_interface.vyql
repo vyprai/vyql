@@ -1,6 +1,0 @@
-import code.{UrlFetch}
-adapter dart {
-  package "just_audio_platform_interface" {
-    sink method "load" -> code.UrlFetch
-  }
-}

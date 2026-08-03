@@ -1,0 +1,9 @@
+module bindings.rust.generated.mdc258509;
+
+binding userControlledData0 {
+  requires {
+    dependency("oboe")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}

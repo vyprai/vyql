@@ -1,0 +1,9 @@
+module bindings.python.generated.m25e32fc5;
+
+binding filePathAccess1 {
+  requires {
+    dependency("s3transfer")
+  }
+  query pattern callExpr where callee.method == "TransferManager.download"
+  emit sink code.FilePathAccess at args[0]
+}

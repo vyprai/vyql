@@ -1,0 +1,11 @@
+module code;
+
+concept MissingGuestFallbackForWebAuth : issue {
+  cwe: [CWE_287]
+  reviewAssumption: "guest-user fallback is configured to constrain unknown web-authenticated users to guest permissions"
+  reviewCategory: auth
+  reviewCondition: "web-server authenticated users missing from the local database can exit before the configured guest fallback is considered"
+  reviewConfidence: medium
+  reviewEvidence: "web basic authentication context {pattern} checks the template user before the later guest-user fallback"
+  vulnerableTo: [authentication.ImproperAuthentication]
+}

@@ -1,0 +1,9 @@
+module bindings.python.generated.me67695c6;
+
+binding codeEval0 {
+  requires {
+    dependency("six")
+  }
+  query pattern callExpr where callee.method == "exec_"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m47da9b45;
+
+binding nosqlQuery45 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "transact_write_items"
+  emit sink code.NosqlQuery at args[0]
+}

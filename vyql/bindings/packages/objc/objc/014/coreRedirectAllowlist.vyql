@@ -1,0 +1,13 @@
+module bindings.objc.generated.m942721f9;
+
+binding redirectAllowlist14 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "stringByAddingPercentEncodingWithAllowedCharacters"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

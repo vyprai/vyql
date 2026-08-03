@@ -1,0 +1,13 @@
+module bindings.php.generated.m3c07ec34;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("sensio/framework-extra-bundle")
+  }
+  query pattern callExpr where callee.method == "SensioBundleFrameworkExtraBundleEventListenerSecurityListener::onKernelController"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

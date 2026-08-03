@@ -1,0 +1,10 @@
+module bindings.csharp.generated.mc8424360;
+
+binding redirectTarget0 {
+  requires {
+    dependency("xam.plugin.externalmaps")
+  }
+  query pattern callExpr where callee.method == "NavigateTo"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

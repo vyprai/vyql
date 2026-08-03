@@ -1,0 +1,10 @@
+module bindings.dart.generated.m7fc7337d;
+
+binding privilegedOp10 {
+  requires {
+    dependency("bitsdojo_window_linux")
+  }
+  query pattern callExpr where callee.method == "minimizeWindow"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

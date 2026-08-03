@@ -1,0 +1,9 @@
+module bindings.dart.generated.mbd732551;
+
+binding deserialization3 {
+  requires {
+    dependency("barback")
+  }
+  query pattern callExpr where callee.method == "deserializeId"
+  emit sink code.Deserialization at args[0]
+}

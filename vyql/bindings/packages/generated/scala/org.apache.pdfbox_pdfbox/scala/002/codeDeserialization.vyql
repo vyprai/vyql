@@ -1,0 +1,9 @@
+module bindings.scala.generated.mda6a07ad;
+
+binding deserialization2 {
+  requires {
+    dependency("org.apache.pdfbox:pdfbox")
+  }
+  query pattern callExpr where callee.method == "parseHex"
+  emit sink code.Deserialization at args[0]
+}

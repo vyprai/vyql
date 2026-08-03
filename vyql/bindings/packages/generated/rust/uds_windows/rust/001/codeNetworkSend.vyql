@@ -1,0 +1,9 @@
+module bindings.rust.generated.m71105256;
+
+binding networkSend1 {
+  requires {
+    dependency("uds_windows")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

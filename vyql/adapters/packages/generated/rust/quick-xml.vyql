@@ -1,5 +1,0 @@
-adapter rust {
-  package "quick-xml" {
-    sink method "parse" -> code.XmlParse
-  }
-}

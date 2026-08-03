@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc6005d88;
+
+binding commandExecution8 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "Process"
+  emit sink code.CommandExecution at args[0]
+}

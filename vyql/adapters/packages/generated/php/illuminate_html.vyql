@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-
-adapter php {
-  package "illuminate/html" {
-    control method "decode" -> core.HtmlEscape
-  }
-}

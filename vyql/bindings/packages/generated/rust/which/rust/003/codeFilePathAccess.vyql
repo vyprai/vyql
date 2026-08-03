@@ -1,0 +1,9 @@
+module bindings.rust.generated.m3ed6ed01;
+
+binding filePathAccess3 {
+  requires {
+    dependency("which")
+  }
+  query pattern callExpr where callee.method == "all_results"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter go {
-  package "github.com/hashicorp/go-cleanhttp" {
-    control method "PrintablePathCheckHandler" -> core.InputValidation
-  }
-}

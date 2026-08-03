@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter java {
-  package "org.glassfish.jersey.media:jersey-media-multipart" {
-    sink method "moveTo" -> code.FilePathAccess
-  }
-}

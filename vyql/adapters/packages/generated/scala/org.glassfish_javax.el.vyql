@@ -1,6 +1,0 @@
-import code.{ExpressionEval}
-adapter scala {
-  package "org.glassfish:javax.el" {
-    sink method "eval" -> code.ExpressionEval
-  }
-}

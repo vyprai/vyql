@@ -1,0 +1,9 @@
+module bindings.rust.generated.m91eb054d;
+
+binding weakHash0 {
+  requires {
+    dependency("sha1_smol")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit issue code.WeakHash at call
+}

@@ -1,5 +1,0 @@
-adapter javascript {
-  package "error-stack-parser" {
-    sink method "parse" -> code.Deserialization
-  }
-}

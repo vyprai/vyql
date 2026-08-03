@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter ruby {
-  package "dm-types" {
-    sink method "load" -> code.Deserialization
-  }
-}

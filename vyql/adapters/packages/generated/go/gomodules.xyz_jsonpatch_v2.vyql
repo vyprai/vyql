@@ -1,5 +1,0 @@
-adapter go {
-  package "gomodules.xyz/jsonpatch/v2" {
-    sink method "CreatePatch" -> code.Deserialization
-  }
-}

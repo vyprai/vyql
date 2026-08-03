@@ -1,0 +1,9 @@
+module bindings.php.generated.m00928a3c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("wyrihaximus/twig-view")
+  }
+  query pattern callExpr where callee.method == "file_get_contents"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m34899715;
+
+binding userControlledData0 {
+  requires {
+    dependency("browser")
+  }
+  query pattern callExpr where callee.method == "to_ua"
+  emit source core.UserControlledData at call.result
+}

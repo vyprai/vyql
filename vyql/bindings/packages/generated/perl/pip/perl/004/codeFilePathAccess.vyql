@@ -1,0 +1,9 @@
+module bindings.perl.generated.mc265bf40;
+
+binding filePathAccess4 {
+  requires {
+    dependency("pip")
+  }
+  query pattern callExpr where callee.method == "read_p5i"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mf641581a;
+
+binding networkSend1 {
+  requires {
+    dependency("rest-client")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.NetworkSend at args[0]
+}

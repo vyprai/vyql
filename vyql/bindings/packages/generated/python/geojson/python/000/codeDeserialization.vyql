@@ -1,0 +1,9 @@
+module bindings.python.generated.m03d4e5c7;
+
+binding deserialization0 {
+  requires {
+    dependency("geojson")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

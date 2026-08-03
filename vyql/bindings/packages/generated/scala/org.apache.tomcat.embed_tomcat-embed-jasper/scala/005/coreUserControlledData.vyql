@@ -1,0 +1,9 @@
+module bindings.scala.generated.m5861c132;
+
+binding userControlledData5 {
+  requires {
+    dependency("org.apache.tomcat.embed:tomcat-embed-jasper")
+  }
+  query pattern callExpr where callee.method == "setWebXmlEncoding"
+  emit source core.UserControlledData at call.result
+}

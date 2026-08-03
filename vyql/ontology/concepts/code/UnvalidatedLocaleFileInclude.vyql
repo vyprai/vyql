@@ -1,0 +1,11 @@
+module code;
+
+concept UnvalidatedLocaleFileInclude : issue {
+  cwe: [CWE_98]
+  reviewAssumption: "an application can pass user-controlled locale names to the translator or setLocale API"
+  reviewCategory: path
+  reviewCondition: "a locale parameter is interpolated into a PHP include path before locale validation"
+  reviewConfidence: medium
+  reviewEvidence: "locale include context {pattern} builds a language file path from the locale value"
+  vulnerableTo: [path.FileInclusion]
+}

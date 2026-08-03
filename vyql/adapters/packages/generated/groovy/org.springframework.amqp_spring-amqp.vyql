@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter groovy {
-  package "org.springframework.amqp:spring-amqp" {
-    source method "Message" -> core.UserControlledData
-    source method "getBody" -> core.UserControlledData
-  }
-}

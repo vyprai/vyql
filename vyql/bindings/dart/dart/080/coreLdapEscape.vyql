@@ -1,0 +1,11 @@
+module bindings.dart.generated.m1c398214;
+
+binding ldapEscape80 {
+  query pattern callExpr where callee.path ~= "encodeForLDAP"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

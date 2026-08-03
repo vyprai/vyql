@@ -1,8 +1,0 @@
-import code.{NetworkData}
-
-adapter python {
-  package "channels" {
-    source method "receive" -> code.NetworkData
-    source method "receive_json" -> code.NetworkData
-  }
-}

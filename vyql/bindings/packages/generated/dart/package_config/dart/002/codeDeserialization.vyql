@@ -1,0 +1,9 @@
+module bindings.dart.generated.m52f4cdf4;
+
+binding deserialization2 {
+  requires {
+    dependency("package_config")
+  }
+  query pattern callExpr where callee.method == "parseJson"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{Deserialization, ExpressionEval}
-
-adapter python {
-  package "gast" {
-    sink method "parse" -> code.Deserialization
-    sink method "literal_eval" -> code.ExpressionEval
-  }
-}

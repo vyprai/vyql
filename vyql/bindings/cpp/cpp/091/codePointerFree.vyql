@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding pointerFree91 {
+  query pattern presenceNode where node.path ~= "free"
+  emit issue code.PointerFree at node
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.NodePreGypRemoteBinaryInstall {
+  category: supply_chain
+  expected: [core.CodeExecutionValidation]
+  kind: target
+  text: "review npm native module install manifests for remote node-pre-gyp binary downloads outside the package tarball"
+}

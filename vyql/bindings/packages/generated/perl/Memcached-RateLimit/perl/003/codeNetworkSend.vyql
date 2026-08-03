@@ -1,0 +1,9 @@
+module bindings.perl.generated.m18d6b6ba;
+
+binding networkSend3 {
+  requires {
+    dependency("Memcached-RateLimit")
+  }
+  query pattern callExpr where callee.method == "set_read_timeout"
+  emit sink code.NetworkSend at args[0]
+}

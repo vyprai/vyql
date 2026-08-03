@@ -1,0 +1,9 @@
+module bindings.php.generated.mc5601031;
+
+binding sqlExecution16 {
+  requires {
+    dependency("laravel/framework")
+  }
+  query pattern callExpr where callee.method == "whereRaw"
+  emit sink code.SqlExecution at args[0]
+}

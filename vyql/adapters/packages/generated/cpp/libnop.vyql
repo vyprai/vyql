@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "libnop" {
-    sink method "Read" -> code.Deserialization
-    sink method "ReadPayload" -> code.Deserialization
-  }
-}

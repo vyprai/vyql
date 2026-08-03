@@ -1,0 +1,9 @@
+module bindings.swift.generated.med844381;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/skelpo/Countries")
+  }
+  query pattern callExpr where callee.method == "countryFromURL"
+  emit source core.UserControlledData at call.result
+}

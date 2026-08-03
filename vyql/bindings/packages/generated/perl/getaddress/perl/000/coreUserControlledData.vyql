@@ -1,0 +1,9 @@
+module bindings.perl.generated.mb6521505;
+
+binding userControlledData0 {
+  requires {
+    dependency("getaddress")
+  }
+  query pattern callExpr where callee.method == "ipwhere"
+  emit source core.UserControlledData at call.result
+}

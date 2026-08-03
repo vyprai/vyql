@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mcfdcd6a0;
+
+binding userControlledData0 {
+  requires {
+    dependency("os-locale")
+  }
+  query pattern callExpr where callee.method == "osLocale"
+  emit source core.UserControlledData at call.result
+}

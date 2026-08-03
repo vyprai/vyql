@@ -1,0 +1,9 @@
+module bindings.c.generated.mcf656555;
+
+binding deserialization1 {
+  requires {
+    dependency("oatpp")
+  }
+  query pattern callExpr where callee.method == "parseAuthority"
+  emit sink code.Deserialization at args[0]
+}

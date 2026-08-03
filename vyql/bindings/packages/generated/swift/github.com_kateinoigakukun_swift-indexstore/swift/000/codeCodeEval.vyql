@@ -1,0 +1,9 @@
+module bindings.swift.generated.m31ecc214;
+
+binding codeEval0 {
+  requires {
+    dependency("github.com/kateinoigakukun/swift-indexstore")
+  }
+  query pattern callExpr where callee.method == "open(url:)"
+  emit sink code.CodeEval at args[0]
+}

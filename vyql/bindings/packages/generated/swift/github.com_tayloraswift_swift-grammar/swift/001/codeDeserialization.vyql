@@ -1,0 +1,9 @@
+module bindings.swift.generated.m22c82683;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/tayloraswift/swift-grammar")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit sink code.Deserialization at args[0]
+}

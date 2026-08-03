@@ -1,0 +1,9 @@
+module bindings.java.generated.m79bd0cb4;
+
+binding filePathAccess2 {
+  requires {
+    dependency("org.antlr:antlr4-runtime")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.FilePathAccess at args[0]
+}

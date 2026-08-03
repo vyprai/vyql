@@ -1,0 +1,9 @@
+module bindings.perl.generated.m8ab15add;
+
+binding databaseRead0 {
+  requires {
+    dependency("Myco")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.DatabaseReadSink at args[0]
+}

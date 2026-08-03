@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m7758ee8c;
+
+binding userControlledData1 {
+  requires {
+    dependency("json_web_token")
+  }
+  query pattern callExpr where callee.method == "sign"
+  emit source core.UserControlledData at call.result
+}

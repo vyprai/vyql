@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "org.codehaus.jackson:jackson-mapper-asl" {
-    sink method "readValue" -> code.Deserialization
-    sink method "readTree" -> code.Deserialization
-  }
-}

@@ -1,0 +1,10 @@
+module bindings.javascript.generated.m5103d1c9;
+
+binding redirectTarget7 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "res.redirect"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

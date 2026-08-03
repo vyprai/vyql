@@ -1,0 +1,8 @@
+module code;
+
+review code.CaseInsensitiveLocalIdentityAuthorizationBypass {
+  category: auth
+  expected: [core.AuthorizationCheck]
+  kind: attention
+  text: "review local user/group authorization checks that compare supplied identity text case-insensitively instead of canonical OS identity names"
+}

@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter elixir {
-  package "mix_test_watch" {
-    sink method "build_tasks_cmds" -> code.CommandExecution
-  }
-}

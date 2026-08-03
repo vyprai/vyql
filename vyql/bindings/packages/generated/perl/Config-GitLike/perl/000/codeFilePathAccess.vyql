@@ -1,0 +1,9 @@
+module bindings.perl.generated.m98837b45;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Config-GitLike")
+  }
+  query pattern callExpr where callee.method == "load_dirs"
+  emit sink code.FilePathAccess at args[0]
+}

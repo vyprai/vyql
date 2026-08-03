@@ -1,0 +1,8 @@
+# Rank 145 / CVE-2015-7747: audiofile raw memory copy size issue.
+
+test "rank145: raw memory copy size is a CVE anchor"
+  expect VYQL-MEM-016
+  graph
+  ```
+  node copy code.RawMemoryCopySize
+  ```

@@ -1,6 +1,0 @@
-adapter elixir {
-  package "download" {
-    sink method "Download.from" -> code.UrlFetch
-    sink method "Download.from" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.generated.m027a4d7d;
+
+binding deserialization2 {
+  requires {
+    dependency("tldextract")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule LeadingDotSegmentOnlyRouteFilter {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22, CWE_184]
+    id: "VYQL-PATH-041"
+    severity: high
+  }
+  issue code.LeadingDotSegmentOnlyRouteFilter as sink
+}

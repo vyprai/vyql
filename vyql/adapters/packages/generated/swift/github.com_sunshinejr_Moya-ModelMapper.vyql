@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter swift {
-  package "github.com/sunshinejr/Moya-ModelMapper" {
-    sink method "map" -> code.Deserialization
-    sink method "compactMap" -> code.Deserialization
-    sink method "mapOptional" -> code.Deserialization
-    sink method "compactMapOptional" -> code.Deserialization
-  }
-}

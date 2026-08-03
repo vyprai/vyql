@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding weakCipher150 {
+  query pattern presenceNode where node.path ~= "CipherMode.ECB"
+  emit issue code.WeakCipher at node
+}

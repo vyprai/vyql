@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "org.apache.maven:maven-settings" {
-    sink method "read" -> code.Deserialization
-  }
-}

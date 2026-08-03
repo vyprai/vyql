@@ -1,0 +1,9 @@
+module bindings.python.generated.mb369e269;
+
+binding expressionEval1 {
+  requires {
+    dependency("parsel")
+  }
+  query pattern callExpr where callee.method == "xpath"
+  emit sink code.ExpressionEval at args[0]
+}

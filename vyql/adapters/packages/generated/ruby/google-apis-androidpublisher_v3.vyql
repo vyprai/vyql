@@ -1,6 +1,0 @@
-adapter ruby {
-  package "google-apis-androidpublisher_v3" {
-    source path "ActivateBasePlanRequest" -> code.HttpInput
-    sink path "AddTargetingResponse" -> code.ResponseHeaderWrite
-  }
-}

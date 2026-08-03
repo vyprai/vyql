@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mcc5a44a6;
+
+binding deserialization3 {
+  requires {
+    dependency("kafka_protocol")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

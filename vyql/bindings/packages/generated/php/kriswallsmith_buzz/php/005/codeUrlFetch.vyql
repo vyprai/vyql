@@ -1,0 +1,9 @@
+module bindings.php.generated.m21d118c6;
+
+binding urlFetch5 {
+  requires {
+    dependency("kriswallsmith/buzz")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.UrlFetch at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m942721f9;
+
+binding xpathQuery11 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.method == "nodesForXPath"
+  emit sink code.XpathQuery at args[0]
+}

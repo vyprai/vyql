@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "org.springframework.security:spring-security-oauth2-jose" {
-    sink method "parse" -> code.Deserialization
-  }
-}

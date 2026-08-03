@@ -1,0 +1,13 @@
+module bindings.rust.generated.m953cfa5f;
+
+binding pathAccessCheck1 {
+  requires {
+    dependency("vcpkg")
+  }
+  query pattern callExpr where callee.method == "validate_vcpkg_root"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

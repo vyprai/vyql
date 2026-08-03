@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding locklessSharedMutation118 {
+  query pattern presenceNode where node.path ~= "pthread_create"
+  emit issue code.LocklessSharedMutation at node
+}

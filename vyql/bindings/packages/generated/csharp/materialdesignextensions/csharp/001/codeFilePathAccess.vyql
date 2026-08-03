@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m1534383c;
+
+binding filePathAccess1 {
+  requires {
+    dependency("materialdesignextensions")
+  }
+  query pattern callExpr where callee.method == "CreateNewDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

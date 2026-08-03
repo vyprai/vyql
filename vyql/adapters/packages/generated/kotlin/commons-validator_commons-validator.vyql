@@ -1,7 +1,0 @@
-import core.{InputValidation}
-adapter kotlin {
-  package "commons-validator:commons-validator" {
-    control method "UrlValidator.isValidPath" -> core.InputValidation
-    control method "UrlValidator.isValidQuery" -> core.InputValidation
-  }
-}

@@ -1,8 +1,0 @@
-import code.{UrlFetch, HttpInput}
-adapter dart {
-  package "desktop_webview_auth" {
-    sink method "authorizeFromCallback" -> code.UrlFetch
-    sink method "buildSignInUri" -> code.UrlFetch
-    source method "UrlChangedCallback" -> code.HttpInput
-  }
-}

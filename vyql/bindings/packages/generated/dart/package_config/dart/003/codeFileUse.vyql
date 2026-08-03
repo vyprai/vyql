@@ -1,0 +1,9 @@
+module bindings.dart.generated.m52f4cdf4;
+
+binding fileUse3 {
+  requires {
+    dependency("package_config")
+  }
+  query pattern callExpr where callee.method == "writeBytes"
+  emit sink code.FileUseSink at args[0]
+}

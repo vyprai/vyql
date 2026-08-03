@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mb6a49a80;
+
+binding codeEval1 {
+  requires {
+    dependency("@webassemblyjs/wasm-edit")
+  }
+  query pattern callExpr where callee.method == "edit"
+  emit sink code.CodeEval at args[0]
+}

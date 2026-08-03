@@ -1,0 +1,9 @@
+module bindings.rust.generated.m96dd8ad3;
+
+binding weakRandomValue2 {
+  requires {
+    dependency("rand_core")
+  }
+  query pattern callExpr where callee.method == "fill_bytes"
+  emit issue code.WeakRandomValue at call
+}

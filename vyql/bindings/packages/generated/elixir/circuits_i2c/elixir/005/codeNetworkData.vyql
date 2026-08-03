@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mbb4bffae;
+
+binding networkData5 {
+  requires {
+    dependency("circuits_i2c")
+  }
+  query pattern callExpr where callee.method == "write_read"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.m26e821cb;
+
+binding storedDataRead0 {
+  requires {
+    dependency("wsdl4j:wsdl4j")
+  }
+  query pattern callExpr where callee.method == "readWSDL"
+  emit source code.StoredDataRead at call.result
+}

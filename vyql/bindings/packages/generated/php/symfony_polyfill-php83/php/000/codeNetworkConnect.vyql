@@ -1,0 +1,9 @@
+module bindings.php.generated.m3d97c3c5;
+
+binding networkConnect0 {
+  requires {
+    dependency("symfony/polyfill-php83")
+  }
+  query pattern callExpr where callee.method == "ldap_exop_sync"
+  emit sink code.NetworkConnectSink at args[0]
+}

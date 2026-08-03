@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mc993eae4;
+
+binding deserialization0 {
+  requires {
+    dependency("json3")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

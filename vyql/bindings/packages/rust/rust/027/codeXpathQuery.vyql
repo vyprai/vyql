@@ -1,0 +1,9 @@
+module bindings.rust.generated.m222602a5;
+
+binding xpathQuery27 {
+  requires {
+    dependency("sxd-xpath")
+  }
+  query pattern callExpr where callee.method == "evaluate"
+  emit sink code.XpathQuery at args[0]
+}

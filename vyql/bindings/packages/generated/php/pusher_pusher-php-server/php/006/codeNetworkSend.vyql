@@ -1,0 +1,9 @@
+module bindings.php.generated.mde571bb4;
+
+binding networkSend6 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "sendToUserAsync"
+  emit sink code.NetworkSend at args[0]
+}

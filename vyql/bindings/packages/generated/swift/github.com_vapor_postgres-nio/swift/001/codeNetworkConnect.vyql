@@ -1,0 +1,9 @@
+module bindings.swift.generated.me335d7a5;
+
+binding networkConnect1 {
+  requires {
+    dependency("github.com/vapor/postgres-nio")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter javascript {
-  package "babylon" {
-    sink method "parse" -> code.Deserialization
-  }
-}

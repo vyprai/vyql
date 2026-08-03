@@ -1,0 +1,9 @@
+module bindings.php.generated.m20758425;
+
+binding filePathAccess2 {
+  requires {
+    dependency("jakub-onderka/php-var-dump-check")
+  }
+  query pattern callExpr where callee.method == "JakubOnderkaPhpVarDumpCheckManager::loadFile"
+  emit sink code.FilePathAccess at args[0]
+}

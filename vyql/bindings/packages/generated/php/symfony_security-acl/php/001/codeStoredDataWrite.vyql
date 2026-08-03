@@ -1,0 +1,9 @@
+module bindings.php.generated.m628c3e85;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("symfony/security-acl")
+  }
+  query pattern callExpr where callee.method == "set"
+  emit sink code.StoredDataWrite at args[0]
+}

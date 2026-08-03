@@ -1,0 +1,9 @@
+module bindings.scala.generated.ma90b1979;
+
+binding userControlledData0 {
+  requires {
+    dependency("com.jcabi:jcabi-manifests")
+  }
+  query pattern callExpr where callee.method == "Manifests.read"
+  emit source core.UserControlledData at call.result
+}

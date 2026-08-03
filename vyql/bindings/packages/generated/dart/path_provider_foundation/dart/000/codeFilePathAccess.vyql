@@ -1,0 +1,9 @@
+module bindings.dart.generated.m353b9714;
+
+binding filePathAccess0 {
+  requires {
+    dependency("path_provider_foundation")
+  }
+  query pattern callExpr where callee.method == "getTemporaryPath"
+  emit sink code.FilePathAccess at args[0]
+}

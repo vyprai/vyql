@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-
-adapter php {
-  package "twbs/bootstrap" {
-    control method "sanitizeHtml" -> core.HtmlEscape
-  }
-}

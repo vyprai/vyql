@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m8e564aef;
+
+binding filePathAccess5 {
+  requires {
+    dependency("com.lowagie:itext")
+  }
+  query pattern callExpr where callee.method == "DocWriter.write"
+  emit sink code.FilePathAccess at args[0]
+}

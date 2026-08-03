@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter ruby {
-  package "tzinfo" {
-    sink method "read" -> code.FilePathAccess
-  }
-}

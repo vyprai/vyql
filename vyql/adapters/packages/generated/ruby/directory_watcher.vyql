@@ -1,5 +1,0 @@
-adapter ruby {
-  package "directory_watcher" {
-    sink method "delete_observer" -> code.FilePathAccess
-  }
-}

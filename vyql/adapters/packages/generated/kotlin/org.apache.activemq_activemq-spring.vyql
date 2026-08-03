@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-import core.{InputValidation}
-
-adapter kotlin {
-  package "org.apache.activemq:activemq-spring" {
-    sink method "resourceFromString" -> code.FilePathAccess
-    control method "validateUrlAllowed" -> core.InputValidation
-  }
-}

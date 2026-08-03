@@ -1,7 +1,0 @@
-import code.{ExpressionEval}
-
-adapter kotlin {
-  package "org.apache.camel:camel-spring" {
-    sink method "SpelExpression.evaluate" -> code.ExpressionEval
-  }
-}

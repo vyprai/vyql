@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{HtmlEscape}
-
-adapter scala {
-  package "com.sun.xml.bind:jaxb-core" {
-    sink method "parse" -> code.Deserialization
-    control method "escape" -> core.HtmlEscape
-  }
-}

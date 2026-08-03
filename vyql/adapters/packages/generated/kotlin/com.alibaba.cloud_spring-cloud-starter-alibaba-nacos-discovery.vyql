@@ -1,9 +1,0 @@
-import code.{SecretValue}
-adapter kotlin {
-  package "com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery" {
-    source method "getUsername" -> code.SecretValue
-    source method "getPassword" -> code.SecretValue
-    source method "getAccessKey" -> code.SecretValue
-    source method "getSecretKey" -> code.SecretValue
-  }
-}

@@ -1,0 +1,6 @@
+test "rank103: XWiki generated migration documents require content exposure review"
+  expect_review code.InternalContentExposureReview
+  graph
+  ```
+  node op code.InternalContentExposureReview
+  ```

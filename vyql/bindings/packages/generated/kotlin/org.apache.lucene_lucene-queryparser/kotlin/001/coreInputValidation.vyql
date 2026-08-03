@@ -1,0 +1,14 @@
+module bindings.kotlin.generated.m90f018c0;
+
+binding inputValidation1 {
+  requires {
+    dependency("org.apache.lucene:lucene-queryparser")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.rust.generated.mc226c3b1;
+
+binding stdinInput4 {
+  requires {
+    dependency("console")
+  }
+  query pattern callExpr where callee.method == "read_line_initial_text"
+  emit source code.StdinInput at call.result
+}

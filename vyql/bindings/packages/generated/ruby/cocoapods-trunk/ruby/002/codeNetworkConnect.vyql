@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m02cc521c;
+
+binding networkConnect2 {
+  requires {
+    dependency("cocoapods-trunk")
+  }
+  query pattern callExpr where callee.method == "request_path"
+  emit sink code.NetworkConnectSink at args[0]
+}

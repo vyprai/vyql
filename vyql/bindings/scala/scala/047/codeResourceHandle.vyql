@@ -1,0 +1,7 @@
+module bindings.scala.generated.m06d0685b;
+
+binding resourceHandle47 {
+  query pattern presenceNode where node.path ~= "Socket"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.meea5184f;
+
+binding expressionEval0 {
+  requires {
+    dependency("ognl:ognl")
+  }
+  query pattern callExpr where callee.method == "parseExpression"
+  emit sink code.ExpressionEval at args[0]
+}

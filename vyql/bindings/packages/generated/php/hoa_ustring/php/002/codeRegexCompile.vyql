@@ -1,0 +1,10 @@
+module bindings.php.generated.m5c7effc5;
+
+binding regexCompile2 {
+  requires {
+    dependency("hoa/ustring")
+  }
+  query pattern callExpr where callee.method == "split"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

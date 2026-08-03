@@ -1,0 +1,11 @@
+module code;
+
+concept OveleonCookiebarLocaleReflectedXss : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "the cookiebar block route locale segment is attacker-controlled and may be included in the rendered backend response path"
+  reviewCategory: xss
+  reviewCondition: "Oveleon Cookiebar renders the route locale into a frontend template response without locale validation"
+  reviewConfidence: high
+  reviewEvidence: "CookiebarController::blockAction context {pattern} loads language data with $locale, assigns it to the frontend template, and returns getResponse before the patched Validator::isLocale guard"
+  vulnerableTo: [injection.Xss]
+}

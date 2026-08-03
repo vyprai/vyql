@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m5fe6fdbe;
+
+binding networkSend1 {
+  requires {
+    dependency("org.mule.connectors:mule-http-connector")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

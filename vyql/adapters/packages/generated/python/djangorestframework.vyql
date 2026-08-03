@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "djangorestframework" {
-    sink method "parse" -> code.Deserialization
-  }
-}

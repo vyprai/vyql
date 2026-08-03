@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m3d3597aa;
+
+binding httpInput0 {
+  requires {
+    dependency("weber")
+  }
+  query pattern callExpr where callee.method == "get_path"
+  emit source code.HttpInput at call.result
+}

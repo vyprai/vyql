@@ -1,0 +1,9 @@
+module bindings.dart.generated.m5342780c;
+
+binding archiveEntryWrite18 {
+  requires {
+    dependency("archive")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

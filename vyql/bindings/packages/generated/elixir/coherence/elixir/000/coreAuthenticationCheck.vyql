@@ -1,0 +1,13 @@
+module bindings.elixir.generated.m24ddb9d3;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("coherence")
+  }
+  query pattern callExpr where callee.method == "checkpw"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

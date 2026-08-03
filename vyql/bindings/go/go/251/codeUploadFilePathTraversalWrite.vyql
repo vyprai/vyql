@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding uploadFilePathTraversalWrite251 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "UploadFileSafe" and node.context.callPath contains "uploadFile" and not (node.context.callPath contains "strings.Contains")
+  emit issue code.UploadFilePathTraversalWrite at node
+}

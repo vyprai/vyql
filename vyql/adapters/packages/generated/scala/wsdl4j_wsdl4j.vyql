@@ -1,8 +1,0 @@
-import code.{StoredDataRead, FilePathAccess}
-
-adapter scala {
-  package "wsdl4j:wsdl4j" {
-    source method "readWSDL" -> code.StoredDataRead
-    sink method "writeWSDL" -> code.FilePathAccess
-  }
-}

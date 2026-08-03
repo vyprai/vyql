@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mbfb08350;
+
+binding deserialization5 {
+  requires {
+    dependency("exquery")
+  }
+  query pattern callExpr where callee.method == "css_to_spec"
+  emit sink code.Deserialization at args[0]
+}

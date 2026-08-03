@@ -1,9 +1,0 @@
-import code.{FilePathAccess, ResponseHeaderWrite}
-adapter php {
-  package "setasign/fpdf" {
-    sink method "Output" -> code.FilePathAccess
-    sink method "Output" -> code.ResponseHeaderWrite
-    sink method "AddFont" -> code.FilePathAccess
-    sink method "Image" -> code.FilePathAccess
-  }
-}

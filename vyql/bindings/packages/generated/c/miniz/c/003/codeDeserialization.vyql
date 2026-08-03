@@ -1,0 +1,9 @@
+module bindings.c.generated.m7e625f98;
+
+binding deserialization3 {
+  requires {
+    dependency("miniz")
+  }
+  query pattern callExpr where callee.method == "inflate"
+  emit sink code.Deserialization at args[0]
+}

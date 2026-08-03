@@ -1,0 +1,9 @@
+module bindings.go.generated.m7c85617b;
+
+binding deserialization3 {
+  requires {
+    dependency("rsc.io/pdf")
+  }
+  query pattern callExpr where callee.method == "readCmap"
+  emit sink code.Deserialization at args[0]
+}

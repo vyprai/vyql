@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding commandExecution243 {
+  query pattern callExpr where callee.path ~= "commands.getstatusoutput"
+  emit sink code.CommandExecution at args[0]
+}

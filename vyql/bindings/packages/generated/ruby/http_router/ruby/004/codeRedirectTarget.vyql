@@ -1,0 +1,10 @@
+module bindings.ruby.generated.m02e745e0;
+
+binding redirectTarget4 {
+  requires {
+    dependency("http_router")
+  }
+  query pattern callExpr where callee.method == "rewrite_partial_path_info"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

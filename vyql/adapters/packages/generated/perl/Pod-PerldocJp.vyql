@@ -1,8 +1,0 @@
-import code.{UrlFetch, FileUse}
-
-adapter perl {
-  package "Pod-PerldocJp" {
-    sink method "grand_search_init" -> code.UrlFetch
-    sink method "grand_search_init" -> code.FileUse
-  }
-}

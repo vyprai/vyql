@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.mule.connectors:mule-http-connector" {
-    sink method "request" -> code.UrlFetch
-  }
-}

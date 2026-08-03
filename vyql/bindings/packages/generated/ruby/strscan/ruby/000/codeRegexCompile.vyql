@@ -1,0 +1,10 @@
+module bindings.ruby.generated.m3232053a;
+
+binding regexCompile0 {
+  requires {
+    dependency("strscan")
+  }
+  query pattern callExpr where callee.method == "scan"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

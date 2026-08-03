@@ -1,0 +1,8 @@
+module code;
+
+review code.UserIdentityMappingReview {
+  category: auth
+  expected: [core.AuthorizationCheck]
+  kind: attention
+  text: "review external identity to local UID/GID mapping for collision resistance and durable uniqueness"
+}

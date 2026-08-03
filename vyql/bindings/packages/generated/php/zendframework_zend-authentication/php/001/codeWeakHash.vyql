@@ -1,0 +1,9 @@
+module bindings.php.generated.mbcadae5e;
+
+binding weakHash1 {
+  requires {
+    dependency("zendframework/zend-authentication")
+  }
+  query pattern presenceNode where node.path ~= "zendframework.zend.authentication.hash"
+  emit issue code.WeakHash at node
+}

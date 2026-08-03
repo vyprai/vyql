@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter cpp {
-  package "basisu" {
-    sink method "run" -> code.CommandExecution
-  }
-}

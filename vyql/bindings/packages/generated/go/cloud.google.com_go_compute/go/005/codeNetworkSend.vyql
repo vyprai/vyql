@@ -1,0 +1,9 @@
+module bindings.go.generated.mb5e4ad24;
+
+binding networkSend5 {
+  requires {
+    dependency("cloud.google.com/go/compute")
+  }
+  query pattern callExpr where callee.method == "executeStreamingHTTPRequest"
+  emit sink code.NetworkSend at args[0]
+}

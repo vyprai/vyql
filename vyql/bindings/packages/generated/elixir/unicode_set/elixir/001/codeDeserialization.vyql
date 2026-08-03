@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m394a00f5;
+
+binding deserialization1 {
+  requires {
+    dependency("unicode_set")
+  }
+  query pattern callExpr where callee.method == "parse!"
+  emit sink code.Deserialization at args[0]
+}

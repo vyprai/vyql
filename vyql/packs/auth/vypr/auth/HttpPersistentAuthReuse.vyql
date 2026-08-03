@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule HttpPersistentAuthReuse {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_287, CWE_613]
+    id: "VYQL-AUTH-094"
+    severity: high
+  }
+  issue code.HttpPersistentAuthReuse as state
+}

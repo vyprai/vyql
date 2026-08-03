@@ -1,0 +1,9 @@
+module bindings.python.generated.mdd67e031;
+
+binding deserialization1 {
+  requires {
+    dependency("macholib")
+  }
+  query pattern callExpr where callee.method == "macholib.MachO.MachO.load_fat"
+  emit sink code.Deserialization at args[0]
+}

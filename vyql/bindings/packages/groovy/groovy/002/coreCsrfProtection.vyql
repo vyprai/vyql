@@ -1,0 +1,13 @@
+module bindings.groovy.generated.mbfd454d1;
+
+binding csrfProtection2 {
+  requires {
+    dependency("grails")
+  }
+  query pattern callExpr where callee.path ~= "withForm"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

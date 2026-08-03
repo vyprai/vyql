@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter perl {
-  package "Catalyst-Plugin-I18N-DBIC" {
-    sink method "load_lexicon" -> code.SqlExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mde51090e;
+
+binding userControlledData3 {
+  requires {
+    dependency("com.aliyun:aliyun-java-sdk-dysmsapi")
+  }
+  query pattern callExpr where callee.method == "setTemplateParam"
+  emit source core.UserControlledData at call.result
+}

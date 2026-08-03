@@ -1,0 +1,14 @@
+module bindings.php.generated.m99cfa80f;
+
+binding inputValidation6 {
+  requires {
+    dependency("cakephp/chronos")
+  }
+  query pattern callExpr where callee.method == "lessThan"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

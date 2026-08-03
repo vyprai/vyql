@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m713df3c4;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.apache.logging.log4j:log4j-1.2-api")
+  }
+  query pattern callExpr where callee.method == "setFile"
+  emit sink code.FilePathAccess at args[0]
+}

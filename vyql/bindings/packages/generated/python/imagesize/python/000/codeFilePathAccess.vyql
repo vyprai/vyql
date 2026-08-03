@@ -1,0 +1,9 @@
+module bindings.python.generated.m0a55ad42;
+
+binding filePathAccess0 {
+  requires {
+    dependency("imagesize")
+  }
+  query pattern callExpr where callee.method == "get_info"
+  emit sink code.FilePathAccess at args[0]
+}

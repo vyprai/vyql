@@ -1,0 +1,9 @@
+module bindings.c.generated.mfd531f33;
+
+binding storedDataWrite5 {
+  requires {
+    dependency("boost-serialization")
+  }
+  query pattern callExpr where callee.method == "save"
+  emit sink code.StoredDataWrite at args[0]
+}

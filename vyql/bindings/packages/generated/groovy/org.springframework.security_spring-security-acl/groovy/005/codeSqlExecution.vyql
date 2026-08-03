@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m0294a815;
+
+binding sqlExecution5 {
+  requires {
+    dependency("org.springframework.security:spring-security-acl")
+  }
+  query pattern callExpr where callee.method == "setLookupPrimaryKeysWhereClause"
+  emit sink code.SqlExecution at args[0]
+}

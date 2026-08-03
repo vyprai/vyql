@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m1457a768;
+
+binding sqlExecution10 {
+  requires {
+    dependency("android.database")
+  }
+  query pattern callExpr where callee.method == "execSQL"
+  emit sink code.SqlExecution at args[0]
+}

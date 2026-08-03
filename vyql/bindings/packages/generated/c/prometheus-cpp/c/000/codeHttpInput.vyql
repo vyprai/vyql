@@ -1,0 +1,9 @@
+module bindings.c.generated.m12cfcb63;
+
+binding httpInput0 {
+  requires {
+    dependency("prometheus-cpp")
+  }
+  query pattern callExpr where callee.method == "handleGet"
+  emit source code.HttpInput at call.result
+}

@@ -1,7 +1,0 @@
-import code.{HttpInput}
-adapter php {
-  package "league/oauth2-server" {
-    source method "validateAuthorizationRequest" -> code.HttpInput
-    source method "validateAuthenticatedRequest" -> code.HttpInput
-  }
-}

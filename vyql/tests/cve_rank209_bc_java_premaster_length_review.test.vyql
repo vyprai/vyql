@@ -1,5 +1,6 @@
 test "rank209: TLS RSA premaster decrypt uses unverified length"
   lang java
+  expect VYQL-CRY-029
   expect_review code.PremasterSecretLengthReview
   code
   ```
@@ -30,8 +31,40 @@ test "rank209: TLS RSA premaster decrypt uses unverified length"
   }
   ```
 
+test "rank209: TLS RSA premaster decrypt generalizes over buffer variable naming"
+  lang java
+  expect VYQL-CRY-029
+  expect_review code.PremasterSecretLengthReview
+  code
+  ```
+  import javax.crypto.Cipher;
+
+  class JceDefaultTlsCredentialedDecryptor {
+      Object safeDecryptPreMasterSecret(Object cryptoParams, Object rsaServerPrivateKey, byte[] encryptedPreMasterSecret) throws Exception {
+          byte[] fallback = new byte[48];
+          byte[] secret = fallback.clone();
+          try {
+              Cipher cipher = Cipher.getInstance("RSA");
+              cipher.init(Cipher.DECRYPT_MODE, null);
+              secret = cipher.doFinal(encryptedPreMasterSecret);
+          } catch (Exception e) {
+          }
+
+          int correct = (3 ^ (secret[0] & 0xff)) | (3 ^ (secret[1] & 0xff));
+          int mask = ~((correct & 1) - 1);
+          for (int i = 0; i < 48; i++) {
+              secret[i] = (byte)((secret[i] & (~mask)) | (fallback[i] & mask));
+          }
+          return createSecret(secret);
+      }
+
+      Object createSecret(byte[] m) { return m; }
+  }
+  ```
+
 test "rank209: TLS RSA premaster decrypt checks fixed length"
   lang java
+  reject VYQL-CRY-029
   reject_review code.PremasterSecretLengthReview
   code
   ```
@@ -59,6 +92,40 @@ test "rank209: TLS RSA premaster decrypt checks fixed length"
               M[i] = (byte)((M[i] & (~mask)) | (fallback[i] & mask));
           }
           return createSecret(M);
+      }
+
+      Object createSecret(byte[] m) { return m; }
+  }
+  ```
+
+test "rank209: TLS RSA premaster decrypt renamed length check is clean"
+  lang java
+  reject VYQL-CRY-029
+  reject_review code.PremasterSecretLengthReview
+  code
+  ```
+  import javax.crypto.Cipher;
+
+  class JceDefaultTlsCredentialedDecryptor {
+      Object safeDecryptPreMasterSecret(Object cryptoParams, Object rsaServerPrivateKey, byte[] encryptedPreMasterSecret) throws Exception {
+          byte[] fallback = new byte[48];
+          byte[] secret = fallback.clone();
+          try {
+              Cipher cipher = Cipher.getInstance("RSA");
+              cipher.init(Cipher.DECRYPT_MODE, null);
+              byte[] candidate = cipher.doFinal(encryptedPreMasterSecret);
+              if (candidate != null && candidate.length == 48) {
+                  secret = candidate;
+              }
+          } catch (Exception e) {
+          }
+
+          int correct = (3 ^ (secret[0] & 0xff)) | (3 ^ (secret[1] & 0xff));
+          int mask = ~((correct & 1) - 1);
+          for (int i = 0; i < 48; i++) {
+              secret[i] = (byte)((secret[i] & (~mask)) | (fallback[i] & mask));
+          }
+          return createSecret(secret);
       }
 
       Object createSecret(byte[] m) { return m; }

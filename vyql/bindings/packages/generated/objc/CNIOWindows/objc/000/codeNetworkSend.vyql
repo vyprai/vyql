@@ -1,0 +1,9 @@
+module bindings.objc.generated.m7b0b866c;
+
+binding networkSend0 {
+  requires {
+    dependency("CNIOWindows")
+  }
+  query pattern callExpr where callee.method == "CNIOWindows_sendmmsg"
+  emit sink code.NetworkSend at args[0]
+}

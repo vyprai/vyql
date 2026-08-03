@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter scala {
-  package "org.primefaces:primefaces" {
-    sink method "PrimeFaces.executeScript" -> code.CodeEval
-  }
-}

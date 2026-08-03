@@ -1,8 +1,0 @@
-import code.{StoredDataRead, StoredDataWrite}
-
-adapter swift {
-  package "github.com/SvenTiigi/WhatsNewKit" {
-    sink method "UserDefaultsWhatsNewVersionStore.save" -> code.StoredDataWrite
-    source method "UserDefaultsWhatsNewVersionStore.presentedVersions" -> code.StoredDataRead
-  }
-}

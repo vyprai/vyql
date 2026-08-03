@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m083f0bb4;
+
+binding sqlExecution1 {
+  requires {
+    dependency("ex_money_sql")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

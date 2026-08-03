@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-
-adapter php {
-  package "seld/phar-utils" {
-    sink method "Seld\PharUtils\Linter::lint" -> code.Deserialization
-    sink method "Seld\PharUtils\Timestamps::save" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,11 @@
+module vypr.model_exposure;
+
+rule SensitiveModelJsonSerializationExposure {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_200, CWE_522]
+    id: "VYQL-SEC-018"
+    severity: high
+  }
+  issue code.SensitiveModelJsonSerializationExposure as p
+}

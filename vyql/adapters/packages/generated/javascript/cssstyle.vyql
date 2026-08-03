@@ -1,6 +1,0 @@
-adapter javascript {
-  package "cssstyle" {
-    sink method "parseCSS" -> code.Deserialization
-    sink method "parsePropertyValue" -> code.Deserialization
-  }
-}

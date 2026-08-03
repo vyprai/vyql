@@ -1,8 +1,0 @@
-import code.{CliArgument, CommandExecution}
-adapter ruby {
-  package "rubocop" {
-    source method "CLI.run" -> code.CliArgument
-    source method "Options.parse" -> code.CliArgument
-    sink method "CLI.run_command" -> code.CommandExecution
-  }
-}

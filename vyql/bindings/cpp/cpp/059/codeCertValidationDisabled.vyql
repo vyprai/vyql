@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding certValidationDisabled59 {
+  query pattern callExpr where callee.path ~= "setsslverify" and args.any.literal contains "false"
+  emit issue code.CertValidationDisabled at call
+}

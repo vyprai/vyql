@@ -1,0 +1,9 @@
+module bindings.dart.generated.mdc507b47;
+
+binding codeEval0 {
+  requires {
+    dependency("back_button_interceptor")
+  }
+  query pattern callExpr where callee.method == "add"
+  emit sink code.CodeEval at args[0]
+}

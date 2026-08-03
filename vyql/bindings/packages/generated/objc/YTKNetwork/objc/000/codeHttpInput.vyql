@@ -1,0 +1,9 @@
+module bindings.objc.generated.mea34866a;
+
+binding httpInput0 {
+  requires {
+    dependency("YTKNetwork")
+  }
+  query pattern callExpr where callee.method == "requestUrl"
+  emit source code.HttpInput at call.result
+}

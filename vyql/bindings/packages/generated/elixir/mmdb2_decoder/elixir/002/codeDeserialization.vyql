@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mc9bf9bf6;
+
+binding deserialization2 {
+  requires {
+    dependency("mmdb2_decoder")
+  }
+  query pattern callExpr where callee.method == "decode_binary"
+  emit sink code.Deserialization at args[0]
+}

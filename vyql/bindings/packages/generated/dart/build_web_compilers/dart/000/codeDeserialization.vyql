@@ -1,0 +1,9 @@
+module bindings.dart.generated.m83835f17;
+
+binding deserialization0 {
+  requires {
+    dependency("build_web_compilers")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

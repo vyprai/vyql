@@ -1,0 +1,13 @@
+module bindings.java.generated.m9ef49b0f;
+
+binding redirectAllowlist50 {
+  requires {
+    dependency("commons-validator")
+  }
+  query pattern callExpr where callee.path ~= "UrlValidator.isValid"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

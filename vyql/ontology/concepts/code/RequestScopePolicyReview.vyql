@@ -1,0 +1,11 @@
+module code;
+
+concept RequestScopePolicyReview : issue {
+  cwe: [CWE_863]
+  reviewAssumption: "the request may be authorized or dispatched under the wrong resource scope"
+  reviewCategory: auth
+  reviewCondition: "request metadata and resource metadata are used without an observed request/resource scope consistency check"
+  reviewConfidence: possibility
+  reviewEvidence: "handler context {pattern} resolves request and resource metadata without a scope comparison"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

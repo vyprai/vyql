@@ -1,0 +1,9 @@
+module bindings.rust.generated.mf6c617f5;
+
+binding deserialization0 {
+  requires {
+    dependency("bzip2")
+  }
+  query pattern callExpr where callee.method == "decompress"
+  emit sink code.Deserialization at args[0]
+}

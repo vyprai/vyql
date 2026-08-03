@@ -1,0 +1,9 @@
+module bindings.scala.generated.m696a9f36;
+
+binding xmlParse0 {
+  requires {
+    dependency("javax.xml.ws:jaxws-api")
+  }
+  query pattern callExpr where callee.method == "getPayload"
+  emit sink code.XmlParse at args[0]
+}

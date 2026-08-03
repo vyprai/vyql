@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m65af8e11;
+
+binding filePathAccess4 {
+  requires {
+    dependency("require_all")
+  }
+  query pattern callExpr where callee.method == "autoload_all"
+  emit sink code.FilePathAccess at args[0]
+}

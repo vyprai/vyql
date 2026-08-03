@@ -1,0 +1,9 @@
+module bindings.swift.generated.m7292326d;
+
+binding networkData18 {
+  requires {
+    dependency("github.com/dduan/Just")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit source code.NetworkData at call.result
+}

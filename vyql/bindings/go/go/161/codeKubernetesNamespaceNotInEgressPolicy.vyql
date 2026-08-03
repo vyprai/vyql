@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding kubernetesNamespaceNotInEgressPolicy161 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.callPath contains "netwv1.NewNetworkPolicy" and node.context.callPath contains "netwv1.NetworkPolicyEgressRuleArgs" and node.context.callPath contains "netwv1.NetworkPolicyPeerArgs" and node.context.callPath contains "metav1.LabelSelectorRequirementArgs" and node.context.literal contains "Egress" and node.context.literal contains "kubernetes.io/metadata.name" and node.context.literal contains "NotIn" and containsAny(node.context.callPath, ["Metadata.Name.Elem", "Namespace.Name.Elem"])
+  emit issue code.KubernetesNamespaceNotInEgressPolicy at node
+}

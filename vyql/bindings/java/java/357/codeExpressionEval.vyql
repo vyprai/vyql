@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding expressionEval357 {
+  query pattern callExpr where callee.method == "buildConstraintViolationWithTemplate"
+  emit sink code.ExpressionEval at args[0]
+}

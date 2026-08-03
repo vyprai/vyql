@@ -1,0 +1,9 @@
+module bindings.elixir.generated.md9454c39;
+
+binding deserialization0 {
+  requires {
+    dependency("ex_struct_translator")
+  }
+  query pattern callExpr where callee.method == "str_to_map"
+  emit sink code.Deserialization at args[0]
+}

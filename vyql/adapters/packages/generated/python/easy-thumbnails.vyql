@@ -1,8 +1,0 @@
-import code.{FilePathAccess, FileUse}
-
-adapter python {
-  package "easy-thumbnails" {
-    sink method "open" -> code.FilePathAccess
-    sink method "save" -> code.FileUse
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding dynamicCodeLoad272 {
+  query pattern callExpr where callee.path == "require"
+  emit sink code.DynamicCodeLoad at args[0]
+}

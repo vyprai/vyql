@@ -1,0 +1,9 @@
+module bindings.swift.generated.mbb916bbc;
+
+binding urlFetch1 {
+  requires {
+    dependency("github.com/jellyfin/jellyfin-sdk-swift")
+  }
+  query pattern callExpr where callee.method == "data"
+  emit sink code.UrlFetch at args[0]
+}

@@ -1,0 +1,7 @@
+module code;
+
+concept PrivilegedOp : issue {
+  cwe: [CWE_284]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [smartcontract.PrivilegedDestruct]
+}

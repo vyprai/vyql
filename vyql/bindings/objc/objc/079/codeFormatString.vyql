@@ -1,0 +1,6 @@
+module bindings.objc.generated.mccadd221;
+
+binding formatString79 {
+  query pattern callExpr where callee.path ~= "NSLog"
+  emit sink code.FormatString at args[0]
+}

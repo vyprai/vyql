@@ -1,0 +1,9 @@
+module bindings.python.generated.m2982b66d;
+
+binding httpInput1 {
+  requires {
+    dependency("falcon")
+  }
+  query pattern callExpr where callee.method == "falcon.request.Request.get_param"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ContaoAjaxToggleSubpaletteSqlIdentifierInjection {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_89]
+    id: "VYQL-INJ-112"
+    severity: high
+  }
+  issue code.ContaoAjaxToggleSubpaletteSqlIdentifierInjection as sink
+}

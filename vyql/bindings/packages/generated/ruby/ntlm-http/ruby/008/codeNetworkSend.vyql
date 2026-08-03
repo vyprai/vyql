@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mc9010118;
+
+binding networkSend8 {
+  requires {
+    dependency("ntlm-http")
+  }
+  query pattern callExpr where callee.method == "old_request"
+  emit sink code.NetworkSend at args[0]
+}

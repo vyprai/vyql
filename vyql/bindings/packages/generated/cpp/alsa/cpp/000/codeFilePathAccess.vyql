@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m6b02cad0;
+
+binding filePathAccess0 {
+  requires {
+    dependency("alsa")
+  }
+  query pattern callExpr where callee.method == "snd_pcm_open"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.rust.generated.m8aa2719e;
+
+binding httpInput0 {
+  requires {
+    dependency("http")
+  }
+  query pattern callExpr where callee.method == "uri::query"
+  emit source code.HttpInput at call.result
+}

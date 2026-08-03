@@ -1,0 +1,9 @@
+module bindings.objc.generated.mcf19b29f;
+
+binding filePathAccess7 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "deleteWithFilepath:"
+  emit sink code.FilePathAccess at args[0]
+}

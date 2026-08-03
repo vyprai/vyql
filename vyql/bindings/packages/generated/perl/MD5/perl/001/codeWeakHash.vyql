@@ -1,0 +1,9 @@
+module bindings.perl.generated.mb0e9f9cf;
+
+binding weakHash1 {
+  requires {
+    dependency("MD5")
+  }
+  query pattern callExpr where callee.method == "hexhash"
+  emit issue code.WeakHash at call
+}

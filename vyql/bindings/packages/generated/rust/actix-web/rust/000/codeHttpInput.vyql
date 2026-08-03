@@ -1,0 +1,9 @@
+module bindings.rust.generated.mfcac2c50;
+
+binding httpInput0 {
+  requires {
+    dependency("actix-web")
+  }
+  query pattern callExpr where callee.path ~= "request"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding rateLimitedMbufResponseLeak128 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.paramType contains "mbuf" and node.context.callPath contains "tcp_challenge_ack_check" and node.context.callPath contains "tcp_respond" and not (node.context.callPath contains "m_freem")
+  emit issue code.RateLimitedMbufResponseLeak at node
+}

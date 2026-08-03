@@ -1,8 +1,0 @@
-import code.{XmlParse}
-
-adapter kotlin {
-  package "com.sun.faces:jsf-impl" {
-    sink method "resolveEntity" -> code.XmlParse
-    sink method "resolveResource" -> code.XmlParse
-  }
-}

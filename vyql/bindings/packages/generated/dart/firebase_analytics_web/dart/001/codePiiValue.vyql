@@ -1,0 +1,9 @@
+module bindings.dart.generated.m56895ad0;
+
+binding piiValue1 {
+  requires {
+    dependency("firebase_analytics_web")
+  }
+  query pattern callExpr where callee.method == "getAppInstanceId"
+  emit source code.PiiValue at call.result
+}

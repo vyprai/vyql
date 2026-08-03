@@ -1,0 +1,9 @@
+module bindings.objc.generated.m68bf71d8;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("SPTPersistentCache")
+  }
+  query pattern callExpr where callee.method == "write:buffer:bufferSize:"
+  emit sink code.StoredDataWrite at args[0]
+}

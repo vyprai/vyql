@@ -1,6 +1,0 @@
-import code.{NetworkData}
-adapter scala {
-  package "org.springframework.cloud:spring-cloud-stream" {
-    source method "send" -> code.NetworkData
-  }
-}

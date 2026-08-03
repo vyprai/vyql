@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule OpnSenseRrdRestoreFilenameCommandInjection {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_78, CWE_20]
+    id: "VYQL-INJ-114"
+    severity: critical
+  }
+  issue code.OpnSenseRrdRestoreFilenameCommandInjection as sink
+}

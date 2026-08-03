@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter dart {
-  package "intl_utils" {
-    sink method "parse" -> code.Deserialization
-  }
-}

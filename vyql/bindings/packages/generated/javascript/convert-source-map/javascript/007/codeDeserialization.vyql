@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m602ccca3;
+
+binding deserialization7 {
+  requires {
+    dependency("convert-source-map")
+  }
+  query pattern callExpr where callee.method == "decodeBase64WithAtob"
+  emit sink code.Deserialization at args[0]
+}

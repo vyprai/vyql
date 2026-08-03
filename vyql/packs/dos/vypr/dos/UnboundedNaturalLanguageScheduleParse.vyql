@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule UnboundedNaturalLanguageScheduleParse {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_400]
+    id: "VYQL-DOS-038"
+    severity: high
+  }
+  issue code.UnboundedNaturalLanguageScheduleParse as parser
+}

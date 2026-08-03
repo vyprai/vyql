@@ -1,0 +1,14 @@
+module bindings.csharp.generated.m1b942e7b;
+
+binding inputValidation2 {
+  requires {
+    dependency("nhibernate.validator")
+  }
+  query pattern callExpr where callee.method == "ValidatePropertyValue"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

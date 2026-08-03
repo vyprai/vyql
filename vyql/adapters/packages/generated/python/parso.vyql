@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "parso" {
-    sink method "parse" -> code.Deserialization
-  }
-}

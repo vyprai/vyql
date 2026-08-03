@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter java {
-  package "org.apache.httpcomponents:httpcore" {
-    sink method "ContentType.parse" -> code.Deserialization
-  }
-}

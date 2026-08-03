@@ -1,0 +1,9 @@
+module bindings.javascript.generated.md2fd4000;
+
+binding deserialization3 {
+  requires {
+    dependency("cosmiconfig")
+  }
+  query pattern callExpr where callee.method == "loadJson"
+  emit sink code.Deserialization at args[0]
+}

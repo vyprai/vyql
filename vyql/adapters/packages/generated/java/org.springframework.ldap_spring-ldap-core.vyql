@@ -1,8 +1,0 @@
-import code.{NosqlQuery, Deserialization}
-
-adapter java {
-  package "org.springframework.ldap:spring-ldap-core" {
-    sink method "LdapClient.query" -> code.NosqlQuery
-    sink method "DistinguishedName.parse" -> code.Deserialization
-  }
-}

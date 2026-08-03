@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/mgechev/revive" {
-    sink method "GetConfig" -> code.FilePathAccess
-  }
-}

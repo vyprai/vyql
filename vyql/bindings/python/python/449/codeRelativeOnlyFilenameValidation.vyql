@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding relativeOnlyFilenameValidation449 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "relative_only_filename_validation"
+  emit issue code.RelativeOnlyFilenameValidation at node
+}

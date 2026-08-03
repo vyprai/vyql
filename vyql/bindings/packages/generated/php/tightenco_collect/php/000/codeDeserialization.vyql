@@ -1,0 +1,9 @@
+module bindings.php.generated.m53b53a52;
+
+binding deserialization0 {
+  requires {
+    dependency("tightenco/collect")
+  }
+  query pattern callExpr where callee.method == "json_decode"
+  emit sink code.Deserialization at args[0]
+}

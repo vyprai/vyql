@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "parity-scale-codec-derive" {
-    sink method "parse" -> code.Deserialization
-  }
-}

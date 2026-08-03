@@ -1,0 +1,9 @@
+module bindings.php.generated.me4f39690;
+
+binding fileUse3 {
+  requires {
+    dependency("enlightn/security-checker")
+  }
+  query pattern callExpr where callee.method == "deleteDirectory"
+  emit sink code.FileUseSink at args[0]
+}

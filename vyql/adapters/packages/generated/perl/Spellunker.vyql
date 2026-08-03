@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter perl {
-  package "Spellunker" {
-    sink method "load_dictionary" -> code.FilePathAccess
-  }
-}

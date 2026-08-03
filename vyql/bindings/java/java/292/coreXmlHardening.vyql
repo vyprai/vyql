@@ -1,0 +1,11 @@
+module bindings.java.generated.m420f6b67;
+
+binding xmlHardening292 {
+  query pattern callExpr where callee.path ~= "setProperty" and args.any.literal contains "IS_SUPPORTING_EXTERNAL_ENTITIES" and not args.any.literal contains "true"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}

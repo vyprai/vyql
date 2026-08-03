@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding sensitiveOperation205 {
+  query pattern presenceNode where node.path ~= "Login.accurevLoginFromGlobalConfig"
+  emit issue code.SensitiveOperation at node
+}

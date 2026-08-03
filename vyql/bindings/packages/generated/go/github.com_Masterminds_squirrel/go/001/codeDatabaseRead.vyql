@@ -1,0 +1,9 @@
+module bindings.go.generated.m7b25c55c;
+
+binding databaseRead1 {
+  requires {
+    dependency("github.com/Masterminds/squirrel")
+  }
+  query pattern callExpr where callee.method == "QueryWith"
+  emit sink code.DatabaseReadSink at args[0]
+}

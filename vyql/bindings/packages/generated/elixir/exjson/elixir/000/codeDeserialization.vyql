@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m535ffe4a;
+
+binding deserialization0 {
+  requires {
+    dependency("exjson")
+  }
+  query pattern callExpr where callee.method == "ExJSON.parse"
+  emit sink code.Deserialization at args[0]
+}

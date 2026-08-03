@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mf5aa3046;
+
+binding codeEval0 {
+  requires {
+    dependency("execjs")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CodeEval at args[0]
+}

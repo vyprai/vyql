@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m33000db9;
+
+binding codeEval0 {
+  requires {
+    dependency("exsync")
+  }
+  query pattern callExpr where callee.method == "reload"
+  emit sink code.CodeEval at args[0]
+}

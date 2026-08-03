@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding idorPolicyReview152 {
+  query pattern presenceNode where node.analysis == "module.context" and node.context.language == "php" and node.context.phpReview == "review_id_without_customer_id"
+  emit issue code.IdorPolicyReview at node
+}

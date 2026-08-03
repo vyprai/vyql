@@ -1,0 +1,9 @@
+module bindings.php.generated.maee6c4a1;
+
+binding userControlledData0 {
+  requires {
+    dependency("webonyx/graphql-php")
+  }
+  query pattern callExpr where callee.method == "GraphQL\\Server\\Helper::parseHttpRequest"
+  emit source core.UserControlledData at call.result
+}

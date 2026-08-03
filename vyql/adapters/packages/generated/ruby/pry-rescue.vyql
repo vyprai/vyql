@@ -1,8 +1,0 @@
-import code.{CodeEval}
-
-adapter ruby {
-  package "pry-rescue" {
-    sink method "load" -> code.CodeEval
-    sink method "load_rake" -> code.CodeEval
-  }
-}

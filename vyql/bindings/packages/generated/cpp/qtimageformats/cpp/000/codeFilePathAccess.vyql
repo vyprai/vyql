@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mbc6ac631;
+
+binding filePathAccess0 {
+  requires {
+    dependency("qtimageformats")
+  }
+  query pattern callExpr where callee.method == "TIFFFileName"
+  emit sink code.FilePathAccess at args[0]
+}

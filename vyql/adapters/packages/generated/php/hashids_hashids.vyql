@@ -1,6 +1,0 @@
-adapter php {
-  package "hashids/hashids" {
-    sink method "decode" -> code.Deserialization
-    sink method "decodeHex" -> code.Deserialization
-  }
-}

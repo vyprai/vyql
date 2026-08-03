@@ -1,0 +1,9 @@
+module bindings.java.generated.mc1571c75;
+
+binding logOutput0 {
+  requires {
+    dependency("log4j:log4j")
+  }
+  query pattern callExpr where callee.method == "ConsoleAppender.write"
+  emit sink code.LogOutput at args[0]
+}

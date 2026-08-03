@@ -1,0 +1,9 @@
+module bindings.php.generated.mf7bebf2b;
+
+binding logOutput4 {
+  requires {
+    dependency("illuminate/log")
+  }
+  query pattern callExpr where callee.method == "warning"
+  emit sink code.LogOutput at args[0]
+}

@@ -1,8 +1,0 @@
-import core.{AuthorizationCheck, CsrfProtection, HtmlEscape}
-adapter groovy {
-  package "org.springframework.security:spring-security-taglibs" {
-    control method "authorizeUsingUrlCheck" -> core.AuthorizationCheck
-    control method "setHtmlEscape" -> core.HtmlEscape
-    control method "handleToken" -> core.CsrfProtection
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m3d3e6904;
+
+binding filePathAccess3 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-ie-driver")
+  }
+  query pattern callExpr where callee.method == "withEdgeExecutablePath"
+  emit sink code.FilePathAccess at args[0]
+}

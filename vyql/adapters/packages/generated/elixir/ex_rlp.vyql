@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "ex_rlp" {
-    sink method "decode" -> code.Deserialization
-  }
-}

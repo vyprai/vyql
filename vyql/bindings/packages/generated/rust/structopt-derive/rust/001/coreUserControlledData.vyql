@@ -1,0 +1,9 @@
+module bindings.rust.generated.mad57970c;
+
+binding userControlledData1 {
+  requires {
+    dependency("structopt-derive")
+  }
+  query pattern callExpr where callee.method == "structopt"
+  emit source core.UserControlledData at call.result
+}

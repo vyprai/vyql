@@ -1,0 +1,9 @@
+module bindings.dart.generated.m0d5a9baa;
+
+binding networkSend0 {
+  requires {
+    dependency("nm")
+  }
+  query pattern callExpr where callee.method == "NetworkManagerSettings.addConnection"
+  emit sink code.NetworkSend at args[0]
+}

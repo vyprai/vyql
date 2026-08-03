@@ -1,0 +1,11 @@
+module code;
+
+concept CommandLineAssemblyReview : issue {
+  cwe: [CWE_77, CWE_88, CWE_829]
+  reviewAssumption: "the appended value can be influenced through a document, URI, desktop action, or caller-controlled parameter"
+  reviewCategory: command
+  reviewCondition: "command line text is assembled from contextual values without observed shell quoting"
+  reviewConfidence: medium
+  reviewEvidence: "command-line assembly context {pattern} appends a placeholder value before process/application launch"
+  vulnerableTo: [injection.CommandInjection, injection.ArgumentInjection, injection.UnsafeDynamicLoading]
+}

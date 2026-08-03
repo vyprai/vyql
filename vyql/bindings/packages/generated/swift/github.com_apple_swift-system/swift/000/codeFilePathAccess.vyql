@@ -1,0 +1,9 @@
+module bindings.swift.generated.m98fe851e;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/apple/swift-system")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

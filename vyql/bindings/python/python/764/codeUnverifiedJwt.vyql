@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding unverifiedJwt764 {
+  query pattern presenceNode where node.path ~= "jwt.decode" and node.token contains "none"
+  emit issue code.UnverifiedJwt at node
+}

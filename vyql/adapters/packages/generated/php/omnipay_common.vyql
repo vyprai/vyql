@@ -1,7 +1,0 @@
-import code.{NetworkSend, NetworkConnect}
-adapter php {
-  package "omnipay/common" {
-    sink method "send" -> code.NetworkSend
-    sink method "request" -> code.NetworkConnect
-  }
-}

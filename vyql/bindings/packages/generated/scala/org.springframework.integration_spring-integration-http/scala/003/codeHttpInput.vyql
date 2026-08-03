@@ -1,0 +1,9 @@
+module bindings.scala.generated.m31e3db5b;
+
+binding httpInput3 {
+  requires {
+    dependency("org.springframework.integration:spring-integration-http")
+  }
+  query pattern callExpr where callee.method == "inboundControllerAdapter"
+  emit source code.HttpInput at call.result
+}

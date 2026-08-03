@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding absoluteUriUserFolderLookup169 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and containsAny(node.context.name, ["AbsoluteUri", "AbsoluteURI", "AbsolutePath"]) and node.context.callPath contains "explode" and node.context.callPath contains "$this.rootFolder.getUserFolder" and not (node.context.callPath contains "$this.userSession.getUser") and not (node.context.callPath contains "$user.getUID")
+  emit issue code.AbsoluteUriUserFolderLookup at node
+}

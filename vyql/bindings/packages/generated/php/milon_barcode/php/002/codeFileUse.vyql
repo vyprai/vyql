@@ -1,0 +1,9 @@
+module bindings.php.generated.m2c142896;
+
+binding fileUse2 {
+  requires {
+    dependency("milon/barcode")
+  }
+  query pattern callExpr where callee.method == "getBarcodeSVG"
+  emit sink code.FileUseSink at args[0]
+}

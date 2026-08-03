@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m940a7789;
+
+binding filePathAccess0 {
+  requires {
+    dependency("fsevents")
+  }
+  query pattern callExpr where callee.method == "watch"
+  emit sink code.FilePathAccess at args[0]
+}

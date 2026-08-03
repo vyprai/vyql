@@ -3,6 +3,7 @@
 
 test "rank139: javascript SRI metadata registers unapproved external resource for review"
   lang javascript
+  expect VYQL-INJ-198
   expect_review code.ExternalResourceIntegrityReview
   code
   ```
@@ -40,6 +41,7 @@ test "rank139: javascript SRI metadata registers unapproved external resource fo
 
 test "rank139: javascript SRI metadata unknown resource removal is clean"
   lang javascript
+  reject VYQL-INJ-198
   reject_review code.ExternalResourceIntegrityReview
   code
   ```

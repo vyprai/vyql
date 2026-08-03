@@ -1,0 +1,9 @@
+module bindings.dart.generated.m9fbac062;
+
+binding storedDataRead1 {
+  requires {
+    dependency("shared_preferences_web")
+  }
+  query pattern callExpr where callee.method == "SharedPreferencesPlugin.getValue"
+  emit source code.StoredDataRead at call.result
+}

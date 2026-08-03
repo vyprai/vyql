@@ -1,0 +1,10 @@
+module bindings.go.generated.m417c0eb3;
+
+binding regexCompile5 {
+  requires {
+    dependency("github.com/go-task/slim-sprig")
+  }
+  query pattern callExpr where callee.method == "regexFind"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

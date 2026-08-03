@@ -1,0 +1,9 @@
+module bindings.python.generated.mf093cc62;
+
+binding commandExecution2 {
+  requires {
+    dependency("setuptools")
+  }
+  query pattern callExpr where callee.method == "execv"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding commandLineAssemblyReview22 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "command_line.glib_unquoted_placeholder"
+  emit issue code.CommandLineAssemblyReview at node
+}

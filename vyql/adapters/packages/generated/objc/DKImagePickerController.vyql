@@ -1,5 +1,0 @@
-adapter objc {
-  package "DKImagePickerController" {
-    sink method "write" -> code.FileUse
-  }
-}

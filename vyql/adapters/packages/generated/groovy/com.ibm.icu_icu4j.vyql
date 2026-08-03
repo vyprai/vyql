@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "com.ibm.icu:icu4j" {
-    sink method "parse" -> code.Deserialization
-    sink method "unserialize" -> code.Deserialization
-  }
-}

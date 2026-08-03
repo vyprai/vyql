@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter perl {
-  package "Pye" {
-    sink method "new" -> code.CodeEval
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m464a36f7;
+
+binding networkSend1 {
+  requires {
+    dependency("pobox")
+  }
+  query pattern callExpr where callee.method == "send_notification"
+  emit sink code.NetworkSend at args[0]
+}

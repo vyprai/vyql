@@ -1,8 +1,0 @@
-import core.{InputValidation}
-
-adapter javascript {
-  package "ms" {
-    control method "parse" -> core.InputValidation
-    control method "module.exports" -> core.InputValidation
-  }
-}

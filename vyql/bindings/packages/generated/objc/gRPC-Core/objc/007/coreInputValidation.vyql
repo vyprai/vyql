@@ -1,0 +1,14 @@
+module bindings.objc.generated.me76efafa;
+
+binding inputValidation7 {
+  requires {
+    dependency("gRPC-Core")
+  }
+  query pattern callExpr where callee.method == "grpc_header_key_is_legal"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

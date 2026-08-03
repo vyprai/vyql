@@ -1,0 +1,13 @@
+module bindings.javascript.generated.m1d6366bf;
+
+binding pathAccessCheck1 {
+  requires {
+    dependency("path-is-absolute")
+  }
+  query pattern callExpr where callee.method == "win32"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

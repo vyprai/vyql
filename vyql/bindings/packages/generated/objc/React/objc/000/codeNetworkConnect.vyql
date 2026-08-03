@@ -1,0 +1,9 @@
+module bindings.objc.generated.m3752807f;
+
+binding networkConnect0 {
+  requires {
+    dependency("React")
+  }
+  query pattern callExpr where callee.method == "downloadTaskWithRequest"
+  emit sink code.NetworkConnectSink at args[0]
+}

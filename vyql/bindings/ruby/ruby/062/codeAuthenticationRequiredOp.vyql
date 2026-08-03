@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding authenticationRequiredOp62 {
+  query pattern presenceNode where node.path ~= "delete_account"
+  emit issue code.AuthenticationRequiredOp at node
+}

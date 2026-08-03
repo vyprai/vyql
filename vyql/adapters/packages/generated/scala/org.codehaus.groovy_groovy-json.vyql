@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter scala {
-  package "org.codehaus.groovy:groovy-json" {
-    sink method "parse" -> code.Deserialization
-    sink method "parseText" -> code.Deserialization
-  }
-}

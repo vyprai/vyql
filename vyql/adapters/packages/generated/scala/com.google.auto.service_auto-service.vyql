@@ -1,7 +1,0 @@
-import code.{FileUse}
-adapter scala {
-  package "com.google.auto.service:auto-service" {
-    sink method "readServiceFile" -> code.FileUse
-    sink method "writeServiceFile" -> code.FileUse
-  }
-}

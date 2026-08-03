@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m8a69c8a8;
+
+binding commandExecution0 {
+  requires {
+    dependency("honeydew")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

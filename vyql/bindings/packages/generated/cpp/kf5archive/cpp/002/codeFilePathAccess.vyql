@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mc48a5869;
+
+binding filePathAccess2 {
+  requires {
+    dependency("kf5archive")
+  }
+  query pattern callExpr where callee.method == "doWriteSymLink"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-
-adapter go {
-  package "github.com/apparentlymart/go-textseg/v13" {
-    source method "AllTokens" -> core.UserControlledData
-    source method "TokenCount" -> core.UserControlledData
-    source method "ScanUTF8Sequences" -> core.UserControlledData
-  }
-}

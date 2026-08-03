@@ -4,6 +4,7 @@
 
 test "rank159: python config dict serialization without API redaction requires review"
   lang python
+  expect VYQL-SEC-041
   expect_review code.ConfigExposureReview
   code
   ```
@@ -18,6 +19,7 @@ test "rank159: python config dict serialization without API redaction requires r
 
 test "rank159: python config dict serialization with API redaction is clean"
   lang python
+  reject VYQL-SEC-041
   reject_review code.ConfigExposureReview
   code
   ```

@@ -1,9 +1,0 @@
-import code.{SqlExecution}
-adapter groovy {
-  package "org.springframework:spring-jdbc" {
-    sink method "query" -> code.SqlExecution
-    sink method "update" -> code.SqlExecution
-    sink method "batchUpdate" -> code.SqlExecution
-    sink method "execute" -> code.SqlExecution
-  }
-}

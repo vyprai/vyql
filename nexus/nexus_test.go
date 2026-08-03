@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/resultpolicy"
 )
 
 func TestNexusEmitAndValidate(t *testing.T) {
@@ -15,7 +16,7 @@ func TestNexusEmitAndValidate(t *testing.T) {
 			{Name: "source", NodeID: "in", Concept: "code.HttpInput", Loc: "a.go:1"},
 			{Name: "sink", NodeID: "q", Concept: "code.SqlExecution", Loc: "a.go:2"},
 		},
-		NegationEvidence: []findings.NegationEvidence{{Clause: "sanitized_by core.SqlParameterization", Satisfied: false}},
+		NegationEvidence: []findings.NegationEvidence{{Clause: "path_covered_by core.SqlParameterization", Satisfied: false}},
 	}
 	doc := ToNexus([]*findings.Finding{f}, "0.1.0", "1.4.0")
 	if p := Validate(doc); len(p) != 0 {
@@ -26,7 +27,7 @@ func TestNexusEmitAndValidate(t *testing.T) {
 	}
 	fs := doc["findings"].([]any)
 	nf := fs[0].(map[string]any)
-	if nf["fingerprint"] != f.Fingerprint() {
+	if nf["fingerprint"] != resultpolicy.Fingerprint(f) {
 		t.Fatalf("nexus fingerprint mismatch")
 	}
 	if len(nf["bindings"].([]any)) != 2 {

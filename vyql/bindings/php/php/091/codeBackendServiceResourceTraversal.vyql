@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding backendServiceResourceTraversal91 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "handleServiceRequest" and node.context.phpReview == "backend_service_resource_traversal"
+  emit issue code.BackendServiceResourceTraversal at node
+}

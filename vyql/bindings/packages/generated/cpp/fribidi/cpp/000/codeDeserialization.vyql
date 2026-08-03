@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m9ae30796;
+
+binding deserialization0 {
+  requires {
+    dependency("fribidi")
+  }
+  query pattern callExpr where callee.method == "fribidi_parse_charset"
+  emit sink code.Deserialization at args[0]
+}

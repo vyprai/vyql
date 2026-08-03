@@ -1,0 +1,9 @@
+module bindings.python.generated.m98a05381;
+
+binding filePathAccess0 {
+  requires {
+    dependency("soundfile")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

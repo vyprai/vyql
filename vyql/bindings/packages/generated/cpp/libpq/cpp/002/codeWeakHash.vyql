@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m8056df59;
+
+binding weakHash2 {
+  requires {
+    dependency("libpq")
+  }
+  query pattern callExpr where callee.method == "pg_md5_final"
+  emit issue code.WeakHash at call
+}

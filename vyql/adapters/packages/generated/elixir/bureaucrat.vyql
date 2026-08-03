@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter elixir {
-  package "bureaucrat" {
-    sink method "Bureaucrat.JSON.decode" -> code.Deserialization
-    sink method "Bureaucrat.JSON.decode!" -> code.Deserialization
-    sink method "Bureaucrat.ApiBlueprintWriter.write" -> code.FilePathAccess
-  }
-}

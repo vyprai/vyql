@@ -1,0 +1,9 @@
+module bindings.perl.generated.m2894cebd;
+
+binding httpInput0 {
+  requires {
+    dependency("POE-Filter-SimpleHTTP")
+  }
+  query pattern callExpr where callee.method == "get_one"
+  emit source code.HttpInput at call.result
+}

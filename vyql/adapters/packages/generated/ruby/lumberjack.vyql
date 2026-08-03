@@ -1,7 +1,0 @@
-import code.{LogOutput}
-
-adapter ruby {
-  package "lumberjack" {
-    sink method "write" -> code.LogOutput
-  }
-}

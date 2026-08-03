@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding ignoredAuthorizationResult210 {
+  query pattern presenceNode where node.scope == "function" and node.context.call contains "canObtainDelegationToken" and not (node.context.callPath contains "ThriftSecurityException")
+  emit issue code.IgnoredAuthorizationResult at node
+}

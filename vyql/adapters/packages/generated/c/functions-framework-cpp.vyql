@@ -1,9 +1,0 @@
-import code.{HttpInput, HtmlRender, ResponseHeaderWrite}
-
-adapter c {
-  package "functions-framework-cpp" {
-    source method "HttpRequest" -> code.HttpInput
-    sink method "HttpResponse.set_header" -> code.ResponseHeaderWrite
-    sink method "HttpResponse.set_payload" -> code.HtmlRender
-  }
-}

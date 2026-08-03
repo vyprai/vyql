@@ -1,0 +1,9 @@
+module bindings.c.generated.m2816daee;
+
+binding ldapQuery30 {
+  requires {
+    dependency("openldap")
+  }
+  query pattern callExpr where callee.path ~= "ldap_search_ext_s"
+  emit sink code.LdapQuery at args[3]
+}

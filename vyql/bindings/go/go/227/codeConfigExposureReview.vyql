@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding configExposureReview227 {
+  query pattern callExpr where callee.path ~= "instance.MarshalConfig" and args.any.literal contains "false"
+  emit issue code.ConfigExposureReview at node
+}

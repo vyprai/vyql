@@ -1,0 +1,9 @@
+module bindings.swift.generated.ma7ff33b6;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/apple/ml-stable-diffusion")
+  }
+  query pattern callExpr where callee.method == "tokenize"
+  emit sink code.Deserialization at args[0]
+}

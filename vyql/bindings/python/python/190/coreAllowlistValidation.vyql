@@ -1,0 +1,10 @@
+module bindings.python.generated.m21017d75;
+
+binding allowlistValidation190 {
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.literal contains "socket.getaddrinfo" and args.any.literal contains "ipaddress.ip_address" and args.any.literal contains "is_private" and args.any.literal contains "is_loopback" and args.any.literal contains "is_link_local"
+  emit check core.AllowlistValidation at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

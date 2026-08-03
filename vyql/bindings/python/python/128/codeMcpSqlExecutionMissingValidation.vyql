@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding mcpSqlExecutionMissingValidation128 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "mcp_sql_execution_missing_validation"
+  emit issue code.McpSqlExecutionMissingValidation at node
+}

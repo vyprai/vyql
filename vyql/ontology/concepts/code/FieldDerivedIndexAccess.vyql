@@ -1,0 +1,6 @@
+module code;
+
+concept FieldDerivedIndexAccess : issue {
+  cwe: [CWE_129, CWE_125, CWE_787]
+  vulnerableTo: [memory.OobRead, memory.OobWrite]
+}

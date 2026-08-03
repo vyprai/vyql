@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding archiveSymlinkFilterBypass47 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "archive_symlink_filter_bypass"
+  emit issue code.ArchiveSymlinkFilterBypass at node
+}

@@ -1,0 +1,14 @@
+module bindings.javascript.generated.m854e2786;
+
+binding inputValidation2 {
+  requires {
+    dependency("@rollup/pluginutils")
+  }
+  query pattern callExpr where callee.method == "escapeRegex"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

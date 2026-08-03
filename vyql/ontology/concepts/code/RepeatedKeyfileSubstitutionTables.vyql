@@ -1,0 +1,11 @@
+module code;
+
+concept RepeatedKeyfileSubstitutionTables : issue {
+  cwe: [CWE_327, CWE_326]
+  reviewAssumption: "an attacker with known plaintext or ciphertext samples can exploit repeated substitution-table order for frequency analysis or key recovery"
+  reviewCategory: crypto
+  reviewCondition: "keyfile-driven substitution-table generation repeats the same table schedule or table order across encryption rounds"
+  reviewConfidence: high
+  reviewEvidence: "substitution-table setup context {pattern} reads keyfile bytes and uses them directly to swap table entries for each table without per-table PRNG mixing or a separate keyfile-derived table-order stream"
+  vulnerableTo: [crypto.WeakCipher]
+}

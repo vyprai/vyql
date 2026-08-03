@@ -1,0 +1,9 @@
+module bindings.swift.generated.m4a99fdf8;
+
+binding fileUse2 {
+  requires {
+    dependency("github.com/xcode-actions/clt-logger")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit sink code.FileUseSink at args[0]
+}

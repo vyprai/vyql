@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding cleartextChannel657 {
+  query pattern callExpr where callee.path ~= "fetch" and args.any.literal contains "http://" and not args.any.literal contains "127.0" and not args.any.literal contains "localhost"
+  emit issue code.CleartextChannel at call
+}

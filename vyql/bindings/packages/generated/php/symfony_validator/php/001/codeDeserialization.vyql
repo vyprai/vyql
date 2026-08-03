@@ -1,0 +1,9 @@
+module bindings.php.generated.m3a4a401a;
+
+binding deserialization1 {
+  requires {
+    dependency("symfony/validator")
+  }
+  query pattern callExpr where callee.method == "addYamlMapping"
+  emit sink code.Deserialization at args[0]
+}

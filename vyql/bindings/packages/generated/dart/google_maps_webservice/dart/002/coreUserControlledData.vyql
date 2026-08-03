@@ -1,0 +1,9 @@
+module bindings.dart.generated.ma5c0d506;
+
+binding userControlledData2 {
+  requires {
+    dependency("google_maps_webservice")
+  }
+  query pattern callExpr where callee.method == "getGeolocationFromMap"
+  emit source core.UserControlledData at call.result
+}

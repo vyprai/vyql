@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m4b05a11d;
+
+binding codeEval2 {
+  requires {
+    dependency("org.scala-lang:scala-compiler")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.java.generated.m44b3cafd;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.apache.maven.plugin-testing:maven-plugin-testing-harness")
+  }
+  query pattern callExpr where callee.method == "getTestFile"
+  emit sink code.FilePathAccess at args[0]
+}

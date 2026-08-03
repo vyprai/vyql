@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter groovy {
-  package "com.googlecode.json-simple:json-simple" {
-    sink method "parse" -> code.Deserialization
-  }
-}

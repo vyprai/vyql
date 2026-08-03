@@ -1,0 +1,9 @@
+module bindings.perl.generated.m69730f94;
+
+binding filePathAccess1 {
+  requires {
+    dependency("Locale-Country-Multilingual")
+  }
+  query pattern callExpr where callee.method == "code2country"
+  emit sink code.FilePathAccess at args[0]
+}

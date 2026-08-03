@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m232fb4c7;
+
+binding networkConnect2 {
+  requires {
+    dependency("io.github.bonigarcia:webdrivermanager")
+  }
+  query pattern callExpr where callee.method == "exchange"
+  emit sink code.NetworkConnectSink at args[0]
+}

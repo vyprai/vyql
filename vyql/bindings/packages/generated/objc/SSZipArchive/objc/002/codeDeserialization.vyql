@@ -1,0 +1,9 @@
+module bindings.objc.generated.m4ce0caf1;
+
+binding deserialization2 {
+  requires {
+    dependency("SSZipArchive")
+  }
+  query pattern callExpr where callee.method == "unzipFileAtPath:toDestination:delegate:"
+  emit sink code.Deserialization at args[0]
+}

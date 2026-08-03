@@ -1,0 +1,9 @@
+module bindings.python.generated.mb6c97805;
+
+binding filePathAccess1 {
+  requires {
+    dependency("pyreadline")
+  }
+  query pattern callExpr where callee.method == "read_init_file"
+  emit sink code.FilePathAccess at args[0]
+}

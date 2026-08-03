@@ -1,0 +1,6 @@
+module core;
+
+review core.OwnershipCheck {
+  category: auth
+  kind: check
+}

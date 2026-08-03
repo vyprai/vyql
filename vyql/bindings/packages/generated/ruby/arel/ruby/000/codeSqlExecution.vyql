@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m187cb072;
+
+binding sqlExecution0 {
+  requires {
+    dependency("arel")
+  }
+  query pattern callExpr where callee.method == "Row"
+  emit sink code.SqlExecution at args[0]
+}

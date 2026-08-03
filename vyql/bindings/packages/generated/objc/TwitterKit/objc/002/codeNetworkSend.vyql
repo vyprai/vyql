@@ -1,0 +1,9 @@
+module bindings.objc.generated.mad0b6a3d;
+
+binding networkSend2 {
+  requires {
+    dependency("TwitterKit")
+  }
+  query pattern callExpr where callee.method == "uploadMedia:contentType:completion:"
+  emit sink code.NetworkSend at args[0]
+}

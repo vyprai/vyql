@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding serverSideBrowserActiveHtmlRendering314 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "server_side_browser_active_html_js_enabled"
+  emit issue code.ServerSideBrowserActiveHtmlRendering at node
+}

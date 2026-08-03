@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule DotNetArchiveOrRenamePathTraversal {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22]
+    id: "VYQL-PATH-037"
+    severity: high
+  }
+  issue code.DotNetArchiveOrRenamePathTraversal as sink
+}

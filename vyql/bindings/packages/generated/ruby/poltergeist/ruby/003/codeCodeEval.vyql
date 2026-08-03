@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mcf1af1b6;
+
+binding codeEval3 {
+  requires {
+    dependency("poltergeist")
+  }
+  query pattern callExpr where callee.method == "evaluate_async_script"
+  emit sink code.CodeEval at args[0]
+}

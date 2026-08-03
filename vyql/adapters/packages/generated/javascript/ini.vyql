@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "ini" {
-    sink method "decode" -> code.Deserialization
-  }
-}

@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule CollectivesPublicTrashMissingEditPermission {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_284]
+    id: "VYQL-AUTH-024"
+    severity: medium
+  }
+  issue code.CollectivesPublicTrashMissingEditPermission as endpoint
+}

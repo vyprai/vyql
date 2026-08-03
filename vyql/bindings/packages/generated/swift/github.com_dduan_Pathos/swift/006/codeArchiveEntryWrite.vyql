@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc537eea8;
+
+binding archiveEntryWrite6 {
+  requires {
+    dependency("github.com/dduan/Pathos")
+  }
+  query pattern callExpr where callee.method == "copy"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

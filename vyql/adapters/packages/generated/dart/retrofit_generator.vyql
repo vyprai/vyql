@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter dart {
-  package "retrofit_generator" {
-    sink method "RetrofitGenerator.generateForAnnotatedElement" -> code.CodeEval
-  }
-}

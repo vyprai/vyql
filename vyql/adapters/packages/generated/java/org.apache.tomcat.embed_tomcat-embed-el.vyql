@@ -1,7 +1,0 @@
-import code.{ExpressionEval}
-adapter java {
-  package "org.apache.tomcat.embed:tomcat-embed-el" {
-    sink method "eval" -> code.ExpressionEval
-    sink method "parse" -> code.ExpressionEval
-  }
-}

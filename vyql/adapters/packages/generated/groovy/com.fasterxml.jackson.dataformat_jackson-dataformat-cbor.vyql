@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "com.fasterxml.jackson.dataformat:jackson-dataformat-cbor" {
-    sink method "nextToken" -> code.Deserialization
-    sink method "readBinaryValue" -> code.Deserialization
-  }
-}

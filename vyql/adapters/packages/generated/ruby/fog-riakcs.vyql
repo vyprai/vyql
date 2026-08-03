@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "fog-riakcs" {
-    sink method "parse" -> code.Deserialization
-  }
-}

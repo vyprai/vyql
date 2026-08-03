@@ -1,0 +1,9 @@
+module bindings.python.generated.m4c9086e1;
+
+binding filePathAccess2 {
+  requires {
+    dependency("spyder")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

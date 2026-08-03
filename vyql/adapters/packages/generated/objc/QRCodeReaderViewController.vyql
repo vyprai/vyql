@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter objc {
-  package "QRCodeReaderViewController" {
-    source method "reader:didScanResult:" -> core.UserControlledData
-  }
-}

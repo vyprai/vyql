@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding envVariable0 {
+  query pattern callExpr where callee.path ~= "getenv"
+  emit source code.EnvVariable at call.result
+}

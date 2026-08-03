@@ -1,0 +1,6 @@
+module bindings.powershell.generated.m390f1180;
+
+binding cleartextChannel19 {
+  query pattern callExpr where callee.path ~= "wget" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}

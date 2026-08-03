@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding insecurePermission159 {
+  query pattern presenceNode where node.path ~= "UnixFileMode.OtherWrite"
+  emit issue code.InsecurePermission at node
+}

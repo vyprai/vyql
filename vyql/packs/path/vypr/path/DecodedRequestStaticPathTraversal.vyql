@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule DecodedRequestStaticPathTraversal {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22]
+    id: "VYQL-PATH-052"
+    severity: high
+  }
+  issue code.DecodedRequestStaticPathTraversal as sink
+}

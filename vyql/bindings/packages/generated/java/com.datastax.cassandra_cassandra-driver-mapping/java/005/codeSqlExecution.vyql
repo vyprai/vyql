@@ -1,0 +1,9 @@
+module bindings.java.generated.m06341d24;
+
+binding sqlExecution5 {
+  requires {
+    dependency("com.datastax.cassandra:cassandra-driver-mapping")
+  }
+  query pattern callExpr where callee.method == "deleteQueryAsync"
+  emit sink code.SqlExecution at args[0]
+}

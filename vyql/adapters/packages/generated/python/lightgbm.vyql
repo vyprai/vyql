@@ -1,5 +1,0 @@
-adapter python {
-  package "lightgbm" {
-    sink method "LoadFromMemory" -> code.Deserialization
-  }
-}

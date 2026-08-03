@@ -1,0 +1,9 @@
+module bindings.php.generated.mfad1c7c6;
+
+binding htmlRender0 {
+  requires {
+    dependency("pelago/emogrifier")
+  }
+  query pattern callExpr where callee.method == "querySelectorAll"
+  emit sink code.HtmlRender at args[0]
+}

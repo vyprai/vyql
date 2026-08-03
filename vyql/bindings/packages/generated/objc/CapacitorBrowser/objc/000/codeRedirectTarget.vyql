@@ -1,0 +1,10 @@
+module bindings.objc.generated.m3cf54a46;
+
+binding redirectTarget0 {
+  requires {
+    dependency("CapacitorBrowser")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

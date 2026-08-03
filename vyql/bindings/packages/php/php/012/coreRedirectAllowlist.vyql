@@ -1,0 +1,13 @@
+module bindings.php.generated.mc5601031;
+
+binding redirectAllowlist12 {
+  requires {
+    dependency("php")
+  }
+  query pattern callExpr where callee.path ~= "filter_var"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter scala {
-  package "com.belerweb:pinyin4j" {
-    sink method "parse" -> code.Deserialization
-  }
-}

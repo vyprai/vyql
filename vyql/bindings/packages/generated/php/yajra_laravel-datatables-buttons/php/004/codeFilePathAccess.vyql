@@ -1,0 +1,9 @@
+module bindings.php.generated.m7c3e16db;
+
+binding filePathAccess4 {
+  requires {
+    dependency("yajra/laravel-datatables-buttons")
+  }
+  query pattern callExpr where callee.method == "streamOpenSpoutExport"
+  emit sink code.FilePathAccess at args[0]
+}

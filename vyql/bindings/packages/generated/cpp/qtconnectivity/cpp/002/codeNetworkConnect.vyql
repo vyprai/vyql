@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m676b3c51;
+
+binding networkConnect2 {
+  requires {
+    dependency("qtconnectivity")
+  }
+  query pattern callExpr where callee.method == "QBluetoothSocket::connectToService"
+  emit sink code.NetworkConnectSink at args[0]
+}

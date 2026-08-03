@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mde62ae8b;
+
+binding logOutput2 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "color"
+  emit sink code.LogOutput at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding lockAcquire140 {
+  query pattern presenceNode where node.path ~= "Monitor.Enter"
+  emit issue code.LockAcquire at node
+}

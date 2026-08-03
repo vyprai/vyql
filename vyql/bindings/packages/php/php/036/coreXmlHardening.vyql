@@ -1,0 +1,13 @@
+module bindings.php.generated.mc5601031;
+
+binding xmlHardening36 {
+  requires {
+    dependency("libxml")
+  }
+  query pattern callExpr where callee.path ~= "libxml_disable_entity_loader"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}

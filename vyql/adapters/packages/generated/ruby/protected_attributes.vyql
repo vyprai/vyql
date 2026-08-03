@@ -1,9 +1,0 @@
-import core.{InputValidation}
-
-adapter ruby {
-  package "protected_attributes" {
-    control method "attr_protected" -> core.InputValidation
-    control method "attr_accessible" -> core.InputValidation
-    control method "sanitize_for_mass_assignment" -> core.InputValidation
-  }
-}

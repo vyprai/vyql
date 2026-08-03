@@ -1,0 +1,9 @@
+module bindings.python.generated.m38fd08c7;
+
+binding networkSend6 {
+  requires {
+    dependency("kafka-python")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding sessionHashMissingAuthorizationState52 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "authenticate" and node.context.callPath contains "$this.session.set" and node.context.callArg contains "$this.session.set:SESSION_HASH" and node.context.subscript contains "$u['password']" and not (node.context.subscript contains "$u['permissions']") and not (node.context.subscript contains "$u['homedir']") and not (node.context.subscript contains "$u['role']")
+  emit issue code.SessionHashMissingAuthorizationState at node
+}

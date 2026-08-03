@@ -1,0 +1,13 @@
+module bindings.cpp.generated.m1c1357ee;
+
+binding authorizationCheck38 {
+  requires {
+    dependency("poco")
+  }
+  query pattern callExpr where callee.path ~= "poco.authorize"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

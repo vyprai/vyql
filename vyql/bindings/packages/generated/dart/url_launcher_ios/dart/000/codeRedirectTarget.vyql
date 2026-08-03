@@ -1,0 +1,10 @@
+module bindings.dart.generated.m2c5ba391;
+
+binding redirectTarget0 {
+  requires {
+    dependency("url_launcher_ios")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

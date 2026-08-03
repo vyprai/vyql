@@ -1,0 +1,14 @@
+module bindings.go.generated.m39efcd29;
+
+binding htmlEscape34 {
+  requires {
+    dependency("github.com/microcosm-cc/bluemonday")
+  }
+  query pattern callExpr where callee.path ~= "bluemonday.UGCPolicy"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.c.generated.ma4ef2d7a;
+
+binding deserialization0 {
+  requires {
+    dependency("yaml-cpp")
+  }
+  query pattern callExpr where callee.path ~= "util::parse"
+  emit sink code.Deserialization at args[0]
+}

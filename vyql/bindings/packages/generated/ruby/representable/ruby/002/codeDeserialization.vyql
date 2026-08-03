@@ -1,0 +1,9 @@
+module bindings.ruby.generated.maace8868;
+
+binding deserialization2 {
+  requires {
+    dependency("representable")
+  }
+  query pattern callExpr where callee.method == "from_hash"
+  emit sink code.Deserialization at args[0]
+}

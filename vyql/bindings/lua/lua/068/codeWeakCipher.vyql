@@ -1,0 +1,6 @@
+module bindings.lua.generated.ma99d12f7;
+
+binding weakCipher68 {
+  query pattern callExpr where callee.path ~= "crypto.cipher" and args.any.literal contains "DES"
+  emit issue code.WeakCipher at call
+}

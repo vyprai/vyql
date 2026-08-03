@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mc62d4f71;
+
+binding userControlledData2 {
+  requires {
+    dependency("org.springframework.security.oauth.boot:spring-security-oauth2-autoconfigure")
+  }
+  query pattern callExpr where callee.method == "extractPrincipal"
+  emit source core.UserControlledData at call.result
+}

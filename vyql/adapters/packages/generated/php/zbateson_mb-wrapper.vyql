@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "zbateson/mb-wrapper" {
-    sink method "convert" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m89730995;
+
+binding deserialization0 {
+  requires {
+    dependency("com.jayway.restassured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

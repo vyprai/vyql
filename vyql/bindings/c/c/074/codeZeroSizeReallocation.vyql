@@ -1,0 +1,7 @@
+module bindings.c.generated.mce54b166;
+
+binding zeroSizeReallocation74 {
+  query pattern presenceNode where node.path ~= "realloc"
+  emit issue code.ZeroSizeReallocation at node
+  emit sink code.ZeroSizeReallocationSink at node
+}

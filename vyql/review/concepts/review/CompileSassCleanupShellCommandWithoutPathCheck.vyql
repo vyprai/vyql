@@ -1,0 +1,8 @@
+module code;
+
+review code.CompileSassCleanupShellCommandWithoutPathCheck {
+  category: command
+  expected: [core.ShellEscape]
+  kind: attention
+  text: "review compile-sass cleanup paths before formatting them into rm -r shell commands"
+}

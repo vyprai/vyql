@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "guzzle/service" {
-    sink method "DefaultResponseParser::parse" -> code.Deserialization
-  }
-}

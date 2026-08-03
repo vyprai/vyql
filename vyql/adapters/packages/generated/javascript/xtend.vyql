@@ -1,5 +1,0 @@
-adapter javascript {
-  package "xtend" {
-    sink method "extend" -> code.Deserialization
-  }
-}

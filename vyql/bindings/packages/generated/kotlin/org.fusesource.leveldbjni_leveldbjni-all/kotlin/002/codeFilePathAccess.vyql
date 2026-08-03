@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mfe67d068;
+
+binding filePathAccess2 {
+  requires {
+    dependency("org.fusesource.leveldbjni:leveldbjni-all")
+  }
+  query pattern callExpr where callee.method == "repair"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.go.generated.m210edfbc;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("go.mongodb.org/mongo-driver")
+  }
+  query pattern callExpr where callee.method == "setRewrapManyDataKeyWriteModels"
+  emit sink code.StoredDataWrite at args[0]
+}

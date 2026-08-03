@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m88bcc516;
+
+binding filePathAccess0 {
+  requires {
+    dependency("com.google.zxing:javase")
+  }
+  query pattern callExpr where callee.method == "readImage"
+  emit sink code.FilePathAccess at args[0]
+}

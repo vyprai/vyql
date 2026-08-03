@@ -1,0 +1,9 @@
+module bindings.scala.generated.m564f33d7;
+
+binding userControlledData0 {
+  requires {
+    dependency("org.apache.logging.log4j:log4j-api")
+  }
+  query pattern callExpr where callee.method == "log"
+  emit source core.UserControlledData at call.result
+}

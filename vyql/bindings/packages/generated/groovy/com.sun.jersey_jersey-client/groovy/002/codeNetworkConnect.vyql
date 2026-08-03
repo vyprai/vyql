@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m7aeb7b9c;
+
+binding networkConnect2 {
+  requires {
+    dependency("com.sun.jersey:jersey-client")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkConnectSink at args[0]
+}

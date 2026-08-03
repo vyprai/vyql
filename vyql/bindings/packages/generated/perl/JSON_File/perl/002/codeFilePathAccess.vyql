@@ -1,0 +1,9 @@
+module bindings.perl.generated.m6e18a6dc;
+
+binding filePathAccess2 {
+  requires {
+    dependency("JSON_File")
+  }
+  query pattern callExpr where callee.method == "save_file"
+  emit sink code.FilePathAccess at args[0]
+}

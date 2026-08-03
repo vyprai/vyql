@@ -1,0 +1,9 @@
+module bindings.swift.generated.m662babba;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/apollographql/apollo-ios")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

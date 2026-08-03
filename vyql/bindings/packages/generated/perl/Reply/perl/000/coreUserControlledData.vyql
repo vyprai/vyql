@@ -1,0 +1,9 @@
+module bindings.perl.generated.m71a8aeab;
+
+binding userControlledData0 {
+  requires {
+    dependency("Reply")
+  }
+  query pattern callExpr where callee.method == "_read"
+  emit source core.UserControlledData at call.result
+}

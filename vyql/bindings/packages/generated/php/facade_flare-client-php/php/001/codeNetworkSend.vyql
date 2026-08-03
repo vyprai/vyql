@@ -1,0 +1,9 @@
+module bindings.php.generated.mca3f8814;
+
+binding networkSend1 {
+  requires {
+    dependency("facade/flare-client-php")
+  }
+  query pattern callExpr where callee.method == "sendReportToApi"
+  emit sink code.NetworkSend at args[0]
+}

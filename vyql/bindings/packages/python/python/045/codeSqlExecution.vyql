@@ -1,0 +1,9 @@
+module bindings.python.generated.m3d9ccbad;
+
+binding sqlExecution45 {
+  requires {
+    dependency("mysqlclient")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

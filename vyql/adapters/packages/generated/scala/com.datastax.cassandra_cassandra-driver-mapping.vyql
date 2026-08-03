@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-adapter scala {
-  package "com.datastax.cassandra:cassandra-driver-mapping" {
-    sink method "saveQuery" -> code.SqlExecution
-    sink method "getQuery" -> code.SqlExecution
-    sink method "deleteQuery" -> code.SqlExecution
-  }
-}

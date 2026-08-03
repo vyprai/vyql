@@ -1,8 +1,0 @@
-import code.{ExpressionEval}
-
-adapter go {
-  package "github.com/Knetic/govaluate" {
-    sink method "NewEvaluableExpression" -> code.ExpressionEval
-    sink method "NewEvaluableExpressionWithFunctions" -> code.ExpressionEval
-  }
-}

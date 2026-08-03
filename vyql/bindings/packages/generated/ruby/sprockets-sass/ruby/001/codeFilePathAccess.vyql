@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m4edf2d8b;
+
+binding filePathAccess1 {
+  requires {
+    dependency("sprockets-sass")
+  }
+  query pattern callExpr where callee.method == "resolve_glob"
+  emit sink code.FilePathAccess at args[0]
+}

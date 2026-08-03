@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule ForgeableIdentityToken {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_345, CWE_639]
+    id: "VYQL-AUTH-096"
+    severity: high
+  }
+  issue code.ForgeableIdentityToken as token
+}

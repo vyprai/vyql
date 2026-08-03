@@ -1,7 +1,0 @@
-import code.{CliArgument}
-adapter go {
-  package "gopkg.in/alecthomas/kingpin.v2" {
-    source method "Parse" -> code.CliArgument
-    source method "MustParse" -> code.CliArgument
-  }
-}

@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{InputValidation}
-
-adapter cpp {
-  package "json-schema-validator" {
-    sink method "validate" -> code.Deserialization
-    control method "escape" -> core.InputValidation
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.generated.mf7644b81;
+
+binding networkSend1 {
+  requires {
+    dependency("php-http/guzzle6-adapter")
+  }
+  query pattern callExpr where callee.method == "sendRequest"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,5 +1,0 @@
-adapter csharp {
-  package "spring.web.mvc4" {
-    sink method "Application_BeginRequest" -> code.UrlFetch
-  }
-}

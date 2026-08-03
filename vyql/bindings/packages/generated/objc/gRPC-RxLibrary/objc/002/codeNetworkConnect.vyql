@@ -1,0 +1,9 @@
+module bindings.objc.generated.m13dabcde;
+
+binding networkConnect2 {
+  requires {
+    dependency("gRPC-RxLibrary")
+  }
+  query pattern callExpr where callee.method == "Create"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,5 +1,0 @@
-adapter groovy {
-  package "com.fasterxml.jackson.core:jackson-databind" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

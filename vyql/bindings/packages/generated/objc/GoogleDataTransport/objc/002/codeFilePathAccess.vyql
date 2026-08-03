@@ -1,0 +1,9 @@
+module bindings.objc.generated.m3e54372e;
+
+binding filePathAccess2 {
+  requires {
+    dependency("GoogleDataTransport")
+  }
+  query pattern callExpr where callee.method == "GDTCORWriteDataToFile"
+  emit sink code.FilePathAccess at args[0]
+}

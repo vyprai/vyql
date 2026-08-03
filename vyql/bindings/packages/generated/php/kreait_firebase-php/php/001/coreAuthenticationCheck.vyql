@@ -1,0 +1,13 @@
+module bindings.php.generated.mccc7d20f;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("kreait/firebase-php")
+  }
+  query pattern callExpr where callee.method == "sendPasswordResetLink"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m6b5b5523;
+
+binding filePathAccess1 {
+  requires {
+    dependency("intervention/image")
+  }
+  query pattern callExpr where callee.method == "save"
+  emit sink code.FilePathAccess at args[0]
+}

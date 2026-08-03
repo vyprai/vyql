@@ -1,0 +1,9 @@
+module bindings.php.generated.m78f74363;
+
+binding filePathAccess3 {
+  requires {
+    dependency("laravel/dusk")
+  }
+  query pattern callExpr where callee.method == "file_put_contents"
+  emit sink code.FilePathAccess at args[0]
+}

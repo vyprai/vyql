@@ -1,0 +1,9 @@
+module bindings.python.generated.m37e54522;
+
+binding cliArgument0 {
+  requires {
+    dependency("plac")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit source code.CliArgument at call.result
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter dart {
-  package "dds_service_extensions" {
-    sink method "parse" -> code.Deserialization
-  }
-}

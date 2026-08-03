@@ -1,0 +1,11 @@
+module code;
+
+concept UnescapedChartTooltipDataName : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "series data item names can contain stored project data controlled by a chart author"
+  reviewCategory: xss
+  reviewCondition: "chart tooltip formatter returns a raw data item name before the tooltip markup builder can escape or structure it"
+  reviewConfidence: high
+  reviewEvidence: "chart tooltip formatter {pattern} reads an item name and returns it directly"
+  vulnerableTo: [injection.Xss]
+}

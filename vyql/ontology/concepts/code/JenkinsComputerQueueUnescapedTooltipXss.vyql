@@ -1,0 +1,11 @@
+module code;
+
+concept JenkinsComputerQueueUnescapedTooltipXss : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "attackers with Agent/Configure permission can influence the agent/cause text displayed in the queue tooltip"
+  reviewCategory: xss
+  reviewCondition: "Computer Queue Plugin renders queue item agent/cause text in a tooltip without HTML escaping"
+  reviewConfidence: high
+  reviewEvidence: "Jelly tooltip context {pattern} starts with item.why before escaped queue parameters"
+  vulnerableTo: [injection.Xss]
+}

@@ -1,0 +1,10 @@
+module bindings.python.generated.m11fd24d1;
+
+binding redirectTarget3 {
+  requires {
+    dependency("django-bootstrap3")
+  }
+  query pattern callExpr where callee.method == "url_replace_param"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.md63fc04b;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("symfony/redis-messenger")
+  }
+  query pattern callExpr where callee.method == "add"
+  emit sink code.StoredDataWrite at args[0]
+}

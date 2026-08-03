@@ -1,0 +1,6 @@
+module bindings.objc.generated.mccadd221;
+
+binding unboundedCopySmell30 {
+  query pattern presenceNode where node.path ~= "sprintf"
+  emit issue code.UnboundedCopySmell at node
+}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.m204e4c6a;
+
+binding userControlledData2 {
+  requires {
+    dependency("javax.websocket:javax.websocket-api")
+  }
+  query pattern callExpr where callee.method == "getQueryString"
+  emit source core.UserControlledData at call.result
+}

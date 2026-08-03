@@ -1,8 +1,0 @@
-import code.{NetworkSend, SecretValue}
-
-adapter swift {
-  package "github.com/supabase-community/functions-swift" {
-    source method "setAuth" -> code.SecretValue
-    sink method "invoke" -> code.NetworkSend
-  }
-}

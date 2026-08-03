@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mce8be92d;
+
+binding deserialization2 {
+  requires {
+    dependency("org.springframework.security:spring-security-oauth2-jose")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

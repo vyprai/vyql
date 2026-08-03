@@ -1,0 +1,9 @@
+module bindings.php.generated.mc30de6aa;
+
+binding filePathAccess2 {
+  requires {
+    dependency("typo3/phar-stream-wrapper")
+  }
+  query pattern callExpr where callee.method == "dir_opendir"
+  emit sink code.FilePathAccess at args[0]
+}

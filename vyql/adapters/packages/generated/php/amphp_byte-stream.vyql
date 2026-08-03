@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "amphp/byte-stream" {
-    sink method "parseLineDelimitedJson" -> code.Deserialization
-  }
-}

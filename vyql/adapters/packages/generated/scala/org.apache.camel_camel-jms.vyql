@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "org.apache.camel:camel-jms" {
-    sink method "extractBodyFromJms" -> code.Deserialization
-  }
-}

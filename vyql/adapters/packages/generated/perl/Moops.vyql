@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter perl {
-  package "Moops" {
-    sink method "parse" -> code.Deserialization
-  }
-}

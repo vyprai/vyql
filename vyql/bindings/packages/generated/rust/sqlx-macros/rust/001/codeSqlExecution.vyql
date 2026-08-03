@@ -1,0 +1,9 @@
+module bindings.rust.generated.m3ac09500;
+
+binding sqlExecution1 {
+  requires {
+    dependency("sqlx-macros")
+  }
+  query pattern callExpr where callee.method == "migrate"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m2a6a5b64;
+
+binding httpInput0 {
+  requires {
+    dependency("com.squareup.okhttp:mockwebserver")
+  }
+  query pattern callExpr where callee.method == "RecordedRequest.getRequestLine"
+  emit source code.HttpInput at call.result
+}

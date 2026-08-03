@@ -1,7 +1,0 @@
-import code.{NetworkData}
-
-adapter php {
-  package "beyondcode/laravel-websockets" {
-    source method "onMessage" -> code.NetworkData
-  }
-}

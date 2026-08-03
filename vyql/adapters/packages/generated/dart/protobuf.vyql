@@ -1,5 +1,0 @@
-adapter dart {
-  package "protobuf" {
-    sink method "base64Decode" -> code.Deserialization
-  }
-}

@@ -1,9 +1,0 @@
-import code.{CommandExecution, FilePathAccess}
-
-adapter python {
-  package "virtualenvwrapper" {
-    sink method "run_script" -> code.CommandExecution
-    sink method "run_global" -> code.CommandExecution
-    sink method "make_hook" -> code.FilePathAccess
-  }
-}

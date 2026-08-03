@@ -1,0 +1,11 @@
+module code;
+
+concept ConfigUrlStoredBeforeSchemeValidation : issue {
+  cwe: [CWE_918, CWE_20]
+  reviewAssumption: "the configured URL is later used by a server-side connector with access to internal network targets"
+  reviewCategory: request_forgery
+  reviewCondition: "import or connector configuration stores a caller-supplied service URL before enforcing URL syntax and allowed schemes"
+  reviewConfidence: high
+  reviewEvidence: "configuration handler context {pattern} copies a URL field from request data into persisted connection configuration and performs a connection check without an observed URL/scheme validation helper"
+  vulnerableTo: [request_forgery.Ssrf, validation.ImproperInputValidation]
+}

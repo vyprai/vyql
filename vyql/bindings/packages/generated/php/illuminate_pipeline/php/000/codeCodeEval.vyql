@@ -1,0 +1,9 @@
+module bindings.php.generated.md3b25a89;
+
+binding codeEval0 {
+  requires {
+    dependency("illuminate/pipeline")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,7 +1,0 @@
-adapter python {
-  package "duckdb" {
-    sink method "Query" -> code.SqlExecution
-    control method "parameters" -> core.SqlParameterization
-    sink method "read" -> code.Deserialization
-  }
-}

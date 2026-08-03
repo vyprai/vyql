@@ -1,5 +1,0 @@
-adapter bash {
-  package "jless" {
-    source path "jless.argv" -> code.CliArgument
-  }
-}

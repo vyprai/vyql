@@ -1,0 +1,11 @@
+module bindings.java.generated.m420f6b67;
+
+binding lockRelease268 {
+  query pattern callExpr where callee.method == "unlock"
+  emit check core.LockRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}

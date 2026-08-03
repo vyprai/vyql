@@ -1,0 +1,6 @@
+module bindings.lua.generated.ma99d12f7;
+
+binding xpathQuery51 {
+  query pattern callExpr where callee.method == "evaluate"
+  emit sink code.XpathQuery at args[0]
+}

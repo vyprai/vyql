@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule IncompleteServerPortValidation {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_918]
+    id: "VYQL-RF-005"
+    severity: medium
+  }
+  issue code.IncompleteServerPortValidation as guard
+}

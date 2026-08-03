@@ -1,0 +1,7 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding commandOptionInjection252 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "?.gitExec" and containsAny(node.context.literal, ["clone${repository}", "clone${remote}", "clone${url}"]) and not (containsAny(node.context.literal, ["--${repository}", "--${remote}", "--${url}"]))
+  emit issue code.CommandOptionInjection at node
+  emit sink code.CommandOptionInjectionSink at node
+}

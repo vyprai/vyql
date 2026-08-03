@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m0f13fa05;
+
+binding networkConnect4 {
+  requires {
+    dependency("httpi")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.NetworkConnectSink at args[0]
+}

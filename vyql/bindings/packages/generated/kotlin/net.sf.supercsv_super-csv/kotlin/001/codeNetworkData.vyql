@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mec622833;
+
+binding networkData1 {
+  requires {
+    dependency("net.sf.supercsv:super-csv")
+  }
+  query pattern callExpr where callee.method == "readColumns"
+  emit source code.NetworkData at call.result
+}

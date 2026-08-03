@@ -1,7 +1,0 @@
-import core.{AuthorizationCheck}
-
-adapter scala {
-  package "org.springframework.security:spring-security-acl" {
-    control method "hasPermission" -> core.AuthorizationCheck
-  }
-}

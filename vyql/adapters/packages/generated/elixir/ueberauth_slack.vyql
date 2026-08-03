@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter elixir {
-  package "ueberauth_slack" {
-    source method "handle_callback!" -> core.UserControlledData
-  }
-}

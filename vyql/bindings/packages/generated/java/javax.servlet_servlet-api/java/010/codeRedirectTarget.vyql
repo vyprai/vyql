@@ -1,0 +1,10 @@
+module bindings.java.generated.m92038514;
+
+binding redirectTarget10 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "include"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

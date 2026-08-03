@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mef70b88d;
+
+binding deserialization2 {
+  requires {
+    dependency("net-ldap")
+  }
+  query pattern callExpr where callee.method == "parse_ber"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule IncompleteHtmlEventHandlerStrip {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-136"
+    severity: high
+  }
+  issue code.IncompleteHtmlEventHandlerStrip as sink
+}

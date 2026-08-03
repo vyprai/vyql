@@ -1,5 +1,0 @@
-adapter ruby {
-  package "jbuilder" {
-    sink method "partial!" -> code.TemplateRender
-  }
-}

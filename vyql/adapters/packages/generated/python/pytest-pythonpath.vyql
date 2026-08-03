@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-import core.{UserControlledData}
-
-adapter python {
-  package "pytest-pythonpath" {
-    source method "pytest_addoption" -> core.UserControlledData
-    sink method "pytest_load_initial_conftests" -> code.FilePathAccess
-  }
-}

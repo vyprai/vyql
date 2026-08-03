@@ -1,0 +1,13 @@
+module bindings.objc.generated.ma399f56c;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("ParseFacebookUtilsV4")
+  }
+  query pattern callExpr where callee.method == "logInInBackgroundWithAccessToken"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

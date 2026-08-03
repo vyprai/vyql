@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "postcss-normalize-string" {
-    sink method "parse" -> code.Deserialization
-  }
-}

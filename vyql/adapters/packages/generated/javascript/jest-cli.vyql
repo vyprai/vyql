@@ -1,9 +1,0 @@
-import code.{CommandExecution}
-import core.{InputValidation}
-
-adapter javascript {
-  package "jest-cli" {
-    sink method "run" -> code.CommandExecution
-    control method "check" -> core.InputValidation
-  }
-}

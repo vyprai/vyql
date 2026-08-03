@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m23562f2c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("exleveldb")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

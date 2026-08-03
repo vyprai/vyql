@@ -1,0 +1,10 @@
+module vypr.auth;
+
+rule InsecureCookieFlag {
+  meta {
+    cwe: [CWE_614]
+    id: "VYQL-AUTH-100"
+    severity: medium
+  }
+  issue code.InsecureCookieFlag as c
+}

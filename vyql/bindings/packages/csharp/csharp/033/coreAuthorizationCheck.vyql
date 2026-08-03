@@ -1,0 +1,13 @@
+module bindings.csharp.generated.m2a0e231a;
+
+binding authorizationCheck33 {
+  requires {
+    dependency("Microsoft.AspNetCore.Authorization")
+  }
+  query pattern callExpr where callee.path ~= "AuthorizeAttribute"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

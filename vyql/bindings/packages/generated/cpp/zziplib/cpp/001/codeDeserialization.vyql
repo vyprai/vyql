@@ -1,0 +1,9 @@
+module bindings.cpp.generated.medfd5ab5;
+
+binding deserialization1 {
+  requires {
+    dependency("zziplib")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

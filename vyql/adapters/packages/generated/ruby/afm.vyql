@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter ruby {
-  package "afm" {
-    sink method "initialize" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m21ccd42d;
+
+binding deserialization0 {
+  requires {
+    dependency("ex_cldr_dates_times")
+  }
+  query pattern callExpr where callee.method == "tokenize"
+  emit sink code.Deserialization at args[0]
+}

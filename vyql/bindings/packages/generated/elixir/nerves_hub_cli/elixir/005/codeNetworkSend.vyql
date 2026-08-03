@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m7f651093;
+
+binding networkSend5 {
+  requires {
+    dependency("nerves_hub_cli")
+  }
+  query pattern callExpr where callee.method == "NervesHubCLI.API.file_request"
+  emit sink code.NetworkSend at args[0]
+}

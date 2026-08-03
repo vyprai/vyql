@@ -1,0 +1,9 @@
+module bindings.python.generated.m62a74517;
+
+binding sqlExecution2 {
+  requires {
+    dependency("alembic")
+  }
+  query pattern callExpr where callee.method == "run_cmd"
+  emit sink code.SqlExecution at args[0]
+}

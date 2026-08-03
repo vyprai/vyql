@@ -1,0 +1,38 @@
+test "python deserialization: request data passed to jsonpickle decode is unsafe"
+  lang python
+  expect VYQL-DESER-001
+  code
+  ```
+  import jsonpickle
+  from flask import request
+
+  def load_state():
+      return jsonpickle.decode(request.get_data())
+  ```
+
+test "python deserialization: verified JWT decode is not arbitrary object deserialization"
+  lang python
+  reject VYQL-DESER-001
+  code
+  ```
+  from jose import jwt
+  from flask import request
+
+  def principal():
+      token = request.cookies.get("access_token")
+      return jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+  ```
+
+test "python deserialization: unverified JWT remains a JWT issue, not object deserialization"
+  lang python
+  expect VYQL-CFG-005
+  reject VYQL-DESER-001
+  code
+  ```
+  from jose import jwt
+  from flask import request
+
+  def principal():
+      token = request.cookies.get("access_token")
+      return jwt.decode(token, options={"verify_signature": False})
+  ```

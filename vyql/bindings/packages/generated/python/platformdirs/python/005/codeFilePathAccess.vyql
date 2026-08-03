@@ -1,0 +1,9 @@
+module bindings.python.generated.m4d1eec17;
+
+binding filePathAccess5 {
+  requires {
+    dependency("platformdirs")
+  }
+  query pattern callExpr where callee.method == "user_documents_dir"
+  emit sink code.FilePathAccess at args[0]
+}

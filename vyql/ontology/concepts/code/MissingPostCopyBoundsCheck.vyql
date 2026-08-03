@@ -1,0 +1,11 @@
+module code;
+
+concept MissingPostCopyBoundsCheck : issue {
+  cwe: [CWE_787]
+  reviewAssumption: "the second block length can make the advanced destination offset exceed the allocation"
+  reviewCategory: memory
+  reviewCondition: "a later raw copy uses an advanced destination offset without a matching length bound"
+  reviewConfidence: medium
+  reviewEvidence: "post-copy memory context {pattern} copies another block after advancing the destination offset"
+  vulnerableTo: [memory.OobWrite]
+}

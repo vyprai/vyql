@@ -1,7 +1,0 @@
-adapter ruby {
-  package "bson_ext" {
-    sink method "bson_buffer_get_max_size" -> code.NosqlQuery
-    sink method "bson_buffer_set_max_size" -> code.StoredDataWrite
-    sink method "method_deserialize" -> code.Deserialization
-  }
-}

@@ -1,5 +1,0 @@
-adapter java {
-  package "org.codehaus.groovy:groovy-all" {
-    sink method "JsonParser.parse" -> code.Deserialization
-  }
-}

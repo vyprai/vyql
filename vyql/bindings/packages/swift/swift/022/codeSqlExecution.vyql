@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc6005d88;
+
+binding sqlExecution22 {
+  requires {
+    dependency("fluent")
+  }
+  query pattern callExpr where callee.method == "raw"
+  emit sink code.SqlExecution at args[0]
+}

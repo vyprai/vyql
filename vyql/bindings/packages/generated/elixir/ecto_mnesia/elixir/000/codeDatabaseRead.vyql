@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mc5ee8124;
+
+binding databaseRead0 {
+  requires {
+    dependency("ecto_mnesia")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.DatabaseReadSink at args[0]
+}

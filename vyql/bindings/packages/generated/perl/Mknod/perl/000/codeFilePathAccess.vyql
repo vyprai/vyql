@@ -1,0 +1,9 @@
+module bindings.perl.generated.m62b43dd8;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Mknod")
+  }
+  query pattern callExpr where callee.method == "mknod"
+  emit sink code.FilePathAccess at args[0]
+}

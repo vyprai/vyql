@@ -1,9 +1,0 @@
-import code.{SecretValue}
-import core.{AuthenticationCheck}
-
-adapter elixir {
-  package "ex_crypto" {
-    control method "ExCrypto.Token.verify" -> core.AuthenticationCheck
-    control method "ExCrypto.HMAC.verify_hmac" -> core.AuthenticationCheck
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m3971303a;
+
+binding deserialization0 {
+  requires {
+    dependency("SwiftyJSON")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit sink code.Deserialization at args[0]
+}

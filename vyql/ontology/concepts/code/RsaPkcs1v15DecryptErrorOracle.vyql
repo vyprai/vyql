@@ -1,0 +1,11 @@
+module code;
+
+concept RsaPkcs1v15DecryptErrorOracle : issue {
+  cwe: [CWE_203, CWE_385]
+  reviewAssumption: "an attacker can submit repeated malformed RSA ciphertexts and observe timing or error behavior"
+  reviewCategory: crypto
+  reviewCondition: "RSA PKCS#1 v1.5 decryption branches on the OpenSSL decrypt result before buffering output and clearing error state"
+  reviewConfidence: high
+  reviewEvidence: "RSA decrypt context {pattern} handles EVP_PKEY_decrypt failure before ERR_clear_error and output buffering, preserving a Bleichenbacher-style observable discrepancy"
+  vulnerableTo: [crypto.ObservableDiscrepancy]
+}

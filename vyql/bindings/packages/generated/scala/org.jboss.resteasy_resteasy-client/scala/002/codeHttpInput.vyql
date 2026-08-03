@@ -1,0 +1,9 @@
+module bindings.scala.generated.m2a670a38;
+
+binding httpInput2 {
+  requires {
+    dependency("org.jboss.resteasy:resteasy-client")
+  }
+  query pattern callExpr where callee.method == "cookie"
+  emit source code.HttpInput at call.result
+}

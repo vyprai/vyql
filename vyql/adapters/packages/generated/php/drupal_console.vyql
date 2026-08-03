@@ -1,9 +1,0 @@
-import code.{FilePathAccess, UrlFetch}
-
-adapter php {
-  package "drupal/console" {
-    sink method "loadLegacyFile" -> code.FilePathAccess
-    sink method "downloadFile" -> code.UrlFetch
-    sink method "downloadFile" -> code.FilePathAccess
-  }
-}

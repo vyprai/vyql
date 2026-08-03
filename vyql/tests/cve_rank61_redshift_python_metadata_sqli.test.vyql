@@ -1,0 +1,22 @@
+# Rank 61 / CVE-2024-12745: Amazon Redshift Python metadata API SQL injection.
+# Ledger verification: VYQL-INJ-001 touches cursor.py/metadataServerAPIHelper.py.
+
+test "rank61: Redshift metadata parameter reaches SQL"
+  lang python
+  expect VYQL-INJ-001
+  code
+  ```
+  def metadata(request, cursor):
+      schema = request.args["schema"]
+      cursor.execute("SELECT * FROM information_schema.tables WHERE table_schema = '" + schema + "'")
+  ```
+
+test "rank61: Redshift metadata parameter is parameterized"
+  lang python
+  reject VYQL-INJ-001
+  code
+  ```
+  def metadata(request, cursor):
+      schema = request.args["schema"]
+      cursor.execute("SELECT * FROM information_schema.tables WHERE table_schema = ?", [schema])
+  ```

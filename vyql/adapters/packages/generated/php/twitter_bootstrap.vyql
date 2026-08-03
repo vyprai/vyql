@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter php {
-  package "twitter/bootstrap" {
-    control method "sanitizeHtml" -> core.HtmlEscape
-  }
-}

@@ -1,0 +1,6 @@
+module mobile;
+
+threat BackupExposure {
+  cwe: [CWE_922]
+  desc: "Sensitive mobile app data can be included in platform backup or restore"
+}

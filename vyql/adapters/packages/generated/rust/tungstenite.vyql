@@ -1,8 +1,0 @@
-import code.{Deserialization, NetworkData, NetworkSend}
-adapter rust {
-  package "tungstenite" {
-    sink method "send" -> code.NetworkSend
-    source method "read" -> code.NetworkData
-    sink method "parse" -> code.Deserialization
-  }
-}

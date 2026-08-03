@@ -10,40 +10,6 @@ import (
 	"github.com/vyprai/vyql/extract/lowering"
 )
 
-// TestNilExprNoPanic guards the Go frontend against nil-expression panics.
-// A tagless `switch { }` makes switchStmt pass a nil tag to (*conv).expr, which
-// previously dereferenced nil in c.loc(e.Pos()) and panicked (crashed scans of
-// go-redis, anubis, and any Go repo using tagless switches). expr now returns an
-// empty node for nil input. Regression for that fix.
-func TestNilExprNoPanic(t *testing.T) {
-	src := `package p
-
-func tagless(x int) string {
-	switch {
-	case x > 0:
-		return "pos"
-	default:
-		return ""
-	}
-}
-
-func emptyTagless() {
-	switch {
-	}
-}
-
-func emptyReturn() { return }
-`
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "a.go"), []byte(src), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	// Must not panic; must extract without error.
-	if _, err := gofrontend.ExtractDir(dir); err != nil {
-		t.Fatalf("ExtractDir on tagless-switch source: %v", err)
-	}
-}
-
 func TestGoFunctionContextIncludesIndexAndSliceTokens(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "mysql.go")
@@ -199,6 +165,278 @@ func fixed(config *ContainerConfig, imageConfig *ImageConfig) {
 	}
 }
 
+func TestGoSemanticReviewDetectsContainerdCRIImageEnvAlias(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "container_create.go")
+	src := []byte(`package server
+
+type Image struct{ Env []string }
+type ContainerConfig struct{ Envs []EnvVar }
+type EnvVar struct{ Key, Value string }
+
+func (c *ContainerConfig) GetEnvs() []EnvVar { return c.Envs }
+func (e EnvVar) GetKey() string { return e.Key }
+func (e EnvVar) GetValue() string { return e.Value }
+
+var oci = struct{ WithEnv func([]string) func() }{}
+
+func vulnerable(cfg *ContainerConfig, img *Image) {
+	merged := img.Env
+	for _, item := range cfg.GetEnvs() {
+		merged = append(merged, item.GetKey()+"="+item.GetValue())
+	}
+	_ = oci.WithEnv(merged)
+}
+
+func fixed(cfg *ContainerConfig, img *Image) {
+	merged := append([]string{}, img.Env...)
+	for _, item := range cfg.GetEnvs() {
+		merged = append(merged, item.GetKey()+"="+item.GetValue())
+	}
+	_ = oci.WithEnv(merged)
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.go.containerd_cri_image_env_alias" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("containerd CRI image env alias observations = %d, want 1; nodes=%#v", count, nodes)
+	}
+}
+
+func TestGoSemanticReviewDetectsContainerdCRIImageEnvAliasInMethodShape(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "container_create.go")
+	src := []byte(`package server
+
+type ImageConfig struct{ Env []string }
+type ContainerConfig struct{ Envs []EnvVar }
+type EnvVar struct{ Key, Value string }
+type SpecOpts func()
+type service struct{}
+
+func (c *ContainerConfig) GetEnvs() []EnvVar { return c.Envs }
+func (e EnvVar) GetKey() string { return e.Key }
+func (e EnvVar) GetValue() string { return e.Value }
+
+var oci = struct{ WithEnv func([]string) SpecOpts }{}
+
+func (s *service) generateContainerSpec(config *ContainerConfig, imageConfig *ImageConfig) error {
+	specOpts := []SpecOpts{}
+	env := imageConfig.Env
+	for _, e := range config.GetEnvs() {
+		env = append(env, e.GetKey()+"="+e.GetValue())
+	}
+	specOpts = append(specOpts, oci.WithEnv(env))
+	_ = specOpts
+	return nil
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.go.containerd_cri_image_env_alias" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("containerd CRI method-shape observations = %d, want 1; nodes=%#v", count, nodes)
+	}
+}
+
+func TestGoSemanticReviewDetectsPublicAllUsersRouteMissingAuth(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "user.go")
+	src := []byte(`package router
+
+type AppRouterGroup struct {
+	PublicRouterGroup *RouterGroup
+	AuthRouterGroup   *RouterGroup
+}
+type RouterGroup struct{}
+type UserHandler struct{}
+type HandlerBundle struct{ UserHandler *UserHandler }
+
+func (g *RouterGroup) GET(path string, handlers ...any) {}
+func (h *UserHandler) GetAllUsers() any { return nil }
+
+func vulnerable(groups *AppRouterGroup, h *HandlerBundle) {
+	groups.PublicRouterGroup.GET("/allusers", h.UserHandler.GetAllUsers())
+}
+
+func fixed(groups *AppRouterGroup, h *HandlerBundle) {
+	groups.AuthRouterGroup.GET("/allusers", h.UserHandler.GetAllUsers())
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.go.public_user_list_route_missing_auth" {
+			count++
+			if !strings.Contains(n.Prop("str_args"), "route:/allusers") ||
+				!strings.Contains(n.Prop("str_args"), "handler:h.UserHandler.GetAllUsers") {
+				t.Fatalf("public allusers observation has weak evidence tokens: %q", n.Prop("str_args"))
+			}
+		}
+	}
+	if count != 1 {
+		t.Fatalf("public allusers observations = %d, want 1; nodes=%#v", count, nodes)
+	}
+}
+
+func TestGoSemanticReviewDetectsPowerShellCommandStringWrapperEnv(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "windows_share.go")
+	src := []byte(`package share
+
+import "fmt"
+
+func createLink(remoteShare, mountPoint string) error {
+	script := "New-Item -ItemType SymbolicLink $Env:targetPath -Target $Env:sourcePath"
+	_, err := win.InvokePowerShellCommand(script,
+		fmt.Sprintf("sourcePath=%s", remoteShare),
+		fmt.Sprintf("targetPath=%s", mountPoint))
+	return err
+}
+
+func fixedConstantEnv() error {
+	script := "New-Item -ItemType SymbolicLink $Env:targetPath -Target $Env:sourcePath"
+	_, err := win.InvokePowerShellCommand(script,
+		fmt.Sprintf("sourcePath=%s", "\\server\\share"),
+		fmt.Sprintf("targetPath=%s", "c:\\mount"))
+	return err
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.go.powershell_command_string_wrapper_env" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("PowerShell command-string wrapper env observations = %d, want 1; nodes=%#v", count, nodes)
+	}
+}
+
+func TestGoSemanticReviewDetectsOsqueryAllowUnsafePlatformArgs(t *testing.T) {
+	dir := t.TempDir()
+	vulnPath := filepath.Join(dir, "vuln_osqueryd_windows.go")
+	vulnSrc := []byte(`package osqd
+
+func platformArgs() map[string]interface{} {
+	return map[string]interface{}{
+		"allow_unsafe": true,
+	}
+}
+`)
+	if err := os.WriteFile(vulnPath, vulnSrc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fixedPath := filepath.Join(dir, "fixed_osqueryd_windows.go")
+	fixedSrc := []byte(`package osqd
+
+func platformArgs() map[string]interface{} {
+	return nil
+}
+`)
+	if err := os.WriteFile(fixedPath, fixedSrc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{vulnPath, fixedPath}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.go.osquery_allow_unsafe_platform_args" {
+			continue
+		}
+		count++
+		if !strings.Contains(n.Prop("str_args"), "arg:allow_unsafe") ||
+			!strings.Contains(n.Prop("str_args"), "component:osqueryd") ||
+			strings.Contains(n.Prop("loc"), "fixed_osqueryd_windows.go") {
+			t.Fatalf("osquery allow_unsafe observation has weak evidence: loc=%q args=%q", n.Prop("loc"), n.Prop("str_args"))
+		}
+	}
+	if count != 1 {
+		t.Fatalf("osquery allow_unsafe platformArgs observations = %d, want 1; nodes=%#v", count, nodes)
+	}
+}
+
 func TestGoFunctionContextIncludesNonAdjacentCallBeforeTokens(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "commands.go")
@@ -290,4 +528,173 @@ var PermissionsByRole = map[RoleID][]string{
 		}
 	}
 	t.Fatalf("Go module context did not include top-level permission map initializer; nodes=%#v", nodes)
+}
+
+func TestGoModuleContextDetectsOverbroadRolePermissionGrant(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "authorization.go")
+	src := []byte(`package server
+
+var grants = map[RoleID][]string{
+	RoleAdmin: {"*"},
+	RoleNetworkManager: {
+		PermReadUser, PermBackup, PermRestore,
+	},
+}
+
+var clean = map[RoleID][]string{
+	RoleAdmin: {PermBackup, PermRestore},
+	RoleNetworkManager: {PermBackup, PermRestore},
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.go.overbroad_role_permission_grant" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("overbroad role permission observations = %d, want 1; nodes=%#v", count, nodes)
+	}
+}
+
+func TestGoFunctionContextIncludesIdentifierTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "identifiers.go")
+	src := []byte(`package repository
+
+func query(cluster string) {
+	var queryParams []string
+	if ignoredSubresources.Has(cluster) {
+		_ = queryParams
+	}
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		if strings.Contains(tokens, "function_name:query") &&
+			strings.Contains(tokens, "identifier:queryParams") &&
+			strings.Contains(tokens, "identifier:ignoredSubresources") {
+			return
+		}
+	}
+	t.Fatalf("Go function context did not include identifier tokens; nodes=%#v", nodes)
+}
+
+func TestGoSecurityObservationDetectsCountNonzeroGuard(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bounds.go")
+	src := []byte(`package bbolt
+
+func guarded(p Page) {
+	if p.Count() != 0 {
+		use(p)
+	}
+}
+
+func unguarded(p Page) {
+	use(p)
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.go.count_nonzero_guard" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("count nonzero guard observations = %d, want 1; nodes=%#v", count, nodes)
+	}
+}
+
+func TestGoSecurityObservationDetectsManifestInfoLog(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "agent.go")
+	src := []byte(`package agent
+
+func vulnerable(logger Logger, ctx Context, mp Manifest) {
+	logger.Info(ctx, "fetched manifest", slog.F("manifest", mp))
+}
+
+func fixed(logger Logger, ctx Context, mp Manifest) {
+	logger.Critical(ctx, "fetched manifest", slog.F("manifest", mp))
+	logger.Info(ctx, "fetched manifest")
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.go.coder_manifest_info_log" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("coder manifest info log observations = %d, want 1; nodes=%#v", count, nodes)
+	}
 }

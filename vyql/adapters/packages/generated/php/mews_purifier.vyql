@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter php {
-  package "mews/purifier" {
-    control method "clean" -> core.HtmlEscape
-  }
-}

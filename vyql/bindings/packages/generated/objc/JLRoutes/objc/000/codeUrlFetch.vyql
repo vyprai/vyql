@@ -1,0 +1,9 @@
+module bindings.objc.generated.m2db34a9e;
+
+binding urlFetch0 {
+  requires {
+    dependency("JLRoutes")
+  }
+  query pattern callExpr where callee.method == "routeURL:"
+  emit sink code.UrlFetch at args[0]
+}

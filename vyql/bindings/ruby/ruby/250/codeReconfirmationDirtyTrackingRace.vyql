@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding reconfirmationDirtyTrackingRace250 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.functionName == "postpone_email_change_until_confirmation_and_regenerate_confirmation_token" and node.context.rubyReview == "devise_reconfirmation_missing_dirty_tracking"
+  emit issue code.ReconfirmationDirtyTrackingRace at node
+}

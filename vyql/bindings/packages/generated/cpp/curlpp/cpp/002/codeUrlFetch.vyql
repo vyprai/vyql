@@ -1,0 +1,9 @@
+module bindings.cpp.generated.maca94c35;
+
+binding urlFetch2 {
+  requires {
+    dependency("curlpp")
+  }
+  query pattern callExpr where callee.method == "perform"
+  emit sink code.UrlFetch at args[0]
+}

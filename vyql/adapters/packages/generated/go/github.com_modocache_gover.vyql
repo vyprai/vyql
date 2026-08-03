@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter go {
-  package "github.com/modocache/gover" {
-    sink method "Gover" -> code.FilePathAccess
-  }
-}

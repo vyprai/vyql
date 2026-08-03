@@ -1,0 +1,9 @@
+module bindings.dart.generated.ma1fc4f1b;
+
+binding networkConnect0 {
+  requires {
+    dependency("web_socket_channel")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

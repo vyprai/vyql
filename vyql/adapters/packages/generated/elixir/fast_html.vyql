@@ -1,5 +1,0 @@
-adapter elixir {
-  package "fast_html" {
-    sink method "lxb_css_parser_fail" -> code.XmlParse
-  }
-}

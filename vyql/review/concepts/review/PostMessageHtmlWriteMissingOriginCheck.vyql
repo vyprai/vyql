@@ -1,0 +1,8 @@
+module code;
+
+review code.PostMessageHtmlWriteMissingOriginCheck {
+  category: xss
+  expected: [core.HtmlEscape, core.InputValidation]
+  kind: target
+  text: "verify postMessage handlers validate sender origin before writing message.data into document.write, parsed HTML, or innerHTML"
+}

@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter perl {
-  package "JSON-Immutable-XS" {
-    sink method "load_dict" -> code.FilePathAccess
-  }
-}

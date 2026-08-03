@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding icmpEchoPayloadLengthUnderflow93 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "icmp.echo_payload_length_underflow"
+  emit issue code.IcmpEchoPayloadLengthUnderflow at node
+}

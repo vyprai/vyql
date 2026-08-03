@@ -1,0 +1,6 @@
+module bindings.config.generated.m2b6375a9;
+
+binding hostNamespaceShare10 {
+  query pattern presenceNode where node.analysis ~= "config.k8s.host_namespace"
+  emit issue code.HostNamespaceShare at node
+}

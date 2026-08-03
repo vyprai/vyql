@@ -1,0 +1,14 @@
+module bindings.perl.generated.mccd9a275;
+
+binding inputValidation1 {
+  requires {
+    dependency("Tenjin")
+  }
+  query pattern callExpr where callee.method == "encode_url"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding shopwareStoreApiManyToManyCriteriaBypass171 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "processCriteria" and node.context.phpReview == "shopware_many_to_many_criteria_bypass"
+  emit issue code.ShopwareStoreApiManyToManyCriteriaBypass at node
+}

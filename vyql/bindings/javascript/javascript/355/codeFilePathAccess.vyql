@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding filePathAccess355 {
+  query pattern callExpr where callee.path ~= "res.download"
+  emit sink code.FilePathAccess at args[0]
+}

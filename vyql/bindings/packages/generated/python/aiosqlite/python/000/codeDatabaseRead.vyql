@@ -1,0 +1,9 @@
+module bindings.python.generated.m4dd2b22b;
+
+binding databaseRead0 {
+  requires {
+    dependency("aiosqlite")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.DatabaseReadSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.m37917467;
+
+binding deserialization0 {
+  requires {
+    dependency("org.jdom:jdom")
+  }
+  query pattern callExpr where callee.method == "SAXBuilder.build"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.m2987ea5b;
+
+binding logOutput0 {
+  requires {
+    dependency("org.slf4j:slf4j-ext")
+  }
+  query pattern callExpr where callee.method == "LoggerWrapper.trace"
+  emit sink code.LogOutput at args[0]
+}

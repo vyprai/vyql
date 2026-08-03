@@ -1,0 +1,9 @@
+module bindings.c.generated.m63c25a31;
+
+binding filePathAccess0 {
+  requires {
+    dependency("ampl-mp")
+  }
+  query pattern callExpr where callee.method == "replaceInFile"
+  emit sink code.FilePathAccess at args[0]
+}

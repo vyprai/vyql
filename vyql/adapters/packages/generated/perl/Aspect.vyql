@@ -1,7 +1,0 @@
-import code.{CodeEval}
-adapter perl {
-  package "Aspect" {
-    sink method "compile_weave" -> code.CodeEval
-    sink method "compile_runtime" -> code.CodeEval
-  }
-}

@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter php {
-  package "phpunit/php-invoker" {
-    sink method "invoke" -> code.CodeEval
-  }
-}

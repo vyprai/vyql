@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule StoredXss {
+  meta {
+    cwe: [CWE_79]
+    id: "VYQL-INJ-018"
+    severity: medium
+  }
+  taint code.DatabaseRead -> code.HtmlRender
+  unless path coveredBy core.HtmlEscape
+}

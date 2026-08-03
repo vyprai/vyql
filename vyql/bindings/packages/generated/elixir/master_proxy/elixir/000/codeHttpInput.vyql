@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mc35dee74;
+
+binding httpInput0 {
+  requires {
+    dependency("master_proxy")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit source code.HttpInput at call.result
+}

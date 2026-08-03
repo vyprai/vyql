@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m08886c3e;
+
+binding codeEval2 {
+  requires {
+    dependency("pry-byebug")
+  }
+  query pattern callExpr where callee.method == "change"
+  emit sink code.CodeEval at args[0]
+}

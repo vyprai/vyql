@@ -1,0 +1,6 @@
+module bindings.groovy.generated.m6eabb149;
+
+binding checksumErrorLogoutRedirect22 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "groovy" and node.context.redirectFlow == "checksum_error_uses_default_logout"
+  emit issue code.ChecksumErrorLogoutRedirect at node
+}

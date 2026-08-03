@@ -1,0 +1,9 @@
+module bindings.php.generated.mdd0f105e;
+
+binding urlFetch1 {
+  requires {
+    dependency("laravel/passport")
+  }
+  query pattern callExpr where callee.method == "redirectUris"
+  emit sink code.UrlFetch at args[0]
+}

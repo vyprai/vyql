@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mcf94adcc;
+
+binding codeEval2 {
+  requires {
+    dependency("org.spockframework:spock-core")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.CodeEval at args[0]
+}

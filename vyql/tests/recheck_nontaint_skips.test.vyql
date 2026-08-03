@@ -21,6 +21,19 @@ test "recheck: javascript localhost protected-route bypass is review-visible"
   }
   ```
 
+test "recheck: c privileged trigger generalizes across names"
+  lang c
+  expect_review code.PrivilegedEntryPointReview
+  code
+  ```
+  static int handle_creation(void) {
+      if (event_kind == CREATION_NOTIFICATION) {
+          return run_post_create(payload);
+      }
+      return 0;
+  }
+  ```
+
 test "recheck: javascript CLI token guarded protected route is clean"
   lang javascript
   reject_review code.LocalRequestBypassReview

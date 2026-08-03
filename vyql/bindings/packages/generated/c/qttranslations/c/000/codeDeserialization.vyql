@@ -1,0 +1,9 @@
+module bindings.c.generated.m114be65c;
+
+binding deserialization0 {
+  requires {
+    dependency("qttranslations")
+  }
+  query pattern callExpr where callee.path ~= "src/translations/add_tika_to_ts.py.parse_tika_mime_types"
+  emit sink code.Deserialization at args[0]
+}

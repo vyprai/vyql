@@ -1,0 +1,9 @@
+module bindings.rust.generated.m222602a5;
+
+binding httpInput2 {
+  requires {
+    dependency("axum")
+  }
+  query pattern callExpr where callee.method == "path" and callee.receiver.type == "Request"
+  emit source code.HttpInput at call.result
+}

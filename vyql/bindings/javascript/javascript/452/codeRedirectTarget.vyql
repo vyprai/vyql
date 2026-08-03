@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding redirectTarget452 {
+  query pattern callExpr where callee.path ~= "reply.redirect"
+  emit sink code.RedirectTargetSink at args[0]
+}

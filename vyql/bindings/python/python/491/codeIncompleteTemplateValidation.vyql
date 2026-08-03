@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding incompleteTemplateValidation491 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "incomplete_template_validation"
+  emit issue code.IncompleteTemplateValidation at node
+}

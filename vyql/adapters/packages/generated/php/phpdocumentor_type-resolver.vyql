@@ -1,7 +1,0 @@
-import code.{ExpressionEval}
-adapter php {
-  package "phpdocumentor/type-resolver" {
-    sink method "resolve" -> code.ExpressionEval
-    sink method "createType" -> code.ExpressionEval
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.generated.m2ee68240;
+
+binding commandExecution0 {
+  requires {
+    dependency("twisted")
+  }
+  query pattern callExpr where callee.method == "execCommand"
+  emit sink code.CommandExecution at args[0]
+}

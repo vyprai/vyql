@@ -1,8 +1,0 @@
-adapter javascript {
-  package "regex-parser" {
-    sink method "Parse" -> code.Deserialization
-    flag code.RegexCompile on any {
-      method "Parse"
-    }
-  }
-}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter objc {
-  package "IBAnimatable" {
-    sink method "tokenize" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-  }
-}

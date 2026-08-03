@@ -1,0 +1,10 @@
+module bindings.php.generated.mfbe84119;
+
+binding csrfProtection428 {
+  query pattern callExpr where callee.path ~= "check_admin_referer"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

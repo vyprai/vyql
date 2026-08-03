@@ -1,0 +1,6 @@
+module bindings.config.generated.m2b6375a9;
+
+binding storedHtmlWrite35 {
+  query pattern presenceNode where node.analysis ~= "template.django.safe_filter_raw_html"
+  emit issue code.StoredHtmlWrite at node
+}

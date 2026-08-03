@@ -1,0 +1,9 @@
+module bindings.php.generated.m9c7ebd54;
+
+binding deserialization2 {
+  requires {
+    dependency("zendframework/zendxml")
+  }
+  query pattern callExpr where callee.method == "ZendXmlSecurity::scanFile"
+  emit sink code.Deserialization at args[0]
+}

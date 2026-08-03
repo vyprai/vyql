@@ -1,0 +1,9 @@
+module bindings.objc.generated.m268f8503;
+
+binding userControlledData3 {
+  requires {
+    dependency("Intercom")
+  }
+  query pattern callExpr where callee.method == "loginUserWithUserAttributes"
+  emit source core.UserControlledData at call.result
+}

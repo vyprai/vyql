@@ -1,0 +1,9 @@
+module bindings.c.generated.m082d41e3;
+
+binding deserialization3 {
+  requires {
+    dependency("directxtex")
+  }
+  query pattern callExpr where callee.method == "PNGDecompress"
+  emit sink code.Deserialization at args[0]
+}

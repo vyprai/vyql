@@ -1,0 +1,6 @@
+module bindings.dart.generated.m1c398214;
+
+binding stdinInput1 {
+  query pattern callExpr where callee.path ~= "stdin.readLineSync"
+  emit source code.StdinInput at call.result
+}

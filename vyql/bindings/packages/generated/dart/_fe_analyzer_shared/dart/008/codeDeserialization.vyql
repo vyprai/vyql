@@ -1,0 +1,9 @@
+module bindings.dart.generated.macfed050;
+
+binding deserialization8 {
+  requires {
+    dependency("_fe_analyzer_shared")
+  }
+  query pattern callExpr where callee.method == "endIfControlFlow"
+  emit sink code.Deserialization at args[0]
+}

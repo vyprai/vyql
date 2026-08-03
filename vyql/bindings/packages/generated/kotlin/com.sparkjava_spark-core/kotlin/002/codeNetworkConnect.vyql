@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mf36347a9;
+
+binding networkConnect2 {
+  requires {
+    dependency("com.sparkjava:spark-core")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

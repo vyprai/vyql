@@ -1,0 +1,9 @@
+module bindings.perl.generated.m718368cb;
+
+binding networkConnect1 {
+  requires {
+    dependency("NetworkInfo-Discovery-NetBIOS")
+  }
+  query pattern callExpr where callee.method == "do_it"
+  emit sink code.NetworkConnectSink at args[0]
+}

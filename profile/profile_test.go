@@ -6,7 +6,10 @@ package profile
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/vyprai/vyql/datadir"
 )
 
 func TestProfileAutoDetect(t *testing.T) {
@@ -56,6 +59,68 @@ func TestProfileAutoDetect(t *testing.T) {
 				t.Errorf("Detect = %q, want %q (fingerprint did not select the right archetype)", got.Name, c.name)
 			}
 		})
+	}
+}
+
+func TestLoadSourcesReportsInvalidProfileSyntax(t *testing.T) {
+	profiles, err := loadSources([]datadir.Source{{
+		Name: "profiles/bad.vyql",
+		Data: []byte(`profile bad {}`),
+	}})
+	if err == nil {
+		t.Fatal("loadSources succeeded, want parse error")
+	}
+	if !strings.Contains(err.Error(), "parse profiles") {
+		t.Fatalf("error = %v, want parse profiles context", err)
+	}
+	if len(profiles) != 1 || profiles[0].Name != "generic" {
+		t.Fatalf("fallback profiles = %#v, want generic", profiles)
+	}
+}
+
+func TestLoadSourcesParsesV2Profiles(t *testing.T) {
+	profiles, err := loadSources([]datadir.Source{{
+		Name: "profiles/sample.vyql",
+		Data: []byte(`module profiles;
+profile sample {
+  title: "Sample"
+  priority: 12
+  detect: [any(dependency("sample"), file("sample.toml"))]
+  entrypoints: [code.HttpInput, core.UserControlledData]
+}`),
+	}})
+	if err != nil {
+		t.Fatalf("loadSources: %v", err)
+	}
+	if len(profiles) != 1 {
+		t.Fatalf("profiles = %d, want 1", len(profiles))
+	}
+	got := profiles[0]
+	if got.Name != "sample" || got.Title != "Sample" || got.Priority != 12 {
+		t.Fatalf("profile header wrong: %#v", got)
+	}
+	if len(got.Detect) != 1 || got.Detect[0].Op != "any" || len(got.Detect[0].Args) != 2 {
+		t.Fatalf("detect = %#v", got.Detect)
+	}
+	active := got.ActiveSources()
+	if !active["code.HttpInput"] || !active["core.UserControlledData"] {
+		t.Fatalf("active sources = %#v", active)
+	}
+}
+
+func TestLoadSourcesRejectsLegacyDetectFingerprints(t *testing.T) {
+	_, err := loadSources([]datadir.Source{{
+		Name: "profiles/legacy.vyql",
+		Data: []byte(`module profiles;
+profile legacy {
+  detect: ["dep:legacy"]
+}`),
+	}})
+	if err == nil {
+		t.Fatal("loadSources succeeded, want legacy detect rejection")
+	}
+	if !strings.Contains(err.Error(), "detect entries must be requirement predicate calls") {
+		t.Fatalf("error = %v", err)
 	}
 }
 

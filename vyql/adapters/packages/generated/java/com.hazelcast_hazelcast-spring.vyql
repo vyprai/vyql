@@ -1,6 +1,0 @@
-import code.{XmlParse}
-adapter java {
-  package "com.hazelcast:hazelcast-spring" {
-    sink method "parseInternal" -> code.XmlParse
-  }
-}

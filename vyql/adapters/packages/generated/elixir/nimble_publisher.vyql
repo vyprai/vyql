@@ -1,7 +1,0 @@
-import code.{Deserialization, HtmlRender}
-adapter elixir {
-  package "nimble_publisher" {
-    sink method "parse_contents" -> code.Deserialization
-    sink method "convert_body" -> code.HtmlRender
-  }
-}

@@ -1,5 +1,6 @@
 test "rank164: Avahi publish flags reach assertion-backed invariant without pair rejection"
   lang c
+  expect VYQL-DOS-040
   expect_review code.ReachableAssertionReview
   code
   ```
@@ -21,8 +22,26 @@ test "rank164: Avahi publish flags reach assertion-backed invariant without pair
   }
   ```
 
+test "rank164: Avahi publish flag assertion generalizes across names"
+  lang c
+  expect VYQL-DOS-040
+  expect_review code.ReachableAssertionReview
+  code
+  ```
+  #define AVAHI_PUBLISH_USE_MULTICAST 1
+  #define AVAHI_PUBLISH_USE_WIDE_AREA 2
+  #define AVAHI_ERR_INVALID_FLAGS -1
+  static void transport_flags_from_domain(void *server, int *selected, const char *domain);
+  int add_service(void *server, int selected) {
+      AVAHI_CHECK_VALIDITY_RETURN_NULL(server, AVAHI_FLAGS_VALID(selected, AVAHI_PUBLISH_USE_WIDE_AREA|AVAHI_PUBLISH_USE_MULTICAST), AVAHI_ERR_INVALID_FLAGS);
+      transport_flags_from_domain(server, &selected, "example.org");
+      return 0;
+  }
+  ```
+
 test "rank164: Avahi publish flags pair rejection is clean for reachable assertion review"
   lang c
+  reject VYQL-DOS-040
   reject_review code.ReachableAssertionReview
   code
   ```

@@ -1,0 +1,9 @@
+module bindings.go.generated.m2a9e41ea;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/rogpeppe/go-internal")
+  }
+  query pattern callExpr where callee.method == "ParseFile"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m2444f0af;
+
+binding deserialization2 {
+  requires {
+    dependency("cocoapods-core")
+  }
+  query pattern callExpr where callee.method == "from_yaml"
+  emit sink code.Deserialization at args[0]
+}

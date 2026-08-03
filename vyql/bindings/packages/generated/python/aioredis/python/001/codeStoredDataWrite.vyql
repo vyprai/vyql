@@ -1,0 +1,9 @@
+module bindings.python.generated.mc8d34990;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("aioredis")
+  }
+  query pattern callExpr where callee.method == "update"
+  emit sink code.StoredDataWrite at args[0]
+}

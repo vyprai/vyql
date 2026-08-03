@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "@humanwhocodes/object-schema" {
-    sink method "merge" -> code.Deserialization
-    sink method "validate" -> code.Deserialization
-  }
-}

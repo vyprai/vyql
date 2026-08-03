@@ -1,0 +1,27 @@
+# Rank 591 / CVE-2023-1000: dcnnt notification command injection.
+# Ledger verification: VYQL-INJ-002 catches notification fields in shell command.
+
+test "rank591: dcnnt notification field reaches shell command"
+  lang python
+  expect VYQL-INJ-002
+  code
+  ```
+  import os
+
+  def notify(request):
+      title = request.args["title"]
+      os.system("notify-send " + title)
+  ```
+
+test "rank591: dcnnt notification field is shell-quoted"
+  lang python
+  reject VYQL-INJ-002
+  code
+  ```
+  import os
+  import shlex
+
+  def notify(request):
+      title = request.args["title"]
+      os.system("notify-send " + shlex.quote(title))
+  ```

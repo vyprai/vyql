@@ -1,0 +1,9 @@
+module bindings.rust.generated.mdb0b5b88;
+
+binding cliArgument2 {
+  requires {
+    dependency("system-configuration")
+  }
+  query pattern callExpr where callee.method == "default"
+  emit source code.CliArgument at call.result
+}

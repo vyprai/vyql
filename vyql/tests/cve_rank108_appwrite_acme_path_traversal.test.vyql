@@ -1,0 +1,26 @@
+# Rank 108 / CVE-2022-25377: Appwrite ACME challenge path traversal.
+# Ledger verification: VYQL-PATH-001 catches request URI token to file access.
+
+test "rank108: Appwrite ACME token reaches filesystem path"
+  lang php
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+  $token = $_GET["token"];
+  $path = "/var/app/acme/" . $token;
+  fopen($path, "r");
+  ?>
+  ```
+
+test "rank108: Appwrite ACME token is basename-normalized"
+  lang php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+  $token = basename($_GET["token"]);
+  $path = "/var/app/acme/" . $token;
+  fopen($path, "r");
+  ?>
+  ```

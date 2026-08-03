@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-adapter java {
-  package "org.eclipse.persistence:org.eclipse.persistence.jpa" {
-    sink method "createQuery" -> code.SqlExecution
-    sink method "createQueryByExample" -> code.SqlExecution
-    sink method "createDescriptorNamedQuery" -> code.SqlExecution
-  }
-}

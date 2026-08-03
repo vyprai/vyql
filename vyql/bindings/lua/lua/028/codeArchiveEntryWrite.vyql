@@ -1,0 +1,6 @@
+module bindings.lua.generated.ma99d12f7;
+
+binding archiveEntryWrite28 {
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

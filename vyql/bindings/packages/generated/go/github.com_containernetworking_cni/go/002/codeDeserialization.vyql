@@ -1,0 +1,9 @@
+module bindings.go.generated.m6de698c1;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/containernetworking/cni")
+  }
+  query pattern callExpr where callee.method == "ConfFromBytes"
+  emit sink code.Deserialization at args[0]
+}

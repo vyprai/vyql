@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mc04ebba6;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("org.mongodb:bson")
+  }
+  query pattern callExpr where callee.method == "set"
+  emit sink code.StoredDataWrite at args[0]
+}

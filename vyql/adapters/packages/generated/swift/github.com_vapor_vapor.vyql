@@ -1,7 +1,0 @@
-import code.{HttpInput}
-
-adapter swift {
-  package "github.com/vapor/vapor" {
-    source method "query" -> code.HttpInput
-  }
-}

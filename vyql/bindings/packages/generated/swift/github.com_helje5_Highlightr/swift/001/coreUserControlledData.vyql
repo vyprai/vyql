@@ -1,0 +1,9 @@
+module bindings.swift.generated.m54d35b6a;
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/helje5/Highlightr")
+  }
+  query pattern callExpr where callee.method == "language"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mb0a76b3a;
+
+binding networkConnect2 {
+  requires {
+    dependency("socket.io")
+  }
+  query pattern callExpr where callee.method == "on"
+  emit sink code.NetworkConnectSink at args[0]
+}

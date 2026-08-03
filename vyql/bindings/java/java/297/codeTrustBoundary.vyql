@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding trustBoundary297 {
+  query pattern callExpr where callee.path ~= "getSession.setAttribute"
+  emit sink code.TrustBoundary at args.any
+}

@@ -1,5 +1,0 @@
-adapter javascript {
-  package "get-intrinsic" {
-    sink method "getEvalledConstructor" -> code.CodeEval
-  }
-}

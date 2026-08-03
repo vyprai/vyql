@@ -1,8 +1,0 @@
-import code.{CliArgument, FilePathAccess}
-adapter objc {
-  package "SwiftFormat" {
-    source method "run" -> code.CliArgument
-    sink method "expandGlobs" -> code.FilePathAccess
-    sink method "matchGlobs" -> code.FilePathAccess
-  }
-}

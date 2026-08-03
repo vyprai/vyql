@@ -3,6 +3,7 @@
 
 test "rank142: c glib command line assembly with unquoted placeholders requires review"
   lang c
+  expect VYQL-INJ-053
   expect_review code.CommandLineAssemblyReview
   code
   ```
@@ -35,6 +36,7 @@ test "rank142: c glib command line assembly with unquoted placeholders requires 
 
 test "rank142: c glib command line assembly with shell quoting is clean"
   lang c
+  reject VYQL-INJ-053
   reject_review code.CommandLineAssemblyReview
   code
   ```
@@ -69,5 +71,26 @@ test "rank142: c glib command line assembly with shell quoting is clean"
 
     cmdline = g_string_free(cmd, FALSE);
     g_app_info_create_from_commandline(cmdline, NULL, 0, NULL);
+  }
+  ```
+
+test "rank142: glib command line assembly generalizes across names"
+  lang c
+  expect VYQL-INJ-053
+  expect_review code.CommandLineAssemblyReview
+  code
+  ```
+  typedef struct _GString GString;
+  GString *g_string_new(const char *init);
+  void g_string_append_printf(GString *string, const char *format, ...);
+  char *g_string_free(GString *string, int free_segment);
+  void *g_app_info_create_from_commandline(const char *commandline, const char *name, int flags, void *error);
+
+  static void launch_doc(const char *needle) {
+    GString *builder = g_string_new(0);
+    char *assembled;
+    g_string_append_printf(builder, " --query=%s", needle);
+    assembled = g_string_free(builder, 0);
+    g_app_info_create_from_commandline(assembled, 0, 0, 0);
   }
   ```

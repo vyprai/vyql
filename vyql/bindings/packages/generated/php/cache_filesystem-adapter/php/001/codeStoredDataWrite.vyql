@@ -1,0 +1,9 @@
+module bindings.php.generated.m58a90d88;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("cache/filesystem-adapter")
+  }
+  query pattern callExpr where callee.method == "setFolder"
+  emit sink code.StoredDataWrite at args[0]
+}

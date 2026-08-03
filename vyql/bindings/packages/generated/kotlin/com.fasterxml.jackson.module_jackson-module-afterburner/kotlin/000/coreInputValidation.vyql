@@ -1,0 +1,14 @@
+module bindings.kotlin.generated.m7b8195eb;
+
+binding inputValidation0 {
+  requires {
+    dependency("com.fasterxml.jackson.module:jackson-module-afterburner")
+  }
+  query pattern callExpr where callee.method == "setUseOptimizedBeanDeserializer"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

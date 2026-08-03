@@ -1,8 +1,0 @@
-import code.{Deserialization}
-import core.{InputValidation}
-adapter groovy {
-  package "org.eclipse.persistence:org.eclipse.persistence.moxy" {
-    sink method "unmarshal" -> code.Deserialization
-    control method "validate" -> core.InputValidation
-  }
-}

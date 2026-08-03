@@ -1,9 +1,0 @@
-import core.{InputValidation}
-
-adapter javascript {
-  package "jest-regex-util" {
-    control method "escapeStrForRegex" -> core.InputValidation
-    control method "escapePathForRegex" -> core.InputValidation
-    control method "replacePathSepForRegex" -> core.InputValidation
-  }
-}

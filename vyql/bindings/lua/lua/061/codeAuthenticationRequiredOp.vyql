@@ -1,0 +1,6 @@
+module bindings.lua.generated.ma99d12f7;
+
+binding authenticationRequiredOp61 {
+  query pattern presenceNode where node.path ~= "delete_account"
+  emit issue code.AuthenticationRequiredOp at node
+}

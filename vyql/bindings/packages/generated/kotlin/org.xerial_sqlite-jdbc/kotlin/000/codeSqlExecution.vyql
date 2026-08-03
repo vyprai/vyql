@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.me396344b;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.xerial:sqlite-jdbc")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.SqlExecution at args[0]
+}

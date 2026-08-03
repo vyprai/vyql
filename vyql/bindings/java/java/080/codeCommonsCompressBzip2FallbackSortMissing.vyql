@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding commonsCompressBzip2FallbackSortMissing80 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "blockSort" and node.context.call contains "mainSort" and node.context.call contains "randomiseBlock" and node.context.expr contains "this.workDone>this.workLimit" and not (node.context.scopeCall contains "fallbackSort")
+  emit issue code.CommonsCompressBzip2FallbackSortMissing at node
+}

@@ -1,0 +1,10 @@
+module vypr.auth;
+
+rule SmellWeakAuthz {
+  meta {
+    cwe: [CWE_285]
+    id: "VYQL-SMELL-AUTHZ"
+    severity: info
+  }
+  issue code.WeakAuthzSmell as s
+}

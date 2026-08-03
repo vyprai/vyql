@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m92ab0abc;
+
+binding filePathAccess3 {
+  requires {
+    dependency("rb-fsevent")
+  }
+  query pattern callExpr where callee.method == "append_path"
+  emit sink code.FilePathAccess at args[0]
+}

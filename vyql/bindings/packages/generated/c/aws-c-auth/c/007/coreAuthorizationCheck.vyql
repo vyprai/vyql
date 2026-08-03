@@ -1,0 +1,13 @@
+module bindings.c.generated.m3fb53739;
+
+binding authorizationCheck7 {
+  requires {
+    dependency("aws-c-auth")
+  }
+  query pattern callExpr where callee.method == "aws_validate_v4a_authorization_value"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

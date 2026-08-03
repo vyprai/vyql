@@ -48,7 +48,7 @@ func loweringForbiddenConceptLiterals(t *testing.T) []string {
 	t.Helper()
 	out := map[string]bool{}
 	for _, c := range ontology.Seed().AllConcepts() {
-		if c.AnalysisRole != "" {
+		if ontology.IsInternalConceptRoleConcept(c.QualifiedName()) {
 			continue
 		}
 		out[`"`+c.Name+`"`] = true
@@ -90,7 +90,7 @@ func addPackRuleIDNeedles(t *testing.T, out map[string]bool) {
 		if err != nil {
 			return err
 		}
-		decls, err := parser.Parse(string(raw))
+		decls, err := parseV2DefinitionsForTest(string(raw))
 		if err != nil {
 			return err
 		}
@@ -398,6 +398,50 @@ func TestTargetArgsCallbackDispatchesDynamicCallee(t *testing.T) {
 	}
 }
 
+func TestDynamicCallbackFallbackDoesNotCrossLanguageFamilies(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{
+		{
+			Key:  "java",
+			File: "Helper.java",
+			Body: []nir.Stmt{
+				nir.FuncDef{Name: "worker", Params: []string{"x"}, Body: []nir.Stmt{
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "sink", Loc: "Helper.java:2"},
+						Args:   []nir.Expr{nir.Name{ID: "x", Loc: "Helper.java:2"}},
+						Path:   "sink", Method: "sink", Loc: "Helper.java:2",
+					}},
+				}, Loc: "Helper.java:1"},
+			},
+		},
+		{
+			Key:  "webapp/js/jquery.min.js",
+			File: "webapp/js/jquery.min.js",
+			Body: []nir.Stmt{
+				nir.FuncDef{Name: "runner", Params: []string{"callback", "payload"}, Body: []nir.Stmt{
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "callback", Loc: "webapp/js/jquery.min.js:2"},
+						Args:   []nir.Expr{nir.Name{ID: "payload", Loc: "webapp/js/jquery.min.js:2"}},
+						Path:   "callback", Method: "callback", Loc: "webapp/js/jquery.min.js:2",
+					}},
+				}, Loc: "webapp/js/jquery.min.js:1"},
+			},
+		},
+	}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := findNodeID(t, g, "code.Param", "func", "runner", "name", "payload")
+	javaSinkArg := findNodeID(t, g, "code.Arg", "loc", "Helper.java:2")
+	reachable, err := usg.BFS(g, payload, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reachable[javaSinkArg] {
+		t.Fatalf("dynamic callback fallback crossed from javascript into java")
+	}
+}
+
 func TestAllowlistMembershipIfBoundsTrueBranchValue(t *testing.T) {
 	prog := nir.Program{Modules: []nir.Module{{
 		Key:  "app",
@@ -475,6 +519,112 @@ func findNodeID(t *testing.T, g usg.Store, typ string, props ...string) string {
 	return ""
 }
 
+func TestCallEffectIdentityAliasesOutParam(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.py",
+		Body: []nir.Stmt{
+			nir.FuncDef{
+				Name:   "handler",
+				Params: []string{"payload", "stale"},
+				Loc:    "app.py:1",
+				Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"out"}, Value: nir.Name{ID: "stale", Loc: "app.py:2"}},
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "alias", Loc: "app.py:3"},
+						Path:   "alias",
+						Method: "alias",
+						Loc:    "app.py:3",
+						Args: []nir.Expr{
+							nir.Name{ID: "payload", Loc: "app.py:3"},
+							nir.Name{ID: "out", Loc: "app.py:3"},
+						},
+						Effects: []nir.CallEffect{{SourceArg: 0, DestArg: 1, Identity: true}},
+					}},
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "sink", Loc: "app.py:4"},
+						Path:   "sink",
+						Method: "sink",
+						Loc:    "app.py:4",
+						Args:   []nir.Expr{nir.Name{ID: "out", Loc: "app.py:4"}},
+					}},
+				},
+			},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+
+	payload := findNodeID(t, g, "code.Param", "name", "payload")
+	stale := findNodeID(t, g, "code.Param", "name", "stale")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "app.py:4")
+	reachable, err := usg.BFS(g, payload, "FLOWS", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[sinkArg] {
+		t.Fatalf("identity call effect did not route payload to out-param sink")
+	}
+	reachable, err = usg.BFS(g, stale, "FLOWS", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reachable[sinkArg] {
+		t.Fatalf("identity call effect behaved like a join; stale value reached out-param sink")
+	}
+}
+
+func TestCallEffectReceiverFlowsToResult(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.py",
+		Body: []nir.Stmt{
+			nir.FuncDef{
+				Name:   "handler",
+				Params: []string{"builder"},
+				Loc:    "app.py:1",
+				Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"next"}, Value: nir.Call{
+						Callee: nir.Attr{
+							Base: nir.Name{ID: "builder", Loc: "app.py:2"},
+							Attr: "setOption",
+							Path: "builder.setOption",
+							Loc:  "app.py:2",
+						},
+						Path:    "builder.setOption",
+						Method:  "setOption",
+						Loc:     "app.py:2",
+						Effects: []nir.CallEffect{{Receiver: true}},
+					}},
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "sink", Loc: "app.py:3"},
+						Path:   "sink",
+						Method: "sink",
+						Loc:    "app.py:3",
+						Args:   []nir.Expr{nir.Name{ID: "next", Loc: "app.py:3"}},
+					}},
+				},
+			},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+
+	builder := findNodeID(t, g, "code.Param", "name", "builder")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "app.py:3")
+	reachable, err := usg.BFS(g, builder, "FLOWS", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[sinkArg] {
+		t.Fatalf("receiver call effect did not route receiver to fluent result")
+	}
+}
+
 func TestLowerMaterializesImportNodes(t *testing.T) {
 	g, err := Lower(nir.Program{Modules: []nir.Module{{
 		Key:  "app",
@@ -528,6 +678,65 @@ func TestLowerStampsReceiverTypeFromParamTypes(t *testing.T) {
 		}
 	}
 	t.Fatalf("svc.clean call not found")
+}
+
+func TestBenchmarkThingIdentityCallDoesNotShareReturnAcrossCallSites(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{
+		{
+			Key:  "helpers",
+			File: "ThingInterface.java",
+			Body: []nir.Stmt{
+				nir.ClassDef{Name: "ThingInterface", Body: []nir.Stmt{
+					nir.FuncDef{Name: "doSomething", Params: []string{"i"}, Body: nil, Loc: "ThingInterface.java:1"},
+				}, Loc: "ThingInterface.java:1"},
+				nir.ClassDef{Name: "Thing1", Bases: []string{"ThingInterface"}, Body: []nir.Stmt{
+					nir.FuncDef{Name: "doSomething", Params: []string{"i"}, Body: []nir.Stmt{
+						nir.Return{Value: nir.Name{ID: "i", Loc: "Thing1.java:3"}},
+					}, Loc: "Thing1.java:2"},
+				}, Loc: "Thing1.java:1"},
+			},
+		},
+		{
+			Key:  "app",
+			File: "App.java",
+			Body: []nir.Stmt{
+				nir.FuncDef{Name: "taint", Params: []string{"p"}, Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"thing"}, Value: nir.Const{Loc: "App.java:2"}, Type: "ThingInterface", Loc: "App.java:2"},
+					nir.Assign{Targets: []string{"x"}, Value: nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "thing", Loc: "App.java:3"}, Attr: "doSomething", Path: "thing.doSomething", Loc: "App.java:3"},
+						Args:   []nir.Expr{nir.Name{ID: "p", Loc: "App.java:3"}},
+						Path:   "thing.doSomething", Method: "doSomething", Loc: "App.java:3",
+					}},
+				}, Loc: "App.java:1"},
+				nir.FuncDef{Name: "safe", Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"thing"}, Value: nir.Const{Loc: "App.java:6"}, Type: "ThingInterface", Loc: "App.java:6"},
+					nir.Assign{Targets: []string{"bar"}, Value: nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "thing", Loc: "App.java:7"}, Attr: "doSomething", Path: "thing.doSomething", Loc: "App.java:7"},
+						Args:   []nir.Expr{nir.Const{Value: "safe", Loc: "App.java:7"}},
+						Path:   "thing.doSomething", Method: "doSomething", Loc: "App.java:7",
+					}},
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "File", Loc: "App.java:8"},
+						Args:   []nir.Expr{nir.Name{ID: "bar", Loc: "App.java:8"}},
+						Path:   "File", Method: "File", Loc: "App.java:8",
+					}},
+				}, Loc: "App.java:5"},
+			},
+		},
+	}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := findNodeID(t, g, "code.Param", "name", "p")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "App.java:8")
+	reachable, err := usg.BFS(g, src, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reachable[sinkArg] {
+		t.Fatalf("benchmark helper identity call shared taint across call sites")
+	}
 }
 
 func TestLowerPreservesDeclaredReceiverTypeAfterUntypedAssignment(t *testing.T) {

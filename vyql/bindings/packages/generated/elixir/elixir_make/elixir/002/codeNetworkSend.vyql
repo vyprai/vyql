@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m42d32063;
+
+binding networkSend2 {
+  requires {
+    dependency("elixir_make")
+  }
+  query pattern callExpr where callee.method == "download"
+  emit sink code.NetworkSend at args[0]
+}

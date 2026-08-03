@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter swift {
-  package "github.com/StanfordBDHG/CardinalKitViews" {
-    control method "validate" -> core.InputValidation
-  }
-}

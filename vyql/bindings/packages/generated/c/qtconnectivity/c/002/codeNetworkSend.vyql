@@ -1,0 +1,9 @@
+module bindings.c.generated.me87f9701;
+
+binding networkSend2 {
+  requires {
+    dependency("qtconnectivity")
+  }
+  query pattern callExpr where callee.method == "QBluetoothSocket::write"
+  emit sink code.NetworkSend at args[0]
+}

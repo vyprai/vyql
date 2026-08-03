@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding unboundedEmailRegexValidation553 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.regex contains "^\\S+@\\S+$" and node.context.callPath contains "dns.resolveMx" and node.context.callPath contains "email.split" and not (node.context.expr contains "email.length>300") and not (node.context.expr contains "email.length>=300") and not (node.context.expr contains "MAX_EMAIL_LEN<email.length")
+  emit issue code.UnboundedEmailRegexValidation at node
+}

@@ -1,0 +1,9 @@
+module bindings.rust.generated.m00180752;
+
+binding httpInput3 {
+  requires {
+    dependency("wry")
+  }
+  query pattern callExpr where callee.method == "url"
+  emit source code.HttpInput at call.result
+}

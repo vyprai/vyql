@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mb30b9b4b;
+
+binding dynamicCodeLoad5 {
+  requires {
+    dependency("dry-types")
+  }
+  query pattern callExpr where callee.method == "compile_fn"
+  emit sink code.DynamicCodeLoad at args[0]
+}

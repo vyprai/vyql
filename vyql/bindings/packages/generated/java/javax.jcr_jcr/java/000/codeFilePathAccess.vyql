@@ -1,0 +1,9 @@
+module bindings.java.generated.mbbc78ebf;
+
+binding filePathAccess0 {
+  requires {
+    dependency("javax.jcr:jcr")
+  }
+  query pattern callExpr where callee.method == "addNode"
+  emit sink code.FilePathAccess at args[0]
+}

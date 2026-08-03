@@ -1,0 +1,9 @@
+module bindings.java.generated.mc5948639;
+
+binding deserialization0 {
+  requires {
+    dependency("net.sf.opencsv:opencsv")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

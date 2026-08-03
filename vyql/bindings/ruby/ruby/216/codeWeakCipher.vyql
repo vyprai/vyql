@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding weakCipher216 {
+  query pattern callExpr where callee.path ~= "OpenSSL.Cipher.new" and args.any.literal contains "rc2"
+  emit issue code.WeakCipher at call
+}

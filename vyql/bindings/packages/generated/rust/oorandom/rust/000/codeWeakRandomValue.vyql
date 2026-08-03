@@ -1,0 +1,9 @@
+module bindings.rust.generated.m5589dbe9;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("oorandom")
+  }
+  query pattern callExpr where callee.method == "rand_u32"
+  emit issue code.WeakRandomValue at call
+}

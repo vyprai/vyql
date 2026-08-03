@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m110a7cf3;
+
+binding deserialization0 {
+  requires {
+    dependency("tough-cookie")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

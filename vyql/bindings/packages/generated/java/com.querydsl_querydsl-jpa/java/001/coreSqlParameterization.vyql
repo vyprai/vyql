@@ -1,0 +1,14 @@
+module bindings.java.generated.m86b063bc;
+
+binding sqlParameterization1 {
+  requires {
+    dependency("com.querydsl:querydsl-jpa")
+  }
+  query pattern callExpr where callee.method == "where"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m7c4fc6af;
+
+binding deserialization2 {
+  requires {
+    dependency("jansson")
+  }
+  query pattern callExpr where callee.method == "json_loadf"
+  emit sink code.Deserialization at args[0]
+}

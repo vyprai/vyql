@@ -1,6 +1,8 @@
 call analysis.function.context
+call analysis.function.context.end
 call analysis.function.context.sink
 call analysis.function.context.source
+call analysis.function.local.end
 call analysis.module.context
 call source.value
 call worker.run

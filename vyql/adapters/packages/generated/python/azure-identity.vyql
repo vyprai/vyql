@@ -1,7 +1,0 @@
-import code.{SecretValue}
-
-adapter python {
-  package "azure-identity" {
-    source method "obtain_token_by_client_secret" -> code.SecretValue
-  }
-}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "github.com/hashicorp/hcl/v2" {
-    sink method "Parse" -> code.Deserialization
-    sink method "ParseExpression" -> code.Deserialization
-  }
-}

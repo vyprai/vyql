@@ -1,0 +1,7 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding resourceHandle171 {
+  query pattern presenceNode where node.path ~= "File.Open"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}

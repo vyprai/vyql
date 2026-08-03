@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m50cbdff9;
+
+binding networkSend1 {
+  requires {
+    dependency("mdns")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NetworkSend at args[0]
+}

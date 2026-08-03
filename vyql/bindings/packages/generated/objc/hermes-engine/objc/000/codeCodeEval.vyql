@@ -1,0 +1,9 @@
+module bindings.objc.generated.m58d78687;
+
+binding codeEval0 {
+  requires {
+    dependency("hermes-engine")
+  }
+  query pattern callExpr where callee.method == "evaluateJavaScript"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{StoredDataRead}
-adapter java {
-  package "io.qameta.allure:allure-testng" {
-    source method "loadConfigProperties" -> code.StoredDataRead
-  }
-}

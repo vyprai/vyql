@@ -1,0 +1,13 @@
+module bindings.php.generated.m4864f250;
+
+binding authorizationCheck1 {
+  requires {
+    dependency("zizaco/entrust")
+  }
+  query pattern callExpr where callee.method == "routeNeedsRole"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

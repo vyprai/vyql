@@ -1,0 +1,6 @@
+module bindings.groovy.generated.m6eabb149;
+
+binding sqlExecution14 {
+  query pattern callExpr where callee.method == "executeInsert"
+  emit sink code.SqlExecution at args[0]
+}

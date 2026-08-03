@@ -1,0 +1,9 @@
+module bindings.scala.generated.m76a9764d;
+
+binding templateRender2 {
+  requires {
+    dependency("org.apache.velocity:velocity")
+  }
+  query pattern callExpr where callee.method == "process"
+  emit sink code.TemplateRender at args[0]
+}

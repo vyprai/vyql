@@ -1,0 +1,10 @@
+module vypr.path;
+
+rule PackageEntryPointScriptTraversal {
+  meta {
+    cwe: [CWE_22]
+    id: "VYQL-PATH-005"
+    severity: high
+  }
+  issue code.PackageEntryPointScriptWrite as sink
+}

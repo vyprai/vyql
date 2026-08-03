@@ -1,0 +1,9 @@
+module bindings.swift.generated.mfca3abe8;
+
+binding networkConnect0 {
+  requires {
+    dependency("github.com/apple/swift-nio-ssh")
+  }
+  query pattern callExpr where callee.method == "sendTCPForwardingRequest"
+  emit sink code.NetworkConnectSink at args[0]
+}

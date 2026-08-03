@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule CoerciblePathSegmentPrototypePollution {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_1321]
+    id: "VYQL-INJ-165"
+    severity: high
+  }
+  issue code.CoerciblePathSegmentPrototypePollution as sink
+}

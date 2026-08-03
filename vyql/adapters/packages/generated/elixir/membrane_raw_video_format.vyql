@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "membrane_raw_video_format" {
-    sink method "payload_to_image" -> code.Deserialization
-  }
-}

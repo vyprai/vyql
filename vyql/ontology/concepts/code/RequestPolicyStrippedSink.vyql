@@ -1,0 +1,6 @@
+module code;
+
+concept RequestPolicyStrippedSink : sink {
+  cwe: [CWE_200, CWE_441, CWE_524]
+  vulnerableTo: [injection.ProtocolStateConfusion]
+}

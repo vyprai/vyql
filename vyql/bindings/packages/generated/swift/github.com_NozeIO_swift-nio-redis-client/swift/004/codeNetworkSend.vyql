@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc18252ef;
+
+binding networkSend4 {
+  requires {
+    dependency("github.com/NozeIO/swift-nio-redis-client")
+  }
+  query pattern callExpr where callee.method == "enqueueCommandCall"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,10 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding prototypePollutionGuard566 {
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.literal contains "curr[prop]===constructor.prototype" and args.any.literal contains "curr[prop]={}"
+  emit check core.PrototypePollutionGuard at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

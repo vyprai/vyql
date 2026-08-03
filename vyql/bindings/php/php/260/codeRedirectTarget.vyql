@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding redirectTarget260 {
+  query pattern callExpr where callee.path ~= "RedirectResponse"
+  emit sink code.RedirectTargetSink at args[0]
+}

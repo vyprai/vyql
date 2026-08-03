@@ -1,0 +1,9 @@
+module bindings.rust.generated.m82f910f2;
+
+binding cliArgument0 {
+  requires {
+    dependency("clap_derive")
+  }
+  query pattern callExpr where callee.method == "args"
+  emit source code.CliArgument at call.result
+}

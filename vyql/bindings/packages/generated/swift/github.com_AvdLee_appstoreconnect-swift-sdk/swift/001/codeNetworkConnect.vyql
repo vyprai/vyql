@@ -1,0 +1,9 @@
+module bindings.swift.generated.mb07686b1;
+
+binding networkConnect1 {
+  requires {
+    dependency("github.com/AvdLee/appstoreconnect-swift-sdk")
+  }
+  query pattern callExpr where callee.method == "asURLRequest"
+  emit sink code.NetworkConnectSink at args[0]
+}

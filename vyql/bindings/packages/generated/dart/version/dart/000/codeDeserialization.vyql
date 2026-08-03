@@ -1,0 +1,9 @@
+module bindings.dart.generated.ma0bac72b;
+
+binding deserialization0 {
+  requires {
+    dependency("version")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

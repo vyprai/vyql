@@ -1,0 +1,7 @@
+module core;
+
+concept HtmlEscape : check {
+  applies: path
+  covers: [endpoint, path]
+  neutralizes: [injection.Xss]
+}

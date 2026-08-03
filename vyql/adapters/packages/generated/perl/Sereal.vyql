@@ -1,8 +1,0 @@
-adapter perl {
-  package "Sereal" {
-    sink method "get_sereal_decoder" -> code.Deserialization
-    flag code.WeakHash on any {
-      path "sereal.hash"
-    }
-  }
-}

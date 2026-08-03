@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding unescapedHtmlOptionRenderer442 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unescaped_html_option_renderer"
+  emit issue code.UnescapedHtmlOptionRenderer at node
+}

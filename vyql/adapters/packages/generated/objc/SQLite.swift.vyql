@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter objc {
-  package "SQLite.swift" {
-    sink method "run" -> code.SqlExecution
-  }
-}

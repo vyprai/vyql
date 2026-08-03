@@ -1,0 +1,14 @@
+module bindings.bash.generated.mb6f991a5;
+
+binding shellEscape3 {
+  requires {
+    dependency("bash")
+  }
+  query pattern callExpr where callee.path ~= "printf"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

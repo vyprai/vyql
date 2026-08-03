@@ -1,7 +1,0 @@
-adapter elixir {
-  package "siphash" {
-    flag code.WeakHash on any {
-      path "siphash.hash"
-    }
-  }
-}

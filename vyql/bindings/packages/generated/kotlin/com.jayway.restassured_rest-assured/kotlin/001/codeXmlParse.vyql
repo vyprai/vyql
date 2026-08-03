@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m89730995;
+
+binding xmlParse1 {
+  requires {
+    dependency("com.jayway.restassured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit sink code.XmlParse at args[0]
+}

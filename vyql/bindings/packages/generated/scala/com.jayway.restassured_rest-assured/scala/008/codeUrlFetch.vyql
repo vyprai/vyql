@@ -1,0 +1,9 @@
+module bindings.scala.generated.m68d3b056;
+
+binding urlFetch8 {
+  requires {
+    dependency("com.jayway.restassured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.UrlFetch at args[0]
+}

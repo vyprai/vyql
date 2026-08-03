@@ -1,0 +1,8 @@
+module code;
+
+review code.CheckmkPendingChangeTextUnescapeXss {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review pending-change popout data for HTML entity unescaping before frontend HTML insertion"
+}

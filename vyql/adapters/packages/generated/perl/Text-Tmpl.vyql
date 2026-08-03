@@ -1,5 +1,0 @@
-adapter perl {
-  package "Text-Tmpl" {
-    sink method "new" -> code.Deserialization
-  }
-}

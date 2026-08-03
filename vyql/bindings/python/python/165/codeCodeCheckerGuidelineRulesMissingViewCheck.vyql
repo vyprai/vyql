@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding codeCheckerGuidelineRulesMissingViewCheck165 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "codechecker_guideline_rules_missing_view_check"
+  emit issue code.CodeCheckerGuidelineRulesMissingViewCheck at node
+}

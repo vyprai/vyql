@@ -1,0 +1,10 @@
+module bindings.perl.generated.m5f43f196;
+
+binding redirectTarget0 {
+  requires {
+    dependency("Pickles")
+  }
+  query pattern callExpr where callee.method == "uri_for"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

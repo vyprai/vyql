@@ -1,6 +1,0 @@
-adapter kotlin {
-  package "com.google.dagger:dagger-android-support" {
-    sink method "inject" -> code.CodeEval
-    sink method "androidInjector" -> code.CodeEval
-  }
-}

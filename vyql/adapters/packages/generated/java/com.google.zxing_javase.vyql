@@ -1,9 +1,0 @@
-import code.{CliArgument, FilePathAccess}
-adapter java {
-  package "com.google.zxing:javase" {
-    sink method "readImage" -> code.FilePathAccess
-    sink method "readDataURIImage" -> code.FilePathAccess
-    sink method "writeToFile" -> code.FilePathAccess
-    sink method "writeToPath" -> code.FilePathAccess
-  }
-}

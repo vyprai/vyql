@@ -1,0 +1,10 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding authenticationCheck136 {
+  query pattern callExpr where callee.method == "Authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

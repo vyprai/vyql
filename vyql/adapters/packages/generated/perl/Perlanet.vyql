@@ -1,5 +1,0 @@
-adapter perl {
-  package "Perlanet" {
-    sink method "feed_file" -> code.FilePathAccess
-  }
-}

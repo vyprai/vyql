@@ -1,0 +1,9 @@
+module bindings.php.generated.m82a48309;
+
+binding sqlExecution0 {
+  requires {
+    dependency("doctrine/orm")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.SqlExecution at args[0]
+}

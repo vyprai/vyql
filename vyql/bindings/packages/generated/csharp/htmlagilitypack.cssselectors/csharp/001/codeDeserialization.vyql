@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m91b12635;
+
+binding deserialization1 {
+  requires {
+    dependency("htmlagilitypack.cssselectors")
+  }
+  query pattern callExpr where callee.method == "SelectSingleNode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding flarumTranslatorRawStringParameterXss125 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.expr contains "'user'inparameters" and node.context.callPath contains "extract" and node.context.selector contains "parameters.username" and node.context.callPath contains "username" and not (node.context.identifier contains "escapedParameters") and not (node.context.expr contains "typeofparamValue==='string'") and not (node.context.literal contains "<>{parameters[param]}</>")
+  emit issue code.FlarumTranslatorRawStringParameterXss at node
+}

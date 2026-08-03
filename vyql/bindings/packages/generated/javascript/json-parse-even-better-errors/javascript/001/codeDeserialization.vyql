@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m245aea51;
+
+binding deserialization1 {
+  requires {
+    dependency("json-parse-even-better-errors")
+  }
+  query pattern callExpr where callee.method == "parseJsonError"
+  emit sink code.Deserialization at args[0]
+}

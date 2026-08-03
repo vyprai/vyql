@@ -1,0 +1,10 @@
+module bindings.php.generated.mfbe84119;
+
+binding authenticationCheck298 {
+  query pattern callExpr where callee.path ~= "auth.check"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

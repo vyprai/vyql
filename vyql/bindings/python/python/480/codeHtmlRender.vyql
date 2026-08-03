@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding htmlRender480 {
+  query pattern callExpr where callee.path ~= "mako.template.Template"
+  emit sink code.HtmlRender at args[0]
+}

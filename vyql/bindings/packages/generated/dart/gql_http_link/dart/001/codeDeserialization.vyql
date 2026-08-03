@@ -1,0 +1,9 @@
+module bindings.dart.generated.ma0c6f545;
+
+binding deserialization1 {
+  requires {
+    dependency("gql_http_link")
+  }
+  query pattern callExpr where callee.method == "_defaultHttpResponseDecode"
+  emit sink code.Deserialization at args[0]
+}

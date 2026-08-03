@@ -1,6 +1,0 @@
-adapter ruby {
-  package "gyoku" {
-    sink method "Gyoku::Hash.to_xml" -> code.XmlParse
-    source method "Gyoku::XMLKey.create" -> core.UserControlledData
-  }
-}

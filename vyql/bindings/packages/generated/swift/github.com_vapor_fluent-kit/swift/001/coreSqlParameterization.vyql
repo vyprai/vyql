@@ -1,0 +1,14 @@
+module bindings.swift.generated.m9c81201c;
+
+binding sqlParameterization1 {
+  requires {
+    dependency("github.com/vapor/fluent-kit")
+  }
+  query pattern callExpr where callee.method == "prepare"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

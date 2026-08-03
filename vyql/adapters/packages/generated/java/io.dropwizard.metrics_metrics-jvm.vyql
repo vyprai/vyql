@@ -1,5 +1,0 @@
-adapter java {
-  package "io.dropwizard.metrics:metrics-jvm" {
-    sink method "dump" -> code.NetworkSend
-  }
-}

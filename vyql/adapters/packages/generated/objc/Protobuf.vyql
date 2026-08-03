@@ -1,5 +1,0 @@
-adapter objc {
-  package "Protobuf" {
-    sink method "parse" -> code.Deserialization
-  }
-}

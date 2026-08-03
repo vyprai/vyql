@@ -1,0 +1,7 @@
+module bindings.powershell.owasp;
+
+binding invokeExpressionCommandExecution {
+  query pattern callExpr where callee.path ~= "Invoke-Expression"
+  emit sink code.CommandExecution at args[0]
+}
+

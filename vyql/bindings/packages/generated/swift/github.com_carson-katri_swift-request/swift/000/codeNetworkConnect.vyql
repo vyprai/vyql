@@ -1,0 +1,9 @@
+module bindings.swift.generated.m4c07e92e;
+
+binding networkConnect0 {
+  requires {
+    dependency("github.com/carson-katri/swift-request")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.NetworkConnectSink at args[0]
+}

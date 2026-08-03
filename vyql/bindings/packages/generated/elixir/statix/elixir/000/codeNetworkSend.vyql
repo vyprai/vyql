@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mbda29f3a;
+
+binding networkSend0 {
+  requires {
+    dependency("statix")
+  }
+  query pattern callExpr where callee.method == "transmit"
+  emit sink code.NetworkSend at args[0]
+}

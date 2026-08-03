@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mcf1af1b6;
+
+binding cookie6 {
+  requires {
+    dependency("poltergeist")
+  }
+  query pattern callExpr where callee.method == "set_cookie"
+  emit source code.Cookie at call.result
+}

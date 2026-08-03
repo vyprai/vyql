@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-
-adapter elixir {
-  package "vintage_net_wifi" {
-    sink method "up_cmds" -> code.CommandExecution
-    sink method "down_cmds" -> code.CommandExecution
-  }
-}

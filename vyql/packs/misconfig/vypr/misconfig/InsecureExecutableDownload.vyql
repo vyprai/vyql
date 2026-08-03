@@ -1,0 +1,11 @@
+module vypr.misconfig;
+
+rule InsecureExecutableDownload {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_319, CWE_494]
+    id: "VYQL-CFG-016"
+    severity: high
+  }
+  issue code.InsecureExecutableDownload as d
+}

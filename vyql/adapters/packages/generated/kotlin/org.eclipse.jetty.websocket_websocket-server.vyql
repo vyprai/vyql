@@ -1,6 +1,0 @@
-import code.{HttpInput}
-adapter kotlin {
-  package "org.eclipse.jetty.websocket:websocket-server" {
-    source method "handle" -> code.HttpInput
-  }
-}

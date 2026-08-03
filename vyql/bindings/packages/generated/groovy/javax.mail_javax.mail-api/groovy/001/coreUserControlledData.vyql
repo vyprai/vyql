@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m34603f2c;
+
+binding userControlledData1 {
+  requires {
+    dependency("javax.mail:javax.mail-api")
+  }
+  query pattern callExpr where callee.method == "InternetAddress.parse"
+  emit source core.UserControlledData at call.result
+}

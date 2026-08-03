@@ -1,0 +1,7 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding resourceHandle633 {
+  query pattern presenceNode where node.path ~= "fs.openSync"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}

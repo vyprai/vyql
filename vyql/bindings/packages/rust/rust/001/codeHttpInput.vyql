@@ -1,0 +1,9 @@
+module bindings.rust.generated.m222602a5;
+
+binding httpInput1 {
+  requires {
+    dependency("actix-web")
+  }
+  query pattern callExpr where callee.method == "form" and callee.receiver.type == "HttpRequest"
+  emit source code.HttpInput at call.result
+}

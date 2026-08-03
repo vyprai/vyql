@@ -1,0 +1,75 @@
+# Rank 704 / CVE-2022-0482: Easy!Appointments exposed backend calendar event
+# data to callers without an authenticated role / appointment-view privilege
+# check. The fresh corpus checkout is already after the security commit, so this
+# spec is a runnable local regression but is skipped by the current fresh-target
+# verifier.
+#
+# verify_current_expected: skip-fresh-target
+
+test "rank704: backend calendar events disclose appointment data without authorization"
+  lang php
+  file Backend_api.php
+  expect VYQL-AUTH-093
+  expect_review code.BackendCalendarEventsMissingAuthorization
+  code
+  ```
+  <?php
+  class Backend_api {
+    public function ajax_get_calendar_events() {
+      $start_date = $this->input->post('startDate') . ' 00:00:00';
+      $end_date = $this->input->post('endDate') . ' 23:59:59';
+
+      $response = [
+        'appointments' => $this->appointments_model->get_batch([
+          'is_unavailable' => FALSE,
+          'start_datetime >=' => $start_date,
+          'end_datetime <=' => $end_date
+        ])
+      ];
+
+      foreach ($response['appointments'] as &$appointment) {
+        $appointment['provider'] = $this->providers_model->get_row($appointment['id_users_provider']);
+        $appointment['service'] = $this->services_model->get_row($appointment['id_services']);
+        $appointment['customer'] = $this->customers_model->get_row($appointment['id_users_customer']);
+      }
+
+      $this->output->set_output(json_encode($response));
+    }
+  }
+  ```
+
+test "rank704: appointment-view privilege guard suppresses backend calendar event finding"
+  lang php
+  file Backend_api.php
+  reject VYQL-AUTH-093
+  reject_review code.BackendCalendarEventsMissingAuthorization
+  code
+  ```
+  <?php
+  class Backend_api {
+    public function ajax_get_calendar_events() {
+      if ($this->privileges[PRIV_APPOINTMENTS]['view'] == FALSE) {
+        throw new Exception('You do not have the required privileges for this task.');
+      }
+
+      $start_date = $this->input->post('startDate') . ' 00:00:00';
+      $end_date = $this->input->post('endDate') . ' 23:59:59';
+
+      $response = [
+        'appointments' => $this->appointments_model->get_batch([
+          'is_unavailable' => FALSE,
+          'start_datetime >=' => $start_date,
+          'end_datetime <=' => $end_date
+        ])
+      ];
+
+      foreach ($response['appointments'] as &$appointment) {
+        $appointment['provider'] = $this->providers_model->get_row($appointment['id_users_provider']);
+        $appointment['service'] = $this->services_model->get_row($appointment['id_services']);
+        $appointment['customer'] = $this->customers_model->get_row($appointment['id_users_customer']);
+      }
+
+      $this->output->set_output(json_encode($response));
+    }
+  }
+  ```

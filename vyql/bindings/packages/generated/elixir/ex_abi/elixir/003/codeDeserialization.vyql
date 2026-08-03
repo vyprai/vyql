@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m1e2b77c7;
+
+binding deserialization3 {
+  requires {
+    dependency("ex_abi")
+  }
+  query pattern callExpr where callee.method == "parse!"
+  emit sink code.Deserialization at args[0]
+}

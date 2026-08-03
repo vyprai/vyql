@@ -1,0 +1,9 @@
+module bindings.dart.generated.mb2b137a5;
+
+binding userControlledData0 {
+  requires {
+    dependency("modular_core")
+  }
+  query pattern callExpr where callee.method == "setArguments"
+  emit source core.UserControlledData at call.result
+}

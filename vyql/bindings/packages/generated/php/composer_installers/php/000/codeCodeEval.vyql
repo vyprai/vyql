@@ -1,0 +1,9 @@
+module bindings.php.generated.m73655d18;
+
+binding codeEval0 {
+  requires {
+    dependency("composer/installers")
+  }
+  query pattern callExpr where callee.method == "getInstallPath"
+  emit sink code.CodeEval at args[0]
+}

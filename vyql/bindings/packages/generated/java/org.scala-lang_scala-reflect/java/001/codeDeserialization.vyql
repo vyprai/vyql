@@ -1,0 +1,9 @@
+module bindings.java.generated.me8db2bd0;
+
+binding deserialization1 {
+  requires {
+    dependency("org.scala-lang:scala-reflect")
+  }
+  query pattern callExpr where callee.method == "writeReplace"
+  emit sink code.Deserialization at args[0]
+}

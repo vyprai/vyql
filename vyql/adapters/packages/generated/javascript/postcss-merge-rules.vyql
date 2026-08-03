@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter javascript {
-  package "postcss-merge-rules" {
-    sink method "pluginCreator" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding djangoAttachmentSaveWithoutModelValidation260 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "django_attachment_save_without_model_validation"
+  emit issue code.DjangoAttachmentSaveWithoutModelValidation at node
+}

@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "levn" {
-    sink method "parse" -> code.Deserialization
-    sink method "parsedTypeParse" -> code.Deserialization
-  }
-}

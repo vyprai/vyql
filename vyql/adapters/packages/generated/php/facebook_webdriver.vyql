@@ -1,6 +1,0 @@
-adapter php {
-  package "facebook/webdriver" {
-    source method "sendKeys" -> core.UserControlledData
-    sink method "xpath" -> code.Deserialization
-  }
-}

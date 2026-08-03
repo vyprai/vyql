@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding httpInput17 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.entryKind contains "function_param" and args.any.context.functionName contains "resolve" and args.any.context.paramName contains "args"
+  emit source code.HttpInput at call.result
+}

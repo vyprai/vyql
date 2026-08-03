@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding authenticatedDecryptionTagReview409 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "authenticated_decryption_tag_length_missing"
+  emit issue code.AuthenticatedDecryptionTagReview at node
+}

@@ -46,6 +46,29 @@ test "rank248: ATT cancel removes queued ops during disconnect cleanup without g
   }
   ```
 
+test "rank248: reentrant queue cleanup generalizes across names"
+  lang c
+  expect VYQL-MEM-019
+  expect_review code.ReentrantQueueCleanupReview
+  code
+  ```
+  void *queue_remove_if(void *queue, int (*match)(void), void *id);
+  void destroy_att_send_op(void *op);
+  int match_id(void);
+
+  int cancel_pending(struct session *state, unsigned int key) {
+    void *entry;
+    entry = queue_remove_if(state->requests, match_id, &key);
+    if (!entry) entry = queue_remove_if(state->indications, match_id, &key);
+    if (!entry) entry = queue_remove_if(state->writes, match_id, &key);
+    if (entry) {
+      destroy_att_send_op(entry);
+      return 1;
+    }
+    return 0;
+  }
+  ```
+
 test "rank248: ATT cancel uses disconnect cleanup diversion before queue removal"
   lang c
   reject VYQL-MEM-019

@@ -1,0 +1,9 @@
+module bindings.php.generated.m79b9f1a8;
+
+binding userControlledData2 {
+  requires {
+    dependency("zendframework/zend-navigation")
+  }
+  query pattern callExpr where callee.method == "setRoute"
+  emit source core.UserControlledData at call.result
+}

@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter perl {
-  package "Locales" {
-    control method "normalize_tag" -> core.InputValidation
-  }
-}

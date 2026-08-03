@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding caseInsensitiveLocalIdentityAuthorizationBypass123 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "local_identity.case_insensitive_authz"
+  emit issue code.CaseInsensitiveLocalIdentityAuthorizationBypass at node
+}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.m658a6b13;
+
+binding sqlExecution0 {
+  requires {
+    dependency("com.microsoft.sqlserver:mssql-jdbc")
+  }
+  query pattern callExpr where callee.method == "SocketFinder"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter objc {
-  package "FLEX" {
-    source method "filter:completion:" -> core.UserControlledData
-  }
-}

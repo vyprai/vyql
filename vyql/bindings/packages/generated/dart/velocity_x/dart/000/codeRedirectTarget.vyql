@@ -1,0 +1,10 @@
+module bindings.dart.generated.mb87a162d;
+
+binding redirectTarget0 {
+  requires {
+    dependency("velocity_x")
+  }
+  query pattern callExpr where callee.method == "replaceUrl"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

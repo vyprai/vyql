@@ -1,0 +1,9 @@
+module bindings.php.generated.m91539972;
+
+binding htmlRender2 {
+  requires {
+    dependency("doctrine/doctrine-bundle")
+  }
+  query pattern callExpr where callee.method == "formatSql"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter swift {
-  package "github.com/Nef10/SwiftBeanCountParser" {
-    sink method "parse" -> code.FilePathAccess
-  }
-}

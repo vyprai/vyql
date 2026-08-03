@@ -1,0 +1,9 @@
+module bindings.objc.generated.m1dd16f91;
+
+binding sqlExecution0 {
+  requires {
+    dependency("sqlite3")
+  }
+  query pattern callExpr where callee.method == "Jim_FindHashEntry"
+  emit sink code.SqlExecution at args[0]
+}

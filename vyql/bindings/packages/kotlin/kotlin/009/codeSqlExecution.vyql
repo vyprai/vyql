@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m1457a768;
+
+binding sqlExecution9 {
+  requires {
+    dependency("java.sql")
+  }
+  query pattern callExpr where callee.method == "executeQuery"
+  emit sink code.SqlExecution at args[0]
+}

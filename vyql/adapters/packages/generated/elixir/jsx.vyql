@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "jsx" {
-    sink method "parse_config" -> code.Deserialization
-    sink method "value" -> code.Deserialization
-  }
-}

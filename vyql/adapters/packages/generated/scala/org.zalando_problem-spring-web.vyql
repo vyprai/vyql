@@ -1,7 +1,0 @@
-import code.{HttpInput, NetworkConnect, FilePathAccess}
-adapter scala {
-  package "org.zalando:problem-spring-web" {
-    source method "create" -> code.HttpInput
-    source method "negotiate" -> code.HttpInput
-  }
-}

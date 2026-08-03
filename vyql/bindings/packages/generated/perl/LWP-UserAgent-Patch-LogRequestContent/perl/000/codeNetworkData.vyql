@@ -1,0 +1,9 @@
+module bindings.perl.generated.md104939b;
+
+binding networkData0 {
+  requires {
+    dependency("LWP-UserAgent-Patch-LogRequestContent")
+  }
+  query pattern callExpr where callee.method == "patch_data"
+  emit source code.NetworkData at call.result
+}

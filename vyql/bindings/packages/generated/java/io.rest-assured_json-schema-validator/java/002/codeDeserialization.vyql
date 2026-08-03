@@ -1,0 +1,9 @@
+module bindings.java.generated.mc17cac28;
+
+binding deserialization2 {
+  requires {
+    dependency("io.rest-assured:json-schema-validator")
+  }
+  query pattern callExpr where callee.method == "matchesSafely"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,13 @@
+module bindings.lua.generated.m49b0a04f;
+
+binding redirectAllowlist4 {
+  requires {
+    dependency("openresty")
+  }
+  query pattern callExpr where callee.path ~= "ngx.escape_uri"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.go.generated.md88132c8;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/go-toolsmith/strparse")
+  }
+  query pattern callExpr where callee.method == "Expr"
+  emit sink code.Deserialization at args[0]
+}

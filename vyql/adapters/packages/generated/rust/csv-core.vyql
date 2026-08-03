@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "csv-core" {
-    sink method "read_field" -> code.Deserialization
-    sink method "read_record" -> code.Deserialization
-  }
-}

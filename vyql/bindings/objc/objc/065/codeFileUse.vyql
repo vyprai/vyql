@@ -1,0 +1,7 @@
+module bindings.objc.generated.mccadd221;
+
+binding fileUse65 {
+  query pattern presenceNode where node.path ~= "remove"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}

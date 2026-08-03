@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mc12e92cb;
+
+binding networkSend0 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-remote-driver")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

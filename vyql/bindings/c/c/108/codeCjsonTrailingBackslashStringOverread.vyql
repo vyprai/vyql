@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding cjsonTrailingBackslashStringOverread108 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "string.trailing_escape_overread"
+  emit issue code.CjsonTrailingBackslashStringOverread at node
+}

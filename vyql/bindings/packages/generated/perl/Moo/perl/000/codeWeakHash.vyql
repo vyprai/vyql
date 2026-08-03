@@ -1,0 +1,9 @@
+module bindings.perl.generated.mdefe5e10;
+
+binding weakHash0 {
+  requires {
+    dependency("Moo")
+  }
+  query pattern callExpr where callee.method == "as_md5"
+  emit issue code.WeakHash at call
+}

@@ -1,7 +1,0 @@
-import code.{UrlFetch}
-
-adapter elixir {
-  package "exgravatar" {
-    sink method "gravatar_url" -> code.UrlFetch
-  }
-}

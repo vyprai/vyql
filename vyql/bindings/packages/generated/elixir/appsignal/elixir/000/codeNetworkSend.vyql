@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m6f2d638c;
+
+binding networkSend0 {
+  requires {
+    dependency("appsignal")
+  }
+  query pattern callExpr where callee.method == "Appsignal.Diagnose.Report.send"
+  emit sink code.NetworkSend at args[0]
+}

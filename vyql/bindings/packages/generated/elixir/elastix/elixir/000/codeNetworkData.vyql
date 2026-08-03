@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m9d136887;
+
+binding networkData0 {
+  requires {
+    dependency("elastix")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit source code.NetworkData at call.result
+}

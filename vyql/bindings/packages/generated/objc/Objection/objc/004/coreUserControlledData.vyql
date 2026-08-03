@@ -1,0 +1,9 @@
+module bindings.objc.generated.m58067ca3;
+
+binding userControlledData4 {
+  requires {
+    dependency("Objection")
+  }
+  query pattern callExpr where callee.method == "bindMetaClass"
+  emit source core.UserControlledData at call.result
+}

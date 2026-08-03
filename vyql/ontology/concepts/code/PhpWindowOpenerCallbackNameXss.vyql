@@ -1,0 +1,11 @@
+module code;
+
+concept PhpWindowOpenerCallbackNameXss : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "the file-browser endpoint is reachable by an authenticated user and the callback name parameter can contain JavaScript metacharacters"
+  reviewCategory: xss
+  reviewCondition: "PHP file-browser callback name from request data is emitted into a window.opener JavaScript property access"
+  reviewConfidence: high
+  reviewEvidence: "PHP module context {pattern} assigns func from $_GET and renders window.opener.<func> without var_out or an equivalent JavaScript-safe identifier escape"
+  vulnerableTo: [injection.Xss]
+}

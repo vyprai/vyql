@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m33b4c36e;
+
+binding userControlledData1 {
+  requires {
+    dependency("surface_catalogue")
+  }
+  query pattern callExpr where callee.method == "handle_params"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept CiliumBroadTcFilterCleanup : issue {
+  cwe: [CWE_755, CWE_284]
+  reviewAssumption: "agent startup or cleanup can run while endpoint or host-network policy enforcement depends on attached TC BPF programs"
+  reviewCategory: lifecycle
+  reviewCondition: "Cilium cleanup selects TC BPF filters with an overly broad name match that can detach endpoint datapath programs during restart"
+  reviewConfidence: high
+  reviewEvidence: "TC filter cleanup context {pattern} matches bpfFilter.Name against the generic cilium substring"
+  vulnerableTo: [access_control.BrokenAccess, business_logic.BusinessLogic]
+}

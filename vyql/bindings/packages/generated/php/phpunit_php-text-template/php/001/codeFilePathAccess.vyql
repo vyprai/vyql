@@ -1,0 +1,9 @@
+module bindings.php.generated.m1fe52f0a;
+
+binding filePathAccess1 {
+  requires {
+    dependency("phpunit/php-text-template")
+  }
+  query pattern callExpr where callee.method == "renderTo"
+  emit sink code.FilePathAccess at args[0]
+}

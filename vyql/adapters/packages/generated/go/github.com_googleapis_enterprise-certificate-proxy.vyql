@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/googleapis/enterprise-certificate-proxy" {
-    source method "Encrypt" -> code.SecretValue
-  }
-}

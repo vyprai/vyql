@@ -1,0 +1,9 @@
+module bindings.cpp.generated.me3a92c4e;
+
+binding networkData2 {
+  requires {
+    dependency("tacopie")
+  }
+  query pattern callExpr where callee.method == "on_read_available"
+  emit source code.NetworkData at call.result
+}

@@ -1,8 +1,0 @@
-import code.{CodeEval}
-
-adapter python {
-  package "mccabe" {
-    sink method "get_code_complexity" -> code.CodeEval
-    sink method "get_module_complexity" -> code.CodeEval
-  }
-}

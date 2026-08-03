@@ -1,0 +1,9 @@
+module bindings.go.generated.mf4d208b3;
+
+binding networkData0 {
+  requires {
+    dependency("github.com/hashicorp/yamux")
+  }
+  query pattern callExpr where callee.method == "Server"
+  emit source code.NetworkData at call.result
+}

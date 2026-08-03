@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mbe406f0a;
+
+binding httpInput2 {
+  requires {
+    dependency("fog-storm_on_demand")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit source code.HttpInput at call.result
+}

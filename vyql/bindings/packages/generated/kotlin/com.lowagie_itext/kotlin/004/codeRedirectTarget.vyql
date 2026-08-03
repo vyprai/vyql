@@ -1,0 +1,10 @@
+module bindings.kotlin.generated.m8e564aef;
+
+binding redirectTarget4 {
+  requires {
+    dependency("com.lowagie:itext")
+  }
+  query pattern callExpr where callee.method == "Chunk.setAnchor"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding filePathAccess169 {
+  query pattern callExpr where callee.path ~= "Paths.get"
+  emit sink code.FilePathAccess at args[0]
+}

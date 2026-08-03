@@ -1,0 +1,13 @@
+module bindings.swift.generated.m59574965;
+
+binding authorizationCheck5 {
+  requires {
+    dependency("github.com/trilemma-dev/Authorized")
+  }
+  query pattern callExpr where callee.method == "removeDefinition"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

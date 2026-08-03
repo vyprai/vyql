@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule IncompleteCsrfTokenValidation {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_352]
+    id: "VYQL-RF-006"
+    severity: medium
+  }
+  issue code.IncompleteCsrfTokenValidation as guard
+}

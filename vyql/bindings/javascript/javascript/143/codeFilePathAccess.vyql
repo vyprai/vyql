@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding filePathAccess143 {
+  query pattern callExpr where callee.method == "findKeys"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.bash.generated.mb6f991a5;
+
+binding commandExecution11 {
+  requires {
+    dependency("dash")
+  }
+  query pattern callExpr where callee.path ~= "sh"
+  emit sink code.CommandExecution at args.any
+}

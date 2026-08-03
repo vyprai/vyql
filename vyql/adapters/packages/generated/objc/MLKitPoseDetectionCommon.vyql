@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter objc {
-  package "MLKitPoseDetectionCommon" {
-    source method "processImage:completion:" -> core.UserControlledData
-    source method "resultsInImage:" -> core.UserControlledData
-  }
-}

@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/go-playground/validator/v10" {
-    control method "isValidateFn" -> core.InputValidation
-  }
-}

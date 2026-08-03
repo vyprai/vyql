@@ -1,0 +1,9 @@
+module bindings.objc.generated.mf608c243;
+
+binding userControlledData3 {
+  requires {
+    dependency("libavif")
+  }
+  query pattern callExpr where callee.method == "avifIOCreateMemoryReader"
+  emit source core.UserControlledData at call.result
+}

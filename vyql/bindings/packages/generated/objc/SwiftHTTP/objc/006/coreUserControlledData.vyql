@@ -1,0 +1,9 @@
+module bindings.objc.generated.m61035d9b;
+
+binding userControlledData6 {
+  requires {
+    dependency("SwiftHTTP")
+  }
+  query pattern callExpr where callee.method == "appendParametersAsJSON"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m73153651;
+
+binding networkSend12 {
+  requires {
+    dependency("httpoison")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkSend at args[0]
+}

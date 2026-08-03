@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m5d28f8f2;
+
+binding filePathAccess1 {
+  requires {
+    dependency("xcodeproj")
+  }
+  query pattern callExpr where callee.method == "Xcodeproj::Plist.write_to_path"
+  emit sink code.FilePathAccess at args[0]
+}

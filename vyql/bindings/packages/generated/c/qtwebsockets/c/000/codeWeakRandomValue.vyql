@@ -1,0 +1,9 @@
+module bindings.c.generated.m3ac2633c;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("qtwebsockets")
+  }
+  query pattern callExpr where callee.method == "QMaskGenerator::generateMask"
+  emit issue code.WeakRandomValue at call
+}

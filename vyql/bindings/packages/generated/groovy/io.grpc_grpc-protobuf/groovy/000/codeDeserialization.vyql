@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m774122a9;
+
+binding deserialization0 {
+  requires {
+    dependency("io.grpc:grpc-protobuf")
+  }
+  query pattern callExpr where callee.method == "marshallerWithRecursionLimit"
+  emit sink code.Deserialization at args[0]
+}

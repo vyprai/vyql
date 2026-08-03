@@ -1,0 +1,9 @@
+module bindings.perl.generated.m1a2efc41;
+
+binding commandExecution0 {
+  requires {
+    dependency("Plagger")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

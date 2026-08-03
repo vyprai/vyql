@@ -1,0 +1,9 @@
+module bindings.php.generated.m05c08863;
+
+binding filePathAccess2 {
+  requires {
+    dependency("league/glide")
+  }
+  query pattern callExpr where callee.method == "LeagueGlideServer::getSourcePath"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{NetworkData, NetworkSend}
-
-adapter groovy {
-  package "org.springframework.social:spring-social-facebook" {
-    source method "fetchObject" -> code.NetworkData
-    sink method "publish" -> code.NetworkSend
-    sink method "post" -> code.NetworkSend
-  }
-}

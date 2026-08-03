@@ -1,0 +1,9 @@
+module bindings.go.generated.m32ea2e1f;
+
+binding filePathAccess4 {
+  requires {
+    dependency("github.com/spf13/viper")
+  }
+  query pattern callExpr where callee.method == "AddConfigPath"
+  emit sink code.FilePathAccess at args[0]
+}

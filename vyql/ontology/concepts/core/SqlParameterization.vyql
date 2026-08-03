@@ -1,0 +1,7 @@
+module core;
+
+concept SqlParameterization : check {
+  applies: path
+  covers: [path]
+  neutralizes: [injection.SqlInjection]
+}

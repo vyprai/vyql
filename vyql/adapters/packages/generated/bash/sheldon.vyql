@@ -1,5 +1,0 @@
-adapter bash {
-  package "sheldon" {
-    source path "sheldon.argv" -> code.CliArgument
-  }
-}

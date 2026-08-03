@@ -1,6 +1,0 @@
-adapter groovy {
-  package "org.postgresql:postgresql" {
-    sink method "getPreferQueryMode" -> code.SqlExecution
-    control method "isUseServerPrepare" -> core.SqlParameterization
-  }
-}

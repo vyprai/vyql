@@ -1,0 +1,9 @@
+module bindings.python.generated.mba7fb4c0;
+
+binding urlFetch2 {
+  requires {
+    dependency("raven")
+  }
+  query pattern callExpr where callee.method == "urlopen"
+  emit sink code.UrlFetch at args[0]
+}

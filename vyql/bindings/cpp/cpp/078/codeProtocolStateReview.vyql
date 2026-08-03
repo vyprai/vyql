@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding protocolStateReview78 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "protocol.tls_appdata_before_decryptable"
+  emit issue code.ProtocolStateReview at node
+}

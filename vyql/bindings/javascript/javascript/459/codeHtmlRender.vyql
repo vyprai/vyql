@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding htmlRender459 {
+  query pattern callExpr where callee.path ~= "window.location.href"
+  emit sink code.HtmlRender at args[0]
+}

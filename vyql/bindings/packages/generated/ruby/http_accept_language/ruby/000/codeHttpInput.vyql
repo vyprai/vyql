@@ -1,0 +1,9 @@
+module bindings.ruby.generated.ma438879c;
+
+binding httpInput0 {
+  requires {
+    dependency("http_accept_language")
+  }
+  query pattern callExpr where callee.method == "HttpAcceptLanguage::Parser.initialize"
+  emit source code.HttpInput at call.result
+}

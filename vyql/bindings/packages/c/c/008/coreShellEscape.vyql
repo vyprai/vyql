@@ -1,0 +1,14 @@
+module bindings.c.generated.m2816daee;
+
+binding shellEscape8 {
+  requires {
+    dependency("libc")
+  }
+  query pattern callExpr where callee.path ~= "wordexp"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

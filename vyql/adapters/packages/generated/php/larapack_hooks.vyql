@@ -1,5 +1,0 @@
-adapter php {
-  package "larapack/hooks" {
-    sink method "runComposer" -> code.CommandExecution
-  }
-}

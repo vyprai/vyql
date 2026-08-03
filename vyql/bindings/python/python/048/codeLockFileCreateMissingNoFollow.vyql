@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding lockFileCreateMissingNoFollow48 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.functionName, ["acquire", "lock"]) and node.context.callPath contains "os.open" and node.context.selector contains "os.O_CREAT" and node.context.selector contains "os.O_EXCL" and not (node.context.literal contains "O_NOFOLLOW")
+  emit issue code.LockFileCreateMissingNoFollow at node
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.mfbf8bb99;
+
+binding filePathAccess2 {
+  requires {
+    dependency("consolidation/robo")
+  }
+  query pattern callExpr where callee.method == "loadConfiguration"
+  emit sink code.FilePathAccess at args[0]
+}

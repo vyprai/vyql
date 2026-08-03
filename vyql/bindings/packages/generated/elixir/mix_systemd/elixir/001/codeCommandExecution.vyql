@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m08cdbeb3;
+
+binding commandExecution1 {
+  requires {
+    dependency("mix_systemd")
+  }
+  query pattern callExpr where callee.method == "start_command"
+  emit sink code.CommandExecution at args[0]
+}

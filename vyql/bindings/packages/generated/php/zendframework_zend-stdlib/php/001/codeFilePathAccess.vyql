@@ -1,0 +1,9 @@
+module bindings.php.generated.m91f2453a;
+
+binding filePathAccess1 {
+  requires {
+    dependency("zendframework/zend-stdlib")
+  }
+  query pattern callExpr where callee.method == "ZendStdlibGlob::glob"
+  emit sink code.FilePathAccess at args[0]
+}

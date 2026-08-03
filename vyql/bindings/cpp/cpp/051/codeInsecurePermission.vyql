@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding insecurePermission51 {
+  query pattern callExpr where callee.path ~= "chmod" and args.any.literal contains "0666"
+  emit issue code.InsecurePermission at call
+}

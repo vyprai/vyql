@@ -1,0 +1,8 @@
+module code;
+
+review code.SamlFirstSignatureOnlyBypass {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review SAML response signature verification to ensure every XMLDSIG signature is validated, not only the first Signature node"
+}

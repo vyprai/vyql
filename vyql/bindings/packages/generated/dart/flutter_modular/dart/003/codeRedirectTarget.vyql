@@ -1,0 +1,10 @@
+module bindings.dart.generated.me0c7bf86;
+
+binding redirectTarget3 {
+  requires {
+    dependency("flutter_modular")
+  }
+  query pattern callExpr where callee.method == "getRoute"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.m7e40519e;
+
+binding networkSend5 {
+  requires {
+    dependency("org.mule.connectors:mule-sockets-connector")
+  }
+  query pattern callExpr where callee.method == "sendUdpPackages"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m4f24edc7;
+
+binding deserialization1 {
+  requires {
+    dependency("com.auth0:java-jwt")
+  }
+  query pattern callExpr where callee.method == "verify"
+  emit sink code.Deserialization at args[0]
+}

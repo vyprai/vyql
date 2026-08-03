@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter python {
-  package "pytesseract" {
-    sink method "run_tesseract" -> code.CommandExecution
-  }
-}

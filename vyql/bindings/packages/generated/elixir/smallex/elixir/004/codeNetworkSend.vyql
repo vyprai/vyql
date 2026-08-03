@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m9bacb8bf;
+
+binding networkSend4 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkSend at args[0]
+}

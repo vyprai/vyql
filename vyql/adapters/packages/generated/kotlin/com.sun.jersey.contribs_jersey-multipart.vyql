@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "com.sun.jersey.contribs:jersey-multipart" {
-    sink method "readFrom" -> code.Deserialization
-  }
-}

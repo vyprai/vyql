@@ -1,0 +1,7 @@
+module code;
+
+review code.LocalFileUrlNavigation {
+  category: path
+  kind: attention
+  text: "review headless-browser navigation for file:// URL handling before caller-controlled URLs reach page.goto"
+}

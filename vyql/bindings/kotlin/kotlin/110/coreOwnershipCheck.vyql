@@ -1,0 +1,10 @@
+module bindings.kotlin.generated.m304d1620;
+
+binding ownershipCheck110 {
+  query pattern callExpr where callee.method == "isOwner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

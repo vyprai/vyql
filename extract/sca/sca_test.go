@@ -118,6 +118,62 @@ func TestParseVendoredJSTinyMCEBanner(t *testing.T) {
 	}
 }
 
+func TestParseNpmrcBraveElectronRuntime(t *testing.T) {
+	got := ParseNpmrc(`runtime = electron
+target = 1.4.0
+target_arch = x64
+brave_electron_version = 1.4.18
+disturl = https://atom.io/download/atom-shell
+`)
+	want := []Dep{{"brave/electron", "1.4.18"}}
+	if len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("ParseNpmrc() = %+v, want %+v", got, want)
+	}
+}
+
+func TestParseNpmrcElectronTargetFallback(t *testing.T) {
+	got := ParseNpmrc(`runtime = electron
+target = 1.4.20
+target_arch = x64
+`)
+	want := []Dep{{"brave/electron", "1.4.20"}}
+	if len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("ParseNpmrc() = %+v, want %+v", got, want)
+	}
+}
+
+func TestParseNpmrcIgnoresNonElectronRuntime(t *testing.T) {
+	if got := ParseNpmrc("runtime = node\ntarget = 20.0.0\n"); len(got) != 0 {
+		t.Fatalf("non-electron .npmrc should not emit deps, got %+v", got)
+	}
+}
+
+func TestParseComposerLockPackages(t *testing.T) {
+	got := ParseComposerLock(`{
+  "packages": [
+    {
+      "name": "amnah/yii2-user",
+      "version": "3.0.0"
+    }
+  ],
+  "packages-dev": [
+    {
+      "name": "yiisoft/yii2-debug",
+      "version": "2.1.0"
+    }
+  ]
+}`)
+	want := []Dep{{"amnah/yii2-user", "3.0.0"}, {"yiisoft/yii2-debug", "2.1.0"}}
+	if len(got) != len(want) {
+		t.Fatalf("parsed %d deps, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("dep %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestMinSafeAdvisoryMatch(t *testing.T) {
 	d := &scaData{advisories: map[string]map[string][]advisoryEntry{"npm": {
 		"tinymce": {{Version: "*", ID: "CVE-2024-21910", MinSafe: "5.10.0"}},
@@ -186,7 +242,7 @@ func TestSCARuntimeDoesNotHardcodeOntologyConcepts(t *testing.T) {
 	root := filepath.Dir(file)
 	var forbidden []string
 	for _, c := range ontology.Seed().AllConcepts() {
-		if c.AnalysisRole != "" {
+		if ontology.IsInternalConceptRoleConcept(c.QualifiedName()) {
 			continue
 		}
 		forbidden = append(forbidden,
@@ -243,6 +299,23 @@ func TestParseGitmodules(t *testing.T) {
 	want := []Dep{{"github.com/nodejs/llhttp", "69d6db2008508489d19267a0dcab30602b16fc5b"}}
 	if len(got) != len(want) || got[0] != want[0] {
 		t.Fatalf("ParseGitmodules() = %+v, want %+v", got, want)
+	}
+}
+
+func TestParseCargoLockGitDependencies(t *testing.T) {
+	got := ParseCargoLockGit(`[[package]]
+name = "clash_verge_service_ipc"
+version = "2.0.26"
+source = "git+https://github.com/clash-verge-rev/clash-verge-service-ipc#37b9964a9bce767b5b95ea2be75613b23400c9f0"
+
+[[package]]
+name = "serde"
+version = "1.0.228"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+`)
+	want := []Dep{{"github.com/clash-verge-rev/clash-verge-service-ipc", "37b9964a9bce767b5b95ea2be75613b23400c9f0"}}
+	if len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("ParseCargoLockGit() = %+v, want %+v", got, want)
 	}
 }
 

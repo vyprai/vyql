@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding protoPollute591 {
+  query pattern callExpr where callee.path ~= "opts.client"
+  emit sink code.ProtoPollute at args[0]
+}

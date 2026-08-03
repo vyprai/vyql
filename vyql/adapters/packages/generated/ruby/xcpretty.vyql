@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "xcpretty" {
-    sink method "parse" -> code.Deserialization
-  }
-}

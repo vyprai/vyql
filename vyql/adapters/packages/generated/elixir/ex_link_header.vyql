@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "ex_link_header" {
-    sink method "parse" -> code.Deserialization
-    sink method "parse!" -> code.Deserialization
-  }
-}

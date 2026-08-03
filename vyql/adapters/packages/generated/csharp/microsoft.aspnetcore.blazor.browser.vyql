@@ -1,9 +1,0 @@
-adapter csharp {
-  package "microsoft.aspnetcore.blazor.browser" {
-    sink method "SendAsync" -> code.NetworkSend
-    source method "DispatchEvent" -> core.UserControlledData
-    flag code.RedirectTarget on any {
-      method "NavigateToCore"
-    }
-  }
-}

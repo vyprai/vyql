@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule PersistentModelTitleStoredXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-117"
+    severity: high
+  }
+  issue code.PersistentModelTitleStoredXss as sink
+}

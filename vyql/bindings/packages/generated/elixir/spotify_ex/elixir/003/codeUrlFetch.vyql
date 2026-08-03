@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m73783765;
+
+binding urlFetch3 {
+  requires {
+    dependency("spotify_ex")
+  }
+  query pattern callExpr where callee.method == "Spotify.Client.delete"
+  emit sink code.UrlFetch at args[0]
+}

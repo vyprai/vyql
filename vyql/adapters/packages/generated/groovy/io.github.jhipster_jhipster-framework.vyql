@@ -1,8 +1,0 @@
-adapter groovy {
-  package "io.github.jhipster:jhipster-framework" {
-    source method "generateRandomAlphanumericString" -> code.SecretValue
-    source method "generatePassword" -> code.SecretValue
-    source method "generateActivationKey" -> code.SecretValue
-    source method "generateResetKey" -> code.SecretValue
-  }
-}

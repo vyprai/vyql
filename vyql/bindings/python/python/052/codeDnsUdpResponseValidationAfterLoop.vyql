@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding dnsUdpResponseValidationAfterLoop52 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "dns_udp_response_validation_after_loop"
+  emit issue code.DnsUdpResponseValidationAfterLoop at node
+}

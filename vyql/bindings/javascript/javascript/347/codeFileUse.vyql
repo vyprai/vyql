@@ -1,0 +1,7 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding fileUse347 {
+  query pattern presenceNode where node.path ~= "fs.chown"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}

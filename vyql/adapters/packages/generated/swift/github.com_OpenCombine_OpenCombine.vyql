@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter swift {
-  package "github.com/OpenCombine/OpenCombine" {
-    sink method "decode" -> code.Deserialization
-  }
-}

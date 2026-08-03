@@ -1,0 +1,9 @@
+module bindings.python.generated.med8d6667;
+
+binding codeEval3 {
+  requires {
+    dependency("py")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}

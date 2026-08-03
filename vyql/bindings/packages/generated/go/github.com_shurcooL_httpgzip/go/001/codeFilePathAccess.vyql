@@ -1,0 +1,9 @@
+module bindings.go.generated.maabc6139;
+
+binding filePathAccess1 {
+  requires {
+    dependency("github.com/shurcooL/httpgzip")
+  }
+  query pattern callExpr where callee.method == "FileServer"
+  emit sink code.FilePathAccess at args[0]
+}

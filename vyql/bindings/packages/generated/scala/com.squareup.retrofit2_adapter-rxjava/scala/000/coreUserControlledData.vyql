@@ -1,0 +1,9 @@
+module bindings.scala.generated.m5a6dc6a5;
+
+binding userControlledData0 {
+  requires {
+    dependency("com.squareup.retrofit2:adapter-rxjava")
+  }
+  query pattern callExpr where callee.method == "response"
+  emit source core.UserControlledData at call.result
+}

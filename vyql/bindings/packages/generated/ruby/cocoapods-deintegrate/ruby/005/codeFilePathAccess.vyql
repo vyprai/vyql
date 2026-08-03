@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m312b2054;
+
+binding filePathAccess5 {
+  requires {
+    dependency("cocoapods-deintegrate")
+  }
+  query pattern callExpr where callee.method == "deintegrate_configuration_file_references"
+  emit sink code.FilePathAccess at args[0]
+}

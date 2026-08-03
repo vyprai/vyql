@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter groovy {
-  package "net.sourceforge.nekohtml:nekohtml" {
-    sink method "parse" -> code.Deserialization
-  }
-}

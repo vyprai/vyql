@@ -1,0 +1,9 @@
+module bindings.perl.generated.m9bc66920;
+
+binding deserialization0 {
+  requires {
+    dependency("Cikl")
+  }
+  query pattern callExpr where callee.method == "Cikl::Codecs::JSON::decode_event"
+  emit sink code.Deserialization at args[0]
+}

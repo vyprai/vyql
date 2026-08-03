@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mc871e07f;
+
+binding codeEval0 {
+  requires {
+    dependency("ripl")
+  }
+  query pattern callExpr where callee.method == "eval_input"
+  emit sink code.CodeEval at args[0]
+}

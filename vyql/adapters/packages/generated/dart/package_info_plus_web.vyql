@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter dart {
-  package "package_info_plus_web" {
-    sink method "jsonDecode" -> code.Deserialization
-  }
-}

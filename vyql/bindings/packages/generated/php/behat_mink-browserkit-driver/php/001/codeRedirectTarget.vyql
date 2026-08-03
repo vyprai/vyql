@@ -1,0 +1,10 @@
+module bindings.php.generated.m26dcc6cc;
+
+binding redirectTarget1 {
+  requires {
+    dependency("behat/mink-browserkit-driver")
+  }
+  query pattern callExpr where callee.method == "visit"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

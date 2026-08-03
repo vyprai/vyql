@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter php {
-  package "sonata-project/core-bundle" {
-    control method "slugify" -> core.InputValidation
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.generated.ma91e227c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("ezimuel/guzzlestreams")
+  }
+  query pattern callExpr where callee.method == "GuzzleHttpStreamUtils::open"
+  emit sink code.FilePathAccess at args[0]
+}

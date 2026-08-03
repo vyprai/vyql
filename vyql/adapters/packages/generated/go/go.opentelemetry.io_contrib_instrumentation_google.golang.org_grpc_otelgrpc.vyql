@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter go {
-  package "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc" {
-    sink method "ParseFullMethod" -> code.Deserialization
-    sink method "ParseFullMethodOld" -> code.Deserialization
-  }
-}

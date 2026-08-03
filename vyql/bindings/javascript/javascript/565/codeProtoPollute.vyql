@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding protoPollute565 {
+  query pattern callExpr where callee.path ~= "__js_dynamic_property_write"
+  emit sink code.ProtoPollute at args[0]
+}

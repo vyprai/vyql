@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc6b388cf;
+
+binding networkBind5 {
+  requires {
+    dependency("github.com/Building42/Telegraph")
+  }
+  query pattern callExpr where callee.method == "start"
+  emit sink code.NetworkBind at args[0]
+}

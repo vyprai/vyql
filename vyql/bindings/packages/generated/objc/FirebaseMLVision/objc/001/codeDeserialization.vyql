@@ -1,0 +1,9 @@
+module bindings.objc.generated.m39a5e11a;
+
+binding deserialization1 {
+  requires {
+    dependency("FirebaseMLVision")
+  }
+  query pattern callExpr where callee.method == "processImage"
+  emit sink code.Deserialization at args[0]
+}

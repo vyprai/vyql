@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding pythonDunderPathClassPollution261 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "python_dunder_path_class_pollution"
+  emit issue code.PythonDunderPathClassPollution at node
+}

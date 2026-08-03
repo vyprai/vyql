@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule CollectionExtendPrototypePollution {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_1321]
+    id: "VYQL-INJ-088"
+    severity: high
+  }
+  issue code.CollectionExtendPrototypePollution as sink
+}

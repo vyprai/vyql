@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding prestaShopContactformMessageEmailXss109 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "sendMessage" and node.context.phpReview == "prestashop_contactform_message_email_xss"
+  emit issue code.PrestaShopContactformMessageEmailXss at node
+}

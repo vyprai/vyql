@@ -1,0 +1,7 @@
+module code;
+
+concept TemplateRender : sink {
+  cwe: [CWE_1336]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [injection.TemplateInjection]
+}

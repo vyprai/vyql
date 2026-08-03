@@ -1,0 +1,9 @@
+module bindings.rust.generated.m8e5dfe4d;
+
+binding weakHash0 {
+  requires {
+    dependency("precomputed-hash")
+  }
+  query pattern callExpr where callee.method == "precomputed_hash"
+  emit issue code.WeakHash at call
+}

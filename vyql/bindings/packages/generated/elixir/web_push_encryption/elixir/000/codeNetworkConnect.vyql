@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m1bdac5ee;
+
+binding networkConnect0 {
+  requires {
+    dependency("web_push_encryption")
+  }
+  query pattern callExpr where callee.method == "send_web_push"
+  emit sink code.NetworkConnectSink at args[0]
+}

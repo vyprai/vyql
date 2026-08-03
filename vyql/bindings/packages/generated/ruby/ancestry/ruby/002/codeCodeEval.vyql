@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m373ebbc3;
+
+binding codeEval2 {
+  requires {
+    dependency("ancestry")
+  }
+  query pattern callExpr where callee.method == "check_ancestry_integrity!"
+  emit sink code.CodeEval at args[0]
+}

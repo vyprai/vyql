@@ -1,0 +1,9 @@
+module bindings.python.generated.m5d2093cb;
+
+binding httpInput7 {
+  requires {
+    dependency("httplib2")
+  }
+  query pattern callExpr where callee.method == "urlnorm"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.m1f2682d3;
+
+binding storedDataRead1 {
+  requires {
+    dependency("CPANDB")
+  }
+  query pattern callExpr where callee.method == "dbh"
+  emit source code.StoredDataRead at call.result
+}

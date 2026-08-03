@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m652a0712;
+
+binding logOutput2 {
+  requires {
+    dependency("bunt")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.LogOutput at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{CommandExecution, FilePathAccess, FileUse}
-adapter swift {
-  package "github.com/tomlokhorst/XcodeEdit" {
-    sink method "write" -> code.FilePathAccess
-    sink method "createShellScript" -> code.CommandExecution
-    sink method "createFileReference" -> code.FilePathAccess
-    sink method "serialized" -> code.FileUse
-  }
-}

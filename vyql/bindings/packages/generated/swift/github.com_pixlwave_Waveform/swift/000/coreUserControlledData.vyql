@@ -1,0 +1,9 @@
+module bindings.swift.generated.m67ab746c;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/pixlwave/Waveform")
+  }
+  query pattern callExpr where callee.method == "WaveformGenerator.init"
+  emit source core.UserControlledData at call.result
+}

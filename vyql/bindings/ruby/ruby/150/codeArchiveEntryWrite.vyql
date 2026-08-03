@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding archiveEntryWrite150 {
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

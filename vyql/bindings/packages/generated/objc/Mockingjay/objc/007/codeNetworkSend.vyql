@@ -1,0 +1,9 @@
+module bindings.objc.generated.mc8a5efdc;
+
+binding networkSend7 {
+  requires {
+    dependency("Mockingjay")
+  }
+  query pattern callExpr where callee.method == "http"
+  emit sink code.NetworkSend at args[0]
+}

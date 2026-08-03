@@ -1,0 +1,6 @@
+module bindings.groovy.generated.m6eabb149;
+
+binding htmlRender49 {
+  query pattern callExpr where callee.path ~= "raw"
+  emit sink code.HtmlRender at args[0]
+}

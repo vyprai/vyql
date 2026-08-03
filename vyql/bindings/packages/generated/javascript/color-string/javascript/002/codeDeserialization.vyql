@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m62b94c62;
+
+binding deserialization2 {
+  requires {
+    dependency("color-string")
+  }
+  query pattern callExpr where callee.method == "hwb"
+  emit sink code.Deserialization at args[0]
+}

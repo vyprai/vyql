@@ -1,6 +1,0 @@
-import code.{XmlParse}
-adapter c {
-  package "rapidxml" {
-    sink method "xml_document::parse" -> code.XmlParse
-  }
-}

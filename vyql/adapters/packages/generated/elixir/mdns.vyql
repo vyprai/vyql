@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-import code.{NetworkSend}
-
-adapter elixir {
-  package "mdns" {
-    source method "query" -> core.UserControlledData
-    sink method "query" -> code.NetworkSend
-  }
-}

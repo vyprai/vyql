@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.eclipse.jetty:jetty-client" {
-    source method "cookie" -> code.HttpInput
-  }
-}

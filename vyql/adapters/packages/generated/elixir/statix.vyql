@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter elixir {
-  package "statix" {
-    sink method "transmit" -> code.NetworkSend
-  }
-}

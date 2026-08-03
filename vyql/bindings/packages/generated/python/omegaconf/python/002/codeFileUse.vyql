@@ -1,0 +1,9 @@
+module bindings.python.generated.m789b09c5;
+
+binding fileUse2 {
+  requires {
+    dependency("omegaconf")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.FileUseSink at args[0]
+}

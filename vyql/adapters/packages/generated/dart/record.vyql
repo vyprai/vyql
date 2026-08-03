@@ -1,9 +1,0 @@
-import core.{AuthorizationCheck}
-
-adapter dart {
-  package "record" {
-    sink method "start" -> code.FilePathAccess
-    source method "startStream" -> core.UserControlledData
-    control method "hasPermission" -> core.AuthorizationCheck
-  }
-}

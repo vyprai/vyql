@@ -1,0 +1,6 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding authenticationRequiredOp126 {
+  query pattern presenceNode where node.path ~= "delete_account"
+  emit issue code.AuthenticationRequiredOp at node
+}

@@ -1,0 +1,13 @@
+module bindings.kotlin.generated.m1457a768;
+
+binding csrfProtection36 {
+  requires {
+    dependency("spring-security")
+  }
+  query pattern callExpr where callee.path ~= "CsrfToken"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

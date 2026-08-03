@@ -1,8 +1,0 @@
-import code.{HttpInput, FilePathAccess}
-adapter java {
-  package "commons-fileupload:commons-fileupload" {
-    source method "parse" -> code.HttpInput
-    source method "read" -> code.HttpInput
-    sink method "write" -> code.FilePathAccess
-  }
-}

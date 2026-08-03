@@ -1,7 +1,0 @@
-import code.{FilePathAccess, NetworkSend}
-adapter perl {
-  package "MIDI-RtController" {
-    sink method "_open_port" -> code.FilePathAccess
-    sink method "send_it" -> code.NetworkSend
-  }
-}

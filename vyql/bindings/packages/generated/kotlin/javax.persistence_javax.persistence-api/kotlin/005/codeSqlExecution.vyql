@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m16d918e1;
+
+binding sqlExecution5 {
+  requires {
+    dependency("javax.persistence:javax.persistence-api")
+  }
+  query pattern callExpr where callee.method == "executeUpdate"
+  emit sink code.SqlExecution at args[0]
+}

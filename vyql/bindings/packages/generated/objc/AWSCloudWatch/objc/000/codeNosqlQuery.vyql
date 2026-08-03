@@ -1,0 +1,9 @@
+module bindings.objc.generated.md46e50e9;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("AWSCloudWatch")
+  }
+  query pattern callExpr where callee.method == "testInvokePathWithQueryString"
+  emit sink code.NosqlQuery at args[0]
+}

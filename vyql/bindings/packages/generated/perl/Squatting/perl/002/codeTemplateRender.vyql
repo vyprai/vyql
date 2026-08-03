@@ -1,0 +1,9 @@
+module bindings.perl.generated.m2830a609;
+
+binding templateRender2 {
+  requires {
+    dependency("Squatting")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.TemplateRender at args[0]
+}

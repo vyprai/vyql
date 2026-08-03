@@ -1,0 +1,9 @@
+module bindings.objc.generated.me3e9bb7d;
+
+binding deserialization2 {
+  requires {
+    dependency("Typhoon")
+  }
+  query pattern callExpr where callee.method == "objectForKeyedSubscript:"
+  emit sink code.Deserialization at args[0]
+}

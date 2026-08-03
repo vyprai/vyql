@@ -1,6 +1,0 @@
-adapter perl {
-  package "Facebook" {
-    source method "secret" -> code.SecretValue
-    source method "check_cookie_payload" -> code.HttpInput
-  }
-}

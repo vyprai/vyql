@@ -1,0 +1,9 @@
+module bindings.perl.generated.m921ec245;
+
+binding deserialization1 {
+  requires {
+    dependency("Data-Binary")
+  }
+  query pattern callExpr where callee.method == "is_binary"
+  emit sink code.Deserialization at args[0]
+}

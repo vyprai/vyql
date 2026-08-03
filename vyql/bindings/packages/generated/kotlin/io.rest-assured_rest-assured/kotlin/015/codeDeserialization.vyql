@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m191318b4;
+
+binding deserialization15 {
+  requires {
+    dependency("io.rest-assured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "registerParser"
+  emit sink code.Deserialization at args[0]
+}

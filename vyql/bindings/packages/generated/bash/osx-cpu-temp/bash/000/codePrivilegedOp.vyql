@@ -1,0 +1,10 @@
+module bindings.bash.generated.mc406ba68;
+
+binding privilegedOp0 {
+  requires {
+    dependency("osx-cpu-temp")
+  }
+  query pattern presenceNode where node.path ~= "osx-cpu-temp"
+  emit issue code.PrivilegedOp at node
+  emit sink code.PrivilegedOpSink at node
+}

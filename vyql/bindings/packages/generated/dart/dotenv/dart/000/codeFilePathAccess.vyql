@@ -1,0 +1,9 @@
+module bindings.dart.generated.md468412b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("dotenv")
+  }
+  query pattern callExpr where callee.method == "DotEnv.load"
+  emit sink code.FilePathAccess at args[0]
+}

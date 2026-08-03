@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m50cbdff9;
+
+binding userControlledData0 {
+  requires {
+    dependency("mdns")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source core.UserControlledData at call.result
+}

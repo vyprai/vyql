@@ -1,0 +1,14 @@
+module bindings.bash.generated.mb6f991a5;
+
+binding htmlEscape14 {
+  requires {
+    dependency("jq")
+  }
+  query pattern callExpr where callee.path ~= "jq"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

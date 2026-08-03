@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter swift {
-  package "github.com/omochi/FineJSON" {
-    sink method "decode" -> code.Deserialization
-  }
-}

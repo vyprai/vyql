@@ -1,7 +1,0 @@
-import core.{PathCanonicalization}
-
-adapter ruby {
-  package "jekyll-paginate-v2" {
-    control method "Utils.ensure_full_path" -> core.PathCanonicalization
-  }
-}

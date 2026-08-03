@@ -1,5 +1,0 @@
-adapter elixir {
-  package "triq" {
-    sink method "do_run_command" -> code.CommandExecution
-  }
-}

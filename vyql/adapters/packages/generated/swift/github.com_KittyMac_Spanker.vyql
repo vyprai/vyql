@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter swift {
-  package "github.com/KittyMac/Spanker" {
-    sink method "parse" -> code.Deserialization
-    sink method "parsed" -> code.Deserialization
-  }
-}

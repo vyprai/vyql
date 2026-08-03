@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding csvFormulaProneExportRow325 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "csv_formula_prone_export_row"
+  emit issue code.CsvFormulaProneExportRow at node
+}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc3cf6f83;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/dgrzeszczak/KeyedCodable")
+  }
+  query pattern callExpr where callee.method == "fromJSON"
+  emit sink code.Deserialization at args[0]
+}

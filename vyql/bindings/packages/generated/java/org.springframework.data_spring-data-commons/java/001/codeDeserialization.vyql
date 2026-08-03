@@ -1,0 +1,9 @@
+module bindings.java.generated.madd99749;
+
+binding deserialization1 {
+  requires {
+    dependency("org.springframework.data:spring-data-commons")
+  }
+  query pattern callExpr where callee.method == "readType"
+  emit sink code.Deserialization at args[0]
+}

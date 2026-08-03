@@ -1,8 +1,0 @@
-import code.{NetworkData}
-
-adapter groovy {
-  package "org.apache.activemq:activemq-pool" {
-    source method "PooledConnectionFactory" -> code.NetworkData
-    source method "setProperties" -> code.NetworkData
-  }
-}

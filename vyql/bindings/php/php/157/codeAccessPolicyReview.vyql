@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding accessPolicyReview157 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "groupblog_settings_missing_admin_guard"
+  emit issue code.AccessPolicyReview at node
+}

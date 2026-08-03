@@ -1,0 +1,11 @@
+module bindings.java.generated.m420f6b67;
+
+binding xmlHardening289 {
+  query pattern callExpr where callee.path ~= "setAttribute" and args.any.literal contains "ACCESS_EXTERNAL_DTD"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}

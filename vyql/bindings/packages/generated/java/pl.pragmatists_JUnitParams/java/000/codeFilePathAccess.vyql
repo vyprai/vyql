@@ -1,0 +1,9 @@
+module bindings.java.generated.me23b1e66;
+
+binding filePathAccess0 {
+  requires {
+    dependency("pl.pragmatists:JUnitParams")
+  }
+  query pattern callExpr where callee.method == "createProperReader"
+  emit sink code.FilePathAccess at args[0]
+}

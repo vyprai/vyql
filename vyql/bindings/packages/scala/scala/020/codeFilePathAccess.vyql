@@ -1,0 +1,9 @@
+module bindings.scala.generated.m3608f193;
+
+binding filePathAccess20 {
+  requires {
+    dependency("scala-io")
+  }
+  query pattern callExpr where callee.path ~= "Source.fromFile"
+  emit sink code.FilePathAccess at args[0]
+}

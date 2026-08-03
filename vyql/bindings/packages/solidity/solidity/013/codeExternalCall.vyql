@@ -1,0 +1,9 @@
+module bindings.solidity.generated.m72929a80;
+
+binding externalCall13 {
+  requires {
+    dependency("@openzeppelin/contracts")
+  }
+  query pattern callExpr where callee.method == "safeTransferFrom"
+  emit sink code.ExternalCall at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m0edc6b5b;
+
+binding expressionEval0 {
+  requires {
+    dependency("ng-grid")
+  }
+  query pattern callExpr where callee.method == "evalProperty"
+  emit sink code.ExpressionEval at args[0]
+}

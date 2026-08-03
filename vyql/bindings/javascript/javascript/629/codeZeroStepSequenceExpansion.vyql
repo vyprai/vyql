@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding zeroStepSequenceExpansion629 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.zeroStepSequenceRisk == "true"
+  emit issue code.ZeroStepSequenceExpansion at node
+}

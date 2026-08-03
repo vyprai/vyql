@@ -244,3 +244,30 @@ test "memory: escaped terminator check before decoded buffer write is clean"
       return input + 1;
   }
   ```
+
+test "memory: escaped terminator write generalizes across names"
+  lang c
+  expect VYQL-MEM-013
+  code
+  ```
+  char decode_escape(char c);
+
+  char *copy_text(char *source) {
+      char *reader = source + 1;
+      char *writer = reader;
+      char value;
+
+      for (;;) {
+          value = *reader++;
+          if (value == '\0') return 0;
+          if (value == '"') break;
+          if (value == '\\') {
+              value = decode_escape(*reader++);
+          }
+          *writer++ = value;
+      }
+
+      *writer = '\0';
+      return source + 1;
+  }
+  ```

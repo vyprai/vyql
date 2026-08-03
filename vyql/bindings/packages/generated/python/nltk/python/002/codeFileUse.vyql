@@ -1,0 +1,9 @@
+module bindings.python.generated.mb80d6ebf;
+
+binding fileUse2 {
+  requires {
+    dependency("nltk")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FileUseSink at args[0]
+}

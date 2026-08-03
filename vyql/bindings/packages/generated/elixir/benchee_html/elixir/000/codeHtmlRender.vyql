@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m7b991e07;
+
+binding htmlRender0 {
+  requires {
+    dependency("benchee_html")
+  }
+  query pattern callExpr where callee.method == "format"
+  emit sink code.HtmlRender at args[0]
+}

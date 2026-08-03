@@ -1,0 +1,9 @@
+module bindings.scala.generated.mb05f2bb0;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.springframework:spring-orm")
+  }
+  query pattern callExpr where callee.method == "DeferredQueryInvocationHandler"
+  emit sink code.SqlExecution at args[0]
+}

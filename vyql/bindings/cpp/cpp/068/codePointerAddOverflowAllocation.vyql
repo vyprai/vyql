@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding pointerAddOverflowAllocation68 {
+  query pattern presenceNode where node.kind == "binop" and node.op contains "+" and node.flowTo.op contains ">" and not (node.flowTo.op contains "<") and operand(node, where: operand.path ~= "alignPointer")
+  emit issue code.PointerAddOverflowAllocation at node
+}

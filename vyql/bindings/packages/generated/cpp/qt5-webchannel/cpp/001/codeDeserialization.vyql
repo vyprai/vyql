@@ -1,0 +1,9 @@
+module bindings.cpp.generated.ma422cfb9;
+
+binding deserialization1 {
+  requires {
+    dependency("qt5-webchannel")
+  }
+  query pattern callExpr where callee.method == "toVariant"
+  emit sink code.Deserialization at args[0]
+}

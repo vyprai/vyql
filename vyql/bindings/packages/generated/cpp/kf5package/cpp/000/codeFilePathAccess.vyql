@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m36c4f5fb;
+
+binding filePathAccess0 {
+  requires {
+    dependency("kf5package")
+  }
+  query pattern callExpr where callee.method == "filePath"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.seleniumhq.selenium:selenium-ie-driver" {
-    sink method "addCommandSwitches" -> code.CommandExecution
-  }
-}

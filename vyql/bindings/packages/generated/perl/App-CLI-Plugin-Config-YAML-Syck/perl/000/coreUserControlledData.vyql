@@ -1,0 +1,9 @@
+module bindings.perl.generated.me9d7343f;
+
+binding userControlledData0 {
+  requires {
+    dependency("App-CLI-Plugin-Config-YAML-Syck")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source core.UserControlledData at call.result
+}

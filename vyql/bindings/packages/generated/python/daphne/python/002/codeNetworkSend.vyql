@@ -1,0 +1,9 @@
+module bindings.python.generated.me761b794;
+
+binding networkSend2 {
+  requires {
+    dependency("daphne")
+  }
+  query pattern callExpr where callee.method == "serverSend"
+  emit sink code.NetworkSend at args[0]
+}

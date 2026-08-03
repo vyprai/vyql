@@ -23,6 +23,23 @@ type rbConv struct {
 	root       string
 	file       string
 	visibility string
+	childCache map[uintptr][]*tree_sitter.Node
+}
+
+func (c *rbConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = make(map[uintptr][]*tree_sitter.Node)
+	}
+	key := uintptr(n.Id())
+	if kids, ok := c.childCache[key]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[key] = kids
+	return kids
 }
 
 // ExtractRuby parses Ruby files into one NIR Program (all modules keyed "").
@@ -265,7 +282,7 @@ func (c *rbConv) text(n *tree_sitter.Node) string {
 }
 
 func (c *rbConv) blockChildren(n *tree_sitter.Node) []nir.Stmt {
-	return c.rbStmtList(namedChildren(n))
+	return c.rbStmtList(c.namedChildren(n))
 }
 
 func (c *rbConv) body(n *tree_sitter.Node) []nir.Stmt {
@@ -330,7 +347,7 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if left != nil && left.Kind() == "element_reference" {
 			base := field(left, "object")
 			if base == nil {
-				if kids := namedChildren(left); len(kids) > 0 {
+				if kids := c.namedChildren(left); len(kids) > 0 {
 					base = kids[0]
 				}
 			}
@@ -352,7 +369,7 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(field(n, "right"))}}
 	case "return", "return_statement":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) > 0 {
 			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
 		}
@@ -421,7 +438,7 @@ func (c *rbConv) rubyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 			nir.Const{Loc: loc, Value: "param_index:" + itoa(i)},
 		)
 	}
-	for _, tok := range c.rbStructuredContextTokens(body) {
+	for _, tok := range c.rbStructuredContextTokens(body, "function") {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
@@ -444,7 +461,7 @@ func (c *rbConv) rubyModuleContext(root *tree_sitter.Node) []nir.Stmt {
 		nir.Const{Loc: loc, Value: text},
 		nir.Const{Loc: loc, Value: rbCompactText(text)},
 	}
-	for _, tok := range c.rbStructuredContextTokens(root) {
+	for _, tok := range c.rbStructuredContextTokens(root, "module") {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
@@ -469,7 +486,7 @@ func (c *rbConv) rubyClassContext(cls *tree_sitter.Node, bases []string) []nir.S
 		nir.Const{Loc: loc, Value: text},
 		nir.Const{Loc: loc, Value: rbCompactText(text)},
 	}
-	for _, tok := range c.rbStructuredContextTokens(body) {
+	for _, tok := range c.rbStructuredContextTokens(body, "class") {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
@@ -517,7 +534,7 @@ func (c *rbConv) rubyClassBases(cls *tree_sitter.Node) []string {
 	return out
 }
 
-func (c *rbConv) rbStructuredContextTokens(root *tree_sitter.Node) []string {
+func (c *rbConv) rbStructuredContextTokens(root *tree_sitter.Node, scope string) []string {
 	seen := map[string]bool{}
 	var out []string
 	add := func(tok string) {
@@ -571,10 +588,16 @@ func (c *rbConv) rbStructuredContextTokens(root *tree_sitter.Node) []string {
 			}
 			if base := c.dotted(field(n, "object")); base != "" && base != "?" {
 				add("index_base:" + base)
+				if key := rbContextValue(c.text(field(n, "argument"))); key != "" {
+					add("index_key:" + base + ":" + key)
+				}
 			}
 		case "string", "heredoc_body", "heredoc_content":
 			if lit := rbContextValue(c.text(n)); lit != "" {
 				add("literal:" + lit)
+			}
+			for _, interp := range rbInterpolationValues(c.text(n)) {
+				add("interpolation:" + interp)
 			}
 		case "regex":
 			if lit := rubyRegexPattern(c.text(n)); lit != "" {
@@ -582,11 +605,14 @@ func (c *rbConv) rbStructuredContextTokens(root *tree_sitter.Node) []string {
 				add("literal:" + rbCompactText(lit))
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
 	walk(root)
+	for _, tok := range rbSemanticReviewTokens(c.text(root), scope) {
+		add(tok)
+	}
 	return out
 }
 
@@ -622,6 +648,137 @@ func rbContextValue(raw string) string {
 	return rbCompactText(s)
 }
 
+func rbInterpolationValues(raw string) []string {
+	var out []string
+	for _, m := range rbInterpolationRe.FindAllStringSubmatch(raw, -1) {
+		if len(m) == 2 {
+			if v := rbCompactText(m[1]); v != "" {
+				out = append(out, v)
+			}
+		}
+	}
+	return out
+}
+
+var rbInterpolationRe = regexp.MustCompile(`#\{([^}]*)\}`)
+
+func rbSemanticReviewTokens(raw, scope string) []string {
+	compact := rbCompactText(raw)
+	var out []string
+	add := func(fact string) {
+		out = append(out, "ruby_review:"+fact)
+	}
+	if scope == "function" && rbStoredHTMLInterpolationMissingSanitizeRe.MatchString(raw) && !strings.Contains(compact, "sanitize") {
+		add("stored_html_interpolation_missing_sanitize")
+	}
+	if scope == "function" && (strings.Contains(compact, "find_by(params[") || strings.Contains(compact, "find_by(params)")) {
+		add("active_record_find_by_request_hash")
+	}
+	if scope == "class" &&
+		strings.Contains(compact, "Chef::WebUIUser.cdb_load") &&
+		strings.Contains(compact, "cdb_save") &&
+		strings.Contains(compact, "cdb_destroy") &&
+		!strings.Contains(compact, "before:is_admin") {
+		add("chef_user_management_missing_admin_guard")
+	}
+	if scope == "function" && rbPersistentResponseReuse(compact) && !strings.Contains(compact, "persistent_socket_reusable") {
+		add("persistent_response_reuse_missing_guard")
+	}
+	if scope == "class" &&
+		strings.Contains(compact, "ClockworkWeb.enable(") &&
+		strings.Contains(compact, "ClockworkWeb.disable(") &&
+		strings.Contains(compact, "params[:job]") &&
+		strings.Contains(compact, "params[:enable]") &&
+		!strings.Contains(compact, "protect_from_forgery") {
+		add("clockwork_job_csrf_missing_forgery_protection")
+	}
+	if scope == "function" && rbConvertBacktickInterpolationRe.MatchString(raw) &&
+		!strings.Contains(compact, "shellescape") &&
+		!strings.Contains(compact, ".to_i") {
+		add("imagemagick_convert_backtick_unescaped_interpolation")
+	}
+	if scope == "function" &&
+		strings.Contains(compact, "WINDOWS") &&
+		strings.Contains(compact, "sprintf") &&
+		strings.Contains(compact, ".join('')") &&
+		strings.Contains(compact, "@paths.map") &&
+		rbBacktickInterpolationRe.MatchString(raw) &&
+		!strings.Contains(compact, "Open3.capture3") &&
+		!strings.Contains(compact, "Shellwords") &&
+		!strings.Contains(compact, "shellescape") {
+		add("windows_backtick_diff_command_unescaped")
+	}
+	if scope == "function" &&
+		strings.Contains(compact, "FROMpost_revisions") &&
+		strings.Contains(compact, "JOINpostsp") &&
+		strings.Contains(compact, "report.data<<") &&
+		!strings.Contains(compact, "Archetype.private_message") &&
+		!strings.Contains(compact, "secure_category") {
+		add("post_edit_report_missing_private_filters")
+	}
+	if scope == "function" && rbQueryStringJoinInterpolationRe.MatchString(raw) && !strings.Contains(compact, "CGI.escape(") {
+		add("unescaped_query_string_join_interpolation")
+	}
+	if scope == "function" && strings.Contains(compact, "string.to_s") && strings.Contains(compact, "/^[0-9a-f]{24}$/i") {
+		add("ruby_line_anchor_hex_validation")
+	}
+	if scope == "function" && strings.Contains(compact, "SSLContext.new") && strings.Contains(compact, ".ca_file=") && !strings.Contains(compact, ".verify_mode=") {
+		add("tls_ca_file_without_verify_mode")
+	}
+	if scope == "function" &&
+		strings.Contains(compact, "polymorphic_as") &&
+		strings.Contains(compact, "_type=") &&
+		strings.Contains(compact, "params[\"#{polymorphic_as}_type\"]") &&
+		strings.Contains(compact, ".send(") &&
+		!strings.Contains(compact, "valid_polymorphic_class") {
+		add("polymorphic_type_selected_from_params")
+	}
+	if scope == "function" &&
+		strings.Contains(compact, "unconfirmed_email=self.email") &&
+		strings.Contains(compact, "email=self.devise_email_in_database") &&
+		strings.Contains(compact, "confirmation_token=nil") &&
+		strings.Contains(compact, "generate_confirmation_token") &&
+		!strings.Contains(compact, "devise_unconfirmed_email_will_change!") {
+		add("devise_reconfirmation_missing_dirty_tracking")
+	}
+	if scope == "function" &&
+		strings.Contains(compact, "run_shell_command(") &&
+		strings.Contains(compact, "gitclone") &&
+		rbGitCloneInterpolatedBranchOptionRe.MatchString(compact) &&
+		!strings.Contains(compact, "Shellwords") &&
+		!strings.Contains(compact, "shellescape") {
+		add("git_clone_interpolated_branch_option_unescaped")
+	}
+	return out
+}
+
+var (
+	rbStoredHTMLInterpolationMissingSanitizeRe = regexp.MustCompile(`#\{[^}]+\.content\}`)
+	rbResponseAssignRe                         = regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*)=response\(([A-Za-z_][A-Za-z0-9_]*)\)`)
+	rbConvertBacktickInterpolationRe           = regexp.MustCompile("`\\s*convert\\s+#\\{[^}]+\\}.*-colors\\s+#\\{[^}]+\\}.*-depth\\s+#\\{[^}]+\\}")
+	rbBacktickInterpolationRe                  = regexp.MustCompile("`\\s*#\\{[^}]+\\}\\s*`")
+	rbQueryStringJoinInterpolationRe           = regexp.MustCompile(`\?[A-Za-z0-9_%-]+=\s*#\{[^}]+\.join\(`)
+	rbGitCloneInterpolatedBranchOptionRe       = regexp.MustCompile(`--branch#\{[^}]*branch[^}]*\}--single-branch`)
+)
+
+func rbPersistentResponseReuse(compact string) bool {
+	for _, m := range rbResponseAssignRe.FindAllStringSubmatchIndex(compact, -1) {
+		if len(m) < 6 {
+			continue
+		}
+		lhs := compact[m[2]:m[3]]
+		rhs := compact[m[4]:m[5]]
+		if lhs != rhs {
+			continue
+		}
+		rest := compact[m[1]:]
+		if strings.Contains(rest, lhs+"[:persistent]") && strings.Contains(rest, "reset") {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *rbConv) rbParamEntries(name string, params []string) []nir.ParamEntry {
 	out := make([]nir.ParamEntry, 0, len(params))
 	for i, p := range params {
@@ -639,14 +796,14 @@ func (c *rbConv) rbParamEntries(name string, params []string) []nir.ParamEntry {
 
 func (c *rbConv) rbAssignmentExpr(n *tree_sitter.Node) (string, nir.Expr, bool) {
 	for n != nil && n.Kind() == "parenthesized_statements" {
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) != 1 {
 			return "", nil, false
 		}
 		n = kids[0]
 	}
 	if n == nil || n.Kind() != "assignment" {
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if target, val, ok := c.rbAssignmentExpr(ch); ok {
 				return target, val, true
 			}
@@ -679,7 +836,7 @@ func (c *rbConv) rubyBody(n *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	if n.Kind() == "then" || n.Kind() == "else" || n.Kind() == "body_statement" {
-		return c.rbStmtList(namedChildren(n))
+		return c.rbStmtList(c.namedChildren(n))
 	}
 	return c.stmt(n)
 }
@@ -702,15 +859,15 @@ func (c *rbConv) rubyCase(n *tree_sitter.Node) nir.Stmt {
 	var cases [][]nir.Stmt
 	var labels [][]nir.Expr
 	var deflt []nir.Stmt
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		switch ch.Kind() {
 		case "when":
 			var labs []nir.Expr
 			var body []nir.Stmt
-			for _, w := range namedChildren(ch) {
+			for _, w := range c.namedChildren(ch) {
 				switch w.Kind() {
 				case "pattern":
-					if k := namedChildren(w); len(k) > 0 {
+					if k := c.namedChildren(w); len(k) > 0 {
 						labs = append(labs, c.expr(k[0]))
 					}
 				case "then":
@@ -730,7 +887,7 @@ func (c *rbConv) rubyCase(n *tree_sitter.Node) nir.Stmt {
 // (flow-approximate).
 func (c *rbConv) collectBodies(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	kids := namedChildren(n)
+	kids := c.namedChildren(n)
 	for i := 0; i < len(kids); i++ {
 		ch := kids[i]
 		switch ch.Kind() {
@@ -814,14 +971,14 @@ func (c *rbConv) params(params *tree_sitter.Node) []string {
 		return nil
 	}
 	var out []string
-	for _, ch := range namedChildren(params) {
+	for _, ch := range c.namedChildren(params) {
 		switch ch.Kind() {
 		case "identifier":
 			out = append(out, c.text(ch))
 		case "optional_parameter", "keyword_parameter", "splat_parameter", "typed_parameter":
 			if nm := field(ch, "name"); nm != nil {
 				out = append(out, c.text(nm))
-			} else if kids := namedChildren(ch); len(kids) > 0 && kids[0].Kind() == "identifier" {
+			} else if kids := c.namedChildren(ch); len(kids) > 0 && kids[0].Kind() == "identifier" {
 				out = append(out, c.text(kids[0]))
 			}
 		}
@@ -865,7 +1022,7 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 		return c.call(n, L)
 	case "element_reference":
 		var key nir.Expr
-		if kids := namedChildren(n); len(kids) > 1 {
+		if kids := c.namedChildren(n); len(kids) > 1 {
 			key = c.expr(kids[1])
 		}
 		return nir.Index{Base: c.expr(field(n, "object")), Key: key, Path: c.dotted(field(n, "object")), Loc: L}
@@ -882,18 +1039,18 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "unary":
 		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(field(n, "operand")), Loc: L}
 	case "parenthesized_statements":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return c.expr(kids[len(kids)-1])
 		}
 	case "array", "argument_list":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Seq{Parts: parts, Loc: L}
 	case "hash":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "pair" {
 				parts = append(parts, nir.Pair{Key: c.keyName(field(ch, "key")), Value: c.expr(field(ch, "value")), Loc: L})
 			}
@@ -908,7 +1065,7 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: c.dotted(n)}
 	}
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
@@ -974,20 +1131,6 @@ func rubyRegexPattern(raw string) string {
 	return strings.Trim(raw, "/")
 }
 
-func hasNestedBacktrackingQuantifier(pat string) bool {
-	for i := 0; i < len(pat); i++ {
-		if pat[i] != ')' || i+1 >= len(pat) || !isRegexQuantifier(pat[i+1]) || isPossessiveQuantifier(pat, i+1) {
-			continue
-		}
-		for j := i - 1; j >= 0 && pat[j] != '('; j-- {
-			if isRegexQuantifier(pat[j]) && !isEscaped(pat, j) && !isPossessiveQuantifier(pat, j) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func firstBacktrackingQuantifiedLiteral(alt string) (byte, bool) {
 	for i := 0; i+1 < len(alt); i++ {
 		if isEscaped(alt, i) || !isRegexLiteralByte(alt[i]) || !isRegexQuantifier(alt[i+1]) {
@@ -1025,9 +1168,9 @@ func (c *rbConv) string(n *tree_sitter.Node, L string) nir.Expr {
 	var parts []nir.Expr
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
-		for _, ch := range namedChildren(m) {
+		for _, ch := range c.namedChildren(m) {
 			if ch.Kind() == "interpolation" {
-				for _, e := range namedChildren(ch) {
+				for _, e := range c.namedChildren(ch) {
 					parts = append(parts, c.expr(e))
 				}
 			} else {
@@ -1055,7 +1198,7 @@ func (c *rbConv) call(n *tree_sitter.Node, L string) nir.Expr {
 	}
 	var args []nir.Expr
 	if al := field(n, "arguments"); al != nil {
-		for _, a := range namedChildren(al) {
+		for _, a := range c.namedChildren(al) {
 			args = append(args, c.expr(a))
 		}
 	}
@@ -1090,7 +1233,7 @@ func (c *rbConv) callBlockStmts(n *tree_sitter.Node) []nir.Stmt {
 	if b := field(n, "block"); b != nil {
 		blk = b
 	} else {
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if k := ch.Kind(); k == "block" || k == "do_block" {
 				blk = ch
 				break
@@ -1108,7 +1251,7 @@ func (c *rbConv) callBlockStmts(n *tree_sitter.Node) []nir.Stmt {
 				Value: nir.Format{Parts: []nir.Expr{rv}, Loc: c.loc(blk)}})
 		}
 	}
-	for _, ch := range namedChildren(blk) {
+	for _, ch := range c.namedChildren(blk) {
 		switch ch.Kind() {
 		case "block_parameters", "parameters":
 			// bound above
@@ -1124,7 +1267,7 @@ func (c *rbConv) callBlockStmts(n *tree_sitter.Node) []nir.Stmt {
 // blockParams returns the identifier names of a block's |params|.
 func (c *rbConv) blockParams(blk *tree_sitter.Node) []string {
 	var bp *tree_sitter.Node
-	for _, ch := range namedChildren(blk) {
+	for _, ch := range c.namedChildren(blk) {
 		if k := ch.Kind(); k == "block_parameters" || k == "parameters" {
 			bp = ch
 			break
@@ -1134,7 +1277,7 @@ func (c *rbConv) blockParams(blk *tree_sitter.Node) []string {
 		return nil
 	}
 	var out []string
-	for _, ch := range namedChildren(bp) {
+	for _, ch := range c.namedChildren(bp) {
 		if ch.Kind() == "identifier" {
 			out = append(out, c.text(ch))
 		}

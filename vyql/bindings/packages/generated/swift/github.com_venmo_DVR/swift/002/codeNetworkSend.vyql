@@ -1,0 +1,9 @@
+module bindings.swift.generated.m8a9fa4e6;
+
+binding networkSend2 {
+  requires {
+    dependency("github.com/venmo/DVR")
+  }
+  query pattern callExpr where callee.method == "uploadTask"
+  emit sink code.NetworkSend at args[0]
+}

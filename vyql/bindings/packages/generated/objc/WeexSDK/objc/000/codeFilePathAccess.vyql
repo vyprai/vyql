@@ -1,0 +1,9 @@
+module bindings.objc.generated.mf97fd0db;
+
+binding filePathAccess0 {
+  requires {
+    dependency("WeexSDK")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

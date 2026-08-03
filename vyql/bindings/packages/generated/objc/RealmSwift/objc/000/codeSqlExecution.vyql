@@ -1,0 +1,9 @@
+module bindings.objc.generated.mbc1c1b4c;
+
+binding sqlExecution0 {
+  requires {
+    dependency("RealmSwift")
+  }
+  query pattern callExpr where callee.method == "insertionsInSection"
+  emit sink code.SqlExecution at args[0]
+}

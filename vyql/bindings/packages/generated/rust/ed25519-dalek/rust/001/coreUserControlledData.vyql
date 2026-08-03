@@ -1,0 +1,9 @@
+module bindings.rust.generated.mf2568995;
+
+binding userControlledData1 {
+  requires {
+    dependency("ed25519-dalek")
+  }
+  query pattern callExpr where callee.method == "from_slice"
+  emit source core.UserControlledData at call.result
+}

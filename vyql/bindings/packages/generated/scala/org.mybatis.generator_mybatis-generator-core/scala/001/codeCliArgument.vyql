@@ -1,0 +1,9 @@
+module bindings.scala.generated.me8232238;
+
+binding cliArgument1 {
+  requires {
+    dependency("org.mybatis.generator:mybatis-generator-core")
+  }
+  query pattern callExpr where callee.method == "setJdbcConnectionConfiguration"
+  emit source code.CliArgument at call.result
+}

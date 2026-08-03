@@ -1,0 +1,9 @@
+module bindings.go.generated.m0a0d32e4;
+
+binding expressionEval1 {
+  requires {
+    dependency("github.com/go-openapi/jsonpointer")
+  }
+  query pattern callExpr where callee.method == "SetForToken"
+  emit sink code.ExpressionEval at args[0]
+}

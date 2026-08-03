@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter rust {
-  package "assert_cmd" {
-    sink method "spawn" -> code.CommandExecution
-  }
-}

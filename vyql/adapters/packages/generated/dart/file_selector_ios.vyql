@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter dart {
-  package "file_selector_ios" {
-    source method "openFile" -> core.UserControlledData
-  }
-}

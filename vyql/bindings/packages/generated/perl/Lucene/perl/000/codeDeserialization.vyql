@@ -1,0 +1,9 @@
+module bindings.perl.generated.m68e04a9f;
+
+binding deserialization0 {
+  requires {
+    dependency("Lucene")
+  }
+  query pattern callExpr where callee.method == "tokenStream"
+  emit sink code.Deserialization at args[0]
+}

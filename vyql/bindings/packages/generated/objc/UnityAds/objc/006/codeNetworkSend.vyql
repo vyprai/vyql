@@ -1,0 +1,9 @@
+module bindings.objc.generated.m89200495;
+
+binding networkSend6 {
+  requires {
+    dependency("UnityAds")
+  }
+  query pattern callExpr where callee.method == "loadWithOptions"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m5ac66786;
+
+binding networkData8 {
+  requires {
+    dependency("nng")
+  }
+  query pattern callExpr where callee.method == "nni_pipe_recv"
+  emit source code.NetworkData at call.result
+}

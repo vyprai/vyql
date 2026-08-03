@@ -1,0 +1,9 @@
+module bindings.csharp.generated.mb516a7c2;
+
+binding codeEval1 {
+  requires {
+    dependency("dnlib")
+  }
+  query pattern callExpr where callee.method == "AssemblyDef.Write"
+  emit sink code.CodeEval at args[0]
+}

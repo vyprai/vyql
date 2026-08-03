@@ -1,7 +1,0 @@
-import code.{Deserialization, SecretValue}
-
-adapter elixir {
-  package "pot" {
-    sink method "decode" -> code.Deserialization
-  }
-}

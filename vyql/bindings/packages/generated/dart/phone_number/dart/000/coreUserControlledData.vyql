@@ -1,0 +1,9 @@
+module bindings.dart.generated.md32fc9c1;
+
+binding userControlledData0 {
+  requires {
+    dependency("phone_number")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit source core.UserControlledData at call.result
+}

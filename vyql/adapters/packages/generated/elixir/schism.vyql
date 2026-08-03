@@ -1,7 +1,0 @@
-import code.{NetworkDisconnect, NetworkConnect}
-adapter elixir {
-  package "schism" {
-    sink method "partition" -> code.NetworkDisconnect
-    sink method "heal" -> code.NetworkConnect
-  }
-}

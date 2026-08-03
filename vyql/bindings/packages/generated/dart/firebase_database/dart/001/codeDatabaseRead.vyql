@@ -1,0 +1,9 @@
+module bindings.dart.generated.meb2e0012;
+
+binding databaseRead1 {
+  requires {
+    dependency("firebase_database")
+  }
+  query pattern callExpr where callee.method == "Query.startAfter"
+  emit sink code.DatabaseReadSink at args[0]
+}

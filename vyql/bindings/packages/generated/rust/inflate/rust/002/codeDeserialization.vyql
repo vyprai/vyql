@@ -1,0 +1,9 @@
+module bindings.rust.generated.m7e95535b;
+
+binding deserialization2 {
+  requires {
+    dependency("inflate")
+  }
+  query pattern callExpr where callee.method == "from_zlib"
+  emit sink code.Deserialization at args[0]
+}

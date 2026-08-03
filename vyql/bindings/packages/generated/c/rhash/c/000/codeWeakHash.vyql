@@ -1,0 +1,9 @@
+module bindings.c.generated.mdbbb55eb;
+
+binding weakHash0 {
+  requires {
+    dependency("rhash")
+  }
+  query pattern callExpr where callee.method == "load_updated_hash_file"
+  emit issue code.WeakHash at call
+}

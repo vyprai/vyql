@@ -1,0 +1,9 @@
+module bindings.objc.generated.m942721f9;
+
+binding weakHash30 {
+  requires {
+    dependency("CommonCrypto")
+  }
+  query pattern presenceNode where node.path ~= "CC_SHA1"
+  emit issue code.WeakHash at node
+}

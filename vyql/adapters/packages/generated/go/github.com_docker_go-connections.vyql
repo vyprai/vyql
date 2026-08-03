@@ -1,7 +1,0 @@
-adapter go {
-  package "github.com/docker/go-connections" {
-    sink method "ParsePort" -> code.Deserialization
-    sink method "ParsePortSpec" -> code.Deserialization
-    sink method "ParsePortRange" -> code.Deserialization
-  }
-}

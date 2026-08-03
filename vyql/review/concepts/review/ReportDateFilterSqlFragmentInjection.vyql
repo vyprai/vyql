@@ -1,0 +1,8 @@
+module code;
+
+review code.ReportDateFilterSqlFragmentInjection {
+  category: sql
+  expected: [core.SqlParameterization, core.InputValidation]
+  kind: attention
+  text: "review report date filters for strict date/comparison validation or parameterized query construction before SQL execution"
+}

@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding csrfDisabled421 {
+  query pattern callExpr where callee.path ~= "withoutMiddleware" and args.any.literal contains "VerifyCsrfToken"
+  emit issue code.CsrfDisabled at call
+}

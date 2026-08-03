@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m70d3d45f;
+
+binding deserialization3 {
+  requires {
+    dependency("activejob")
+  }
+  query pattern callExpr where callee.method == "deserialize_hash"
+  emit sink code.Deserialization at args[0]
+}

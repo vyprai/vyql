@@ -1,0 +1,9 @@
+module bindings.scala.generated.ma6b87da4;
+
+binding networkSend2 {
+  requires {
+    dependency("org.springframework.ws:spring-ws-core")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

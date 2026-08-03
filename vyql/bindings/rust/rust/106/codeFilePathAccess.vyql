@@ -1,0 +1,6 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding filePathAccess106 {
+  query pattern callExpr where callee.path ~= "File.open"
+  emit sink code.FilePathAccess at args[0]
+}

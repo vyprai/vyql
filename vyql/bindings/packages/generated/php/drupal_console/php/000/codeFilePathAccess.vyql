@@ -1,0 +1,9 @@
+module bindings.php.generated.m27db084a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("drupal/console")
+  }
+  query pattern callExpr where callee.method == "loadLegacyFile"
+  emit sink code.FilePathAccess at args[0]
+}

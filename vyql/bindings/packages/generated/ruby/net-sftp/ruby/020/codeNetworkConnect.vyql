@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m2f77b2d5;
+
+binding networkConnect20 {
+  requires {
+    dependency("net-sftp")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

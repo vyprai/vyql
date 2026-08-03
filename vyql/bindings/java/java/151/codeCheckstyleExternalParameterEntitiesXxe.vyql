@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding checkstyleExternalParameterEntitiesXxe151 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "setFeaturesBySystemProperty" and node.context.className contains "LoadExternalDtdFeatureProvider" and node.context.callPath contains "factory.setFeature" and node.context.identifier contains "LOAD_EXTERNAL_DTD" and node.context.identifier contains "EXTERNAL_GENERAL_ENTITIES" and not (node.context.identifier contains "EXTERNAL_PARAMETER_ENTITIES")
+  emit issue code.CheckstyleExternalParameterEntitiesXxe at node
+}

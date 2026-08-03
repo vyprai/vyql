@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m60d16c4b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("persistent_ets")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.FilePathAccess at args[0]
+}

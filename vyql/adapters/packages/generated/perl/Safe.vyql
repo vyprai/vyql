@@ -1,5 +1,0 @@
-adapter perl {
-  package "Safe" {
-    sink method "reval" -> code.CodeEval
-  }
-}

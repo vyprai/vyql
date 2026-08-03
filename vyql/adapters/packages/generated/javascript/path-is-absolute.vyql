@@ -1,6 +1,0 @@
-adapter javascript {
-  package "path-is-absolute" {
-    control method "posix" -> core.PathAccessCheck
-    control method "win32" -> core.PathAccessCheck
-  }
-}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter go {
-  package "github.com/src-d/gcfg" {
-    sink method "ReadWithCallback" -> code.Deserialization
-  }
-}

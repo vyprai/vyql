@@ -1,0 +1,9 @@
+module bindings.objc.generated.m29559e25;
+
+binding storedDataRead0 {
+  requires {
+    dependency("KakaoSDKTalk")
+  }
+  query pattern callExpr where callee.method == "profile"
+  emit source code.StoredDataRead at call.result
+}

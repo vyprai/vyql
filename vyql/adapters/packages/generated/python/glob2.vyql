@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter python {
-  package "glob2" {
-    sink method "glob" -> code.FilePathAccess
-    sink method "iglob" -> code.FilePathAccess
-  }
-}

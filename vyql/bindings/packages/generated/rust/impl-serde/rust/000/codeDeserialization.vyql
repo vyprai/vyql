@@ -1,0 +1,9 @@
+module bindings.rust.generated.m8a156480;
+
+binding deserialization0 {
+  requires {
+    dependency("impl-serde")
+  }
+  query pattern callExpr where callee.method == "from_hex"
+  emit sink code.Deserialization at args[0]
+}

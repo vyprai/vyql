@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m6507593e;
+
+binding deserialization1 {
+  requires {
+    dependency("libtommath")
+  }
+  query pattern callExpr where callee.method == "mp_fread"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{NetworkSend}
-
-adapter java {
-  package "com.facebook.fresco:imagepipeline-okhttp3" {
-    sink method "fetch" -> code.NetworkSend
-    sink method "fetchWithRequest" -> code.NetworkSend
-  }
-}

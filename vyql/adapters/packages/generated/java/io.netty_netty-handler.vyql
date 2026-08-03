@@ -1,6 +1,0 @@
-import code.{SecretValue}
-adapter java {
-  package "io.netty:netty-handler" {
-    source method "readPrivateKey" -> code.SecretValue
-  }
-}

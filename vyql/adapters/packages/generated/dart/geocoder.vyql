@@ -1,9 +1,0 @@
-import code.{UrlFetch}
-import core.{UserControlledData}
-
-adapter dart {
-  package "geocoder" {
-    sink method "findAddressesFromQuery" -> code.UrlFetch
-    sink method "findAddressesFromCoordinates" -> code.UrlFetch
-  }
-}

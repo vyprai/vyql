@@ -1,0 +1,13 @@
+module bindings.php.generated.mecdba9b5;
+
+binding authenticationCheck6 {
+  requires {
+    dependency("nexmo/client-core")
+  }
+  query pattern callExpr where callee.method == "authRequest"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

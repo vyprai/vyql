@@ -1,7 +1,0 @@
-adapter perl {
-  package "ZMQ" {
-    source method "term" -> code.NetworkData
-    sink method "send_multipart" -> code.NetworkSend
-    sink method "load" -> code.Deserialization
-  }
-}

@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter swift {
-  package "github.com/apple/swift-llbuild" {
-    sink method "spawn" -> code.CommandExecution
-  }
-}

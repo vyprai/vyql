@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m2a0e231a;
+
+binding sqlExecution10 {
+  requires {
+    dependency("System.Data.SqlClient")
+  }
+  query pattern callExpr where callee.path ~= "SqlCommand"
+  emit sink code.SqlExecution at args[0]
+}

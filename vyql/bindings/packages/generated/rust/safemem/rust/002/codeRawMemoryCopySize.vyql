@@ -1,0 +1,10 @@
+module bindings.rust.generated.mf6f16430;
+
+binding rawMemoryCopySize2 {
+  requires {
+    dependency("safemem")
+  }
+  query pattern callExpr where callee.method == "prepend"
+  emit issue code.RawMemoryCopySize at call
+  emit sink code.RawMemoryCopySizeSink at call
+}

@@ -1,0 +1,9 @@
+module bindings.java.generated.m7532ca1b;
+
+binding sqlExecution4 {
+  requires {
+    dependency("org.springframework.security:spring-security-acl")
+  }
+  query pattern callExpr where callee.method == "setupLookupObjectIdentitiesStatement"
+  emit sink code.SqlExecution at args[0]
+}

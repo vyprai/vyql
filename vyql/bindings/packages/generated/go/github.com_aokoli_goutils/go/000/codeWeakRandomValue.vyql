@@ -1,0 +1,9 @@
+module bindings.go.generated.m9e95a54a;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("github.com/aokoli/goutils")
+  }
+  query pattern callExpr where callee.method == "RandomNonAlphaNumeric"
+  emit issue code.WeakRandomValue at call
+}

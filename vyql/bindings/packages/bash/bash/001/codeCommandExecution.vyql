@@ -1,0 +1,9 @@
+module bindings.bash.generated.mb6f991a5;
+
+binding commandExecution1 {
+  requires {
+    dependency("bash")
+  }
+  query pattern callExpr where callee.path ~= "bash"
+  emit sink code.CommandExecution at args.any
+}

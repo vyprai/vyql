@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-adapter objc {
-  package "mysql-connector-c" {
-    sink method "mysql_query" -> code.SqlExecution
-    sink method "mysql_stmt_execute" -> code.SqlExecution
-  }
-}

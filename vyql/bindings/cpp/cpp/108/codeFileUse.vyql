@@ -1,0 +1,7 @@
+module bindings.cpp.generated.m4e783366;
+
+binding fileUse108 {
+  query pattern presenceNode where node.path ~= "rename"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}

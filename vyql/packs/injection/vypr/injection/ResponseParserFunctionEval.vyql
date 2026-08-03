@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ResponseParserFunctionEval {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_94, CWE_95]
+    id: "VYQL-INJ-197"
+    severity: high
+  }
+  issue code.ResponseParserFunctionEval as sink
+}

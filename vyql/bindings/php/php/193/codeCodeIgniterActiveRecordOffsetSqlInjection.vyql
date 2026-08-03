@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding codeIgniterActiveRecordOffsetSqlInjection193 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "offset" and node.context.phpReview == "codeigniter_active_record_offset_sqli"
+  emit issue code.CodeIgniterActiveRecordOffsetSqlInjection at node
+}

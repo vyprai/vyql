@@ -1,0 +1,9 @@
+module bindings.scala.generated.m909124f5;
+
+binding sqlExecution3 {
+  requires {
+    dependency("org.jooq:jooq")
+  }
+  query pattern callExpr where callee.method == "xor"
+  emit sink code.SqlExecution at args[0]
+}

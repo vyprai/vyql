@@ -1,7 +1,0 @@
-adapter java {
-  package "org.glassfish.jaxb:jaxb-runtime" {
-    sink method "parse" -> code.Deserialization
-    sink method "unmarshal" -> code.Deserialization
-    control method "escape" -> core.HtmlEscape
-  }
-}

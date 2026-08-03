@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-adapter java {
-  package "org.apache.taglibs:taglibs-standard-impl" {
-    control method "org.apache.taglibs.standard.util.EscapeXML.escape" -> core.HtmlEscape
-    control method "org.apache.taglibs.standard.util.EscapeXML.emit" -> core.HtmlEscape
-  }
-}

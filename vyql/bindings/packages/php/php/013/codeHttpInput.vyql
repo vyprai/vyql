@@ -1,0 +1,9 @@
+module bindings.php.generated.mc5601031;
+
+binding httpInput13 {
+  requires {
+    dependency("symfony/http-foundation")
+  }
+  query pattern callExpr where callee.method == "get" and callee.receiver.type == "Request"
+  emit source code.HttpInput at call.result
+}

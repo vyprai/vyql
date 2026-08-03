@@ -1,0 +1,10 @@
+module vypr.sca;
+
+rule SsrfDependency {
+  meta {
+    cwe: [CWE_918]
+    id: "VYQL-SCA-008"
+    severity: high
+  }
+  issue sbom.SsrfDependency as p
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m3dce76f0;
+
+binding filePathAccess0 {
+  requires {
+    dependency("johnpbloch/wordpress-core-installer")
+  }
+  query pattern callExpr where callee.method == "getInstallPath"
+  emit sink code.FilePathAccess at args[0]
+}

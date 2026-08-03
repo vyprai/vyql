@@ -1,0 +1,9 @@
+module bindings.perl.generated.mcf4ec8cf;
+
+binding deserialization0 {
+  requires {
+    dependency("JKML")
+  }
+  query pattern callExpr where callee.method == "decode_jkml"
+  emit sink code.Deserialization at args[0]
+}

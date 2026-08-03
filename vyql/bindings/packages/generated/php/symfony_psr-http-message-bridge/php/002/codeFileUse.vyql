@@ -1,0 +1,9 @@
+module bindings.php.generated.m067a974c;
+
+binding fileUse2 {
+  requires {
+    dependency("symfony/psr-http-message-bridge")
+  }
+  query pattern callExpr where callee.method == "createUploadedFile"
+  emit sink code.FileUseSink at args[0]
+}

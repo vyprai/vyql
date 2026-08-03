@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule HtmlAttributeRewriteReview {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_79]
+    id: "VYQL-INJ-199"
+    severity: medium
+  }
+  issue code.HtmlAttributeRewriteReview as sink
+}

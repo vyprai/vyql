@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m1bd8beb9;
+
+binding responseHeaderWrite0 {
+  requires {
+    dependency("corsica")
+  }
+  query pattern callExpr where callee.method == "send_preflight_resp"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

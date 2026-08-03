@@ -1,7 +1,0 @@
-import code.{CommandExecution, Deserialization}
-adapter ruby {
-  package "ruby-graphviz" {
-    sink method "parse" -> code.Deserialization
-    sink method "run" -> code.CommandExecution
-  }
-}

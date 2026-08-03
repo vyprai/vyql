@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding fatfreeClearKeyExternalEntryInput466 {
+  query pattern callExpr where callee.analysis ~= "php.fatfree_clear_key_external_entry"
+  emit source code.ExternalEntryInput at call.result
+}

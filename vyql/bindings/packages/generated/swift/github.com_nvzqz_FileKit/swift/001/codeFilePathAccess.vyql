@@ -1,0 +1,9 @@
+module bindings.swift.generated.mba9fec3c;
+
+binding filePathAccess1 {
+  requires {
+    dependency("github.com/nvzqz/FileKit")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FilePathAccess at args[0]
+}

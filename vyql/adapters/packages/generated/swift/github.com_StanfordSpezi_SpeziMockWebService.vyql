@@ -1,9 +1,0 @@
-import code.{NetworkSend, NetworkData}
-
-adapter swift {
-  package "github.com/StanfordSpezi/SpeziMockWebService" {
-    sink method "upload" -> code.NetworkSend
-    sink method "remove" -> code.NetworkSend
-    source method "body" -> code.NetworkData
-  }
-}

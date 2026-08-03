@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding zipEntryCompressedSizeTokenRead630 {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "tokenizer.readToken" and operand(node, where: operand.path ~= "Token.StringType" and operand.path ~= "zipHeader.compressedSize")
+  emit issue code.ZipEntryCompressedSizeTokenRead at node
+}

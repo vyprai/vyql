@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m8ad3979e;
+
+binding networkData0 {
+  requires {
+    dependency("comms")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

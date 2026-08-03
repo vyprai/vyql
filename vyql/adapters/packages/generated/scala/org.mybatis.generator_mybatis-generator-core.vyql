@@ -1,8 +1,0 @@
-import code.{DatabaseRead, CliArgument}
-
-adapter scala {
-  package "org.mybatis.generator:mybatis-generator-core" {
-    sink method "getConnection" -> code.DatabaseRead
-    source method "setJdbcConnectionConfiguration" -> code.CliArgument
-  }
-}

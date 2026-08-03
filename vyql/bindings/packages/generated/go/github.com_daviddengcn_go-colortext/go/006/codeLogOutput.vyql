@@ -1,0 +1,9 @@
+module bindings.go.generated.mea5a6714;
+
+binding logOutput6 {
+  requires {
+    dependency("github.com/daviddengcn/go-colortext")
+  }
+  query pattern callExpr where callee.method == "Printfln"
+  emit sink code.LogOutput at args[0]
+}

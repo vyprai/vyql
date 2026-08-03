@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m1494a80f;
+
+binding deserialization0 {
+  requires {
+    dependency("ja_serializer")
+  }
+  query pattern callExpr where callee.method == "JaSerializer.ParamParser.parse"
+  emit sink code.Deserialization at args[0]
+}

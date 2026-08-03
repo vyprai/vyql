@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter python {
-  package "websockets" {
-    source method "parse" -> code.CliArgument
-  }
-}

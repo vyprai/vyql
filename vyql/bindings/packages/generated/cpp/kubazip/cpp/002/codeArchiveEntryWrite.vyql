@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m0c3bde5d;
+
+binding archiveEntryWrite2 {
+  requires {
+    dependency("kubazip")
+  }
+  query pattern callExpr where callee.method == "zip_entry_write"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter ruby {
-  package "fog-aws" {
-    control method "escape" -> core.InputValidation
-  }
-}

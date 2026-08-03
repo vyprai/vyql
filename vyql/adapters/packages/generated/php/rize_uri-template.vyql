@@ -1,6 +1,0 @@
-adapter php {
-  package "rize/uri-template" {
-    sink method "parse" -> code.Deserialization
-    source method "extract" -> core.UserControlledData
-  }
-}

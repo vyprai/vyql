@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mc096a7db;
+
+binding expressionEval1 {
+  requires {
+    dependency("c89stringutils")
+  }
+  query pattern callExpr where callee.method == "wtf_vsnprintf"
+  emit sink code.ExpressionEval at args[0]
+}

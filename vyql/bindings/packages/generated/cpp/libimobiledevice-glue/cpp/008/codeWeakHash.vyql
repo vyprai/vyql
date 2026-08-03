@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m9681b87d;
+
+binding weakHash8 {
+  requires {
+    dependency("libimobiledevice-glue")
+  }
+  query pattern callExpr where callee.method == "sha1_final"
+  emit issue code.WeakHash at call
+}

@@ -1,0 +1,9 @@
+module bindings.java.generated.mbf1436bb;
+
+binding networkSend0 {
+  requires {
+    dependency("com.facebook.fresco:imagepipeline-okhttp3")
+  }
+  query pattern callExpr where callee.method == "fetch"
+  emit sink code.NetworkSend at args[0]
+}

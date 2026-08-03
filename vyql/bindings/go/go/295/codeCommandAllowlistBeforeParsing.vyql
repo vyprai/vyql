@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding commandAllowlistBeforeParsing295 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.callPath contains "strings.Split" and node.context.callPath contains "d.user.CanExecute" and node.context.callPath contains "runner.ParseCommand" and node.context.callPath contains "exec.Command" and node.context.callBefore contains "d.user.CanExecute>runner.ParseCommand"
+  emit issue code.CommandAllowlistBeforeParsing at node
+}

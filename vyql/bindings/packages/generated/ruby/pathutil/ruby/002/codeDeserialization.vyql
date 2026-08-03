@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mb81e8809;
+
+binding deserialization2 {
+  requires {
+    dependency("pathutil")
+  }
+  query pattern callExpr where callee.method == "read_json"
+  emit sink code.Deserialization at args[0]
+}

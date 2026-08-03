@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter php {
-  package "opis/closure" {
-    sink method "Opis\Closure\Serializer::unserialize" -> code.Deserialization
-    sink method "Opis\Closure\Serializer::decode" -> code.Deserialization
-  }
-}

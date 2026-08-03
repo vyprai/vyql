@@ -1,5 +1,0 @@
-adapter rust {
-  package "wasmparser" {
-    control method "validate" -> core.InputValidation
-  }
-}

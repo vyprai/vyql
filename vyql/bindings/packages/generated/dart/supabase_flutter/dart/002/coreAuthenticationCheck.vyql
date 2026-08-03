@@ -1,0 +1,13 @@
+module bindings.dart.generated.m4b533710;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("supabase_flutter")
+  }
+  query pattern callExpr where callee.method == "Supabase.initialize"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

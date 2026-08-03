@@ -1,0 +1,9 @@
+module bindings.objc.generated.m05e7deec;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("AWSCore")
+  }
+  query pattern callExpr where callee.method == "testInvokePathWithQueryString"
+  emit sink code.NosqlQuery at args[0]
+}

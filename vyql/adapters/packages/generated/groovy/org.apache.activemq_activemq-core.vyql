@@ -1,5 +1,0 @@
-adapter groovy {
-  package "org.apache.activemq:activemq-core" {
-    sink method "send" -> code.NetworkSend
-  }
-}

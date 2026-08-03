@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter ruby {
-  package "elasticsearch-api" {
-    control method "escape" -> core.InputValidation
-  }
-}

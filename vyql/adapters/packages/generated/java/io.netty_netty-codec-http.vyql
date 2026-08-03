@@ -1,7 +1,0 @@
-import code.{HttpInput}
-
-adapter java {
-  package "io.netty:netty-codec-http" {
-    source method "ClientCookieDecoder.decode" -> code.HttpInput
-  }
-}

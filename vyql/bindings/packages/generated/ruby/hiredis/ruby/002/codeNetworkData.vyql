@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mfcdfa016;
+
+binding networkData2 {
+  requires {
+    dependency("hiredis")
+  }
+  query pattern callExpr where callee.method == "reader_feed"
+  emit source code.NetworkData at call.result
+}

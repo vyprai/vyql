@@ -1,7 +1,0 @@
-import code.{CliArgument}
-
-adapter bash {
-  package "aws-sam-cli" {
-    source path "aws-sam-cli" -> code.CliArgument
-  }
-}

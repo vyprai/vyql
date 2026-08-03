@@ -1,8 +1,0 @@
-import code.{NetworkData, NetworkSend}
-adapter elixir {
-  package "ex_statsd" {
-    source method "start_link" -> code.NetworkData
-    source method "parse_host" -> code.NetworkData
-    sink method "transmit" -> code.NetworkSend
-  }
-}

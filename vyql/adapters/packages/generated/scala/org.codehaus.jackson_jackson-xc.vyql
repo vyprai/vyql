@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter scala {
-  package "org.codehaus.jackson:jackson-xc" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

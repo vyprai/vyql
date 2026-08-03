@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m3dbac85a;
+
+binding expressionEval3 {
+  requires {
+    dependency("com.jayway.jsonpath:json-path-assert")
+  }
+  query pattern callExpr where callee.method == "assertNotDefined"
+  emit sink code.ExpressionEval at args[0]
+}

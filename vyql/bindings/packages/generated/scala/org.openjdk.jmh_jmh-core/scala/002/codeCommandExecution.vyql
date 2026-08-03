@@ -1,0 +1,9 @@
+module bindings.scala.generated.m5f67c63a;
+
+binding commandExecution2 {
+  requires {
+    dependency("org.openjdk.jmh:jmh-core")
+  }
+  query pattern callExpr where callee.method == "getPrintPropertiesCommand"
+  emit sink code.CommandExecution at args[0]
+}

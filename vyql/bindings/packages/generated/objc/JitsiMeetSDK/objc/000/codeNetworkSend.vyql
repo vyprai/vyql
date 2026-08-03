@@ -1,0 +1,9 @@
+module bindings.objc.generated.mb118e0aa;
+
+binding networkSend0 {
+  requires {
+    dependency("JitsiMeetSDK")
+  }
+  query pattern callExpr where callee.method == "sendEndpointTextMessage"
+  emit sink code.NetworkSend at args[0]
+}

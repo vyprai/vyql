@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding requestPathPercentSLogInjection209 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "request_path_percent_s_log_injection"
+  emit issue code.RequestPathPercentSLogInjection at node
+}

@@ -1,0 +1,10 @@
+module bindings.dart.generated.m1c398214;
+
+binding ownershipCheck87 {
+  query pattern callExpr where callee.path ~= "checkOwnership"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.mf2c48db6;
+
+binding filePathAccess5 {
+  requires {
+    dependency("change_app_package_name")
+  }
+  query pattern callExpr where callee.method == "deleteOldDirectories"
+  emit sink code.FilePathAccess at args[0]
+}

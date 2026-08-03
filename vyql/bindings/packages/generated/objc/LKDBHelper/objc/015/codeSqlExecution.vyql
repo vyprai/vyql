@@ -1,0 +1,9 @@
+module bindings.objc.generated.mcf19b29f;
+
+binding sqlExecution15 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "deleteToDB:callback:"
+  emit sink code.SqlExecution at args[0]
+}

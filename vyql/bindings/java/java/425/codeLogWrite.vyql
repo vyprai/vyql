@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding logWrite425 {
+  query pattern callExpr where callee.path ~= "LOG.info"
+  emit sink code.LogWriteSink at args.any
+}

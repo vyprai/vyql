@@ -1,0 +1,13 @@
+module bindings.php.generated.m140375a4;
+
+binding authorizationCheck7 {
+  requires {
+    dependency("spatie/laravel-permission")
+  }
+  query pattern callExpr where callee.method == "hasPermissionTo"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.m3608f193;
+
+binding sqlExecution10 {
+  requires {
+    dependency("slick")
+  }
+  query pattern callExpr where callee.method == "sql"
+  emit sink code.SqlExecution at args[0]
+}

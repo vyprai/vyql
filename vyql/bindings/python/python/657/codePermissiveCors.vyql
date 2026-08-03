@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding permissiveCors657 {
+  query pattern callExpr where callee.path ~= "cross_origin" and args.any.literal contains "origins=*"
+  emit issue code.PermissiveCors at call
+}

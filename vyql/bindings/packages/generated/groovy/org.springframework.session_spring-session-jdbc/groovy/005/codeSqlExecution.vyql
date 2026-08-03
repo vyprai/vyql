@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m59519c26;
+
+binding sqlExecution5 {
+  requires {
+    dependency("org.springframework.session:spring-session-jdbc")
+  }
+  query pattern callExpr where callee.method == "setDeleteSessionAttributeQuery"
+  emit sink code.SqlExecution at args[0]
+}

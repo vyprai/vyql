@@ -1,0 +1,9 @@
+module bindings.java.generated.m9ed95fbd;
+
+binding deserialization1 {
+  requires {
+    dependency("org.springframework.security:spring-security-web")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

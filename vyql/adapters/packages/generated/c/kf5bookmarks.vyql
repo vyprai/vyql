@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter c {
-  package "kf5bookmarks" {
-    sink method "parse" -> code.Deserialization
-  }
-}

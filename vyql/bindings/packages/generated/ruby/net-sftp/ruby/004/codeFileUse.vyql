@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m2f77b2d5;
+
+binding fileUse4 {
+  requires {
+    dependency("net-sftp")
+  }
+  query pattern callExpr where callee.method == "download!"
+  emit sink code.FileUseSink at args[0]
+}

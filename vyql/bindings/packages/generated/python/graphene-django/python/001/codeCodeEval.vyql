@@ -1,0 +1,9 @@
+module bindings.python.generated.mc0b69c8c;
+
+binding codeEval1 {
+  requires {
+    dependency("graphene-django")
+  }
+  query pattern callExpr where callee.method == "execute_graphql_request"
+  emit sink code.CodeEval at args[0]
+}

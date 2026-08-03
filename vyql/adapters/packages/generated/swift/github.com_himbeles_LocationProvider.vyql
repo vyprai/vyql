@@ -1,8 +1,0 @@
-import code.{PrivilegedOp, StoredDataRead}
-import core.{AuthorizationCheck, UserControlledData}
-
-adapter swift {
-  package "github.com/himbeles/LocationProvider" {
-    control method "requestAuthorization" -> core.AuthorizationCheck
-  }
-}

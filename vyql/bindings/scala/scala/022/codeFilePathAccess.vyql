@@ -1,0 +1,6 @@
+module bindings.scala.generated.m06d0685b;
+
+binding filePathAccess22 {
+  query pattern callExpr where callee.path ~= "Source.fromFile"
+  emit sink code.FilePathAccess at args[0]
+}

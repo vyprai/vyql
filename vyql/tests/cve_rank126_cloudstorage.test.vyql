@@ -2,6 +2,7 @@
 
 test "rank126: csharp SAS URL expiry with fixed duration is review-visible"
   lang csharp
+  expect VYQL-AUTH-086
   expect_review code.TimeBoundAccessTokenReview
   code
   ```
@@ -25,6 +26,7 @@ test "rank126: csharp SAS URL expiry with fixed duration is review-visible"
 
 test "rank126: csharp SAS URL expiry using requested duration is clean"
   lang csharp
+  reject VYQL-AUTH-086
   reject_review code.TimeBoundAccessTokenReview
   code
   ```

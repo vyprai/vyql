@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m60412f76;
+
+binding storedDataWrite4 {
+  requires {
+    dependency("org.springframework.session:spring-session-data-redis")
+  }
+  query pattern callExpr where callee.method == "setAttribute"
+  emit sink code.StoredDataWrite at args[0]
+}

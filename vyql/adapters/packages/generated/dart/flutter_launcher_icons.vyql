@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-adapter dart {
-  package "flutter_launcher_icons" {
-    sink method "decodeImageFile" -> code.FilePathAccess
-    sink method "createFileIfNotExist" -> code.FilePathAccess
-    sink method "createDirIfNotExist" -> code.FilePathAccess
-  }
-}

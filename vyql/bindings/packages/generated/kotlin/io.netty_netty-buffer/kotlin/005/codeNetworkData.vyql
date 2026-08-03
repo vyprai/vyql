@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m19ec740d;
+
+binding networkData5 {
+  requires {
+    dependency("io.netty:netty-buffer")
+  }
+  query pattern callExpr where callee.method == "readLong"
+  emit source code.NetworkData at call.result
+}

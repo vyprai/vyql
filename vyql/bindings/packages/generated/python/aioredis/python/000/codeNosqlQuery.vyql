@@ -1,0 +1,9 @@
+module bindings.python.generated.mc8d34990;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("aioredis")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NosqlQuery at args[0]
+}

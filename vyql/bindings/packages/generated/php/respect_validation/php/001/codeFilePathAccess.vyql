@@ -1,0 +1,9 @@
+module bindings.php.generated.mf3aa1cae;
+
+binding filePathAccess1 {
+  requires {
+    dependency("respect/validation")
+  }
+  query pattern callExpr where callee.method == "file"
+  emit sink code.FilePathAccess at args[0]
+}

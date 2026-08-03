@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m73153651;
+
+binding networkSend4 {
+  requires {
+    dependency("httpoison")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkSend at args[0]
+}

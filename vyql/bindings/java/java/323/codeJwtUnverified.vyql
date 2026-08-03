@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding jwtUnverified323 {
+  query pattern presenceNode where node.path ~= "Algorithm.none"
+  emit issue code.JwtUnverified at node
+}

@@ -1,5 +1,0 @@
-adapter bash {
-  package "gum" {
-    source path "gum.argv" -> code.CliArgument
-  }
-}

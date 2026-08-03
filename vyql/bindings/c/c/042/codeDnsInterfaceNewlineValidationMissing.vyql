@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding dnsInterfaceNewlineValidationMissing42 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "config.dns_interface_newline_validation_missing"
+  emit issue code.DnsInterfaceNewlineValidationMissing at node
+}

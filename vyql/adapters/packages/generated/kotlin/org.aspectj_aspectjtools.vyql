@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter kotlin {
-  package "org.aspectj:aspectjtools" {
-    sink method "runInNewVM" -> code.CommandExecution
-  }
-}

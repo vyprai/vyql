@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter objc {
-  package "MapboxNavigation" {
-    sink method "parse" -> code.Deserialization
-  }
-}

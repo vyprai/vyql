@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "rust_decimal" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

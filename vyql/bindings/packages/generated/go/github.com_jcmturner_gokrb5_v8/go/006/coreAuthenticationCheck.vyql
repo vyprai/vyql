@@ -1,0 +1,13 @@
+module bindings.go.generated.m8e782cf3;
+
+binding authenticationCheck6 {
+  requires {
+    dependency("github.com/jcmturner/gokrb5/v8")
+  }
+  query pattern callExpr where callee.method == "SPNEGOKRB5Authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

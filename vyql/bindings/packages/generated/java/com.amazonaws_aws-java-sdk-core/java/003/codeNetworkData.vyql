@@ -1,0 +1,9 @@
+module bindings.java.generated.m8599cd06;
+
+binding networkData3 {
+  requires {
+    dependency("com.amazonaws:aws-java-sdk-core")
+  }
+  query pattern callExpr where callee.method == "getAwsResponse"
+  emit source code.NetworkData at call.result
+}

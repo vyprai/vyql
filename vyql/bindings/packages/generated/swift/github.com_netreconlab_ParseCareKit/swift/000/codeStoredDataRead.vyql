@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc2f3ed08;
+
+binding storedDataRead0 {
+  requires {
+    dependency("github.com/netreconlab/ParseCareKit")
+  }
+  query pattern callExpr where callee.method == "configureParse"
+  emit source code.StoredDataRead at call.result
+}

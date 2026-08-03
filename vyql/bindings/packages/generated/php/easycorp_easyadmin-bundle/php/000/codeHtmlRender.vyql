@@ -1,0 +1,9 @@
+module bindings.php.generated.m3ef54163;
+
+binding htmlRender0 {
+  requires {
+    dependency("easycorp/easyadmin-bundle")
+  }
+  query pattern callExpr where callee.method == "addHtmlContentToBody"
+  emit sink code.HtmlRender at args[0]
+}

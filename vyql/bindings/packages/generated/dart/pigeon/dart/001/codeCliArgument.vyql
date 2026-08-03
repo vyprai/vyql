@@ -1,0 +1,9 @@
+module bindings.dart.generated.m2ecd1293;
+
+binding cliArgument1 {
+  requires {
+    dependency("pigeon")
+  }
+  query pattern callExpr where callee.method == "parseArgs"
+  emit source code.CliArgument at call.result
+}

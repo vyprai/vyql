@@ -1,0 +1,9 @@
+module bindings.dart.generated.m673f9f94;
+
+binding networkSend2 {
+  requires {
+    dependency("sse")
+  }
+  query pattern callExpr where callee.method == "SseConnection.sink"
+  emit sink code.NetworkSend at args[0]
+}

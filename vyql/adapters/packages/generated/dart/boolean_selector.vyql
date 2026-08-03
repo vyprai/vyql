@@ -1,5 +1,0 @@
-adapter dart {
-  package "boolean_selector" {
-    sink method "BooleanSelector.parse" -> code.Deserialization
-  }
-}

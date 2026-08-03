@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mfb0a552d;
+
+binding sqlExecution0 {
+  requires {
+    dependency("com.mysql:mysql-connector-j")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

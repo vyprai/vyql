@@ -1,0 +1,9 @@
+module bindings.python.generated.me11298ae;
+
+binding networkConnect5 {
+  requires {
+    dependency("pysocks")
+  }
+  query pattern callExpr where callee.method == "connect_ex"
+  emit sink code.NetworkConnectSink at args[0]
+}

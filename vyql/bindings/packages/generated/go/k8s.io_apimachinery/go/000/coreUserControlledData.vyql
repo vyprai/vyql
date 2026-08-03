@@ -1,0 +1,9 @@
+module bindings.go.generated.m650dbb0f;
+
+binding userControlledData0 {
+  requires {
+    dependency("k8s.io/apimachinery")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}

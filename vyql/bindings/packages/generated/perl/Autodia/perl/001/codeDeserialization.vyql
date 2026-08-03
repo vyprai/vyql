@@ -1,0 +1,9 @@
+module bindings.perl.generated.m14546802;
+
+binding deserialization1 {
+  requires {
+    dependency("Autodia")
+  }
+  query pattern callExpr where callee.method == "_parse"
+  emit sink code.Deserialization at args[0]
+}

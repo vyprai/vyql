@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m5c270092;
+
+binding xpathQuery40 {
+  requires {
+    dependency("xpath")
+  }
+  query pattern callExpr where callee.path ~= "xpath.select"
+  emit sink code.XpathQuery at args[0]
+}

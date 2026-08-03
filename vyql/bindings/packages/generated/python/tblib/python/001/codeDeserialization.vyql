@@ -1,0 +1,9 @@
+module bindings.python.generated.m3f900891;
+
+binding deserialization1 {
+  requires {
+    dependency("tblib")
+  }
+  query pattern callExpr where callee.method == "unpickle_exception_with_attrs"
+  emit sink code.Deserialization at args[0]
+}

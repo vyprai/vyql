@@ -1,0 +1,9 @@
+module bindings.swift.generated.mad2e399d;
+
+binding networkSend3 {
+  requires {
+    dependency("github.com/serhii-londar/BaseAPI")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkSend at args[0]
+}

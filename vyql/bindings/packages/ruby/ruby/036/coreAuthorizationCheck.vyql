@@ -1,0 +1,13 @@
+module bindings.ruby.generated.m5895bccf;
+
+binding authorizationCheck36 {
+  requires {
+    dependency("pundit")
+  }
+  query pattern callExpr where callee.method == "authorize"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

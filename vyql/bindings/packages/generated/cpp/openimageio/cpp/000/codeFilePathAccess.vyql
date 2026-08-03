@@ -1,0 +1,9 @@
+module bindings.cpp.generated.md2df1e4a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("openimageio")
+  }
+  query pattern callExpr where callee.method == "ImageInput::open"
+  emit sink code.FilePathAccess at args[0]
+}

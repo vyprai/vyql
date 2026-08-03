@@ -1,7 +1,6 @@
 package definitions
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -23,15 +22,17 @@ type Catalog struct {
 	Stats    CatalogStats     `json:"stats"`
 	Concepts []ConceptSummary `json:"concepts,omitempty"`
 	Rules    []RuleSummary    `json:"rules,omitempty"`
-	Adapters []MappingSummary `json:"adapters,omitempty"`
+	Bindings []MappingSummary `json:"bindings,omitempty"`
 	Reviews  []ReviewSummary  `json:"reviews,omitempty"`
+	Packs    []PackSummary    `json:"packs,omitempty"`
 }
 
 type CatalogStats struct {
 	Concepts int `json:"concepts"`
 	Rules    int `json:"rules"`
-	Adapters int `json:"adapters"`
+	Bindings int `json:"bindings"`
 	Reviews  int `json:"reviews"`
+	Packs    int `json:"packs"`
 }
 
 type ConceptSummary struct {
@@ -78,6 +79,13 @@ type ReviewSummary struct {
 	Source   string   `json:"source"`
 }
 
+type PackSummary struct {
+	Name     string   `json:"name"`
+	Includes []string `json:"includes,omitempty"`
+	Excludes []string `json:"excludes,omitempty"`
+	Source   string   `json:"source"`
+}
+
 func Inspect(opts InspectOptions) (Catalog, error) {
 	if opts.Max <= 0 {
 		opts.Max = 80
@@ -90,7 +98,7 @@ func Inspect(opts InspectOptions) (Catalog, error) {
 	opts.Query = strings.ToLower(strings.TrimSpace(opts.Query))
 
 	cat := Catalog{Root: datadir.Root()}
-	if wantKind(opts.Kind, "concepts") || wantKind(opts.Kind, "rules") || wantKind(opts.Kind, "reviews") {
+	if wantKind(opts.Kind, "concepts") || wantKind(opts.Kind, "rules") || wantKind(opts.Kind, "reviews") || wantKind(opts.Kind, "packs") {
 		if err := inspectDeclDir(&cat, "ontology"); err != nil {
 			return cat, err
 		}
@@ -101,8 +109,8 @@ func Inspect(opts InspectOptions) (Catalog, error) {
 			return cat, err
 		}
 	}
-	if wantKind(opts.Kind, "adapters") {
-		if err := inspectDeclDir(&cat, "adapters"); err != nil {
+	if wantKind(opts.Kind, "bindings") {
+		if err := inspectDeclDir(&cat, "bindings"); err != nil {
 			return cat, err
 		}
 	}
@@ -111,8 +119,9 @@ func Inspect(opts InspectOptions) (Catalog, error) {
 	cat.Stats = CatalogStats{
 		Concepts: len(cat.Concepts),
 		Rules:    len(cat.Rules),
-		Adapters: len(cat.Adapters),
+		Bindings: len(cat.Bindings),
 		Reviews:  len(cat.Reviews),
+		Packs:    len(cat.Packs),
 	}
 	filterCatalog(&cat, opts)
 	return cat, nil
@@ -127,10 +136,12 @@ func wantKind(got, want string) bool {
 		got = "concepts"
 	case "rule":
 		got = "rules"
-	case "adapter", "mapping", "mappings":
-		got = "adapters"
+	case "binding", "mapping", "mappings":
+		got = "bindings"
 	case "review":
 		got = "reviews"
+	case "pack":
+		got = "packs"
 	}
 	return got == want
 }
@@ -147,7 +158,8 @@ func inspectDeclDir(cat *Catalog, rel string) error {
 	if !info.IsDir() {
 		return nil
 	}
-	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	var sources []parser.V2DefinitionSource
+	err = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -158,15 +170,56 @@ func inspectDeclDir(cat *Catalog, rel string) error {
 		if err != nil {
 			return err
 		}
-		decls, err := parser.Parse(string(b))
-		if err != nil {
-			return fmt.Errorf("%s: %w", relPath(path), err)
-		}
-		for _, d := range decls {
-			addDecl(cat, relPath(path), d)
-		}
+		sources = append(sources, parser.V2DefinitionSource{Name: relPath(path), Source: string(b)})
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	selected := map[string]bool{}
+	for _, source := range sources {
+		selected[source.Name] = true
+	}
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesWithCore(sources), func(src parser.V2DefinitionSource) bool {
+		return selected[src.Name]
+	})
+	if err != nil {
+		return err
+	}
+	for _, d := range decls {
+		addDecl(cat, "", d)
+	}
+	return nil
+}
+
+func v2DefinitionSourcesWithCore(sources []parser.V2DefinitionSource) []parser.V2DefinitionSource {
+	hasOntology, hasPolicies := false, false
+	for _, source := range sources {
+		hasOntology = hasOntology || strings.HasPrefix(source.Name, "ontology/")
+		hasPolicies = hasPolicies || strings.HasPrefix(source.Name, "policies/")
+	}
+	out := make([]parser.V2DefinitionSource, 0, len(sources)+32)
+	if !hasOntology {
+		if files, err := datadir.ReadVYQLDir("ontology/concepts"); err == nil {
+			for _, file := range files {
+				out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+			}
+		}
+		if files, err := datadir.ReadVYQLDir("ontology/threatkinds"); err == nil {
+			for _, file := range files {
+				out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+			}
+		}
+	}
+	if !hasPolicies {
+		if files, err := datadir.ReadVYQLDir("policies"); err == nil {
+			for _, file := range files {
+				out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+			}
+		}
+	}
+	out = append(out, sources...)
+	return out
 }
 
 func addDecl(cat *Catalog, source string, d parser.Decl) {
@@ -195,7 +248,7 @@ func addDecl(cat *Catalog, source string, d parser.Decl) {
 			Concepts: ruleConcepts(x),
 			Source:   source,
 		})
-	case *parser.AdapterDecl:
+	case *parser.BindingSet:
 		for _, m := range x.Mappings {
 			item := MappingSummary{
 				Language:   x.Name,
@@ -213,7 +266,7 @@ func addDecl(cat *Catalog, source string, d parser.Decl) {
 				item.Scope = m.Flag.Scope
 				item.NodeKind = m.Flag.NodeKind
 			}
-			cat.Adapters = append(cat.Adapters, item)
+			cat.Bindings = append(cat.Bindings, item)
 		}
 	case *parser.ReviewDecl:
 		cat.Reviews = append(cat.Reviews, ReviewSummary{
@@ -222,6 +275,13 @@ func addDecl(cat *Catalog, source string, d parser.Decl) {
 			Kind:     stringField(x.Fields, "kind"),
 			Expected: listField(x.Fields, "expected"),
 			Text:     stringField(x.Fields, "text"),
+			Source:   source,
+		})
+	case *parser.PackDecl:
+		cat.Packs = append(cat.Packs, PackSummary{
+			Name:     x.Name,
+			Includes: listField(x.Fields, "includes"),
+			Excludes: listField(x.Fields, "excludes"),
 			Source:   source,
 		})
 	}
@@ -298,29 +358,32 @@ func ruleConcepts(r *parser.Rule) []string {
 func sortCatalog(cat *Catalog) {
 	sort.Slice(cat.Concepts, func(i, j int) bool { return cat.Concepts[i].Name < cat.Concepts[j].Name })
 	sort.Slice(cat.Rules, func(i, j int) bool { return cat.Rules[i].ID < cat.Rules[j].ID })
-	sort.Slice(cat.Adapters, func(i, j int) bool {
-		a, b := cat.Adapters[i], cat.Adapters[j]
+	sort.Slice(cat.Bindings, func(i, j int) bool {
+		a, b := cat.Bindings[i], cat.Bindings[j]
 		return a.Language+"\x00"+a.Kind+"\x00"+a.Pattern+"\x00"+a.Concept < b.Language+"\x00"+b.Kind+"\x00"+b.Pattern+"\x00"+b.Concept
 	})
 	sort.Slice(cat.Reviews, func(i, j int) bool { return cat.Reviews[i].Concept < cat.Reviews[j].Concept })
+	sort.Slice(cat.Packs, func(i, j int) bool { return cat.Packs[i].Name < cat.Packs[j].Name })
 }
 
 func filterCatalog(cat *Catalog, opts InspectOptions) {
 	if opts.Query != "" {
 		cat.Concepts = filterSlice(cat.Concepts, opts.Query, conceptHaystack)
 		cat.Rules = filterSlice(cat.Rules, opts.Query, ruleHaystack)
-		cat.Adapters = filterSlice(cat.Adapters, opts.Query, mappingHaystack)
+		cat.Bindings = filterSlice(cat.Bindings, opts.Query, mappingHaystack)
 		cat.Reviews = filterSlice(cat.Reviews, opts.Query, reviewHaystack)
+		cat.Packs = filterSlice(cat.Packs, opts.Query, packHaystack)
 	}
 	if opts.Language != "" {
-		cat.Adapters = filterSlice(cat.Adapters, opts.Language, func(v MappingSummary) string {
+		cat.Bindings = filterSlice(cat.Bindings, opts.Language, func(v MappingSummary) string {
 			return strings.ToLower(v.Language)
 		})
 	}
 	cat.Concepts = limitSlice(cat.Concepts, opts.Max)
 	cat.Rules = limitSlice(cat.Rules, opts.Max)
-	cat.Adapters = limitSlice(cat.Adapters, opts.Max)
+	cat.Bindings = limitSlice(cat.Bindings, opts.Max)
 	cat.Reviews = limitSlice(cat.Reviews, opts.Max)
+	cat.Packs = limitSlice(cat.Packs, opts.Max)
 }
 
 func filterSlice[T any](in []T, q string, hay func(T) string) []T {
@@ -363,5 +426,11 @@ func mappingHaystack(v MappingSummary) string {
 func reviewHaystack(v ReviewSummary) string {
 	return strings.ToLower(strings.Join([]string{
 		v.Concept, v.Category, v.Kind, strings.Join(v.Expected, " "), v.Text, v.Source,
+	}, " "))
+}
+
+func packHaystack(v PackSummary) string {
+	return strings.ToLower(strings.Join([]string{
+		v.Name, strings.Join(v.Includes, " "), strings.Join(v.Excludes, " "), v.Source,
 	}, " "))
 }

@@ -1,6 +1,0 @@
-adapter groovy {
-  package "net.sf.ehcache:ehcache-core" {
-    sink method "get" -> code.NosqlQuery
-    sink method "setBootstrapCacheLoader" -> code.StoredDataWrite
-  }
-}

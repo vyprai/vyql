@@ -1,0 +1,9 @@
+module bindings.c.generated.m1b9b358f;
+
+binding deserialization3 {
+  requires {
+    dependency("matio")
+  }
+  query pattern callExpr where callee.method == "Mat_VarRead4"
+  emit sink code.Deserialization at args[0]
+}

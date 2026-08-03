@@ -1,0 +1,9 @@
+module bindings.objc.generated.m39c92ced;
+
+binding userControlledData0 {
+  requires {
+    dependency("FirebaseAuthUI")
+  }
+  query pattern callExpr where callee.method == "handleOpenURL"
+  emit source core.UserControlledData at call.result
+}

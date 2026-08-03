@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m2bcb37ed;
+
+binding deserialization1 {
+  requires {
+    dependency("org.openjfx:javafx-fxml")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

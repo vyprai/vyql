@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m0e6fd67c;
+
+binding networkSend0 {
+  requires {
+    dependency("com.android.volley:volley")
+  }
+  query pattern callExpr where callee.method == "performRequest"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding parsedUserIdDefaultRootPrivilegeEscalation121 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "user_parser.default_root_return"
+  emit issue code.ParsedUserIdDefaultRootPrivilegeEscalation at node
+}

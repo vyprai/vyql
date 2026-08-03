@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter perl {
-  package "Exception-Warning" {
-    source method "__WARN__" -> core.UserControlledData
-    source method "__DIE__" -> core.UserControlledData
-  }
-}

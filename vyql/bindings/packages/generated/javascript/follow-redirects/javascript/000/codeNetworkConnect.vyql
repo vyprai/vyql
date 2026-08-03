@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m4e127658;
+
+binding networkConnect0 {
+  requires {
+    dependency("follow-redirects")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkConnectSink at args[0]
+}

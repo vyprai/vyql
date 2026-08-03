@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mb36ef84f;
+
+binding networkConnect4 {
+  requires {
+    dependency("com.badlogicgames.gdx:gdx")
+  }
+  query pattern callExpr where callee.method == "newServerSocket"
+  emit sink code.NetworkConnectSink at args[0]
+}

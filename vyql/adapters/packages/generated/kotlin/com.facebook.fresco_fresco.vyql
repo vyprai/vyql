@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter kotlin {
-  package "com.facebook.fresco:fresco" {
-    source method "setUri" -> core.UserControlledData
-  }
-}

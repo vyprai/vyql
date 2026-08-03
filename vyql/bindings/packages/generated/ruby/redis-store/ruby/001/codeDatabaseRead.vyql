@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m0afebd11;
+
+binding databaseRead1 {
+  requires {
+    dependency("redis-store")
+  }
+  query pattern callExpr where callee.method == "scan"
+  emit sink code.DatabaseReadSink at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{CodeEval, FilePathAccess, HtmlRender}
-
-adapter javascript {
-  package "html-webpack-plugin" {
-    sink method "evaluateCompilationResult" -> code.CodeEval
-    sink method "replacePlaceholdersInFilename" -> code.FilePathAccess
-    sink method "getTemplatePath" -> code.FilePathAccess
-  }
-}

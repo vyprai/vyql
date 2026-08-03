@@ -1,0 +1,7 @@
+module bindings.dart.generated.m1c398214;
+
+binding resourceHandle69 {
+  query pattern presenceNode where node.path ~= "Socket.connect"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}

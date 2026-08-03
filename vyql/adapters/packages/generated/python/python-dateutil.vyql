@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "python-dateutil" {
-    sink method "parse" -> code.Deserialization
-  }
-}

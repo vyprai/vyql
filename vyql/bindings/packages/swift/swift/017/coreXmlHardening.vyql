@@ -1,0 +1,13 @@
+module bindings.swift.generated.mc6005d88;
+
+binding xmlHardening17 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "XMLParser.shouldResolveExternalEntities" and args.any.literal contains "false"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}

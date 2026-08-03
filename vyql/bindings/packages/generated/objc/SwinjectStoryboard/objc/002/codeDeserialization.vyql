@@ -1,0 +1,9 @@
+module bindings.objc.generated.m40dc17ee;
+
+binding deserialization2 {
+  requires {
+    dependency("SwinjectStoryboard")
+  }
+  query pattern callExpr where callee.method == "instantiateController"
+  emit sink code.Deserialization at args[0]
+}

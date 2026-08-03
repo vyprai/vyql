@@ -1,6 +1,0 @@
-import core.{SqlParameterization}
-adapter scala {
-  package "javax.servlet:jstl" {
-    control method "addSQLParameter" -> core.SqlParameterization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mcbc58268;
+
+binding deserialization3 {
+  requires {
+    dependency("tar")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

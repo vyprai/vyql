@@ -1,0 +1,9 @@
+module bindings.objc.generated.m2d36e45b;
+
+binding fileUse1 {
+  requires {
+    dependency("CapacitorFilesystem")
+  }
+  query pattern callExpr where callee.method == "writeFile"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m42c361e1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("is-directory")
+  }
+  query pattern callExpr where callee.method == "isDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

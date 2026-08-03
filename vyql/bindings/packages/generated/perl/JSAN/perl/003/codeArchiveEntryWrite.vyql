@@ -1,0 +1,9 @@
+module bindings.perl.generated.mdd98cc15;
+
+binding archiveEntryWrite3 {
+  requires {
+    dependency("JSAN")
+  }
+  query pattern callExpr where callee.method == "_read_script"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

@@ -1,0 +1,11 @@
+module bindings.python.generated.m21017d75;
+
+binding safeDeserialization546 {
+  query pattern callExpr where callee.path ~= "yaml.safe_load"
+  emit check core.SafeDeserialization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

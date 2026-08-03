@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding pathMatcherNormalizationOrderBypass145 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "Match" and node.context.callPath contains "url.PathUnescape" and node.context.selector contains "r.URL.Path" and node.context.callOrder contains "strings.TrimRight>path.Clean" and node.context.call contains "HasSuffix"
+  emit issue code.PathMatcherNormalizationOrderBypass at node
+}

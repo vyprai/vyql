@@ -1,8 +1,0 @@
-import code.{CodeEval}
-
-adapter python {
-  package "decorator" {
-    sink method "make" -> code.CodeEval
-    sink method "create" -> code.CodeEval
-  }
-}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter php {
-  package "laminas/laminas-validator" {
-    sink method "Laminas\\Validator\\IsJsonString::isValid" -> code.Deserialization
-  }
-}

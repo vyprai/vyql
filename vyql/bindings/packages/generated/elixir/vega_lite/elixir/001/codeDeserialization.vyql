@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m4e17a62f;
+
+binding deserialization1 {
+  requires {
+    dependency("vega_lite")
+  }
+  query pattern callExpr where callee.method == "from_spec"
+  emit sink code.Deserialization at args[0]
+}

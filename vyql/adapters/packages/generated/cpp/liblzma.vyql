@@ -1,7 +1,0 @@
-import code.{CliArgument}
-
-adapter cpp {
-  package "liblzma" {
-    source method "args_parse" -> code.CliArgument
-  }
-}

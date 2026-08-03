@@ -1,0 +1,6 @@
+module bindings.solidity.generated.m88e544d8;
+
+binding rsaPkcs1DigestSuffixOnlyVerification14 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "solidity" and node.context.rsaPkcs1 == "digest_suffix_sha256"
+  emit issue code.RsaPkcs1DigestSuffixOnlyVerification at node
+}

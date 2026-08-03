@@ -1,0 +1,9 @@
+module bindings.java.generated.m5549f66f;
+
+binding databaseRead1 {
+  requires {
+    dependency("org.apache.tomcat:tomcat-jdbc")
+  }
+  query pattern callExpr where callee.method == "getConnection"
+  emit sink code.DatabaseReadSink at args[0]
+}

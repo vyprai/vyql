@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter perl {
-  package "JSON" {
-    sink method "decode_json" -> code.Deserialization
-    sink method "decode" -> code.Deserialization
-    sink method "decode_prefix" -> code.Deserialization
-    sink method "incr_parse" -> code.Deserialization
-  }
-}

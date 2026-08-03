@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding authenticationRequiredOp184 {
+  query pattern presenceNode where node.path ~= "deleteAccount"
+  emit issue code.AuthenticationRequiredOp at node
+}

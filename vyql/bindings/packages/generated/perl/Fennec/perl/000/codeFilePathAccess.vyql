@@ -1,0 +1,9 @@
+module bindings.perl.generated.ma29b5eb2;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Fennec")
+  }
+  query pattern callExpr where callee.method == "find_files"
+  emit sink code.FilePathAccess at args[0]
+}

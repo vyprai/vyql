@@ -1,9 +1,0 @@
-import code.{NetworkData, NetworkSend}
-
-adapter elixir {
-  package "fast_tls" {
-    source method "recv" -> code.NetworkData
-    source method "recv_data" -> code.NetworkData
-    sink method "send" -> code.NetworkSend
-  }
-}

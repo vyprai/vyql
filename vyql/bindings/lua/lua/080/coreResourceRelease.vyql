@@ -1,0 +1,11 @@
+module bindings.lua.generated.ma99d12f7;
+
+binding resourceRelease80 {
+  query pattern callExpr where callee.method == "close"
+  emit check core.ResourceRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}

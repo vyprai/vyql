@@ -1,0 +1,9 @@
+module bindings.scala.generated.m4ec29445;
+
+binding deserialization0 {
+  requires {
+    dependency("net.sf.ehcache:ehcache")
+  }
+  query pattern callExpr where callee.method == "readExternal"
+  emit sink code.Deserialization at args[0]
+}

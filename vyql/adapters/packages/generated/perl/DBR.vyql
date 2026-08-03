@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-
-adapter perl {
-  package "DBR" {
-    sink method "run" -> code.SqlExecution
-  }
-}

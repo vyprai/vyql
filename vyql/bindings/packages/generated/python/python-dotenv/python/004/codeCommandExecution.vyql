@@ -1,0 +1,9 @@
+module bindings.python.generated.mf16a0cc3;
+
+binding commandExecution4 {
+  requires {
+    dependency("python-dotenv")
+  }
+  query pattern callExpr where callee.method == "run_command"
+  emit sink code.CommandExecution at args[0]
+}

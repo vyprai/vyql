@@ -1,5 +1,0 @@
-adapter perl {
-  package "Gentoo-Perl-Distmap" {
-    sink method "load" -> code.Deserialization
-  }
-}

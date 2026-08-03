@@ -1,0 +1,9 @@
+module bindings.python.generated.mffc7db44;
+
+binding filePathAccess0 {
+  requires {
+    dependency("portalocker")
+  }
+  query pattern callExpr where callee.method == "lock"
+  emit sink code.FilePathAccess at args[0]
+}

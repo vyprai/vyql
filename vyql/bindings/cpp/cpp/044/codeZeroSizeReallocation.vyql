@@ -1,0 +1,7 @@
+module bindings.cpp.generated.m4e783366;
+
+binding zeroSizeReallocation44 {
+  query pattern presenceNode where node.path ~= "reallocarray"
+  emit issue code.ZeroSizeReallocation at node
+  emit sink code.ZeroSizeReallocationSink at node
+}

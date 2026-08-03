@@ -1,0 +1,13 @@
+module bindings.go.generated.m2ed1e8ac;
+
+binding authenticationCheck11 {
+  requires {
+    dependency("google.golang.org/api")
+  }
+  query pattern callExpr where callee.method == "GetOAuth2Configuration"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

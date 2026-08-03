@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding rsaPkcs1v15DecryptErrorOracle664 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "rsa_pkcs1v15_decrypt_error_oracle"
+  emit issue code.RsaPkcs1v15DecryptErrorOracle at node
+}

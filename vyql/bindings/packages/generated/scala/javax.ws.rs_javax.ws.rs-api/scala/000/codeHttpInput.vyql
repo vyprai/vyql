@@ -1,0 +1,9 @@
+module bindings.scala.generated.m553320b6;
+
+binding httpInput0 {
+  requires {
+    dependency("javax.ws.rs:javax.ws.rs-api")
+  }
+  query pattern callExpr where callee.method == "getQueryParameters"
+  emit source code.HttpInput at call.result
+}

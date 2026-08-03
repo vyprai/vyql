@@ -1,0 +1,9 @@
+module bindings.c.generated.m3c4a9620;
+
+binding deserialization0 {
+  requires {
+    dependency("parson")
+  }
+  query pattern callExpr where callee.method == "json_parse_file"
+  emit sink code.Deserialization at args[0]
+}

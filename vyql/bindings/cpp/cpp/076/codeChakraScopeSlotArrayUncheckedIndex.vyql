@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding chakraScopeSlotArrayUncheckedIndex76 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "chakra.scope_slot_array_unchecked_index"
+  emit issue code.ChakraScopeSlotArrayUncheckedIndex at node
+}

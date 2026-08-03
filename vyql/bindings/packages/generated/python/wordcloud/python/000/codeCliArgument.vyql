@@ -1,0 +1,9 @@
+module bindings.python.generated.md92c33a1;
+
+binding cliArgument0 {
+  requires {
+    dependency("wordcloud")
+  }
+  query pattern callExpr where callee.method == "parse_args"
+  emit source code.CliArgument at call.result
+}

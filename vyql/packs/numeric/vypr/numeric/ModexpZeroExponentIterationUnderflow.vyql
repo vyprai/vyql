@@ -1,0 +1,11 @@
+module vypr.numeric;
+
+rule ModexpZeroExponentIterationUnderflow {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_191, CWE_400]
+    id: "VYQL-NUM-016"
+    severity: high
+  }
+  issue code.ModexpZeroExponentIterationUnderflow as underflow
+}

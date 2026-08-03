@@ -1,0 +1,9 @@
+module bindings.csharp.generated.mdbb4bf36;
+
+binding deserialization1 {
+  requires {
+    dependency("cyotek.drawing.bitmapfont")
+  }
+  query pattern callExpr where callee.method == "LoadBinary"
+  emit sink code.Deserialization at args[0]
+}

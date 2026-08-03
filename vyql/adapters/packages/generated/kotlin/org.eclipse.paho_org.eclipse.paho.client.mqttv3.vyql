@@ -1,8 +1,0 @@
-import code.{NetworkConnect, NetworkSend}
-
-adapter kotlin {
-  package "org.eclipse.paho:org.eclipse.paho.client.mqttv3" {
-    sink method "publish" -> code.NetworkSend
-    sink method "connect" -> code.NetworkConnect
-  }
-}

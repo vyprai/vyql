@@ -1,0 +1,9 @@
+module bindings.swift.generated.m8fcce929;
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/apple/swift-openapi-urlsession")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

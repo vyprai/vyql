@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m5c270092;
+
+binding sqlExecution20 {
+  requires {
+    dependency("@prisma/client")
+  }
+  query pattern callExpr where callee.method == "$queryRawUnsafe"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{SecretValue}
-
-adapter dart {
-  package "stripe_android" {
-    source method "createTokenFromCard" -> code.SecretValue
-    source method "createTokenFromBankAccount" -> code.SecretValue
-    source method "createTokenFromPii" -> code.SecretValue
-  }
-}

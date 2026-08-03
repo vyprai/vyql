@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter kotlin {
-  package "org.springframework.boot:spring-boot-loader-tools" {
-    sink method "RunProcess.run" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.csharp.generated.mf2c46657;
+
+binding deserialization0 {
+  requires {
+    dependency("semver")
+  }
+  query pattern callExpr where callee.method == "Semver.Parsing.SemVersionParser.Parse"
+  emit sink code.Deserialization at args[0]
+}

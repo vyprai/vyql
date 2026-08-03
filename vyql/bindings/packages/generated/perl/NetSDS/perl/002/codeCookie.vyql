@@ -1,0 +1,9 @@
+module bindings.perl.generated.m2249bc7a;
+
+binding cookie2 {
+  requires {
+    dependency("NetSDS")
+  }
+  query pattern callExpr where callee.method == "get_cookie"
+  emit source code.Cookie at call.result
+}

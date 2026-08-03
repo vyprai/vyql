@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "isoduration" {
-    sink method "parse_duration" -> code.Deserialization
-  }
-}

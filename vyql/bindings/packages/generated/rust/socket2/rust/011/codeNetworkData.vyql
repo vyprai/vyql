@@ -1,0 +1,9 @@
+module bindings.rust.generated.m86000b79;
+
+binding networkData11 {
+  requires {
+    dependency("socket2")
+  }
+  query pattern callExpr where callee.method == "recv_from"
+  emit source code.NetworkData at call.result
+}

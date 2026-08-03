@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter perl {
-  package "XML-Handler-Machine2GraphViz" {
-    sink method "start_document" -> code.Deserialization
-  }
-}

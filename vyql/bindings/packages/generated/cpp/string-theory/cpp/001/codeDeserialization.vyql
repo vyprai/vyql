@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m5df56d4e;
+
+binding deserialization1 {
+  requires {
+    dependency("string-theory")
+  }
+  query pattern callExpr where callee.method == "base64_decode"
+  emit sink code.Deserialization at args[0]
+}

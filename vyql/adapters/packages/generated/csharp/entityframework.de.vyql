@@ -1,9 +1,0 @@
-import code.{SqlExecution}
-
-adapter csharp {
-  package "entityframework.de" {
-    sink method "ExecuteSqlCommand" -> code.SqlExecution
-    sink method "ExecuteSqlCommandAsync" -> code.SqlExecution
-    sink method "SqlQuery" -> code.SqlExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m44f70df4;
+
+binding urlFetch1 {
+  requires {
+    dependency("behat/mink")
+  }
+  query pattern callExpr where callee.method == "setBasicAuth"
+  emit sink code.UrlFetch at args[0]
+}

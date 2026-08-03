@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "pem" {
-    sink method "parse" -> code.Deserialization
-    sink method "parse_captures" -> code.Deserialization
-    sink method "parse_captures_iter" -> code.Deserialization
-  }
-}

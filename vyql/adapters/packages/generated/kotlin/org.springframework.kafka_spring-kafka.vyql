@@ -1,9 +1,0 @@
-import code.{NetworkData, NetworkSend, Deserialization}
-adapter kotlin {
-  package "org.springframework.kafka:spring-kafka" {
-    sink method "send" -> code.NetworkSend
-    source method "receive" -> code.NetworkData
-    sink method "getKeyDeserializer" -> code.Deserialization
-    sink method "getValueDeserializer" -> code.Deserialization
-  }
-}

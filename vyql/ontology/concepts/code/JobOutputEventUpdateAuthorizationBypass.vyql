@@ -1,0 +1,11 @@
+module code;
+
+concept JobOutputEventUpdateAuthorizationBypass : issue {
+  cwe: [CWE_862]
+  reviewAssumption: "plugin or child process output is less trusted than the scheduler configuration it can update"
+  reviewCategory: auth
+  reviewCondition: "untrusted child job output can request persistent event or schedule updates without an explicit configuration or authorization gate"
+  reviewConfidence: high
+  reviewEvidence: "job child-output handler context {pattern} copies an update_event field from child output into job state before a later schedule update"
+  vulnerableTo: [access_control.MissingAuthorization]
+}

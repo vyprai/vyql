@@ -1,6 +1,0 @@
-import code.{ExpressionEval}
-adapter cpp {
-  package "exprtk" {
-    sink method "compile" -> code.ExpressionEval
-  }
-}

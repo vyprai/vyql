@@ -1,0 +1,9 @@
+module bindings.perl.generated.m0b38966e;
+
+binding userControlledData0 {
+  requires {
+    dependency("DBIx-Class-UserStamp")
+  }
+  query pattern callExpr where callee.method == "get_current_user_id"
+  emit source core.UserControlledData at call.result
+}

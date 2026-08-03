@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mab577c9f;
+
+binding filePathAccess2 {
+  requires {
+    dependency("seacas")
+  }
+  query pattern callExpr where callee.method == "Open"
+  emit sink code.FilePathAccess at args[0]
+}

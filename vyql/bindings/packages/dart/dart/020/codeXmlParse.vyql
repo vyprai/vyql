@@ -1,0 +1,9 @@
+module bindings.dart.generated.m5342780c;
+
+binding xmlParse20 {
+  requires {
+    dependency("xml")
+  }
+  query pattern callExpr where callee.path ~= "XmlDocument.parse"
+  emit sink code.XmlParse at args[0]
+}

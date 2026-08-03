@@ -1,0 +1,6 @@
+module bindings.kotlin.generated.m304d1620;
+
+binding intentInput13 {
+  query pattern callExpr where callee.path ~= ".getCharSequenceExtra"
+  emit source code.IntentInput at call.result
+}

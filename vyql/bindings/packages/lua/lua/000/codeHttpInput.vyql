@@ -1,0 +1,9 @@
+module bindings.lua.generated.m49b0a04f;
+
+binding httpInput0 {
+  requires {
+    dependency("openresty")
+  }
+  query pattern callExpr where callee.path ~= "ngx.var.arg"
+  emit source code.HttpInput at call.result
+}

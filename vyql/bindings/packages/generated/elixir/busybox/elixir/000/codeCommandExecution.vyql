@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mee85bf03;
+
+binding commandExecution0 {
+  requires {
+    dependency("busybox")
+  }
+  query pattern callExpr where callee.method == "cmd"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-import code.{SqlExecution}
-
-adapter php {
-  package "maximebf/debugbar" {
-    source method "handle" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding weakHash415 {
+  query pattern callExpr where callee.path ~= "hash" and args.any.literal contains "sha1"
+  emit issue code.WeakHash at call
+}

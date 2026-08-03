@@ -1,0 +1,6 @@
+module bindings.scala.generated.m06d0685b;
+
+binding urlFetch26 {
+  query pattern callExpr where callee.method == "singleRequest"
+  emit sink code.UrlFetch at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m3b5cdde0;
+
+binding htmlRender2 {
+  requires {
+    dependency("CWStatusBarNotification")
+  }
+  query pattern callExpr where callee.method == "displayNotificationWithAttributedString:completion:"
+  emit sink code.HtmlRender at args[0]
+}

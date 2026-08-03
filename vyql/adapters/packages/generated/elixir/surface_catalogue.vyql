@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-adapter elixir {
-  package "surface_catalogue" {
-    source method "mount" -> core.UserControlledData
-    source method "handle_params" -> core.UserControlledData
-    source method "handle_info" -> core.UserControlledData
-    source method "handle_event" -> core.UserControlledData
-  }
-}

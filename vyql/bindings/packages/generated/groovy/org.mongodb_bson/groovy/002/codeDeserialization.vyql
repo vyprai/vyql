@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m033a1d35;
+
+binding deserialization2 {
+  requires {
+    dependency("org.mongodb:bson")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m628c72ff;
+
+binding nosqlQuery1 {
+  requires {
+    dependency("ruflin/elastica")
+  }
+  query pattern callExpr where callee.method == "ElasticaIndex::search"
+  emit sink code.NosqlQuery at args[0]
+}

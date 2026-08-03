@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter python {
-  package "s3transfer" {
-    sink method "TransferManager.upload" -> code.FilePathAccess
-    sink method "TransferManager.download" -> code.FilePathAccess
-  }
-}

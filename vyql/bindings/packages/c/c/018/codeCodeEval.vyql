@@ -1,0 +1,9 @@
+module bindings.c.generated.m2816daee;
+
+binding codeEval18 {
+  requires {
+    dependency("libdl")
+  }
+  query pattern callExpr where callee.path ~= "dlopen"
+  emit sink code.CodeEval at args[0]
+}

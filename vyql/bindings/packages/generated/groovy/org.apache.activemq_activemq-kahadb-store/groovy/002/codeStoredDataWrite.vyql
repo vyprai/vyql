@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mc43097c1;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("org.apache.activemq:activemq-kahadb-store")
+  }
+  query pattern callExpr where callee.method == "addMessage"
+  emit sink code.StoredDataWrite at args[0]
+}

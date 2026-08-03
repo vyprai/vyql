@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter objc {
-  package "Polyline" {
-    sink method "decodePolyline" -> code.Deserialization
-    sink method "decodeLevels" -> code.Deserialization
-    sink method "decodeSingleCoordinate" -> code.Deserialization
-  }
-}

@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkSend}
-
-adapter rust {
-  package "attohttpc" {
-    sink method "send" -> code.NetworkSend
-    sink method "connect" -> code.NetworkConnect
-    sink method "write" -> code.NetworkSend
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.ma66d92b3;
+
+binding filePathAccess4 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "apply_patch"
+  emit sink code.FilePathAccess at args[0]
+}

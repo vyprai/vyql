@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter cpp {
-  package "loguru" {
-    sink method "add_file" -> code.FilePathAccess
-  }
-}

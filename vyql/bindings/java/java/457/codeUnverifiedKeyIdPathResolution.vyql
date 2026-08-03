@@ -1,0 +1,6 @@
+module bindings.java.generated.m3f9a1420;
+
+binding unverifiedKeyIdPathResolution457 {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "analysis.java.unverified_keyid_path_resolve"
+  emit issue code.UnverifiedKeyIdPathResolution at node
+}

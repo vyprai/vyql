@@ -1,5 +1,0 @@
-adapter php {
-  package "zendframework/zend-servicemanager" {
-    sink method "dumpConfigFile" -> code.FileUse
-  }
-}

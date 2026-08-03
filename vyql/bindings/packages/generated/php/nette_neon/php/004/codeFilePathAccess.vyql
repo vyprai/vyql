@@ -1,0 +1,9 @@
+module bindings.php.generated.mbbfcbacd;
+
+binding filePathAccess4 {
+  requires {
+    dependency("nette/neon")
+  }
+  query pattern callExpr where callee.method == "NetteNeonNeon::decodeFile"
+  emit sink code.FilePathAccess at args[0]
+}

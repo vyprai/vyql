@@ -1,0 +1,9 @@
+module bindings.go.generated.mdb0733ab;
+
+binding deserialization0 {
+  requires {
+    dependency("k8s.io/legacy-cloud-providers")
+  }
+  query pattern callExpr where callee.method == "readConfig"
+  emit sink code.Deserialization at args[0]
+}

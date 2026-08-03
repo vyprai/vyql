@@ -1,0 +1,9 @@
+module bindings.objc.generated.m57ebb34d;
+
+binding networkConnect0 {
+  requires {
+    dependency("Overcoat")
+  }
+  query pattern callExpr where callee.method == "GET:parameters:progress:success:failure:"
+  emit sink code.NetworkConnectSink at args[0]
+}

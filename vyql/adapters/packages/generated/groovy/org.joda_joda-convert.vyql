@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter groovy {
-  package "org.joda:joda-convert" {
-    sink method "parse" -> code.Deserialization
-  }
-}

@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter javascript {
-  package "del" {
-    sink method "deleteAsync" -> code.FilePathAccess
-    sink method "deleteSync" -> code.FilePathAccess
-  }
-}

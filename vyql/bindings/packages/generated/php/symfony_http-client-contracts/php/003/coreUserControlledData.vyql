@@ -1,0 +1,9 @@
+module bindings.php.generated.m70032eae;
+
+binding userControlledData3 {
+  requires {
+    dependency("symfony/http-client-contracts")
+  }
+  query pattern callExpr where callee.method == "HttpClientInterface::withOptions.options"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m942d4423;
+
+binding storedDataRead7 {
+  requires {
+    dependency("mongoid")
+  }
+  query pattern callExpr where callee.method == "load_configuration"
+  emit source code.StoredDataRead at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.mfa0c438f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Importer")
+  }
+  query pattern callExpr where callee.method == "from_file"
+  emit sink code.FilePathAccess at args[0]
+}

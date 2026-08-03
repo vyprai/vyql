@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule SessionHashMissingAuthorizationState {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_863, CWE_613]
+    id: "VYQL-AUTH-058"
+    severity: high
+  }
+  issue code.SessionHashMissingAuthorizationState as session
+}

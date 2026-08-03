@@ -1,0 +1,9 @@
+module bindings.swift.generated.mb63ccca5;
+
+binding userControlledData20 {
+  requires {
+    dependency("github.com/Mattijah/QKMRZParser")
+  }
+  query pattern callExpr where callee.method == "issueDate"
+  emit source core.UserControlledData at call.result
+}

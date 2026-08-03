@@ -1,7 +1,0 @@
-adapter objc {
-  package "ActiveLabel" {
-    source method "handleMentionTap" -> core.UserControlledData
-    source method "handleHashtagTap" -> core.UserControlledData
-    source method "handleURLTap" -> core.UserControlledData
-  }
-}

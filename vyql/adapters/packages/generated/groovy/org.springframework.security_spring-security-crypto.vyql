@@ -1,8 +1,0 @@
-import core.{AuthenticationCheck, InputValidation}
-
-adapter groovy {
-  package "org.springframework.security:spring-security-crypto" {
-    control method "encode" -> core.InputValidation
-    control method "matches" -> core.AuthenticationCheck
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.rust.generated.m73dfb5cd;
+
+binding weakHash1 {
+  requires {
+    dependency("sha1")
+  }
+  query pattern callExpr where callee.method == "compress"
+  emit issue code.WeakHash at call
+}

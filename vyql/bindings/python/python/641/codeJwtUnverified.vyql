@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding jwtUnverified641 {
+  query pattern callExpr where callee.path ~= "jwt.decode" and args.any.literal contains "algorithms=none"
+  emit issue code.JwtUnverified at call
+}

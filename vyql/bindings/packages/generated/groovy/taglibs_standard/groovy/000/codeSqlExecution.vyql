@@ -1,0 +1,9 @@
+module bindings.groovy.generated.maa3b48fa;
+
+binding sqlExecution0 {
+  requires {
+    dependency("taglibs:standard")
+  }
+  query pattern callExpr where callee.method == "addSQLParameter"
+  emit sink code.SqlExecution at args[0]
+}

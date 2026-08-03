@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter java {
-  package "com.fasterxml.jackson.module:jackson-module-jaxb-annotations" {
-    sink method "DomElementJsonDeserializer.deserialize" -> code.Deserialization
-  }
-}

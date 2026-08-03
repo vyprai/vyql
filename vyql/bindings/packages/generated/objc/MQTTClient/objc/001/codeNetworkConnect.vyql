@@ -1,0 +1,9 @@
+module bindings.objc.generated.ma6a67695;
+
+binding networkConnect1 {
+  requires {
+    dependency("MQTTClient")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.go.generated.mfbb2d55f;
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/cockroachdb/datadriven")
+  }
+  query pattern callExpr where callee.method == "RunTest"
+  emit source core.UserControlledData at call.result
+}

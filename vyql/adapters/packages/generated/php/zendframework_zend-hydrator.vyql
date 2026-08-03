@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "zendframework/zend-hydrator" {
-    sink method "SerializableStrategy.unserialize" -> code.Deserialization
-  }
-}

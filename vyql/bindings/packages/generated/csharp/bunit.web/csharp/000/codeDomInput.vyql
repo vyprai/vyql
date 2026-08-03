@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m5fad7f45;
+
+binding domInput0 {
+  requires {
+    dependency("bunit.web")
+  }
+  query pattern callExpr where callee.method == "CompareTo"
+  emit source code.DomInput at call.result
+}

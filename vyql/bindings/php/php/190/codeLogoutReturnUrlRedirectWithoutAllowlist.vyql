@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding logoutReturnUrlRedirectWithoutAllowlist190 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and containsAny(node.context.name, ["handle", "logout", "logOut", "redirect"]) and node.context.callPath contains "$request.getQueryParams" and node.context.callPath contains "Arr.get" and node.context.callPath contains "RedirectResponse" and not (node.context.callPath contains "sanitizeReturnUrl") and not (node.context.callPath contains "url_is_external") and not (node.context.callPath contains "is_safe_url") and not (node.context.callPath contains "getAllowedRedirectDomains")
+  emit issue code.LogoutReturnUrlRedirectWithoutAllowlist at node
+}

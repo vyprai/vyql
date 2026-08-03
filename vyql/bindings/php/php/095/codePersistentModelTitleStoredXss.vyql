@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding persistentModelTitleStoredXss95 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "onSaveElement" and node.context.phpReview == "persistent_model_title_stored_xss"
+  emit issue code.PersistentModelTitleStoredXss at node
+}

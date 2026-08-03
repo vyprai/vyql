@@ -1,0 +1,9 @@
+module bindings.ruby.generated.me4874d07;
+
+binding networkConnect3 {
+  requires {
+    dependency("gh_inspector")
+  }
+  query pattern callExpr where callee.method == "Sidekick.get_api_results"
+  emit sink code.NetworkConnectSink at args[0]
+}

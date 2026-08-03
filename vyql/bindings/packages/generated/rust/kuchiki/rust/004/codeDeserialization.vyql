@@ -1,0 +1,9 @@
+module bindings.rust.generated.m45635220;
+
+binding deserialization4 {
+  requires {
+    dependency("kuchiki")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.Deserialization at args[0]
+}

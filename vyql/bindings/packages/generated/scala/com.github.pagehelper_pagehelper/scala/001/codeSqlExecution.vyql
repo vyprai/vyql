@@ -1,0 +1,9 @@
+module bindings.scala.generated.m5c712c61;
+
+binding sqlExecution1 {
+  requires {
+    dependency("com.github.pagehelper:pagehelper")
+  }
+  query pattern callExpr where callee.method == "getCountSql"
+  emit sink code.SqlExecution at args[0]
+}

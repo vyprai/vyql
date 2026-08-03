@@ -1,0 +1,6 @@
+module bindings.objc.generated.mccadd221;
+
+binding commandExecution16 {
+  query pattern callExpr where callee.path ~= "execl"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{XmlParse}
-
-adapter cpp {
-  package "igraph" {
-    sink method "igraph_read_graph_graphml" -> code.XmlParse
-  }
-}

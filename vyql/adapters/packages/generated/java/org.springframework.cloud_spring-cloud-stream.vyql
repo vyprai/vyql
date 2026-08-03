@@ -1,6 +1,0 @@
-import code.{NetworkSend}
-adapter java {
-  package "org.springframework.cloud:spring-cloud-stream" {
-    sink method "send" -> code.NetworkSend
-  }
-}

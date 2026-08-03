@@ -1,6 +1,0 @@
-import core.{AuthorizationCheck}
-adapter dart {
-  package "geolocator_web" {
-    control method "GeolocatorPlugin.requestPermission" -> core.AuthorizationCheck
-  }
-}

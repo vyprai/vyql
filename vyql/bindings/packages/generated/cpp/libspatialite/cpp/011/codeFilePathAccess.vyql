@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m26768a6c;
+
+binding filePathAccess11 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "load_dbf_ex3"
+  emit sink code.FilePathAccess at args[0]
+}

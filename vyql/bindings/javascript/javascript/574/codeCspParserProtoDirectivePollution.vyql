@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding cspParserProtoDirectivePollution574 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.callPath contains "policy.split.forEach" and node.context.prototypeKeyGuard == "true" and node.context.callPath contains "Object.defineProperty" and node.context.prop contains "value=directiveValue" and not (node.context.callPath contains "Map") and not (node.context.callPath contains "result.set")
+  emit issue code.CspParserProtoDirectivePollution at node
+}

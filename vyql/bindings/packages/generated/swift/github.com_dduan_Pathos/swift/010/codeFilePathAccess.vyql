@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc537eea8;
+
+binding filePathAccess10 {
+  requires {
+    dependency("github.com/dduan/Pathos")
+  }
+  query pattern callExpr where callee.method == "workingDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

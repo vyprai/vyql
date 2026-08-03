@@ -1,0 +1,9 @@
+module bindings.swift.generated.mb190fccd;
+
+binding cliArgument5 {
+  requires {
+    dependency("github.com/MakeAWishFoundation/SwiftyMocky")
+  }
+  query pattern callExpr where callee.method == "migrate"
+  emit source code.CliArgument at call.result
+}

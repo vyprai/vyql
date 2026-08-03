@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding cowAgentMemoryFilenameTraversal446 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cowagent_memory_filename_traversal"
+  emit issue code.CowAgentMemoryFilenameTraversal at node
+}

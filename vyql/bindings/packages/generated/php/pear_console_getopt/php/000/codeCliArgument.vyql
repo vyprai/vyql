@@ -1,0 +1,9 @@
+module bindings.php.generated.mdf5e1a10;
+
+binding cliArgument0 {
+  requires {
+    dependency("pear/console_getopt")
+  }
+  query pattern callExpr where callee.method == "getopt"
+  emit source code.CliArgument at call.result
+}

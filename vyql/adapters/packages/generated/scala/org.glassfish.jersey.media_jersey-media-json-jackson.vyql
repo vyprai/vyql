@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "org.glassfish.jersey.media:jersey-media-json-jackson" {
-    sink method "readFrom" -> code.Deserialization
-  }
-}

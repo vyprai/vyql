@@ -1,0 +1,9 @@
+module bindings.php.generated.md072f631;
+
+binding filePathAccess2 {
+  requires {
+    dependency("hoa/protocol")
+  }
+  query pattern callExpr where callee.method == "Wrapper.realPath"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter php {
-  package "nette/mail" {
-    sink method "Nette\Mail\Mailer::send" -> code.NetworkSend
-  }
-}

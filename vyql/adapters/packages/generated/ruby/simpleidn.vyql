@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-adapter ruby {
-  package "simpleidn" {
-    source method "decode" -> core.UserControlledData
-    source method "encode" -> core.UserControlledData
-    source method "to_ascii" -> core.UserControlledData
-    source method "to_unicode" -> core.UserControlledData
-  }
-}

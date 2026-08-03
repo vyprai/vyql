@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding gzipDeflateFixedExpansionUnderallocation112 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.callPath contains "deflateInit2" and node.context.callPath contains "deflate" and containsAny(node.context.callPath, ["malloc", "flb_malloc"]) and containsAny(node.context.assign, ["out_size=in_len+", "out_size=input_len+", "out_size=source_len+", "out_size=src_len+"]) and not (containsAny(node.context.assign, ["max_input_expansion", "compressBound", "deflateBound"])) and not (containsAny(node.context.callPath, ["compressBound", "deflateBound"]))
+  emit issue code.GzipDeflateFixedExpansionUnderallocation at node
+}

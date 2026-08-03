@@ -1,0 +1,9 @@
+module bindings.objc.generated.m7dbf77d3;
+
+binding deserialization6 {
+  requires {
+    dependency("PINCache")
+  }
+  query pattern callExpr where callee.method == "setObjectAsync:forKey:withAgeLimit:completion:"
+  emit sink code.Deserialization at args[0]
+}

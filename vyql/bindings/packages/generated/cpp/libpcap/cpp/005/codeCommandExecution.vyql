@@ -1,0 +1,9 @@
+module bindings.cpp.generated.ma70876e4;
+
+binding commandExecution5 {
+  requires {
+    dependency("libpcap")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

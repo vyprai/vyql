@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mf88fa75b;
+
+binding deserialization2 {
+  requires {
+    dependency("@webassemblyjs/leb128")
+  }
+  query pattern callExpr where callee.method == "decodeInt64"
+  emit sink code.Deserialization at args[0]
+}

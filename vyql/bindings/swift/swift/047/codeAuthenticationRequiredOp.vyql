@@ -1,0 +1,6 @@
+module bindings.swift.generated.m388f23d0;
+
+binding authenticationRequiredOp47 {
+  query pattern presenceNode where node.path ~= "grantRole"
+  emit issue code.AuthenticationRequiredOp at node
+}

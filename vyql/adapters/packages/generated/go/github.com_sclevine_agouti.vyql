@@ -1,8 +1,0 @@
-import code.{CommandExecution, UrlFetch}
-
-adapter go {
-  package "github.com/sclevine/agouti" {
-    sink method "NewPage" -> code.UrlFetch
-    sink method "JoinPage" -> code.UrlFetch
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding logOutput204 {
+  query pattern callExpr where callee.path ~= "logger.error"
+  emit sink code.LogOutput at args[0]
+}

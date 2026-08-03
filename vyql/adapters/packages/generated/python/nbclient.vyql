@@ -1,7 +1,0 @@
-import code.{CodeEval}
-adapter python {
-  package "nbclient" {
-    sink method "async_execute" -> code.CodeEval
-    sink method "async_execute_cell" -> code.CodeEval
-  }
-}

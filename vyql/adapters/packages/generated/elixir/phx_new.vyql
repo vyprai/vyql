@@ -1,9 +1,0 @@
-import code.{CommandExecution, CodeEval}
-
-adapter elixir {
-  package "phx_new" {
-    sink method "cmd" -> code.CommandExecution
-    sink method "System.cmd" -> code.CommandExecution
-    sink method "generate" -> code.CodeEval
-  }
-}

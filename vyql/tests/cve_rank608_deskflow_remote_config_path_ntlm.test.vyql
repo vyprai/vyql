@@ -45,6 +45,23 @@ test "rank608: privileged Windows daemon probes remote config path before UNC re
   };
   ```
 
+test "rank608: Windows remote config probe generalizes across names"
+  lang cpp
+  file DaemonApp.cpp
+  expect VYQL-SEC-020
+  expect_review code.WindowsRemotePathCredentialLeak
+  code
+  ```
+  class QFileInfo { public: static bool exists(const QString &path); };
+  class QSettings { public: enum Format { IniFormat }; QSettings(const QString &path, Format format); };
+  class Watchdog { public: void setProcessConfig(const std::string &command, bool elevate); };
+  void configure(const QString& path_setting, Watchdog *watchdog) {
+    if (!QFileInfo::exists(path_setting)) return;
+    QSettings parsed(path_setting, QSettings::IniFormat);
+    watchdog->setProcessConfig("daemon", true);
+  }
+  ```
+
 test "rank608: privileged Windows daemon rejects UNC config paths before probing"
   lang cpp
   file DaemonApp.cpp

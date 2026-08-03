@@ -1,0 +1,10 @@
+module bindings.java.generated.m420f6b67;
+
+binding xmlHardening274 {
+  query pattern callExpr where callee.method == "getSecuredDocumentBuilder"
+  emit check core.XmlHardening at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

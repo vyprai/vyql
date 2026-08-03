@@ -1,0 +1,9 @@
+module bindings.rust.generated.m90bf7a65;
+
+binding filePathAccess2 {
+  requires {
+    dependency("memmap")
+  }
+  query pattern callExpr where callee.method == "map_copy"
+  emit sink code.FilePathAccess at args[0]
+}

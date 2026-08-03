@@ -1,0 +1,9 @@
+module bindings.python.generated.mcdb5745e;
+
+binding filePathAccess1 {
+  requires {
+    dependency("glob2")
+  }
+  query pattern callExpr where callee.method == "iglob"
+  emit sink code.FilePathAccess at args[0]
+}

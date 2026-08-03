@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "pkgconf" {
-    sink method "pkgconf_parser_parse" -> code.Deserialization
-  }
-}

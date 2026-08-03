@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "github.com/labstack/gommon" {
-    sink method "Parse" -> code.Deserialization
-  }
-}

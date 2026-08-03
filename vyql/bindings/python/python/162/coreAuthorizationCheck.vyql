@@ -1,0 +1,10 @@
+module bindings.python.generated.m21017d75;
+
+binding authorizationCheck162 {
+  query pattern callExpr where callee.path ~= "user_passes_test"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

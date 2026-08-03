@@ -1,7 +1,0 @@
-import code.{HttpInput}
-
-adapter php {
-  package "sonata-project/admin-bundle" {
-    source method "Sonata\AdminBundle\BCLayer\BCHelper::getFromRequest" -> code.HttpInput
-  }
-}

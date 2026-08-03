@@ -1,0 +1,8 @@
+module code;
+
+review code.PublicUserListRouteMissingAuthentication {
+  category: auth
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  kind: target
+  text: "verify all-users listing routes are registered on authenticated route groups or protected by equivalent auth middleware"
+}

@@ -1,0 +1,9 @@
+module bindings.java.generated.mc025dab7;
+
+binding deserialization2 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "rowToJSONObject"
+  emit sink code.Deserialization at args[0]
+}

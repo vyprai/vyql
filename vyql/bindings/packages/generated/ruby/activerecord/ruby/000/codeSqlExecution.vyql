@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mbbb56a8d;
+
+binding sqlExecution0 {
+  requires {
+    dependency("activerecord")
+  }
+  query pattern callExpr where callee.method == "sql"
+  emit sink code.SqlExecution at args[0]
+}

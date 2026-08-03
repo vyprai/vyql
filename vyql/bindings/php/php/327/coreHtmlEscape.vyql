@@ -1,0 +1,10 @@
+module bindings.php.generated.mfbe84119;
+
+binding htmlEscape327 {
+  query pattern callExpr where callee.method == "purify"
+  emit check core.HtmlEscape at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

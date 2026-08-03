@@ -1,0 +1,9 @@
+module bindings.php.generated.m422ff57e;
+
+binding networkSend1 {
+  requires {
+    dependency("algolia/algoliasearch-client-php")
+  }
+  query pattern callExpr where callee.method == "customDelete"
+  emit sink code.NetworkSend at args[0]
+}

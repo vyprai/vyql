@@ -1,6 +1,0 @@
-adapter scala {
-  package "org.apache.tomcat:tomcat-jdbc" {
-    sink method "create" -> code.SqlExecution
-    control method "prepare" -> core.SqlParameterization
-  }
-}

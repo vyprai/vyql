@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "org.apache.felix:org.apache.felix.framework" {
-    sink method "createFilter" -> code.Deserialization
-  }
-}

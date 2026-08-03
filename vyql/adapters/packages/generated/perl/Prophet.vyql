@@ -1,6 +1,0 @@
-adapter perl {
-  package "Prophet" {
-    sink method "create" -> code.SqlExecution
-    control method "_prepare_record_index_update" -> core.SqlParameterization
-  }
-}

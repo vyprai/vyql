@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-
-adapter groovy {
-  package "org.mybatis:mybatis" {
-    sink method "query" -> code.SqlExecution
-    sink method "parse" -> code.SqlExecution
-  }
-}

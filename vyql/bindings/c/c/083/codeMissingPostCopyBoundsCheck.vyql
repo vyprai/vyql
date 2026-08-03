@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding missingPostCopyBoundsCheck83 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "post_copy.missing_bounds"
+  emit issue code.MissingPostCopyBoundsCheck at node
+}

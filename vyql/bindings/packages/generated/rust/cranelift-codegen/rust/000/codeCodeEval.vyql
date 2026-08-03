@@ -1,0 +1,9 @@
+module bindings.rust.generated.m4649b496;
+
+binding codeEval0 {
+  requires {
+    dependency("cranelift-codegen")
+  }
+  query pattern callExpr where callee.method == "Context.compile"
+  emit sink code.CodeEval at args[0]
+}

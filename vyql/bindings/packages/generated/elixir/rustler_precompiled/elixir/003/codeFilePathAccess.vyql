@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mbfe07de5;
+
+binding filePathAccess3 {
+  requires {
+    dependency("rustler_precompiled")
+  }
+  query pattern callExpr where callee.method == "download_or_reuse_nif_file"
+  emit sink code.FilePathAccess at args[0]
+}

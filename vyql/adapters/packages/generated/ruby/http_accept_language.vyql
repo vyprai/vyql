@@ -1,7 +1,0 @@
-import code.{HttpInput}
-
-adapter ruby {
-  package "http_accept_language" {
-    source method "HttpAcceptLanguage::Parser.initialize" -> code.HttpInput
-  }
-}

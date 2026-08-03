@@ -1,0 +1,9 @@
+module bindings.objc.generated.m2112dc0e;
+
+binding filePathAccess0 {
+  requires {
+    dependency("GoogleMaps")
+  }
+  query pattern callExpr where callee.method == "styleWithContentsOfFileURL:error:"
+  emit sink code.FilePathAccess at args[0]
+}

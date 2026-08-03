@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding nestedPathInheritedPropertyPrototypePollution584 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.dynamicPropertyWrite == "true" and node.context.dynamicPropertyWriteObjectLiteral == "true" and not (node.context.prototypeKeyGuard == "true") and not (node.context.ownPropertyKeyGuard == "true")
+  emit issue code.NestedPathInheritedPropertyPrototypePollution at node
+}

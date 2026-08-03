@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter php {
-  package "league/event" {
-    sink method "OneTimeListener.call_user_func" -> code.CodeEval
-  }
-}

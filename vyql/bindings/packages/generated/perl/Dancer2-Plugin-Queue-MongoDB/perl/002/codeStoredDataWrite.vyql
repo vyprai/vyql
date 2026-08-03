@@ -1,0 +1,9 @@
+module bindings.perl.generated.ma6b12da1;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("Dancer2-Plugin-Queue-MongoDB")
+  }
+  query pattern callExpr where callee.method == "remove_msg"
+  emit sink code.StoredDataWrite at args[0]
+}

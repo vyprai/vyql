@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-
-adapter java {
-  package "commons-dbutils:commons-dbutils" {
-    sink method "query" -> code.SqlExecution
-    sink method "update" -> code.SqlExecution
-  }
-}

@@ -1,0 +1,7 @@
+module bindings.cpp.generated.m4e783366;
+
+binding indexAccess60 {
+  query pattern presenceNode where node.path ~= "__subscript"
+  emit issue code.IndexAccess at node
+  emit sink code.IndexAccessSink at node
+}

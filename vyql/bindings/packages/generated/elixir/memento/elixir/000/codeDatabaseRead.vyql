@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m82bf2c3c;
+
+binding databaseRead0 {
+  requires {
+    dependency("memento")
+  }
+  query pattern callExpr where callee.method == "Memento.Query.read"
+  emit sink code.DatabaseReadSink at args[0]
+}

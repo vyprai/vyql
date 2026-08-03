@@ -1,0 +1,6 @@
+module bindings.swift.generated.m388f23d0;
+
+binding objectLookupByUserInput38 {
+  query pattern callExpr where callee.method == "findById"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}

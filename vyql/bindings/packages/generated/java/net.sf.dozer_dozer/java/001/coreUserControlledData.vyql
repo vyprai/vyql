@@ -1,0 +1,9 @@
+module bindings.java.generated.mf29647fd;
+
+binding userControlledData1 {
+  requires {
+    dependency("net.sf.dozer:dozer")
+  }
+  query pattern callExpr where callee.method == "map"
+  emit source core.UserControlledData at call.result
+}

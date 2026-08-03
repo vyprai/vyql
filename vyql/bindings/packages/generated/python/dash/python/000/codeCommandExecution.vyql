@@ -1,0 +1,9 @@
+module bindings.python.generated.mcf1b0efa;
+
+binding commandExecution0 {
+  requires {
+    dependency("dash")
+  }
+  query pattern callExpr where callee.method == "run_command_with_process"
+  emit sink code.CommandExecution at args[0]
+}

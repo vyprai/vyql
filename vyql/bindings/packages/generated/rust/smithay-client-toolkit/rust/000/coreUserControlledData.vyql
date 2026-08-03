@@ -1,0 +1,9 @@
+module bindings.rust.generated.m9132d312;
+
+binding userControlledData0 {
+  requires {
+    dependency("smithay-client-toolkit")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}

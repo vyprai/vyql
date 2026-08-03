@@ -1,0 +1,8 @@
+module bindings.go.generated.m48a985c1;
+
+binding dB3 {
+  query pattern callExpr where callee.path ~= "sqlx.Connect"
+  emit fact runtime.ReceiverType at call.result {
+    about: sqlx.DB
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m515659be;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Mixpanel")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

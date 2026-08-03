@@ -1,9 +1,0 @@
-import core.{InputValidation}
-
-adapter go {
-  package "github.com/coreos/go-systemd/v22" {
-    control method "PathBusEscape" -> core.InputValidation
-    control method "UnitNameEscape" -> core.InputValidation
-    control method "UnitNamePathEscape" -> core.InputValidation
-  }
-}

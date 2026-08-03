@@ -1,8 +1,0 @@
-import code.{NetworkConnect, NetworkSend}
-
-adapter scala {
-  package "com.qiniu:qiniu-java-sdk" {
-    sink method "send" -> code.NetworkConnect
-    sink method "send" -> code.NetworkSend
-  }
-}

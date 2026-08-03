@@ -1,0 +1,8 @@
+module code;
+
+review code.CiviCrmScientificNotationNumericValidationBypass {
+  category: sql
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review CiviCRM numeric validators for exponent-form values before SQL integer parameters are accepted"
+}

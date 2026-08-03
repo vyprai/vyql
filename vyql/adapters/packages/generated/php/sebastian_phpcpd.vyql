@@ -1,5 +1,0 @@
-adapter php {
-  package "sebastian/phpcpd" {
-    source method "key" -> code.SecretValue
-  }
-}

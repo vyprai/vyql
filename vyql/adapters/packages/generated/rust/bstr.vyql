@@ -1,5 +1,0 @@
-adapter rust {
-  package "bstr" {
-    control method "escape" -> core.HtmlEscape
-  }
-}

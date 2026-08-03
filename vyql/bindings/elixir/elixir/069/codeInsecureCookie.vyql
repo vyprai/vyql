@@ -1,0 +1,6 @@
+module bindings.elixir.generated.m728b8a72;
+
+binding insecureCookie69 {
+  query pattern callExpr where callee.path ~= "put_resp_cookie" and args.any.literal contains "false"
+  emit issue code.InsecureCookie at call
+}

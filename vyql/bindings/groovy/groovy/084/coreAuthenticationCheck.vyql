@@ -1,0 +1,10 @@
+module bindings.groovy.generated.m6eabb149;
+
+binding authenticationCheck84 {
+  query pattern callExpr where callee.method == "ensureAuthenticated"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

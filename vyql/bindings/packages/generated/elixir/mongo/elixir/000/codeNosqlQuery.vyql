@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m5fe18a15;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("mongo")
+  }
+  query pattern callExpr where callee.method == "Mongo.Db.cmd_sync"
+  emit sink code.NosqlQuery at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.go.generated.m447b4385;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/pkg/diff")
+  }
+  query pattern callExpr where callee.method == "Text"
+  emit sink code.FilePathAccess at args[0]
+}

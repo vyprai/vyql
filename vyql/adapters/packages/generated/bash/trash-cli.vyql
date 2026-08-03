@@ -1,5 +1,0 @@
-adapter bash {
-  package "trash-cli" {
-    sink path "trash-cli" -> code.CommandExecution
-  }
-}

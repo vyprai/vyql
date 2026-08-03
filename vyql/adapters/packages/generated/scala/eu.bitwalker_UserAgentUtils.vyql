@@ -1,7 +1,0 @@
-adapter scala {
-  package "eu.bitwalker:UserAgentUtils" {
-    sink method "parseUserAgentString" -> code.Deserialization
-    sink method "parseUserAgentLowercaseString" -> code.Deserialization
-    sink method "parseReferrerString" -> code.Deserialization
-  }
-}

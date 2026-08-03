@@ -1,0 +1,9 @@
+module bindings.dart.generated.m0b519c66;
+
+binding userControlledData1 {
+  requires {
+    dependency("sensors_plus_web")
+  }
+  query pattern callExpr where callee.method == "gyroscopeEvents"
+  emit source core.UserControlledData at call.result
+}

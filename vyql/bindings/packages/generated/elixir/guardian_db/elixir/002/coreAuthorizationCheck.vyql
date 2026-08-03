@@ -1,0 +1,13 @@
+module bindings.elixir.generated.med6b4913;
+
+binding authorizationCheck2 {
+  requires {
+    dependency("guardian_db")
+  }
+  query pattern callExpr where callee.method == "revoke_all"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.lua.generated.m49b0a04f;
+
+binding commandExecution11 {
+  requires {
+    dependency("lua")
+  }
+  query pattern callExpr where callee.path ~= "os.execute"
+  emit sink code.CommandExecution at args[0]
+}

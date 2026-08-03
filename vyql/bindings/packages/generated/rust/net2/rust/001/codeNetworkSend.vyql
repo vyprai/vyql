@@ -1,0 +1,9 @@
+module bindings.rust.generated.m7991fff7;
+
+binding networkSend1 {
+  requires {
+    dependency("net2")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m2e86df4e;
+
+binding deserialization1 {
+  requires {
+    dependency("fast-cpp-csv-parser")
+  }
+  query pattern callExpr where callee.method == "SynchronousReader::finish_read"
+  emit sink code.Deserialization at args[0]
+}

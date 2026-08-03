@@ -1,9 +1,0 @@
-import code.{Deserialization, ExpressionEval}
-
-adapter groovy {
-  package "org.apache.tomcat:tomcat-jasper-el" {
-    sink method "createValueExpression" -> code.ExpressionEval
-    sink method "invoke" -> code.ExpressionEval
-    sink method "parse" -> code.Deserialization
-  }
-}

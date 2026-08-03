@@ -1,0 +1,10 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding authenticationCheck68 {
+  query pattern callExpr where callee.path ~= "authenticate_user!"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

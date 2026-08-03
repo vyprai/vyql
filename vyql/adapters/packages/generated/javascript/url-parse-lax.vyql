@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "url-parse-lax" {
-    sink method "urlParseLax" -> code.Deserialization
-  }
-}

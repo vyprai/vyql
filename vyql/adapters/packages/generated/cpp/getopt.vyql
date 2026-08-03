@@ -1,7 +1,0 @@
-import code.{CliArgument}
-adapter cpp {
-  package "getopt" {
-    source method "getopt" -> code.CliArgument
-    source method "getopt_long" -> code.CliArgument
-  }
-}

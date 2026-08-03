@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding certValidationDisabled54 {
+  query pattern callExpr where callee.path ~= "setPeerVerifyMode" and args.any.literal contains "VerifyNone"
+  emit issue code.CertValidationDisabled at call
+}

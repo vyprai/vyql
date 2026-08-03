@@ -1,7 +1,0 @@
-adapter objc {
-  package "gRPC-RxLibrary" {
-    source method "grpc_byte_buffer_reader_next" -> code.NetworkData
-    sink method "grpc_tls_credentials_options_set_send_client_ca_list" -> code.NetworkSend
-    sink method "Create" -> code.NetworkConnect
-  }
-}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter dart {
-  package "sqlparser" {
-    sink method "tokenize" -> code.Deserialization
-    sink method "tokenizeString" -> code.Deserialization
-  }
-}

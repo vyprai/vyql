@@ -1,0 +1,9 @@
+module bindings.scala.generated.m2dab7975;
+
+binding networkConnect2 {
+  requires {
+    dependency("org.springframework:spring-websocket")
+  }
+  query pattern callExpr where callee.method == "SessionConnectEvent"
+  emit sink code.NetworkConnectSink at args[0]
+}

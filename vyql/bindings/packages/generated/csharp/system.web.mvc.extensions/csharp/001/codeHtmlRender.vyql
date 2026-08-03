@@ -1,0 +1,9 @@
+module bindings.csharp.generated.ma92c6776;
+
+binding htmlRender1 {
+  requires {
+    dependency("system.web.mvc.extensions")
+  }
+  query pattern callExpr where callee.method == "ScriptInclude"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{CommandExecution, Deserialization}
-adapter rust {
-  package "cargo_metadata" {
-    sink method "exec" -> code.CommandExecution
-  }
-}

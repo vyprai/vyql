@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule UnvalidatedRatingRange {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_20]
+    id: "VYQL-VAL-002"
+    severity: medium
+  }
+  issue code.UnvalidatedRatingRange as rating
+}

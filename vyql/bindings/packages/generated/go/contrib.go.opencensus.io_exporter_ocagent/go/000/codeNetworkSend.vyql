@@ -1,0 +1,9 @@
+module bindings.go.generated.m364c6374;
+
+binding networkSend0 {
+  requires {
+    dependency("contrib.go.opencensus.io/exporter/ocagent")
+  }
+  query pattern callExpr where callee.method == "WithHeaders"
+  emit sink code.NetworkSend at args[0]
+}

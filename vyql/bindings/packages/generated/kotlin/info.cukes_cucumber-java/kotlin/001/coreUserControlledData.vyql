@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mb74d1b54;
+
+binding userControlledData1 {
+  requires {
+    dependency("info.cukes:cucumber-java")
+  }
+  query pattern callExpr where callee.method == "addBeforeHookDefinition"
+  emit source core.UserControlledData at call.result
+}

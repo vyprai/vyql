@@ -1,0 +1,14 @@
+module bindings.swift.generated.m0a87d484;
+
+binding inputValidation2 {
+  requires {
+    dependency("github.com/airsidemobile/JOSESwift")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

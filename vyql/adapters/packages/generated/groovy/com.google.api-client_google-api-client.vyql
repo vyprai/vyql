@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "com.google.api-client:google-api-client" {
-    sink method "GoogleJsonError.parse" -> code.Deserialization
-  }
-}

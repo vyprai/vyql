@@ -1,0 +1,9 @@
+module bindings.go.generated.ma1dcd30c;
+
+binding sqlExecution2 {
+  requires {
+    dependency("github.com/StackExchange/wmi")
+  }
+  query pattern callExpr where callee.method == "CreateQuery"
+  emit sink code.SqlExecution at args[0]
+}

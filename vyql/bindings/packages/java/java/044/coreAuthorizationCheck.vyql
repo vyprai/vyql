@@ -1,0 +1,13 @@
+module bindings.java.generated.m9ef49b0f;
+
+binding authorizationCheck44 {
+  requires {
+    dependency("spring-security")
+  }
+  query pattern callExpr where callee.path ~= "PreAuthorize"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

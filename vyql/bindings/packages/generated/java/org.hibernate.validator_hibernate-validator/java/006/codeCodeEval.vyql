@@ -1,0 +1,9 @@
+module bindings.java.generated.m2ab2b350;
+
+binding codeEval6 {
+  requires {
+    dependency("org.hibernate.validator:hibernate-validator")
+  }
+  query pattern callExpr where callee.method == "scriptEvaluatorFactory"
+  emit sink code.CodeEval at args[0]
+}

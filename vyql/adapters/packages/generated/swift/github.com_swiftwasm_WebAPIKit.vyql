@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter swift {
-  package "github.com/swiftwasm/WebAPIKit" {
-    control method "CSSOM.escape" -> core.HtmlEscape
-  }
-}

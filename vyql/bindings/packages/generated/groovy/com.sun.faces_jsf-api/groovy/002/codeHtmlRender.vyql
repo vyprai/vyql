@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mb7697fce;
+
+binding htmlRender2 {
+  requires {
+    dependency("com.sun.faces:jsf-api")
+  }
+  query pattern callExpr where callee.method == "writeAttribute"
+  emit sink code.HtmlRender at args[0]
+}

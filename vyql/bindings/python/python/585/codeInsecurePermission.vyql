@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding insecurePermission585 {
+  query pattern callExpr where callee.path ~= "os.open" and args.any.literal contains "0o666"
+  emit issue code.InsecurePermission at call
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m4eae030a;
+
+binding networkData1 {
+  requires {
+    dependency("CocoaAsyncSocket")
+  }
+  query pattern callExpr where callee.method == "readDataToLength"
+  emit source code.NetworkData at call.result
+}

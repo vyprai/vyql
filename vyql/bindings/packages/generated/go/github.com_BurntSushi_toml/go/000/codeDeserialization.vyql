@@ -1,0 +1,9 @@
+module bindings.go.generated.meac3b55f;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/BurntSushi/toml")
+  }
+  query pattern callExpr where callee.method == "Decode"
+  emit sink code.Deserialization at args[0]
+}

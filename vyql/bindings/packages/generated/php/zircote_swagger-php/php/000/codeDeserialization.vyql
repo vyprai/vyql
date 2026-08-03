@@ -1,0 +1,9 @@
+module bindings.php.generated.m09900338;
+
+binding deserialization0 {
+  requires {
+    dependency("zircote/swagger-php")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

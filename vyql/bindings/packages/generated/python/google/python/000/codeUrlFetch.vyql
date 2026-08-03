@@ -1,0 +1,9 @@
+module bindings.python.generated.m7d62eecb;
+
+binding urlFetch0 {
+  requires {
+    dependency("google")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.UrlFetch at args[0]
+}

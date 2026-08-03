@@ -2,9 +2,9 @@ package frontend
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/datadir"
@@ -44,9 +44,9 @@ type topPackage struct {
 
 func TestTop1000PackageCoverageSnapshot(t *testing.T) {
 	var sources topPackageSources
-	mustReadJSON(t, "adapters/packages/top1000.sources.json", &sources)
+	mustReadJSON(t, "bindings/packages/top1000.sources.json", &sources)
 	var snapshot topPackageSnapshot
-	mustReadJSON(t, "adapters/packages/top1000.snapshot.json", &snapshot)
+	mustReadJSON(t, "bindings/packages/top1000.snapshot.json", &snapshot)
 
 	if sources.Schema != 1 || snapshot.Schema != 1 {
 		t.Fatalf("unexpected schema: sources=%d snapshot=%d", sources.Schema, snapshot.Schema)
@@ -102,6 +102,22 @@ func TestTop1000PackageCoverageSnapshot(t *testing.T) {
 	}
 }
 
+func TestGeneratedPackageBindingSourceRejectsLegacySyntax(t *testing.T) {
+	source := datadir.Source{
+		Name: "bindings/packages/generated/javascript/legacy.vyql",
+		Data: []byte(`adapter javascript { source "req.body" -> code.HttpInput }`),
+	}
+
+	_, err := parseGeneratedPackageBindingSource(source)
+	if err == nil {
+		t.Fatal("generated package binding accepted legacy syntax")
+	}
+	if !strings.Contains(err.Error(), "invalid generated package binding bindings/packages/generated/javascript/legacy.vyql") {
+		t.Fatalf("generated binding error = %v, want generated file context", err)
+	}
+
+}
+
 func mustReadJSON(t *testing.T, rel string, dst any) {
 	t.Helper()
 	b, err := datadir.Read(rel)
@@ -115,24 +131,31 @@ func mustReadJSON(t *testing.T, rel string, dst any) {
 
 func supportedPackageCatalogLanguages(t *testing.T) []string {
 	t.Helper()
-	root := filepath.Join(datadir.Root(), "adapters", "packages")
+	root := filepath.Join(datadir.Root(), "bindings", "packages")
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		t.Fatalf("read package catalog dir: %v", err)
 	}
 	var out []string
 	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".vyql" {
+		var lang string
+		if entry.IsDir() {
+			if entry.Name() == "generated" {
+				continue
+			}
+			lang = entry.Name()
+		} else if filepath.Ext(entry.Name()) == ".vyql" {
+			lang = entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
+		} else {
 			continue
 		}
-		lang := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
 		out = append(out, lang)
 	}
 	if len(out) != 22 {
 		t.Fatalf("supported package catalogs = %d (%v), want 22", len(out), out)
 	}
 	for _, lang := range out {
-		if _, err := os.Stat(filepath.Join(root, fmt.Sprintf("%s.vyql", lang))); err != nil {
+		if _, err := datadir.ReadVYQLDir(filepath.ToSlash(filepath.Join("bindings", "packages", lang))); err != nil {
 			t.Fatalf("missing catalog for %s: %v", lang, err)
 		}
 	}

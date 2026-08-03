@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding protocolStateReview501 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "starttls_transport_buffer_handoff"
+  emit issue code.ProtocolStateReview at node
+}

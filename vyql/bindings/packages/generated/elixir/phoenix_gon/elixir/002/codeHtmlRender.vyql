@@ -1,0 +1,9 @@
+module bindings.elixir.generated.ma10737f9;
+
+binding htmlRender2 {
+  requires {
+    dependency("phoenix_gon")
+  }
+  query pattern callExpr where callee.method == "PhoenixGon.View.render_gon_script"
+  emit sink code.HtmlRender at args[0]
+}

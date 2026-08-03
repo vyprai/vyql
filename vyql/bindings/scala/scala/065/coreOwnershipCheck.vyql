@@ -1,0 +1,10 @@
+module bindings.scala.generated.m06d0685b;
+
+binding ownershipCheck65 {
+  query pattern callExpr where callee.method == "isOwner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.java.generated.m0f1fd39c;
+
+binding httpInput3 {
+  requires {
+    dependency("io.quarkus:quarkus-resteasy")
+  }
+  query pattern callExpr where callee.method == "extractRequestHeaders"
+  emit source code.HttpInput at call.result
+}

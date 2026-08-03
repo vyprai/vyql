@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter kotlin {
-  package "org.jfree:jfreechart" {
-    sink method "readObject" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.ma160c909;
+
+binding deserialization1 {
+  requires {
+    dependency("org.antlr:antlr4-runtime")
+  }
+  query pattern callExpr where callee.method == "matchWildcard"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.made672ab;
+
+binding sqlExecution6 {
+  requires {
+    dependency("dm-do-adapter")
+  }
+  query pattern callExpr where callee.method == "insert_statement"
+  emit sink code.SqlExecution at args[0]
+}

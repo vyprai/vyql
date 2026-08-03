@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m1c1357ee;
+
+binding nosqlQuery13 {
+  requires {
+    dependency("mongocxx")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}

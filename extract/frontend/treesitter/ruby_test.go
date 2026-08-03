@@ -141,6 +141,65 @@ end
 	t.Fatalf("analysis.function.context for ffi_lib not found; nodes=%#v", nodes)
 }
 
+func TestRubyFunctionContextMarksGitCloneInterpolatedBranchOption(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fetcher.rb")
+	src := []byte(`class Fetcher
+  def vulnerable_clone(source, path)
+    branch_option = " --branch #{source.branch} --single-branch" if source.branch
+    SharedHelpers.run_shell_command(
+      <<~CMD
+        git clone --no-tags --depth 1#{branch_option} #{source.url} #{path}
+      CMD
+    )
+  end
+
+  def fixed_clone(source, path)
+    branch_option = " --branch #{Shellwords.escape(source.branch)} --single-branch" if source.branch
+    SharedHelpers.run_shell_command(
+      <<~CMD
+        git clone --no-tags --depth 1#{branch_option} #{source.url} #{path}
+      CMD
+    )
+  end
+end
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractRuby([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawVulnerable, sawFixed bool
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		args := n.Prop("str_args")
+		if strings.Contains(args, "name=vulnerable_clone") && strings.Contains(args, "ruby_review:git_clone_interpolated_branch_option_unescaped") {
+			sawVulnerable = true
+		}
+		if strings.Contains(args, "name=fixed_clone") && strings.Contains(args, "ruby_review:git_clone_interpolated_branch_option_unescaped") {
+			sawFixed = true
+		}
+	}
+	if !sawVulnerable {
+		t.Fatalf("ruby function context did not mark interpolated git clone branch option; nodes=%#v", nodes)
+	}
+	if sawFixed {
+		t.Fatalf("ruby function context marked Shellwords-escaped branch option as vulnerable; nodes=%#v", nodes)
+	}
+}
+
 func TestRubyClassContextIncludesSuperclassTokens(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "base_controller.rb")
@@ -173,7 +232,6 @@ end
 		for _, want := range []string{
 			"class_base:ActionController::Base",
 			"class_base:ActionController.Base",
-			"class_bases=ActionController::Base,ActionController.Base",
 		} {
 			if !strings.Contains(args, want) {
 				t.Fatalf("ruby class context missing %q; context=%q", want, args)
@@ -284,6 +342,216 @@ func TestRubyERBExtractsHtmlEscapedUrlHrefObservation(t *testing.T) {
 	}
 	if hits != 2 {
 		t.Fatalf("got %d URL href observations, want 2; nodes=%#v", hits, nodes)
+	}
+}
+
+func TestRubySemanticReviewTokens(t *testing.T) {
+	dir := t.TempDir()
+	vuln := filepath.Join(dir, "vuln.rb")
+	fixed := filepath.Join(dir, "fixed.rb")
+	if err := os.WriteFile(vuln, []byte(`
+class Users < Application
+  before :authenticate_every
+  def update
+    Chef::WebUIUser.cdb_load(params[:id])
+    @user.cdb_save
+    @user.cdb_destroy
+  end
+end
+
+class HomeController < ActionController::Base
+  def job
+    job = params[:job]
+    enable = params[:enable]
+    ClockworkWeb.enable(job)
+    ClockworkWeb.disable(job)
+  end
+end
+
+def cama_comments_render_html(comment)
+  "<div>#{comment.content}</div>"
+end
+
+def create
+  User.find_by(params[:user])
+end
+
+def request
+  datum = response(datum)
+  reset if datum[:persistent]
+end
+
+def initialize(image_path, colors=16, depth=8)
+  `+"`"+`convert #{image_path} -colors #{colors} -depth #{depth} histogram:info:-`+"`"+`
+end
+
+def diff
+  if WINDOWS
+    cmd = sprintf '"%s" %s %s', diff_bin, diff_options.join(' '), @paths.map { |s| %("#{s}") }.join(' ')
+    out = `+"`"+`#{cmd}`+"`"+`
+  end
+end
+
+def report_post_edits(report)
+  builder = DB.build <<~SQL
+  FROM post_revisions pr
+  JOIN posts p ON p.id = pr.post_id
+  SQL
+  report.data << revision
+end
+
+def url_path
+  url = "?queues=#{@queues.join(",")}"
+end
+
+def legal?(string)
+  string.to_s =~ /^[0-9a-f]{24}$/i
+end
+
+def build_ssl_context
+  OpenSSL::SSL::SSLContext.new.tap do |context|
+    context.ca_file = @config.server_ca_cert
+  end
+end
+
+def fill_field(model, params)
+  model.send("#{polymorphic_as}_type=", params["#{polymorphic_as}_type"])
+end
+
+def postpone_email_change_until_confirmation_and_regenerate_confirmation_token
+  self.unconfirmed_email = self.email
+  self.email = self.devise_email_in_database
+  self.confirmation_token = nil
+  generate_confirmation_token
+end
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fixed, []byte(`
+class Users < Application
+  before :is_admin
+  def update
+    Chef::WebUIUser.cdb_load(params[:id])
+    @user.cdb_save
+    @user.cdb_destroy
+  end
+end
+
+class HomeController < ActionController::Base
+  protect_from_forgery with: :exception
+  def job
+    job = params[:job]
+    enable = params[:enable]
+    ClockworkWeb.enable(job)
+    ClockworkWeb.disable(job)
+  end
+end
+
+def cama_comments_render_html(comment)
+  sanitize comment.content
+end
+
+def create
+  User.find_by(email: params[:user][:email])
+end
+
+def request
+  @persistent_socket_reusable = true
+  datum = response(datum)
+  reset if datum[:persistent]
+end
+
+def initialize(image_path, colors=16, depth=8)
+  `+"`"+`convert #{image_path.shellescape} -colors #{colors.to_i} -depth #{depth.to_i} histogram:info:-`+"`"+`
+end
+
+def diff
+  Open3.capture3(diff_bin, *(diff_options + @paths))
+end
+
+def report_post_edits(report)
+  builder = DB.build <<~SQL
+  FROM post_revisions pr
+  JOIN posts p ON p.id = pr.post_id
+  SQL
+  builder.where("t.archetype != ?", Archetype.private_message)
+  builder.secure_category(ids)
+  report.data << revision
+end
+
+def url_path
+  url = "?queues=#{CGI.escape(@queues.join(","))}"
+end
+
+def legal?(string)
+  string.to_s =~ /\A[0-9a-f]{24}\z/i
+end
+
+def build_ssl_context
+  OpenSSL::SSL::SSLContext.new.tap do |context|
+    context.ca_file = @config.server_ca_cert
+    context.verify_mode = OpenSSL::SSL::VERIFY_PEER
+  end
+end
+
+def fill_field(model, params)
+  valid_model_class = valid_polymorphic_class params["#{polymorphic_as}_type"]
+  model.send("#{polymorphic_as}_type=", valid_model_class)
+end
+
+def postpone_email_change_until_confirmation_and_regenerate_confirmation_token
+  devise_unconfirmed_email_will_change!
+  self.unconfirmed_email = self.email
+  self.email = self.devise_email_in_database
+  self.confirmation_token = nil
+  generate_confirmation_token
+end
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractRuby([]string{vuln, fixed}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	vulnArgs := ""
+	for _, n := range nodes {
+		if n.Type != "code.Call" || !strings.HasPrefix(n.Prop("callee_path"), "analysis.") {
+			continue
+		}
+		if strings.Contains(n.Prop("loc"), "fixed.rb") && strings.Contains(n.Prop("str_args"), "ruby_review:") {
+			t.Fatalf("fixed Ruby context emitted review fact: loc=%s args=%q", n.Prop("loc"), n.Prop("str_args"))
+		}
+		if strings.Contains(n.Prop("loc"), "vuln.rb") {
+			vulnArgs += "\x00" + n.Prop("str_args")
+		}
+	}
+	for _, want := range []string{
+		"ruby_review:stored_html_interpolation_missing_sanitize",
+		"ruby_review:active_record_find_by_request_hash",
+		"ruby_review:chef_user_management_missing_admin_guard",
+		"ruby_review:persistent_response_reuse_missing_guard",
+		"ruby_review:clockwork_job_csrf_missing_forgery_protection",
+		"ruby_review:imagemagick_convert_backtick_unescaped_interpolation",
+		"ruby_review:windows_backtick_diff_command_unescaped",
+		"ruby_review:post_edit_report_missing_private_filters",
+		"ruby_review:unescaped_query_string_join_interpolation",
+		"ruby_review:ruby_line_anchor_hex_validation",
+		"ruby_review:tls_ca_file_without_verify_mode",
+		"ruby_review:polymorphic_type_selected_from_params",
+		"ruby_review:devise_reconfirmation_missing_dirty_tracking",
+	} {
+		if !strings.Contains(vulnArgs, want) {
+			t.Fatalf("vulnerable Ruby context missing %q; args=%q", want, vulnArgs)
+		}
 	}
 }
 

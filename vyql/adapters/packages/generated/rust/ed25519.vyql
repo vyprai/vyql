@@ -1,6 +1,0 @@
-import code.{SecretValue}
-adapter rust {
-  package "ed25519" {
-    source method "to_pkcs8_der" -> code.SecretValue
-  }
-}

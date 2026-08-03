@@ -1,0 +1,14 @@
+module bindings.ruby.generated.maec902d9;
+
+binding htmlEscape4 {
+  requires {
+    dependency("rabl")
+  }
+  query pattern callExpr where callee.method == "escape_output"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

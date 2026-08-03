@@ -1,6 +1,0 @@
-adapter go {
-  package "github.com/kardianos/osext" {
-    sink method "Executable" -> code.FilePathAccess
-    sink method "ExecutableFolder" -> code.FilePathAccess
-  }
-}

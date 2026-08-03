@@ -1,0 +1,9 @@
+module bindings.rust.generated.m46f2b65f;
+
+binding userControlledData1 {
+  requires {
+    dependency("ciborium-ll")
+  }
+  query pattern callExpr where callee.method == "bytes"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.mf2c061b0;
+
+binding databaseRead0 {
+  requires {
+    dependency("couchbase-lite-ios")
+  }
+  query pattern callExpr where callee.method == "run:"
+  emit sink code.DatabaseReadSink at args[0]
+}

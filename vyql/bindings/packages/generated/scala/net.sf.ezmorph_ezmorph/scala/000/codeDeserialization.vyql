@@ -1,0 +1,9 @@
+module bindings.scala.generated.m406c2a2d;
+
+binding deserialization0 {
+  requires {
+    dependency("net.sf.ezmorph:ezmorph")
+  }
+  query pattern callExpr where callee.method == "morph"
+  emit sink code.Deserialization at args[0]
+}

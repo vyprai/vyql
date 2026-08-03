@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter go {
-  package "github.com/PuerkitoBio/purell" {
-    control method "NormalizeURLString" -> core.InputValidation
-  }
-}

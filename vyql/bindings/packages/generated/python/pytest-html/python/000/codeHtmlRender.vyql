@@ -1,0 +1,9 @@
+module bindings.python.generated.mf47d1f87;
+
+binding htmlRender0 {
+  requires {
+    dependency("pytest-html")
+  }
+  query pattern callExpr where callee.method == "html"
+  emit sink code.HtmlRender at args[0]
+}

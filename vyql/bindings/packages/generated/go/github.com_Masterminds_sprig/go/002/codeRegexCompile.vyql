@@ -1,0 +1,10 @@
+module bindings.go.generated.m571f7b1a;
+
+binding regexCompile2 {
+  requires {
+    dependency("github.com/Masterminds/sprig")
+  }
+  query pattern callExpr where callee.method == "regexMatch"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

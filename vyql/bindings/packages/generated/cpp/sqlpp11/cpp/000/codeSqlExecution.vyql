@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mb204f76f;
+
+binding sqlExecution0 {
+  requires {
+    dependency("sqlpp11")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.SqlExecution at args[0]
+}

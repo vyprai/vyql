@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mbc9343ef;
+
+binding deserialization0 {
+  requires {
+    dependency("membrane_raw_video_format")
+  }
+  query pattern callExpr where callee.method == "payload_to_image"
+  emit sink code.Deserialization at args[0]
+}

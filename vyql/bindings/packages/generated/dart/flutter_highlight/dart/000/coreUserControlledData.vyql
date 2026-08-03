@@ -1,0 +1,9 @@
+module bindings.dart.generated.md273b760;
+
+binding userControlledData0 {
+  requires {
+    dependency("flutter_highlight")
+  }
+  query pattern callExpr where callee.method == "HighlightView"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.medc51638;
+
+binding commandExecution2 {
+  requires {
+    dependency("sched_ex")
+  }
+  query pattern callExpr where callee.method == "run_in"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m20f5be65;
+
+binding userControlledData17 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "ForwardedFrom"
+  emit source core.UserControlledData at call.result
+}

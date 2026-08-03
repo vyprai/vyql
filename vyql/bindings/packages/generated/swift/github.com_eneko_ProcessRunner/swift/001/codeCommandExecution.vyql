@@ -1,0 +1,9 @@
+module bindings.swift.generated.m243b5584;
+
+binding commandExecution1 {
+  requires {
+    dependency("github.com/eneko/ProcessRunner")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

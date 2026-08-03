@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m2444f0af;
+
+binding deserialization3 {
+  requires {
+    dependency("cocoapods-core")
+  }
+  query pattern callExpr where callee.method == "from_hash"
+  emit sink code.Deserialization at args[0]
+}

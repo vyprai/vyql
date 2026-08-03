@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.skyscreamer:jsonassert" {
-    sink method "parseJSON" -> code.Deserialization
-  }
-}

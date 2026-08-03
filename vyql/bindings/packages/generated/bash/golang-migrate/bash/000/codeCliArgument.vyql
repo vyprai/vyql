@@ -1,0 +1,9 @@
+module bindings.bash.generated.m237d9dd8;
+
+binding cliArgument0 {
+  requires {
+    dependency("golang-migrate")
+  }
+  query pattern callExpr where callee.path ~= "migrate.argv"
+  emit source code.CliArgument at call.result
+}

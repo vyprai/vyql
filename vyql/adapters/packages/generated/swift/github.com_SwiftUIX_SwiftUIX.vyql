@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter swift {
-  package "github.com/SwiftUIX/SwiftUIX" {
-    source method "loadData" -> core.UserControlledData
-  }
-}

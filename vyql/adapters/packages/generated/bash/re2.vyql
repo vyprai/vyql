@@ -1,9 +1,0 @@
-import code.{RegexCompile}
-
-adapter bash {
-  package "re2" {
-    flag code.RegexCompile on any {
-      path "Re2.RE2"
-    }
-  }
-}

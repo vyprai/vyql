@@ -1,0 +1,9 @@
+module bindings.rust.generated.m83fbeeb2;
+
+binding userControlledData1 {
+  requires {
+    dependency("urlencoding")
+  }
+  query pattern callExpr where callee.method == "decode_binary"
+  emit source core.UserControlledData at call.result
+}

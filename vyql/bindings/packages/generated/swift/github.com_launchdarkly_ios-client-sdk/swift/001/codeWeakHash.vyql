@@ -1,0 +1,9 @@
+module bindings.swift.generated.m82c58001;
+
+binding weakHash1 {
+  requires {
+    dependency("github.com/launchdarkly/ios-client-sdk")
+  }
+  query pattern callExpr where callee.method == "hash"
+  emit issue code.WeakHash at call
+}

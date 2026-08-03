@@ -1,0 +1,9 @@
+module bindings.php.generated.mb0b88739;
+
+binding codeEval0 {
+  requires {
+    dependency("jcalderonzumba/mink-phantomjs-driver")
+  }
+  query pattern callExpr where callee.method == "executeScript"
+  emit sink code.CodeEval at args[0]
+}

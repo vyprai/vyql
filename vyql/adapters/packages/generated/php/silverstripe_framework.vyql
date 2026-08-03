@@ -1,9 +1,0 @@
-import code.{HttpInput}
-import core.{HtmlEscape}
-
-adapter php {
-  package "silverstripe/framework" {
-    source method "SilverStripe\\Control\\HTTPRequest::getBody" -> code.HttpInput
-    control method "SilverStripe\\Core\\Convert::raw2htmlatt" -> core.HtmlEscape
-  }
-}

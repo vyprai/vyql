@@ -1,0 +1,9 @@
+module bindings.php.generated.mfb75f9df;
+
+binding filePathAccess1 {
+  requires {
+    dependency("vlucas/phpdotenv")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.FilePathAccess at args[0]
+}

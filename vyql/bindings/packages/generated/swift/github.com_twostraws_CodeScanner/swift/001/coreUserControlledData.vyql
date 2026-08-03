@@ -1,0 +1,9 @@
+module bindings.swift.generated.mbe363070;
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/twostraws/CodeScanner")
+  }
+  query pattern callExpr where callee.method == "imagePickerController"
+  emit source core.UserControlledData at call.result
+}

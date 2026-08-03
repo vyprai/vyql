@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding packageInstallExecution614 {
+  query pattern callExpr where callee.path ~= "child_process.execFileSync" and args.any.literal contains "sync"
+  emit issue code.PackageInstallExecution at call
+}

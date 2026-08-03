@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding cookiexDeepPrototypePollution581 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.objectKeysForEach == "true" and node.context.dynamicPropertyWriteFromSubscript == "true" and node.context.callPath contains "delegate.call" and not (node.context.callPath contains "invalids.includes") and not (node.context.prototypeKeyGuard == "true")
+  emit issue code.CookiexDeepPrototypePollution at node
+}

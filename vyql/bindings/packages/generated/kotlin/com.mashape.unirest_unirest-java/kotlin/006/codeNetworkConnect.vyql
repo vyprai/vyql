@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mb26cebfd;
+
+binding networkConnect6 {
+  requires {
+    dependency("com.mashape.unirest:unirest-java")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{CommandExecution, Deserialization}
-adapter java {
-  package "redis.clients:jedis" {
-    sink method "exec" -> code.CommandExecution
-    sink method "restore" -> code.Deserialization
-  }
-}

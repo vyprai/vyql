@@ -1,0 +1,9 @@
+module bindings.scala.generated.m1c965e9d;
+
+binding networkBind1 {
+  requires {
+    dependency("com.badlogicgames.gdx:gdx-backend-android")
+  }
+  query pattern callExpr where callee.method == "newServerSocket"
+  emit sink code.NetworkBind at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.generated.m1891bbe2;
+
+binding deserialization1 {
+  requires {
+    dependency("babel")
+  }
+  query pattern callExpr where callee.method == "babel.messages.jslexer.tokenize"
+  emit sink code.Deserialization at args[0]
+}

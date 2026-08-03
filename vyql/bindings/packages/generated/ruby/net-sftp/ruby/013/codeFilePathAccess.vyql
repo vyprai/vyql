@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m2f77b2d5;
+
+binding filePathAccess13 {
+  requires {
+    dependency("net-sftp")
+  }
+  query pattern callExpr where callee.method == "opendir!"
+  emit sink code.FilePathAccess at args[0]
+}

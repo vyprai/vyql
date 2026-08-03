@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mec5fdd77;
+
+binding commandExecution0 {
+  requires {
+    dependency("react-scripts")
+  }
+  query pattern callExpr where callee.method == "spawnSync"
+  emit sink code.CommandExecution at args[0]
+}

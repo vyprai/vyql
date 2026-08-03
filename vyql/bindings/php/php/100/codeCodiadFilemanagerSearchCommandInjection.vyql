@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding codiadFilemanagerSearchCommandInjection100 {
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.className contains "Filemanager" and node.context.phpReview == "codiad_filemanager_search_command_injection"
+  emit issue code.CodiadFilemanagerSearchCommandInjection at node
+}

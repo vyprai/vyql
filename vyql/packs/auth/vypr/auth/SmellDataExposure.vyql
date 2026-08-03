@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule SmellDataExposure {
+  meta {
+    cwe: [CWE_200]
+    id: "VYQL-SMELL-DATA"
+    severity: info
+  }
+  issue code.DataExposureSmell as s
+  unless s.endpoint coveredBy core.AuthenticationCheck
+}

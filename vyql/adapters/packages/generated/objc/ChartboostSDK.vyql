@@ -1,6 +1,0 @@
-import code.{HtmlRender}
-adapter objc {
-  package "ChartboostSDK" {
-    sink method "initWithHtml" -> code.HtmlRender
-  }
-}

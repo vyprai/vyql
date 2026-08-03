@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m55dfca5a;
+
+binding commandExecution0 {
+  requires {
+    dependency("core")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.CommandExecution at args[0]
+}

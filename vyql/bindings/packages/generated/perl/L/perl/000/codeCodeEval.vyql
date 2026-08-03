@@ -1,0 +1,9 @@
+module bindings.perl.generated.mfb3cd577;
+
+binding codeEval0 {
+  requires {
+    dependency("L")
+  }
+  query pattern callExpr where callee.method == "AUTOLOAD"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "calendar" {
-    sink method "httpdate" -> code.Deserialization
-    sink method "httpdate!" -> code.Deserialization
-  }
-}

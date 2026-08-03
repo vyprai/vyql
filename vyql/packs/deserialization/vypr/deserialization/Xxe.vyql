@@ -1,0 +1,14 @@
+module vypr.deserialization;
+
+rule Xxe {
+  meta {
+    benchmark: xxe
+    cwe: [CWE_611]
+    id: "VYQL-DESER-002"
+    severity: high
+  }
+  taint core.UserControlledData as input -> code.XmlParse as parser
+  unless path coveredBy core.XmlHardening
+  unless parser.endpoint coveredBy core.XmlHardening
+  unless parser.sameReceiver coveredBy core.XmlHardening
+}

@@ -104,7 +104,8 @@ func (r *bufReader) smap() map[string]string {
 }
 func (r *bufReader) boolean() bool { v := r.b[r.i] == 1; r.i++; return v }
 
-// writeNode/readNode (de)serialize a usg.Node including its inline loc/region/order fields.
+// writeNode/readNode (de)serialize a usg.Node including its inline loc/region/order
+// and hot call-matching fields.
 func (w *bufWriter) node(n usg.Node) {
 	w.str(n.ID)
 	w.str(n.Type)
@@ -113,13 +114,19 @@ func (w *bufWriter) node(n usg.Node) {
 	w.uvar(int(n.Order))
 	w.boolean(n.HasOrder)
 	w.str(n.Scope)
+	w.str(n.Method)
+	w.str(n.CalleePath)
+	w.str(n.StrArgs)
+	w.str(n.Vkind)
 	w.smap(n.Props)
 }
 
 func (r *bufReader) node() usg.Node {
 	return usg.Node{
 		ID: r.str(), Type: r.str(), Loc: r.str(), Region: r.str(),
-		Order: int32(r.uvar()), HasOrder: r.boolean(), Scope: r.str(), Props: r.smap(),
+		Order: int32(r.uvar()), HasOrder: r.boolean(), Scope: r.str(),
+		Method: r.str(), CalleePath: r.str(), StrArgs: r.str(), Vkind: r.str(),
+		Props: r.smap(),
 	}
 }
 func (r *bufReader) strs() []string {
@@ -177,7 +184,7 @@ func encodeDelta(d *moduleDelta) []byte {
 		w.str(l.Label.Concept)
 		p := l.Label.Provenance
 		w.str(p.Extractor)
-		w.str(p.Adapter)
+		w.str(p.Applicator)
 		w.str(p.SourceRef)
 		w.str(p.Confidence)
 		w.str(p.Fidelity)
@@ -212,7 +219,7 @@ func decodeDelta(raw []byte) (d *moduleDelta, err error) {
 			nodeID := r.str()
 			lbl := usg.Label{Concept: r.str()}
 			lbl.Provenance = usg.Provenance{
-				Extractor: r.str(), Adapter: r.str(), SourceRef: r.str(),
+				Extractor: r.str(), Applicator: r.str(), SourceRef: r.str(),
 				Confidence: r.str(), Fidelity: r.str(),
 			}
 			lbl.Detail = r.smap()

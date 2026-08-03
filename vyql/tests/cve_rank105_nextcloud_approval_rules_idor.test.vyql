@@ -1,0 +1,6 @@
+test "rank105: Nextcloud approval rules require resource-scoped IDOR review"
+  expect_review code.IdorPolicyReview
+  graph
+  ```
+  node op code.IdorPolicyReview
+  ```

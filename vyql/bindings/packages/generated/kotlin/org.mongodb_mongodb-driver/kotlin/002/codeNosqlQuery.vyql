@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m85b27bed;
+
+binding nosqlQuery2 {
+  requires {
+    dependency("org.mongodb:mongodb-driver")
+  }
+  query pattern callExpr where callee.method == "command"
+  emit sink code.NosqlQuery at args[0]
+}

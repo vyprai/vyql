@@ -1,0 +1,9 @@
+module bindings.c.generated.m2816daee;
+
+binding httpInput11 {
+  requires {
+    dependency("fcgi")
+  }
+  query pattern callExpr where callee.path ~= "FCGX_GetParam"
+  emit source code.HttpInput at call.result
+}

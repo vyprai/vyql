@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m03b1e9d2;
+
+binding sqlExecution7 {
+  requires {
+    dependency("ecto_shorts")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.SqlExecution at args[0]
+}

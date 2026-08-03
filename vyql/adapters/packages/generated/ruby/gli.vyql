@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter ruby {
-  package "gli" {
-    source method "run" -> code.CliArgument
-  }
-}

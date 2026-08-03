@@ -1,7 +1,0 @@
-adapter cpp {
-  package "freexl" {
-    sink method "freexl_open" -> code.Deserialization
-    sink method "freexl_open_xlsx" -> code.Deserialization
-    sink method "freexl_open_ods" -> code.Deserialization
-  }
-}

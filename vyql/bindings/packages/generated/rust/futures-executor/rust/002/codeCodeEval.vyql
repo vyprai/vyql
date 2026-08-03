@@ -1,0 +1,9 @@
+module bindings.rust.generated.m9a3ec488;
+
+binding codeEval2 {
+  requires {
+    dependency("futures-executor")
+  }
+  query pattern callExpr where callee.method == "spawn_obj_ok"
+  emit sink code.CodeEval at args[0]
+}

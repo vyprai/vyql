@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mf677f249;
+
+binding codeEval1 {
+  requires {
+    dependency("exq")
+  }
+  query pattern callExpr where callee.method == "Exq.Redis.Script.eval!"
+  emit sink code.CodeEval at args[0]
+}

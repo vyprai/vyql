@@ -1,0 +1,9 @@
+module bindings.php.generated.m23fc1340;
+
+binding filePathAccess12 {
+  requires {
+    dependency("codeception/module-filesystem")
+  }
+  query pattern callExpr where callee.method == "writeToFile"
+  emit sink code.FilePathAccess at args[0]
+}

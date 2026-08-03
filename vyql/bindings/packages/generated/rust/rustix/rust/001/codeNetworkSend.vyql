@@ -1,0 +1,9 @@
+module bindings.rust.generated.m49bea96b;
+
+binding networkSend1 {
+  requires {
+    dependency("rustix")
+  }
+  query pattern callExpr where callee.method == "close"
+  emit sink code.NetworkSend at args[0]
+}

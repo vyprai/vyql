@@ -1,0 +1,9 @@
+module bindings.python.generated.mda872f49;
+
+binding filePathAccess2 {
+  requires {
+    dependency("virtualenvwrapper")
+  }
+  query pattern callExpr where callee.method == "make_hook"
+  emit sink code.FilePathAccess at args[0]
+}

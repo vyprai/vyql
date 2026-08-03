@@ -1,0 +1,9 @@
+module bindings.java.generated.mfbaacf89;
+
+binding networkSend0 {
+  requires {
+    dependency("io.dropwizard.metrics:metrics-jvm")
+  }
+  query pattern callExpr where callee.method == "dump"
+  emit sink code.NetworkSend at args[0]
+}

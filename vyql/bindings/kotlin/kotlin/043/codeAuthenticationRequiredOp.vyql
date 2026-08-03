@@ -1,0 +1,6 @@
+module bindings.kotlin.generated.m304d1620;
+
+binding authenticationRequiredOp43 {
+  query pattern presenceNode where node.path ~= "deleteAccount"
+  emit issue code.AuthenticationRequiredOp at node
+}

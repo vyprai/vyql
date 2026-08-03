@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter objc {
-  package "URI" {
-    sink method "parse_uri" -> code.Deserialization
-    sink method "http_parser_parse_url" -> code.Deserialization
-  }
-}

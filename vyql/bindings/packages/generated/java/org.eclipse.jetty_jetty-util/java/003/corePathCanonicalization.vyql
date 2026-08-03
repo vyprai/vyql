@@ -1,0 +1,14 @@
+module bindings.java.generated.md924ce75;
+
+binding pathCanonicalization3 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-util")
+  }
+  query pattern callExpr where callee.method == "resolvePath"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

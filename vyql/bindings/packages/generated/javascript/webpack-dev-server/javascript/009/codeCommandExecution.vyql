@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m27cf45a6;
+
+binding commandExecution9 {
+  requires {
+    dependency("webpack-dev-server")
+  }
+  query pattern callExpr where callee.method == "launchEditor"
+  emit sink code.CommandExecution at args[0]
+}

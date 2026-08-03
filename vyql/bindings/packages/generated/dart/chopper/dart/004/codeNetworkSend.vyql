@@ -1,0 +1,9 @@
+module bindings.dart.generated.md5715606;
+
+binding networkSend4 {
+  requires {
+    dependency("chopper")
+  }
+  query pattern callExpr where callee.method == "patch"
+  emit sink code.NetworkSend at args[0]
+}

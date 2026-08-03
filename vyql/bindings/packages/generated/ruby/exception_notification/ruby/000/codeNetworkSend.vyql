@@ -1,0 +1,9 @@
+module bindings.ruby.generated.me0bce59b;
+
+binding networkSend0 {
+  requires {
+    dependency("exception_notification")
+  }
+  query pattern callExpr where callee.method == "notify_exception"
+  emit sink code.NetworkSend at args[0]
+}

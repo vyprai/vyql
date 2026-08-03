@@ -1,0 +1,13 @@
+module bindings.php.generated.m93f2c4d0;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("dingo/api")
+  }
+  query pattern callExpr where callee.method == "user"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

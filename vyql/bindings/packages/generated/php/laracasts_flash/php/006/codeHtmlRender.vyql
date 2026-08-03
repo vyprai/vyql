@@ -1,0 +1,9 @@
+module bindings.php.generated.m367a7c67;
+
+binding htmlRender6 {
+  requires {
+    dependency("laracasts/flash")
+  }
+  query pattern callExpr where callee.method == "flash"
+  emit sink code.HtmlRender at args[0]
+}

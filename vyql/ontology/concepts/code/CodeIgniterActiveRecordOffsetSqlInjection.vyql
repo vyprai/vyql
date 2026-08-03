@@ -1,0 +1,11 @@
+module code;
+
+concept CodeIgniterActiveRecordOffsetSqlInjection : issue {
+  cwe: [CWE_89]
+  reviewAssumption: "application code can pass attacker-controlled offset values into the query builder"
+  reviewCategory: sql
+  reviewCondition: "CodeIgniter Active Record stores the offset argument without forcing it to an integer"
+  reviewConfidence: high
+  reviewEvidence: "Active Record offset context {pattern} assigns $offset directly into ar_offset before query compilation"
+  vulnerableTo: [injection.SqlInjection]
+}

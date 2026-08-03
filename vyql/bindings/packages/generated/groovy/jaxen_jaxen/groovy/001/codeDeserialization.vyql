@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m8f3b747b;
+
+binding deserialization1 {
+  requires {
+    dependency("jaxen:jaxen")
+  }
+  query pattern callExpr where callee.method == "DOMXPath"
+  emit sink code.Deserialization at args[0]
+}

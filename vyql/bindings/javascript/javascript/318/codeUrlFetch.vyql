@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding urlFetch318 {
+  query pattern callExpr where callee.path ~= "undici.fetch"
+  emit sink code.UrlFetch at args[0]
+}

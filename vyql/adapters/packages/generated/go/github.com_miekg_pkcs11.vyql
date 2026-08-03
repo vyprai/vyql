@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter go {
-  package "github.com/miekg/pkcs11" {
-    sink method "OpenModule" -> code.FilePathAccess
-  }
-}

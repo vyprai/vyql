@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mb053e00e;
+
+binding filePathAccess1 {
+  requires {
+    dependency("globby")
+  }
+  query pattern callExpr where callee.method == "globbySync"
+  emit sink code.FilePathAccess at args[0]
+}

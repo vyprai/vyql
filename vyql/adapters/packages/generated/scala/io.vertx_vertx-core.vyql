@@ -1,8 +1,0 @@
-import code.{FilePathAccess, NetworkSend}
-
-adapter scala {
-  package "io.vertx:vertx-core" {
-    sink method "open" -> code.FilePathAccess
-    sink method "send" -> code.NetworkSend
-  }
-}

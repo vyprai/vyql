@@ -1,0 +1,9 @@
+module bindings.ruby.generated.me1b471a1;
+
+binding codeEval0 {
+  requires {
+    dependency("jekyll-sass-converter")
+  }
+  query pattern callExpr where callee.method == "convert"
+  emit sink code.CodeEval at args[0]
+}

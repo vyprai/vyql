@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding weakCipher598 {
+  query pattern callExpr where callee.path ~= "simplecrypt" and args.any.literal contains "aes-192-ecb"
+  emit issue code.WeakCipher at call
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m72578c4c;
+
+binding commandExecution0 {
+  requires {
+    dependency("mix_erlang_tasks")
+  }
+  query pattern callExpr where callee.method == "Mix.Tasks.Ct.run"
+  emit sink code.CommandExecution at args[0]
+}

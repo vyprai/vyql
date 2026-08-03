@@ -1,0 +1,9 @@
+module bindings.dart.generated.medf72a0e;
+
+binding networkData0 {
+  requires {
+    dependency("device_info_plus_web")
+  }
+  query pattern callExpr where callee.method == "webBrowserInfo"
+  emit source code.NetworkData at call.result
+}

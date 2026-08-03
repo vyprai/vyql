@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m20c0bd0f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("write-file-atomic")
+  }
+  query pattern callExpr where callee.method == "writeFile"
+  emit sink code.FilePathAccess at args[0]
+}

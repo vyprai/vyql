@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter php {
-  package "phar-io/version" {
-    sink method "PharIo\\Version\\VersionConstraintParser::parse" -> code.Deserialization
-  }
-}

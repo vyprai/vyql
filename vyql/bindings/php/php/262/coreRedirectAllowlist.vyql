@@ -1,0 +1,10 @@
+module bindings.php.generated.mfbe84119;
+
+binding redirectAllowlist262 {
+  query pattern callExpr where callee.method == "sanitizeReturnUrl"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

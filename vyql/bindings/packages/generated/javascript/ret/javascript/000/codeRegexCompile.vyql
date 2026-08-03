@@ -1,0 +1,10 @@
+module bindings.javascript.generated.m6240d8b0;
+
+binding regexCompile0 {
+  requires {
+    dependency("ret")
+  }
+  query pattern callExpr where callee.method == "tokenizer"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

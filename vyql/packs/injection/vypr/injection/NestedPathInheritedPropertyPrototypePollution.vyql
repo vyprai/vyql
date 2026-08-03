@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule NestedPathInheritedPropertyPrototypePollution {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_1321]
+    id: "VYQL-INJ-134"
+    severity: high
+  }
+  issue code.NestedPathInheritedPropertyPrototypePollution as sink
+}

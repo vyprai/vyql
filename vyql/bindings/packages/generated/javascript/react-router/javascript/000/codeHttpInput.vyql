@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mc099262a;
+
+binding httpInput0 {
+  requires {
+    dependency("react-router")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.python.generated.mbc0437ed;
+
+binding networkSend2 {
+  requires {
+    dependency("websocket-client")
+  }
+  query pattern callExpr where callee.method == "send_text"
+  emit sink code.NetworkSend at args[0]
+}

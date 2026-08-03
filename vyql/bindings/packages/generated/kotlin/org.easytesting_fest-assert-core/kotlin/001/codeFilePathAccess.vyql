@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m5bdbcbcf;
+
+binding filePathAccess1 {
+  requires {
+    dependency("org.easytesting:fest-assert-core")
+  }
+  query pattern callExpr where callee.method == "hasContent"
+  emit sink code.FilePathAccess at args[0]
+}

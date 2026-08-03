@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m5a1d215f;
+
+binding deserialization0 {
+  requires {
+    dependency("tomlplusplus")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

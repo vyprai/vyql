@@ -1,0 +1,6 @@
+module bindings.perl.generated.mfca40a44;
+
+binding weakHash58 {
+  query pattern presenceNode where node.path ~= "Digest.SHA1"
+  emit issue code.WeakHash at node
+}

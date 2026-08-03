@@ -1,0 +1,9 @@
+module bindings.swift.generated.ma6237a2d;
+
+binding networkSend0 {
+  requires {
+    dependency("github.com/netreconlab/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

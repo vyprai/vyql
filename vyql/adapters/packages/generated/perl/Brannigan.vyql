@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter perl {
-  package "Brannigan" {
-    source method "process" -> core.UserControlledData
-  }
-}

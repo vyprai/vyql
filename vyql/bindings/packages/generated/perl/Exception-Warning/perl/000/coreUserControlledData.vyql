@@ -1,0 +1,9 @@
+module bindings.perl.generated.m3e148717;
+
+binding userControlledData0 {
+  requires {
+    dependency("Exception-Warning")
+  }
+  query pattern callExpr where callee.method == "__WARN__"
+  emit source core.UserControlledData at call.result
+}

@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter javascript {
-  package "is-directory" {
-    sink method "isDirectory" -> code.FilePathAccess
-  }
-}

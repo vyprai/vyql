@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding authenticationRequiredOp381 {
+  query pattern presenceNode where node.path ~= "transferFunds"
+  emit issue code.AuthenticationRequiredOp at node
+}

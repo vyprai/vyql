@@ -1,0 +1,9 @@
+module bindings.groovy.generated.med520b51;
+
+binding storedDataRead0 {
+  requires {
+    dependency("org.apache.maven:maven-settings-builder")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.StoredDataRead at call.result
+}

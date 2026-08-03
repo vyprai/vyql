@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter go {
-  package "github.com/ethereum/go-ethereum" {
-    source method "ParseDerivationPath" -> core.UserControlledData
-  }
-}

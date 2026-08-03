@@ -1,0 +1,6 @@
+module bindings.kotlin.generated.m304d1620;
+
+binding missingFrameProtection123 {
+  query pattern callExpr where callee.path ~= "setHeader" and args.any.literal contains "X-Frame-Options" and args.any.literal contains "ALLOWALL"
+  emit issue code.MissingFrameProtection at call
+}

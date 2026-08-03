@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter groovy {
-  package "org.glassfish.jaxb:jaxb-runtime" {
-    sink method "unmarshal" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-  }
-}

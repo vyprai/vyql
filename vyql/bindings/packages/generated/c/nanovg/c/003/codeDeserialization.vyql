@@ -1,0 +1,9 @@
+module bindings.c.generated.m49c2c434;
+
+binding deserialization3 {
+  requires {
+    dependency("nanovg")
+  }
+  query pattern callExpr where callee.method == "nvgCreateFontMem"
+  emit sink code.Deserialization at args[0]
+}

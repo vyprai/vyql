@@ -1,0 +1,9 @@
+module bindings.swift.generated.mab0c3409;
+
+binding fileUse0 {
+  requires {
+    dependency("github.com/dreymonde/Shallows")
+  }
+  query pattern callExpr where callee.method == "retrieve"
+  emit sink code.FileUseSink at args[0]
+}

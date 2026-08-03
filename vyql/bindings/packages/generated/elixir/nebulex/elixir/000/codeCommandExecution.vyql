@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m218f0b0a;
+
+binding commandExecution0 {
+  requires {
+    dependency("nebulex")
+  }
+  query pattern callExpr where callee.method == "run_command"
+  emit sink code.CommandExecution at args[0]
+}

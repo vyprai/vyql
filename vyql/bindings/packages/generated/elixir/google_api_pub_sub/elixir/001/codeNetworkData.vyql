@@ -1,0 +1,9 @@
+module bindings.elixir.generated.meaa83594;
+
+binding networkData1 {
+  requires {
+    dependency("google_api_pub_sub")
+  }
+  query pattern callExpr where callee.method == "pubsub_projects_subscriptions_pull"
+  emit source code.NetworkData at call.result
+}

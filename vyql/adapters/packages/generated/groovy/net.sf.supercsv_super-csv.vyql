@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "net.sf.supercsv:super-csv" {
-    sink method "read" -> code.Deserialization
-    sink method "readIntoBean" -> code.Deserialization
-  }
-}

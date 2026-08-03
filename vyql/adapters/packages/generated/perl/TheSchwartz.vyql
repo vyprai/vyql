@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter perl {
-  package "TheSchwartz" {
-    source method "new" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.generated.mc24cc569;
+
+binding filePathAccess2 {
+  requires {
+    dependency("symfony/filesystem")
+  }
+  query pattern callExpr where callee.method == "exists"
+  emit sink code.FilePathAccess at args[0]
+}

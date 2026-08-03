@@ -1,0 +1,13 @@
+module bindings.php.generated.m190c713b;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("symfony/security-bundle")
+  }
+  query pattern callExpr where callee.method == "login"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m74445637;
+
+binding httpInput1 {
+  requires {
+    dependency("io.vertx:vertx-web")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.HttpInput at call.result
+}

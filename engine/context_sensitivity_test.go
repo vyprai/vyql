@@ -1,15 +1,13 @@
 package engine
 
 import (
-	"testing"
-
-	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
+	"testing"
 )
 
 func TestContextSensitivityBoundary(t *testing.T) {
 	onto := testOntology()
-	decls, err := parser.Parse(flowRule)
+	decls, err := parseV2DefinitionsForTest(flowRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

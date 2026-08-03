@@ -1,0 +1,9 @@
+module bindings.powershell.generated.m92132a18;
+
+binding externalApiResponse4 {
+  requires {
+    dependency("Microsoft.PowerShell.Utility")
+  }
+  query pattern callExpr where callee.method == "Content"
+  emit source code.ExternalApiResponse at call.result
+}

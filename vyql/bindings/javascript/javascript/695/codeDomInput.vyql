@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding domInputClipboard695 {
+  query pattern callExpr where callee.path ~= "clipboardData.getData"
+  emit source code.DomInput at call.result
+}

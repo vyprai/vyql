@@ -1,9 +1,0 @@
-import code.{NetworkSend, NetworkData, SecretValue}
-
-adapter java {
-  package "org.apache.activemq:activemq-client" {
-    sink method "send" -> code.NetworkSend
-    source method "receiveBody" -> code.NetworkData
-    source method "setPassword" -> code.SecretValue
-  }
-}

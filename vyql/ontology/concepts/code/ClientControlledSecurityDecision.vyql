@@ -1,0 +1,12 @@
+module code;
+
+concept ClientControlledSecurityDecision : sink {
+  cwe: [CWE_807]
+  enabledBy: [taint.UntrustedData]
+  reviewAssumption: "the value is not re-derived server-side"
+  reviewCategory: access_control
+  reviewCondition: "a client-controlled value drives a role or privilege decision"
+  reviewConfidence: medium
+  reviewEvidence: "privilege decision {pattern} reads a client-controlled value"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

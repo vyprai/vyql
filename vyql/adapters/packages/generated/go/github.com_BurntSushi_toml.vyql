@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "github.com/BurntSushi/toml" {
-    sink method "Decode" -> code.Deserialization
-    sink method "Unmarshal" -> code.Deserialization
-  }
-}

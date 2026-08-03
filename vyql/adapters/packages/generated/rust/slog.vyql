@@ -1,9 +1,0 @@
-import code.{LogOutput}
-
-adapter rust {
-  package "slog" {
-    sink method "log" -> code.LogOutput
-    sink method "flush" -> code.LogOutput
-    sink method "file" -> code.LogOutput
-  }
-}

@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-adapter cpp {
-  package "sleef" {
-    sink method "SleefDFT_setPath" -> code.FilePathAccess
-    sink method "SleefDFT_getPath" -> code.FilePathAccess
-    sink method "SleefDFT_setPlanFilePath" -> code.FilePathAccess
-    sink method "SleefDFT_savePlan" -> code.FilePathAccess
-  }
-}

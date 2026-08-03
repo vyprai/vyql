@@ -1,9 +1,0 @@
-import code.{FileUpload}
-
-adapter swift {
-  package "github.com/dylanshine/openai-kit" {
-    flag code.FileUpload on any {
-      method "upload"
-    }
-  }
-}

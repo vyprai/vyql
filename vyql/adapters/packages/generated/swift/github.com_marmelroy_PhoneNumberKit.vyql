@@ -1,9 +1,0 @@
-import code.{Deserialization, CliArgument}
-import core.{InputValidation}
-
-adapter swift {
-  package "github.com/marmelroy/PhoneNumberKit" {
-    sink method "parse" -> code.Deserialization
-    control method "isValidPhoneNumber" -> core.InputValidation
-  }
-}

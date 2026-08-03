@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule CWebRequestFilePathTraversal {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22]
+    id: "VYQL-PATH-029"
+    severity: high
+  }
+  issue code.CWebRequestFilePathTraversal as sink
+}

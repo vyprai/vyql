@@ -1,0 +1,9 @@
+module bindings.dart.generated.mcb82f086;
+
+binding networkData1 {
+  requires {
+    dependency("build_daemon")
+  }
+  query pattern callExpr where callee.method == "connectUnchecked"
+  emit source code.NetworkData at call.result
+}

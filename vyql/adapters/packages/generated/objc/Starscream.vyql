@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkData, NetworkSend, Deserialization}
-adapter objc {
-  package "Starscream" {
-    sink method "connect" -> code.NetworkConnect
-    sink method "write" -> code.NetworkSend
-    sink method "parse" -> code.Deserialization
-    source method "read" -> code.NetworkData
-  }
-}

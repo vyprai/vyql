@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding isolateLevelIncrementWithoutCap94 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "bidi.isolate_level_increment_without_cap"
+  emit issue code.IsolateLevelIncrementWithoutCap at node
+}

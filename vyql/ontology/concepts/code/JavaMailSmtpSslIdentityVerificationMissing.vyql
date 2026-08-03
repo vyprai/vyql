@@ -1,0 +1,11 @@
+module code;
+
+concept JavaMailSmtpSslIdentityVerificationMissing : issue {
+  cwe: [CWE_295]
+  reviewAssumption: "SMTP credentials or message content rely on TLS hostname verification against a server that may be intercepted"
+  reviewCategory: crypto
+  reviewCondition: "JavaMail SMTP SSL/TLS is configured without enabling server identity verification"
+  reviewConfidence: high
+  reviewEvidence: "JavaMail SMTP SSL context {pattern} configures an SSL socket factory without mail.smtp.ssl.checkserveridentity=true"
+  vulnerableTo: [crypto.ImproperCertValidation]
+}

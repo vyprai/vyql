@@ -1,0 +1,8 @@
+module bindings.go.generated.m48a985c1;
+
+binding client8 {
+  query pattern callExpr where callee.path ~= "graphql.NewClient"
+  emit fact runtime.ReceiverType at call.result {
+    about: graphql.Client
+  }
+}

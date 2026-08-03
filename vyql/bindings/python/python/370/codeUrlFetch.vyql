@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding urlFetch370 {
+  query pattern callExpr where callee.analysis ~= "function.context.sink" and args.any.literal contains "python_review:loop_requests_get_url_without_validation"
+  emit sink code.UrlFetch at args[0]
+}

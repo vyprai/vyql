@@ -1,0 +1,14 @@
+module bindings.perl.generated.m3762fed4;
+
+binding htmlEscape7 {
+  requires {
+    dependency("CGI")
+  }
+  query pattern callExpr where callee.method == "escapeHTML"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

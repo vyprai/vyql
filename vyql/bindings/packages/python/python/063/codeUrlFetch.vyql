@@ -1,0 +1,9 @@
+module bindings.python.generated.m3d9ccbad;
+
+binding urlFetch63 {
+  requires {
+    dependency("urllib")
+  }
+  query pattern callExpr where callee.path ~= "urllib.request.urlopen"
+  emit sink code.UrlFetch at args[0]
+}

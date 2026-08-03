@@ -1,0 +1,11 @@
+module code;
+
+concept RequestViewVariableHtmlEscapeMissing : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "the receiving view renders the variable in HTML or JavaScript where caller-side escaping is required"
+  reviewCategory: xss
+  reviewCondition: "request-derived view variables are passed into an HTML view without local entity escaping"
+  reviewConfidence: high
+  reviewEvidence: "view-render context {pattern} reads a request parameter and passes the same variable into a view parameter array before htmlentities/htmlspecialchars-style escaping"
+  vulnerableTo: [injection.Xss]
+}

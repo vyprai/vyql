@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "libplist" {
-    sink method "plist_from_xml" -> code.Deserialization
-    sink method "plist_from_bin" -> code.Deserialization
-    sink method "jsmn_parse" -> code.Deserialization
-  }
-}

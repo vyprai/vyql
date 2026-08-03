@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter kotlin {
-  package "com.h2database:h2" {
-    sink method "query" -> code.SqlExecution
-  }
-}

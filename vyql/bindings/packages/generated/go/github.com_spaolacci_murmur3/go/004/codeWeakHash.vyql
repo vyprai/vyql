@@ -1,0 +1,9 @@
+module bindings.go.generated.m50f7fc36;
+
+binding weakHash4 {
+  requires {
+    dependency("github.com/spaolacci/murmur3")
+  }
+  query pattern callExpr where callee.method == "New64"
+  emit issue code.WeakHash at call
+}

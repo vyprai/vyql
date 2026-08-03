@@ -1,0 +1,9 @@
+module bindings.swift.generated.mad2e399d;
+
+binding networkSend6 {
+  requires {
+    dependency("github.com/serhii-londar/BaseAPI")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkSend at args[0]
+}

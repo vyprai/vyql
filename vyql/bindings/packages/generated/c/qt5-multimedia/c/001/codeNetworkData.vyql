@@ -1,0 +1,9 @@
+module bindings.c.generated.m79a72aef;
+
+binding networkData1 {
+  requires {
+    dependency("qt5-multimedia")
+  }
+  query pattern callExpr where callee.method == "on_need_data"
+  emit source code.NetworkData at call.result
+}

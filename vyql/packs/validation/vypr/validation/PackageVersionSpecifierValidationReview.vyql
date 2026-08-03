@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule PackageVersionSpecifierValidationReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_20, CWE_94]
+    id: "VYQL-VAL-019"
+    severity: high
+  }
+  issue code.PackageVersionSpecifierValidationReview as sink
+}

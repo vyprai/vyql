@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter dart {
-  package "socket_io_common" {
-    sink method "decodeString" -> code.Deserialization
-    sink method "decodePayload" -> code.Deserialization
-  }
-}

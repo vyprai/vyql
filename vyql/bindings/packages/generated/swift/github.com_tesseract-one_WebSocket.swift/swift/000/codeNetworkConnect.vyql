@@ -1,0 +1,9 @@
+module bindings.swift.generated.mbb53f57a;
+
+binding networkConnect0 {
+  requires {
+    dependency("github.com/tesseract-one/WebSocket.swift")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

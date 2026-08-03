@@ -1,0 +1,6 @@
+module bindings.elixir.generated.m728b8a72;
+
+binding weakCipher61 {
+  query pattern callExpr where callee.path ~= ":crypto.crypto_one_time" and args.any.literal contains ":blowfish"
+  emit issue code.WeakCipher at call
+}

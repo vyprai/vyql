@@ -5,8 +5,8 @@ depending on what kind of application it is — so a profile declares, per arche
 
 - **the trust boundary** — `entrypoints:` lists the source families that count as
   attacker-controlled (e.g. a CLI's argv/env, a browser's DOM, an Android app's intents);
-- **auto-detection fingerprints** — `detect:` lists `dep:<x>` (a dependency in
-  package.json/go.mod/etc.), `file:<rel>` (a marker file), or `ext:<.x>` (a file extension).
+- **auto-detection predicates** — `detect:` uses v2 project-fact requirements such as
+  `dependency("express")`, `file("openapi.yaml")`, and `project.has("ext:.tsx")`.
 
 The scanner picks a profile with `--profile <name>`, or on `--profile auto` (the default)
 fingerprints the project and chooses one. The chosen profile **gates source labelling**:
@@ -25,7 +25,7 @@ params as attacker input, a server scan never treats argv as attacker input, etc
 | `cli` | argv, env, stdin, config files | cobra/click/argparse/clap/commander |
 | `mobile_android` | intent extras, deep-link URIs (+ DB/network) | AndroidManifest.xml, build.gradle android |
 | `mobile_ios` | pasteboard, URL schemes (+ DB/network) | Info.plist, *.xcodeproj, Package.swift |
-| `electron` | IPC, files, protocols (+ the renderer config surface) | dep:electron, electron-builder |
+| `electron` | IPC, files, protocols (+ the renderer config surface) | electron, electron-builder |
 | `library` | any public-API param + external data | setup.py/pyproject, rollup/tsup |
 | `worker` | message-queue payloads, webhooks, file drops | celery/sidekiq/bull/kafkajs/sqs |
 

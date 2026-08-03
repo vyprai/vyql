@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m23561784;
+
+binding expressionEval0 {
+  requires {
+    dependency("linguist")
+  }
+  query pattern callExpr where callee.method == "t"
+  emit sink code.ExpressionEval at args[0]
+}

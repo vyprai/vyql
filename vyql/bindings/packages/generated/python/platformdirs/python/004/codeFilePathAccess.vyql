@@ -1,0 +1,9 @@
+module bindings.python.generated.m4d1eec17;
+
+binding filePathAccess4 {
+  requires {
+    dependency("platformdirs")
+  }
+  query pattern callExpr where callee.method == "user_log_dir"
+  emit sink code.FilePathAccess at args[0]
+}

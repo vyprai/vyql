@@ -1,0 +1,9 @@
+module bindings.perl.generated.m7e2cdb55;
+
+binding commandExecution0 {
+  requires {
+    dependency("POE-Devel-Benchmarker")
+  }
+  query pattern callExpr where callee.method == "create_subprocess"
+  emit sink code.CommandExecution at args[0]
+}

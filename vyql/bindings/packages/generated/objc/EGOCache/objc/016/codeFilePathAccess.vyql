@@ -1,0 +1,9 @@
+module bindings.objc.generated.m048c22d9;
+
+binding filePathAccess16 {
+  requires {
+    dependency("EGOCache")
+  }
+  query pattern callExpr where callee.method == "copyFilePath:asKey"
+  emit sink code.FilePathAccess at args[0]
+}

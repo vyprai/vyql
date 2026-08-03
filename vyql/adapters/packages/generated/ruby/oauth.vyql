@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter ruby {
-  package "oauth" {
-    control method "escape" -> core.InputValidation
-  }
-}

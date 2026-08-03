@@ -1,0 +1,10 @@
+module bindings.python.generated.m21017d75;
+
+pattern bindingMetadata {
+  binding: {
+    name: "python"
+    meta: {
+      fidelity: "resolved"
+    }
+  }
+}

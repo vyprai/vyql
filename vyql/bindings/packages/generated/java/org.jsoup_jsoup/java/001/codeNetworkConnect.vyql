@@ -1,0 +1,9 @@
+module bindings.java.generated.mf125e731;
+
+binding networkConnect1 {
+  requires {
+    dependency("org.jsoup:jsoup")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

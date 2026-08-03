@@ -1,0 +1,9 @@
+module bindings.dart.generated.mdd32c5df;
+
+binding networkData0 {
+  requires {
+    dependency("location_web")
+  }
+  query pattern callExpr where callee.method == "LocationWebPlugin.getLocation"
+  emit source code.NetworkData at call.result
+}

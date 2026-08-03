@@ -1,0 +1,9 @@
+module bindings.go.generated.m68ebe15d;
+
+binding weakHash4 {
+  requires {
+    dependency("github.com/go-redis/redis")
+  }
+  query pattern callExpr where callee.method == "Hash"
+  emit issue code.WeakHash at call
+}

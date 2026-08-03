@@ -8,6 +8,7 @@ package ontology
 import (
 	"fmt"
 	"sort"
+	"sync"
 )
 
 // Concept is the unit of the controlled vocabulary. Loaded from
@@ -35,13 +36,11 @@ type Concept struct {
 	ReviewEvidence          string   `json:"review_evidence,omitempty"`
 	ReviewAssumption        string   `json:"review_assumption,omitempty"`
 	ReviewConfidence        string   `json:"review_confidence,omitempty"`
-	SourcePolicy            string   `json:"source_policy,omitempty"` // source review policy: direct|caller_conditional
 	SourceConditionCategory string   `json:"source_condition_category,omitempty"`
 	SourceCondition         string   `json:"source_condition,omitempty"`
 	SourceAssumption        string   `json:"source_assumption,omitempty"`
 	SourceConfidence        string   `json:"source_confidence,omitempty"`
-	AssumeMinLevel          string   `json:"assume_min_level,omitempty"`
-	AnalysisRole            string   `json:"analysis_role,omitempty"`
+	GrantMinLevel           string   `json:"grantMinLevel,omitempty"`
 	ContextReachSource      string   `json:"context_reach_source,omitempty"`
 	ContextReachLabel       string   `json:"context_reach_label,omitempty"`
 	ContextReachTargetProp  string   `json:"context_reach_target_prop,omitempty"`
@@ -51,6 +50,7 @@ type Concept struct {
 	ContextConfirmFlagProp  string   `json:"context_confirm_flag_prop,omitempty"`
 	ContextConfirmFlagValue string   `json:"context_confirm_flag_value,omitempty"`
 	ContextConfirmLabel     string   `json:"context_confirm_label,omitempty"`
+	InternalRoles           []string `json:"internal_roles,omitempty"`
 	// ExcludedChars: for sinks, the characters that MUST be absent for taint to be
 	// neutralized — lets a character-filter (allowlist replace) be proven a sound
 	// sanitizer when its output alphabet excludes all of them.
@@ -58,15 +58,51 @@ type Concept struct {
 }
 
 const (
-	AnalysisRoleAttributeSink         = "attribute_sink"
-	AnalysisRoleCharFilter            = "char_filter"
-	AnalysisRoleDomInput              = "dom_input"
-	AnalysisRoleNeutralizerAssumption = "neutralizer_assumption"
-	AnalysisRolePathAccessCheck       = "path_access_check"
-	AnalysisRoleProcessArgVector      = "process_arg_vector"
-	AnalysisRoleSameReceiverGuard     = "same_receiver_guard"
-	AnalysisRoleSameReceiverTarget    = "same_receiver_guard_target"
+	InternalNeutralizerAssumptionConcept = "vyql.internal.NeutralizerAssumption"
+
+	InternalConceptRoleAttributeSink      = "attribute_sink"
+	InternalConceptRoleCharFilter         = "char_filter"
+	InternalConceptRoleDomInput           = "dom_input"
+	InternalConceptRolePathAccessCheck    = "path_access_check"
+	InternalConceptRoleProcessArgVector   = "process_arg_vector"
+	InternalConceptRoleSameReceiverGuard  = "same_receiver_guard"
+	InternalConceptRoleSameReceiverTarget = "same_receiver_guard_target"
 )
+
+var internalConceptRoles = []string{
+	InternalConceptRoleAttributeSink,
+	InternalConceptRoleCharFilter,
+	InternalConceptRoleDomInput,
+	InternalConceptRolePathAccessCheck,
+	InternalConceptRoleProcessArgVector,
+	InternalConceptRoleSameReceiverGuard,
+	InternalConceptRoleSameReceiverTarget,
+}
+
+var (
+	internalRoleConceptsOnce sync.Once
+	internalRoleConcepts     map[string]bool
+)
+
+// InternalConceptRoles returns the Go-owned internal concept-role names.
+func InternalConceptRoles() []string {
+	out := append([]string(nil), internalConceptRoles...)
+	return out
+}
+
+// IsInternalConceptRoleConcept reports whether concept is used only by a
+// Go-owned internal concept role.
+func IsInternalConceptRoleConcept(concept string) bool {
+	internalRoleConceptsOnce.Do(func() {
+		internalRoleConcepts = map[string]bool{}
+		for _, c := range Seed().AllConcepts() {
+			if len(c.InternalRoles) > 0 {
+				internalRoleConcepts[c.QualifiedName()] = true
+			}
+		}
+	})
+	return internalRoleConcepts[concept]
+}
 
 // QualifiedName returns the namespaced id `<package>.<Name>`.
 func (c Concept) QualifiedName() string {
@@ -79,20 +115,32 @@ func (c Concept) QualifiedName() string {
 // Ontology holds concepts + an alias index.
 type Ontology struct {
 	concepts map[string]*Concept
-	alias    map[string]string // alias -> canonical
+	alias    map[string]string   // alias -> canonical
+	children map[string][]string // parent concept -> direct refinements
 }
 
 func New() *Ontology {
-	return &Ontology{concepts: map[string]*Concept{}, alias: map[string]string{}}
+	return &Ontology{concepts: map[string]*Concept{}, alias: map[string]string{}, children: map[string][]string{}}
 }
 
 func (o *Ontology) Add(c Concept) *Concept {
-	if c.Kind == "control" && c.Applies == "" {
+	if o.children == nil {
+		o.children = o.buildChildrenIndex()
+	}
+	if (c.Kind == "control" || c.Kind == "check" && len(c.Neutralizes) > 0) && c.Applies == "" {
 		c.Applies = "path"
 	}
 	cp := c
 	q := cp.QualifiedName()
+	if old, exists := o.concepts[q]; exists && old.Refines != "" {
+		parent := o.Canonical(old.Refines)
+		o.children[parent] = removeChild(o.children[parent], q)
+	}
 	o.concepts[q] = &cp
+	if cp.Refines != "" {
+		parent := o.Canonical(cp.Refines)
+		o.children[parent] = append(o.children[parent], q)
+	}
 	for _, a := range c.Aliases {
 		o.alias[a] = q
 	}
@@ -109,25 +157,28 @@ func (o *Ontology) AllConcepts() []Concept {
 	return out
 }
 
-// ConceptsWithAnalysisRole returns the concepts tagged for an internal engine
-// role. The role names are generic mechanics; the concrete concept identities
-// live in ontology data.
-func (o *Ontology) ConceptsWithAnalysisRole(role string) map[string]bool {
+// ConceptsWithInternalConceptRole returns the concepts assigned to an internal
+// engine role. The roles are Go-owned language mechanics, not authored ontology
+// fields.
+func (o *Ontology) ConceptsWithInternalConceptRole(role string) map[string]bool {
 	out := map[string]bool{}
 	if role == "" {
 		return out
 	}
-	for _, c := range o.concepts {
-		if c.AnalysisRole == role {
-			out[c.QualifiedName()] = true
+	for _, concept := range o.concepts {
+		for _, candidate := range concept.InternalRoles {
+			if candidate == role {
+				out[concept.QualifiedName()] = true
+				break
+			}
 		}
 	}
 	return out
 }
 
-// SingleConceptWithAnalysisRole returns the sole concept tagged for role.
-func (o *Ontology) SingleConceptWithAnalysisRole(role string) string {
-	concepts := o.ConceptsWithAnalysisRole(role)
+// SingleConceptWithInternalConceptRole returns the sole concept tagged for role.
+func (o *Ontology) SingleConceptWithInternalConceptRole(role string) string {
+	concepts := o.ConceptsWithInternalConceptRole(role)
 	var out string
 	for c := range concepts {
 		if out != "" {
@@ -203,17 +254,44 @@ func (o *Ontology) DeprecationWarning(name string) string {
 func (o *Ontology) Descendants(name string) map[string]bool {
 	name = o.Canonical(name)
 	out := map[string]bool{name: true}
-	for changed := true; changed; {
-		changed = false
-		for _, c := range o.concepts {
-			q := c.QualifiedName()
-			if c.Refines != "" && out[c.Refines] && !out[q] {
-				out[q] = true
-				changed = true
+	if o.children == nil {
+		o.children = o.buildChildrenIndex()
+	}
+	queue := []string{name}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, child := range o.children[cur] {
+			if out[child] {
+				continue
 			}
+			out[child] = true
+			queue = append(queue, child)
 		}
 	}
 	return out
+}
+
+func (o *Ontology) buildChildrenIndex() map[string][]string {
+	children := map[string][]string{}
+	for _, c := range o.concepts {
+		if c.Refines == "" {
+			continue
+		}
+		parent := o.Canonical(c.Refines)
+		children[parent] = append(children[parent], c.QualifiedName())
+	}
+	return children
+}
+
+func removeChild(children []string, child string) []string {
+	for i, c := range children {
+		if c == child {
+			copy(children[i:], children[i+1:])
+			return children[:len(children)-1]
+		}
+	}
+	return children
 }
 
 // --- typing predicates ---------------------------------------------------
@@ -241,10 +319,10 @@ func (o *Ontology) field(name, which string) []string {
 	return nil
 }
 
-// CheckSanitizerTyping returns the neutralized threat kind if
-// `unless sanitized_by control` is well-typed for `taint source -> sink`, else
-// an error. This makes `taint HTTP_INPUT -> SQL_EXECUTION unless sanitized_by
-// HTML_ESCAPE` a compile error (docs/06).
+// CheckSanitizerTyping returns the neutralized threat kind when a v2 path or
+// endpoint coveredBy control is well-typed for `taint source -> sink`, else an
+// error. This makes an HTML_ESCAPE control on a SQL_EXECUTION sink a compile
+// error (docs/06).
 func (o *Ontology) CheckSanitizerTyping(source, sink, control string) (string, error) {
 	sinkThreats := set(o.SinkThreats(sink))
 	neutralized := set(o.ControlNeutralizes(control))

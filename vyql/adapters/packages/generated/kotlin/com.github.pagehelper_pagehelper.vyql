@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "com.github.pagehelper:pagehelper" {
-    sink method "parse" -> code.SqlExecution
-  }
-}

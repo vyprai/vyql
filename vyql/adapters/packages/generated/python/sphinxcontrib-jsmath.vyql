@@ -1,6 +1,0 @@
-adapter python {
-  package "sphinxcontrib-jsmath" {
-    sink method "html_visit_math" -> code.HtmlRender
-    sink method "html_visit_displaymath" -> code.HtmlRender
-  }
-}

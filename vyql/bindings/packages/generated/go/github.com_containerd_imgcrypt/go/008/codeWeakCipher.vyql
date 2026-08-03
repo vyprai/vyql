@@ -1,0 +1,9 @@
+module bindings.go.generated.m11300376;
+
+binding weakCipher8 {
+  requires {
+    dependency("github.com/containerd/imgcrypt")
+  }
+  query pattern callExpr where callee.method == "decryptLayer"
+  emit issue code.WeakCipher at call
+}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.mcfba857c;
+
+binding networkConnect1 {
+  requires {
+    dependency("github.com/manolofdez/AsyncBluetooth")
+  }
+  query pattern callExpr where callee.method == "openL2CAPChannel"
+  emit sink code.NetworkConnectSink at args[0]
+}

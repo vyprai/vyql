@@ -1,0 +1,6 @@
+module bindings.config.generated.m2b6375a9;
+
+binding cleartextConfig1 {
+  query pattern presenceNode where node.analysis ~= "config.android.cleartext_enabled"
+  emit issue code.CleartextConfig at node
+}

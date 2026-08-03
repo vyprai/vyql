@@ -1,5 +1,0 @@
-adapter groovy {
-  package "io.jsonwebtoken:jjwt-api" {
-    sink method "parse" -> code.Deserialization
-  }
-}

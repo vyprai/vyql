@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc6005d88;
+
+binding regexCompile15 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "NSRegularExpression"
+  emit sink code.RegexCompileSink at args[0]
+}

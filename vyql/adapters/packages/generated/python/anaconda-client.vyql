@@ -1,8 +1,0 @@
-import core.{AuthenticationCheck}
-import code.{UrlFetch}
-adapter python {
-  package "anaconda-client" {
-    control method "authenticate" -> core.AuthenticationCheck
-    sink method "download" -> code.UrlFetch
-  }
-}

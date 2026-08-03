@@ -1,0 +1,6 @@
+module injection;
+
+threat ProtocolStateConfusion {
+  cwe: [CWE_349]
+  desc: "Protocol state transition accepts stale untrusted data as trusted data"
+}

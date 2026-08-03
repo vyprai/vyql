@@ -1,7 +1,0 @@
-import code.{CodeEval}
-adapter perl {
-  package "unless" {
-    sink method "import" -> code.CodeEval
-    sink method "unimport" -> code.CodeEval
-  }
-}

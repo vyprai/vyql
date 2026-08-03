@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter javascript {
-  package "@jest/core" {
-    source method "runCLI" -> code.CliArgument
-  }
-}

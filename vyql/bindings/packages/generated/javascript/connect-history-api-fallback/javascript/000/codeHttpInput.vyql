@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m0f3197e2;
+
+binding httpInput0 {
+  requires {
+    dependency("connect-history-api-fallback")
+  }
+  query pattern callExpr where callee.method == "module.exports"
+  emit source code.HttpInput at call.result
+}

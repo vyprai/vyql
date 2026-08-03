@@ -1,0 +1,8 @@
+module code;
+
+review code.CowAgentMemoryFilenameTraversal {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: attention
+  text: "review memory content filename resolution for realpath containment before reading files"
+}

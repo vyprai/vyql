@@ -1,7 +1,0 @@
-adapter ruby {
-  package "rbvmomi" {
-    sink method "findByUuid" -> code.NosqlQuery
-    sink method "LeaseTool" -> code.StoredDataWrite
-    sink method "load_x509" -> code.Deserialization
-  }
-}

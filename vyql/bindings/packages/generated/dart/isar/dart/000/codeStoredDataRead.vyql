@@ -1,0 +1,9 @@
+module bindings.dart.generated.m566b51ec;
+
+binding storedDataRead0 {
+  requires {
+    dependency("isar")
+  }
+  query pattern callExpr where callee.method == "exportJsonRaw"
+  emit source code.StoredDataRead at call.result
+}

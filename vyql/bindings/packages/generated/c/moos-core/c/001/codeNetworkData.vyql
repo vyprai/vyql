@@ -1,0 +1,9 @@
+module bindings.c.generated.m734b81f3;
+
+binding networkData1 {
+  requires {
+    dependency("moos-core")
+  }
+  query pattern callExpr where callee.method == "CMOOSCommClient::Receive"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.m12bea118;
+
+binding deserialization1 {
+  requires {
+    dependency("PYX")
+  }
+  query pattern callExpr where callee.method == "parse_file"
+  emit sink code.Deserialization at args[0]
+}

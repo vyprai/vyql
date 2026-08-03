@@ -1,9 +1,0 @@
-import code.{FilePathAccess, FileUse}
-
-adapter swift {
-  package "github.com/dreymonde/Shallows" {
-    sink method "retrieve" -> code.FileUse
-    sink method "set" -> code.FileUse
-    sink method "clear" -> code.FilePathAccess
-  }
-}

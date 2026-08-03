@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter cpp {
-  package "onnx-optimizer" {
-    sink method "loadModel" -> code.FilePathAccess
-    sink method "saveModel" -> code.FilePathAccess
-  }
-}

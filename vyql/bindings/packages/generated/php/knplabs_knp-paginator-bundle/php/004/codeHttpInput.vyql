@@ -1,0 +1,9 @@
+module bindings.php.generated.m3aabedbe;
+
+binding httpInput4 {
+  requires {
+    dependency("knplabs/knp-paginator-bundle")
+  }
+  query pattern callExpr where callee.method == "KnpBundlePaginatorBundlePaginationSlidingPagination::getQuery"
+  emit source code.HttpInput at call.result
+}

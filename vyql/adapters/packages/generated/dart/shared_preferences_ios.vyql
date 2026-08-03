@@ -1,8 +1,0 @@
-import code.{StoredDataRead, StoredDataWrite}
-adapter dart {
-  package "shared_preferences_ios" {
-    sink method "UserDefaultsApi.remove" -> code.StoredDataWrite
-    sink method "UserDefaultsApi.setValue" -> code.StoredDataWrite
-    source method "UserDefaultsApi.value" -> code.StoredDataRead
-  }
-}

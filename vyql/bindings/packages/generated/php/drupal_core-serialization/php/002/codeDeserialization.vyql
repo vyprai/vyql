@@ -1,0 +1,9 @@
+module bindings.php.generated.m09e52295;
+
+binding deserialization2 {
+  requires {
+    dependency("drupal/core-serialization")
+  }
+  query pattern callExpr where callee.method == "DrupalComponentSerializationYaml::decode"
+  emit sink code.Deserialization at args[0]
+}

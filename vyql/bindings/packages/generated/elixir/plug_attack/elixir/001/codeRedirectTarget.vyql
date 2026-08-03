@@ -1,0 +1,10 @@
+module bindings.elixir.generated.mf526726a;
+
+binding redirectTarget1 {
+  requires {
+    dependency("plug_attack")
+  }
+  query pattern callExpr where callee.method == "block_action"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

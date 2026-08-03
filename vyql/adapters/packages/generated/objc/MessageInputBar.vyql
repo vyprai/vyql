@@ -1,5 +1,0 @@
-adapter objc {
-  package "MessageInputBar" {
-    source method "InputTextView.paste" -> core.UserControlledData
-  }
-}

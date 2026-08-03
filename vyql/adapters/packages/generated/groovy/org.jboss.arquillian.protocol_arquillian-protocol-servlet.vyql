@@ -1,7 +1,0 @@
-import code.{HttpInput}
-adapter groovy {
-  package "org.jboss.arquillian.protocol:arquillian-protocol-servlet" {
-    source method "doPost" -> code.HttpInput
-    source method "doGet" -> code.HttpInput
-  }
-}

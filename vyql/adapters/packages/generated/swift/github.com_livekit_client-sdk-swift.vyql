@@ -1,7 +1,0 @@
-import code.{HttpInput, NetworkSend}
-adapter swift {
-  package "github.com/livekit/client-sdk-swift" {
-    source method "connect" -> code.HttpInput
-    sink method "send" -> code.NetworkSend
-  }
-}

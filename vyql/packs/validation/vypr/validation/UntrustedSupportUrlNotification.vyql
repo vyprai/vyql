@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule UntrustedSupportUrlNotification {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_20]
+    id: "VYQL-VAL-018"
+    severity: medium
+  }
+  issue code.UntrustedSupportUrlNotification as notification
+}

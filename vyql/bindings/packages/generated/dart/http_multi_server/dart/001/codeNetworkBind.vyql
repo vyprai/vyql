@@ -1,0 +1,9 @@
+module bindings.dart.generated.m2a84533f;
+
+binding networkBind1 {
+  requires {
+    dependency("http_multi_server")
+  }
+  query pattern callExpr where callee.method == "loopback"
+  emit sink code.NetworkBind at args[0]
+}

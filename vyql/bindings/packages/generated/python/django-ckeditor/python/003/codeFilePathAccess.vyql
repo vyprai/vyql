@@ -1,0 +1,9 @@
+module bindings.python.generated.mf4fe81f1;
+
+binding filePathAccess3 {
+  requires {
+    dependency("django-ckeditor")
+  }
+  query pattern callExpr where callee.method == "ckeditor_uploader.views.browse"
+  emit sink code.FilePathAccess at args[0]
+}

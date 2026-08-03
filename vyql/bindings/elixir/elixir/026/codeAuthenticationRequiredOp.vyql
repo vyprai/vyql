@@ -1,0 +1,6 @@
+module bindings.elixir.generated.m728b8a72;
+
+binding authenticationRequiredOp26 {
+  query pattern presenceNode where node.path ~= "transfer_funds"
+  emit issue code.AuthenticationRequiredOp at node
+}

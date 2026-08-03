@@ -1,0 +1,9 @@
+module bindings.php.generated.m20e556e0;
+
+binding filePathAccess0 {
+  requires {
+    dependency("nette/caching")
+  }
+  query pattern callExpr where callee.method == "NetteCachingStoragesFileStorage::read"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,13 @@
+module bindings.php.generated.mccc7d20f;
+
+binding authenticationCheck5 {
+  requires {
+    dependency("kreait/firebase-php")
+  }
+  query pattern callExpr where callee.method == "verifySessionCookie"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

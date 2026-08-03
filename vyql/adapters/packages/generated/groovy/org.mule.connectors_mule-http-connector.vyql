@@ -1,8 +1,0 @@
-import code.{NetworkConnect, NetworkSend}
-
-adapter groovy {
-  package "org.mule.connectors:mule-http-connector" {
-    sink method "send" -> code.NetworkConnect
-    sink method "send" -> code.NetworkSend
-  }
-}

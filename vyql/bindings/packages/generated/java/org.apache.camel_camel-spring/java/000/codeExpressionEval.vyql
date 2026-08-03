@@ -1,0 +1,9 @@
+module bindings.java.generated.m11fd9b61;
+
+binding expressionEval0 {
+  requires {
+    dependency("org.apache.camel:camel-spring")
+  }
+  query pattern callExpr where callee.method == "parseExpression"
+  emit sink code.ExpressionEval at args[0]
+}

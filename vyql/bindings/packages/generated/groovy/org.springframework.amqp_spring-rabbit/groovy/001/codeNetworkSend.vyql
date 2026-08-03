@@ -1,0 +1,9 @@
+module bindings.groovy.generated.md86a8747;
+
+binding networkSend1 {
+  requires {
+    dependency("org.springframework.amqp:spring-rabbit")
+  }
+  query pattern callExpr where callee.method == "sendDirect"
+  emit sink code.NetworkSend at args[0]
+}

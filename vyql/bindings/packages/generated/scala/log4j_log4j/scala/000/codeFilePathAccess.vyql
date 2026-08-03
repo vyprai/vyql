@@ -1,0 +1,9 @@
+module bindings.scala.generated.mcb8075d5;
+
+binding filePathAccess0 {
+  requires {
+    dependency("log4j:log4j")
+  }
+  query pattern callExpr where callee.method == "org.apache.log4j.FileAppender.setFile"
+  emit sink code.FilePathAccess at args[0]
+}

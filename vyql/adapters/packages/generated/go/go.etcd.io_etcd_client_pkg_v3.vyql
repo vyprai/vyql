@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-import core.{PathCanonicalization}
-
-adapter go {
-  package "go.etcd.io/etcd/client/pkg/v3" {
-    sink method "OpenDir" -> code.FilePathAccess
-    control method "CanonicalURLPath" -> core.PathCanonicalization
-  }
-}

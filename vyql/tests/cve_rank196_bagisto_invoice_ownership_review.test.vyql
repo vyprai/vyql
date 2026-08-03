@@ -1,5 +1,6 @@
 test "rank196: bagisto invoice print lookup without customer ownership guard is review-visible"
   lang php
+  expect VYQL-AUTH-002
   expect_review code.ObjectLookupByUserInput
   code
   ```
@@ -16,6 +17,7 @@ test "rank196: bagisto invoice print lookup without customer ownership guard is 
 
 test "rank196: bagisto invoice print customer ownership guard is review-visible"
   lang php
+  reject VYQL-AUTH-002
   expect_review core.OwnershipCheck
   code
   ```

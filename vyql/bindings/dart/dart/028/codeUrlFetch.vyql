@@ -1,0 +1,6 @@
+module bindings.dart.generated.m1c398214;
+
+binding urlFetch28 {
+  query pattern callExpr where callee.path ~= "http.head"
+  emit sink code.UrlFetch at args[0]
+}

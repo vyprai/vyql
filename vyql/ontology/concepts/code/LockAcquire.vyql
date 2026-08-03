@@ -1,0 +1,11 @@
+module code;
+
+concept LockAcquire : issue {
+  cwe: [CWE_667]
+  reviewAssumption: "an unreleased lock can be triggered to deadlock or starve concurrent work"
+  reviewCategory: lifecycle
+  reviewCondition: "a lock acquisition may not be released on every path"
+  reviewConfidence: medium
+  reviewEvidence: "lock primitive {pattern} is acquired"
+  vulnerableTo: [concurrency.Deadlock]
+}

@@ -1,0 +1,13 @@
+module bindings.php.generated.mccc7d20f;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("kreait/firebase-php")
+  }
+  query pattern callExpr where callee.method == "sendSignInWithEmailLink"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

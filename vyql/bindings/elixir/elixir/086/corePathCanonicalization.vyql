@@ -1,0 +1,11 @@
+module bindings.elixir.generated.m728b8a72;
+
+binding pathCanonicalization86 {
+  query pattern callExpr where callee.path ~= "safe_path"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

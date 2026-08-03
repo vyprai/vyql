@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m281fe399;
+
+binding deserialization2 {
+  requires {
+    dependency("org.codehaus.jettison:jettison")
+  }
+  query pattern callExpr where callee.method == "JSONArray"
+  emit sink code.Deserialization at args[0]
+}

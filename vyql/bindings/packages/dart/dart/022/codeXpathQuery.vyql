@@ -1,0 +1,9 @@
+module bindings.dart.generated.m5342780c;
+
+binding xpathQuery22 {
+  requires {
+    dependency("xpath_selector")
+  }
+  query pattern callExpr where callee.method == "xpath"
+  emit sink code.XpathQuery at args[0]
+}

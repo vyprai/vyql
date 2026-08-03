@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter kotlin {
-  package "org.apache.maven:maven-model" {
-    sink method "setPomFile" -> code.FilePathAccess
-    sink method "setPomPath" -> code.FilePathAccess
-  }
-}

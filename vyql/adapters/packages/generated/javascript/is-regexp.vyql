@@ -1,9 +1,0 @@
-import code.{RegexCompile}
-
-adapter javascript {
-  package "is-regexp" {
-    flag code.RegexCompile on any {
-      method "isRegexp"
-    }
-  }
-}

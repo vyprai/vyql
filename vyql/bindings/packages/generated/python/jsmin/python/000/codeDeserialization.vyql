@@ -1,0 +1,9 @@
+module bindings.python.generated.md939fe59;
+
+binding deserialization0 {
+  requires {
+    dependency("jsmin")
+  }
+  query pattern callExpr where callee.method == "jsmin"
+  emit sink code.Deserialization at args[0]
+}

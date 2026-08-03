@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m11f9a242;
+
+binding deserialization2 {
+  requires {
+    dependency("org.springframework:spring-webmvc-portlet")
+  }
+  query pattern callExpr where callee.method == "parseInts"
+  emit sink code.Deserialization at args[0]
+}

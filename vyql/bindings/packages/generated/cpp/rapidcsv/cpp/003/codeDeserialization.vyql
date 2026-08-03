@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m7b5f7815;
+
+binding deserialization3 {
+  requires {
+    dependency("rapidcsv")
+  }
+  query pattern callExpr where callee.method == "ReadCsv"
+  emit sink code.Deserialization at args[0]
+}

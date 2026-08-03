@@ -1,0 +1,9 @@
+module bindings.java.generated.md6bba3e8;
+
+binding userControlledData0 {
+  requires {
+    dependency("org.springframework.plugin:spring-plugin-core")
+  }
+  query pattern callExpr where callee.method == "supports"
+  emit source core.UserControlledData at call.result
+}

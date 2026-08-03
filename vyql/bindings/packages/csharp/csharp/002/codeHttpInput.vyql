@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m2a0e231a;
+
+binding httpInput2 {
+  requires {
+    dependency("Microsoft.AspNetCore.Http")
+  }
+  query pattern callExpr where callee.method == "Headers" and callee.receiver.type == "HttpRequest"
+  emit source code.HttpInput at call.result
+}

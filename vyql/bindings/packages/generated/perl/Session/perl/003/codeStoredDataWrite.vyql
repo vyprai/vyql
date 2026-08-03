@@ -1,0 +1,9 @@
+module bindings.perl.generated.m935fdd23;
+
+binding storedDataWrite3 {
+  requires {
+    dependency("Session")
+  }
+  query pattern callExpr where callee.method == "remove"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.m68e62d4c;
+
+binding cliArgument0 {
+  requires {
+    dependency("dart_code_metrics")
+  }
+  query pattern callExpr where callee.method == "ParsedArguments.fromArgs"
+  emit source code.CliArgument at call.result
+}

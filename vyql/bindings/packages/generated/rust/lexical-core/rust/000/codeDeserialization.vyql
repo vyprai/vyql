@@ -1,0 +1,9 @@
+module bindings.rust.generated.m92874b8e;
+
+binding deserialization0 {
+  requires {
+    dependency("lexical-core")
+  }
+  query pattern callExpr where callee.method == "from_lexical"
+  emit sink code.Deserialization at args[0]
+}

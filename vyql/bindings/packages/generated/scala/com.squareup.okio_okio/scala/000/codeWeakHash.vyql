@@ -1,0 +1,9 @@
+module bindings.scala.generated.m4b4d6c14;
+
+binding weakHash0 {
+  requires {
+    dependency("com.squareup.okio:okio")
+  }
+  query pattern callExpr where callee.method == "digest"
+  emit issue code.WeakHash at call
+}

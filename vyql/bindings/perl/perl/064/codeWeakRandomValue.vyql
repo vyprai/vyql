@@ -1,0 +1,6 @@
+module bindings.perl.generated.mfca40a44;
+
+binding weakRandomValue64 {
+  query pattern presenceNode where node.path ~= "rand"
+  emit issue code.WeakRandomValue at node
+}

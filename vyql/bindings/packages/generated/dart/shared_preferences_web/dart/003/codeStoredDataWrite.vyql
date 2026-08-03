@@ -1,0 +1,9 @@
+module bindings.dart.generated.m9fbac062;
+
+binding storedDataWrite3 {
+  requires {
+    dependency("shared_preferences_web")
+  }
+  query pattern callExpr where callee.method == "SharedPreferencesPlugin.clear"
+  emit sink code.StoredDataWrite at args[0]
+}

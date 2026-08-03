@@ -1,0 +1,14 @@
+module bindings.go.generated.m4f608b1f;
+
+binding inputValidation9 {
+  requires {
+    dependency("github.com/gobwas/httphead")
+  }
+  query pattern callExpr where callee.method == "CanonicalizeHeaderKey"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

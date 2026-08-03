@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding classroomBookingsDisplayNameAltXss84 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "display_name_alt_unescaped"
+  emit issue code.ClassroomBookingsDisplayNameAltXss at node
+}

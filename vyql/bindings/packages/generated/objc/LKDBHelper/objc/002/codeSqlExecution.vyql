@@ -1,0 +1,9 @@
+module bindings.objc.generated.mcf19b29f;
+
+binding sqlExecution2 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "executeDB:"
+  emit sink code.SqlExecution at args[0]
+}

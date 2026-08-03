@@ -1,0 +1,9 @@
+module bindings.elixir.generated.ma152eb54;
+
+binding networkConnect5 {
+  requires {
+    dependency("httpotion")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule SensitiveOperation {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_862]
+    id: "VYQL-AUTH-079"
+    severity: high
+  }
+  issue code.SensitiveOperation as sink
+}

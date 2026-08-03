@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m93ede54e;
+
+binding deserialization0 {
+  requires {
+    dependency("knockoutjs")
+  }
+  query pattern callExpr where callee.method == "parseJson"
+  emit sink code.Deserialization at args[0]
+}

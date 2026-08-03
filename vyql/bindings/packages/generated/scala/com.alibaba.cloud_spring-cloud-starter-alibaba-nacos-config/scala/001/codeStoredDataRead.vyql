@@ -1,0 +1,9 @@
+module bindings.scala.generated.meeaa476d;
+
+binding storedDataRead1 {
+  requires {
+    dependency("com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-config")
+  }
+  query pattern callExpr where callee.method == "loadNacosConfiguration"
+  emit source code.StoredDataRead at call.result
+}

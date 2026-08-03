@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter rust {
-  package "rustls-native-certs" {
-    sink method "load_native_certs" -> code.FilePathAccess
-    sink method "load_certs_from_paths" -> code.FilePathAccess
-  }
-}

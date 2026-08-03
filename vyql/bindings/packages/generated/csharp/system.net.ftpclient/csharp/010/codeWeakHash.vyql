@@ -1,0 +1,9 @@
+module bindings.csharp.generated.md1519ec6;
+
+binding weakHash10 {
+  requires {
+    dependency("system.net.ftpclient")
+  }
+  query pattern callExpr where callee.method == "GetMD5"
+  emit issue code.WeakHash at call
+}

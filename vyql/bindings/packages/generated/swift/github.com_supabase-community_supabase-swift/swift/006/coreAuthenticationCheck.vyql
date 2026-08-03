@@ -1,0 +1,13 @@
+module bindings.swift.generated.m9fb65a21;
+
+binding authenticationCheck6 {
+  requires {
+    dependency("github.com/supabase-community/supabase-swift")
+  }
+  query pattern callExpr where callee.method == "challenge"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

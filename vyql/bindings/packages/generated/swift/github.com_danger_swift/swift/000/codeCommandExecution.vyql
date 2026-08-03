@@ -1,0 +1,9 @@
+module bindings.swift.generated.m87c5d565;
+
+binding commandExecution0 {
+  requires {
+    dependency("github.com/danger/swift")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.go.generated.m600cfa6d;
+
+binding filePathAccess5 {
+  requires {
+    dependency("github.com/Microsoft/go-winio")
+  }
+  query pattern callExpr where callee.method == "OpenForBackup"
+  emit sink code.FilePathAccess at args[0]
+}

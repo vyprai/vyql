@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mff8ced10;
+
+binding weakHash1 {
+  requires {
+    dependency("com.clearspring.analytics:stream")
+  }
+  query pattern callExpr where callee.method == "hashLong"
+  emit issue code.WeakHash at call
+}

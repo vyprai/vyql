@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter scala {
-  package "org.apache.tomcat:tomcat-catalina" {
-    sink method "parse" -> code.Deserialization
-  }
-}

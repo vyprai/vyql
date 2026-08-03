@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter java {
-  package "org.apache.velocity:velocity" {
-    sink method "parse" -> code.CodeEval
-  }
-}

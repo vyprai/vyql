@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding filePathAccess386 {
+  query pattern callExpr where callee.analysis ~= "function.context.sink" and args.any.context.name contains "get_filename_for_event_id" and args.any.literal contains "event_id" and args.any.literal contains "os.path.join" and args.any.literal contains "INGEST_STORE_BASE_DIR" and not args.any.literal contains "uuid.UUID(event_id).hex"
+  emit sink code.FilePathAccess at args[0]
+}

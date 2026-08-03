@@ -1,0 +1,9 @@
+module bindings.rust.generated.mdde311f6;
+
+binding deserialization1 {
+  requires {
+    dependency("serde_json")
+  }
+  query pattern callExpr where callee.method == "from_slice"
+  emit sink code.Deserialization at args[0]
+}

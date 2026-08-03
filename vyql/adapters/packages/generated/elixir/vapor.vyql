@@ -1,7 +1,0 @@
-import code.{SecretValue}
-adapter elixir {
-  package "vapor" {
-    source method "load" -> code.SecretValue
-    source method "load!" -> code.SecretValue
-  }
-}

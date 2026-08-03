@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mb54676b8;
+
+binding networkData0 {
+  requires {
+    dependency("boost-interprocess")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit source code.NetworkData at call.result
+}

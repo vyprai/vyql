@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mab577c9f;
+
+binding deserialization3 {
+  requires {
+    dependency("seacas")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

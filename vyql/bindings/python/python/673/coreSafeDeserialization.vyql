@@ -1,0 +1,11 @@
+module bindings.python.deserialization;
+
+binding jwtDecodeIsNotObjectDeserialization673 {
+  query pattern callExpr where callee.path == "jwt.decode"
+  emit check core.SafeDeserialization at args[0] {
+    covers path {
+      from: args[0]
+      to: call
+    }
+  }
+}

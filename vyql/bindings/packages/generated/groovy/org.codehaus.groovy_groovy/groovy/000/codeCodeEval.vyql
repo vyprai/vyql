@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m05538901;
+
+binding codeEval0 {
+  requires {
+    dependency("org.codehaus.groovy:groovy")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.CodeEval at args[0]
+}

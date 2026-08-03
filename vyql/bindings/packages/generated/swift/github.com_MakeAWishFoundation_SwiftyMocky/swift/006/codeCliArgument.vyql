@@ -1,0 +1,9 @@
+module bindings.swift.generated.mb190fccd;
+
+binding cliArgument6 {
+  requires {
+    dependency("github.com/MakeAWishFoundation/SwiftyMocky")
+  }
+  query pattern callExpr where callee.method == "doctor"
+  emit source code.CliArgument at call.result
+}

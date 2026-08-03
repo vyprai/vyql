@@ -1,0 +1,9 @@
+module bindings.perl.generated.m558a6fdd;
+
+binding deserialization3 {
+  requires {
+    dependency("YAOO")
+  }
+  query pattern callExpr where callee.method == "deep_clone"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,10 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding allowlistValidation202 {
+  query pattern callExpr where callee.path ~= "isUrlSafeToOpen"
+  emit check core.AllowlistValidation at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

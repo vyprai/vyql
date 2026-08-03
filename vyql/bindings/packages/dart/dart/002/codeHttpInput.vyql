@@ -1,0 +1,9 @@
+module bindings.dart.generated.m5342780c;
+
+binding httpInput2 {
+  requires {
+    dependency("dart_frog")
+  }
+  query pattern callExpr where callee.method == "params" and callee.receiver.type == "RequestContext"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.m9e8e9fe2;
+
+binding networkData3 {
+  requires {
+    dependency("com.sun.jersey:jersey-client")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit source code.NetworkData at call.result
+}

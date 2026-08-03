@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding weakHash374 {
+  query pattern callExpr where callee.path ~= "MessageDigest.getInstance" and args.any.literal contains "SHA1"
+  emit issue code.WeakHash at call
+}

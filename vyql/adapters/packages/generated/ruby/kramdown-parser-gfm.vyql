@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter ruby {
-  package "kramdown-parser-gfm" {
-    sink method "initialize" -> code.Deserialization
-  }
-}

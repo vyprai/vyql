@@ -1,0 +1,9 @@
+module bindings.php.generated.m5306ffb4;
+
+binding userControlledData0 {
+  requires {
+    dependency("sebastian/exporter")
+  }
+  query pattern callExpr where callee.method == "export"
+  emit source core.UserControlledData at call.result
+}

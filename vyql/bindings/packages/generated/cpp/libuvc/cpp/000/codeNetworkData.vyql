@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m6740c624;
+
+binding networkData0 {
+  requires {
+    dependency("libuvc")
+  }
+  query pattern callExpr where callee.method == "uvc_start_streaming"
+  emit source code.NetworkData at call.result
+}

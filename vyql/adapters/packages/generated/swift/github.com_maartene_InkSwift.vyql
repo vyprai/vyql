@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter swift {
-  package "github.com/maartene/InkSwift" {
-    sink method "InkStory.loadStory(ink:)" -> code.Deserialization
-    sink method "InkStory.loadStory(json:)" -> code.Deserialization
-    sink method "InkStory.loadState(_:)" -> code.Deserialization
-  }
-}

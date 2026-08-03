@@ -1,6 +1,0 @@
-adapter kotlin {
-  package "org.springframework.security:spring-security-core" {
-    source method "getCredentials" -> code.SecretValue
-    sink method "deserialize" -> code.Deserialization
-  }
-}

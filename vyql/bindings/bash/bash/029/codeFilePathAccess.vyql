@@ -1,0 +1,6 @@
+module bindings.bash.generated.m59952d5d;
+
+binding filePathAccess29 {
+  query pattern callExpr where callee.path ~= "chown"
+  emit sink code.FilePathAccess at args.any
+}

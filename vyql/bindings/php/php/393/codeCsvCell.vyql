@@ -1,0 +1,7 @@
+module bindings.php.generated.mfbe84119;
+
+binding csvCell393 {
+  query pattern callExpr where callee.path ~= "fputcsv"
+  emit sink code.CsvCell at args[1]
+  emit sink code.CsvCell at args[1].collection
+}

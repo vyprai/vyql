@@ -1,0 +1,9 @@
+module bindings.ruby.generated.meb3abca7;
+
+binding sqlExecution3 {
+  requires {
+    dependency("http-cookie")
+  }
+  query pattern callExpr where callee.method == "HTTP::CookieJar::MozillaStore.prepare"
+  emit sink code.SqlExecution at args[0]
+}

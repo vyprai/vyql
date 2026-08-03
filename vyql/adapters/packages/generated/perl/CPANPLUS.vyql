@@ -1,9 +1,0 @@
-import code.{CommandExecution, UrlFetch}
-
-adapter perl {
-  package "CPANPLUS" {
-    sink method "run" -> code.CommandExecution
-    sink method "fetch" -> code.UrlFetch
-    sink method "get" -> code.UrlFetch
-  }
-}

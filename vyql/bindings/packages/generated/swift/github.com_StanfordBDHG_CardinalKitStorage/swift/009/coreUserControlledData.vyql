@@ -1,0 +1,9 @@
+module bindings.swift.generated.m156364f6;
+
+binding userControlledData9 {
+  requires {
+    dependency("github.com/StanfordBDHG/CardinalKitStorage")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit source core.UserControlledData at call.result
+}

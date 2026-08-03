@@ -1,0 +1,9 @@
+module bindings.perl.generated.m1c0c7f4a;
+
+binding userControlledData0 {
+  requires {
+    dependency("lexicals")
+  }
+  query pattern callExpr where callee.method == "lexicals"
+  emit source core.UserControlledData at call.result
+}

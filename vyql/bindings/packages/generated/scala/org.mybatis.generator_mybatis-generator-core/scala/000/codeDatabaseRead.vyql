@@ -1,0 +1,9 @@
+module bindings.scala.generated.me8232238;
+
+binding databaseRead0 {
+  requires {
+    dependency("org.mybatis.generator:mybatis-generator-core")
+  }
+  query pattern callExpr where callee.method == "getConnection"
+  emit sink code.DatabaseReadSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.m9d24c957;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.struts:struts2-spring-plugin")
+  }
+  query pattern callExpr where callee.method == "setApplicationContextPath"
+  emit sink code.Deserialization at args[0]
+}

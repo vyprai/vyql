@@ -1,9 +1,0 @@
-import code.{Deserialization, NetworkData, NetworkSend}
-
-adapter cpp {
-  package "libsoundio" {
-    sink method "soundio_parse_channel_id" -> code.Deserialization
-    source method "soundio_instream_begin_read" -> code.NetworkData
-    sink method "soundio_outstream_begin_write" -> code.NetworkSend
-  }
-}

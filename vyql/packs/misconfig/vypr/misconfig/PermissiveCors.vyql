@@ -1,0 +1,10 @@
+module vypr.misconfig;
+
+rule PermissiveCors {
+  meta {
+    cwe: [CWE_942]
+    id: "VYQL-CFG-003"
+    severity: medium
+  }
+  issue code.PermissiveCors as c
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m46b991be;
+
+binding deserialization1 {
+  requires {
+    dependency("vimeo/psalm")
+  }
+  query pattern callExpr where callee.method == "loadFromXML"
+  emit sink code.Deserialization at args[0]
+}

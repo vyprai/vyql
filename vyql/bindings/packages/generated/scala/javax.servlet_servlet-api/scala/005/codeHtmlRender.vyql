@@ -1,0 +1,9 @@
+module bindings.scala.generated.mfa6b53f4;
+
+binding htmlRender5 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getWriter"
+  emit sink code.HtmlRender at args[0]
+}

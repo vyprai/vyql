@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter php {
-  package "liip/imagine-bundle" {
-    sink method "createProcess" -> code.CommandExecution
-  }
-}

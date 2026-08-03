@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mc80df900;
+
+binding cliArgument3 {
+  requires {
+    dependency("tty-prompt")
+  }
+  query pattern callExpr where callee.method == "mask"
+  emit source code.CliArgument at call.result
+}

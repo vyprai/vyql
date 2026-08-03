@@ -1,0 +1,10 @@
+module bindings.lua.generated.ma99d12f7;
+
+pattern bindingMetadata {
+  binding: {
+    name: "lua"
+    meta: {
+      fidelity: "resolved"
+    }
+  }
+}

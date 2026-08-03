@@ -1,0 +1,10 @@
+module bindings.python.generated.m21017d75;
+
+binding pathAccessCheck551 {
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.context.name contains "get_or_launch" and args.any.literal contains "SAFE_SEED_RE.match(seed)" and args.any.literal contains "os.path.join(self._data_dir,seed_key)"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

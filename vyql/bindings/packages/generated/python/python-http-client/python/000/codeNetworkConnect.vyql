@@ -1,0 +1,9 @@
+module bindings.python.generated.m6661519b;
+
+binding networkConnect0 {
+  requires {
+    dependency("python-http-client")
+  }
+  query pattern callExpr where callee.method == "http_request"
+  emit sink code.NetworkConnectSink at args[0]
+}

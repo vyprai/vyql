@@ -1,8 +1,0 @@
-adapter groovy {
-  package "io.undertow:undertow-core" {
-    sink method "requestLimitingHandler" -> code.UrlFetch
-    source method "urlDecodingHandler" -> code.NetworkData
-    sink method "remoteEndpointFailedToSendInitialSettings" -> code.NetworkSend
-    sink method "getConnectorStatistics" -> code.NetworkConnect
-  }
-}

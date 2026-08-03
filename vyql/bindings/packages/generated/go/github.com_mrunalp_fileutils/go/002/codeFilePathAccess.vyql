@@ -1,0 +1,9 @@
+module bindings.go.generated.m171cbac6;
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/mrunalp/fileutils")
+  }
+  query pattern callExpr where callee.method == "MkdirAllNewAs"
+  emit sink code.FilePathAccess at args[0]
+}

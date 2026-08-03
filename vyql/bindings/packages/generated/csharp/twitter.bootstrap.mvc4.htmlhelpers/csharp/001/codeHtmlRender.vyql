@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m3524e916;
+
+binding htmlRender1 {
+  requires {
+    dependency("twitter.bootstrap.mvc4.htmlhelpers")
+  }
+  query pattern callExpr where callee.method == "Pager"
+  emit sink code.HtmlRender at args[0]
+}

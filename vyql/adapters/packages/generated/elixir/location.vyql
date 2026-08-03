@@ -1,7 +1,0 @@
-import code.{StoredDataRead}
-
-adapter elixir {
-  package "location" {
-    source method "find_by" -> code.StoredDataRead
-  }
-}

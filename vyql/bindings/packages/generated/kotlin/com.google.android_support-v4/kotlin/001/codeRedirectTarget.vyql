@@ -1,0 +1,10 @@
+module bindings.kotlin.generated.mec43e687;
+
+binding redirectTarget1 {
+  requires {
+    dependency("com.google.android:support-v4")
+  }
+  query pattern callExpr where callee.method == "startActivityForResult"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

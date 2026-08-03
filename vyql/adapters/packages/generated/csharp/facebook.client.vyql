@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter csharp {
-  package "facebook.client" {
-    sink method "Facebook.Client.AppAuthenticationHelper.ParseQueryString" -> code.Deserialization
-  }
-}

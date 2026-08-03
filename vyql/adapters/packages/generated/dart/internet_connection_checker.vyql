@@ -1,8 +1,0 @@
-import code.{NetworkConnect}
-
-adapter dart {
-  package "internet_connection_checker" {
-    sink method "checkConnectivity" -> code.NetworkConnect
-    sink method "isHostReachable" -> code.NetworkConnect
-  }
-}

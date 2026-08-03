@@ -1,0 +1,10 @@
+module bindings.python.generated.m21017d75;
+
+binding codeExecutionValidation191 {
+  query pattern callExpr where callee.path ~= "validate_python_code"
+  emit check core.CodeExecutionValidation at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

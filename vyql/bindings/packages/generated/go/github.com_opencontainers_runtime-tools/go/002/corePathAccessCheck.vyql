@@ -1,0 +1,13 @@
+module bindings.go.generated.m93dbd5f2;
+
+binding pathAccessCheck2 {
+  requires {
+    dependency("github.com/opencontainers/runtime-tools")
+  }
+  query pattern callExpr where callee.method == "IsAncestor"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

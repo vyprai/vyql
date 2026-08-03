@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding templateRender168 {
+  query pattern callExpr where callee.path ~= "Erubi.new"
+  emit sink code.TemplateRender at args[0]
+}

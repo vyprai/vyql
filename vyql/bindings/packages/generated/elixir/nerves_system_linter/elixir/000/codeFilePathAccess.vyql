@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m23eba2d1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("nerves_system_linter")
+  }
+  query pattern callExpr where callee.method == "file_to_map"
+  emit sink code.FilePathAccess at args[0]
+}

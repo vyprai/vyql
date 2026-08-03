@@ -1,5 +1,0 @@
-adapter php {
-  package "egulias/email-validator" {
-    control method "isValid" -> core.InputValidation
-  }
-}

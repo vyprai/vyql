@@ -1,0 +1,9 @@
+module bindings.php.generated.m5cc0d483;
+
+binding codeEval1 {
+  requires {
+    dependency("clue/stream-filter")
+  }
+  query pattern callExpr where callee.method == "prepend"
+  emit sink code.CodeEval at args[0]
+}

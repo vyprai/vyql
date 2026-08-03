@@ -1,6 +1,0 @@
-import code.{UrlFetch}
-adapter dart {
-  package "firebase_storage_platform_interface" {
-    sink method "getDownloadURL" -> code.UrlFetch
-  }
-}

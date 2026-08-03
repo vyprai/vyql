@@ -1,0 +1,9 @@
+module bindings.scala.generated.mf483c1b1;
+
+binding networkSend4 {
+  requires {
+    dependency("org.apache.httpcomponents:fluent-hc")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.NetworkSend at args[0]
+}

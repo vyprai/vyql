@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter rust {
-  package "loom" {
-    sink method "checkpoint_file" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.java.generated.m8a3460e9;
+
+binding networkData1 {
+  requires {
+    dependency("org.eclipse.paho:org.eclipse.paho.client.mqttv3")
+  }
+  query pattern callExpr where callee.method == "subscribe"
+  emit source code.NetworkData at call.result
+}

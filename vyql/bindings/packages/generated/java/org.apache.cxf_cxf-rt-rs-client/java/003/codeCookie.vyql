@@ -1,0 +1,9 @@
+module bindings.java.generated.mb2560d14;
+
+binding cookie3 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.cookie"
+  emit source code.Cookie at call.result
+}

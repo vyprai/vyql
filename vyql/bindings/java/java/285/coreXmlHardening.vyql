@@ -1,0 +1,11 @@
+module bindings.java.generated.m420f6b67;
+
+binding xmlHardening285 {
+  query pattern callExpr where callee.path ~= "setExpandEntityReferences" and args.any.literal contains "false"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}

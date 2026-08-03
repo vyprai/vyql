@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding networkFilteringDisabled235 {
+  query pattern callExpr where callee.path ~= "command" and args.any.literal contains "bridge-nf-call-iptables" and args.any.literal contains "echo 0"
+  emit issue code.NetworkFilteringDisabled at call
+}

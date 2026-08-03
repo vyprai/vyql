@@ -1,0 +1,6 @@
+module bindings.config.generated.m2b6375a9;
+
+binding userControlledData30 {
+  query pattern callExpr where callee.analysis ~= "template.xwiki_velocity.input"
+  emit source core.UserControlledData at call.result
+}

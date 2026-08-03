@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m89dc0457;
+
+binding weakRandomValue1 {
+  requires {
+    dependency("misc_random")
+  }
+  query pattern presenceNode where node.path ~= "Misc.Random.seed_random"
+  emit issue code.WeakRandomValue at node
+}

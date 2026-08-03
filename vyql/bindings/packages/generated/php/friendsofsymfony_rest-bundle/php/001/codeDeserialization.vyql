@@ -1,0 +1,9 @@
+module bindings.php.generated.m3d447b53;
+
+binding deserialization1 {
+  requires {
+    dependency("friendsofsymfony/rest-bundle")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

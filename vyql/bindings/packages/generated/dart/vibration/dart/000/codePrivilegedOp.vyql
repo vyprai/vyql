@@ -1,0 +1,10 @@
+module bindings.dart.generated.m230aecc1;
+
+binding privilegedOp0 {
+  requires {
+    dependency("vibration")
+  }
+  query pattern callExpr where callee.method == "vibrate"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

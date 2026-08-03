@@ -1,0 +1,9 @@
+module bindings.perl.generated.ma164dcec;
+
+binding deserialization19 {
+  requires {
+    dependency("YAML")
+  }
+  query pattern callExpr where callee.path ~= "YAML.Load"
+  emit sink code.Deserialization at args[0]
+}

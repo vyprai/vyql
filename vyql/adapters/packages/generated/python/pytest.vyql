@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter python {
-  package "pytest" {
-    source method "pytest_addoption" -> code.CliArgument
-  }
-}

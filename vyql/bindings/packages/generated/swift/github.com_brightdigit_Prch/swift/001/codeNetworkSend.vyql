@@ -1,0 +1,9 @@
+module bindings.swift.generated.m77b5f8d5;
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/brightdigit/Prch")
+  }
+  query pattern callExpr where callee.method == "beginRequest"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m46c40b45;
+
+binding sqlExecution2 {
+  requires {
+    dependency("sqlite-net")
+  }
+  query pattern callExpr where callee.method == "InsertAll"
+  emit sink code.SqlExecution at args[0]
+}

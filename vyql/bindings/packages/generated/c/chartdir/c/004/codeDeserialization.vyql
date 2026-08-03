@@ -1,0 +1,9 @@
+module bindings.c.generated.m0519de0e;
+
+binding deserialization4 {
+  requires {
+    dependency("chartdir")
+  }
+  query pattern callExpr where callee.method == "loadWMP"
+  emit sink code.Deserialization at args[0]
+}

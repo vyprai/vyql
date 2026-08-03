@@ -1,0 +1,9 @@
+module bindings.solidity.generated.m72929a80;
+
+binding externalCall4 {
+  requires {
+    dependency("solidity")
+  }
+  query pattern callExpr where callee.method == "delegatecall"
+  emit sink code.ExternalCall at args[0]
+}

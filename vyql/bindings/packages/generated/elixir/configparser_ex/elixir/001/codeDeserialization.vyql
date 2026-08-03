@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m5bbff6cc;
+
+binding deserialization1 {
+  requires {
+    dependency("configparser_ex")
+  }
+  query pattern callExpr where callee.method == "parse_string"
+  emit sink code.Deserialization at args[0]
+}

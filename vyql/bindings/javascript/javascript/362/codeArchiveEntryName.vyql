@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding archiveEntryName362 {
+  requires {
+    dependency("adm-zip")
+  }
+  query pattern callExpr where callee.path ~= "adm-zip"
+  emit source code.ArchiveEntryName at call.result
+}

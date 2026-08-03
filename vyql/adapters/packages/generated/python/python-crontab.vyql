@@ -1,8 +1,0 @@
-import code.{CommandExecution, FilePathAccess}
-adapter python {
-  package "python-crontab" {
-    sink method "run" -> code.CommandExecution
-    sink method "read" -> code.FilePathAccess
-    sink method "write" -> code.FilePathAccess
-  }
-}

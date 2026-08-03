@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.me099a3fc;
+
+binding deserialization2 {
+  requires {
+    dependency("jdom:jdom")
+  }
+  query pattern callExpr where callee.method == "build(java.io.InputStream)"
+  emit sink code.Deserialization at args[0]
+}

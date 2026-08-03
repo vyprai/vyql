@@ -1,9 +1,0 @@
-import code.{HtmlRender}
-import core.{InputValidation}
-
-adapter php {
-  package "aptoma/twig-markdown" {
-    sink method "parseMarkdown" -> code.HtmlRender
-    control method "setSafeMode" -> core.InputValidation
-  }
-}

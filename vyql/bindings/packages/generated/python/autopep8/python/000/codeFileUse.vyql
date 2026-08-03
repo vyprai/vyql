@@ -1,0 +1,9 @@
+module bindings.python.generated.md83add5e;
+
+binding fileUse0 {
+  requires {
+    dependency("autopep8")
+  }
+  query pattern callExpr where callee.method == "open_with_encoding"
+  emit sink code.FileUseSink at args[0]
+}

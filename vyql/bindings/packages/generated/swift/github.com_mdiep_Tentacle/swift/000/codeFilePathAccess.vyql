@@ -1,0 +1,9 @@
+module bindings.swift.generated.m7493376c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/mdiep/Tentacle")
+  }
+  query pattern callExpr where callee.method == "create"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{NetworkConnect}
-import core.{UserControlledData}
-
-adapter dart {
-  package "flutter_web_auth" {
-    sink method "authenticate" -> code.NetworkConnect
-    source method "authenticate" -> core.UserControlledData
-  }
-}

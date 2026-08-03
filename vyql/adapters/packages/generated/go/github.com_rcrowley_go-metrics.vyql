@@ -1,9 +1,0 @@
-import code.{NetworkSend}
-
-adapter go {
-  package "github.com/rcrowley/go-metrics" {
-    sink method "WriteJSON" -> code.NetworkSend
-    sink method "WriteJSONOnce" -> code.NetworkSend
-    sink method "ExpHandler" -> code.NetworkSend
-  }
-}

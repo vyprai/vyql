@@ -1,0 +1,9 @@
+module bindings.php.generated.m00733b29;
+
+binding weakHash1 {
+  requires {
+    dependency("illuminate/auth")
+  }
+  query pattern presenceNode where node.path ~= "illuminate.auth.hash"
+  emit issue code.WeakHash at node
+}

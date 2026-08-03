@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-
-adapter elixir {
-  package "emysql" {
-    sink method "execute" -> code.SqlExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m5ed5c10f;
+
+binding fileUse2 {
+  requires {
+    dependency("llfio")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding protoPollute593 {
+  query pattern callExpr where callee.path ~= "opts.escapeFunction"
+  emit sink code.ProtoPollute at args[0]
+}

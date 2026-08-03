@@ -1,5 +1,0 @@
-adapter scala {
-  package "com.firebaseui:firebase-ui-database" {
-    sink method "parseSnapshot" -> code.DatabaseRead
-  }
-}

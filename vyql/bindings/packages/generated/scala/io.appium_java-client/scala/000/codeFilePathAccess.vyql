@@ -1,0 +1,9 @@
+module bindings.scala.generated.m8b5ba2c7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("io.appium:java-client")
+  }
+  query pattern callExpr where callee.method == "pullFile"
+  emit sink code.FilePathAccess at args[0]
+}

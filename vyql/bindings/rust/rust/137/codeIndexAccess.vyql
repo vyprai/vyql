@@ -1,0 +1,7 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding indexAccess137 {
+  query pattern presenceNode where node.path ~= "__subscript"
+  emit issue code.IndexAccess at node
+  emit sink code.IndexAccessSink at node
+}

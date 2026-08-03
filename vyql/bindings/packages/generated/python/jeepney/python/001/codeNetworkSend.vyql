@@ -1,0 +1,9 @@
+module bindings.python.generated.m0dc49fb6;
+
+binding networkSend1 {
+  requires {
+    dependency("jeepney")
+  }
+  query pattern callExpr where callee.method == "send_and_get_reply"
+  emit sink code.NetworkSend at args[0]
+}

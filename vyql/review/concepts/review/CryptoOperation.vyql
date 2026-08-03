@@ -1,0 +1,8 @@
+module code;
+
+review code.CryptoOperation {
+  category: crypto
+  expected: [core.CertificateValidation, core.EncryptionAtRest, core.EncryptionInTransit]
+  kind: target
+  text: "verify algorithm choice, key/IV handling, and signature or certificate checks"
+}

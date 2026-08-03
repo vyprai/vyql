@@ -1,0 +1,14 @@
+module bindings.bash.generated.mb6f991a5;
+
+binding sqlParameterization9 {
+  requires {
+    dependency("postgresql-client")
+  }
+  query pattern callExpr where callee.path ~= "psql"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

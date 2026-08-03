@@ -1,0 +1,9 @@
+module bindings.swift.generated.m342303c4;
+
+binding networkSend2 {
+  requires {
+    dependency("github.com/kean/Get")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit sink code.NetworkSend at args[0]
+}

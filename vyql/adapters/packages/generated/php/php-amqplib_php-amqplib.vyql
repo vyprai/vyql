@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "php-amqplib/php-amqplib" {
-    sink method "PhpAmqpLib\Wire\AMQPReader::read_shortstr" -> code.Deserialization
-    sink method "PhpAmqpLib\Wire\AMQPReader::read_longstr" -> code.Deserialization
-    sink method "PhpAmqpLib\Wire\AMQPReader::read_table" -> code.Deserialization
-    sink method "PhpAmqpLib\Wire\AMQPReader::read_array" -> code.Deserialization
-  }
-}

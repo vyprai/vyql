@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m9d068601;
+
+binding deserialization2 {
+  requires {
+    dependency("body-parser")
+  }
+  query pattern callExpr where callee.method == "rawParser"
+  emit sink code.Deserialization at args[0]
+}

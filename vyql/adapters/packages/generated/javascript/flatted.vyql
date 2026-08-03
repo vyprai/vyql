@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter javascript {
-  package "flatted" {
-    sink method "parse" -> code.Deserialization
-  }
-}

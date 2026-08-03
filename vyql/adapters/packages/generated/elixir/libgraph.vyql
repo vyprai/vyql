@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter elixir {
-  package "libgraph" {
-    control method "escape_quotes" -> core.InputValidation
-  }
-}

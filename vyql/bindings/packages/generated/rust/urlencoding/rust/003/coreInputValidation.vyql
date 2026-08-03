@@ -1,0 +1,14 @@
+module bindings.rust.generated.m83fbeeb2;
+
+binding inputValidation3 {
+  requires {
+    dependency("urlencoding")
+  }
+  query pattern callExpr where callee.method == "encode_binary"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

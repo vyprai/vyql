@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m4513d69d;
+
+binding httpInput0 {
+  requires {
+    dependency("cauldron")
+  }
+  query pattern callExpr where callee.method == "Cauldron.HTTP.run"
+  emit source code.HttpInput at call.result
+}

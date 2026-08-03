@@ -1,0 +1,9 @@
+module bindings.go.generated.m1ef4170a;
+
+binding deserialization11 {
+  requires {
+    dependency("github.com/jcmturner/gofork")
+  }
+  query pattern callExpr where callee.method == "parseT61String"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m56a368d6;
+
+binding filePathAccess6 {
+  requires {
+    dependency("gdcm")
+  }
+  query pattern callExpr where callee.method == "GetPermissions"
+  emit sink code.FilePathAccess at args[0]
+}

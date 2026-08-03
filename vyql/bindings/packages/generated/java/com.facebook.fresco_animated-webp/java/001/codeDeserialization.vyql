@@ -1,0 +1,9 @@
+module bindings.java.generated.m35763cbe;
+
+binding deserialization1 {
+  requires {
+    dependency("com.facebook.fresco:animated-webp")
+  }
+  query pattern callExpr where callee.method == "createFromByteBuffer"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "net.sf.json-lib:json-lib" {
-    sink method "parse" -> code.Deserialization
-    sink method "read" -> code.Deserialization
-  }
-}

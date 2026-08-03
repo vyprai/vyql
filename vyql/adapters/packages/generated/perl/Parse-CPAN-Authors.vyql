@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter perl {
-  package "Parse-CPAN-Authors" {
-    sink method "_parse" -> code.Deserialization
-  }
-}

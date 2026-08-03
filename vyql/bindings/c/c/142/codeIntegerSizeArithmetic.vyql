@@ -1,0 +1,7 @@
+module bindings.c.generated.mce54b166;
+
+binding integerSizeArithmetic142 {
+  query pattern presenceNode where node.path ~= "__binop.mul"
+  emit issue code.IntegerSizeArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}

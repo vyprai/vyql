@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mcb8eafcb;
+
+binding httpInput4 {
+  requires {
+    dependency("negotiator")
+  }
+  query pattern callExpr where callee.method == "preferredMediaTypes"
+  emit source code.HttpInput at call.result
+}

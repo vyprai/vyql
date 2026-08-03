@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter go {
-  package "go4.org" {
-    sink method "ReadFile" -> code.Deserialization
-  }
-}

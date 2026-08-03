@@ -1,0 +1,11 @@
+module code;
+
+concept RandomSpreadModuloZeroDenominator : issue {
+  cwe: [CWE_369]
+  reviewAssumption: "configuration can set the spread/count duration to zero"
+  reviewCategory: numeric
+  reviewCondition: "a randomized timeout or retry spread uses modulo by a count-derived duration without an observed nonzero guard"
+  reviewConfidence: high
+  reviewEvidence: "random-spread modulo context {pattern} divides by a count() value"
+  vulnerableTo: [numeric.DivideByZero]
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "scapy" {
-    sink method "parse" -> code.Deserialization
-  }
-}

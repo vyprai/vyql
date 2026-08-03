@@ -1,0 +1,9 @@
+module bindings.rust.generated.m7a6cd51e;
+
+binding userControlledData0 {
+  requires {
+    dependency("tiny-bip39")
+  }
+  query pattern callExpr where callee.method == "Mnemonic::from_phrase"
+  emit source core.UserControlledData at call.result
+}

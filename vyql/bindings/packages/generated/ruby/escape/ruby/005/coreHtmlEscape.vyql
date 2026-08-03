@@ -1,0 +1,14 @@
+module bindings.ruby.generated.m59c914f1;
+
+binding htmlEscape5 {
+  requires {
+    dependency("escape")
+  }
+  query pattern callExpr where callee.method == "html_form"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.mef7389dc;
+
+binding filePathAccess0 {
+  requires {
+    dependency("sembast")
+  }
+  query pattern callExpr where callee.method == "file"
+  emit sink code.FilePathAccess at args[0]
+}

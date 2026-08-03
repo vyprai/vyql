@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/shurcooL/vfsgen" {
-    sink method "Generate" -> code.FileUse
-  }
-}

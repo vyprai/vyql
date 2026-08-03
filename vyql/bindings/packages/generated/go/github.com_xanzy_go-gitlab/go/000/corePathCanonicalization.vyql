@@ -1,0 +1,14 @@
+module bindings.go.generated.m881b01c6;
+
+binding pathCanonicalization0 {
+  requires {
+    dependency("github.com/xanzy/go-gitlab")
+  }
+  query pattern callExpr where callee.method == "PathEscape"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

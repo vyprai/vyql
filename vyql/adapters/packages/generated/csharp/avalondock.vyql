@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter csharp {
-  package "avalondock" {
-    control method "UrlEncode" -> core.InputValidation
-  }
-}

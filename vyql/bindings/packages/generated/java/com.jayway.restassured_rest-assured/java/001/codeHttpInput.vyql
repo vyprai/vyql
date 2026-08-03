@@ -1,0 +1,9 @@
+module bindings.java.generated.m676afa76;
+
+binding httpInput1 {
+  requires {
+    dependency("com.jayway.restassured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "when"
+  emit source code.HttpInput at call.result
+}

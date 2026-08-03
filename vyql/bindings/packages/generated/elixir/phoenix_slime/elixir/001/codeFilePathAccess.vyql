@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m62fb0bc5;
+
+binding filePathAccess1 {
+  requires {
+    dependency("phoenix_slime")
+  }
+  query pattern callExpr where callee.method == "PhoenixSlime.Engine.read!"
+  emit sink code.FilePathAccess at args[0]
+}

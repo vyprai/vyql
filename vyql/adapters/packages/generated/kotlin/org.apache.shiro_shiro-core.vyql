@@ -1,7 +1,0 @@
-import core.{AuthenticationCheck, UserControlledData}
-adapter kotlin {
-  package "org.apache.shiro:shiro-core" {
-    source method "supports" -> core.UserControlledData
-    control method "authenticate" -> core.AuthenticationCheck
-  }
-}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter swift {
-  package "github.com/EFPrefix/EFQRCode" {
-    sink method "recognize" -> code.Deserialization
-  }
-}

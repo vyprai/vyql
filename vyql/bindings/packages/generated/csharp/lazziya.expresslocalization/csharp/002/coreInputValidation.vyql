@@ -1,0 +1,14 @@
+module bindings.csharp.generated.m7e5863c0;
+
+binding inputValidation2 {
+  requires {
+    dependency("lazziya.expresslocalization")
+  }
+  query pattern callExpr where callee.method == "ExMinLengthAttribute"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mdf0acaa8;
+
+binding httpInput1 {
+  requires {
+    dependency("journey")
+  }
+  query pattern callExpr where callee.path ~= "Router.call"
+  emit source code.HttpInput at call.result
+}

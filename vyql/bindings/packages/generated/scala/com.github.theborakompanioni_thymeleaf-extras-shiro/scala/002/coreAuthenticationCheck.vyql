@@ -1,0 +1,13 @@
+module bindings.scala.generated.m40e67106;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("com.github.theborakompanioni:thymeleaf-extras-shiro")
+  }
+  query pattern callExpr where callee.method == "isUser"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

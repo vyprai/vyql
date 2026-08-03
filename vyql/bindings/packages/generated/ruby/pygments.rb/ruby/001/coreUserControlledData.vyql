@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m4c5c84e3;
+
+binding userControlledData1 {
+  requires {
+    dependency("pygments.rb")
+  }
+  query pattern callExpr where callee.method == "highlight"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m14ff77f8;
+
+binding deserialization6 {
+  requires {
+    dependency("CFPropertyList")
+  }
+  query pattern callExpr where callee.method == "load_str"
+  emit sink code.Deserialization at args[0]
+}

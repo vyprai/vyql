@@ -1,0 +1,9 @@
+module bindings.php.generated.m065c532a;
+
+binding commandExecution0 {
+  requires {
+    dependency("cakephp/bake")
+  }
+  query pattern callExpr where callee.method == "Process.call"
+  emit sink code.CommandExecution at args[0]
+}

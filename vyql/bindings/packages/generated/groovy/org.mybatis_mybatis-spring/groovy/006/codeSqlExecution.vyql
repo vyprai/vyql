@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m1e08d747;
+
+binding sqlExecution6 {
+  requires {
+    dependency("org.mybatis:mybatis-spring")
+  }
+  query pattern callExpr where callee.method == "update"
+  emit sink code.SqlExecution at args[0]
+}

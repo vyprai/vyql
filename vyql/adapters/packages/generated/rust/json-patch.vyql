@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "json-patch" {
-    sink method "patch" -> code.Deserialization
-    sink method "patch_unsafe" -> code.Deserialization
-  }
-}

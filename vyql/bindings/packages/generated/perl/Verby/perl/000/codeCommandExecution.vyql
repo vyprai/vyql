@@ -1,0 +1,9 @@
+module bindings.perl.generated.mc4d1f9ef;
+
+binding commandExecution0 {
+  requires {
+    dependency("Verby")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

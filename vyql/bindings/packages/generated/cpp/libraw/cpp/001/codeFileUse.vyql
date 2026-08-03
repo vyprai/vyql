@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m9ac101a6;
+
+binding fileUse1 {
+  requires {
+    dependency("libraw")
+  }
+  query pattern callExpr where callee.method == "libraw_open_file_ex"
+  emit sink code.FileUseSink at args[0]
+}

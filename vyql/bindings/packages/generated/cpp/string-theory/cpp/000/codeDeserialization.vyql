@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m5df56d4e;
+
+binding deserialization0 {
+  requires {
+    dependency("string-theory")
+  }
+  query pattern callExpr where callee.method == "hex_decode"
+  emit sink code.Deserialization at args[0]
+}

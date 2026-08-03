@@ -1,0 +1,9 @@
+module bindings.objc.generated.m764368db;
+
+binding sqlExecution0 {
+  requires {
+    dependency("FMDB")
+  }
+  query pattern callExpr where callee.method == "executeUpdate:withErrorAndBindings:"
+  emit sink code.SqlExecution at args[0]
+}

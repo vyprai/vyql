@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m23fe5458;
+
+binding deserialization3 {
+  requires {
+    dependency("ftgl")
+  }
+  query pattern callExpr where callee.method == "Glyph"
+  emit sink code.Deserialization at args[0]
+}

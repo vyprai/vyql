@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/otiai10/mint" {
-    sink method "Query" -> code.Deserialization
-  }
-}

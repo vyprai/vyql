@@ -1,0 +1,9 @@
+module bindings.php.generated.m684f3b0d;
+
+binding userControlledData0 {
+  requires {
+    dependency("arcanedev/support")
+  }
+  query pattern callExpr where callee.method == "handle"
+  emit source core.UserControlledData at call.result
+}

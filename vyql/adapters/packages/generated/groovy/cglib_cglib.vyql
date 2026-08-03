@@ -1,5 +1,0 @@
-adapter groovy {
-  package "cglib:cglib" {
-    sink method "copy" -> code.FilePathAccess
-  }
-}

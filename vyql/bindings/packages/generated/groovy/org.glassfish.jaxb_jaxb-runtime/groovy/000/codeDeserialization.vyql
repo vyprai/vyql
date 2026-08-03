@@ -1,0 +1,9 @@
+module bindings.groovy.generated.me0ee4ae8;
+
+binding deserialization0 {
+  requires {
+    dependency("org.glassfish.jaxb:jaxb-runtime")
+  }
+  query pattern callExpr where callee.method == "unmarshal"
+  emit sink code.Deserialization at args[0]
+}

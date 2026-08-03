@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "boost-stacktrace" {
-    sink method "from_dump" -> code.Deserialization
-  }
-}

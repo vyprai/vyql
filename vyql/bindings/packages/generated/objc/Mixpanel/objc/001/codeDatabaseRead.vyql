@@ -1,0 +1,9 @@
+module bindings.objc.generated.m515659be;
+
+binding databaseRead1 {
+  requires {
+    dependency("Mixpanel")
+  }
+  query pattern callExpr where callee.method == "readRows"
+  emit sink code.DatabaseReadSink at args[0]
+}

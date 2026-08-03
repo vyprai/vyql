@@ -1,0 +1,11 @@
+module code;
+
+concept PersistentConnectionReuseAfterInterruptedResponse : issue {
+  cwe: [CWE_444, CWE_841]
+  reviewAssumption: "an interrupted response read can leave bytes buffered on the persistent socket before the next request"
+  reviewCategory: lifecycle
+  reviewCondition: "persistent client connection reuse is not gated by a response-read completion state after interrupts or timeouts"
+  reviewConfidence: high
+  reviewEvidence: "persistent request context {pattern} reads a response and can keep the socket for later reuse without an observed reusable-state guard"
+  vulnerableTo: [injection.ProtocolStateConfusion]
+}

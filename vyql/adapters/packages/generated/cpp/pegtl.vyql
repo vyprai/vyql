@@ -1,9 +1,0 @@
-adapter cpp {
-  package "pegtl" {
-    sink method "parse" -> code.Deserialization
-    sink method "parse_nested" -> code.Deserialization
-    source method "file_input" -> core.UserControlledData
-    source method "mmap_input" -> core.UserControlledData
-    source method "read_input" -> core.UserControlledData
-  }
-}

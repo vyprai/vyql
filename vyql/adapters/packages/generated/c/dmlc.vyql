@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter c {
-  package "dmlc" {
-    sink method "Eval" -> code.CodeEval
-  }
-}

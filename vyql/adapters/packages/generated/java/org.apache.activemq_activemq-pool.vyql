@@ -1,7 +1,0 @@
-adapter java {
-  package "org.apache.activemq:activemq-pool" {
-    sink method "setConnectionFactory" -> code.StoredDataWrite
-    sink method "setProperties" -> code.StoredDataWrite
-    sink method "setBrokerUrl" -> code.StoredDataWrite
-  }
-}

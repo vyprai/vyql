@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding domInput82 {
+  query pattern callExpr where callee.path ~= "document.cookie"
+  emit source code.DomInput at call.result
+}

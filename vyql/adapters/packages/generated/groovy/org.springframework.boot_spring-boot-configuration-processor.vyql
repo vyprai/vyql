@@ -1,8 +1,0 @@
-import code.{Deserialization, FileUse}
-
-adapter groovy {
-  package "org.springframework.boot:spring-boot-configuration-processor" {
-    sink method "read" -> code.Deserialization
-    sink method "readMetadata" -> code.Deserialization
-  }
-}

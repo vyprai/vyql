@@ -1,0 +1,9 @@
+module bindings.python.generated.m961f1c1f;
+
+binding deserialization4 {
+  requires {
+    dependency("hyperframe")
+  }
+  query pattern callExpr where callee.method == "parse_priority_data"
+  emit sink code.Deserialization at args[0]
+}

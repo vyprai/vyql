@@ -1,0 +1,14 @@
+module bindings.dart.generated.m2c5ba391;
+
+binding inputValidation1 {
+  requires {
+    dependency("url_launcher_ios")
+  }
+  query pattern callExpr where callee.method == "canOpenURL"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

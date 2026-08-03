@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mbb7b1591;
+
+binding userControlledData0 {
+  requires {
+    dependency("table")
+  }
+  query pattern callExpr where callee.method == "Table.Reader.init"
+  emit source core.UserControlledData at call.result
+}

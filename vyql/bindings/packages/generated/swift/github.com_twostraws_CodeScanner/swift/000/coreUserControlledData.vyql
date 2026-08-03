@@ -1,0 +1,9 @@
+module bindings.swift.generated.mbe363070;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/twostraws/CodeScanner")
+  }
+  query pattern callExpr where callee.method == "metadataOutput"
+  emit source core.UserControlledData at call.result
+}

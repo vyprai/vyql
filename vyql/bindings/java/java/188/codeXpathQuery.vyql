@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding xpathQuery188 {
+  query pattern callExpr where callee.method == "evaluate" and callee.receiver.type == "XPath"
+  emit sink code.XpathQuery at args[0]
+}

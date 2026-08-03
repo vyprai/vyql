@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mb9fb6807;
+
+binding deserialization2 {
+  requires {
+    dependency("gherkin")
+  }
+  query pattern callExpr where callee.method == "parse_feature"
+  emit sink code.Deserialization at args[0]
+}

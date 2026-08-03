@@ -1,0 +1,14 @@
+module bindings.python.generated.m3d9ccbad;
+
+binding sqlParameterization30 {
+  requires {
+    dependency("sqlalchemy")
+  }
+  query pattern callExpr where callee.method == "bindparams"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

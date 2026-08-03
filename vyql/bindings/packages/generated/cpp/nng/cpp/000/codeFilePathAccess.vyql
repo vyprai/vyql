@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m5ac66786;
+
+binding filePathAccess0 {
+  requires {
+    dependency("nng")
+  }
+  query pattern callExpr where callee.method == "nni_file_put"
+  emit sink code.FilePathAccess at args[0]
+}

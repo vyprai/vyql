@@ -1,0 +1,9 @@
+module bindings.php.generated.ma81f61c1;
+
+binding networkSend0 {
+  requires {
+    dependency("grpc/grpc")
+  }
+  query pattern callExpr where callee.method == "UnaryCall"
+  emit sink code.NetworkSend at args[0]
+}

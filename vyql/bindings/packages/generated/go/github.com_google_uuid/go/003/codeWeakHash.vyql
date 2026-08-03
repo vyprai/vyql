@@ -1,0 +1,9 @@
+module bindings.go.generated.m000d1d82;
+
+binding weakHash3 {
+  requires {
+    dependency("github.com/google/uuid")
+  }
+  query pattern callExpr where callee.method == "NewMD5"
+  emit issue code.WeakHash at call
+}

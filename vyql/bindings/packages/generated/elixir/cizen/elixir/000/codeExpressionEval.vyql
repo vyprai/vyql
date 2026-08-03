@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m21029856;
+
+binding expressionEval0 {
+  requires {
+    dependency("cizen")
+  }
+  query pattern callExpr where callee.method == "Cizen.Pattern.Compiler.compile"
+  emit sink code.ExpressionEval at args[0]
+}

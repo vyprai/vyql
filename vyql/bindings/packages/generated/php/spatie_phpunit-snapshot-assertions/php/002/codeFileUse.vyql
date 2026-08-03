@@ -1,0 +1,9 @@
+module bindings.php.generated.mdef2ed9c;
+
+binding fileUse2 {
+  requires {
+    dependency("spatie/phpunit-snapshot-assertions")
+  }
+  query pattern callExpr where callee.method == "SpatieSnapshotsFilesystem::delete"
+  emit sink code.FileUseSink at args[0]
+}

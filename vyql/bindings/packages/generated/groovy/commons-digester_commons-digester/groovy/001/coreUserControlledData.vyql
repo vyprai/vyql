@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m50e1c1b1;
+
+binding userControlledData1 {
+  requires {
+    dependency("commons-digester:commons-digester")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source core.UserControlledData at call.result
+}

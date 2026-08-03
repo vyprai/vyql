@@ -1,0 +1,6 @@
+module code;
+
+concept IncompleteTemplateValidation : issue {
+  cwe: [CWE_1336]
+  vulnerableTo: [injection.TemplateInjection]
+}

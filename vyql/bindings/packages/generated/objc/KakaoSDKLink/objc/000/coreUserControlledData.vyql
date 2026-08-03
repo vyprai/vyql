@@ -1,0 +1,9 @@
+module bindings.objc.generated.m8d031327;
+
+binding userControlledData0 {
+  requires {
+    dependency("KakaoSDKLink")
+  }
+  query pattern callExpr where callee.method == "isKakaoLinkUrl"
+  emit source core.UserControlledData at call.result
+}

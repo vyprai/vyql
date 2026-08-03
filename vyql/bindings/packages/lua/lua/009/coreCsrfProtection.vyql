@@ -1,0 +1,13 @@
+module bindings.lua.generated.m49b0a04f;
+
+binding csrfProtection9 {
+  requires {
+    dependency("lapis")
+  }
+  query pattern callExpr where callee.path ~= "csrf.assert_token"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

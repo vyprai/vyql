@@ -1,0 +1,9 @@
+module bindings.dart.generated.mc4c1775d;
+
+binding storedDataRead0 {
+  requires {
+    dependency("package_info_plus")
+  }
+  query pattern callExpr where callee.method == "fromPlatform"
+  emit source code.StoredDataRead at call.result
+}

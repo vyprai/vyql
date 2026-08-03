@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m5103d1c9;
+
+binding templateRender11 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "res.render"
+  emit sink code.TemplateRender at args[0]
+}

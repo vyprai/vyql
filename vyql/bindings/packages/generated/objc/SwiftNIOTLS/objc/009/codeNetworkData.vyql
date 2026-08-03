@@ -1,0 +1,9 @@
+module bindings.objc.generated.mc0faafde;
+
+binding networkData9 {
+  requires {
+    dependency("SwiftNIOTLS")
+  }
+  query pattern callExpr where callee.method == "CNIOWindows_recvmmsg"
+  emit source code.NetworkData at call.result
+}

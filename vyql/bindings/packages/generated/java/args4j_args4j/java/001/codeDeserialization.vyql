@@ -1,0 +1,9 @@
+module bindings.java.generated.m75bd25f5;
+
+binding deserialization1 {
+  requires {
+    dependency("args4j:args4j")
+  }
+  query pattern callExpr where callee.method == "org.kohsuke.args4j.XmlParser.parse"
+  emit sink code.Deserialization at args[0]
+}

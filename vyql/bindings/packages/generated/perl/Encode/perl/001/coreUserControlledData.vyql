@@ -1,0 +1,9 @@
+module bindings.perl.generated.me482955b;
+
+binding userControlledData1 {
+  requires {
+    dependency("Encode")
+  }
+  query pattern callExpr where callee.method == "cat_decode"
+  emit source core.UserControlledData at call.result
+}

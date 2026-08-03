@@ -1,9 +1,0 @@
-import core.{InputValidation}
-import code.{NetworkConnect}
-
-adapter cpp {
-  package "fizz" {
-    control method "FizzClientContext.validate" -> core.InputValidation
-    sink method "FizzClient.connect" -> code.NetworkConnect
-  }
-}

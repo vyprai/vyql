@@ -1,0 +1,6 @@
+module bindings.pii.generated.m24e11c07;
+
+binding piiValue17 {
+  query pattern callExpr where callee.method == "get_credit_card"
+  emit source code.PiiValue at call.result
+}

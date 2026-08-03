@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding archiveEntryName36 {
+  query pattern callExpr where callee.path ~= "$this.metadata"
+  emit source code.ArchiveEntryName at call.result
+}

@@ -1,7 +1,0 @@
-import code.{CliArgument}
-adapter javascript {
-  package "meow" {
-    source method "parse" -> code.CliArgument
-    source method "parseCommand" -> code.CliArgument
-  }
-}

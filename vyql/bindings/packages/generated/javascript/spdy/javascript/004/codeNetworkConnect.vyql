@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mf932fff7;
+
+binding networkConnect4 {
+  requires {
+    dependency("spdy")
+  }
+  query pattern callExpr where callee.method == "Agent"
+  emit sink code.NetworkConnectSink at args[0]
+}

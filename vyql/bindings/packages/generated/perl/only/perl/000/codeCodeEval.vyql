@@ -1,0 +1,9 @@
+module bindings.perl.generated.ma1a1c5db;
+
+binding codeEval0 {
+  requires {
+    dependency("only")
+  }
+  query pattern callExpr where callee.method == "import"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter python {
-  package "requests-file" {
-    sink method "send" -> code.FilePathAccess
-  }
-}

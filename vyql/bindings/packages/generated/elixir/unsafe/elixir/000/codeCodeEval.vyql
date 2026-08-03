@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m58cb80ed;
+
+binding codeEval0 {
+  requires {
+    dependency("unsafe")
+  }
+  query pattern callExpr where callee.method == "Unsafe.Compiler.compile!"
+  emit sink code.CodeEval at args[0]
+}

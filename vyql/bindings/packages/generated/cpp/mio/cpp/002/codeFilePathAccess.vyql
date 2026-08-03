@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m75b97fc0;
+
+binding filePathAccess2 {
+  requires {
+    dependency("mio")
+  }
+  query pattern callExpr where callee.method == "make_mmap_sink"
+  emit sink code.FilePathAccess at args[0]
+}

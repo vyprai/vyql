@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mde208c02;
+
+binding deserialization0 {
+  requires {
+    dependency("com.typesafe:config")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

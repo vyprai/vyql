@@ -1,0 +1,13 @@
+module bindings.php.generated.meff8c47a;
+
+binding authenticationCheck3 {
+  requires {
+    dependency("aws/aws-php-sns-message-validator")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

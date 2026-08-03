@@ -1,0 +1,10 @@
+module bindings.rust.generated.mfb74f871;
+
+binding privilegedOp2 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "mach_vm_write"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

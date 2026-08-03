@@ -1,0 +1,6 @@
+module bindings.bash.generated.m59952d5d;
+
+binding sqlExecution39 {
+  query pattern callExpr where callee.path ~= "mysql"
+  emit sink code.SqlExecution at args.any
+}

@@ -1,0 +1,13 @@
+module bindings.kotlin.generated.m1457a768;
+
+binding authorizationCheck35 {
+  requires {
+    dependency("spring-security")
+  }
+  query pattern callExpr where callee.path ~= "PreAuthorize"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

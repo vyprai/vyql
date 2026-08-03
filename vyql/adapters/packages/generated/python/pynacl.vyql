@@ -1,5 +1,0 @@
-adapter python {
-  package "pynacl" {
-    source method "crypto_kx_publickeybytes" -> code.SecretValue
-  }
-}

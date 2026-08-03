@@ -1,0 +1,9 @@
+module bindings.perl.generated.m40f6fa45;
+
+binding filePathAccess5 {
+  requires {
+    dependency("Gepok")
+  }
+  query pattern callExpr where callee.method == "error_log_path"
+  emit sink code.FilePathAccess at args[0]
+}

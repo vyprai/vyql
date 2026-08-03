@@ -1,5 +1,0 @@
-adapter perl {
-  package "Riji" {
-    sink method "system" -> code.CommandExecution
-  }
-}

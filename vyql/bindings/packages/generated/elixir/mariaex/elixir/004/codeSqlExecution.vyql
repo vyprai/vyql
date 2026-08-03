@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mca2e94cc;
+
+binding sqlExecution4 {
+  requires {
+    dependency("mariaex")
+  }
+  query pattern callExpr where callee.method == "prepare_execute"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.m71821df2;
+
+binding filePathAccess0 {
+  requires {
+    dependency("camera_platform_interface")
+  }
+  query pattern callExpr where callee.method == "takePicture"
+  emit sink code.FilePathAccess at args[0]
+}

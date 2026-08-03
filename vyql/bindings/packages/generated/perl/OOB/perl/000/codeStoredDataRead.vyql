@@ -1,0 +1,9 @@
+module bindings.perl.generated.m9bf8f4a7;
+
+binding storedDataRead0 {
+  requires {
+    dependency("OOB")
+  }
+  query pattern callExpr where callee.method == "OOB_get"
+  emit source code.StoredDataRead at call.result
+}

@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter php {
-  package "elasticsearch/elasticsearch" {
-    sink method "query" -> code.SqlExecution
-  }
-}

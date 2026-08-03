@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter scala {
-  package "com.squareup.retrofit2:adapter-rxjava" {
-    source method "response" -> core.UserControlledData
-    source method "error" -> core.UserControlledData
-  }
-}

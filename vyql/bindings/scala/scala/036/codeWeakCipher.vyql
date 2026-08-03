@@ -1,0 +1,6 @@
+module bindings.scala.generated.m06d0685b;
+
+binding weakCipher36 {
+  query pattern callExpr where callee.path ~= "Cipher.getInstance" and args.any.literal contains "RC4"
+  emit issue code.WeakCipher at call
+}

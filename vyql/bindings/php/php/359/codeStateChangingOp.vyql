@@ -1,0 +1,7 @@
+module bindings.php.generated.mfbe84119;
+
+binding stateChangingOp359 {
+  query pattern callExpr where callee.method == "store"
+  emit issue code.StateChangingOp at call
+  emit sink code.StateChangingOpSink at call
+}

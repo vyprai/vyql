@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter cpp {
-  package "kf5xmlgui" {
-    sink method "importConfiguration" -> code.FilePathAccess
-    sink method "exportConfiguration" -> code.FilePathAccess
-  }
-}

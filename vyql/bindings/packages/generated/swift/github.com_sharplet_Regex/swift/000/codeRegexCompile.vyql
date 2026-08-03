@@ -1,0 +1,10 @@
+module bindings.swift.generated.m43f4dc3f;
+
+binding regexCompile0 {
+  requires {
+    dependency("github.com/sharplet/Regex")
+  }
+  query pattern callExpr where callee.method == "match"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

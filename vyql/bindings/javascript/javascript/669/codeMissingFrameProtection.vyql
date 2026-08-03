@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding missingFrameProtection669 {
+  query pattern callExpr where callee.path ~= "res.header" and args.any.literal contains "X-Frame-Options" and args.any.literal contains "ALLOWALL"
+  emit issue code.MissingFrameProtection at call
+}

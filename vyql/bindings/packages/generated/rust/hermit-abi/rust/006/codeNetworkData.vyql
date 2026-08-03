@@ -1,0 +1,9 @@
+module bindings.rust.generated.m7bc32aa6;
+
+binding networkData6 {
+  requires {
+    dependency("hermit-abi")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}

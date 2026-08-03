@@ -1,0 +1,13 @@
+module bindings.ruby.generated.m68f6610f;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("rails_admin")
+  }
+  query pattern callExpr where callee.method == "authenticate_with"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

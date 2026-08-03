@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding fileCheck149 {
+  query pattern presenceNode where node.path ~= "lstat"
+  emit issue code.FileCheck at node
+}

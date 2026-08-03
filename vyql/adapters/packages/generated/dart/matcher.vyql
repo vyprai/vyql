@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter dart {
-  package "matcher" {
-    control method "escape" -> core.HtmlEscape
-  }
-}

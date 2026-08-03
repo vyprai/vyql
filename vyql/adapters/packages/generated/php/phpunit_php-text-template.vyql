@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-import core.{UserControlledData}
-
-adapter php {
-  package "phpunit/php-text-template" {
-    source method "setVar" -> core.UserControlledData
-    sink method "renderTo" -> code.FilePathAccess
-  }
-}

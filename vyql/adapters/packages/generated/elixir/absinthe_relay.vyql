@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "absinthe_relay" {
-    sink method "AbsintheRelay.Node.ParseIds.parse" -> code.Deserialization
-  }
-}

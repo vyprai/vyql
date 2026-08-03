@@ -1,0 +1,9 @@
+module bindings.java.generated.m10c1c37d;
+
+binding networkSend0 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-stream")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

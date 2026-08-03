@@ -1,0 +1,9 @@
+module bindings.perl.generated.m51583f24;
+
+binding sqlExecution0 {
+  requires {
+    dependency("Otogiri")
+  }
+  query pattern callExpr where callee.method == "search_by_sql"
+  emit sink code.SqlExecution at args[0]
+}

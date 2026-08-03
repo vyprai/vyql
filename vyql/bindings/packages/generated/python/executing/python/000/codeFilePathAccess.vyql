@@ -1,0 +1,9 @@
+module bindings.python.generated.med1581b6;
+
+binding filePathAccess0 {
+  requires {
+    dependency("executing")
+  }
+  query pattern callExpr where callee.method == "for_filename"
+  emit sink code.FilePathAccess at args[0]
+}

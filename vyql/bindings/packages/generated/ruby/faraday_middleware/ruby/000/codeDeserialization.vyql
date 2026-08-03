@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m3781d3f1;
+
+binding deserialization0 {
+  requires {
+    dependency("faraday_middleware")
+  }
+  query pattern callExpr where callee.method == "Mashify#parse"
+  emit sink code.Deserialization at args[0]
+}

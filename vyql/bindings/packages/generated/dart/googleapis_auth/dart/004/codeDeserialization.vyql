@@ -1,0 +1,9 @@
+module bindings.dart.generated.m942a4764;
+
+binding deserialization4 {
+  requires {
+    dependency("googleapis_auth")
+  }
+  query pattern callExpr where callee.method == "ClientId.fromJson"
+  emit sink code.Deserialization at args[0]
+}

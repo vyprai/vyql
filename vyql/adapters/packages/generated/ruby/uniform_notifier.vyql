@@ -1,8 +1,0 @@
-import code.{LogOutput}
-adapter ruby {
-  package "uniform_notifier" {
-    sink method "inline_notify" -> code.LogOutput
-    sink method "out_of_channel_notify" -> code.LogOutput
-    sink method "notify" -> code.LogOutput
-  }
-}

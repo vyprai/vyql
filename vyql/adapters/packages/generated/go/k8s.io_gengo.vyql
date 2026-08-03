@@ -1,6 +1,0 @@
-import core.{PathCanonicalization}
-adapter go {
-  package "k8s.io/gengo" {
-    control method "canonicalizeImportPath" -> core.PathCanonicalization
-  }
-}

@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter objc {
-  package "KissXML" {
-    sink method "initWithXMLString:options:error:" -> code.Deserialization
-    sink method "initWithXMLString:error:" -> code.Deserialization
-  }
-}

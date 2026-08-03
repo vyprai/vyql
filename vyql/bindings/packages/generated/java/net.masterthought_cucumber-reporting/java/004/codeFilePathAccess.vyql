@@ -1,0 +1,9 @@
+module bindings.java.generated.md5001608;
+
+binding filePathAccess4 {
+  requires {
+    dependency("net.masterthought:cucumber-reporting")
+  }
+  query pattern callExpr where callee.method == "Configuration.setTrendsStatsFile"
+  emit sink code.FilePathAccess at args[0]
+}

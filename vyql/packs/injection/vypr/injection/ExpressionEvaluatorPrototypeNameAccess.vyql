@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ExpressionEvaluatorPrototypeNameAccess {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_1321]
+    id: "VYQL-INJ-167"
+    severity: high
+  }
+  issue code.ExpressionEvaluatorPrototypeNameAccess as sink
+}

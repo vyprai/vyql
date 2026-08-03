@@ -1,0 +1,8 @@
+module code;
+
+review code.UnvalidatedModelSelection {
+  category: auth
+  expected: [core.InputValidation, core.AuthorizationCheck]
+  kind: target
+  text: "verify request-selected model or classifier names are validated before lookup, processing, or response metadata"
+}

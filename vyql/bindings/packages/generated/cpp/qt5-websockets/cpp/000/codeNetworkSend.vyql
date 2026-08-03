@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m102c0472;
+
+binding networkSend0 {
+  requires {
+    dependency("qt5-websockets")
+  }
+  query pattern callExpr where callee.method == "QWebSocket::sendTextMessage"
+  emit sink code.NetworkSend at args[0]
+}

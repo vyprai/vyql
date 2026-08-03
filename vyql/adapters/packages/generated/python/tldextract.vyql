@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "tldextract" {
-    sink method "extract_str" -> code.Deserialization
-    sink method "extract_urllib" -> code.Deserialization
-    sink method "extract" -> code.Deserialization
-  }
-}

@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter kotlin {
-  package "com.jcraft:jsch" {
-    sink method "ChannelExec.setCommand" -> code.CommandExecution
-  }
-}

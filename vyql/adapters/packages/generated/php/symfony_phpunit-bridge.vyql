@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-
-adapter php {
-  package "symfony/phpunit-bridge" {
-    sink path "bin/simple-phpunit.php::exec" -> code.CommandExecution
-    sink path "bin/simple-phpunit.php::passthru" -> code.CommandExecution
-  }
-}

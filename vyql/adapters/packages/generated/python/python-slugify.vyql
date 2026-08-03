@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter python {
-  package "python-slugify" {
-    control method "slugify" -> core.InputValidation
-  }
-}

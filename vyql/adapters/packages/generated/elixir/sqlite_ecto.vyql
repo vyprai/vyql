@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-
-adapter elixir {
-  package "sqlite_ecto" {
-    sink method "Sqlite.Ecto.Util.exec" -> code.SqlExecution
-    sink method "Sqlite.Ecto.Query.query" -> code.SqlExecution
-  }
-}

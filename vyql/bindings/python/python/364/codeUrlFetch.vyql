@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding urlFetch364 {
+  query pattern callExpr where callee.path ~= "aiohttp.ClientSession"
+  emit sink code.UrlFetch at args[0]
+}

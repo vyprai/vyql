@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding insecurePermission586 {
+  query pattern callExpr where callee.path ~= "Path.chmod" and args.any.literal contains "0o777"
+  emit issue code.InsecurePermission at call
+}

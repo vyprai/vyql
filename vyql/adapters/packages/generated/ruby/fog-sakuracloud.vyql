@@ -1,5 +1,0 @@
-adapter ruby {
-  package "fog-sakuracloud" {
-    sink method "parse" -> code.Deserialization
-  }
-}

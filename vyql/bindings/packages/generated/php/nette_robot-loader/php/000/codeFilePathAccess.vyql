@@ -1,0 +1,9 @@
+module bindings.php.generated.maf4c6ea9;
+
+binding filePathAccess0 {
+  requires {
+    dependency("nette/robot-loader")
+  }
+  query pattern callExpr where callee.method == "addDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

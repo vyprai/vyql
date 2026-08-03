@@ -1,0 +1,9 @@
+module bindings.php.generated.m72a6943d;
+
+binding networkData1 {
+  requires {
+    dependency("riverline/multipart-parser")
+  }
+  query pattern callExpr where callee.method == "RiverlineMultiPartParserConvertersPSR7::convert"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.mc5601031;
+
+binding archiveEntryWrite26 {
+  requires {
+    dependency("ext-zip")
+  }
+  query pattern callExpr where callee.method == "extractTo"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding untrustedSupportUrlNotification222 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "untrusted_support_url_notification"
+  emit issue code.UntrustedSupportUrlNotification at node
+}

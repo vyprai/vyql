@@ -1,0 +1,9 @@
+module bindings.php.generated.m046d8d42;
+
+binding filePathAccess0 {
+  requires {
+    dependency("webmozart/assert")
+  }
+  query pattern callExpr where callee.method == "nullOrReadable"
+  emit sink code.FilePathAccess at args[0]
+}

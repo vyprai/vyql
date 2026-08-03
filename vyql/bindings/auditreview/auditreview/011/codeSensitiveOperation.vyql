@@ -1,0 +1,6 @@
+module bindings.auditreview.generated.mbf0d19ec;
+
+binding sensitiveOperation11 {
+  query pattern callExpr where callee.method == "makeAdmin"
+  emit issue code.SensitiveOperation at call
+}

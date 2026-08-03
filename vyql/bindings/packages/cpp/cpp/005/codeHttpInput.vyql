@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m1c1357ee;
+
+binding httpInput5 {
+  requires {
+    dependency("cpr")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source code.HttpInput at call.result
+}

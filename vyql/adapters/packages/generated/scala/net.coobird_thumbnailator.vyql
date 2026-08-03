@@ -1,6 +1,0 @@
-import code.{FileUse}
-adapter scala {
-  package "net.coobird:thumbnailator" {
-    sink method "write" -> code.FileUse
-  }
-}

@@ -1,0 +1,14 @@
+module bindings.scala.generated.m3608f193;
+
+binding xpathEscape31 {
+  requires {
+    dependency("owasp-java-encoder")
+  }
+  query pattern callExpr where callee.path ~= "Encode.forXPath"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

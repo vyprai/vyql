@@ -1,0 +1,9 @@
+module bindings.php.generated.m382d8800;
+
+binding deserialization2 {
+  requires {
+    dependency("theseer/fdomdocument")
+  }
+  query pattern callExpr where callee.method == "loadHTMLFile"
+  emit sink code.Deserialization at args[0]
+}

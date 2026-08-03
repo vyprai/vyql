@@ -1,6 +1,0 @@
-adapter ruby {
-  package "em-http-request" {
-    sink method "request" -> code.UrlFetch
-    source method "OAuth" -> code.SecretValue
-  }
-}

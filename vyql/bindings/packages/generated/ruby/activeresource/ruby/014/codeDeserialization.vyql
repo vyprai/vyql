@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m4cd96b0a;
+
+binding deserialization14 {
+  requires {
+    dependency("activeresource")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

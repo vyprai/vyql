@@ -1,0 +1,6 @@
+module bindings.bash.generated.m59952d5d;
+
+binding fileInclude19 {
+  query pattern callExpr where callee.path ~= "source"
+  emit sink code.FileInclude at args[0]
+}

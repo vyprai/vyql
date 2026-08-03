@@ -1,0 +1,8 @@
+module code;
+
+review code.CodeIgniterRestserverXmlEntityLoaderXxe {
+  category: xml
+  expected: [core.XmlHardening]
+  kind: attention
+  text: "review CodeIgniter Rest Server XML request parsing for libxml_disable_entity_loader(true) before Format parses the body"
+}

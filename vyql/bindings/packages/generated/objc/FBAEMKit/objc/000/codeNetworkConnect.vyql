@@ -1,0 +1,9 @@
+module bindings.objc.generated.m8d5af79f;
+
+binding networkConnect0 {
+  requires {
+    dependency("FBAEMKit")
+  }
+  query pattern callExpr where callee.method == "startGraphRequestWithGraphPath:parameters:tokenString:HTTPMethod:completion:"
+  emit sink code.NetworkConnectSink at args[0]
+}

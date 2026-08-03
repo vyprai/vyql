@@ -1,7 +1,0 @@
-adapter perl {
-  package "Hal-Cdroms" {
-    sink method "mount" -> code.FilePathAccess
-    sink method "unmount" -> code.FilePathAccess
-    sink method "ensure_mounted" -> code.FilePathAccess
-  }
-}

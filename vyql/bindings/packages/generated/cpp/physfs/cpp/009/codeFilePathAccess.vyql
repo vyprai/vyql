@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m35718952;
+
+binding filePathAccess9 {
+  requires {
+    dependency("physfs")
+  }
+  query pattern callExpr where callee.method == "PHYSFS_getRealDir"
+  emit sink code.FilePathAccess at args[0]
+}

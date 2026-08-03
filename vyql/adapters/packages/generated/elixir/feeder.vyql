@@ -1,7 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-
-adapter elixir {
-  package "feeder" {
-    sink method "start_element" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.md518033e;
+
+binding nosqlQuery5 {
+  requires {
+    dependency("Persevere-Client")
+  }
+  query pattern callExpr where callee.method == "createObjects"
+  emit sink code.NosqlQuery at args[0]
+}

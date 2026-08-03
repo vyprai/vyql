@@ -1,0 +1,9 @@
+module bindings.python.generated.m2982b66d;
+
+binding filePathAccess9 {
+  requires {
+    dependency("falcon")
+  }
+  query pattern callExpr where callee.method == "falcon.response.Response.stream_file"
+  emit sink code.FilePathAccess at args[0]
+}

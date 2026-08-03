@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter objc {
-  package "PurchasesCoreSwift" {
-    sink method "parse" -> code.Deserialization
-  }
-}

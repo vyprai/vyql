@@ -1,0 +1,6 @@
+module bindings.kotlin.generated.m304d1620;
+
+binding xmlParserCreate80 {
+  query pattern callExpr where callee.method == "newDocumentBuilder"
+  emit issue code.XmlParserCreate at call
+}

@@ -1,0 +1,6 @@
+module bindings.powershell.generated.m390f1180;
+
+binding dynamicCodeLoad35 {
+  query pattern callExpr where callee.path ~= "Import-Module"
+  emit sink code.DynamicCodeLoad at args[0]
+}

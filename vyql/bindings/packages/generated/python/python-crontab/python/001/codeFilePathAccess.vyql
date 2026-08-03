@@ -1,0 +1,9 @@
+module bindings.python.generated.m63f423ee;
+
+binding filePathAccess1 {
+  requires {
+    dependency("python-crontab")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

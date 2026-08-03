@@ -1,0 +1,9 @@
+module bindings.dart.generated.m505601c2;
+
+binding codeEval1 {
+  requires {
+    dependency("flutter_sound_web")
+  }
+  query pattern callExpr where callee.method == "loadScript"
+  emit sink code.CodeEval at args[0]
+}

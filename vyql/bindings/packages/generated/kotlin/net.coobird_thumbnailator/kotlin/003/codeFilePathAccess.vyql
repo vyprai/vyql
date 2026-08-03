@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m6fd6eba5;
+
+binding filePathAccess3 {
+  requires {
+    dependency("net.coobird:thumbnailator")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

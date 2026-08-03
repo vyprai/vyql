@@ -1,0 +1,7 @@
+module bindings.objc.generated.mccadd221;
+
+binding indexAccess43 {
+  query pattern presenceNode where node.path ~= "__subscript"
+  emit issue code.IndexAccess at node
+  emit sink code.IndexAccessSink at node
+}

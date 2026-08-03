@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m20487d8b;
+
+binding filePathAccess2 {
+  requires {
+    dependency("butteraugli")
+  }
+  query pattern callExpr where callee.method == "ReadImageOrDie"
+  emit sink code.FilePathAccess at args[0]
+}

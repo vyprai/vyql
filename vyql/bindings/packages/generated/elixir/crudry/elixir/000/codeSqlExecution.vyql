@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m898477b0;
+
+binding sqlExecution0 {
+  requires {
+    dependency("crudry")
+  }
+  query pattern callExpr where callee.method == "list"
+  emit sink code.SqlExecution at args[0]
+}

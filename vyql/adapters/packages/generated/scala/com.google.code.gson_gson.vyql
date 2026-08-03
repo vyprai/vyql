@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter scala {
-  package "com.google.code.gson:gson" {
-    sink method "fromJson" -> code.Deserialization
-  }
-}

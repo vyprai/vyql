@@ -1,7 +1,0 @@
-import code.{CommandExecution, CliArgument}
-adapter ruby {
-  package "thor" {
-    sink method "run" -> code.CommandExecution
-    source method "parse" -> code.CliArgument
-  }
-}

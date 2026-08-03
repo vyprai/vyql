@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mf04cd14b;
+
+binding sqlExecution2 {
+  requires {
+    dependency("absinthe_ecto")
+  }
+  query pattern callExpr where callee.method == "resolve_query"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.powershell.generated.m390f1180;
+
+binding urlFetch12 {
+  query pattern callExpr where callee.path ~= "iwr"
+  emit sink code.UrlFetch at args[0]
+}

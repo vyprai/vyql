@@ -1,0 +1,9 @@
+module bindings.perl.generated.mbe603286;
+
+binding networkConnect7 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "_unauth_connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

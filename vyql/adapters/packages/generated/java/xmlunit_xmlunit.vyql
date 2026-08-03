@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "xmlunit:xmlunit" {
-    sink method "HTMLDocumentBuilder.parse" -> code.Deserialization
-  }
-}

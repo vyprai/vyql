@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding filePathAccess325 {
+  query pattern callExpr where callee.path ~= "fs.readFileSync"
+  emit sink code.FilePathAccess at args[0]
+}

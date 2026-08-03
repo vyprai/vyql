@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ExternalResourceIntegrityReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_345, CWE_829]
+    id: "VYQL-INJ-198"
+    severity: high
+  }
+  issue code.ExternalResourceIntegrityReview as sink
+}

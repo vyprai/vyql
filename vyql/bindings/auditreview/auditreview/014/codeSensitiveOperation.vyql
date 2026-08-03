@@ -1,0 +1,6 @@
+module bindings.auditreview.generated.mbf0d19ec;
+
+binding sensitiveOperation14 {
+  query pattern callExpr where callee.method == "update!" and args.any.literal contains "password"
+  emit issue code.SensitiveOperation at call
+}

@@ -1,5 +1,0 @@
-adapter scala {
-  package "com.squareup.okhttp3:logging-interceptor" {
-    sink method "log" -> code.LogOutput
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m7be05f37;
+
+binding deserialization1 {
+  requires {
+    dependency("com.typesafe:config")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

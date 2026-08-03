@@ -1,0 +1,9 @@
+module bindings.swift.generated.mcf8275fa;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/CoreOffice/XMLCoder")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

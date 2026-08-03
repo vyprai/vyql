@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-
-adapter php {
-  package "laminas/laminas-filter" {
-    control method "Laminas\Filter\StripTags.filter" -> core.HtmlEscape
-  }
-}

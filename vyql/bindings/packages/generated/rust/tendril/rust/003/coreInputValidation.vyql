@@ -1,0 +1,14 @@
+module bindings.rust.generated.mdf8e1b02;
+
+binding inputValidation3 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "validate_subseq"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

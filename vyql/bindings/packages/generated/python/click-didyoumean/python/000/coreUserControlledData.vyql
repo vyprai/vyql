@@ -1,0 +1,9 @@
+module bindings.python.generated.m7e126e64;
+
+binding userControlledData0 {
+  requires {
+    dependency("click-didyoumean")
+  }
+  query pattern callExpr where callee.method == "resolve_command"
+  emit source core.UserControlledData at call.result
+}

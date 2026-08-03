@@ -1,0 +1,9 @@
+module bindings.php.generated.m09de1213;
+
+binding userControlledData0 {
+  requires {
+    dependency("facebook/webdriver")
+  }
+  query pattern callExpr where callee.method == "sendKeys"
+  emit source core.UserControlledData at call.result
+}

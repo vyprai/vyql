@@ -1,0 +1,9 @@
+module bindings.dart.generated.m8750043f;
+
+binding filePathAccess1 {
+  requires {
+    dependency("rename")
+  }
+  query pattern callExpr where callee.method == "setBundleId"
+  emit sink code.FilePathAccess at args[0]
+}

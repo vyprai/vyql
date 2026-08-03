@@ -1,5 +1,0 @@
-adapter groovy {
-  package "org.apache.tomcat:tomcat-jdbc" {
-    sink method "setValidationQuery" -> code.SqlExecution
-  }
-}

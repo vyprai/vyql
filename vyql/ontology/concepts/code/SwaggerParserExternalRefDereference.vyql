@@ -1,0 +1,11 @@
+module code;
+
+concept SwaggerParserExternalRefDereference : issue {
+  cwe: [CWE_918, CWE_22, CWE_20]
+  reviewAssumption: "the parsed Swagger document can contain local-file or remote $ref targets supplied by an attacker"
+  reviewCategory: request_forgery
+  reviewCondition: "Swagger/OpenAPI validation dereferences external references from caller-supplied documents"
+  reviewConfidence: high
+  reviewEvidence: "Swagger parser context {pattern} calls validate on the loaded document without a $refs.external=false option"
+  vulnerableTo: [request_forgery.Ssrf, path.PathTraversal, validation.ImproperInputValidation]
+}

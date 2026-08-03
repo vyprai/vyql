@@ -1,0 +1,9 @@
+module bindings.php.generated.mc24cc569;
+
+binding fileUse9 {
+  requires {
+    dependency("symfony/filesystem")
+  }
+  query pattern callExpr where callee.method == "dumpFile"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mf98b3aca;
+
+binding urlFetch14 {
+  requires {
+    dependency("httpoison")
+  }
+  query pattern callExpr where callee.path ~= "HTTPoison.get"
+  emit sink code.UrlFetch at args[0]
+}

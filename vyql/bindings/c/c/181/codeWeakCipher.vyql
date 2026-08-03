@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding weakCipher181 {
+  query pattern presenceNode where node.path ~= "DES_ecb_encrypt"
+  emit issue code.WeakCipher at node
+}

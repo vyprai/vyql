@@ -1,9 +1,0 @@
-import code.{RegexCompile}
-
-adapter perl {
-  package "Tapir" {
-    flag code.RegexCompile on any {
-      method "Tapir::Validator::Regex::new_from_string"
-    }
-  }
-}

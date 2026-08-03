@@ -1,0 +1,10 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding authorizationCheck177 {
+  query pattern callExpr where callee.path ~= "ability.can"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

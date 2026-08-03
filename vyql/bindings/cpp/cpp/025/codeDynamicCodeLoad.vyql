@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding dynamicCodeLoad25 {
+  query pattern callExpr where callee.path ~= "dlopen"
+  emit sink code.DynamicCodeLoad at args[0]
+}

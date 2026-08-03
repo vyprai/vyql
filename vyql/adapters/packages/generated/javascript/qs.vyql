@@ -1,5 +1,0 @@
-adapter javascript {
-  package "qs" {
-    sink method "decode" -> code.Deserialization
-  }
-}

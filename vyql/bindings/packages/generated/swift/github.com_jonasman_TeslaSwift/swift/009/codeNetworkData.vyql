@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc6882f18;
+
+binding networkData9 {
+  requires {
+    dependency("github.com/jonasman/TeslaSwift")
+  }
+  query pattern callExpr where callee.method == "openStream"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mbeef92ff;
+
+binding cliArgument1 {
+  requires {
+    dependency("yargs")
+  }
+  query pattern callExpr where callee.method == "parseArgs"
+  emit source code.CliArgument at call.result
+}

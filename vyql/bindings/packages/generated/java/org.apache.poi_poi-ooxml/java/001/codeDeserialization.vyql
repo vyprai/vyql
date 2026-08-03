@@ -1,0 +1,9 @@
+module bindings.java.generated.mfa63337f;
+
+binding deserialization1 {
+  requires {
+    dependency("org.apache.poi:poi-ooxml")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.me7b72329;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("github.com/GroupeMINASTE/Keychain.swift")
+  }
+  query pattern callExpr where callee.method == "save"
+  emit sink code.StoredDataWrite at args[0]
+}

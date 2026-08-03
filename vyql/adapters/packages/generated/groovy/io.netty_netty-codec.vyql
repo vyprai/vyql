@@ -1,9 +1,0 @@
-import code.{Deserialization, FilePathAccess, CommandExecution, NetworkConnect}
-import core.{InputValidation, HtmlEscape, ShellEscape}
-
-adapter groovy {
-  package "io.netty:netty-codec" {
-    sink method "parse" -> code.Deserialization
-    control method "escape" -> core.InputValidation
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.m5342780c;
+
+binding storedDataWrite30 {
+  requires {
+    dependency("shared_preferences")
+  }
+  query pattern callExpr where callee.method == "setString"
+  emit sink code.StoredDataWrite at args[0]
+}

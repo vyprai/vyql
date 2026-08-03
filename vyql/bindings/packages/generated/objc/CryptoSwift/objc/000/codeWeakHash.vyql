@@ -1,0 +1,9 @@
+module bindings.objc.generated.m7b773e9e;
+
+binding weakHash0 {
+  requires {
+    dependency("CryptoSwift")
+  }
+  query pattern callExpr where callee.method == "md5"
+  emit issue code.WeakHash at call
+}

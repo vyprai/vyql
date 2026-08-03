@@ -1,0 +1,9 @@
+module bindings.objc.generated.m942721f9;
+
+binding archiveEntryWrite25 {
+  requires {
+    dependency("SSZipArchive")
+  }
+  query pattern callExpr where callee.method == "unzipFileAtPath"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

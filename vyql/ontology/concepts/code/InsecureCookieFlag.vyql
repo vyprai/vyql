@@ -1,0 +1,11 @@
+module code;
+
+concept InsecureCookieFlag : issue {
+  cwe: [CWE_614]
+  reviewAssumption: "the cookie is sent over a channel an attacker can observe"
+  reviewCategory: auth
+  reviewCondition: "a session cookie is set without the Secure attribute"
+  reviewConfidence: medium
+  reviewEvidence: "cookie set {pattern} carries no secure flag"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

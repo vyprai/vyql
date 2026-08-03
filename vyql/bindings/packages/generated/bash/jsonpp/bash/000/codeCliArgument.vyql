@@ -1,0 +1,9 @@
+module bindings.bash.generated.m0d699fd4;
+
+binding cliArgument0 {
+  requires {
+    dependency("jsonpp")
+  }
+  query pattern callExpr where callee.path ~= "jsonpp.argv"
+  emit source code.CliArgument at call.result
+}

@@ -1,5 +1,0 @@
-adapter rust {
-  package "ignore" {
-    sink method "threads" -> code.FilePathAccess
-  }
-}

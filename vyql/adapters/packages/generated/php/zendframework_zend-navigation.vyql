@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-adapter php {
-  package "zendframework/zend-navigation" {
-    source method "setQuery" -> core.UserControlledData
-    source method "setParams" -> core.UserControlledData
-    source method "setRoute" -> core.UserControlledData
-  }
-}

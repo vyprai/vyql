@@ -1,0 +1,7 @@
+module code;
+
+review code.PartiallyEscapedSshCommand {
+  category: command
+  kind: attention
+  text: "review SSH command strings for shell quoting of every interpolated connection field, including username, host, and port"
+}

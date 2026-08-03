@@ -1,6 +1,0 @@
-import code.{NetworkSend}
-adapter objc {
-  package "gRPC-C++" {
-    sink method "grpc_call_start_batch" -> code.NetworkSend
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.generated.ma9d55020;
+
+binding templateRender1 {
+  requires {
+    dependency("spatie/ignition")
+  }
+  query pattern callExpr where callee.method == "renderAsString"
+  emit sink code.TemplateRender at args[0]
+}

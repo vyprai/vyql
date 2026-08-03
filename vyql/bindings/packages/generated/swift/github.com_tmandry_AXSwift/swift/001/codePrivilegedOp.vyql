@@ -1,0 +1,10 @@
+module bindings.swift.generated.m6e375a2a;
+
+binding privilegedOp1 {
+  requires {
+    dependency("github.com/tmandry/AXSwift")
+  }
+  query pattern callExpr where callee.method == "performAction"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.mfcdaa025;
+
+binding userControlledData0 {
+  requires {
+    dependency("naveridlogin-sdk-ios")
+  }
+  query pattern callExpr where callee.method == "receiveAccessToken:"
+  emit source core.UserControlledData at call.result
+}

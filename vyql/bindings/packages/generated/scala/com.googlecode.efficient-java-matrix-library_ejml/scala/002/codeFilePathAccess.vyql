@@ -1,0 +1,9 @@
+module bindings.scala.generated.m2657e85a;
+
+binding filePathAccess2 {
+  requires {
+    dependency("com.googlecode.efficient-java-matrix-library:ejml")
+  }
+  query pattern callExpr where callee.method == "saveCSV"
+  emit sink code.FilePathAccess at args[0]
+}

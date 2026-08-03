@@ -1,0 +1,9 @@
+module bindings.java.generated.m912ff882;
+
+binding networkSend6 {
+  requires {
+    dependency("com.sun.jersey:jersey-client")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkSend at args[0]
+}

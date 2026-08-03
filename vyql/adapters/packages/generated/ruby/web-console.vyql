@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter ruby {
-  package "web-console" {
-    sink method "eval" -> code.CodeEval
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m9b5f4120;
+
+binding httpInput7 {
+  requires {
+    dependency("org.springframework:spring-webmvc")
+  }
+  query pattern callExpr where callee.method == "pathVariable"
+  emit source code.HttpInput at call.result
+}

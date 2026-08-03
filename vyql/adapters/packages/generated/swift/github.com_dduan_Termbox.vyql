@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter swift {
-  package "github.com/dduan/Termbox" {
-    sink method "initialize(file:)" -> code.FilePathAccess
-  }
-}

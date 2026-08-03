@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m6036082e;
+
+binding deserialization1 {
+  requires {
+    dependency("levn")
+  }
+  query pattern callExpr where callee.method == "parsedTypeParse"
+  emit sink code.Deserialization at args[0]
+}

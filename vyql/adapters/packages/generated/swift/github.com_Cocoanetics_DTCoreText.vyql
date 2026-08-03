@@ -1,9 +1,0 @@
-import code.{HtmlRender}
-import core.{UserControlledData}
-adapter swift {
-  package "github.com/Cocoanetics/DTCoreText" {
-    sink method "parseStyleBlock" -> code.HtmlRender
-    sink method "attributedString" -> code.HtmlRender
-    source method "initializeWithOptions" -> core.UserControlledData
-  }
-}

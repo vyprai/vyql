@@ -1,0 +1,9 @@
+module bindings.perl.generated.m75b3cf19;
+
+binding codeEval0 {
+  requires {
+    dependency("Config-ENV-Multi")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.CodeEval at args[0]
+}

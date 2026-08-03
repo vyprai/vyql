@@ -1,0 +1,9 @@
+module bindings.perl.generated.mfd44b194;
+
+binding commandExecution2 {
+  requires {
+    dependency("Applify")
+  }
+  query pattern callExpr where callee.method == "_app_run"
+  emit sink code.CommandExecution at args[0]
+}

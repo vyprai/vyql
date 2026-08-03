@@ -1,0 +1,9 @@
+module bindings.javascript.generated.me7f76c1f;
+
+binding filePathAccess1 {
+  requires {
+    dependency("jsonfile")
+  }
+  query pattern callExpr where callee.method == "writeFileSync"
+  emit sink code.FilePathAccess at args[0]
+}

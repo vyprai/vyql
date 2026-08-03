@@ -1,5 +1,0 @@
-adapter cpp {
-  package "boost-filesystem" {
-    sink path "boost.filesystem.open" -> code.FilePathAccess
-  }
-}

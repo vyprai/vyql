@@ -1,8 +1,0 @@
-import code.{Deserialization, HtmlRender}
-adapter swift {
-  package "github.com/johnxnguyen/Down" {
-    sink method "stringToAST" -> code.Deserialization
-    sink method "toHTML" -> code.HtmlRender
-    sink method "astToHTML" -> code.HtmlRender
-  }
-}

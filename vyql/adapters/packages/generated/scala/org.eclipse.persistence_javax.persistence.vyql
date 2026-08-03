@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-adapter scala {
-  package "org.eclipse.persistence:javax.persistence" {
-    sink method "createQuery" -> code.SqlExecution
-    sink method "createNativeQuery" -> code.SqlExecution
-    sink method "executeUpdate" -> code.SqlExecution
-  }
-}

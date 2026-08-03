@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m21200970;
+
+binding deserialization2 {
+  requires {
+    dependency("cjson")
+  }
+  query pattern callExpr where callee.method == "cJSON_ParseWithOpts"
+  emit sink code.Deserialization at args[0]
+}

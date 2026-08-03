@@ -1,0 +1,9 @@
+module bindings.scala.generated.m1dd58189;
+
+binding deserialization1 {
+  requires {
+    dependency("eu.bitwalker:UserAgentUtils")
+  }
+  query pattern callExpr where callee.method == "parseUserAgentLowercaseString"
+  emit sink code.Deserialization at args[0]
+}

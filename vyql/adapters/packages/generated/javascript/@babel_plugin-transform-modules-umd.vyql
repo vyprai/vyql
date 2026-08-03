@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter javascript {
-  package "@babel/plugin-transform-modules-umd" {
-    sink method "exit" -> code.FilePathAccess
-    sink method "buildBrowserInit" -> code.FilePathAccess
-  }
-}

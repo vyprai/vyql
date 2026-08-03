@@ -1,0 +1,9 @@
+module bindings.cpp.generated.ma9b99c52;
+
+binding deserialization6 {
+  requires {
+    dependency("boost-xpressive")
+  }
+  query pattern callExpr where callee.method == "parse_literal"
+  emit sink code.Deserialization at args[0]
+}

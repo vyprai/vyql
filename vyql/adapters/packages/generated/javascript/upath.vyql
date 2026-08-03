@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-
-adapter javascript {
-  package "upath" {
-    sink method "normalizeSafe" -> code.FilePathAccess
-    sink method "normalizeTrim" -> code.FilePathAccess
-    sink method "joinSafe" -> code.FilePathAccess
-  }
-}

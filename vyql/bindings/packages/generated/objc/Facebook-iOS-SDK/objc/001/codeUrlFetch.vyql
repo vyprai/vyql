@@ -1,0 +1,9 @@
+module bindings.objc.generated.m955859b5;
+
+binding urlFetch1 {
+  requires {
+    dependency("Facebook-iOS-SDK")
+  }
+  query pattern callExpr where callee.method == "URLWithInboundURL"
+  emit sink code.UrlFetch at args[0]
+}

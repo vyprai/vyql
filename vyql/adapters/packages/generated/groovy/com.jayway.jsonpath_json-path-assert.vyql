@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter groovy {
-  package "com.jayway.jsonpath:json-path-assert" {
-    sink method "JsonAssert.with" -> code.Deserialization
-    sink method "JsonPathMatchers.isJsonString" -> code.Deserialization
-    sink method "JsonPathMatchers.isJsonFile" -> code.Deserialization
-  }
-}

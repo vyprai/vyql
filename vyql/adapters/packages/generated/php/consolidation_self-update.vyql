@@ -1,8 +1,0 @@
-import code.{CommandExecution, UrlFetch}
-
-adapter php {
-  package "consolidation/self-update" {
-    sink method "getLatestReleaseFromGithub" -> code.UrlFetch
-    sink method "getReleasesFromGithub" -> code.UrlFetch
-  }
-}

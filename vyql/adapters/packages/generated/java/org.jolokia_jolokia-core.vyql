@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter java {
-  package "org.jolokia:jolokia-core" {
-    control method "escape" -> core.InputValidation
-  }
-}

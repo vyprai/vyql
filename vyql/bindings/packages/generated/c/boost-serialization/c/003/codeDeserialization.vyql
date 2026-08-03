@@ -1,0 +1,9 @@
+module bindings.c.generated.mfd531f33;
+
+binding deserialization3 {
+  requires {
+    dependency("boost-serialization")
+  }
+  query pattern callExpr where callee.method == "load_set_collection"
+  emit sink code.Deserialization at args[0]
+}

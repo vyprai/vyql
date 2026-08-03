@@ -1,14 +1,16 @@
 package main
 
 // Coverage GATES (plan/test-coverage-tasklist.md T0). These meta-tests enforce that
-// every rule/concept/threat/adapter stays tested and internally consistent — so a new
+// every rule/concept/threat/binding stays tested and internally consistent — so a new
 // feature cannot ship untested. They read the shipped VyQL data (vyql/) directly.
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -44,10 +46,31 @@ func readDataFiles(t *testing.T, sub, suffix string) map[string]string {
 
 func parseDataDecls(t *testing.T, sub, suffix string) map[string][]parser.Decl {
 	t.Helper()
-	files := readDataFiles(t, sub, suffix)
 	out := map[string][]parser.Decl{}
+	if !strings.HasPrefix(suffix, ".") {
+		sources, err := datadir.ReadVYQLDir(filepath.ToSlash(filepath.Join(sub, strings.TrimSuffix(suffix, ".vyql"))))
+		if err != nil {
+			t.Fatalf("read %s/%s: %v", sub, suffix, err)
+		}
+		if len(sources) == 0 {
+			t.Fatalf("no %s sources under vyql/%s", suffix, sub)
+		}
+		for _, source := range sources {
+			decls, err := parseV2DefinitionsForTest(string(source.Data))
+			if err != nil {
+				t.Fatalf("parse %s: %v", source.Name, err)
+			}
+			out[source.Name] = decls
+		}
+		return out
+	}
+	files := readDataFiles(t, sub, suffix)
 	for f, c := range files {
-		decls, err := parser.Parse(c)
+		parse := parseV2DefinitionsForTest
+		if sub == "mechanics" {
+			parse = parser.ParseV2Definitions
+		}
+		decls, err := parse(c)
 		if err != nil {
 			t.Fatalf("parse %s: %v", filepath.Base(f), err)
 		}
@@ -60,7 +83,7 @@ func ruleIDs(t *testing.T, files map[string]string) map[string]string { // id ->
 	t.Helper()
 	out := map[string]string{}
 	for f, c := range files {
-		decls, err := parser.Parse(c)
+		decls, err := parseV2DefinitionsForTest(c)
 		if err != nil {
 			t.Fatalf("parse %s: %v", filepath.Base(f), err)
 		}
@@ -119,12 +142,12 @@ func TestRuleFiresCoverageGate(t *testing.T) {
 	t.Logf("rule fires-coverage: %d rules, %d covered, %d in burn-down backlog", len(rules), len(expected), len(unspecced))
 }
 
-// T0.2 — every code/core concept reference in adapters and packs resolves to a defined
+// T0.2 — every code/core concept reference in bindings and packs resolves to a defined
 // concept. References come from the parsed VyQL AST, so string-literal sink paths
 // (e.g. the Python `code` stdlib module) are not mistaken for concept refs.
 func TestConceptRefsResolveGate(t *testing.T) {
 	defined := map[string]bool{}
-	for _, decls := range parseDataDecls(t, "ontology", "concepts.vyql") {
+	for _, decls := range parseDataDecls(t, "ontology", "concepts") {
 		for _, decl := range decls {
 			if cd, ok := decl.(*parser.ConceptDecl); ok {
 				defined[cd.Name] = true
@@ -134,39 +157,39 @@ func TestConceptRefsResolveGate(t *testing.T) {
 	}
 	check := func(sub, suffix string) {
 		for f, refs := range conceptRefsByFile(t, sub, suffix) {
-			if isGeneratedAdapter(f) {
+			if isGeneratedBinding(f) {
 				continue // generated corpus validated separately below
 			}
 			for ref := range refs {
 				if !defined[ref] && !defined[shortConceptName(ref)] {
-					t.Errorf("%s references concept %q which is not defined in concepts.vyql", filepath.Base(f), ref)
+					t.Errorf("%s references concept %q which is not defined in ontology/concepts", filepath.Base(f), ref)
 				}
 			}
 		}
 	}
-	check("adapters", ".vyql")
+	check("bindings", ".vyql")
 	check("packs", ".vyql")
 	// the dynamically-loaded generated package corpus must also reference only real
 	// concepts (a dead label otherwise), but it is excluded from the curated coherence
 	// gates below because it legitimately wires broad concepts that have no curated rule.
-	for f, refs := range conceptRefsByFile(t, "adapters", ".vyql") {
-		if !isGeneratedAdapter(f) {
+	for f, refs := range conceptRefsByFile(t, "bindings", ".vyql") {
+		if !isGeneratedBinding(f) {
 			continue
 		}
 		for ref := range refs {
 			if !defined[ref] && !defined[shortConceptName(ref)] {
-				t.Errorf("generated adapter %s references concept %q not defined in concepts.vyql", f, ref)
+				t.Errorf("generated binding %s references concept %q not defined in ontology/concepts", f, ref)
 			}
 		}
 	}
 	t.Logf("concept refs: %d concepts defined", len(defined))
 }
 
-// isGeneratedAdapter reports whether a data-file path is part of the dynamically-loaded
-// generated package-adapter corpus (adapters/packages/generated/<lang>/<pkg>.vyql), which
+// isGeneratedBinding reports whether a data-file path is part of the dynamically-loaded
+// generated package-binding corpus (bindings/packages/generated/<lang>/<pkg>.vyql), which
 // is auxiliary content gated at scan time and excluded from the curated coherence gates.
-func isGeneratedAdapter(path string) bool {
-	return strings.Contains(filepath.ToSlash(path), "/adapters/packages/generated/")
+func isGeneratedBinding(path string) bool {
+	return strings.Contains(filepath.ToSlash(path), "/bindings/packages/generated/")
 }
 
 // conceptRefsIn returns the set of code/core concept names referenced (as targets or
@@ -174,7 +197,7 @@ func isGeneratedAdapter(path string) bool {
 func conceptRefsIn(t *testing.T, sub string) map[string]bool {
 	out := map[string]bool{}
 	for f, refs := range conceptRefsByFile(t, sub, ".vyql") {
-		if isGeneratedAdapter(f) {
+		if isGeneratedBinding(f) {
 			continue // curated-coherence gates ignore the dynamically-loaded generated corpus
 		}
 		for ref := range refs {
@@ -191,7 +214,7 @@ func conceptRefsByFile(t *testing.T, sub, suffix string) map[string]map[string]b
 		refs := map[string]bool{}
 		for _, decl := range decls {
 			switch d := decl.(type) {
-			case *parser.AdapterDecl:
+			case *parser.BindingSet:
 				for _, m := range d.Mappings {
 					if m.Concept != "" && m.Kind != "type" {
 						addCoverageConceptRef(refs, m.Concept)
@@ -221,15 +244,26 @@ func collectRuleConceptRefs(r *parser.Rule, refs map[string]bool) {
 		if body.Concept != "" {
 			addCoverageConceptRef(refs, body.Concept)
 		}
+		if body.RelatedConcept != "" {
+			addCoverageConceptRef(refs, body.RelatedConcept)
+		}
 	}
 	for _, cl := range r.Clauses {
 		collectExprConceptRefs(cl.Where, refs)
 		switch ex := cl.Unless.(type) {
-		case parser.SanitizedBy:
+		case parser.PathCoveredBy:
 			addCoverageConceptRef(refs, ex.Concept)
-		case parser.GuardedBy:
+		case parser.EndpointCoveredBy:
 			addCoverageConceptRef(refs, ex.Concept)
-		case parser.ClosedBy:
+		case parser.DominatesCoveredBy:
+			addCoverageConceptRef(refs, ex.Concept)
+		case parser.PostDominatesCoveredBy:
+			addCoverageConceptRef(refs, ex.Concept)
+		case parser.SameReceiverCoveredBy:
+			addCoverageConceptRef(refs, ex.Concept)
+		case parser.SameScopeCoveredBy:
+			addCoverageConceptRef(refs, ex.Concept)
+		case parser.GlobalCoveredBy:
 			addCoverageConceptRef(refs, ex.Concept)
 		case parser.ExprException:
 			collectExprConceptRefs(ex.Expr, refs)
@@ -247,8 +281,6 @@ func collectExprConceptRefs(expr parser.Expr, refs map[string]bool) {
 		}
 	case parser.Not:
 		collectExprConceptRefs(e.Inner, refs)
-	case parser.Has:
-		addCoverageConceptRef(refs, e.Concept)
 	case parser.Is:
 		addCoverageConceptRef(refs, e.Concept)
 	case parser.SolverCall:
@@ -286,17 +318,17 @@ func fieldStringList(fields map[string]any, key string) []string {
 }
 
 // T2.5 — concept-coverage gate. Every SINK concept that a rule consumes must be wired
-// in at least one adapter (otherwise the rule is latent — it can never fire). This is
+// in at least one binding (otherwise the rule is latent — it can never fire). This is
 // the gate that catches dead sinks (e.g. the reflection/log/header sinks that shipped
 // referenced-but-unwired). The allowlist holds sinks for documented-deferred rules.
 func TestSinkConceptsWiredGate(t *testing.T) {
-	// no deferred sinks — every sink a rule consumes is adapter-wired.
+	// no deferred sinks — every sink a rule consumes is binding-wired.
 	deferred := map[string]bool{}
 	sinks := map[string]bool{}
 	for s := range conceptsByKind(t, "sink") {
 		sinks[s] = true
 	}
-	adapterRefs := conceptRefsIn(t, "adapters")
+	adapterRefs := conceptRefsIn(t, "bindings")
 	ruleRefs := conceptRefsIn(t, "packs")
 	var latent []string
 	for s := range sinks {
@@ -309,9 +341,9 @@ func TestSinkConceptsWiredGate(t *testing.T) {
 	}
 	sort.Strings(latent)
 	for _, s := range latent {
-		t.Errorf("sink concept %q is consumed by a rule but wired in NO adapter — latent rule (wire it or document-defer)", s)
+		t.Errorf("sink concept %q is consumed by a rule but wired in NO binding — latent rule (wire it or document-defer)", s)
 	}
-	t.Logf("sink concepts: %d defined, %d adapter-wired", len(sinks), countWired(sinks, adapterRefs))
+	t.Logf("sink concepts: %d defined, %d binding-wired", len(sinks), countWired(sinks, adapterRefs))
 }
 
 func countWired(sinks, wired map[string]bool) int {
@@ -327,7 +359,7 @@ func countWired(sinks, wired map[string]bool) int {
 // conceptsByKind returns the set of concept names of the given kind (sink/source/control).
 func conceptsByKind(t *testing.T, kind string) map[string]bool {
 	out := map[string]bool{}
-	for _, decls := range parseDataDecls(t, "ontology", "concepts.vyql") {
+	for _, decls := range parseDataDecls(t, "ontology", "concepts") {
 		for _, decl := range decls {
 			cd, ok := decl.(*parser.ConceptDecl)
 			if ok && cd.Kind == kind {
@@ -340,28 +372,35 @@ func conceptsByKind(t *testing.T, kind string) map[string]bool {
 
 func conceptsWithBoolField(t *testing.T, kind, field string) map[string]bool {
 	out := map[string]bool{}
-	for _, decls := range parseDataDecls(t, "ontology", "concepts.vyql") {
+	for _, decls := range parseDataDecls(t, "ontology", "concepts") {
 		for _, decl := range decls {
 			cd, ok := decl.(*parser.ConceptDecl)
 			if !ok || cd.Kind != kind {
 				continue
 			}
-			if v, ok := cd.Fields[field].(string); ok && v == "true" {
-				out[cd.Name] = true
+			switch v := cd.Fields[field].(type) {
+			case bool:
+				if v {
+					out[cd.Name] = true
+				}
+			case string:
+				if v == "true" {
+					out[cd.Name] = true
+				}
 			}
 		}
 	}
 	return out
 }
 
-// T2.1 — every SOURCE concept is wired in an adapter (something produces it) OR is in the
+// T2.1 — every SOURCE concept is wired in a binding (something produces it) OR is in the
 // documented reserved vocabulary set in ontology metadata (defined ahead of wiring; the input
 // may currently be subsumed by a broader source, or belong to an archetype not yet wired).
-// A NEW source concept must be wired or explicitly marked `coverage_reserved_source: true`.
+// A NEW source concept must be wired or explicitly marked `coverageReservedSource: true`.
 func TestSourceConceptsWiredGate(t *testing.T) {
 	reserved := conceptsWithBoolField(t, "source", "coverage_reserved_source")
 	sources := conceptsByKind(t, "source")
-	wired := conceptRefsIn(t, "adapters")
+	wired := conceptRefsIn(t, "bindings")
 	var unwired []string
 	for s := range sources {
 		if reserved[s] || wired[s] {
@@ -371,24 +410,44 @@ func TestSourceConceptsWiredGate(t *testing.T) {
 	}
 	sort.Strings(unwired)
 	for _, s := range unwired {
-		t.Errorf("source concept %q is wired in NO adapter and not reserved — wire it or add to the reserved set", s)
+		t.Errorf("source concept %q is wired in NO binding and not reserved — wire it or add to the reserved set", s)
 	}
 	t.Logf("source concepts: %d defined, %d reserved-vocabulary", len(sources), len(reserved))
 }
 
-// T2.3 — every CONTROL concept WIRED in an adapter must be consumed by some rule's
-// `unless sanitized_by`/`guarded_by`; a wired control no rule reads is INERT (neutralizes
+// T2.3 — every CONTROL concept WIRED in a binding must be consumed by some rule's
+// coveredBy clause; a wired control no rule reads is INERT (neutralizes
 // nothing). This is the gate that catches the OutputEncoding-style mistake. (A control
 // defined-but-not-wired is just unused vocabulary and is fine.)
 func TestControlsWiredAreConsumedGate(t *testing.T) {
 	reserved := conceptsWithBoolField(t, "control", "coverage_reserved_control")
 	controls := conceptsByKind(t, "control")
-	wired := conceptRefsIn(t, "adapters")
+	wired := conceptRefsIn(t, "bindings")
 	consumed := map[string]bool{}
-	re := regexp.MustCompile(`(?:sanitized_by|guarded_by|closed_by)\s+(?:core|code)\.([A-Za-z0-9_]+)`)
-	for _, c := range readDataFiles(t, "packs", ".vyql") {
-		for _, m := range re.FindAllStringSubmatch(c, -1) {
-			consumed[m[1]] = true
+	for _, decls := range parseDataDecls(t, "packs", ".vyql") {
+		for _, decl := range decls {
+			rule, ok := decl.(*parser.Rule)
+			if !ok {
+				continue
+			}
+			for _, clause := range rule.Clauses {
+				switch ex := clause.Unless.(type) {
+				case parser.PathCoveredBy:
+					consumed[shortConceptName(ex.Concept)] = true
+				case parser.EndpointCoveredBy:
+					consumed[shortConceptName(ex.Concept)] = true
+				case parser.DominatesCoveredBy:
+					consumed[shortConceptName(ex.Concept)] = true
+				case parser.PostDominatesCoveredBy:
+					consumed[shortConceptName(ex.Concept)] = true
+				case parser.SameReceiverCoveredBy:
+					consumed[shortConceptName(ex.Concept)] = true
+				case parser.SameScopeCoveredBy:
+					consumed[shortConceptName(ex.Concept)] = true
+				case parser.GlobalCoveredBy:
+					consumed[shortConceptName(ex.Concept)] = true
+				}
+			}
 		}
 	}
 	var inert []string
@@ -402,7 +461,7 @@ func TestControlsWiredAreConsumedGate(t *testing.T) {
 	}
 	sort.Strings(inert)
 	for _, ctrl := range inert {
-		t.Errorf("control %q is wired in an adapter but consumed by NO rule — inert wiring", ctrl)
+		t.Errorf("control %q is wired in a binding but consumed by NO rule — inert wiring", ctrl)
 	}
 	t.Logf("control concepts: %d defined, %d consumed by rules", len(controls), len(consumed))
 }
@@ -437,14 +496,14 @@ func TestEveryLanguageHasATest(t *testing.T) {
 // correct package.
 func TestThreatRefsResolveGate(t *testing.T) {
 	defined := map[string]bool{} // "pkg.Threat"
-	for _, decls := range parseDataDecls(t, "ontology", "threatkinds.vyql") {
+	for _, decls := range parseDataDecls(t, "ontology", "threatkinds") {
 		for _, decl := range decls {
 			if td, ok := decl.(*parser.ThreatDecl); ok {
 				defined[td.QualifiedName()] = true
 			}
 		}
 	}
-	for f, decls := range parseDataDecls(t, "ontology", "concepts.vyql") {
+	for f, decls := range parseDataDecls(t, "ontology", "concepts") {
 		for _, decl := range decls {
 			cd, ok := decl.(*parser.ConceptDecl)
 			if !ok {
@@ -453,7 +512,7 @@ func TestThreatRefsResolveGate(t *testing.T) {
 			for _, key := range []string{"vulnerable_to", "neutralizes"} {
 				for _, ref := range fieldStringList(cd.Fields, key) {
 					if !defined[ref] {
-						t.Errorf("%s references threat %q which is not defined in threatkinds.vyql", filepath.Base(f), ref)
+						t.Errorf("%s references threat %q which is not defined in ontology/threatkinds", filepath.Base(f), ref)
 					}
 				}
 			}
@@ -465,7 +524,7 @@ func TestThreatRefsResolveGate(t *testing.T) {
 // T0.4 — no duplicate concept names, rule ids, or (package-qualified) threat names.
 func TestNoDuplicateNamesGate(t *testing.T) {
 	seen := map[string]int{}
-	for _, decls := range parseDataDecls(t, "ontology", "concepts.vyql") {
+	for _, decls := range parseDataDecls(t, "ontology", "concepts") {
 		for _, decl := range decls {
 			if cd, ok := decl.(*parser.ConceptDecl); ok {
 				seen[cd.QualifiedName()]++
@@ -495,7 +554,7 @@ func TestNoDuplicateNamesGate(t *testing.T) {
 		}
 	}
 	thr := map[string]int{}
-	for _, decls := range parseDataDecls(t, "ontology", "threatkinds.vyql") {
+	for _, decls := range parseDataDecls(t, "ontology", "threatkinds") {
 		for _, decl := range decls {
 			if td, ok := decl.(*parser.ThreatDecl); ok {
 				thr[td.QualifiedName()]++
@@ -509,27 +568,956 @@ func TestNoDuplicateNamesGate(t *testing.T) {
 	}
 }
 
-// T0.5 — every adapter loads (parses + builds its sink/source/control/mark specs) without
-// panicking, for every adapter shipped under vyql/adapters/.
-func TestAllAdaptersLoadGate(t *testing.T) {
-	for f := range readDataFiles(t, "adapters", ".vyql") {
-		// Files under adapters/packages/ are dependency catalogs keyed by package name,
-		// not standalone tech adapters: the per-language catalog is merged into its tech
-		// by AdaptersFor, and the generated/<lang>/<pkg>.vyql corpus loads dynamically via
-		// GeneratedPackageAdaptersFor. Their basenames are package names, not techs.
-		if strings.Contains(filepath.ToSlash(f), "/adapters/packages/") {
+// V2 migration gate — every shipped definition file must be production v2.
+// This is intentionally corpus-wide rather than layer-specific: it catches
+// legacy v1 files left in less common directories such as profiles, review
+// metadata, generated package bindings, or future definition roots.
+func TestShippedDefinitionCorpusIsV2Only(t *testing.T) {
+	files, err := vyqlFilesUnder(datadir.Root())
+	if err != nil {
+		t.Fatalf("collect shipped definition files: %v", err)
+	}
+	checked, err := checkV2DefinitionFiles(files)
+	if err != nil {
+		t.Fatalf("shipped definition corpus must be v2-only: %v", err)
+	}
+	if checked < 30000 {
+		t.Fatalf("checked only %d v2 definition files; want the full shipped corpus", checked)
+	}
+	t.Logf("checked %d shipped v2 definition files", checked)
+}
+
+func TestShippedDefinitionsDoNotAuthorLanguageMechanics(t *testing.T) {
+	authoredAssumeCall := regexp.MustCompile(`(^|[^A-Za-z0-9_.])assume\s*\(`)
+	var hits []string
+	files, err := vyqlFilesUnder(datadir.Root())
+	if err != nil {
+		t.Fatalf("collect shipped definition files: %v", err)
+	}
+	for _, path := range files {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		src := string(data)
+		prog, err := parser.ParseV2(src)
+		if err != nil {
+			t.Fatalf("parse %s: %v", path, err)
+		}
+		for _, decl := range prog.Decls {
+			if mechanic, ok := decl.(*parser.V2MechanicDecl); ok {
+				rel, _ := filepath.Rel(datadir.Root(), path)
+				hits = append(hits, filepath.ToSlash(rel)+": mechanic "+mechanic.Kind+" "+mechanic.Name)
+			}
+		}
+		for _, line := range strings.Split(src, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "assume ") ||
+				strings.HasPrefix(trimmed, "analysisRole:") ||
+				authoredAssumeCall.MatchString(trimmed) {
+				rel, _ := filepath.Rel(datadir.Root(), path)
+				hits = append(hits, filepath.ToSlash(rel)+": "+trimmed)
+			}
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("Go-owned v2 mechanics must not be authored in shipped definitions:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func TestShippedDefinitionsDoNotUseLegacyV1Syntax(t *testing.T) {
+	files, err := vyqlFilesUnder(datadir.Root())
+	if err != nil {
+		t.Fatalf("collect shipped definition files: %v", err)
+	}
+	legacyLinePatterns := legacyV1DefinitionLinePatterns()
+	var hits []string
+	for _, path := range files {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		for i, line := range strings.Split(string(data), "\n") {
+			for _, pattern := range legacyLinePatterns {
+				if pattern.MatchString(line) {
+					rel, _ := filepath.Rel(datadir.Root(), path)
+					hits = append(hits, fmt.Sprintf("%s:%d: %s", filepath.ToSlash(rel), i+1, strings.TrimSpace(line)))
+					break
+				}
+			}
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("shipped non-test definitions must not use legacy v1 syntax:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func TestShippedProfilesUseV2DetectPredicates(t *testing.T) {
+	files := readDataFiles(t, "profiles", ".vyql")
+	legacyDetect := regexp.MustCompile(`detect:\s*\[\s*"[^"]+:[^"]*"`)
+	quotedPriority := regexp.MustCompile(`priority:\s*"[0-9]+"`)
+	var hits []string
+	for path, src := range files {
+		if legacyDetect.MatchString(src) {
+			rel, _ := filepath.Rel(datadir.Root(), path)
+			hits = append(hits, filepath.ToSlash(rel)+": legacy detect fingerprints")
+		}
+		if quotedPriority.MatchString(src) {
+			rel, _ := filepath.Rel(datadir.Root(), path)
+			hits = append(hits, filepath.ToSlash(rel)+": quoted numeric priority")
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("profiles must use native v2 field syntax:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func TestShippedModelDefinitionsUseV2FieldNames(t *testing.T) {
+	snakeField := regexp.MustCompile(`^\s*[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]*\s*:`)
+	files := map[string]string{}
+	for _, sub := range []string{"ontology", "review", "packs"} {
+		for path, src := range readDataFiles(t, sub, ".vyql") {
+			files[path] = src
+		}
+	}
+	var hits []string
+	for path, src := range files {
+		for i, line := range strings.Split(src, "\n") {
+			if snakeField.MatchString(line) {
+				rel, _ := filepath.Rel(datadir.Root(), path)
+				hits = append(hits, fmt.Sprintf("%s:%d: %s", filepath.ToSlash(rel), i+1, strings.TrimSpace(line)))
+			}
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("model, review, and pack definitions must author v2 camelCase field names:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func TestVyqlTestSpecsDoNotUseLegacyV1DefinitionSyntax(t *testing.T) {
+	files := readDataFiles(t, "tests", ".test.vyql")
+	legacyLinePatterns := legacyV1DefinitionLinePatterns()
+	legacySpecPatterns := []*regexp.Regexp{
+		regexp.MustCompile(`^\s*adapter\s+\S+\s*$`),
+		regexp.MustCompile(`^\s*expect_evidence\s+\S+\s+assumption\s*$`),
+		regexp.MustCompile(`^\s*reject_evidence\s+\S+\s+assumption\s*$`),
+	}
+	var hits []string
+	for path, src := range files {
+		inFence := false
+		for i, line := range strings.Split(src, "\n") {
+			if strings.TrimSpace(line) == "```" {
+				inFence = !inFence
+				continue
+			}
+			if inFence {
+				continue
+			}
+			for _, pattern := range legacyLinePatterns {
+				if pattern.MatchString(line) {
+					rel, _ := filepath.Rel(datadir.Root(), path)
+					hits = append(hits, fmt.Sprintf("%s:%d: %s", filepath.ToSlash(rel), i+1, strings.TrimSpace(line)))
+					break
+				}
+			}
+			for _, pattern := range legacySpecPatterns {
+				if pattern.MatchString(line) {
+					rel, _ := filepath.Rel(datadir.Root(), path)
+					hits = append(hits, fmt.Sprintf("%s:%d: %s", filepath.ToSlash(rel), i+1, strings.TrimSpace(line)))
+					break
+				}
+			}
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("test specs must use the declarative v2 spec format, not legacy v1 definition syntax:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func legacyV1DefinitionLinePatterns() []*regexp.Regexp {
+	return []*regexp.Regexp{
+		regexp.MustCompile(`^\s*adapter\s+[A-Za-z0-9_.-]+\s*\{`),
+		regexp.MustCompile(`^\s*adapter\s*:\s*\{`),
+		regexp.MustCompile(`^\s*pattern\s+adapterMetadata\s*\{`),
+		regexp.MustCompile(`^\s*source\s+"`),
+		regexp.MustCompile(`^\s*sink\s+(?:"|method\s+"|path\s+")`),
+		regexp.MustCompile(`^\s*control\s+"`),
+		regexp.MustCompile(`^\s*flag\s+[A-Za-z0-9_.]+\s+(?:on|in)\b`),
+		regexp.MustCompile(`^\s*mark\s+`),
+		regexp.MustCompile(`^\s*match\s+[A-Za-z0-9_.]+\s+as\b`),
+		regexp.MustCompile(`^\s*package\s+"`),
+		regexp.MustCompile(`^\s*module\s+bindings\.[A-Za-z0-9_.-]+\.migration(?:\.|;)`),
+		regexp.MustCompile(`^\s*analysis_role\s*:`),
+		regexp.MustCompile(`^\s*assume(?:MinLevel|_min_level)\s*:`),
+		regexp.MustCompile(`\bunless\s+(?:sanitized_by|guarded_by|closed_by)\b`),
+		regexp.MustCompile(`\b(?:has|lacks)\s+"(?:call_path|literal|selector|identifier|function_name|class_name|class_base|class_bases|attr_path|decorator_path|decorator_method|param_name|param_type|param_index|var_name|return):`),
+	}
+}
+
+// T0.5 — every binding set loads (parses v2 bindings and builds graph-labeling
+// applicators) without panicking, for every technology shipped under vyql/bindings/.
+func TestAllBindingsLoadGate(t *testing.T) {
+	root := filepath.Join(datadir.Root(), "bindings")
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatalf("read bindings: %v", err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || entry.Name() == "packages" {
 			continue
 		}
-		tech := strings.TrimSuffix(filepath.Base(f), ".vyql")
+		tech := entry.Name()
 		t.Run(tech, func(t *testing.T) {
 			defer func() {
 				if r := recover(); r != nil {
-					t.Fatalf("adapter %q failed to load: %v", tech, r)
+					t.Fatalf("binding set %q failed to load: %v", tech, r)
 				}
 			}()
-			if n := len(frontend.AdaptersFor(tech)); n == 0 {
-				t.Errorf("adapter %q produced no adapters", tech)
+			if n := len(frontend.BindingsFor(tech)); n == 0 {
+				t.Errorf("binding set %q produced no graph-labeling applicators", tech)
 			}
 		})
 	}
+}
+
+func TestEverySourceLanguageHasV2TaintEndpointCoverage(t *testing.T) {
+	for _, lang := range sourceLanguagesForCoverage() {
+		t.Run(lang, func(t *testing.T) {
+			if _, err := os.Stat(filepath.Join(datadir.Root(), "tests", "coverage_"+lang+"_exhaustive.test.vyql")); err != nil {
+				t.Fatalf("missing exhaustive language coverage spec: %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(datadir.Root(), "bindings", "packages", lang)); err != nil {
+				t.Fatalf("missing package catalog for %q: %v", lang, err)
+			}
+			sourceCount, sinkCount, checkCount := countV2TaintEndpointMappings(t, filepath.Join("bindings", lang), filepath.Join("bindings", "packages", lang))
+			if sourceCount == 0 {
+				t.Fatalf("%q has no v2 source endpoint definitions", lang)
+			}
+			if sinkCount == 0 {
+				t.Fatalf("%q has no v2 sink endpoint definitions", lang)
+			}
+			if checkCount == 0 {
+				t.Fatalf("%q has no v2 check coverage definitions", lang)
+			}
+			if n := len(frontend.BindingsFor(lang)); n == 0 {
+				t.Fatalf("%q frontend produced no binding applicators", lang)
+			}
+		})
+	}
+}
+
+func TestEveryExhaustiveLanguageCoverageSpecIsBalanced(t *testing.T) {
+	for _, lang := range sourceLanguagesForCoverage() {
+		t.Run(lang, func(t *testing.T) {
+			path := filepath.Join(datadir.Root(), "tests", "coverage_"+lang+"_exhaustive.test.vyql")
+			specs := parseSpecFile(t, path)
+			if len(specs) < 4 {
+				t.Fatalf("%s has %d exhaustive specs, want at least 4", filepath.Base(path), len(specs))
+			}
+			codeSpecs, positiveSpecs, cleanSpecs := 0, 0, 0
+			totalExpect, totalReject := 0, 0
+			var problems []string
+			for _, spec := range specs {
+				if spec.lang != lang {
+					problems = append(problems, fmt.Sprintf("%s:%d %q uses lang %q, want %q", spec.src, spec.line, spec.name, spec.lang, lang))
+				}
+				if spec.graphSrc != "" {
+					problems = append(problems, fmt.Sprintf("%s:%d %q uses graph-only coverage; exhaustive language coverage must run the source frontend", spec.src, spec.line, spec.name))
+				}
+				if len(spec.files) == 0 {
+					problems = append(problems, fmt.Sprintf("%s:%d %q has no code block", spec.src, spec.line, spec.name))
+				} else {
+					codeSpecs++
+				}
+				if len(spec.expect) > 0 {
+					positiveSpecs++
+					totalExpect += len(spec.expect)
+				}
+				if len(spec.reject) > 0 {
+					cleanSpecs++
+					totalReject += len(spec.reject)
+				}
+			}
+			if len(problems) > 0 {
+				t.Fatalf("invalid exhaustive language coverage spec:\n%s", strings.Join(problems, "\n"))
+			}
+			if codeSpecs != len(specs) {
+				t.Fatalf("%s has %d/%d specs with code blocks; every exhaustive language spec must exercise the frontend", filepath.Base(path), codeSpecs, len(specs))
+			}
+			if positiveSpecs == 0 || totalExpect == 0 {
+				t.Fatalf("%s has no positive expect assertions", filepath.Base(path))
+			}
+			if cleanSpecs == 0 || totalReject == 0 {
+				t.Fatalf("%s has no clean/reject assertions", filepath.Base(path))
+			}
+		})
+	}
+}
+
+func TestCompiledV2BindingsDoNotUseLegacyActionFamilies(t *testing.T) {
+	var hits []string
+	for path, decls := range parseDataDecls(t, "bindings", ".vyql") {
+		for _, decl := range decls {
+			binding, ok := decl.(*parser.BindingSet)
+			if !ok {
+				continue
+			}
+			for _, action := range binding.Mappings {
+				if strings.HasPrefix(action.Kind, "control") || strings.HasPrefix(action.Kind, "mark") || action.Kind == "flag" {
+					hits = append(hits, filepath.ToSlash(path)+": "+binding.Name+" emits legacy compiled action "+action.Kind)
+				}
+			}
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("compiled v2 bindings must use v2 action families, not legacy v1 control/mark/flag:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
+	root := testRepoRoot(t)
+	var hits []string
+	legacyParserCalls := []string{
+		"parser.Parse(",
+		"parser.ParseRuntime",
+		"parser.ParseRuntimeSources",
+		"parser.ParseV2Runtime",
+		"parser.RuntimeSource",
+		"parser.RuntimeSourcesFromText",
+		"parser.LowerRuntimeSources",
+		"parser.LowerV2ToRuntime",
+		"parser.AdapterDecl",
+		"parser.AdapterMapping",
+		"parser.AdapterFlag",
+	}
+	legacyParserDefinitions := []string{
+		"func Parse(",
+		"func ParseRuntime",
+		"func ParseRuntimeSources",
+		"func ParseV2Runtime",
+		"type RuntimeSource",
+		"func RuntimeSourcesFromText",
+		"func LowerRuntimeSources",
+		"func LowerV2ToRuntime",
+		"type AdapterDecl",
+		"type AdapterMapping",
+		"type AdapterFlag",
+	}
+	legacyCoverageClauses := []string{
+		"sanitized_by",
+		"guarded_by",
+		"closed_by",
+	}
+	legacyMetadataNames := []string{
+		"assume_min_level",
+		"analysis_role",
+		"AssumeMinLevel",
+		"assumeMinLevel",
+		"assume_guard_",
+		"assume_sanitizer_",
+	}
+	legacyAuthoredSyntax := []string{
+		"`package \"name\"",
+		"`flag <concept> on|in",
+	}
+	legacyCLISurface := []string{
+		"case \"adapters\"",
+		"case \"validate-adapter\"",
+		"cmdAdapters",
+		"cmdValidateAdapter",
+		"OverlayAdapters",
+		"applyAdaptersIncremental",
+		"syntheticIncrementalAdapters",
+		"buildGraphWithSyntheticAdapters",
+		"GeneratedPackageAdaptersFor",
+		"AdaptersFor(",
+		"AutoAdapters(",
+		"ConfigAdapters(",
+		"TextPatternAdapters(",
+		"PythonAdapters(",
+		"JsAdapters(",
+		"RubyAdapters(",
+		"GoAdapters(",
+		"JavaAdapters(",
+		"PHPAdapters(",
+		"CSharpAdapters(",
+		"CAdapters(",
+		"CPPAdapters(",
+		"RustAdapters(",
+		"BashAdapters(",
+		"ScalaAdapters(",
+		"LuaAdapters(",
+		"KotlinAdapters(",
+		"PowerShellAdapters(",
+		"SwiftAdapters(",
+		"PerlAdapters(",
+		"SolidityAdapters(",
+		"ObjCAdapters(",
+		"adaptersFromSpec",
+		"loadAutoBindings",
+		"parseGeneratedPackageAdapterSource",
+		"adapter-overlay",
+		"overlay adapter",
+		"generated package adapter",
+		"usage: vyql adapters",
+		"validate-adapter parse",
+		"json:\"adapters",
+		"definition kind: all | concepts | rules | adapters",
+		"github.com/vyprai/vyql/adapters",
+		"adapters.Adapter",
+		"adapters.Mapping",
+		"adapters.Apply",
+	}
+	securityConceptNames := []string{
+		"ResourceRelease",
+		"LockRelease",
+	}
+	err := filepath.WalkDir(filepath.Join(root, "go"), func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		rel, _ := filepath.Rel(root, path)
+		rel = filepath.ToSlash(rel)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		src := string(data)
+		importsVyqlParser := strings.Contains(src, `"github.com/vyprai/vyql/parser"`)
+		usesLegacy := false
+		for _, snippet := range legacyCoverageClauses {
+			if strings.Contains(src, snippet) {
+				usesLegacy = true
+				break
+			}
+		}
+		for _, snippet := range legacyMetadataNames {
+			if strings.Contains(src, snippet) {
+				usesLegacy = true
+				break
+			}
+		}
+		for _, snippet := range legacyAuthoredSyntax {
+			if strings.Contains(src, snippet) {
+				usesLegacy = true
+				break
+			}
+		}
+		for _, snippet := range legacyCLISurface {
+			if strings.Contains(src, snippet) {
+				usesLegacy = true
+				break
+			}
+		}
+		for _, snippet := range securityConceptNames {
+			if strings.Contains(src, snippet) {
+				usesLegacy = true
+				break
+			}
+		}
+		if importsVyqlParser {
+			for _, snippet := range legacyParserCalls {
+				if strings.Contains(src, snippet) {
+					usesLegacy = true
+					break
+				}
+			}
+		}
+		if strings.HasPrefix(rel, "go/parser/") {
+			for _, snippet := range legacyParserDefinitions {
+				if strings.Contains(src, snippet) {
+					usesLegacy = true
+					break
+				}
+			}
+		}
+		if usesLegacy {
+			hits = append(hits, rel)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("scan go sources: %v", err)
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("production code must not define or call the legacy v1 parser or runtime bridge:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func TestPublicDocsUseV2BindingTerminology(t *testing.T) {
+	root := testRepoRoot(t)
+	docs := []string{"README.md", "go/README.md", "vyql/README.md", "CLAUDE.md", "AGENTS.md"}
+	forbidden := []string{
+		"concepts, threat-kinds, adapters",
+		"pattern  →  concept  →  adapter",
+		"per-language **adapters**",
+		"framework/config/SCA/secret adapters",
+		"adapter DSL reference",
+		"adapter-content change",
+		"adapter precedence / conflict resolution / provenance",
+		"framework/config adapters",
+		"adapter files",
+		"Concepts, threat kinds, adapters",
+		"`mechanic` and `policy` declarations define the security semantics",
+		"v2 `mechanic` and `policy` declarations define the security semantics",
+	}
+	var hits []string
+	for _, rel := range docs {
+		data, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatalf("read %s: %v", rel, err)
+		}
+		src := string(data)
+		for _, snippet := range forbidden {
+			if strings.Contains(src, snippet) {
+				hits = append(hits, rel+": "+snippet)
+			}
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("public docs must describe v2 authored content as bindings, not adapters:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func TestProductionGoUsesV2BindingTerminology(t *testing.T) {
+	root := testRepoRoot(t)
+	legacyTerms := regexp.MustCompile(`\b[Aa]dapters?\b`)
+	var hits []string
+	err := filepath.WalkDir(filepath.Join(root, "go"), func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for i, line := range strings.Split(string(data), "\n") {
+			if legacyTerms.MatchString(line) {
+				rel, _ := filepath.Rel(root, path)
+				hits = append(hits, fmt.Sprintf("%s:%d: %s", filepath.ToSlash(rel), i+1, strings.TrimSpace(line)))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("scan production Go sources: %v", err)
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("production Go must use v2 binding/applicator terminology, not legacy adapter vocabulary:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func TestCurrentDesignDocsUseV2BindingTerminology(t *testing.T) {
+	root := testRepoRoot(t)
+	docs := []string{
+		"docs/03-architecture-overview.md",
+		"docs/07-adapters-and-patterns.md",
+		"docs/18-ai-integration.md",
+	}
+	forbidden := []string{
+		"validate-adapter",
+		"`adapters`",
+		"adapter javascript",
+		"adapter_decl",
+		"unless sanitized_by",
+		"unless guarded_by",
+		"adapter application",
+		"adapter labels",
+		"adapter coverage",
+		"AI adapters",
+		"│ ADAPTERS",
+	}
+	var hits []string
+	for _, rel := range docs {
+		data, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatalf("read %s: %v", rel, err)
+		}
+		src := string(data)
+		for _, snippet := range forbidden {
+			if strings.Contains(src, snippet) {
+				hits = append(hits, rel+": "+snippet)
+			}
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("current design docs must present v2 bindings, not v1 adapter syntax:\n%s", strings.Join(hits, "\n"))
+	}
+
+	legacySpec, err := os.ReadFile(filepath.Join(root, "docs/05-language-specification.md"))
+	if err != nil {
+		t.Fatalf("read legacy language spec: %v", err)
+	}
+	if !strings.Contains(string(legacySpec), "Status: `SUPERSEDED`") {
+		t.Fatalf("docs/05-language-specification.md contains historical v1 syntax and must remain explicitly superseded")
+	}
+}
+
+func TestBindingDefinitionsUseStableQueryFamilies(t *testing.T) {
+	var hits []string
+	for path, src := range readDataFiles(t, "bindings", ".vyql") {
+		lines := strings.Split(src, "\n")
+		for i, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if !strings.HasPrefix(trimmed, "query unstable.") {
+				continue
+			}
+			rel, _ := filepath.Rel(datadir.Root(), path)
+			hits = append(hits, filepath.ToSlash(rel)+":"+strconv.Itoa(i+1)+": "+trimmed)
+			if len(hits) >= 20 {
+				break
+			}
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("binding definitions must use stable `callExpr` or `presenceNode` query families:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func TestMigrationLedgerDoesNotCarryStaleV1BridgeSuggestions(t *testing.T) {
+	root := testRepoRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "vyql", "migration-ledger.json"))
+	if err != nil {
+		t.Fatalf("read migration ledger: %v", err)
+	}
+	src := string(data)
+	forbidden := []string{
+		"unstable.legacyFlag",
+		"legacyFlagBridgeEntries",
+		"adapterMetadataBridgeEntries",
+		"unstable adapter metadata",
+		"adapter metadata bridge",
+		"legacy flag bridge",
+		"v1 flag converted",
+		"v1 adapter metadata converted",
+	}
+	var hits []string
+	for _, snippet := range forbidden {
+		if strings.Contains(src, snippet) {
+			hits = append(hits, snippet)
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("migration ledger must describe the final v2 state, not stale bridge suggestions: %s", strings.Join(hits, ", "))
+	}
+	if !strings.Contains(src, `"status": "resolved"`) || !strings.Contains(src, "TestShippedDefinitionCorpusIsV2Only") {
+		t.Fatalf("migration ledger must record final resolved status and verification gates")
+	}
+}
+
+func sourceLanguagesForCoverage() []string {
+	out := make([]string, 0, len(languages))
+	for _, lg := range languages {
+		switch lg.name {
+		case "config", "textpattern":
+			continue
+		default:
+			out = append(out, lg.name)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func countV2TaintEndpointMappings(t *testing.T, subs ...string) (int, int, int) {
+	t.Helper()
+	sourceCount, sinkCount, checkCount := 0, 0, 0
+	for _, sub := range subs {
+		for path, src := range readDataFiles(t, sub, ".vyql") {
+			decls, err := parseV2DefinitionsForTest(src)
+			if err != nil {
+				t.Fatalf("parse %s: %v", path, err)
+			}
+			for _, decl := range decls {
+				binding, ok := decl.(*parser.BindingSet)
+				if !ok {
+					continue
+				}
+				for _, mapping := range binding.Mappings {
+					switch {
+					case strings.HasPrefix(mapping.Kind, "source"):
+						sourceCount++
+					case strings.HasPrefix(mapping.Kind, "sink"):
+						sinkCount++
+					case strings.HasPrefix(mapping.Kind, "check") && mapping.Coverage != "":
+						checkCount++
+					}
+				}
+			}
+		}
+	}
+	return sourceCount, sinkCount, checkCount
+}
+
+func TestCVE1000LedgerCoverageGate(t *testing.T) {
+	repo := testRepoRoot(t)
+	poolPath := filepath.Join(repo, "cve-1000", "pool.tsv")
+	ledgerPath := filepath.Join(repo, "cve-1000", "ledger.tsv")
+	poolRaw, err := os.ReadFile(poolPath)
+	if err != nil {
+		t.Fatalf("read CVE pool: %v", err)
+	}
+	ledgerRaw, err := os.ReadFile(ledgerPath)
+	if err != nil {
+		t.Fatalf("read CVE ledger: %v", err)
+	}
+
+	poolRows := nonemptyTSVRows(string(poolRaw))
+	if len(poolRows) != 1000 {
+		t.Fatalf("cve-1000 pool rows = %d, want 1000", len(poolRows))
+	}
+	ledgerRows := nonemptyTSVRows(string(ledgerRaw))
+	if len(ledgerRows) != len(poolRows) {
+		t.Fatalf("cve-1000 ledger rows = %d, want exactly %d pool rows", len(ledgerRows), len(poolRows))
+	}
+	poolFieldsByRank := make([][]string, len(poolRows))
+	for rank, row := range poolRows {
+		fields := strings.Split(row, "\t")
+		if len(fields) < 7 {
+			t.Fatalf("pool row %d has %d fields, want at least 7: %q", rank+1, len(fields), row)
+		}
+		poolFieldsByRank[rank] = fields
+	}
+	covered := make(map[int]bool, len(poolRows))
+	ledgerByRank := make(map[int]string, len(poolRows))
+	statuses := map[string]int{}
+	usedCVEOverrides := map[int]bool{}
+	for i, row := range ledgerRows {
+		fields := strings.SplitN(row, "\t", 6)
+		if len(fields) != 6 {
+			t.Fatalf("ledger row %d has %d fields, want 6: %q", i+1, len(fields), row)
+		}
+		rank, err := strconv.Atoi(fields[0])
+		if err != nil {
+			t.Fatalf("ledger row %d has invalid rank %q", i+1, fields[0])
+		}
+		if rank < 0 || rank >= len(poolRows) {
+			t.Fatalf("ledger row %d rank %d outside pool range 0..%d", i+1, rank, len(poolRows)-1)
+		}
+		poolFields := poolFieldsByRank[rank]
+		if !cve1000LedgerRepoMatches(fields[1], poolFields) {
+			t.Fatalf("ledger row %d rank %d repo = %q, want pool repo %q, owner %q, or owner/repo", i+1, rank, fields[1], poolFields[0], poolFields[1])
+		}
+		if fields[2] != "" && poolFields[6] != "" && fields[2] != poolFields[6] {
+			t.Fatalf("ledger row %d rank %d language = %q, want pool language %q", i+1, rank, fields[2], poolFields[6])
+		}
+		if fields[3] != poolFields[3] {
+			if cve1000AcceptedLedgerCVEMetadataOverrides[rank] != fields[3] {
+				t.Fatalf("ledger row %d rank %d CVE = %q, want pool CVE %q", i+1, rank, fields[3], poolFields[3])
+			}
+			usedCVEOverrides[rank] = true
+		}
+		status := fields[4]
+		switch status {
+		case "CAUGHT", "FIXED", "ATTENTION", "SKIP":
+			statuses[status]++
+		default:
+			t.Fatalf("ledger row %d rank %d has unknown status %q", i+1, rank, status)
+		}
+		if strings.TrimSpace(fields[5]) == "" {
+			t.Fatalf("ledger row %d rank %d status %s is missing verification evidence", i+1, rank, status)
+		}
+		if prev, ok := ledgerByRank[rank]; ok {
+			t.Fatalf("cve-1000 ledger rank %d appears more than once:\nfirst: %s\nagain: %s", rank, prev, row)
+		}
+		ledgerByRank[rank] = row
+		covered[rank] = true
+	}
+	var missing []string
+	for rank := range poolRows {
+		if !covered[rank] {
+			missing = append(missing, strconv.Itoa(rank))
+		}
+	}
+	if len(missing) > 0 {
+		t.Fatalf("cve-1000 ledger missing %d pool rank(s): %s", len(missing), strings.Join(missing, ", "))
+	}
+	wantStatuses := map[string]int{"ATTENTION": 110, "CAUGHT": 107, "FIXED": 781, "SKIP": 2}
+	if !intMapsEqual(statuses, wantStatuses) {
+		t.Fatalf("cve-1000 ledger statuses = %v, want %v", statuses, wantStatuses)
+	}
+	for rank, cve := range cve1000AcceptedLedgerCVEMetadataOverrides {
+		if !usedCVEOverrides[rank] {
+			t.Fatalf("CVE ledger metadata override rank %d (%s) is stale; remove it or fix the ledger/pool pair", rank, cve)
+		}
+	}
+
+	cveSpecs := readCVERankSpecFiles(t)
+	specRanksByRank := map[int][]string{}
+	for _, path := range cveSpecs {
+		rank, ok := cveRankFromSpecName(filepath.Base(path))
+		if !ok {
+			t.Fatalf("CVE spec file has invalid rank name: %s", filepath.Base(path))
+		}
+		if _, ok := ledgerByRank[rank]; !ok {
+			t.Fatalf("CVE spec %s references rank %d which is not present in cve-1000 ledger", filepath.Base(path), rank)
+		}
+		specRanksByRank[rank] = append(specRanksByRank[rank], filepath.Base(path))
+	}
+	uniqueSpecRanks := map[int]bool{}
+	for rank, names := range specRanksByRank {
+		uniqueSpecRanks[rank] = true
+		if len(names) > 1 && !cve1000AllowedDuplicateSpecRanks[rank] {
+			sort.Strings(names)
+			t.Fatalf("CVE rank %d has %d spec files but is not in the duplicate-spec allowlist: %s", rank, len(names), strings.Join(names, ", "))
+		}
+	}
+	for rank := range cve1000AllowedDuplicateSpecRanks {
+		if len(specRanksByRank[rank]) < 2 {
+			t.Fatalf("CVE duplicate-spec allowlist rank %d is stale; found %d spec file(s)", rank, len(specRanksByRank[rank]))
+		}
+	}
+	if len(cveSpecs) < 787 || len(uniqueSpecRanks) < 781 {
+		t.Fatalf("CVE runnable rank specs regressed: files=%d unique_ranks=%d, want at least files=787 unique_ranks=781", len(cveSpecs), len(uniqueSpecRanks))
+	}
+
+	var missingRunnable, staleNoSpecExceptions, skipWithSpecs []string
+	for rank, row := range ledgerByRank {
+		fields := strings.SplitN(row, "\t", 6)
+		status := fields[4]
+		hasSpec := uniqueSpecRanks[rank]
+		switch {
+		case status == "SKIP" && hasSpec:
+			skipWithSpecs = append(skipWithSpecs, fmt.Sprintf("%d", rank))
+		case status != "SKIP" && !hasSpec && !cve1000AcceptedNoSpecRanks[rank]:
+			missingRunnable = append(missingRunnable, fmt.Sprintf("%d:%s", rank, status))
+		}
+	}
+	for rank := range cve1000AcceptedNoSpecRanks {
+		row, ok := ledgerByRank[rank]
+		if !ok {
+			staleNoSpecExceptions = append(staleNoSpecExceptions, fmt.Sprintf("%d:missing-ledger", rank))
+			continue
+		}
+		fields := strings.SplitN(row, "\t", 6)
+		if fields[4] == "SKIP" {
+			staleNoSpecExceptions = append(staleNoSpecExceptions, fmt.Sprintf("%d:skip-status", rank))
+			continue
+		}
+		if uniqueSpecRanks[rank] {
+			staleNoSpecExceptions = append(staleNoSpecExceptions, fmt.Sprintf("%d:now-has-spec", rank))
+		}
+	}
+	if len(skipWithSpecs) > 0 {
+		sort.Strings(skipWithSpecs)
+		t.Fatalf("CVE SKIP ranks must not have runnable specs; remove skip or spec: %s", strings.Join(skipWithSpecs, ", "))
+	}
+	if len(missingRunnable) > 0 {
+		sort.Strings(missingRunnable)
+		t.Fatalf("CVE non-SKIP ledger ranks without runnable specs must be listed in cve1000AcceptedNoSpecRanks: %s", strings.Join(missingRunnable, ", "))
+	}
+	if len(staleNoSpecExceptions) > 0 {
+		sort.Strings(staleNoSpecExceptions)
+		t.Fatalf("CVE no-spec exception list is stale; remove or fix: %s", strings.Join(staleNoSpecExceptions, ", "))
+	}
+	t.Logf("cve-1000 ledger: pool=%d ledger_rows=%d unique_ranks=%d statuses=%v cve_specs=%d unique_spec_ranks=%d",
+		len(poolRows), len(ledgerRows), len(covered), statuses, len(cveSpecs), len(uniqueSpecRanks))
+}
+
+var cve1000AllowedDuplicateSpecRanks = map[int]bool{
+	474: true,
+	495: true,
+	795: true,
+	835: true,
+	955: true,
+}
+
+// cve1000AcceptedLedgerCVEMetadataOverrides is the explicit burn-down list for
+// existing ledger rows whose reviewed CVE differs from the selected pool row.
+// New CVE mismatches fail the gate; fixing this row must remove the exception.
+var cve1000AcceptedLedgerCVEMetadataOverrides = map[int]string{
+	15: "CVE-2010-0684",
+}
+
+// cve1000AcceptedNoSpecRanks is the explicit burn-down list for non-SKIP ledger
+// rows that are currently verified only by the CVE prep/eval ledger rather than a
+// runnable cve_rank*.test.vyql spec. Adding a runnable rank spec must remove the
+// rank here; new non-SKIP ledger rows without specs fail the gate.
+var cve1000AcceptedNoSpecRanks = map[int]bool{
+	21: true,
+	28: true, 37: true,
+	62: true, 69: true, 71: true, 73: true,
+	83:  true,
+	574: true, 588: true,
+}
+
+func nonemptyTSVRows(src string) []string {
+	lines := strings.Split(src, "\n")
+	rows := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			rows = append(rows, line)
+		}
+	}
+	return rows
+}
+
+func intMapsEqual(a, b map[string]int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for key, av := range a {
+		if b[key] != av {
+			return false
+		}
+	}
+	return true
+}
+
+func cve1000LedgerRepoMatches(ledgerRepo string, poolFields []string) bool {
+	if len(poolFields) < 2 {
+		return false
+	}
+	project := poolFields[0]
+	owner := poolFields[1]
+	return ledgerRepo == project || ledgerRepo == owner || ledgerRepo == owner+"/"+project
+}
+
+func readCVERankSpecFiles(t *testing.T) []string {
+	t.Helper()
+	testsDir := filepath.Join(datadir.Root(), "tests")
+	entries, err := os.ReadDir(testsDir)
+	if err != nil {
+		t.Fatalf("read tests dir: %v", err)
+	}
+	var out []string
+	for _, entry := range entries {
+		name := entry.Name()
+		if !entry.IsDir() && strings.HasPrefix(name, "cve_rank") && strings.HasSuffix(name, ".test.vyql") {
+			out = append(out, filepath.Join(testsDir, name))
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func cveRankFromSpecName(name string) (int, bool) {
+	if !strings.HasPrefix(name, "cve_rank") {
+		return 0, false
+	}
+	rest := strings.TrimPrefix(name, "cve_rank")
+	cut := strings.IndexByte(rest, '_')
+	if cut < 0 {
+		return 0, false
+	}
+	rank, err := strconv.Atoi(rest[:cut])
+	return rank, err == nil
 }

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.me84b83db;
+
+binding networkBind1 {
+  requires {
+    dependency("aws-c-io")
+  }
+  query pattern callExpr where callee.method == "aws_socket_bind"
+  emit sink code.NetworkBind at args[0]
+}

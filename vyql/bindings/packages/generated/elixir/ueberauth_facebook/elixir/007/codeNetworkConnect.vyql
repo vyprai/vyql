@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mbee64101;
+
+binding networkConnect7 {
+  requires {
+    dependency("ueberauth_facebook")
+  }
+  query pattern callExpr where callee.method == "user_query"
+  emit sink code.NetworkConnectSink at args[0]
+}

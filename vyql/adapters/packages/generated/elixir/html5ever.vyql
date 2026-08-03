@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "html5ever" {
-    sink method "parse" -> code.Deserialization
-    sink method "parse_with_attributes_as_maps" -> code.Deserialization
-    sink method "flat_parse" -> code.Deserialization
-    sink method "flat_parse_with_attributes_as_maps" -> code.Deserialization
-  }
-}

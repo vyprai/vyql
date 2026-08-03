@@ -1,0 +1,9 @@
+module bindings.dart.generated.m76d5ba41;
+
+binding userControlledData0 {
+  requires {
+    dependency("flutter_share")
+  }
+  query pattern callExpr where callee.method == "share"
+  emit source core.UserControlledData at call.result
+}

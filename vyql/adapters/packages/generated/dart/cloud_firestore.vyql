@@ -1,7 +1,0 @@
-import code.{NosqlQuery}
-
-adapter dart {
-  package "cloud_firestore" {
-    sink method "get" -> code.NosqlQuery
-  }
-}

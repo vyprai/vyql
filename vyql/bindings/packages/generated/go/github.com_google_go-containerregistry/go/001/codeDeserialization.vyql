@@ -1,0 +1,9 @@
+module bindings.go.generated.m6f7d8776;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/google/go-containerregistry")
+  }
+  query pattern callExpr where callee.method == "MustParseReference"
+  emit sink code.Deserialization at args[0]
+}

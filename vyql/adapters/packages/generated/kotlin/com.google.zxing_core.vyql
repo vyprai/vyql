@@ -1,6 +1,0 @@
-adapter kotlin {
-  package "com.google.zxing:core" {
-    sink method "parse" -> code.Deserialization
-    sink method "decodeRow" -> code.Deserialization
-  }
-}

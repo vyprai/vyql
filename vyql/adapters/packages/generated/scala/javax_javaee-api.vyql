@@ -1,7 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter scala {
-  package "javax:javaee-api" {
-    sink method "createParser" -> code.Deserialization
-    sink method "read" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m1008abec;
+
+binding codeEval0 {
+  requires {
+    dependency("phpunit/php-invoker")
+  }
+  query pattern callExpr where callee.method == "invoke"
+  emit sink code.CodeEval at args[0]
+}

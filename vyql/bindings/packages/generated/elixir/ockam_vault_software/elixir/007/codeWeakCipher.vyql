@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mce11883d;
+
+binding weakCipher7 {
+  requires {
+    dependency("ockam_vault_software")
+  }
+  query pattern callExpr where callee.method == "aead_aes_gcm_decrypt"
+  emit issue code.WeakCipher at call
+}

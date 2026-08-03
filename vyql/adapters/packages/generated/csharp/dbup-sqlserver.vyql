@@ -1,8 +1,0 @@
-import code.{SqlExecution, SecretValue}
-adapter csharp {
-  package "dbup-sqlserver" {
-    sink method "SqlScriptExecutor.ExecuteCommandsWithinExceptionHandler" -> code.SqlExecution
-    source method "SqlConnectionManager.#ctor" -> code.SecretValue
-    source method "AzureSqlConnectionManager.#ctor" -> code.SecretValue
-  }
-}

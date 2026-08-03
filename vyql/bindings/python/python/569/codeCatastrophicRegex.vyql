@@ -1,0 +1,7 @@
+module bindings.python.generated.m21017d75;
+
+binding catastrophicRegex569 {
+  query pattern callExpr where callee.path ~= "re.match" and args.any.literal contains "(\\w+=[\\w,]+;?)*" and args.any.literal contains "(\\w+=\\w+;?)*"
+  emit sink code.CatastrophicRegexSink at args[0]
+  emit issue code.CatastrophicRegex at call
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m942721f9;
+
+binding externalApiResponse1 {
+  requires {
+    dependency("AFNetworking")
+  }
+  query pattern callExpr where callee.method == "responseObject"
+  emit source code.ExternalApiResponse at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.python.generated.m97e50a2d;
+
+binding filePathAccess0 {
+  requires {
+    dependency("zipp")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

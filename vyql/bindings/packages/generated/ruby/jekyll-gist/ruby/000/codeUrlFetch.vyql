@@ -1,0 +1,9 @@
+module bindings.ruby.generated.me04e4aed;
+
+binding urlFetch0 {
+  requires {
+    dependency("jekyll-gist")
+  }
+  query pattern callExpr where callee.method == "gist_script_tag"
+  emit sink code.UrlFetch at args[0]
+}

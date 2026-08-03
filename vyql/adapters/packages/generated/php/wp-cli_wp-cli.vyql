@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter php {
-  package "wp-cli/wp-cli" {
-    sink method "WP_CLI\Process::run" -> code.CommandExecution
-  }
-}

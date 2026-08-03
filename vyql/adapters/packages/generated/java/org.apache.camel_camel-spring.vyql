@@ -1,6 +1,0 @@
-import code.{ExpressionEval}
-adapter java {
-  package "org.apache.camel:camel-spring" {
-    sink method "parseExpression" -> code.ExpressionEval
-  }
-}

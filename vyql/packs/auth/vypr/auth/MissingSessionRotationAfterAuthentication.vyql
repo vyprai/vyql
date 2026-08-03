@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule MissingSessionRotationAfterAuthentication {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_384]
+    id: "VYQL-AUTH-074"
+    severity: high
+  }
+  issue code.MissingSessionRotationAfterAuthentication as session
+}

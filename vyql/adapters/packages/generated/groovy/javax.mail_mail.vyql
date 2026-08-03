@@ -1,9 +1,0 @@
-import code.{Deserialization, NetworkSend}
-adapter groovy {
-  package "javax.mail:mail" {
-    sink method "MimeMessage.parse" -> code.Deserialization
-    sink method "InternetAddress.parse" -> code.Deserialization
-    sink method "NewsAddress.parse" -> code.Deserialization
-    sink method "Transport.send" -> code.NetworkSend
-  }
-}

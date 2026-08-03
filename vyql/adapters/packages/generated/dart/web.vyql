@@ -1,8 +1,0 @@
-import code.{UrlFetch, NetworkSend}
-adapter dart {
-  package "web" {
-    sink method "getString" -> code.UrlFetch
-    sink method "postFormData" -> code.NetworkSend
-    sink method "request" -> code.UrlFetch
-  }
-}

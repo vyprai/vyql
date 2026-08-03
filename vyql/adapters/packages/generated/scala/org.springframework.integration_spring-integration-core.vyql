@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "org.springframework.integration:spring-integration-core" {
-    sink method "decode" -> code.Deserialization
-  }
-}

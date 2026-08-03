@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mbb84f4a7;
+
+binding filePathAccess1 {
+  requires {
+    dependency("marisa-trie")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.FilePathAccess at args[0]
+}

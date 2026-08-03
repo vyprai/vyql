@@ -1,0 +1,13 @@
+module bindings.swift.generated.m9bcf7fa5;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("github.com/Alamofire/Alamofire")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,9 +1,0 @@
-import code.{HtmlRender}
-
-adapter ruby {
-  package "libnotify" {
-    sink method "new" -> code.HtmlRender
-    sink method "show" -> code.HtmlRender
-    sink method "update" -> code.HtmlRender
-  }
-}

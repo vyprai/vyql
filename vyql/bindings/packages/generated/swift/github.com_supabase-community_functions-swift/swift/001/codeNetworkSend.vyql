@@ -1,0 +1,9 @@
+module bindings.swift.generated.md2605d62;
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/supabase-community/functions-swift")
+  }
+  query pattern callExpr where callee.method == "invoke"
+  emit sink code.NetworkSend at args[0]
+}

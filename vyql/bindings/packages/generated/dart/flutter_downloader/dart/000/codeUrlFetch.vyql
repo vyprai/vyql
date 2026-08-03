@@ -1,0 +1,9 @@
+module bindings.dart.generated.m252beaed;
+
+binding urlFetch0 {
+  requires {
+    dependency("flutter_downloader")
+  }
+  query pattern callExpr where callee.method == "enqueue"
+  emit sink code.UrlFetch at args[0]
+}

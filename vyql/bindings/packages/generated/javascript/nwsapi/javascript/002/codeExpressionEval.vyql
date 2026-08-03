@@ -1,0 +1,9 @@
+module bindings.javascript.generated.me42203bb;
+
+binding expressionEval2 {
+  requires {
+    dependency("nwsapi")
+  }
+  query pattern callExpr where callee.method == "querySelectorAll"
+  emit sink code.ExpressionEval at args[0]
+}

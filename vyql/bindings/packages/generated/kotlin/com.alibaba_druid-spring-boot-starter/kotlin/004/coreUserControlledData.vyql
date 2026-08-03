@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m94ad0752;
+
+binding userControlledData4 {
+  requires {
+    dependency("com.alibaba:druid-spring-boot-starter")
+  }
+  query pattern callExpr where callee.method == "getUrlPattern"
+  emit source core.UserControlledData at call.result
+}

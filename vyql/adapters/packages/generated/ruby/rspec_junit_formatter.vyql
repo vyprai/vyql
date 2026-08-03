@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter ruby {
-  package "rspec_junit_formatter" {
-    control method "escape" -> core.HtmlEscape
-  }
-}

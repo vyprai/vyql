@@ -1,0 +1,10 @@
+module bindings.kotlin.generated.m666d132a;
+
+binding redirectTarget1 {
+  requires {
+    dependency("org.apache.shiro:shiro-spring")
+  }
+  query pattern callExpr where callee.method == "setSuccessUrl"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

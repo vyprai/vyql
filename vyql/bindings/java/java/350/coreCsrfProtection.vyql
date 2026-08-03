@@ -1,0 +1,10 @@
+module bindings.java.generated.m420f6b67;
+
+binding csrfProtection350 {
+  query pattern callExpr where callee.path ~= "verifyCsrfToken"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

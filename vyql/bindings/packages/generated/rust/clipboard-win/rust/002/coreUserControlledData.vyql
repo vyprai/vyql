@@ -1,0 +1,9 @@
+module bindings.rust.generated.me28c2955;
+
+binding userControlledData2 {
+  requires {
+    dependency("clipboard-win")
+  }
+  query pattern callExpr where callee.method == "get_file_list"
+  emit source core.UserControlledData at call.result
+}

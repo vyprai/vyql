@@ -1,6 +1,0 @@
-adapter scala {
-  package "com.sun.jersey:jersey-bundle" {
-    sink method "get" -> code.UrlFetch
-    source method "Cookie" -> code.HttpInput
-  }
-}

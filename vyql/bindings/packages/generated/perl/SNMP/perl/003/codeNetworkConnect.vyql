@@ -1,0 +1,9 @@
+module bindings.perl.generated.m227799a1;
+
+binding networkConnect3 {
+  requires {
+    dependency("SNMP")
+  }
+  query pattern callExpr where callee.method == "snmp_getnext"
+  emit sink code.NetworkConnectSink at args[0]
+}

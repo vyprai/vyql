@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m46b2b4d8;
+
+binding networkConnect3 {
+  requires {
+    dependency("net-ssh")
+  }
+  query pattern callExpr where callee.method == "connection"
+  emit sink code.NetworkConnectSink at args[0]
+}

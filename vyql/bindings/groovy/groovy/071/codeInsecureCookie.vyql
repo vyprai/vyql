@@ -1,0 +1,6 @@
+module bindings.groovy.generated.m6eabb149;
+
+binding insecureCookie71 {
+  query pattern callExpr where callee.path ~= "setSecure" and args.any.literal contains "false"
+  emit issue code.InsecureCookie at call
+}

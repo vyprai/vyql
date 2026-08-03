@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "rails-dom-testing" {
-    sink method "fragment" -> code.Deserialization
-  }
-}

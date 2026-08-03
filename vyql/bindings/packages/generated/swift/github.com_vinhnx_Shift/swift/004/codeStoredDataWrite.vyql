@@ -1,0 +1,9 @@
+module bindings.swift.generated.mb1f1a06a;
+
+binding storedDataWrite4 {
+  requires {
+    dependency("github.com/vinhnx/Shift")
+  }
+  query pattern callExpr where callee.method == "createEvent"
+  emit sink code.StoredDataWrite at args[0]
+}

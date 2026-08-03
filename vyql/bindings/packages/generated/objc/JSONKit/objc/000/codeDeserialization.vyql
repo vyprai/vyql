@@ -1,0 +1,9 @@
+module bindings.objc.generated.m3ccc533c;
+
+binding deserialization0 {
+  requires {
+    dependency("JSONKit")
+  }
+  query pattern callExpr where callee.method == "parseUTF8String"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{NetworkConnect}
-adapter scala {
-  package "org.eclipse.jetty:jetty-io" {
-    sink method "connect" -> code.NetworkConnect
-  }
-}

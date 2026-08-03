@@ -1,5 +1,6 @@
 test "rank163: Autoptimize lazyload preg_replace placeholder rewrite needs XSS review"
   lang php
+  expect VYQL-INJ-199
   expect_review code.HtmlAttributeRewriteReview
   code
   ```
@@ -18,6 +19,7 @@ test "rank163: Autoptimize lazyload preg_replace placeholder rewrite needs XSS r
 
 test "rank163: Autoptimize fixed str_replace placeholder insertion is clean for lazyload rewrite review"
   lang php
+  reject VYQL-INJ-199
   reject_review code.HtmlAttributeRewriteReview
   code
   ```

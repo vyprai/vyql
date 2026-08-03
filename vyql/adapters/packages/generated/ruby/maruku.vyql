@@ -1,6 +1,0 @@
-adapter ruby {
-  package "maruku" {
-    sink method "parse_doc" -> code.CodeEval
-    sink method "parse_email_headers" -> code.Deserialization
-  }
-}

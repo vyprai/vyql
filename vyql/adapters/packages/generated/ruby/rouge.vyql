@@ -1,7 +1,0 @@
-import core.{ShellEscape}
-adapter ruby {
-  package "rouge" {
-    control method "Rouge::Formatters::Terminal256.escape" -> core.ShellEscape
-    control method "Rouge::Formatters::Terminal256.escape_sequence" -> core.ShellEscape
-  }
-}

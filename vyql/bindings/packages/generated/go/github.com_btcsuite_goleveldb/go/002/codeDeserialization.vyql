@@ -1,0 +1,9 @@
+module bindings.go.generated.m714b0925;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/btcsuite/goleveldb")
+  }
+  query pattern callExpr where callee.method == "decodeBatchHeader"
+  emit sink code.Deserialization at args[0]
+}

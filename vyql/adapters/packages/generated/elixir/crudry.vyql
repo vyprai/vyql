@@ -1,9 +1,0 @@
-import code.{SqlExecution}
-
-adapter elixir {
-  package "crudry" {
-    sink method "list" -> code.SqlExecution
-    sink method "search" -> code.SqlExecution
-    sink method "filter" -> code.SqlExecution
-  }
-}

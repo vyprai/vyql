@@ -11,9 +11,26 @@ import (
 
 // luaConv walks a tree-sitter Lua CST into NIR.
 type luaConv struct {
-	src  []byte
-	file string
-	key  string
+	src        []byte
+	file       string
+	key        string
+	childCache map[uintptr][]*tree_sitter.Node
+}
+
+func (c *luaConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = make(map[uintptr][]*tree_sitter.Node)
+	}
+	key := uintptr(n.Id())
+	if kids, ok := c.childCache[key]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[key] = kids
+	return kids
 }
 
 // ExtractLua parses Lua files into one NIR Program (one module per file).
@@ -44,7 +61,7 @@ func (c *luaConv) text(n *tree_sitter.Node) string {
 
 func (c *luaConv) block(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, st := range namedChildren(n) {
+	for _, st := range c.namedChildren(n) {
 		out = append(out, c.stmt(st)...)
 	}
 	return out
@@ -62,7 +79,7 @@ func (c *luaConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}}
 	case "variable_declaration", "local_variable_declaration":
 		var out []nir.Stmt
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "assignment_statement" {
 				out = append(out, c.stmt(ch)...)
 			}
@@ -71,13 +88,13 @@ func (c *luaConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return out
 		}
 		// local x = v  with fields directly on the node
-		return c.assign(field(n, "name"), field(n, "value"), namedChildren(n))
+		return c.assign(field(n, "name"), field(n, "value"), c.namedChildren(n))
 	case "assignment_statement":
 		return c.assignStmt(n)
 	case "function_call":
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 	case "return_statement":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) > 0 {
 			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
 		}
@@ -97,14 +114,14 @@ func (c *luaConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 func (c *luaConv) assignStmt(n *tree_sitter.Node) []nir.Stmt {
 	var names []string
 	var vals []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		switch ch.Kind() {
 		case "variable_list":
-			for _, v := range namedChildren(ch) {
+			for _, v := range c.namedChildren(ch) {
 				names = append(names, c.lvalName(v))
 			}
 		case "expression_list":
-			for _, v := range namedChildren(ch) {
+			for _, v := range c.namedChildren(ch) {
 				vals = append(vals, c.expr(v))
 			}
 		}
@@ -145,10 +162,10 @@ func (c *luaConv) luaIf(n *tree_sitter.Node) nir.Stmt {
 	if cons := field(n, "consequence"); cons != nil {
 		it.Then = c.block(cons)
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		switch ch.Kind() {
 		case "else_statement", "elseif_statement":
-			for _, b := range namedChildren(ch) {
+			for _, b := range c.namedChildren(ch) {
 				if b.Kind() == "block" {
 					it.Else = append(it.Else, c.block(b)...)
 				}
@@ -180,7 +197,7 @@ func (c *luaConv) params(params *tree_sitter.Node) []string {
 		return nil
 	}
 	var out []string
-	for _, ch := range namedChildren(params) {
+	for _, ch := range c.namedChildren(params) {
 		if ch.Kind() == "identifier" {
 			out = append(out, c.text(ch))
 		}
@@ -193,7 +210,7 @@ func (c *luaConv) callArgs(args *tree_sitter.Node) []nir.Expr {
 		return nil
 	}
 	var out []nir.Expr
-	for _, a := range namedChildren(args) {
+	for _, a := range c.namedChildren(args) {
 		out = append(out, c.expr(a))
 	}
 	return out
@@ -235,17 +252,17 @@ func (c *luaConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "unary_expression":
 		op := c.text(field(n, "operator"))
 		var operand nir.Expr = nir.Const{Loc: L}
-		if k := namedChildren(n); len(k) > 0 {
+		if k := c.namedChildren(n); len(k) > 0 {
 			operand = c.expr(k[len(k)-1])
 		}
 		return nir.Unary{Op: op, Operand: operand, Loc: L}
 	case "parenthesized_expression":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}
 		}
 	}
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}

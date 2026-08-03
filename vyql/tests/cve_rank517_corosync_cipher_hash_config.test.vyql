@@ -101,3 +101,25 @@ test "rank517: cipher configuration rejects disabled hash"
       return 0;
   }
   ```
+
+test "rank517: disabled hash configuration generalizes across names"
+  lang c
+  expect VYQL-CRY-009
+  code
+  ```
+  int icmap_get_string(const char *key, char **out);
+  int strcmp(const char *a, const char *b);
+
+  static void load_crypto(void *out) {
+      char *raw;
+      const char *selected_cipher = "aes256";
+      const char *selected_hash = "sha256";
+
+      if (icmap_get_string("totem.crypto_cipher", &raw) == 0) {
+          if (strcmp(raw, "none") == 0) selected_cipher = "none";
+      }
+      if (icmap_get_string("totem.crypto_hash", &raw) == 0) {
+          if (strcmp(raw, "none") == 0) selected_hash = "none";
+      }
+  }
+  ```

@@ -1,0 +1,10 @@
+module vypr.misconfig;
+
+rule CleartextChannel {
+  meta {
+    cwe: [CWE_319]
+    id: "VYQL-CFG-006"
+    severity: low
+  }
+  issue code.CleartextChannel as c
+}

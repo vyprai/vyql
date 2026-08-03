@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mc01534c9;
+
+binding filePathAccess0 {
+  requires {
+    dependency("loader-runner")
+  }
+  query pattern callExpr where callee.method == "runLoaders"
+  emit sink code.FilePathAccess at args[0]
+}

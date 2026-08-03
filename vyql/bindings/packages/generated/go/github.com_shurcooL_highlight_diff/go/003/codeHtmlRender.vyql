@@ -1,0 +1,9 @@
+module bindings.go.generated.m0589867f;
+
+binding htmlRender3 {
+  requires {
+    dependency("github.com/shurcooL/highlight_diff")
+  }
+  query pattern callExpr where callee.method == "Print"
+  emit sink code.HtmlRender at args[0]
+}

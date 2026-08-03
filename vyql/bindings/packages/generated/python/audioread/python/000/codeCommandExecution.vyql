@@ -1,0 +1,9 @@
+module bindings.python.generated.mb2c994c4;
+
+binding commandExecution0 {
+  requires {
+    dependency("audioread")
+  }
+  query pattern callExpr where callee.method == "popen_multiple"
+  emit sink code.CommandExecution at args[0]
+}

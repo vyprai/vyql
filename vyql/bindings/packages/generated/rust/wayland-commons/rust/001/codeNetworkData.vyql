@@ -1,0 +1,9 @@
+module bindings.rust.generated.m62e9465d;
+
+binding networkData1 {
+  requires {
+    dependency("wayland-commons")
+  }
+  query pattern callExpr where callee.method == "rcv_msg"
+  emit source code.NetworkData at call.result
+}

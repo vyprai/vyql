@@ -1,0 +1,9 @@
+module bindings.go.generated.mb7d799c0;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/nats-io/jwt")
+  }
+  query pattern callExpr where callee.method == "ParseDecoratedJWT"
+  emit sink code.Deserialization at args[0]
+}

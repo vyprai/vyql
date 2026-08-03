@@ -1,5 +1,0 @@
-adapter elixir {
-  package "erlsom" {
-    sink method "parse" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m53dec595;
+
+binding commandExecution1 {
+  requires {
+    dependency("mrclay/minify")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

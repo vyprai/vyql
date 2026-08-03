@@ -1,0 +1,7 @@
+module code;
+
+review code.CompressedBlockSizeCapacityMismatch {
+  category: memory
+  kind: attention
+  text: "review compressed block output capacity accounting before metadata and block writes"
+}

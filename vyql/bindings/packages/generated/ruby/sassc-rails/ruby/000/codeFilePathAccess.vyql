@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m1aec25d5;
+
+binding filePathAccess0 {
+  requires {
+    dependency("sassc-rails")
+  }
+  query pattern callExpr where callee.method == "import_for"
+  emit sink code.FilePathAccess at args[0]
+}

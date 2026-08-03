@@ -1,0 +1,6 @@
+module bindings.swift.generated.m388f23d0;
+
+binding urlFetch29 {
+  query pattern callExpr where callee.path ~= "URLRequest"
+  emit sink code.UrlFetch at args[0]
+}

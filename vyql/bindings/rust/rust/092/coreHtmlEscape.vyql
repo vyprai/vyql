@@ -1,0 +1,11 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding htmlEscape92 {
+  query pattern callExpr where callee.path ~= "html_escape.encode_safe"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

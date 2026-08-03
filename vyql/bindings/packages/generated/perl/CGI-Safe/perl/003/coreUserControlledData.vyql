@@ -1,0 +1,9 @@
+module bindings.perl.generated.m5aa70a56;
+
+binding userControlledData3 {
+  requires {
+    dependency("CGI-Safe")
+  }
+  query pattern callExpr where callee.method == "get_shell"
+  emit source core.UserControlledData at call.result
+}

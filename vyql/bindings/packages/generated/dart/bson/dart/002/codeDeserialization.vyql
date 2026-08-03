@@ -1,0 +1,9 @@
+module bindings.dart.generated.m1eabbf77;
+
+binding deserialization2 {
+  requires {
+    dependency("bson")
+  }
+  query pattern callExpr where callee.method == "BsonCodec.deserialize"
+  emit sink code.Deserialization at args[0]
+}

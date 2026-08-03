@@ -1,0 +1,9 @@
+module bindings.rust.generated.mc470b33a;
+
+binding codeEval0 {
+  requires {
+    dependency("psm")
+  }
+  query pattern callExpr where callee.method == "rust_psm_replace_stack"
+  emit sink code.CodeEval at args[0]
+}

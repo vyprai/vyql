@@ -1,0 +1,8 @@
+module code;
+
+review code.ObjectLookupByUserInput {
+  category: auth
+  expected: [core.OwnershipCheck, core.AuthorizationCheck]
+  kind: target
+  text: "verify object access is constrained to the current principal"
+}

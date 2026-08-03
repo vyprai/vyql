@@ -1,9 +1,0 @@
-import code.{HttpInput}
-import core.{HtmlEscape}
-
-adapter elixir {
-  package "html_entities" {
-    source method "decode" -> code.HttpInput
-    control method "encode" -> core.HtmlEscape
-  }
-}

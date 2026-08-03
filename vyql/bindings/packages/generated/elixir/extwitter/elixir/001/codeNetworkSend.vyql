@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mc2fa3b0d;
+
+binding networkSend1 {
+  requires {
+    dependency("extwitter")
+  }
+  query pattern callExpr where callee.method == "request_async"
+  emit sink code.NetworkSend at args[0]
+}

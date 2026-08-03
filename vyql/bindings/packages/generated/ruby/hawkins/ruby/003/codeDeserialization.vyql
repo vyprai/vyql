@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m7bc51ba1;
+
+binding deserialization3 {
+  requires {
+    dependency("hawkins")
+  }
+  query pattern callExpr where callee.method == "decodeURIComponent"
+  emit sink code.Deserialization at args[0]
+}

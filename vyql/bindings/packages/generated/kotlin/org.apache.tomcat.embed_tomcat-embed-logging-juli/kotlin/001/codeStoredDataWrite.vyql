@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m9f81b7a8;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("org.apache.tomcat.embed:tomcat-embed-logging-juli")
+  }
+  query pattern callExpr where callee.method == "setLevel"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding filePathAccess338 {
+  query pattern callExpr where callee.path ~= "fs.mkdir"
+  emit sink code.FilePathAccess at args[0]
+}

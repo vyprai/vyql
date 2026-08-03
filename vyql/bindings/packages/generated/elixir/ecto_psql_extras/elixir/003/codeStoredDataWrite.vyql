@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mb8c1157b;
+
+binding storedDataWrite3 {
+  requires {
+    dependency("ecto_psql_extras")
+  }
+  query pattern callExpr where callee.method == "db_settings"
+  emit sink code.StoredDataWrite at args[0]
+}

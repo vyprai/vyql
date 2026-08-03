@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m0c8d7d3d;
+
+binding deserialization1 {
+  requires {
+    dependency("mail")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

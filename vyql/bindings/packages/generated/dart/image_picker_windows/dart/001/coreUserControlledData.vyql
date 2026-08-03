@@ -1,0 +1,9 @@
+module bindings.dart.generated.m91ea45e7;
+
+binding userControlledData1 {
+  requires {
+    dependency("image_picker_windows")
+  }
+  query pattern callExpr where callee.method == "PickedFile"
+  emit source core.UserControlledData at call.result
+}

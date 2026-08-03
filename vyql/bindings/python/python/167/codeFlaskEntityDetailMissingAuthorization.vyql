@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding flaskEntityDetailMissingAuthorization167 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "flask_entity_detail_missing_authorization"
+  emit issue code.FlaskEntityDetailMissingAuthorization at node
+}

@@ -1,0 +1,9 @@
+module bindings.go.generated.m97579f60;
+
+binding stdinInput1 {
+  requires {
+    dependency("github.com/opencontainers/runtime-spec")
+  }
+  query pattern callExpr where callee.method == "main"
+  emit source code.StdinInput at call.result
+}

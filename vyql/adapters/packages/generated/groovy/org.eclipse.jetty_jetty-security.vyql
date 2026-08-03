@@ -1,9 +1,0 @@
-import core.{AuthenticationCheck}
-
-adapter groovy {
-  package "org.eclipse.jetty:jetty-security" {
-    control method "login" -> core.AuthenticationCheck
-    control method "validate" -> core.AuthenticationCheck
-    control method "authenticate" -> core.AuthenticationCheck
-  }
-}

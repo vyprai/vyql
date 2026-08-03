@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mee57f381;
+
+binding fileUse1 {
+  requires {
+    dependency("json-c")
+  }
+  query pattern callExpr where callee.method == "json_object_from_file"
+  emit sink code.FileUseSink at args[0]
+}

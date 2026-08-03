@@ -1,9 +1,0 @@
-import code.{Deserialization, SqlExecution}
-
-adapter elixir {
-  package "mongodb_driver" {
-    sink method "admin_command" -> code.SqlExecution
-    sink method "command" -> code.SqlExecution
-    sink method "decode" -> code.Deserialization
-  }
-}

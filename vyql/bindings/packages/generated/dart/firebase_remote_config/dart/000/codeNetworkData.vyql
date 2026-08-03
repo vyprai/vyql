@@ -1,0 +1,9 @@
+module bindings.dart.generated.m38547978;
+
+binding networkData0 {
+  requires {
+    dependency("firebase_remote_config")
+  }
+  query pattern callExpr where callee.method == "fetch"
+  emit source code.NetworkData at call.result
+}

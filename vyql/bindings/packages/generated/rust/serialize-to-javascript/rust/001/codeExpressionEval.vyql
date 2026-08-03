@@ -1,0 +1,9 @@
+module bindings.rust.generated.m4659c23e;
+
+binding expressionEval1 {
+  requires {
+    dependency("serialize-to-javascript")
+  }
+  query pattern callExpr where callee.method == "into_javascript_string_literal"
+  emit sink code.ExpressionEval at args[0]
+}

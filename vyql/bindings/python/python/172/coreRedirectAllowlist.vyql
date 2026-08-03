@@ -1,0 +1,10 @@
+module bindings.python.generated.m21017d75;
+
+binding redirectAllowlist172 {
+  query pattern callExpr where callee.path ~= "url_has_allowed_host_and_scheme"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

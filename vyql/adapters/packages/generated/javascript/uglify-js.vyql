@@ -1,5 +1,0 @@
-adapter javascript {
-  package "uglify-js" {
-    sink method "decode" -> code.Deserialization
-  }
-}

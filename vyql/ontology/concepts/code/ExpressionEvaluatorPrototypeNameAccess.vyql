@@ -1,0 +1,11 @@
+module code;
+
+concept ExpressionEvaluatorPrototypeNameAccess : issue {
+  cwe: [CWE_1321]
+  reviewAssumption: "a caller can evaluate attacker-controlled expressions containing variable or member names"
+  reviewCategory: prototype_pollution
+  reviewCondition: "expression evaluator resolves variable or member tokens against JavaScript objects without rejecting prototype-sensitive names"
+  reviewConfidence: high
+  reviewEvidence: "expression evaluator context {pattern} resolves item.value from expression tokens through values[item.value] and object[item.value] without filtering __proto__/constructor/prototype"
+  vulnerableTo: [injection.PrototypePollution]
+}

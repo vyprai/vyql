@@ -1,6 +1,0 @@
-adapter php {
-  package "aura/intl" {
-    sink method "translate" -> code.CodeEval
-    sink method "format" -> code.CodeEval
-  }
-}

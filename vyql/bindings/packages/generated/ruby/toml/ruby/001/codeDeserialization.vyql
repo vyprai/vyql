@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m68a02bb4;
+
+binding deserialization1 {
+  requires {
+    dependency("toml")
+  }
+  query pattern callExpr where callee.method == "load_file"
+  emit sink code.Deserialization at args[0]
+}

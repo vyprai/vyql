@@ -1,0 +1,9 @@
+module bindings.dart.generated.mf7b93d2b;
+
+binding filePathAccess3 {
+  requires {
+    dependency("image_picker_ios")
+  }
+  query pattern callExpr where callee.method == "ImagePickerIOS.pickMedia"
+  emit sink code.FilePathAccess at args[0]
+}

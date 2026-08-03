@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mdddec266;
+
+binding deserialization0 {
+  requires {
+    dependency("jsdom")
+  }
+  query pattern callExpr where callee.method == "parseIntoDocument"
+  emit sink code.Deserialization at args[0]
+}

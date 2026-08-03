@@ -1,0 +1,9 @@
+module bindings.go.generated.m80404178;
+
+binding logOutput6 {
+  requires {
+    dependency("github.com/davecgh/go-spew")
+  }
+  query pattern callExpr where callee.method == "Println"
+  emit sink code.LogOutput at args[0]
+}

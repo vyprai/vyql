@@ -1,0 +1,13 @@
+module bindings.objc.generated.m942721f9;
+
+binding authenticationCheck17 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "requireAuth"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

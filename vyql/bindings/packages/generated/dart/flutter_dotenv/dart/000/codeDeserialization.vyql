@@ -1,0 +1,9 @@
+module bindings.dart.generated.me7246586;
+
+binding deserialization0 {
+  requires {
+    dependency("flutter_dotenv")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{CodeEval}
-adapter java {
-  package "javax.el:el-api" {
-    sink method "createValueExpression" -> code.CodeEval
-    sink method "getValue" -> code.CodeEval
-    sink method "setValue" -> code.CodeEval
-    sink method "invoke" -> code.CodeEval
-  }
-}

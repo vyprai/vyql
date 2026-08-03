@@ -1,0 +1,9 @@
+module bindings.bash.generated.m1c991bed;
+
+binding cliArgument0 {
+  requires {
+    dependency("argon2")
+  }
+  query pattern callExpr where callee.path ~= "argon2.argv"
+  emit source code.CliArgument at call.result
+}

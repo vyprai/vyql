@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding dynamicCodeLoad390 {
+  query pattern callExpr where callee.path ~= "importlib.import_module"
+  emit sink code.DynamicCodeLoad at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.m6074f131;
+
+binding xmlParse0 {
+  requires {
+    dependency("PRANG")
+  }
+  query pattern callExpr where callee.method == "parse_fh"
+  emit sink code.XmlParse at args[0]
+}

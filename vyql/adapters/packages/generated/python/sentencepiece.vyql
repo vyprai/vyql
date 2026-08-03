@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "sentencepiece" {
-    sink method "DecodePrecompiledCharsMap" -> code.Deserialization
-  }
-}

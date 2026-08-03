@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-adapter objc {
-  package "YouTubePlayer" {
-    source method "videoIDFromYouTubeURL" -> core.UserControlledData
-    source method "loadVideoURL" -> core.UserControlledData
-    source method "loadVideoID" -> core.UserControlledData
-  }
-}

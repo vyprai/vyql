@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding insecureTempFile51 {
+  query pattern presenceNode where node.path ~= "mktemp"
+  emit issue code.InsecureTempFile at node
+}

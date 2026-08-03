@@ -1,0 +1,9 @@
+module bindings.objc.generated.m08ff048e;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("YYCache")
+  }
+  query pattern callExpr where callee.method == "getItemForKey"
+  emit sink code.NosqlQuery at args[0]
+}

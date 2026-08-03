@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding weakRandomValue204 {
+  query pattern presenceNode where node.path ~= "rand.Int63"
+  emit issue code.WeakRandomValue at node
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m70624a32;
+
+binding filePathAccess7 {
+  requires {
+    dependency("libharu")
+  }
+  query pattern callExpr where callee.method == "HPDF_LoadU3DFromFile"
+  emit sink code.FilePathAccess at args[0]
+}

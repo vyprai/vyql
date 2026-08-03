@@ -1,0 +1,13 @@
+module bindings.php.generated.mde571bb4;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "authenticateUser"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

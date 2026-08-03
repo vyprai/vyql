@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/armon/go-metrics" {
-    control method "sanitize" -> core.InputValidation
-  }
-}

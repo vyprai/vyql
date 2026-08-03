@@ -1,5 +1,0 @@
-adapter elixir {
-  package "lager" {
-    sink method "lager_file_backend:write" -> code.FilePathAccess
-  }
-}

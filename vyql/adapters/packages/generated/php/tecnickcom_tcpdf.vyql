@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter php {
-  package "tecnickcom/tcpdf" {
-    control method "setAllowLocalFiles" -> core.InputValidation
-  }
-}

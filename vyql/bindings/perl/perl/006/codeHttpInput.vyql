@@ -1,0 +1,6 @@
+module bindings.perl.generated.mfca40a44;
+
+binding httpInput6 {
+  query pattern callExpr where callee.path ~= "STDIN"
+  emit source code.HttpInput at call.result
+}

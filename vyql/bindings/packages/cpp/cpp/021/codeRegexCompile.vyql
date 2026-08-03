@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m1c1357ee;
+
+binding regexCompile21 {
+  requires {
+    dependency("std")
+  }
+  query pattern callExpr where callee.path ~= "std.regex"
+  emit sink code.RegexCompileSink at args[0]
+}

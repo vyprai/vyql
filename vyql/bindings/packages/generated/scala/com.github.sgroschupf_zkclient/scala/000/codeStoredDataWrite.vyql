@@ -1,0 +1,9 @@
+module bindings.scala.generated.m9343860d;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("com.github.sgroschupf:zkclient")
+  }
+  query pattern callExpr where callee.method == "createPersistent"
+  emit sink code.StoredDataWrite at args[0]
+}

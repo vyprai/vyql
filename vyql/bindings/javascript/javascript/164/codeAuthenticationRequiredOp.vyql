@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding authenticationRequiredOp164 {
+  query pattern presenceNode where node.path ~= "makeAdmin"
+  emit issue code.AuthenticationRequiredOp at node
+}

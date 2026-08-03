@@ -1,0 +1,9 @@
+module bindings.javascript.generated.ma2504c18;
+
+binding filePathAccess1 {
+  requires {
+    dependency("resolve-cwd")
+  }
+  query pattern callExpr where callee.method == "silent"
+  emit sink code.FilePathAccess at args[0]
+}

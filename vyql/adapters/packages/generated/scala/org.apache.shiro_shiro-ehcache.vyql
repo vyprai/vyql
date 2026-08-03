@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter scala {
-  package "org.apache.shiro:shiro-ehcache" {
-    sink method "getCacheManagerConfigFileInputStream" -> code.FilePathAccess
-    sink method "getCacheManagerConfigFile" -> code.FilePathAccess
-  }
-}

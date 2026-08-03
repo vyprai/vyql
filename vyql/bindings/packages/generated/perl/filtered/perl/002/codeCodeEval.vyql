@@ -1,0 +1,9 @@
+module bindings.perl.generated.m8ff394e8;
+
+binding codeEval2 {
+  requires {
+    dependency("filtered")
+  }
+  query pattern callExpr where callee.method == "filtered::hook::INC"
+  emit sink code.CodeEval at args[0]
+}

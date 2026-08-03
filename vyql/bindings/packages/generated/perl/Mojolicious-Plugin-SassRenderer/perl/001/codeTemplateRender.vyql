@@ -1,0 +1,9 @@
+module bindings.perl.generated.m1bc9a7fe;
+
+binding templateRender1 {
+  requires {
+    dependency("Mojolicious-Plugin-SassRenderer")
+  }
+  query pattern callExpr where callee.method == "register"
+  emit sink code.TemplateRender at args[0]
+}

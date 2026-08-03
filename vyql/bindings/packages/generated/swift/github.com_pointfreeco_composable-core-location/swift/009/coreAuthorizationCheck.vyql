@@ -1,0 +1,13 @@
+module bindings.swift.generated.mdb125fb2;
+
+binding authorizationCheck9 {
+  requires {
+    dependency("github.com/pointfreeco/composable-core-location")
+  }
+  query pattern callExpr where callee.method == "accuracyAuthorization"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

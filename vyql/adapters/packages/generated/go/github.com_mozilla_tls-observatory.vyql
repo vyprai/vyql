@@ -1,9 +1,0 @@
-import code.{HttpInput, SqlExecution}
-adapter go {
-  package "github.com/mozilla/tls-observatory" {
-    source method "ScanHandler" -> code.HttpInput
-    source method "PostCertificateHandler" -> code.HttpInput
-    sink method "NewScan" -> code.SqlExecution
-    sink method "RegisterConnection" -> code.SqlExecution
-  }
-}

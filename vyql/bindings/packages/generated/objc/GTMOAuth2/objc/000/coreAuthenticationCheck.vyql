@@ -1,0 +1,13 @@
+module bindings.objc.generated.mbfdd5025;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("GTMOAuth2")
+  }
+  query pattern callExpr where callee.method == "authorizeRequest:"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m95390b03;
+
+binding htmlRender1 {
+  requires {
+    dependency("com.google.inject.extensions:guice-servlet")
+  }
+  query pattern callExpr where callee.method == "getResponse"
+  emit sink code.HtmlRender at args[0]
+}

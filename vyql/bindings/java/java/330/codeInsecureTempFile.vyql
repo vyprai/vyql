@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding insecureTempFile330 {
+  query pattern callExpr where callee.path ~= "Files.createFile" and args.any.literal contains "/tmp/"
+  emit issue code.InsecureTempFile at call
+}

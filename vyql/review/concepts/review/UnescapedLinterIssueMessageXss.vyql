@@ -1,0 +1,8 @@
+module code;
+
+review code.UnescapedLinterIssueMessageXss {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review generated linter HTML reports for escaping diagnostic message text before template rendering"
+}

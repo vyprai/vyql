@@ -1,0 +1,9 @@
+module bindings.rust.generated.mafbad350;
+
+binding filePathAccess0 {
+  requires {
+    dependency("warp")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

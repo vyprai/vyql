@@ -1,0 +1,9 @@
+module bindings.python.generated.m8f0bf627;
+
+binding codeEval1 {
+  requires {
+    dependency("distribute")
+  }
+  query pattern callExpr where callee.method == "execfile"
+  emit sink code.CodeEval at args[0]
+}

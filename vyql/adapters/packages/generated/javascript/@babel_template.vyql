@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter javascript {
-  package "@babel/template" {
-    sink method "parseAndBuildMetadata" -> code.Deserialization
-    sink method "parseWithCodeFrame" -> code.Deserialization
-    sink method "stringTemplate" -> code.Deserialization
-    sink method "literalTemplate" -> code.Deserialization
-  }
-}

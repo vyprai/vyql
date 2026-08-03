@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m89693024;
+
+binding deserialization0 {
+  requires {
+    dependency("asciidoctor")
+  }
+  query pattern callExpr where callee.method == "Asciidoctor::Parser.parse"
+  emit sink code.Deserialization at args[0]
+}

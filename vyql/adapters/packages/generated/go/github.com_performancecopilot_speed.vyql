@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter go {
-  package "github.com/performancecopilot/speed" {
-    sink method "mmvFileLocation" -> code.FilePathAccess
-  }
-}

@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter dart {
-  package "fluro" {
-    source method "parseQueryString" -> core.UserControlledData
-  }
-}

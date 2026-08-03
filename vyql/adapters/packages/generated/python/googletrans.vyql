@@ -1,7 +1,0 @@
-import code.{NetworkSend, NetworkConnect}
-adapter python {
-  package "googletrans" {
-    sink method "translate" -> code.NetworkSend
-    sink method "translate" -> code.NetworkConnect
-  }
-}

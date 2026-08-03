@@ -1,0 +1,9 @@
+module bindings.swift.generated.m0dbd7e87;
+
+binding codeEval1 {
+  requires {
+    dependency("github.com/GraphQLSwift/Graphiti")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.CodeEval at args[0]
+}

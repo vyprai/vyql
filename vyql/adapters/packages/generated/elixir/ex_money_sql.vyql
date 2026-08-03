@@ -1,6 +1,0 @@
-adapter elixir {
-  package "ex_money_sql" {
-    sink method "execute_each" -> code.SqlExecution
-    sink method "execute" -> code.SqlExecution
-  }
-}

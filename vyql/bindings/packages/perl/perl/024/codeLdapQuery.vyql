@@ -1,0 +1,9 @@
+module bindings.perl.generated.ma164dcec;
+
+binding ldapQuery24 {
+  requires {
+    dependency("Net::LDAP")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.LdapQuery at args[1]
+}

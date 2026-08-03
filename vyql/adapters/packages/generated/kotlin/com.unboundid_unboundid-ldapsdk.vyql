@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "com.unboundid:unboundid-ldapsdk" {
-    sink method "read" -> code.FilePathAccess
-  }
-}

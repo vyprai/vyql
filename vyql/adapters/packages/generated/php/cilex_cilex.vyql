@@ -1,6 +1,0 @@
-import code.{CommandExecution, CliArgument}
-adapter php {
-  package "cilex/cilex" {
-    sink method "run" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.generated.m53f9820a;
+
+binding networkSend0 {
+  requires {
+    dependency("telegraph")
+  }
+  query pattern callExpr where callee.method == "create_account"
+  emit sink code.NetworkSend at args[0]
+}

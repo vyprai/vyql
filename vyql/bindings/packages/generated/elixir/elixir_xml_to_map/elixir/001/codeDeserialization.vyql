@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mdfa72da7;
+
+binding deserialization1 {
+  requires {
+    dependency("elixir_xml_to_map")
+  }
+  query pattern callExpr where callee.method == "nested_map"
+  emit sink code.Deserialization at args[0]
+}

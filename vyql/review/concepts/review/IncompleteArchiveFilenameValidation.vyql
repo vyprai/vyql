@@ -1,0 +1,7 @@
+module code;
+
+review code.IncompleteArchiveFilenameValidation {
+  category: deserialization
+  kind: attention
+  text: "review archive member filename validation for dangerous URI or stream-wrapper schemes"
+}

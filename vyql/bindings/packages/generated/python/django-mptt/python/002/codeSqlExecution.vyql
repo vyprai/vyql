@@ -1,0 +1,9 @@
+module bindings.python.generated.m28ea9d1b;
+
+binding sqlExecution2 {
+  requires {
+    dependency("django-mptt")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,10 @@
+module bindings.kotlin.generated.m50a4674c;
+
+binding redirectTarget1 {
+  requires {
+    dependency("org.springdoc:springdoc-openapi-ui")
+  }
+  query pattern callExpr where callee.method == "buildUrl"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

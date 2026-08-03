@@ -1,8 +1,0 @@
-import code.{HttpInput}
-import core.{InputValidation}
-
-adapter elixir {
-  package "plug_cors" {
-    source method "call" -> code.HttpInput
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m9a902388;
+
+binding deserialization4 {
+  requires {
+    dependency("kf5codecs")
+  }
+  query pattern callExpr where callee.method == "decodeRFC2047String"
+  emit sink code.Deserialization at args[0]
+}

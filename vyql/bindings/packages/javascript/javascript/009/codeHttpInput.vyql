@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m5c270092;
+
+binding httpInput9 {
+  requires {
+    dependency("@nestjs/common")
+  }
+  query pattern callExpr where callee.path ~= "context.params"
+  emit source code.HttpInput at call.result
+}

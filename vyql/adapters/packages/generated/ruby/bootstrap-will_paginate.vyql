@@ -1,7 +1,0 @@
-import code.{HtmlRender}
-adapter ruby {
-  package "bootstrap-will_paginate" {
-    sink method "will_paginate" -> code.HtmlRender
-    sink method "html_container" -> code.HtmlRender
-  }
-}

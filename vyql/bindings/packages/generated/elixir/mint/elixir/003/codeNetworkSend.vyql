@@ -1,0 +1,9 @@
+module bindings.elixir.generated.ma217580b;
+
+binding networkSend3 {
+  requires {
+    dependency("mint")
+  }
+  query pattern callExpr where callee.method == "stream_request_body"
+  emit sink code.NetworkSend at args[0]
+}

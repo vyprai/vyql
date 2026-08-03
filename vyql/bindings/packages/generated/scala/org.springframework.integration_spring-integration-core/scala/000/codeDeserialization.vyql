@@ -1,0 +1,9 @@
+module bindings.scala.generated.mf41d98aa;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework.integration:spring-integration-core")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

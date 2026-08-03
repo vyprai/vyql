@@ -1,0 +1,9 @@
+module bindings.scala.generated.m9e718907;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.apache.tomcat.embed:tomcat-embed-logging-juli")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

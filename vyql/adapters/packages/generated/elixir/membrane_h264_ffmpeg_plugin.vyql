@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "membrane_h264_ffmpeg_plugin" {
-    sink method "handle_buffer" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.m1e74582b;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("github.com/mergesort/Bodega")
+  }
+  query pattern callExpr where callee.method == "write(_:)"
+  emit sink code.StoredDataWrite at args[0]
+}

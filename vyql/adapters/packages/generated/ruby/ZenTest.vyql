@@ -1,9 +1,0 @@
-import code.{CliArgument}
-
-adapter ruby {
-  package "ZenTest" {
-    source method "parse_input" -> code.CliArgument
-    source method "unit_diff" -> code.CliArgument
-    source path "bin/unit_diff" -> code.CliArgument
-  }
-}

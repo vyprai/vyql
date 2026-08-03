@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mc405d334;
+
+binding deserialization1 {
+  requires {
+    dependency("net.sf.ehcache:ehcache")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

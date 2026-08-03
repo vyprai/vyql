@@ -1,0 +1,13 @@
+module bindings.ruby.generated.m3781d3f1;
+
+binding authenticationCheck4 {
+  requires {
+    dependency("faraday_middleware")
+  }
+  query pattern callExpr where callee.method == "OAuth2#initialize"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

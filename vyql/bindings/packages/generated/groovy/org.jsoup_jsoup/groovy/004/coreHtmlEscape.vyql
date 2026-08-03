@@ -1,0 +1,14 @@
+module bindings.groovy.generated.m360fd87f;
+
+binding htmlEscape4 {
+  requires {
+    dependency("org.jsoup:jsoup")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

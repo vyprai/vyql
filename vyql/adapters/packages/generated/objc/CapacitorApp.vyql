@@ -1,5 +1,0 @@
-adapter objc {
-  package "CapacitorApp" {
-    source method "getLaunchUrl" -> core.UserControlledData
-  }
-}

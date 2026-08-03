@@ -1,0 +1,9 @@
+module bindings.dart.generated.m22d0a444;
+
+binding weakHash0 {
+  requires {
+    dependency("extended_image_library")
+  }
+  query pattern callExpr where callee.method == "keyToMd5"
+  emit issue code.WeakHash at call
+}

@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter python {
-  package "patsy" {
-    sink method "patsy.eval.EvalEnvironment.eval" -> code.CodeEval
-  }
-}

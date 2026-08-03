@@ -1,0 +1,9 @@
+module bindings.bash.generated.m16fad544;
+
+binding cliArgument0 {
+  requires {
+    dependency("fish")
+  }
+  query pattern callExpr where callee.path ~= "fish.argv"
+  emit source code.CliArgument at call.result
+}

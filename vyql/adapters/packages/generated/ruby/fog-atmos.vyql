@@ -1,8 +1,0 @@
-import code.{NetworkSend, SecretValue}
-
-adapter ruby {
-  package "fog-atmos" {
-    sink method "request" -> code.NetworkSend
-    source method "setup_credentials" -> code.SecretValue
-  }
-}

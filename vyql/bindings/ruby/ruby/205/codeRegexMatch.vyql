@@ -1,0 +1,7 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding regexMatch205 {
+  query pattern presenceNode where node.path ~= "__regex.match"
+  emit issue code.RegexMatch at node
+  emit sink code.RegexMatchSink at node
+}

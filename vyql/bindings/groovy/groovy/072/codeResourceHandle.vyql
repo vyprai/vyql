@@ -1,0 +1,7 @@
+module bindings.groovy.generated.m6eabb149;
+
+binding resourceHandle72 {
+  query pattern presenceNode where node.path ~= "Socket"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}

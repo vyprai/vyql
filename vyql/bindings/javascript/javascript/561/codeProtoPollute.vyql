@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding protoPollute561 {
+  query pattern callExpr where callee.path ~= "_.defaultsDeep"
+  emit sink code.ProtoPollute at args[1]
+}

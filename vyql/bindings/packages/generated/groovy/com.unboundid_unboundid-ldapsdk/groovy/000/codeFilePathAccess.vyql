@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m53b5d928;
+
+binding filePathAccess0 {
+  requires {
+    dependency("com.unboundid:unboundid-ldapsdk")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

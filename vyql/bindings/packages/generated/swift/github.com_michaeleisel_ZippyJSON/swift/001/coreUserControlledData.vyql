@@ -1,0 +1,9 @@
+module bindings.swift.generated.m1c03e148;
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/michaeleisel/ZippyJSON")
+  }
+  query pattern callExpr where callee.method == "userInfo"
+  emit source core.UserControlledData at call.result
+}

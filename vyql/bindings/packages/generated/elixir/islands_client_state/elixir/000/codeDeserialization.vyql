@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m07a225cd;
+
+binding deserialization0 {
+  requires {
+    dependency("islands_client_state")
+  }
+  query pattern callExpr where callee.method == "Islands.Client.State.parse"
+  emit sink code.Deserialization at args[0]
+}

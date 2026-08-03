@@ -1,0 +1,12 @@
+module bindings.php.generated.mfbe84119;
+
+binding mediaWikiValidateAttributesHtmlEscape469 {
+  query pattern callExpr where callee.path ~= "Sanitizer.validateAttributes"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: candidate
+    }
+  }
+}
+

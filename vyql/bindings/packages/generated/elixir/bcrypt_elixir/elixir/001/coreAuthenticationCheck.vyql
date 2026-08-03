@@ -1,0 +1,13 @@
+module bindings.elixir.generated.ma67636dd;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("bcrypt_elixir")
+  }
+  query pattern callExpr where callee.method == "verify_pass"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

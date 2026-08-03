@@ -4,6 +4,7 @@
 
 test "rank279: buddypress docs save path lacks doc capability check"
   lang php
+  expect VYQL-AUTH-080
   expect_review code.AccessPolicyReview
   code
   ```
@@ -25,6 +26,7 @@ test "rank279: buddypress docs save path lacks doc capability check"
 
 test "rank279: buddypress docs save path checks edit or create capability"
   lang php
+  reject VYQL-AUTH-080
   reject_review code.AccessPolicyReview
   code
   ```

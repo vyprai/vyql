@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule AjaxBackslashProtocolRelativeUrlXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-140"
+    severity: high
+  }
+  issue code.AjaxBackslashProtocolRelativeUrlXss as sink
+}

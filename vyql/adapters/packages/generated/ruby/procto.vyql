@@ -1,7 +1,0 @@
-import code.{ExpressionEval}
-adapter ruby {
-  package "procto" {
-    sink method "call" -> code.ExpressionEval
-    sink method "initialize" -> code.ExpressionEval
-  }
-}

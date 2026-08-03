@@ -4,6 +4,7 @@
 
 test "rank152: go authelia verify parse failure using generic error requires auth review"
   lang go
+  expect VYQL-AUTH-084
   expect_review code.AuthFailureResponseReview
   code
   ```
@@ -32,6 +33,7 @@ test "rank152: go authelia verify parse failure using generic error requires aut
 
 test "rank152: go authelia verify parse failure replying unauthorized is clean"
   lang go
+  reject VYQL-AUTH-084
   reject_review code.AuthFailureResponseReview
   code
   ```

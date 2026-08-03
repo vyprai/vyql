@@ -1,0 +1,9 @@
+module bindings.python.generated.mc2fad8fe;
+
+binding cliArgument0 {
+  requires {
+    dependency("speedtest-cli")
+  }
+  query pattern callExpr where callee.method == "parse_args"
+  emit source code.CliArgument at call.result
+}

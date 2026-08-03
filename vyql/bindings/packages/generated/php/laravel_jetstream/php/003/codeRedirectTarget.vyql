@@ -1,0 +1,10 @@
+module bindings.php.generated.me7b7042d;
+
+binding redirectTarget3 {
+  requires {
+    dependency("laravel/jetstream")
+  }
+  query pattern callExpr where callee.method == "redirectPath"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.m1346cefe;
+
+binding weakHash1 {
+  requires {
+    dependency("flutter_secure_storage_linux")
+  }
+  query pattern presenceNode where node.path ~= "flutter_secure_storage_linux.hash"
+  emit issue code.WeakHash at node
+}

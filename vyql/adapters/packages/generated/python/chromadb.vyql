@@ -1,9 +1,0 @@
-import code.{SqlExecution}
-
-adapter python {
-  package "chromadb" {
-    sink method "execute" -> code.SqlExecution
-    sink method "executescript" -> code.SqlExecution
-    sink method "executemany" -> code.SqlExecution
-  }
-}

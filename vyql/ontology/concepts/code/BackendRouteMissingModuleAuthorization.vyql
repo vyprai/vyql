@@ -1,0 +1,11 @@
+module code;
+
+concept BackendRouteMissingModuleAuthorization : issue {
+  cwe: [CWE_862]
+  reviewAssumption: "authenticated users can invoke the route directly even when they lack access to the owning backend module"
+  reviewCategory: auth
+  reviewCondition: "backend route configuration exposes module-owned routes without inheriting or enforcing the module permission check"
+  reviewConfidence: high
+  reviewEvidence: "backend route map {pattern} defines module AJAX routes but lacks the module authorization binding"
+  vulnerableTo: [access_control.MissingAuthorization]
+}

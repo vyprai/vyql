@@ -1,20 +1,18 @@
 package engine
 
 import (
+	"github.com/vyprai/vyql/usg"
 	"strings"
 	"testing"
-
-	"github.com/vyprai/vyql/parser"
-	"github.com/vyprai/vyql/usg"
 )
 
 func TestGuardedByEndpoint(t *testing.T) {
 	rule := `
-package test;
+module test;
 rule GuardedFlow {
   meta { id: "TEST-GUARDED", severity: high }
-  taint custom.Input -> custom.Target
-  unless guarded_by custom.Transform
+  taint custom.Input -> custom.Target as sink
+  unless sink.endpoint coveredBy custom.Transform
 }
 `
 	guarded := func(s usg.Store) {
@@ -23,7 +21,7 @@ rule GuardedFlow {
 		}
 		s.AddLabel("in", usg.Label{Concept: "custom.Input"})
 		s.AddLabel("target", usg.Label{Concept: "custom.Target"})
-		s.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+		s.AddLabel("guard", coverageLabel("custom.Transform", "endpoint"))
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "target"})
 		s.AddEdge(usg.Edge{Type: "PROTECTS", Src: "guard", Dst: "target"})
 	}
@@ -51,11 +49,11 @@ rule GuardedFlow {
 
 func TestGuardedByFunctionContextSummary(t *testing.T) {
 	rule := `
-package test;
+module test;
 rule GuardedFlow {
   meta { id: "TEST-GUARDED", severity: high }
-  taint custom.Input -> custom.Target
-  unless guarded_by custom.Transform
+  taint custom.Input -> custom.Target as sink
+  unless sink.endpoint coveredBy custom.Transform
 }
 `
 	counts, errs := runRule(t, rule, func(s usg.Store) {
@@ -64,7 +62,7 @@ rule GuardedFlow {
 		s.AddNode(usg.Node{ID: "target", Type: "code.Call", Scope: "sample.py/fn1@2", Region: "sample.py/fn1", HasOrder: true, Order: 2, Props: map[string]string{"loc": "sample.py:2"}})
 		s.AddLabel("target", usg.Label{Concept: "custom.Target"})
 		s.AddNode(usg.Node{ID: "summary", Type: "code.Call", Region: "sample.py/fn1", HasOrder: true, Order: 3, Props: map[string]string{"callee_path": "analysis.function.context", "loc": "sample.py:1"}})
-		s.AddLabel("summary", usg.Label{Concept: "custom.Transform"})
+		s.AddLabel("summary", coverageLabel("custom.Transform", "endpoint"))
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "target"})
 	})
 	if len(errs) != 0 {
@@ -80,7 +78,7 @@ rule GuardedFlow {
 		s.AddNode(usg.Node{ID: "target", Type: "code.Call", Scope: "sample.py/fn1@2", Region: "sample.py/fn1", HasOrder: true, Order: 2, Props: map[string]string{"loc": "sample.py:2"}})
 		s.AddLabel("target", usg.Label{Concept: "custom.Target"})
 		s.AddNode(usg.Node{ID: "summary", Type: "code.Call", Scope: "sample.py/fn2@3", Props: map[string]string{"callee_path": "analysis.function.context", "loc": "sample.py:10"}})
-		s.AddLabel("summary", usg.Label{Concept: "custom.Transform"})
+		s.AddLabel("summary", coverageLabel("custom.Transform", "endpoint"))
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "target"})
 	})
 	if counts[0] != 1 {
@@ -94,7 +92,7 @@ rule GuardedFlow {
 		s.AddNode(usg.Node{ID: "target", Type: "code.Arg", Scope: "sample.py/fn1/try8@3", Region: "sample.py/fn1/try8", Props: map[string]string{"loc": "sample.py:25"}})
 		s.AddLabel("target", usg.Label{Concept: "custom.Target"})
 		s.AddNode(usg.Node{ID: "summary", Type: "code.Call", Region: "sample.py/fn1", HasOrder: true, Order: 4, Props: map[string]string{"callee_path": "analysis.function.context", "loc": "sample.py:6"}})
-		s.AddLabel("summary", usg.Label{Concept: "custom.Transform"})
+		s.AddLabel("summary", coverageLabel("custom.Transform", "endpoint"))
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "param"})
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "param", Dst: "target"})
 	})
@@ -105,12 +103,12 @@ rule GuardedFlow {
 
 func TestRefinementAndDisjunctiveControls(t *testing.T) {
 	rule := `
-package test;
+module test;
 rule ParentFlow {
   meta { id: "TEST-PARENT", severity: critical }
-  taint custom.ParentInput -> custom.Target
-  unless sanitized_by custom.Transform
-  unless sanitized_by custom.AlternateTransform
+  taint custom.ParentInput -> custom.Target as sink
+  unless sink.path coveredBy custom.Transform
+  unless sink.path coveredBy custom.AlternateTransform
 }
 `
 	counts, errs := runRule(t, rule, func(s usg.Store) {
@@ -172,14 +170,14 @@ func TestAliasResolutionThroughEngine(t *testing.T) {
 	}
 
 	rule := `
-package test;
+module test;
 rule AliasFlow {
   meta { id: "ALIAS-1", severity: high }
-  taint custom.LegacyInput -> custom.Target
-  unless sanitized_by custom.Transform
+  taint custom.LegacyInput -> custom.Target as sink
+  unless sink.path coveredBy custom.Transform
 }
 `
-	decls, err := parser.Parse(rule)
+	decls, err := parseV2DefinitionsForTest(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

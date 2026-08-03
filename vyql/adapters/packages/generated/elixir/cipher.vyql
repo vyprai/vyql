@@ -1,7 +1,0 @@
-import code.{SecretValue}
-adapter elixir {
-  package "cipher" {
-    source method "encrypt" -> code.SecretValue
-    source method "decrypt" -> code.SecretValue
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding chatterBotSqlalchemySessionPoolExhaustion454 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "chatterbot_sqlalchemy_session_pool_exhaustion_init"
+  emit issue code.ChatterBotSqlalchemySessionPoolExhaustion at node
+}

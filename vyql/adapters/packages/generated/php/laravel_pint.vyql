@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter php {
-  package "laravel/pint" {
-    sink method "getCommandArgs" -> code.CommandExecution
-  }
-}

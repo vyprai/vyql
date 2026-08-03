@@ -1,0 +1,14 @@
+module bindings.javascript.generated.m5349aade;
+
+binding inputValidation2 {
+  requires {
+    dependency("css-selector-tokenizer")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

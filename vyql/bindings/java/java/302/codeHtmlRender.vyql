@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding htmlRender302 {
+  query pattern callExpr where callee.method == "write" and callee.receiver.type in [PrintWriter, ServletOutputStream, JspWriter]
+  emit sink code.HtmlRender at args.any
+}

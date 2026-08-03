@@ -1,8 +1,0 @@
-import code.{CliArgument, FilePathAccess}
-
-adapter php {
-  package "yiisoft/yii2-gii" {
-    sink method "file_put_contents" -> code.FilePathAccess
-    source method "run" -> code.CliArgument
-  }
-}

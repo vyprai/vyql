@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter elixir {
-  package "bamboo_smtp" {
-    sink method "deliver" -> code.NetworkSend
-  }
-}

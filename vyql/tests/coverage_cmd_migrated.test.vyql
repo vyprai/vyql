@@ -1,10 +1,10 @@
 # Coverage migrated out of go/cmd/vyql/main_test.go. These stay as data-driven
 # rule specs so cmd package tests do not encode security knowledge directly.
 
-test "javascript: ldapEscape assumption is reported but does not suppress LDAP injection"
+test "javascript: ldapEscape advisory is reported but does not suppress LDAP injection"
   lang javascript
   expect VYQL-INJ-005
-  expect_evidence VYQL-INJ-005 assumption
+  expect_evidence VYQL-INJ-005 advisory
   code
   ```
   const ldap = require('ldapjs');
@@ -16,10 +16,10 @@ test "javascript: ldapEscape assumption is reported but does not suppress LDAP i
   }
   ```
 
-test "javascript: prefix path guard is reported with an assumption note"
+test "javascript: prefix path guard is reported with an advisory note"
   lang javascript
   expect VYQL-PATH-001
-  expect_evidence VYQL-PATH-001 assumption
+  expect_evidence VYQL-PATH-001 advisory
   code
   ```
   const fs = require('fs');
@@ -31,10 +31,10 @@ test "javascript: prefix path guard is reported with an assumption note"
   }
   ```
 
-test "java: substring blocklist path guard is reported with an assumption note"
+test "java: substring blocklist path guard is reported with an advisory note"
   lang java
   expect VYQL-PATH-001
-  expect_evidence VYQL-PATH-001 assumption
+  expect_evidence VYQL-PATH-001 advisory
   code
   ```
   import java.io.File;

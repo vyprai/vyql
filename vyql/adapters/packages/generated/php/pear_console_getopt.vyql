@@ -1,9 +1,0 @@
-import code.{CliArgument}
-adapter php {
-  package "pear/console_getopt" {
-    source method "getopt" -> code.CliArgument
-    source method "getopt2" -> code.CliArgument
-    source method "doGetopt" -> code.CliArgument
-    source method "readPHPArgv" -> code.CliArgument
-  }
-}

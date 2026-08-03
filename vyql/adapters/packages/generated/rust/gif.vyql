@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "gif" {
-    sink method "decode_next" -> code.Deserialization
-    sink method "decode_next_bytes" -> code.Deserialization
-  }
-}

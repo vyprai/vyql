@@ -1,0 +1,9 @@
+module bindings.objc.generated.m8dfc6ea5;
+
+binding filePathAccess0 {
+  requires {
+    dependency("InAppSettingsKit")
+  }
+  query pattern callExpr where callee.method == "initWithFile:bundle:delegate:"
+  emit sink code.FilePathAccess at args[0]
+}

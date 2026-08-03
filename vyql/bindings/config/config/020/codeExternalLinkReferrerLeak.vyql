@@ -1,0 +1,6 @@
+module bindings.config.generated.m2b6375a9;
+
+binding externalLinkReferrerLeak20 {
+  query pattern presenceNode where node.analysis ~= "config.html.external_link_missing_noreferrer"
+  emit issue code.ExternalLinkReferrerLeak at node
+}

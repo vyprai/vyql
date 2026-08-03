@@ -1,0 +1,14 @@
+module bindings.go.generated.m99a2d42a;
+
+binding inputValidation3 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "IsFilePath"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

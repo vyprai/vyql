@@ -1,0 +1,9 @@
+module bindings.go.generated.m4450683b;
+
+binding deserialization1 {
+  requires {
+    dependency("gopkg.in/ini.v1")
+  }
+  query pattern callExpr where callee.method == "Load"
+  emit sink code.Deserialization at args[0]
+}

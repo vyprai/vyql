@@ -1,0 +1,9 @@
+module bindings.perl.generated.m5e234a59;
+
+binding userControlledData1 {
+  requires {
+    dependency("SpamMonkey")
+  }
+  query pattern callExpr where callee.method == "test"
+  emit source core.UserControlledData at call.result
+}

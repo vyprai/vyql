@@ -1,0 +1,9 @@
+module bindings.rust.generated.m222602a5;
+
+binding ldapQuery28 {
+  requires {
+    dependency("ldap3")
+  }
+  query pattern callExpr where callee.method == "streaming_search"
+  emit sink code.LdapQuery at args[1]
+}

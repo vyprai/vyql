@@ -1,0 +1,13 @@
+module bindings.php.generated.mc41a1abc;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("illuminate/broadcasting")
+  }
+  query pattern callExpr where callee.method == "resolveAuthenticatedUser"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,8 +1,0 @@
-import code.{RegexCompile}
-adapter javascript {
-  package "node-modules-regexp" {
-    flag code.RegexCompile on any {
-      path "module.exports"
-    }
-  }
-}

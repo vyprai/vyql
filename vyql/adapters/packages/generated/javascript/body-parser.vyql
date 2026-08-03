@@ -1,9 +1,0 @@
-adapter javascript {
-  package "body-parser" {
-    source method "read" -> core.UserControlledData
-    sink method "jsonParser" -> code.Deserialization
-    sink method "rawParser" -> code.Deserialization
-    sink method "textParser" -> code.Deserialization
-    sink method "queryparse" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.mabbfe7a7;
+
+binding userControlledData7 {
+  requires {
+    dependency("UMCommon")
+  }
+  query pattern callExpr where callee.method == "didResolveDeepLink"
+  emit source core.UserControlledData at call.result
+}

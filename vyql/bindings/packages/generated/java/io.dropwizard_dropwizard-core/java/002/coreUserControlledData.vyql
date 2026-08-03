@@ -1,0 +1,9 @@
+module bindings.java.generated.m816041d7;
+
+binding userControlledData2 {
+  requires {
+    dependency("io.dropwizard:dropwizard-core")
+  }
+  query pattern callExpr where callee.method == "ConfiguredCommand.configure"
+  emit source core.UserControlledData at call.result
+}

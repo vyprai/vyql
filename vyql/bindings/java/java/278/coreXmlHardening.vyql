@@ -1,0 +1,10 @@
+module bindings.java.generated.m420f6b67;
+
+binding xmlHardening278 {
+  query pattern callExpr where callee.path ~= "setAttribute" and args.any.literal contains "ACCESS_EXTERNAL_SCHEMA"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}

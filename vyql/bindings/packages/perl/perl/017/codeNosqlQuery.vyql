@@ -1,0 +1,9 @@
+module bindings.perl.generated.ma164dcec;
+
+binding nosqlQuery17 {
+  requires {
+    dependency("MongoDB")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}

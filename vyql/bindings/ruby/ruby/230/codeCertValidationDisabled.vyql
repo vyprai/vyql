@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding certValidationDisabled230 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.rubyReview == "tls_ca_file_without_verify_mode"
+  emit issue code.CertValidationDisabled at node
+}

@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-
-adapter python {
-  package "click" {
-    source method "parse_args" -> core.UserControlledData
-    source method "shell_complete" -> core.UserControlledData
-  }
-}

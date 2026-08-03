@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mc2203c1e;
+
+binding userControlledData4 {
+  requires {
+    dependency("babosa")
+  }
+  query pattern callExpr where callee.method == "with_separators!"
+  emit source core.UserControlledData at call.result
+}

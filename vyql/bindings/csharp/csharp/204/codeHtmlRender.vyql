@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding htmlRender204 {
+  requires {
+    dependency("servicestack")
+  }
+  query pattern callExpr where callee.method == "WriteAsync"
+  emit sink code.HtmlRender at args[0]
+}

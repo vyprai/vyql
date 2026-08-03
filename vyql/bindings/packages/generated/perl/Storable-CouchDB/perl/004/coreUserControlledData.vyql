@@ -1,0 +1,9 @@
+module bindings.perl.generated.m17989e44;
+
+binding userControlledData4 {
+  requires {
+    dependency("Storable-CouchDB")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit source core.UserControlledData at call.result
+}

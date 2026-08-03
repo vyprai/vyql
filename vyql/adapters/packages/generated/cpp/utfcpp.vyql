@@ -1,8 +1,0 @@
-import core.{InputValidation}
-
-adapter cpp {
-  package "utfcpp" {
-    control method "replace_invalid" -> core.InputValidation
-    control method "is_valid" -> core.InputValidation
-  }
-}

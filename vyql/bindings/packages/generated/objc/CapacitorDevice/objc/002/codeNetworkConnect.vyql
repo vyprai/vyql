@@ -1,0 +1,9 @@
+module bindings.objc.generated.mfc7672d4;
+
+binding networkConnect2 {
+  requires {
+    dependency("CapacitorDevice")
+  }
+  query pattern callExpr where callee.method == "translatedConnection"
+  emit sink code.NetworkConnectSink at args[0]
+}

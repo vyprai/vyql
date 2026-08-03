@@ -1,8 +1,0 @@
-adapter rust {
-  package "ed25519-dalek" {
-    source method "from_bytes" -> code.SecretValue
-    source method "from_slice" -> core.UserControlledData
-    control method "verify" -> core.InputValidation
-    control method "verify_strict" -> core.InputValidation
-  }
-}

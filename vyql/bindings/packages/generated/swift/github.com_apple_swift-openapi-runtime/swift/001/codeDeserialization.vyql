@@ -1,0 +1,9 @@
+module bindings.swift.generated.mce8ff240;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/apple/swift-openapi-runtime")
+  }
+  query pattern callExpr where callee.method == "getResponseBodyAsJSON"
+  emit sink code.Deserialization at args[0]
+}

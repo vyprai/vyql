@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding offsetLengthBoundsOverflow264 {
+  query pattern presenceNode where node.scope == "function" and node.context.call contains "int" and node.context.call contains "len" and node.context.callArg contains "int:header.StringOff+header.StringLen" and node.context.callArg contains "len:btf" and node.context.slice contains "btf:header.StringOff:" and node.context.slice contains "btf::header.StringOff+header.StringLen" and not (node.context.scopeCall contains "uint64") and not (node.context.callArg contains "uint64:header.StringOff")
+  emit issue code.OffsetLengthBoundsOverflow at node
+}

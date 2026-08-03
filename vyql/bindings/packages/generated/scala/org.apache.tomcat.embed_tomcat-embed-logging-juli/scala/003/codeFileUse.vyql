@@ -1,0 +1,9 @@
+module bindings.scala.generated.m9e718907;
+
+binding fileUse3 {
+  requires {
+    dependency("org.apache.tomcat.embed:tomcat-embed-logging-juli")
+  }
+  query pattern callExpr where callee.method == "openWriter"
+  emit sink code.FileUseSink at args[0]
+}

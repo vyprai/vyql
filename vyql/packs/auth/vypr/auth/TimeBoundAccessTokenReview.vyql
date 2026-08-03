@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule TimeBoundAccessTokenReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_284]
+    id: "VYQL-AUTH-086"
+    severity: medium
+  }
+  issue code.TimeBoundAccessTokenReview as sink
+}

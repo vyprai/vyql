@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mcdbb098d;
+
+binding deserialization0 {
+  requires {
+    dependency("libvorbis")
+  }
+  query pattern callExpr where callee.method == "codebook_load"
+  emit sink code.Deserialization at args[0]
+}

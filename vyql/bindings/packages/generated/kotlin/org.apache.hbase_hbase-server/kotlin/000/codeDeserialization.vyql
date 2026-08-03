@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m1f1f0430;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.hbase:hbase-server")
+  }
+  query pattern callExpr where callee.method == "parseFrom"
+  emit sink code.Deserialization at args[0]
+}

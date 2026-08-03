@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter groovy {
-  package "org.twitter4j:twitter4j-core" {
-    control method "HTMLEntity.escape" -> core.HtmlEscape
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mc9bf9bf6;
+
+binding databaseRead4 {
+  requires {
+    dependency("mmdb2_decoder")
+  }
+  query pattern callExpr where callee.method == "lookup!"
+  emit sink code.DatabaseReadSink at args[0]
+}

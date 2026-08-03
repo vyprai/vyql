@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter kotlin {
-  package "org.apache.httpcomponents:httpcore" {
-    sink method "parse" -> code.Deserialization
-  }
-}

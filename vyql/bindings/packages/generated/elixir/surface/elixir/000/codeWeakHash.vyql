@@ -1,0 +1,9 @@
+module bindings.elixir.generated.macc32cec;
+
+binding weakHash0 {
+  requires {
+    dependency("surface")
+  }
+  query pattern presenceNode where node.path ~= "surface.hash"
+  emit issue code.WeakHash at node
+}

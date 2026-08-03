@@ -1,8 +1,0 @@
-import code.{HttpInput, NetworkData}
-
-adapter c {
-  package "cpp-httplib" {
-    source method "Server.listen" -> code.NetworkData
-    source method "Server.listen" -> code.HttpInput
-  }
-}

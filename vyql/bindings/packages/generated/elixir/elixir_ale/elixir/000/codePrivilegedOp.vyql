@@ -1,0 +1,10 @@
+module bindings.elixir.generated.m6b07d79b;
+
+binding privilegedOp0 {
+  requires {
+    dependency("elixir_ale")
+  }
+  query pattern callExpr where callee.method == "Elixir.ElixirALE.GPIO.write"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

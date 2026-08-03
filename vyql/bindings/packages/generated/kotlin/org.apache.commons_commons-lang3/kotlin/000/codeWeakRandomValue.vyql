@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m7aa2d804;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("org.apache.commons:commons-lang3")
+  }
+  query pattern presenceNode where node.path ~= "org.apache.commons.commons.lang3.random"
+  emit issue code.WeakRandomValue at node
+}

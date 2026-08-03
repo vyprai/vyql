@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding htmlRender282 {
+  query pattern callExpr where callee.path ~= "wp.list_table.render"
+  emit sink code.HtmlRender at args[0]
+}

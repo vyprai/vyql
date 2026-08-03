@@ -1,8 +1,0 @@
-import code.{NetworkData, HtmlRender}
-
-adapter java {
-  package "javax.websocket:javax.websocket-api" {
-    source method "onMessage" -> code.NetworkData
-    sink method "sendText" -> code.HtmlRender
-  }
-}

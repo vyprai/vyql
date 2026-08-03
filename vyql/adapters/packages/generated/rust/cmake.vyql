@@ -1,9 +1,0 @@
-import code.{CommandExecution}
-
-adapter rust {
-  package "cmake" {
-    sink method "run" -> code.CommandExecution
-    sink method "cmake_configure_command" -> code.CommandExecution
-    sink method "cmake_build_command" -> code.CommandExecution
-  }
-}

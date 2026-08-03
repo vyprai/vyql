@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m075eefa4;
+
+binding filePathAccess2 {
+  requires {
+    dependency("com.google.cloud:google-cloud-storage")
+  }
+  query pattern callExpr where callee.method == "downloadTo"
+  emit sink code.FilePathAccess at args[0]
+}

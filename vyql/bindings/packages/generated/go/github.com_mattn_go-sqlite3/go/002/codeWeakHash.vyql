@@ -1,0 +1,9 @@
+module bindings.go.generated.m85270cdc;
+
+binding weakHash2 {
+  requires {
+    dependency("github.com/mattn/go-sqlite3")
+  }
+  query pattern callExpr where callee.method == "Hash"
+  emit issue code.WeakHash at call
+}

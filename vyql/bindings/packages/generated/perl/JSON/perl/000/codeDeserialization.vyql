@@ -1,0 +1,9 @@
+module bindings.perl.generated.m7faac91f;
+
+binding deserialization0 {
+  requires {
+    dependency("JSON")
+  }
+  query pattern callExpr where callee.method == "decode_json"
+  emit sink code.Deserialization at args[0]
+}

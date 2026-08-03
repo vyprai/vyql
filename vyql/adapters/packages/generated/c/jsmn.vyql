@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter c {
-  package "jsmn" {
-    sink method "jsmn_parse" -> code.Deserialization
-  }
-}

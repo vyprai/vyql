@@ -1,0 +1,10 @@
+module bindings.powershell.generated.m390f1180;
+
+binding pathAccessCheck39 {
+  query pattern callExpr where callee.method == "StartsWith"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

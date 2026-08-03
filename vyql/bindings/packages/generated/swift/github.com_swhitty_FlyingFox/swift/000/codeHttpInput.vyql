@@ -1,0 +1,9 @@
+module bindings.swift.generated.md8a19dc9;
+
+binding httpInput0 {
+  requires {
+    dependency("github.com/swhitty/FlyingFox")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding requestTokenCacheCleanupBypass170 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.functionName contains "AddParameterToEndpoint" and node.context.identifier contains "ParameterBasedFrom" and node.context.callPath contains "this.AuthenticateToken" and node.context.selector contains "token.User" and node.context.selector contains "this._tokenCache.Value"
+  emit issue code.RequestTokenCacheCleanupBypass at node
+}

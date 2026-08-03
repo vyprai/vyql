@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mb6eea7a7;
+
+binding expressionEval0 {
+  requires {
+    dependency("org.drools:drools-compiler")
+  }
+  query pattern callExpr where callee.method == "analyzeBlock"
+  emit sink code.ExpressionEval at args[0]
+}

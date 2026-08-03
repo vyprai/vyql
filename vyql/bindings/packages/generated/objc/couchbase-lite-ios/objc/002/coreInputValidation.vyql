@@ -1,0 +1,14 @@
+module bindings.objc.generated.mf2c061b0;
+
+binding inputValidation2 {
+  requires {
+    dependency("couchbase-lite-ios")
+  }
+  query pattern callExpr where callee.method == "validatorForSchemaAtURL:"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

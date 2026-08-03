@@ -4,8 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/adapters"
-	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -14,35 +13,35 @@ func TestToyEndToEndSlice(t *testing.T) {
 	s := buildToyGraph(t)
 
 	rules := `
-package test;
+module test;
 rule FirstFlow {
   meta { id: "TEST-FLOW-001", severity: high }
-  taint custom.Input -> custom.Target
-  unless sanitized_by custom.Transform
+  taint custom.Input -> custom.Target as sink
+  unless sink.path coveredBy custom.Transform
 }
 rule SecondFlow {
   meta { id: "TEST-FLOW-002", severity: critical }
-  taint custom.Input -> custom.OtherTarget
-  unless sanitized_by custom.OtherTargetTransform
+  taint custom.Input -> custom.OtherTarget as sink
+  unless sink.path coveredBy custom.OtherTargetTransform
 }
 
 rule ReachAsset {
   meta { id: "TEST-REACH-003", severity: critical }
   reach custom.Edge -> custom.Asset
-  where custom.Asset holds_asset_kind [custom.Important]
+  where holdsAssetKind(custom.Asset, [custom.Important])
 }
 
 rule ActorCapability {
-  meta { id: "TEST-ASSUME-004", severity: critical }
-  assume custom.Actor -> custom.Capability
+  meta { id: "TEST-GRANT-004", severity: critical }
+  grant custom.Actor -> custom.Capability
 }
 rule ComposedMatch {
   meta { id: "TEST-MATCH-005", severity: critical }
-  match custom.WorkItem as w
-  where reach(custom.Edge, w.workload) and assume(w, custom.Capability)
+  issue custom.WorkItem as w
+  where reach(custom.Edge, w.workload) and grant(w, custom.Capability)
 }
 `
-	decls, err := parser.Parse(rules)
+	decls, err := parseV2DefinitionsForTest(rules)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -87,11 +86,11 @@ rule ComposedMatch {
 	}
 
 	want := map[string]int{
-		"TEST-FLOW-001":   1,
-		"TEST-FLOW-002":   1,
-		"TEST-REACH-003":  1,
-		"TEST-ASSUME-004": 1,
-		"TEST-MATCH-005":  1,
+		"TEST-FLOW-001":  1,
+		"TEST-FLOW-002":  1,
+		"TEST-REACH-003": 1,
+		"TEST-GRANT-004": 1,
+		"TEST-MATCH-005": 1,
 	}
 	for id, n := range want {
 		if byID[id] != n {
@@ -126,18 +125,18 @@ func buildToyGraph(t *testing.T) usg.Store {
 	s.AddEdge(usg.Edge{Type: "FLOWS", Src: "input", Dst: "target"})
 	s.AddEdge(usg.Edge{Type: "FLOWS", Src: "input", Dst: "otherTarget"})
 
-	flowAdapter := adapters.Adapter{
+	flowAdapter := bindings.Applicator{
 		Name: "test.flow", Technology: "test", Specificity: 2,
 		Fidelity: "resolved", Confidence: "high",
-		Apply: func(usg.Store) []adapters.Mapping {
-			return []adapters.Mapping{
+		Apply: func(usg.Store) []bindings.Mapping {
+			return []bindings.Mapping{
 				{NodeID: "input", Concept: "custom.Input"},
 				{NodeID: "target", Concept: "custom.Target"},
 				{NodeID: "otherTarget", Concept: "custom.OtherTarget"},
 			}
 		},
 	}
-	if _, _, err := adapters.Apply(s, []adapters.Adapter{flowAdapter}, nil); err != nil {
+	if _, _, err := bindings.Apply(s, []bindings.Applicator{flowAdapter}, nil); err != nil {
 		t.Fatal(err)
 	}
 

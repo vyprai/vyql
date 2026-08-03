@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "google-pasta" {
-    sink method "parse" -> code.Deserialization
-  }
-}

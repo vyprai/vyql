@@ -1,0 +1,9 @@
+module bindings.perl.generated.mc61d3835;
+
+binding htmlRender2 {
+  requires {
+    dependency("Flea")
+  }
+  query pattern callExpr where callee.method == "html"
+  emit sink code.HtmlRender at args[0]
+}

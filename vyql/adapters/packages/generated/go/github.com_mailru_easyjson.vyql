@@ -1,9 +1,0 @@
-import code.{Deserialization, HtmlRender}
-
-adapter go {
-  package "github.com/mailru/easyjson" {
-    sink method "Unmarshal" -> code.Deserialization
-    sink method "UnmarshalFromReader" -> code.Deserialization
-    sink method "MarshalToHTTPResponseWriter" -> code.HtmlRender
-  }
-}

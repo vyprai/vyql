@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter objc {
-  package "SwiftyRSA" {
-    sink method "parse" -> code.Deserialization
-  }
-}

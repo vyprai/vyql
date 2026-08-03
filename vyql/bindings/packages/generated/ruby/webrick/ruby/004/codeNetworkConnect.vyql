@@ -1,0 +1,9 @@
+module bindings.ruby.generated.me032aebf;
+
+binding networkConnect4 {
+  requires {
+    dependency("webrick")
+  }
+  query pattern callExpr where callee.method == "do_CONNECT"
+  emit sink code.NetworkConnectSink at args[0]
+}

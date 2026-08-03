@@ -1,0 +1,14 @@
+module bindings.ruby.generated.m92baed92;
+
+binding inputValidation2 {
+  requires {
+    dependency("rack-attack")
+  }
+  query pattern callExpr where callee.method == "throttle"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

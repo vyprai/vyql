@@ -1,0 +1,9 @@
+module bindings.php.generated.m72b72430;
+
+binding deserialization0 {
+  requires {
+    dependency("kartik-v/yii2-widget-datetimepicker")
+  }
+  query pattern callExpr where callee.method == "parseMarkup"
+  emit sink code.Deserialization at args[0]
+}

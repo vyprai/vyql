@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m39ee8f21;
+
+binding cliArgument1 {
+  requires {
+    dependency("com.beust:jcommander")
+  }
+  query pattern callExpr where callee.method == "parseWithoutValidation"
+  emit source code.CliArgument at call.result
+}

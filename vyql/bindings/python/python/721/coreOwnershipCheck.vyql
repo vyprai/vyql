@@ -1,0 +1,10 @@
+module bindings.python.generated.m21017d75;
+
+binding ownershipCheck721 {
+  query pattern callExpr where callee.method == "has_object_permission"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

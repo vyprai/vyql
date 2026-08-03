@@ -1,0 +1,9 @@
+module bindings.python.generated.m98a9c2da;
+
+binding networkSend3 {
+  requires {
+    dependency("kubernetes")
+  }
+  query pattern callExpr where callee.method == "OPTIONS"
+  emit sink code.NetworkSend at args[0]
+}

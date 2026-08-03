@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding massAssign401 {
+  query pattern callExpr where callee.method == "bind"
+  emit sink code.MassAssign at args.any
+}

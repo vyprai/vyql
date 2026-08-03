@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mc4650048;
+
+binding nosqlQuery3 {
+  requires {
+    dependency("org.springframework.data:spring-data-mongodb")
+  }
+  query pattern callExpr where callee.method == "updateMulti"
+  emit sink code.NosqlQuery at args[0]
+}

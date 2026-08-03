@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding archiveEntryName46 {
+  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.context.name contains "get_image" and args.any.literal contains "toc_item.name.decode('utf-8')" and args.any.literal contains "os.path.join(output_dir,toc_item.name.decode('utf-8'))" and not args.any.literal contains "get_safe_path"
+  emit source code.ArchiveEntryName at call.result
+}

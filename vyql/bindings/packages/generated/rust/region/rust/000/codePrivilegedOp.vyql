@@ -1,0 +1,10 @@
+module bindings.rust.generated.m92f6cbf2;
+
+binding privilegedOp0 {
+  requires {
+    dependency("region")
+  }
+  query pattern callExpr where callee.method == "alloc_pages"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

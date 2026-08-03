@@ -1,5 +1,0 @@
-adapter java {
-  package "org.skyscreamer:jsonassert" {
-    sink method "parseJSON" -> code.Deserialization
-  }
-}

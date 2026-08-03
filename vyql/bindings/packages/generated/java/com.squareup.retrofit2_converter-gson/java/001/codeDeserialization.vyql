@@ -1,0 +1,9 @@
+module bindings.java.generated.maa87f36d;
+
+binding deserialization1 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-gson")
+  }
+  query pattern callExpr where callee.method == "retrofit2.converter.gson.GsonRequestBodyConverter.convert"
+  emit sink code.Deserialization at args[0]
+}

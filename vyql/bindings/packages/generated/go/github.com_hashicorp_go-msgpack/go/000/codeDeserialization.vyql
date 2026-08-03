@@ -1,0 +1,9 @@
+module bindings.go.generated.ma0f956f8;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/hashicorp/go-msgpack")
+  }
+  query pattern callExpr where callee.method == "NewDecoder"
+  emit sink code.Deserialization at args[0]
+}

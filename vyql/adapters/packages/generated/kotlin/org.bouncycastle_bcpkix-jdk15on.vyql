@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "org.bouncycastle:bcpkix-jdk15on" {
-    sink method "parseNonEmptyASN1" -> code.Deserialization
-  }
-}

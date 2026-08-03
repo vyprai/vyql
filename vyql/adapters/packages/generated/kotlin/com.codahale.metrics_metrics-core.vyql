@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter kotlin {
-  package "com.codahale.metrics:metrics-core" {
-    control method "sanitize" -> core.InputValidation
-  }
-}

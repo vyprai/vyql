@@ -1,6 +1,0 @@
-import code.{NosqlQuery}
-adapter groovy {
-  package "org.mongodb:mongodb-driver" {
-    sink method "command" -> code.NosqlQuery
-  }
-}

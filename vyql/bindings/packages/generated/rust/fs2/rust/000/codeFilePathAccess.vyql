@@ -1,0 +1,9 @@
+module bindings.rust.generated.m8d948af7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("fs2")
+  }
+  query pattern callExpr where callee.method == "duplicate"
+  emit sink code.FilePathAccess at args[0]
+}

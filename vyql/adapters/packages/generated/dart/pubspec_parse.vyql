@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter dart {
-  package "pubspec_parse" {
-    sink method "Pubspec.fromJson" -> code.Deserialization
-  }
-}

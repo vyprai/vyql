@@ -1,7 +1,0 @@
-import code.{UrlFetch}
-
-adapter elixir {
-  package "joken_jwks" {
-    sink method "fetch_signers" -> code.UrlFetch
-  }
-}

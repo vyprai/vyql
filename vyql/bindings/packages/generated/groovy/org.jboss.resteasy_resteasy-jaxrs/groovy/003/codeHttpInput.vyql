@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mdf2aee91;
+
+binding httpInput3 {
+  requires {
+    dependency("org.jboss.resteasy:resteasy-jaxrs")
+  }
+  query pattern callExpr where callee.method == "getDecodedFormParameters"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m58dd491f;
+
+binding deserialization1 {
+  requires {
+    dependency("@hapi/bourne")
+  }
+  query pattern callExpr where callee.method == "safeParse"
+  emit sink code.Deserialization at args[0]
+}

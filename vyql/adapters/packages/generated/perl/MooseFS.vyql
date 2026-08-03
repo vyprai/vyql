@@ -1,6 +1,0 @@
-import code.{NetworkData}
-adapter perl {
-  package "MooseFS" {
-    source method "myrecv" -> code.NetworkData
-  }
-}

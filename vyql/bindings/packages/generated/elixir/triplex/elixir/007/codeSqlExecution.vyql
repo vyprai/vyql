@@ -1,0 +1,9 @@
+module bindings.elixir.generated.me859b561;
+
+binding sqlExecution7 {
+  requires {
+    dependency("triplex")
+  }
+  query pattern callExpr where callee.path ~= "mix.tasks.triplex.rollback.run"
+  emit sink code.SqlExecution at args[0]
+}

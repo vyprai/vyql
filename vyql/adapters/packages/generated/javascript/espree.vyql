@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "espree" {
-    sink method "parse" -> code.Deserialization
-    sink method "tokenize" -> code.Deserialization
-  }
-}

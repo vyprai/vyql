@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m04d4f131;
+
+binding nosqlQuery1 {
+  requires {
+    dependency("leveldb")
+  }
+  query pattern callExpr where callee.method == "Delete"
+  emit sink code.NosqlQuery at args[0]
+}

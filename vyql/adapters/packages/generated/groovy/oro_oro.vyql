@@ -1,9 +1,0 @@
-import code.{RegexCompile}
-
-adapter groovy {
-  package "oro:oro" {
-    flag code.RegexCompile on any {
-      method "compile"
-    }
-  }
-}

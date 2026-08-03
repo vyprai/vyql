@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "libtcod" {
-    sink method "loadAsc" -> code.Deserialization
-    sink method "loadApf" -> code.Deserialization
-    sink method "loadXp" -> code.Deserialization
-  }
-}

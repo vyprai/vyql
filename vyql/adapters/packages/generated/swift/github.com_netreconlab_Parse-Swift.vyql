@@ -1,5 +1,0 @@
-adapter swift {
-  package "github.com/netreconlab/Parse-Swift" {
-    sink method "send" -> code.NetworkSend
-  }
-}

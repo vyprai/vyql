@@ -1,0 +1,9 @@
+module bindings.elixir.generated.md22e87ae;
+
+binding sqlExecution0 {
+  requires {
+    dependency("spandex_ecto")
+  }
+  query pattern callExpr where callee.method == "trace"
+  emit sink code.SqlExecution at args[0]
+}

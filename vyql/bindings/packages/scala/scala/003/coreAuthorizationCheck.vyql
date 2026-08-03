@@ -1,0 +1,13 @@
+module bindings.scala.generated.m3608f193;
+
+binding authorizationCheck3 {
+  requires {
+    dependency("playframework")
+  }
+  query pattern callExpr where callee.path ~= "Security.WithPermissions"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

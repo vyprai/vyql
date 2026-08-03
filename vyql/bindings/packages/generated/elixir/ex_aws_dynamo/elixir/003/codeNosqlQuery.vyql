@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m40a3b1af;
+
+binding nosqlQuery3 {
+  requires {
+    dependency("ex_aws_dynamo")
+  }
+  query pattern callExpr where callee.method == "put_item"
+  emit sink code.NosqlQuery at args[0]
+}

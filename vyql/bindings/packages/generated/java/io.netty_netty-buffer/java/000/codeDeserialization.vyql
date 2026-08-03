@@ -1,0 +1,9 @@
+module bindings.java.generated.m0ab408ca;
+
+binding deserialization0 {
+  requires {
+    dependency("io.netty:netty-buffer")
+  }
+  query pattern callExpr where callee.method == "decodeString"
+  emit sink code.Deserialization at args[0]
+}

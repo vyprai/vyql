@@ -1,0 +1,9 @@
+module bindings.swift.generated.m9b64c798;
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/argentlabs/web3.swift")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m6cca151b;
+
+binding networkSend1 {
+  requires {
+    dependency("php-http/client-common")
+  }
+  query pattern callExpr where callee.method == "sendAsyncRequest"
+  emit sink code.NetworkSend at args[0]
+}

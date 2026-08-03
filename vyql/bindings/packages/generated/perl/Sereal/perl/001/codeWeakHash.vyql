@@ -1,0 +1,9 @@
+module bindings.perl.generated.m18b29b45;
+
+binding weakHash1 {
+  requires {
+    dependency("Sereal")
+  }
+  query pattern presenceNode where node.path ~= "sereal.hash"
+  emit issue code.WeakHash at node
+}

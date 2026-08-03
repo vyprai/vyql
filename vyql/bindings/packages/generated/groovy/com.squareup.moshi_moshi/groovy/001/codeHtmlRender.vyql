@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m72a4e0b8;
+
+binding htmlRender1 {
+  requires {
+    dependency("com.squareup.moshi:moshi")
+  }
+  query pattern callExpr where callee.method == "toJson"
+  emit sink code.HtmlRender at args[0]
+}

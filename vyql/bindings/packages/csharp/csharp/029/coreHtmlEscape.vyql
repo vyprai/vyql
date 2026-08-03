@@ -1,0 +1,14 @@
+module bindings.csharp.generated.m2a0e231a;
+
+binding htmlEscape29 {
+  requires {
+    dependency("Microsoft.Security.Application")
+  }
+  query pattern callExpr where callee.path ~= "AntiXssEncoder.HtmlEncode"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

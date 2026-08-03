@@ -1,0 +1,9 @@
+module bindings.perl.generated.me230644a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Spellunker")
+  }
+  query pattern callExpr where callee.method == "load_dictionary"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.c.generated.m2816daee;
+
+binding httpInput9 {
+  requires {
+    dependency("mongoose")
+  }
+  query pattern callExpr where callee.path ~= "mg_get_http_var"
+  emit source code.HttpInput at call.result
+}

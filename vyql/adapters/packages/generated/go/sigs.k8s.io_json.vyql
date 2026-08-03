@@ -1,5 +1,0 @@
-adapter go {
-  package "sigs.k8s.io/json" {
-    sink method "parseTag" -> code.Deserialization
-  }
-}

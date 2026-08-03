@@ -1,0 +1,9 @@
+module bindings.php.generated.mec6dc796;
+
+binding filePathAccess1 {
+  requires {
+    dependency("prettus/l5-repository")
+  }
+  query pattern callExpr where callee.method == "PrettusRepositoryHelpersCacheKeys::putKey"
+  emit sink code.FilePathAccess at args[0]
+}

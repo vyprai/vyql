@@ -1,9 +1,0 @@
-import code.{CodeEval, Deserialization}
-
-adapter python {
-  package "fastjsonschema" {
-    sink method "validate" -> code.Deserialization
-    sink method "compile" -> code.Deserialization
-    sink method "compile_to_code" -> code.CodeEval
-  }
-}

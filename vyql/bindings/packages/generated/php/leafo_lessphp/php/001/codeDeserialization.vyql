@@ -1,0 +1,9 @@
+module bindings.php.generated.m79240ed5;
+
+binding deserialization1 {
+  requires {
+    dependency("leafo/lessphp")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

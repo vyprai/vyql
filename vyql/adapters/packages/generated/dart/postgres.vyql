@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter dart {
-  package "postgres" {
-    sink method "PgConnectionImplementation.run" -> code.SqlExecution
-  }
-}

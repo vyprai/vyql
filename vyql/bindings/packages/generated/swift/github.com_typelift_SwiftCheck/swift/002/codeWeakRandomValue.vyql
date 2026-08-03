@@ -1,0 +1,9 @@
+module bindings.swift.generated.md8419421;
+
+binding weakRandomValue2 {
+  requires {
+    dependency("github.com/typelift/SwiftCheck")
+  }
+  query pattern callExpr where callee.method == "randomInRange"
+  emit issue code.WeakRandomValue at call
+}

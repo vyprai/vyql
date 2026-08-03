@@ -1,0 +1,9 @@
+module bindings.objc.generated.mfef2c755;
+
+binding userControlledData0 {
+  requires {
+    dependency("GeoFire")
+  }
+  query pattern callExpr where callee.method == "observeEventType:withBlock:"
+  emit source core.UserControlledData at call.result
+}

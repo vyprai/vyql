@@ -1,0 +1,10 @@
+module vypr.misconfig;
+
+rule SessionFixation {
+  meta {
+    cwe: [CWE_384]
+    id: "VYQL-CFG-002"
+    severity: medium
+  }
+  taint core.UserControlledData -> code.SessionIdSink
+}

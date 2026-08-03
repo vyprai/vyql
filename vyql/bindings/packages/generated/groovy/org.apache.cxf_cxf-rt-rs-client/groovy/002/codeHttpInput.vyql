@@ -1,0 +1,9 @@
+module bindings.groovy.generated.md30241c6;
+
+binding httpInput2 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "headers"
+  emit source code.HttpInput at call.result
+}

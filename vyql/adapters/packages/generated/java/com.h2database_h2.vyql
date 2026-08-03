@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter java {
-  package "com.h2database:h2" {
-    sink method "query" -> SqlExecution
-  }
-}

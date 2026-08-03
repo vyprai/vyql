@@ -1,9 +1,0 @@
-import code.{RegexCompile, ExpressionEval}
-adapter c {
-  package "pcre2" {
-    flag code.RegexCompile on any {
-      method "pcre2_regcomp"
-    }
-    sink method "pcre2_regexec" -> code.ExpressionEval
-  }
-}

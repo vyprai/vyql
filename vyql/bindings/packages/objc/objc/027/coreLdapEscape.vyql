@@ -1,0 +1,14 @@
+module bindings.objc.generated.m942721f9;
+
+binding ldapEscape27 {
+  requires {
+    dependency("openldap")
+  }
+  query pattern callExpr where callee.path ~= "ldap_escape"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

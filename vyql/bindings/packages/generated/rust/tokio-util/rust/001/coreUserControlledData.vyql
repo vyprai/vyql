@@ -1,0 +1,9 @@
+module bindings.rust.generated.md585d09d;
+
+binding userControlledData1 {
+  requires {
+    dependency("tokio-util")
+  }
+  query pattern callExpr where callee.method == "encode"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding weakCipher360 {
+  query pattern callExpr where callee.path ~= "Cipher.getInstance" and args.any.literal contains "ARCFOUR"
+  emit issue code.WeakCipher at call
+}

@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{InputValidation}
-
-adapter elixir {
-  package "phoenix_swagger" {
-    sink method "PhoenixSwagger.Validator.parse_swagger_schema" -> code.Deserialization
-    control method "PhoenixSwagger.Validator.validate" -> core.InputValidation
-  }
-}

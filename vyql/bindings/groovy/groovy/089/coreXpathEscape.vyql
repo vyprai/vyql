@@ -1,0 +1,11 @@
+module bindings.groovy.generated.m6eabb149;
+
+binding xpathEscape89 {
+  query pattern callExpr where callee.path ~= "xpathEscape"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

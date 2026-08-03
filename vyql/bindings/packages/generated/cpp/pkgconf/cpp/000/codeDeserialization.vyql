@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m6883d019;
+
+binding deserialization0 {
+  requires {
+    dependency("pkgconf")
+  }
+  query pattern callExpr where callee.method == "pkgconf_parser_parse"
+  emit sink code.Deserialization at args[0]
+}

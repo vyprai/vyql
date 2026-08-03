@@ -1,0 +1,1011 @@
+test "python authz: route target reaches direct ORM lookup without owner relation"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      if principal_id:
+          document = Document.query.get(document_id)
+          return render_template("document.html", document=document)
+      return redirect("/login")
+  ```
+
+test "python authz: owner guard covers direct ORM lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      document = Document.query.get(document_id)
+      if document.owner_id != principal_id:
+          abort(403)
+      return render_template("document.html", document=document)
+  ```
+
+test "python authz: possible branch reassignment invalidates session principal"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, request, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      if request.args.get("use_claimed"):
+          principal_id = request.args.get("owner_id")
+      document = Document.query.get(document_id)
+      if document.owner_id != principal_id:
+          abort(403)
+      return document
+  ```
+
+test "python authz: for target rebinding invalidates session principal"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, request, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      for principal_id in request.args.getlist("owner_id"):
+          audit(principal_id)
+      document = Document.query.get(document_id)
+      if document.owner_id != principal_id:
+          abort(403)
+      return document
+  ```
+
+test "python authz: walrus rebinding invalidates session principal"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, request, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      if (principal_id := request.args.get("owner_id")):
+          audit(principal_id)
+      document = Document.query.get(document_id)
+      if document.owner_id != principal_id:
+          abort(403)
+      return document
+  ```
+
+test "python authz: embedded walrus rebinding invalidates session principal"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, request, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      audit(principal_id := request.args.get("owner_id"))
+      document = Document.query.get(document_id)
+      if document.owner_id != principal_id:
+          abort(403)
+      return document
+  ```
+
+test "python authz: request fallback mixed with session is not a trusted principal"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, request, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = request.args.get("owner_id") or session.get("user_id")
+      document = Document.query.get(document_id)
+      if document.owner_id != principal_id:
+          abort(403)
+      return document
+  ```
+
+test "python authz: wrapper with a request operand is not a trusted principal"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, request, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal = Account.query.get(session.get("user_id"), request.args.get("tenant_id"))
+      document = Document.query.get(document_id)
+      if document.owner != principal:
+          abort(403)
+      return document
+  ```
+
+test "python authz: target-only ORM mutation lacks owner scope"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.route("/records/<int:record_id>/archive")
+  def archive_record(record_id):
+      principal = Account.query.get(session.get("user_id"))
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      record.archived = True
+      db.session.commit()
+      return redirect("/records")
+  ```
+
+test "python authz: owner-scoped ORM mutation is clean"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.route("/records/<int:record_id>/archive")
+  def archive_record(record_id):
+      principal = Account.query.get(session.get("user_id"))
+      record = Record.query.filter(Record.id == record_id).filter(Record.owner == principal).first_or_404()
+      record.archived = True
+      db.session.commit()
+      return redirect("/records")
+  ```
+
+test "python authz: session lookup in another function does not protect a public label"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  def load_principal():
+      return Account.query.get(session.get("user_id"))
+
+  @app.route("/labels/<int:document_id>")
+  def public_label(document_id):
+      document = Document.query.get(document_id)
+      return document.public_label
+  ```
+
+test "python authz: commit in another function does not turn a target lookup into a mutation"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  @app.route("/records/<int:record_id>/label")
+  def record_label(record_id):
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      return record.public_label
+
+  def save_metric(metric):
+      db.session.add(metric)
+      db.session.commit()
+  ```
+
+test "python authz: dashboard parameter is unrelated to principal lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.route("/dashboard/<tab>")
+  def dashboard(tab):
+      user_id = session.get("user_id")
+      user = User.query.get(user_id)
+      return render_template("dashboard.html", tab=tab, user=user)
+  ```
+
+test "python authz: log-only owner comparison does not deny document access"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      document = Document.query.get(document_id)
+      if document.owner_id != principal_id:
+          app.logger.info("document owner differs from principal")
+      return render_template("document.html", document=document)
+  ```
+
+test "python authz: unrelated profile owner denial does not guard document access"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      profile = Profile.query.get(session.get("profile_id"))
+      document = Document.query.get(document_id)
+      if profile.owner_id != principal_id:
+          abort(403)
+      return render_template("document.html", document=document)
+  ```
+
+test "python authz: document owner relation with terminal denial is clean"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal = Account.query.get(session.get("user_id"))
+      document = Document.query.get(document_id)
+      if document.owner != principal:
+          abort(403)
+      return render_template("document.html", document=document)
+  ```
+
+test "python authz: non-owner extra filter is outside bounded target-only mutation shape"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.route("/records/<int:record_id>/archive")
+  def archive_record(record_id):
+      principal = Account.query.get(session.get("user_id"))
+      record = Record.query.filter(Record.id == record_id).filter(Record.deleted == False).first_or_404()
+      record.archived = True
+      db.session.commit()
+      return redirect("/records")
+  ```
+
+test "python authz: inverted owner equality denial does not authorize document access"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      document = Document.query.get(document_id)
+      if document.owner_id == principal_id:
+          abort(403)
+      return render_template("document.html", document=document)
+  ```
+
+test "python authz: unrelated authentication abort and owner log do not authorize access"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      if not principal_id:
+          abort(401)
+      document = Document.query.get(document_id)
+      if document.owner_id != principal_id:
+          app.logger.warning("document owner differs from principal")
+      return render_template("document.html", document=document)
+  ```
+
+test "python authz: internal direct lookup helper is outside endpoint detector"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  def load_document(document_id):
+      principal_id = session.get("user_id")
+      document = Document.query.get(document_id)
+      return document
+  ```
+
+test "python authz: reachable retry-count mutation still lacks owner scope"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id, retry_count):
+      if retry_count >= 0:
+          return ""
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      record.archived = True
+      db.session.commit()
+      return redirect("/records")
+  ```
+
+test "python authz: provably terminal length guard makes later mutation unreachable"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id):
+      user_id = session.get("user_id")
+      if len(user_id) >= 0:
+          return ""
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      record.archived = True
+      db.session.commit()
+      return redirect("/records")
+  ```
+
+test "python authz: dominating request-target non-null guard blocks direct lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.get("/orders/<int:order_id>")
+  def order_receipt(order_id):
+      user_id = session.get("user_id")
+      if user_id != None or order_id is not None:
+          return ""
+      order = Order.query.get(order_id)
+      return render_template("receipt.html", order=order)
+  ```
+
+test "python authz: account route target is correlated with direct lookup"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.get("/accounts/<int:account_id>")
+  def view_account(account_id):
+      principal_id = session.get("user_id")
+      account = Account.query.get(account_id)
+      return render_template("account.html", account=account)
+  ```
+
+test "python authz: company route target is correlated with direct lookup"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.route("/companies/<int:company_id>")
+  def view_company(company_id):
+      principal_id = session.get("user_id")
+      company = Company.query.get(company_id)
+      return render_template("company.html", company=company)
+  ```
+
+test "python authz: user route target is correlated with direct lookup"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.get("/users/<int:user_id>")
+  def view_user(user_id):
+      principal_id = session.get("principal_id")
+      user = User.query.get(user_id)
+      return render_template("user.html", user=user)
+  ```
+
+test "python authz: account target-only mutation lacks owner scope"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  @app.post("/accounts/<int:account_id>/disable")
+  def disable_account(account_id):
+      account = Account.query.filter(Account.id == account_id).first_or_404()
+      account.disabled = True
+      db.session.commit()
+      return redirect("/accounts")
+  ```
+
+test "python authz: sibling class method commit does not mutate endpoint target"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  class RecordRoutes:
+      @app.get("/records/<int:record_id>/label")
+      def record_label(self, record_id):
+          record = Record.query.filter(Record.id == record_id).first_or_404()
+          return record.public_label
+
+      def save_metric(self, metric):
+          db.session.add(metric)
+          db.session.commit()
+  ```
+
+test "python authz: unused nested scopes do not supply principal lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.get("/documents/<int:document_id>/label")
+  def public_document_label(document_id):
+      document = Document.query.get(document_id)
+
+      def unused_principal():
+          return session.get("user_id")
+
+      class UnusedPrincipal:
+          def load(self):
+              return session["user_id"]
+
+      callback = lambda: session.get("lambda-user")
+      return document.public_label
+  ```
+
+test "python authz: unused nested scopes do not supply reachable commit"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  @app.get("/records/<int:record_id>/label")
+  def record_label(record_id):
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+
+      def unused_save():
+          db.commit()
+
+      class UnusedSave:
+          def save(self):
+              database.session.commit()
+
+      callback = lambda: db.session.commit()
+      return record.public_label
+  ```
+
+test "python authz: request-claimed owner mismatch is not principal authorization"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, request, session
+
+  @app.get("/documents/<int:document_id>")
+  def view_document(document_id):
+      authenticated_id = session.get("user_id")
+      claimed_owner_id = request.args.get("owner_id")
+      document = Document.query.get(document_id)
+      if document.owner_id != claimed_owner_id:
+          abort(403)
+      return document
+  ```
+
+test "python authz: session-derived target ID mismatch guards later user lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.get("/users/<int:user_id>")
+  def view_user(user_id):
+      principal_id = session.get("user_id")
+      if principal_id != user_id:
+          abort(403)
+      user = User.query.get(user_id)
+      return user
+  ```
+
+test "python authz: unconditional session alias guards target return"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.get("/documents/<int:document_id>")
+  def view_document(document_id):
+      session_principal = session.get("user_id")
+      principal_alias = session_principal
+      document = Document.query.get(document_id)
+      if principal_alias != document.owner_id:
+          abort(403)
+      return document
+  ```
+
+test "python authz: later unrelated owner use does not guard earlier protected use"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.get("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      document = Document.query.get(document_id)
+      send_to_client(document)
+      if document.owner_id != principal_id:
+          abort(403)
+      audit(document)
+      return "public"
+  ```
+
+test "python authz: db commit receiver is a reachable target mutation"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id):
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      record.archived = True
+      db.commit()
+      return redirect("/records")
+  ```
+
+test "python authz: database session commit receiver is a reachable target mutation"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id):
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      record.archived = True
+      database.session.commit()
+      return redirect("/records")
+  ```
+
+test "python authz: unreachable commit does not hide separate reachable commit"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id, user_id):
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      record.archived = True
+      db.session.commit()
+      if len(user_id) >= 0:
+          return ""
+      db.session.commit()
+  ```
+
+test "python authz: length guard makes db commit unreachable"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id, user_id):
+      if len(user_id) >= 0:
+          return ""
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      record.archived = True
+      db.commit()
+  ```
+
+test "python authz: unconditional return makes later commit unreachable"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id):
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      return ""
+      database.session.commit()
+  ```
+
+test "python authz: not-equal-None target guard blocks later direct lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.get("/invoices/<int:invoice_id>")
+  def view_invoice(invoice_id):
+      principal_id = session.get("user_id")
+      if invoice_id != None:
+          return ""
+      invoice = Invoice.query.get(invoice_id)
+      return invoice
+  ```
+
+test "python authz: nested unreachable commit does not hide reachable branch commit"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id, user_id, enabled):
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      if enabled:
+          db.commit()
+      if len(user_id) >= 0:
+          return ""
+          database.session.commit()
+  ```
+
+test "python authz: request header cannot replace the server-side user principal"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @app.route("/dashboard")
+  def dashboard():
+      user_id = session.get("user_id")
+      requested_user_id = request.headers.get("X-User-Id")
+      if requested_user_id:
+          if User.query.get(requested_user_id):
+              user_id = requested_user_id
+      user = User.query.get(user_id)
+      return render_template("dashboard.html", user=user)
+  ```
+
+test "python authz: request header cannot replace an account principal"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @accounts.get("/account")
+  def account_dashboard():
+      account_id = session["account_id"]
+      selected_account_id = request.headers.get("X-Account-Id")
+      if selected_account_id:
+          account_id = selected_account_id
+      account = Account.query.get(account_id)
+      return account
+  ```
+
+test "python authz: request header cannot replace a company principal"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @companies.post("/switch")
+  def company_switch():
+      company_id = session.get("company_id")
+      claimed_company_id = request.headers.get("X-Company-Id")
+      if claimed_company_id:
+          company_id = claimed_company_id
+      company = Company.query.get(company_id)
+      return company
+  ```
+
+test "python authz: request header cannot replace a tenant principal"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @tenant_api.patch("/tenant-context")
+  def tenant_context():
+      tenant_id = session.get("tenant_id")
+      requested_tenant_id = request.headers.get("X-Tenant-Id")
+      if requested_tenant_id:
+          tenant_id = requested_tenant_id
+      tenant = Tenant.query.get(tenant_id)
+      return tenant
+  ```
+
+test "python authz: mismatched request header is denied without principal replacement"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, request, session
+
+  @app.route("/dashboard")
+  def dashboard():
+      user_id = session.get("user_id")
+      requested_user_id = request.headers.get("X-User-Id")
+      if requested_user_id and requested_user_id != user_id:
+          abort(403)
+      user = User.query.get(user_id)
+      return render_template("dashboard.html", user=user)
+  ```
+
+test "python authz: terminal length guard blocks a header-selected principal lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @app.route("/dashboard")
+  def dashboard():
+      user_id = session.get("user_id")
+      requested_user_id = request.headers.get("X-User-Id")
+      if requested_user_id:
+          if User.query.get(requested_user_id):
+              user_id = requested_user_id
+          else:
+              return ""
+          if user_id:
+              return ""
+      if len(user_id) or len(requested_user_id):
+          return ""
+      user = User.query.get(user_id)
+      return user
+  ```
+
+test "python authz: internal header context helper is outside endpoint detector"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  def load_selected_account():
+      account_id = session.get("account_id")
+      selected_account_id = request.headers.get("X-Account-Id")
+      if selected_account_id:
+          account_id = selected_account_id
+      return Account.query.get(account_id)
+  ```
+
+test "python authz: authenticated credentials cannot select a different form session identity"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @app.route("/password/<username>", methods=["POST"])
+  def password(username):
+      password = request.form["password"]
+      user = User.query.filter_by(username=username, password=password).first()
+      if user:
+          if User.query.get(request.form["user_id"]):
+              session["user_id"] = request.form["user_id"]
+              return redirect("/dashboard")
+      return redirect("/login")
+  ```
+
+test "python authz: authenticated credentials cannot select a different JSON account identity"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @accounts.post("/login")
+  def account_login():
+      password = request.json["password"]
+      account = Account.query.filter_by(email=request.json["email"], password=password).first()
+      if account:
+          session["account_id"] = request.json["account_id"]
+          return redirect("/account")
+      return redirect("/login")
+  ```
+
+test "python authz: authenticated credentials cannot select a different query tenant identity"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @tenants.put("/login")
+  def tenant_login():
+      password = request.form["password"]
+      tenant = Tenant.query.filter_by(slug=request.form["slug"], password=password).first()
+      if tenant:
+          session["tenant_id"] = request.args.get("tenant_id")
+          return redirect("/tenant")
+      return redirect("/login")
+  ```
+
+test "python authz: authenticated credentials cannot select a different parsed JSON company identity"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @companies.post("/login")
+  def company_login():
+      payload = request.get_json()
+      password = payload["password"]
+      company = Company.query.filter_by(name=payload["name"], password=password).first()
+      if company:
+          session["company_id"] = payload["company_id"]
+          return redirect("/company")
+      return redirect("/login")
+  ```
+
+test "python authz: successful credential lookup establishes its own session identity"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @app.post("/password/<username>")
+  def password(username):
+      password = request.form["password"]
+      user = User.query.filter_by(username=username, password=password).first()
+      if user:
+          session["user_id"] = user.id
+          return redirect("/dashboard")
+      return redirect("/login")
+  ```
+
+test "python authz: request-selected session identity without credential authentication is outside detector"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @app.post("/preferences")
+  def preferences():
+      session["user_id"] = request.form["user_id"]
+      return redirect("/preferences")
+  ```
+
+test "python authz: internal credential helper is outside endpoint detector"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  def authenticate_account(email):
+      password = request.form["password"]
+      account = Account.query.filter_by(email=email, password=password).first()
+      if account:
+          session["account_id"] = request.form["account_id"]
+      return account
+  ```
+
+test "python authz: decoded principal must bind a route target before mutation"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from jose import jwt
+
+  @app.post("/edit/{company_id}")
+  def update_profile(company_id, token, db, name, is_admin):
+      payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+      token_company_id = int(payload.get("sub"))
+      company = crud.get_company(db, company_id)
+      company.name = name
+      company.is_admin = is_admin
+      db.add(company)
+      db.commit()
+      return company
+  ```
+
+test "python authz: decoded principal relation covers route-target mutation"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from jose import jwt
+
+  @app.post("/edit/{company_id}")
+  def update_profile(company_id, token, db, name, is_admin):
+      payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+      token_company_id = int(payload.get("sub"))
+      if token_company_id != company_id:
+          raise Forbidden()
+      company = crud.get_company(db, company_id)
+      company.name = name
+      company.is_admin = is_admin
+      db.add(company)
+      db.commit()
+      return company
+  ```
+
+test "python authz: decoded-principal denial in a sibling function does not authorize mutation"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from jose import jwt
+
+  def verify_other_route(token_company_id, other_company_id):
+      if token_company_id != other_company_id:
+          raise Forbidden()
+
+  @app.post("/edit/{company_id}")
+  def update_profile(company_id, token, db, name):
+      payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+      token_company_id = int(payload.get("sub"))
+      company = crud.get_company(db, company_id)
+      company.name = name
+      db.commit()
+      return company
+  ```
+
+test "python authz: GraphQL identity argument requires current-principal scope"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  class Query(graphene.ObjectType):
+      def resolve_documents(self, info, user_id):
+          return Document.query.filter_by(user_id=user_id).all()
+  ```
+
+test "python authz: GraphQL principal comparison and admin override cover lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  class Query(graphene.ObjectType):
+      def resolve_documents(self, info, user_id):
+          if info.context.user.id != user_id and info.context.user.username != "admin":
+              return []
+          return Document.query.filter_by(user_id=user_id).all()
+  ```
+
+test "python authz: GraphQL mutation identity argument requires principal scope"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  class AddDocument(graphene.Mutation):
+      def mutate(self, info, user_id, title):
+          document = Document(user_id=user_id, title=title)
+          db.session.add(document)
+          db.session.commit()
+          return AddDocument(document=document)
+  ```
+
+test "python authz: GraphQL principal guard covers object creation"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  class AddDocument(graphene.Mutation):
+      def mutate(self, info, user_id, title):
+          if info.context.user.id != user_id and info.context.user.username != "admin":
+              return None
+          document = Document(user_id=user_id, title=title)
+          db.session.add(document)
+          db.session.commit()
+          return AddDocument(document=document)
+  ```
+
+test "python authz: internal filter helper is outside GraphQL endpoint detector"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  def load_documents(user_id):
+      return Document.query.filter_by(user_id=user_id).all()
+  ```

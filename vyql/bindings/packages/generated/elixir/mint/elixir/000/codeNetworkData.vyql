@@ -1,0 +1,9 @@
+module bindings.elixir.generated.ma217580b;
+
+binding networkData0 {
+  requires {
+    dependency("mint")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}

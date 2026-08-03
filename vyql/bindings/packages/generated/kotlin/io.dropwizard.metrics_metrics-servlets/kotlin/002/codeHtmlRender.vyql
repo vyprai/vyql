@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m66c00ef3;
+
+binding htmlRender2 {
+  requires {
+    dependency("io.dropwizard.metrics:metrics-servlets")
+  }
+  query pattern callExpr where callee.method == "getWriter"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,0 +1,12 @@
+# Rank 106 / CVE-2012-5666: ownCloud Bookmarks inserted window.location into
+# generated bookmark HTML before escaping the current page URL.
+
+test "rank106: location string reaches bookmark html rendering"
+  expect VYQL-INJ-004
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.HtmlRender
+  edge FLOWS src -> sink
+  ```
+

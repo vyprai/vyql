@@ -1,0 +1,9 @@
+module bindings.scala.generated.m1e2b2f70;
+
+binding urlFetch0 {
+  requires {
+    dependency("com.atomikos:transactions-jdbc")
+  }
+  query pattern callExpr where callee.method == "setUrl"
+  emit sink code.UrlFetch at args[0]
+}

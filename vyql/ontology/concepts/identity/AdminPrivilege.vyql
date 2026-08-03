@@ -1,0 +1,5 @@
+module identity;
+
+concept AdminPrivilege : privilege {
+  grantMinLevel: ADMIN
+}

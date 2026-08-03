@@ -1,0 +1,9 @@
+module bindings.rust.generated.me31a5236;
+
+binding httpInput0 {
+  requires {
+    dependency("actix-http")
+  }
+  query pattern callExpr where callee.method == "Request::take_payload"
+  emit source code.HttpInput at call.result
+}

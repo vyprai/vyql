@@ -1,0 +1,11 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding binding533 {
+  query pattern callExpr where callee.method == "xpathLiteral"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.python.generated.maf509f95;
+
+binding deserialization8 {
+  requires {
+    dependency("srsly")
+  }
+  query pattern callExpr where callee.method == "msgpack_loads"
+  emit sink code.Deserialization at args[0]
+}

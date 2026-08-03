@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter cpp {
-  package "nlohmann-json" {
-    sink method "parse" -> code.Deserialization
-    sink method "sax_parse" -> code.Deserialization
-  }
-}

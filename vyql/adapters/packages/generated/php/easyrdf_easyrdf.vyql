@@ -1,9 +1,0 @@
-import code.{CommandExecution, Deserialization, UrlFetch}
-
-adapter php {
-  package "easyrdf/easyrdf" {
-    sink method "EasyRdf\Graph::parse" -> code.Deserialization
-    sink method "EasyRdf\Graph::load" -> code.UrlFetch
-    sink method "EasyRdf\Utils::execCommandPipe" -> code.CommandExecution
-  }
-}

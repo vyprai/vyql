@@ -1,0 +1,9 @@
+module bindings.perl.generated.m4c2fd2f4;
+
+binding codeEval1 {
+  requires {
+    dependency("X10-Home")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.CodeEval at args[0]
+}

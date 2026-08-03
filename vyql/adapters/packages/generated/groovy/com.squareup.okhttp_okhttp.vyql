@@ -1,9 +1,0 @@
-adapter groovy {
-  package "com.squareup.okhttp:okhttp" {
-    source method "parse" -> core.UserControlledData
-    sink method "execute" -> code.NetworkConnect
-    sink method "enqueue" -> code.NetworkConnect
-    sink method "execute" -> code.NetworkSend
-    sink method "enqueue" -> code.NetworkSend
-  }
-}

@@ -1,9 +1,0 @@
-import code.{SecretValue}
-
-adapter rust {
-  package "secp256k1" {
-    source method "SecretKey::new" -> code.SecretValue
-    source method "SecretKey::to_secret_bytes" -> code.SecretValue
-    source method "SecretKey::as_secret_bytes" -> code.SecretValue
-  }
-}

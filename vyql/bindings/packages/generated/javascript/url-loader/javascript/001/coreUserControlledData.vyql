@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m42c70bea;
+
+binding userControlledData1 {
+  requires {
+    dependency("url-loader")
+  }
+  query pattern callExpr where callee.method == "loader"
+  emit source core.UserControlledData at call.result
+}

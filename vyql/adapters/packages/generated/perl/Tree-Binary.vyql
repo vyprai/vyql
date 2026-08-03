@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter perl {
-  package "Tree-Binary" {
-    sink method "Tree::Binary::VisitorFactory.get" -> code.CodeEval
-  }
-}

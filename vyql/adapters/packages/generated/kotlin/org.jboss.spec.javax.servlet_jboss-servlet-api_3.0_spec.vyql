@@ -1,9 +1,0 @@
-import code.{FilePathAccess, HttpInput}
-import core.{UserControlledData}
-
-adapter kotlin {
-  package "org.jboss.spec.javax.servlet:jboss-servlet-api_3.0_spec" {
-    sink method "write" -> code.FilePathAccess
-    source method "parseQueryString" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.me4ba0f1c;
+
+binding userControlledData0 {
+  requires {
+    dependency("Plack-Middleware-SetLocalEnv")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit source core.UserControlledData at call.result
+}

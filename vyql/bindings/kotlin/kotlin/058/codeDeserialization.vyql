@@ -1,0 +1,6 @@
+module bindings.kotlin.generated.m304d1620;
+
+binding deserialization58 {
+  query pattern callExpr where callee.method == "readValue"
+  emit sink code.Deserialization at args[0]
+}

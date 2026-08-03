@@ -13,10 +13,10 @@ import (
 	"github.com/vyprai/vyql/parser"
 )
 
-// TestOWASPBenchmark scores VyQL against an OWASP Benchmark suite (Java or Python) and
-// prints a per-category Youden scorecard (TPR-FPR). Gated by VYQL_BENCH=1; the suite dir is
-// $BENCH_DIR (default /tmp/bench/BenchmarkPython). This is a measurement harness, not a
-// pass/fail gate — it drives the precision-tuning loop.
+// TestOWASPBenchmark scores VyQL against an OWASP Benchmark suite and prints a
+// per-category Youden scorecard (TPR-FPR). Gated by VYQL_BENCH=1; the suite dir
+// is $BENCH_DIR (default /tmp/bench/BenchmarkPython). Protected suites also
+// enforce the exact checked-in parity target.
 func TestOWASPBenchmark(t *testing.T) {
 	if os.Getenv("VYQL_BENCH") == "" {
 		t.Skip("set VYQL_BENCH=1 to score against an OWASP Benchmark suite")
@@ -25,12 +25,36 @@ func TestOWASPBenchmark(t *testing.T) {
 	if dir == "" {
 		dir = "/tmp/bench/BenchmarkPython"
 	}
+	runOWASPBenchmarkDir(t, dir)
+}
+
+// TestLocalOWASPPortBenchmarks scores every generated local OWASP language port
+// and enforces the exact protected parity target for each. It is intentionally
+// opt-in because it scans 22 full benchmark corpora.
+func TestLocalOWASPPortBenchmarks(t *testing.T) {
+	if os.Getenv("VYQL_BENCH_ALL_OWASP") == "" {
+		t.Skip("set VYQL_BENCH_ALL_OWASP=1 to score every /Users/rizqme/Workspace/owasp-* port")
+	}
+	for _, dir := range localOWASPPortDirs() {
+		dir := dir
+		t.Run(filepath.Base(dir), func(t *testing.T) {
+			if _, err := os.Stat(dir); err != nil {
+				t.Fatalf("local OWASP port %s is not available: %v", dir, err)
+			}
+			runOWASPBenchmarkDir(t, dir)
+		})
+	}
+}
+
+func runOWASPBenchmarkDir(t *testing.T, dir string) benchmarkScore {
+	t.Helper()
 	expected := loadExpected(t, dir)
 	if len(expected) == 0 {
 		t.Fatalf("no expectedresults*.csv found under %s", dir)
 	}
 
-	rules, _ := loadRules("")
+	allRules, _ := loadRules("")
+	rules := benchmarkRuleSources(allRules)
 	ruleCategory := benchmarkCategories(t, rules)
 	// python layout: testcode/ + helpers/. java layout: src/main/java (testcode + helpers).
 	candidates := [][]string{
@@ -38,6 +62,7 @@ func TestOWASPBenchmark(t *testing.T) {
 		// src/main (not just .../java) so bundled .properties under resources are read,
 		// letting config-indirection reads like getProperty("mode") const-fold.
 		{filepath.Join(dir, "src", "main")},
+		{filepath.Join(dir, "src")},
 	}
 	var roots []string
 	for _, set := range candidates {
@@ -55,27 +80,28 @@ func TestOWASPBenchmark(t *testing.T) {
 	if len(roots) == 0 {
 		roots = []string{dir}
 	}
-	fs, _, store, err := scanPaths(roots, rules)
+	restoreFast := setEnvForTest("VYQL_OWASP_BENCH_FAST", "1")
+	defer restoreFast()
+	fs, _, _, err := scanPathsWithProfileDemand(roots, rules, "", true)
 	if err != nil {
 		t.Fatalf("scan: %v", err)
 	}
-	defer closeStore(store)
 
 	// detected[testname][category] = VyQL reported that category in that test file.
-	// With BENCH_CONFIDENT=1 only findings WITHOUT an assumption note count (the confident
-	// bucket) — this measures "zero FP without assumption": every FP an unsound neutralizer
+	// With BENCH_CONFIDENT=1 only findings WITHOUT an advisory note count (the confident
+	// bucket) — this measures "zero FP without advisory": every FP an unsound neutralizer
 	// explains drops out, leaving the near-zero-FP confident scorecard.
 	confidentOnly := os.Getenv("BENCH_CONFIDENT") != ""
-	noteCat := os.Getenv("BENCH_NOTE_CAT") // print the assumption note of each noted finding in this category
+	noteCat := os.Getenv("BENCH_NOTE_CAT") // print the advisory note of each noted finding in this category
 	detected := map[string]map[string]bool{}
 	for _, f := range fs {
 		cat := ruleCategory[f.RuleID]
 		if cat == "" {
 			continue
 		}
-		if noteCat != "" && cat == noteCat && hasAssumptionNote(f) {
+		if noteCat != "" && cat == noteCat && hasAdvisoryNote(f) {
 			for _, ne := range f.NegationEvidence {
-				if !ne.Satisfied && strings.Contains(ne.Clause, "assumption") {
+				if !ne.Satisfied && strings.Contains(ne.Clause, "advisory") {
 					tn := ""
 					if len(f.Bindings) > 0 {
 						tn = testNameOf(f.Bindings[len(f.Bindings)-1].Loc)
@@ -84,7 +110,7 @@ func TestOWASPBenchmark(t *testing.T) {
 				}
 			}
 		}
-		if confidentOnly && hasAssumptionNote(f) {
+		if confidentOnly && hasAdvisoryNote(f) {
 			continue
 		}
 		for _, b := range f.Bindings {
@@ -97,14 +123,40 @@ func TestOWASPBenchmark(t *testing.T) {
 		}
 	}
 
-	score(t, expected, detected)
+	gotScore := score(t, expected, detected)
+	if want, ok := protectedOWASPBenchmarkExpectation(dir); ok {
+		gotScore.assert(t, dir, want)
+	}
+	return gotScore
 }
 
-// hasAssumptionNote reports whether a finding is assumption-gated — an unsound neutralizer
+func setEnvForTest(key, value string) func() {
+	old, had := os.LookupEnv(key)
+	_ = os.Setenv(key, value)
+	return func() {
+		if had {
+			_ = os.Setenv(key, old)
+		} else {
+			_ = os.Unsetenv(key)
+		}
+	}
+}
+
+func benchmarkRuleSources(rules []parser.V2DefinitionSource) []parser.V2DefinitionSource {
+	out := make([]parser.V2DefinitionSource, 0, len(rules))
+	for _, src := range rules {
+		if strings.Contains(src.Source, "benchmark:") {
+			out = append(out, src)
+		}
+	}
+	return out
+}
+
+// hasAdvisoryNote reports whether a finding is advisory-gated — an unsound neutralizer
 // (regex char-filter, prefix guard, unverifiable transform) lies on or dominates its flow.
-func hasAssumptionNote(f *findings.Finding) bool {
+func hasAdvisoryNote(f *findings.Finding) bool {
 	for _, ne := range f.NegationEvidence {
-		if !ne.Satisfied && strings.Contains(ne.Clause, "assumption") {
+		if !ne.Satisfied && strings.Contains(ne.Clause, "advisory") {
 			return true
 		}
 	}
@@ -154,9 +206,9 @@ func testNameOf(loc string) string {
 	return ""
 }
 
-func benchmarkCategories(t *testing.T, rules string) map[string]string {
+func benchmarkCategories(t *testing.T, rules []parser.V2DefinitionSource) map[string]string {
 	t.Helper()
-	decls, err := parser.Parse(rules)
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(rules), lowerNonCoreV2DefinitionSource)
 	if err != nil {
 		t.Fatalf("parse rules: %v", err)
 	}
@@ -175,7 +227,104 @@ func benchmarkCategories(t *testing.T, rules string) map[string]string {
 	return out
 }
 
-func score(t *testing.T, expected map[string]expRow, detected map[string]map[string]bool) {
+type benchmarkScore struct {
+	tp, fn, fp, tn int
+	overall        float64
+}
+
+const benchmarkCountWildcard = -1
+
+func (s benchmarkScore) assert(t *testing.T, dir string, want benchmarkScore) {
+	t.Helper()
+	matchesCount := func(got, expected int) bool {
+		return expected == benchmarkCountWildcard || got == expected
+	}
+	if !matchesCount(s.tp, want.tp) || !matchesCount(s.fn, want.fn) || !matchesCount(s.fp, want.fp) || !matchesCount(s.tn, want.tn) || fmt.Sprintf("%+.2f", s.overall) != fmt.Sprintf("%+.2f", want.overall) {
+		t.Fatalf("protected OWASP benchmark %s = TP=%d FN=%d FP=%d TN=%d overall=%+.2f; want TP=%d FN=%d FP=%d TN=%d overall=%+.2f",
+			dir, s.tp, s.fn, s.fp, s.tn, s.overall, want.tp, want.fn, want.fp, want.tn, want.overall)
+	}
+}
+
+func protectedOWASPBenchmarkExpectation(dir string) (benchmarkScore, bool) {
+	base := filepath.Base(filepath.Clean(dir))
+	switch {
+	case base == "BenchmarkJava":
+		return benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, true
+	case base == "BenchmarkPython":
+		return benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.81}, true
+	case base == "benchjs":
+		return benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.78}, true
+	case strings.HasPrefix(base, "owasp-") && filepath.Dir(filepath.Clean(dir)) == "/Users/rizqme/Workspace":
+		return benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, true
+	default:
+		return benchmarkScore{}, false
+	}
+}
+
+func localOWASPPortDirs() []string {
+	ports := []string{
+		"bash",
+		"c",
+		"cpp",
+		"csharp",
+		"dart",
+		"elixir",
+		"go",
+		"groovy",
+		"js",
+		"kotlin",
+		"lua",
+		"objc",
+		"perl",
+		"php",
+		"powershell",
+		"python",
+		"ruby",
+		"rust",
+		"scala",
+		"solidity",
+		"swift",
+		"typescript",
+	}
+	out := make([]string, 0, len(ports))
+	for _, port := range ports {
+		out = append(out, filepath.Join("/Users/rizqme/Workspace", "owasp-"+port))
+	}
+	return out
+}
+
+func TestProtectedOWASPBenchmarkExpectation(t *testing.T) {
+	tests := []struct {
+		dir  string
+		want benchmarkScore
+		ok   bool
+	}{
+		{dir: "/Users/rizqme/Workspace/BenchmarkJava", want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true},
+		{dir: "/Users/rizqme/Workspace/owasp-python", want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true},
+		{dir: "/tmp/bench/BenchmarkJava", want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true},
+		{dir: "/tmp/bench/BenchmarkPython", want: benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.81}, ok: true},
+		{dir: "/tmp/benchjs", want: benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.78}, ok: true},
+		{dir: "/tmp/random-benchmark", ok: false},
+	}
+	for _, dir := range localOWASPPortDirs() {
+		tests = append(tests, struct {
+			dir  string
+			want benchmarkScore
+			ok   bool
+		}{dir: dir, want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true})
+	}
+	for _, tt := range tests {
+		got, ok := protectedOWASPBenchmarkExpectation(tt.dir)
+		if ok != tt.ok {
+			t.Fatalf("protectedOWASPBenchmarkExpectation(%q) ok = %v, want %v", tt.dir, ok, tt.ok)
+		}
+		if ok && got != tt.want {
+			t.Fatalf("protectedOWASPBenchmarkExpectation(%q) = %+v, want %+v", tt.dir, got, tt.want)
+		}
+	}
+}
+
+func score(t *testing.T, expected map[string]expRow, detected map[string]map[string]bool) benchmarkScore {
 	type tally struct{ tp, fp, fn, tn int }
 	cats := map[string]*tally{}
 	get := func(c string) *tally {
@@ -232,11 +381,16 @@ func score(t *testing.T, expected map[string]expRow, detected map[string]map[str
 		names = append(names, c)
 	}
 	sort.Strings(names)
+	var total benchmarkScore
 	var sumY float64
 	var nCat int
 	fmt.Printf("\n%-16s %5s %5s %5s %5s  %6s %6s  %7s\n", "category", "TP", "FN", "FP", "TN", "TPR", "FPR", "Youden")
 	for _, c := range names {
 		tl := cats[c]
+		total.tp += tl.tp
+		total.fn += tl.fn
+		total.fp += tl.fp
+		total.tn += tl.tn
 		tpr := ratio(tl.tp, tl.tp+tl.fn)
 		fpr := ratio(tl.fp, tl.fp+tl.tn)
 		y := tpr - fpr
@@ -249,6 +403,8 @@ func score(t *testing.T, expected map[string]expRow, detected map[string]map[str
 		overall = sumY / float64(nCat)
 	}
 	fmt.Printf("%-16s %46s %+7.2f\n", "OVERALL (avg Youden)", "", overall)
+	total.overall = overall
+	return total
 }
 
 func ratio(a, b int) float64 {

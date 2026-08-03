@@ -1,0 +1,13 @@
+module bindings.python.generated.m3d9ccbad;
+
+binding xmlHardening79 {
+  requires {
+    dependency("defusedxml")
+  }
+  query pattern callExpr where callee.path ~= "defusedxml.ElementTree.fromstring"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}

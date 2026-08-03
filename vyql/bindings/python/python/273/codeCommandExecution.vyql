@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding commandExecution273 {
+  query pattern callExpr where callee.path ~= "asyncio.create_subprocess_shell"
+  emit sink code.CommandExecution at args[0]
+}

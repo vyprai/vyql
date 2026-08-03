@@ -1,0 +1,9 @@
+module bindings.go.generated.mb3984e9a;
+
+binding filePathAccess6 {
+  requires {
+    dependency("github.com/yudai/pp")
+  }
+  query pattern callExpr where callee.method == "Fprintln"
+  emit sink code.FilePathAccess at args[0]
+}

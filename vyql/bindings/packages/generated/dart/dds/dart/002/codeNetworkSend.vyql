@@ -1,0 +1,9 @@
+module bindings.dart.generated.mc2c1e8dc;
+
+binding networkSend2 {
+  requires {
+    dependency("dds")
+  }
+  query pattern callExpr where callee.method == "sendRequest"
+  emit sink code.NetworkSend at args[0]
+}

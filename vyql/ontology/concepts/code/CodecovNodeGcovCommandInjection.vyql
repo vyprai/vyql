@@ -1,0 +1,11 @@
+module code;
+
+concept CodecovNodeGcovCommandInjection : issue {
+  cwe: [CWE_78]
+  reviewAssumption: "library callers can supply upload options containing shell metacharacters such as backticks that survive sanitizeVar"
+  reviewCategory: command
+  reviewCondition: "Codecov Node upload builds a gcov shell command from upload options after stripping only ampersands"
+  reviewConfidence: high
+  reviewEvidence: "Codecov upload context {pattern} combines gcov-root, gcov-exec, or gcov-args into a command string passed to execSync"
+  vulnerableTo: [injection.CommandInjection]
+}

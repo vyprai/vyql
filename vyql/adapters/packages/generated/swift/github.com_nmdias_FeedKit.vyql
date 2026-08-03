@@ -1,5 +1,0 @@
-adapter swift {
-  package "github.com/nmdias/FeedKit" {
-    sink method "XMLDecoder.decode" -> code.Deserialization
-  }
-}

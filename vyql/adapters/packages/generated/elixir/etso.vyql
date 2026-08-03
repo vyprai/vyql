@@ -1,6 +1,0 @@
-import code.{NosqlQuery}
-adapter elixir {
-  package "etso" {
-    sink method "Etso.ETS.MatchSpecification.build" -> code.NosqlQuery
-  }
-}

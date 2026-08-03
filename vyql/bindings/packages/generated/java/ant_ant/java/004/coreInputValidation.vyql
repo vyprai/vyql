@@ -1,0 +1,14 @@
+module bindings.java.generated.ma182ced9;
+
+binding inputValidation4 {
+  requires {
+    dependency("ant:ant")
+  }
+  query pattern callExpr where callee.method == "match"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

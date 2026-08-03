@@ -1,0 +1,8 @@
+module code;
+
+review code.BrowserlessWorkspaceFilePathTraversal {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: attention
+  text: "review browserless workspace route path construction for containment before file reads or deletion"
+}

@@ -1,6 +1,6 @@
 // Package config is a non-tree-sitter frontend for declarative project files.
 // It performs lightweight file parsing and emits data-defined event calls that
-// adapters can label with concepts.
+// bindings can label with concepts.
 package config
 
 import (
@@ -599,20 +599,29 @@ var (
 
 func loadProfile() configProfile {
 	configProfileOnce.Do(func() {
-		raw := string(datadir.MustRead("adapters/config.vyql"))
-		decls, err := parser.Parse(raw)
+		files, err := datadir.ReadVYQLDir("bindings/config")
 		if err != nil {
-			panic("config: parse adapters/config.vyql: " + err.Error())
+			panic("config: read bindings/config: " + err.Error())
+		}
+		selected := map[string]bool{}
+		for _, file := range files {
+			selected[file.Name] = true
+		}
+		decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForProfile(files), func(src parser.V2DefinitionSource) bool {
+			return selected[src.Name]
+		})
+		if err != nil {
+			panic("config: parse binding corpus: " + err.Error())
 		}
 		var meta map[string]any
 		for _, d := range decls {
-			if ad, ok := d.(*parser.AdapterDecl); ok && ad.Name == "config" {
+			if ad, ok := d.(*parser.BindingSet); ok && ad.Name == "config" {
 				meta = ad.Meta
 				break
 			}
 		}
 		if meta == nil {
-			panic("config: missing adapter metadata")
+			panic("config: missing binding metadata")
 		}
 		configProfileData = configProfile{
 			PlistTrueKey:  map[string]string{},
@@ -1184,6 +1193,29 @@ func metaList(meta map[string]any, key string) []string {
 		}
 	}
 	return nil
+}
+
+func v2DefinitionSourcesForProfile(files []datadir.Source) []parser.V2DefinitionSource {
+	out := make([]parser.V2DefinitionSource, 0, len(files)+32)
+	if core, err := datadir.ReadVYQLDir("ontology/concepts"); err == nil {
+		for _, file := range core {
+			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+		}
+	}
+	if threats, err := datadir.ReadVYQLDir("ontology/threatkinds"); err == nil {
+		for _, file := range threats {
+			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+		}
+	}
+	if policies, err := datadir.ReadVYQLDir("policies"); err == nil {
+		for _, file := range policies {
+			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+		}
+	}
+	for _, file := range files {
+		out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+	}
+	return out
 }
 
 func metaString(meta map[string]any, key string) string {

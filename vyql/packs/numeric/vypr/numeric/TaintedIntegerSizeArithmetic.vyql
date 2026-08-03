@@ -1,0 +1,12 @@
+module vypr.numeric;
+
+rule TaintedIntegerSizeArithmetic {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_190]
+    id: "VYQL-NUM-003"
+    severity: low
+  }
+  taint core.UserControlledData -> code.IntegerSizeArithmeticSink
+  unless endpoint coveredBy core.IntegerOverflowGuard
+}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.m3a8c7104;
+
+binding filePathAccess0 {
+  requires {
+    dependency("NET-IPFilterSimple")
+  }
+  query pattern callExpr where callee.method == "_init"
+  emit sink code.FilePathAccess at args[0]
+}

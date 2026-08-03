@@ -1,0 +1,9 @@
+module bindings.python.generated.ma614fd81;
+
+binding userControlledData0 {
+  requires {
+    dependency("configparser")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}

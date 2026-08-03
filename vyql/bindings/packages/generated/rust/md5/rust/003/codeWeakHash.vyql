@@ -1,0 +1,9 @@
+module bindings.rust.generated.m820bc722;
+
+binding weakHash3 {
+  requires {
+    dependency("md5")
+  }
+  query pattern callExpr where callee.method == "compute"
+  emit issue code.WeakHash at call
+}

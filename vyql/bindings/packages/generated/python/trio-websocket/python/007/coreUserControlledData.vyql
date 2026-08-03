@@ -1,0 +1,9 @@
+module bindings.python.generated.m240fa5ae;
+
+binding userControlledData7 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "headers"
+  emit source core.UserControlledData at call.result
+}

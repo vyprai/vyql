@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m63009774;
+
+binding userControlledData4 {
+  requires {
+    dependency("scss_lint")
+  }
+  query pattern callExpr where callee.method == "SCSSLint::CLI.run"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m3fd03f38;
+
+binding weakHash1 {
+  requires {
+    dependency("CDTDatastore")
+  }
+  query pattern presenceNode where node.path ~= "cdtdatastore.hash"
+  emit issue code.WeakHash at node
+}

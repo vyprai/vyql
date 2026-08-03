@@ -1,0 +1,9 @@
+module bindings.python.generated.m2b2b7e1b;
+
+binding xmlParse2 {
+  requires {
+    dependency("python-docx")
+  }
+  query pattern callExpr where callee.method == "docx.opc.oxml.parse_xml"
+  emit sink code.XmlParse at args[0]
+}

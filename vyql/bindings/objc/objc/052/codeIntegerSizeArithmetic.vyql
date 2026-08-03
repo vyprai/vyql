@@ -1,0 +1,7 @@
+module bindings.objc.generated.mccadd221;
+
+binding integerSizeArithmetic52 {
+  query pattern presenceNode where node.path ~= "__binop.add"
+  emit issue code.IntegerSizeArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}

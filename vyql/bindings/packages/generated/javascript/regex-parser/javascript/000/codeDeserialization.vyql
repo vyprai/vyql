@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mb0129f30;
+
+binding deserialization0 {
+  requires {
+    dependency("regex-parser")
+  }
+  query pattern callExpr where callee.method == "Parse"
+  emit sink code.Deserialization at args[0]
+}

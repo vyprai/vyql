@@ -1,0 +1,14 @@
+module bindings.cpp.generated.m1c1357ee;
+
+binding ldapEscape31 {
+  requires {
+    dependency("openldap")
+  }
+  query pattern callExpr where callee.path ~= "ldap_escape"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

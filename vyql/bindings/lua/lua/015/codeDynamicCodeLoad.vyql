@@ -1,0 +1,6 @@
+module bindings.lua.generated.ma99d12f7;
+
+binding dynamicCodeLoad15 {
+  query pattern callExpr where callee.path ~= "loadfile"
+  emit sink code.DynamicCodeLoad at args[0]
+}

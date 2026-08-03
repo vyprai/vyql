@@ -1,0 +1,10 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding pathAccessCheck528 {
+  query pattern callExpr where callee.path ~= "isWithin"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

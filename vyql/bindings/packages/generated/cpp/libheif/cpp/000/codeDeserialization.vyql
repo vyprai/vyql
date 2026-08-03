@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m4267f400;
+
+binding deserialization0 {
+  requires {
+    dependency("libheif")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

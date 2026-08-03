@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding sniffCsvExternalAccessBypass85 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "sniff_csv.external_access_bypass"
+  emit issue code.SniffCsvExternalAccessBypass at node
+}

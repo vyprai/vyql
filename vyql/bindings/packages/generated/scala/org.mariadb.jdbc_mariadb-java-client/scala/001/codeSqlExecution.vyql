@@ -1,0 +1,9 @@
+module bindings.scala.generated.mbf1feb97;
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.mariadb.jdbc:mariadb-java-client")
+  }
+  query pattern callExpr where callee.method == "NativeSql.parse"
+  emit sink code.SqlExecution at args[0]
+}

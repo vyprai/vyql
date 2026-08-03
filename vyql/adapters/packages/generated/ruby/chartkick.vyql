@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter ruby {
-  package "chartkick" {
-    control method "json_escape" -> core.InputValidation
-  }
-}

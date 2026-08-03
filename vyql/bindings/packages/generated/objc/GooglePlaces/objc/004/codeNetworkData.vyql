@@ -1,0 +1,9 @@
+module bindings.objc.generated.mff36b5b7;
+
+binding networkData4 {
+  requires {
+    dependency("GooglePlaces")
+  }
+  query pattern callExpr where callee.method == "searchByTextWithRequest"
+  emit source code.NetworkData at call.result
+}

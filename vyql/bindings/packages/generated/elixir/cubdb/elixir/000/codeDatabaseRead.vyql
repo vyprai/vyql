@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m50eb1b2d;
+
+binding databaseRead0 {
+  requires {
+    dependency("cubdb")
+  }
+  query pattern callExpr where callee.method == "fetch"
+  emit sink code.DatabaseReadSink at args[0]
+}

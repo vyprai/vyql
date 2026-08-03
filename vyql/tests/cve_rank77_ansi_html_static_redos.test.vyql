@@ -1,0 +1,12 @@
+# Rank 77 / CVE-2021-23424: ansi-html used a static catastrophic regex in
+# replacement/matching logic.
+
+test "rank77: ANSI regex match is ReDoS-prone"
+  expect VYQL-DOS-002
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.RegexMatchSink
+  edge FLOWS src -> sink
+  ```
+

@@ -1,8 +1,0 @@
-import code.{NetworkData, NetworkSend}
-adapter ruby {
-  package "aws-sdk-sqs" {
-    sink method "send_message" -> code.NetworkSend
-    sink method "send_messages" -> code.NetworkSend
-    source method "receive_message" -> code.NetworkData
-  }
-}

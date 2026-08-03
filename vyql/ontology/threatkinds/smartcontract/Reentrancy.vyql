@@ -1,0 +1,6 @@
+module smartcontract;
+
+threat Reentrancy {
+  cwe: [CWE_841]
+  desc: "External call before a state update — reentrancy (checks-effects-interactions violated)"
+}

@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding responseHeaderWrite181 {
+  query pattern callExpr where callee.path ~= "headers.__setitem__"
+  emit sink code.ResponseHeaderWrite at args[1]
+}

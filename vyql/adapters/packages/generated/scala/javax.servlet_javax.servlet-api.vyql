@@ -1,5 +1,0 @@
-adapter scala {
-  package "javax.servlet:javax.servlet-api" {
-    source method "Cookie" -> code.HttpInput
-  }
-}

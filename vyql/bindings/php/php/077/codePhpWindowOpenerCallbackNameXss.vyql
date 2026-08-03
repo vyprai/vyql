@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding phpWindowOpenerCallbackNameXss77 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.callPath contains "echo" and containsAny(node.context.literal, ["window.opener.", "typeofwindow.opener."]) and containsAny(node.context.assign, ["$func=$_GET", "$func=@$_GET", "$func=(isset($_GET['func']))?$_GET['func']"]) and not (node.context.assign contains "$func=var_out")
+  emit issue code.PhpWindowOpenerCallbackNameXss at node
+}

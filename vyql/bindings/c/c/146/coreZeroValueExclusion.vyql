@@ -1,0 +1,11 @@
+module bindings.c.generated.mce54b166;
+
+binding zeroValueExclusion146 {
+  query pattern callExpr where callee.analysis ~= "guard.value_exclusion" and args.any.context.value contains "0"
+  emit check core.ZeroValueExclusion at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.m86f09efb;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/realm/realm-swift")
+  }
+  query pattern callExpr where callee.method == "writeCopy"
+  emit sink code.FilePathAccess at args[0]
+}

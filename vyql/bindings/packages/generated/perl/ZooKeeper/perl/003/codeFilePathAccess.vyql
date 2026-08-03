@@ -1,0 +1,9 @@
+module bindings.perl.generated.m2f5cafad;
+
+binding filePathAccess3 {
+  requires {
+    dependency("ZooKeeper")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.FilePathAccess at args[0]
+}

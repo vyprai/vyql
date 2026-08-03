@@ -1,0 +1,10 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding redirectAllowlist197 {
+  query pattern callExpr where callee.path ~= "isAllowedRedirect"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

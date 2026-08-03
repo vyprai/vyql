@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mc1d498ef;
+
+binding nosqlQuery4 {
+  requires {
+    dependency("org.mongodb:mongodb-driver-sync")
+  }
+  query pattern callExpr where callee.method == "updateOne"
+  emit sink code.NosqlQuery at args[0]
+}

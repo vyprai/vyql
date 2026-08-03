@@ -1,0 +1,8 @@
+module code;
+
+concept FilePathAccess : sink {
+  cwe: [CWE_22]
+  enabledBy: [taint.UntrustedData]
+  excludedChars: "/\\"
+  vulnerableTo: [path.PathTraversal]
+}

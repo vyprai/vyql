@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding weakHash176 {
+  query pattern presenceNode where node.path ~= "MD5.Create"
+  emit issue code.WeakHash at node
+}

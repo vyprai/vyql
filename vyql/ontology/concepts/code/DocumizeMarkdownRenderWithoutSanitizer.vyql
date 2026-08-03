@@ -1,0 +1,11 @@
+module code;
+
+concept DocumizeMarkdownRenderWithoutSanitizer : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "Markdown section content can be authored by a lower-trust user and later rendered in another user's browser"
+  reviewCategory: xss
+  reviewCondition: "Documize Markdown rendering converts untrusted Markdown to HTML without sanitizing the generated HTML"
+  reviewConfidence: high
+  reviewEvidence: "Documize Markdown Render context {pattern} returns blackfriday-rendered HTML without an observed bluemonday sanitizer"
+  vulnerableTo: [injection.Xss]
+}

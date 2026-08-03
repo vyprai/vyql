@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m0e52ebfa;
+
+binding sqlExecution1 {
+  requires {
+    dependency("sqlstreamstore.mssql")
+  }
+  query pattern callExpr where callee.method == "MsSqlStreamStoreV3"
+  emit sink code.SqlExecution at args[0]
+}

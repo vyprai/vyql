@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding unboundedCopySmell64 {
+  query pattern presenceNode where node.path ~= "sprintf"
+  emit issue code.UnboundedCopySmell at node
+}

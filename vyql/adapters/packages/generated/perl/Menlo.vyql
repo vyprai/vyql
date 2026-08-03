@@ -1,6 +1,0 @@
-import core.{ShellEscape}
-adapter perl {
-  package "Menlo" {
-    control method "Menlo::Util::shell_quote" -> core.ShellEscape
-  }
-}

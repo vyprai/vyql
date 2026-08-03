@@ -1,8 +1,0 @@
-adapter php {
-  package "hoa/protocol" {
-    control method "Protocol.resolve" -> core.PathCanonicalization
-    control method "Wrapper.realPath" -> core.PathCanonicalization
-    sink method "Wrapper.realPath" -> code.FilePathAccess
-    sink method "Protocol.resolve" -> code.FilePathAccess
-  }
-}

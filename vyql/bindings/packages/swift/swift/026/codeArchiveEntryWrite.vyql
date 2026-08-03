@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc6005d88;
+
+binding archiveEntryWrite26 {
+  requires {
+    dependency("zipfoundation")
+  }
+  query pattern callExpr where callee.method == "unzipItem"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

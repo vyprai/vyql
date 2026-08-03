@@ -1,6 +1,0 @@
-import code.{NosqlQuery}
-adapter java {
-  package "org.springframework.data:spring-data-elasticsearch" {
-    sink method "searchSimilar" -> code.NosqlQuery
-  }
-}

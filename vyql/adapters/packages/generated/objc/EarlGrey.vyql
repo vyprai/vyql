@@ -1,7 +1,0 @@
-import code.{CodeEval}
-adapter objc {
-  package "EarlGrey" {
-    sink method "actionForJavaScriptExecution" -> code.CodeEval
-    sink method "grey_javaScriptExecution" -> code.CodeEval
-  }
-}

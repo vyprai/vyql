@@ -1,0 +1,10 @@
+module bindings.php.generated.m1167df3a;
+
+binding regexCompile0 {
+  requires {
+    dependency("consolidation/filter-via-dot-access-data")
+  }
+  query pattern callExpr where callee.method == "ConsolidationFilterOperatorsRegexOp::test"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

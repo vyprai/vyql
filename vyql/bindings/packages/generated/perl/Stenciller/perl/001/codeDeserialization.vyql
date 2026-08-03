@@ -1,0 +1,9 @@
+module bindings.perl.generated.m9611fbe0;
+
+binding deserialization1 {
+  requires {
+    dependency("Stenciller")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

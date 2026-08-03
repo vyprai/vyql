@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "range-parser" {
-    sink method "rangeParser" -> code.Deserialization
-  }
-}

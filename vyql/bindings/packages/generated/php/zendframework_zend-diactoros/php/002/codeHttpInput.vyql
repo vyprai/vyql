@@ -1,0 +1,9 @@
+module bindings.php.generated.m4685cbb4;
+
+binding httpInput2 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "ServerRequest::getParsedBody"
+  emit source code.HttpInput at call.result
+}

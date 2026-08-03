@@ -1,0 +1,9 @@
+module bindings.python.generated.m01563ce5;
+
+binding filePathAccess0 {
+  requires {
+    dependency("xarray")
+  }
+  query pattern callExpr where callee.method == "open_dataset"
+  emit sink code.FilePathAccess at args[0]
+}

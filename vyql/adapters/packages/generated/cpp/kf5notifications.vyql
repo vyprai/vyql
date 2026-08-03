@@ -1,8 +1,0 @@
-import code.{HtmlRender}
-
-adapter cpp {
-  package "kf5notifications" {
-    sink method "KNotification::setTitle" -> code.HtmlRender
-    sink method "KNotification::setText" -> code.HtmlRender
-  }
-}

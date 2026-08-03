@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter ruby {
-  package "strings" {
-    control method "sanitize" -> core.InputValidation
-  }
-}

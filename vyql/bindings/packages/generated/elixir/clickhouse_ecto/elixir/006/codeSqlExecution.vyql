@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m7d1994cd;
+
+binding sqlExecution6 {
+  requires {
+    dependency("clickhouse_ecto")
+  }
+  query pattern callExpr where callee.method == "ClickhouseEcto.Connection.prepare_execute"
+  emit sink code.SqlExecution at args[0]
+}

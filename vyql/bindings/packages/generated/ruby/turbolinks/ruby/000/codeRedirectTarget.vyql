@@ -1,0 +1,10 @@
+module bindings.ruby.generated.m550c6ee7;
+
+binding redirectTarget0 {
+  requires {
+    dependency("turbolinks")
+  }
+  query pattern callExpr where callee.method == "redirect_to"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

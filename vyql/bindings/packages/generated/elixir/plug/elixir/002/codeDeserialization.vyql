@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mb703b9d3;
+
+binding deserialization2 {
+  requires {
+    dependency("plug")
+  }
+  query pattern callExpr where callee.method == "Plug.Parsers.Multipart.parse"
+  emit sink code.Deserialization at args[0]
+}

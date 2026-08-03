@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding free5gcChfRechargeInfoSplitPanic270 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "RechargePut" and node.context.callPath contains "strings.Split" and node.context.literal contains "rechargingInfo" and node.context.index contains "ueIdRatingGroup:1" and not (node.context.scopeCall contains "len") and not (node.context.callPath contains "c.Query")
+  emit issue code.Free5gcChfRechargeInfoSplitPanic at node
+}

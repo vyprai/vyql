@@ -1,8 +1,0 @@
-import code.{NetworkSend, DatabaseRead}
-
-adapter objc {
-  package "Mixpanel-swift" {
-    sink method "sendRequest" -> code.NetworkSend
-    sink method "readRows" -> code.DatabaseRead
-  }
-}

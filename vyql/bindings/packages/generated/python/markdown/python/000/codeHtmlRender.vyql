@@ -1,0 +1,9 @@
+module bindings.python.generated.m777f30a9;
+
+binding htmlRender0 {
+  requires {
+    dependency("markdown")
+  }
+  query pattern callExpr where callee.method == "convert"
+  emit sink code.HtmlRender at args[0]
+}

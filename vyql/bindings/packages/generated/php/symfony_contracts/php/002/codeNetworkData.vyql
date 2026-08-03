@@ -1,0 +1,9 @@
+module bindings.php.generated.mdf53e095;
+
+binding networkData2 {
+  requires {
+    dependency("symfony/contracts")
+  }
+  query pattern callExpr where callee.method == "stream"
+  emit source code.NetworkData at call.result
+}

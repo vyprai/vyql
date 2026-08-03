@@ -1,0 +1,9 @@
+module bindings.c.generated.mb12bceb4;
+
+binding commandExecution1 {
+  requires {
+    dependency("icu")
+  }
+  query pattern callExpr where callee.method == "runcmd"
+  emit sink code.CommandExecution at args[0]
+}

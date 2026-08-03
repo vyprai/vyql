@@ -100,3 +100,28 @@ test "rank214: oversized beanstalk put body is discarded before response"
     }
   }
   ```
+
+test "rank214: oversized put body protocol mismatch generalizes across names"
+  lang c
+  expect VYQL-INJ-040
+  code
+  ```
+  #define OP_PUT 1
+  #define MSG_JOB_TOO_BIG "JOB_TOO_BIG"
+  unsigned int max_payload;
+  unsigned long strtoul(const char *nptr, char **endptr, int base);
+  int reply_msg(void *client, const char *msg);
+
+  void parse_put(void *client, int opcode, char *len_text) {
+      char *tail;
+      unsigned int payload_len;
+      payload_len = strtoul(len_text, &tail, 10);
+      switch (opcode) {
+      case OP_PUT:
+        if (payload_len > max_payload) {
+          reply_msg(client, MSG_JOB_TOO_BIG);
+          return;
+        }
+      }
+  }
+  ```

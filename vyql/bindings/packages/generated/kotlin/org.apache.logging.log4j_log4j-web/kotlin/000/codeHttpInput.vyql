@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.ma700ebe8;
+
+binding httpInput0 {
+  requires {
+    dependency("org.apache.logging.log4j:log4j-web")
+  }
+  query pattern callExpr where callee.method == "doFilter"
+  emit source code.HttpInput at call.result
+}

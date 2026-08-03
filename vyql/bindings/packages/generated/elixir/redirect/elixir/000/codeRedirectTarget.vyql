@@ -1,0 +1,10 @@
+module bindings.elixir.generated.m48af8e4b;
+
+binding redirectTarget0 {
+  requires {
+    dependency("redirect")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.mc8a5efdc;
+
+binding userControlledData2 {
+  requires {
+    dependency("Mockingjay")
+  }
+  query pattern callExpr where callee.method == "uri"
+  emit source core.UserControlledData at call.result
+}

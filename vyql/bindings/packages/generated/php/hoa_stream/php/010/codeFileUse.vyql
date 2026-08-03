@@ -1,0 +1,9 @@
+module bindings.php.generated.m2df6e391;
+
+binding fileUse10 {
+  requires {
+    dependency("hoa/stream")
+  }
+  query pattern callExpr where callee.method == "writeString"
+  emit sink code.FileUseSink at args[0]
+}

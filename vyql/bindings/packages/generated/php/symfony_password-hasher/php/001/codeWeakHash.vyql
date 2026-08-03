@@ -1,0 +1,9 @@
+module bindings.php.generated.m9efedd99;
+
+binding weakHash1 {
+  requires {
+    dependency("symfony/password-hasher")
+  }
+  query pattern presenceNode where node.path ~= "symfony.password.hasher.hash"
+  emit issue code.WeakHash at node
+}

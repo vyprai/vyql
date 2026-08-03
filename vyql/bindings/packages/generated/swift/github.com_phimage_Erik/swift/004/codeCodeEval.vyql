@@ -1,0 +1,9 @@
+module bindings.swift.generated.m0ef950b7;
+
+binding codeEval4 {
+  requires {
+    dependency("github.com/phimage/Erik")
+  }
+  query pattern callExpr where callee.method == "evaluateFuture"
+  emit sink code.CodeEval at args[0]
+}

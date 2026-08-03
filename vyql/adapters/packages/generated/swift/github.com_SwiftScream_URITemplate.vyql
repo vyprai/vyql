@@ -1,7 +1,0 @@
-import code.{ExpressionEval}
-
-adapter swift {
-  package "github.com/SwiftScream/URITemplate" {
-    sink method "process" -> code.ExpressionEval
-  }
-}

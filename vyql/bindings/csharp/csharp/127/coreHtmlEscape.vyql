@@ -1,0 +1,11 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding htmlEscape127 {
+  query pattern callExpr where callee.path ~= "HttpUtility.HtmlEncode"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

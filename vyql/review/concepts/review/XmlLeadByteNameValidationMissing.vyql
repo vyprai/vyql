@@ -1,0 +1,8 @@
+module code;
+
+review code.XmlLeadByteNameValidationMissing {
+  category: input_validation
+  expected: [core.InputValidation]
+  kind: target
+  text: "review XML tokenizer lead-byte name parsing for invalid-character rejection before accepting name characters"
+}

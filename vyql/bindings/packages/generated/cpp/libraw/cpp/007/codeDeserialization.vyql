@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m9ac101a6;
+
+binding deserialization7 {
+  requires {
+    dependency("libraw")
+  }
+  query pattern callExpr where callee.method == "libraw_unpack_thumb_ex"
+  emit sink code.Deserialization at args[0]
+}

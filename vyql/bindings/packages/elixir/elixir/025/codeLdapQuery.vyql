@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mf98b3aca;
+
+binding ldapQuery25 {
+  requires {
+    dependency("eldap")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.LdapQuery at args[1]
+}

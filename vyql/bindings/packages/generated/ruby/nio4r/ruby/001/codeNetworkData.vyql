@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mf5d599a0;
+
+binding networkData1 {
+  requires {
+    dependency("nio4r")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit source code.NetworkData at call.result
+}

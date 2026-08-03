@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m29726d38;
+
+binding responseHeaderWrite0 {
+  requires {
+    dependency("com.github.penggle:kaptcha")
+  }
+  query pattern callExpr where callee.method == "doGet"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

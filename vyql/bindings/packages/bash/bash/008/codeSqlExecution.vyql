@@ -1,0 +1,9 @@
+module bindings.bash.generated.mb6f991a5;
+
+binding sqlExecution8 {
+  requires {
+    dependency("postgresql-client")
+  }
+  query pattern callExpr where callee.path ~= "psql"
+  emit sink code.SqlExecution at args.any
+}

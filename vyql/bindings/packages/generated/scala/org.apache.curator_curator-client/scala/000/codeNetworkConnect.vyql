@@ -1,0 +1,9 @@
+module bindings.scala.generated.m1b4e8453;
+
+binding networkConnect0 {
+  requires {
+    dependency("org.apache.curator:curator-client")
+  }
+  query pattern callExpr where callee.method == "CuratorZookeeperClient"
+  emit sink code.NetworkConnectSink at args[0]
+}

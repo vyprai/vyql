@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m5177a875;
+
+binding deserialization3 {
+  requires {
+    dependency("exprotobuf")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

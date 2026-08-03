@@ -1,7 +1,0 @@
-import code.{NetworkConnect}
-
-adapter swift {
-  package "github.com/carson-katri/swift-request" {
-    sink method "call" -> code.NetworkConnect
-  }
-}

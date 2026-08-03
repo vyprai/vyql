@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter perl {
-  package "MQUL" {
-    sink method "doc_matches" -> code.Deserialization
-    sink method "update_doc" -> code.Deserialization
-  }
-}

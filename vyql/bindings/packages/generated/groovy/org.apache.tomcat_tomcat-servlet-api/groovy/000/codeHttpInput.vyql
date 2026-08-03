@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m02b3e026;
+
+binding httpInput0 {
+  requires {
+    dependency("org.apache.tomcat:tomcat-servlet-api")
+  }
+  query pattern callExpr where callee.method == "getHeader"
+  emit source code.HttpInput at call.result
+}

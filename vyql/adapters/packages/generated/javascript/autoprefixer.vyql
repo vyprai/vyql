@@ -1,7 +1,0 @@
-adapter javascript {
-  package "autoprefixer" {
-    flag code.RegexCompile on any {
-      method "parse"
-    }
-  }
-}

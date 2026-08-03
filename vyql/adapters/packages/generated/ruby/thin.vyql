@@ -1,9 +1,0 @@
-import code.{CommandExecution, Deserialization, HtmlRender}
-adapter ruby {
-  package "thin" {
-    sink method "thin_http_parser_execute" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-    sink method "run" -> code.CommandExecution
-    sink method "write" -> code.HtmlRender
-  }
-}

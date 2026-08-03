@@ -1,0 +1,9 @@
+module bindings.c.generated.m49c2c434;
+
+binding filePathAccess5 {
+  requires {
+    dependency("nanovg")
+  }
+  query pattern callExpr where callee.method == "fonsAddFont"
+  emit sink code.FilePathAccess at args[0]
+}

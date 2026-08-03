@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m26e194b2;
+
+binding networkSend13 {
+  requires {
+    dependency("com.mashape.unirest:unirest-java")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.NetworkSend at args[0]
+}

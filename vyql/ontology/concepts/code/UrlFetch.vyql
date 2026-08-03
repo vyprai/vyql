@@ -1,0 +1,7 @@
+module code;
+
+concept UrlFetch : sink {
+  cwe: [CWE_918]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [request_forgery.Ssrf]
+}

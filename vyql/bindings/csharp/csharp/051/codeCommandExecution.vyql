@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding commandExecution51 {
+  query pattern callExpr where callee.path ~= "StartInfo.Arguments"
+  emit sink code.CommandExecution at args[0]
+}

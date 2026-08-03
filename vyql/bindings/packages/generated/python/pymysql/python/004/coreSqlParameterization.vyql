@@ -1,0 +1,14 @@
+module bindings.python.generated.m1eebb4bf;
+
+binding sqlParameterization4 {
+  requires {
+    dependency("pymysql")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

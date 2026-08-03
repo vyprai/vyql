@@ -1,0 +1,9 @@
+module bindings.python.generated.m14764b31;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("pymongo")
+  }
+  query pattern callExpr where callee.method == "PyErr_SetString"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding ambiguousQueryParameterSeparator499 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "ambiguous_query_parameter_separator"
+  emit issue code.AmbiguousQueryParameterSeparator at node
+}

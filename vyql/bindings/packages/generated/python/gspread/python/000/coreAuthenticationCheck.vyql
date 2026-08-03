@@ -1,0 +1,13 @@
+module bindings.python.generated.m2bdece70;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("gspread")
+  }
+  query pattern callExpr where callee.method == "authorize"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

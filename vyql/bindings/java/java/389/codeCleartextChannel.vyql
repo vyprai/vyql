@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding cleartextChannel389 {
+  query pattern callExpr where callee.path ~= "HttpGet" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}

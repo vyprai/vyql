@@ -1,0 +1,14 @@
+module bindings.python.generated.m0f9e9c43;
+
+binding sqlParameterization1 {
+  requires {
+    dependency("duckdb")
+  }
+  query pattern callExpr where callee.method == "parameters"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

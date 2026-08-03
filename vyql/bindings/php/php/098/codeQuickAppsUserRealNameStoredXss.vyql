@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding quickAppsUserRealNameStoredXss98 {
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.className contains "User" and node.context.phpReview == "quickapps_real_name_stored_xss"
+  emit issue code.QuickAppsUserRealNameStoredXss at node
+}

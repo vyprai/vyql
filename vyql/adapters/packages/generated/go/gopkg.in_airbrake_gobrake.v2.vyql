@@ -1,7 +1,0 @@
-import code.{HttpInput}
-
-adapter go {
-  package "gopkg.in/airbrake/gobrake.v2" {
-    source method "NewNotice" -> code.HttpInput
-  }
-}

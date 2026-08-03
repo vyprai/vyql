@@ -1,0 +1,6 @@
+module bindings.auditreview.generated.mbf0d19ec;
+
+binding resourceReview28 {
+  query pattern presenceNode where node.path ~= "net.Listen"
+  emit issue code.ResourceReview at node
+}

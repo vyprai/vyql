@@ -1,5 +1,0 @@
-adapter perl {
-  package "POE-Devel-Benchmarker" {
-    sink method "create_subprocess" -> code.CommandExecution
-  }
-}

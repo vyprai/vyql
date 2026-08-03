@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m3720f5ba;
+
+binding codeEval0 {
+  requires {
+    dependency("dlfcn-win32")
+  }
+  query pattern callExpr where callee.method == "dlopen"
+  emit sink code.CodeEval at args[0]
+}

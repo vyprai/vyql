@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ChartkickRecursiveExtendPrototypePollution {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_1321]
+    id: "VYQL-INJ-062"
+    severity: high
+  }
+  issue code.ChartkickRecursiveExtendPrototypePollution as sink
+}

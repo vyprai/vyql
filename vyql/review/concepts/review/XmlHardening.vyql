@@ -1,0 +1,6 @@
+module core;
+
+review core.XmlHardening {
+  category: xml
+  kind: check
+}

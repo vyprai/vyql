@@ -1,0 +1,9 @@
+module bindings.rust.generated.mf1134ffa;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("rand_chacha")
+  }
+  query pattern callExpr where callee.method == "set_word_pos"
+  emit issue code.WeakRandomValue at call
+}

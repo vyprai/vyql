@@ -1,0 +1,9 @@
+module bindings.scala.generated.m1b90a6e7;
+
+binding xmlParse2 {
+  requires {
+    dependency("org.tuckey:urlrewritefilter")
+  }
+  query pattern callExpr where callee.method == "loadDom"
+  emit sink code.XmlParse at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-adapter perl {
-  package "Mail-SpamAssassin-Contrib-Plugin-IPFilter" {
-    sink method "iptables_cmd" -> code.CommandExecution
-    sink method "service_cmd" -> code.CommandExecution
-  }
-}

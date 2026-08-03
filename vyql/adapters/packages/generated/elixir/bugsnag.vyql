@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter elixir {
-  package "bugsnag" {
-    control method "sanitize" -> core.InputValidation
-  }
-}

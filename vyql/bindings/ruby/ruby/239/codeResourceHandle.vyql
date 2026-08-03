@@ -1,0 +1,7 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding resourceHandle239 {
+  query pattern presenceNode where node.path ~= "TCPSocket.open"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}

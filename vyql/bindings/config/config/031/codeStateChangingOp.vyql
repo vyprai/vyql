@@ -1,0 +1,6 @@
+module bindings.config.generated.m2b6375a9;
+
+binding stateChangingOp31 {
+  query pattern callExpr where callee.analysis ~= "template.xwiki_velocity.state_change"
+  emit sink code.StateChangingOpSink at args[0]
+}

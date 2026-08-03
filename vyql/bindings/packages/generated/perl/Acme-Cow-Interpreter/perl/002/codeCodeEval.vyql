@@ -1,0 +1,9 @@
+module bindings.perl.generated.me2578e40;
+
+binding codeEval2 {
+  requires {
+    dependency("Acme-Cow-Interpreter")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,14 @@
+module bindings.scala.generated.mf9b36ce7;
+
+binding inputValidation6 {
+  requires {
+    dependency("org.apache.activemq:activemq-spring")
+  }
+  query pattern callExpr where callee.method == "validateUrlAllowed"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.m49d0562d;
+
+binding networkConnect3 {
+  requires {
+    dependency("org.jboss.arquillian.protocol:arquillian-protocol-servlet")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.NetworkConnectSink at args[0]
+}

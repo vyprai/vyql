@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m06f34b81;
+
+binding weakHash0 {
+  requires {
+    dependency("comeonin")
+  }
+  query pattern callExpr where callee.method == "add_hash"
+  emit issue code.WeakHash at call
+}

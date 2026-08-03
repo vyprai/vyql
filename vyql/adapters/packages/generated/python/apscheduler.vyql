@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter python {
-  package "apscheduler" {
-    sink method "apscheduler.executors.base.run_job" -> code.CodeEval
-  }
-}

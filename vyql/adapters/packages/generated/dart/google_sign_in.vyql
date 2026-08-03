@@ -1,6 +1,0 @@
-adapter dart {
-  package "google_sign_in" {
-    source method "GoogleSignInAuthentication.idToken" -> code.SecretValue
-    source method "GoogleSignInAuthentication.accessToken" -> code.SecretValue
-  }
-}

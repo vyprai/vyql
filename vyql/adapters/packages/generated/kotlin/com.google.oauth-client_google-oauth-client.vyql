@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "com.google.oauth-client:google-oauth-client" {
-    sink method "IdToken.parse" -> code.Deserialization
-  }
-}

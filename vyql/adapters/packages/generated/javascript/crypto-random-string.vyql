@@ -1,8 +1,0 @@
-import code.{SecretValue}
-
-adapter javascript {
-  package "crypto-random-string" {
-    source method "cryptoRandomString" -> code.SecretValue
-    source method "cryptoRandomStringAsync" -> code.SecretValue
-  }
-}

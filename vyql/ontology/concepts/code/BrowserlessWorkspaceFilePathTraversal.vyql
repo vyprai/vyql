@@ -1,0 +1,11 @@
+module code;
+
+concept BrowserlessWorkspaceFilePathTraversal : issue {
+  cwe: [CWE_22]
+  reviewAssumption: "the workspace route is remotely reachable and route parameters can contain traversal components"
+  reviewCategory: path
+  reviewCondition: "browserless workspace route paths are joined under the workspace directory without a containment check"
+  reviewConfidence: high
+  reviewEvidence: "workspace route context {pattern} joins req.params path data into workspaceDir before reading or deleting files"
+  vulnerableTo: [path.PathTraversal]
+}

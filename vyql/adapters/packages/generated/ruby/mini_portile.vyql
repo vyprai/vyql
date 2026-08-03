@@ -1,9 +1,0 @@
-import code.{CommandExecution, UrlFetch}
-
-adapter ruby {
-  package "mini_portile" {
-    sink method "download_file" -> code.UrlFetch
-    sink method "download_file_http" -> code.UrlFetch
-    sink method "download_file_ftp" -> code.UrlFetch
-  }
-}

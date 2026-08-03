@@ -1,0 +1,9 @@
+module bindings.c.generated.m9fcabd2b;
+
+binding networkData3 {
+  requires {
+    dependency("hiredis")
+  }
+  query pattern callExpr where callee.method == "redisNetRead"
+  emit source code.NetworkData at call.result
+}

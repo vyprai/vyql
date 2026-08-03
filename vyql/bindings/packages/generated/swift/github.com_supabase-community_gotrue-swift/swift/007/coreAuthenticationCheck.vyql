@@ -1,0 +1,13 @@
+module bindings.swift.generated.m6e17abe9;
+
+binding authenticationCheck7 {
+  requires {
+    dependency("github.com/supabase-community/gotrue-swift")
+  }
+  query pattern callExpr where callee.method == "resetPasswordForEmail"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

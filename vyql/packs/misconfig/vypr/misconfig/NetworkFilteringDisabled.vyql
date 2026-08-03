@@ -1,0 +1,10 @@
+module vypr.misconfig;
+
+rule NetworkFilteringDisabled {
+  meta {
+    cwe: [CWE_284]
+    id: "VYQL-CFG-015"
+    severity: high
+  }
+  issue code.NetworkFilteringDisabled as n
+}

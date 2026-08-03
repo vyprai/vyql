@@ -1,0 +1,7 @@
+module code;
+
+review code.EffectiveUidRootCheckBypass {
+  category: auth
+  kind: attention
+  text: "review root/superuser checks that use effective UID where real UID determines retained privilege"
+}

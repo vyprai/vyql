@@ -1,0 +1,9 @@
+module bindings.swift.generated.m4a99fdf8;
+
+binding logOutput1 {
+  requires {
+    dependency("github.com/xcode-actions/clt-logger")
+  }
+  query pattern callExpr where callee.method == "writeLog"
+  emit sink code.LogOutput at args[0]
+}

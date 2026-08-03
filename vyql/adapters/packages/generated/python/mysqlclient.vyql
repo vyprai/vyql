@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-adapter python {
-  package "mysqlclient" {
-    sink method "query" -> code.SqlExecution
-    sink method "execute" -> code.SqlExecution
-    sink method "executemany" -> code.SqlExecution
-  }
-}

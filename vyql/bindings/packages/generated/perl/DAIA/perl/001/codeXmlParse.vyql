@@ -1,0 +1,9 @@
+module bindings.perl.generated.mc41fc632;
+
+binding xmlParse1 {
+  requires {
+    dependency("DAIA")
+  }
+  query pattern callExpr where callee.method == "parse_xml"
+  emit sink code.XmlParse at args[0]
+}

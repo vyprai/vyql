@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mc2fa3b0d;
+
+binding networkSend3 {
+  requires {
+    dependency("extwitter")
+  }
+  query pattern callExpr where callee.method == "oauth_post"
+  emit sink code.NetworkSend at args[0]
+}

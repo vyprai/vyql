@@ -1,0 +1,9 @@
+module bindings.perl.generated.m03e3243d;
+
+binding deserialization0 {
+  requires {
+    dependency("Swim")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,10 @@
+module bindings.dart.generated.m9d27f91c;
+
+binding redirectTarget0 {
+  requires {
+    dependency("url_launcher_web")
+  }
+  query pattern callExpr where callee.method == "openNewWindow"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

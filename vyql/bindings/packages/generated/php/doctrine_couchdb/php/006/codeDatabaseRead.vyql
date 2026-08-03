@@ -1,0 +1,9 @@
+module bindings.php.generated.m32da63f9;
+
+binding databaseRead6 {
+  requires {
+    dependency("doctrine/couchdb")
+  }
+  query pattern callExpr where callee.method == "allDocs"
+  emit sink code.DatabaseReadSink at args[0]
+}

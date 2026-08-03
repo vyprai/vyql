@@ -1,0 +1,10 @@
+module bindings.javascript.generated.m067028b6;
+
+binding regexCompile4 {
+  requires {
+    dependency("extglob")
+  }
+  query pattern callExpr where callee.method == "makeRe"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

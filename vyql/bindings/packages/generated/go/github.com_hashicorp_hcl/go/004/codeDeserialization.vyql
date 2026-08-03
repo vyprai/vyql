@@ -1,0 +1,9 @@
+module bindings.go.generated.mb57ba0ba;
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/hashicorp/hcl")
+  }
+  query pattern callExpr where callee.method == "Parse"
+  emit sink code.Deserialization at args[0]
+}

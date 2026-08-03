@@ -1,0 +1,9 @@
+module bindings.rust.generated.mc5c0b7c9;
+
+binding deserialization0 {
+  requires {
+    dependency("tokio-codec")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

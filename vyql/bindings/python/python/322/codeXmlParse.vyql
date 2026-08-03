@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding xmlParse322 {
+  query pattern callExpr where callee.path ~= "objectify.parse"
+  emit sink code.XmlParse at args[0]
+}

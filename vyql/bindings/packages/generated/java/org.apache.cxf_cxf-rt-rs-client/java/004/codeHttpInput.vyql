@@ -1,0 +1,9 @@
+module bindings.java.generated.mb2560d14;
+
+binding httpInput4 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.getResponse"
+  emit source code.HttpInput at call.result
+}

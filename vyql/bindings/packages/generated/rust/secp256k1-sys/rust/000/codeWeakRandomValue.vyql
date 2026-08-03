@@ -1,0 +1,9 @@
+module bindings.rust.generated.m310ffdba;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("secp256k1-sys")
+  }
+  query pattern callExpr where callee.method == "secp256k1_context_randomize"
+  emit issue code.WeakRandomValue at call
+}

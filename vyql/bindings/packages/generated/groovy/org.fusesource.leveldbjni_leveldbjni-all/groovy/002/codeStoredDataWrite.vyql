@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mc737ee23;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("org.fusesource.leveldbjni:leveldbjni-all")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.StoredDataWrite at args[0]
+}

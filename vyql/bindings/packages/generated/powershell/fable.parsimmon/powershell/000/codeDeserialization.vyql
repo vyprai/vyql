@@ -1,0 +1,9 @@
+module bindings.powershell.generated.m1c4ae433;
+
+binding deserialization0 {
+  requires {
+    dependency("fable.parsimmon")
+  }
+  query pattern callExpr where callee.method == "Parsimmon"
+  emit sink code.Deserialization at args[0]
+}

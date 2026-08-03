@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding assemblyLoadPathTraversal73 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "GetType" and node.context.callPath contains "AssemblyLoadContext.Default.LoadFromAssemblyPath" and node.context.selector contains "AppContext.BaseDirectory" and node.context.identifier contains "splitName" and node.context.literal contains ".dll" and not (node.context.callPath contains "path.Contains")
+  emit issue code.AssemblyLoadPathTraversal at node
+}

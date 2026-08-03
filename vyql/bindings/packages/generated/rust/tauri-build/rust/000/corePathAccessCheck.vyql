@@ -1,0 +1,13 @@
+module bindings.rust.generated.m4c35e160;
+
+binding pathAccessCheck0 {
+  requires {
+    dependency("tauri-build")
+  }
+  query pattern callExpr where callee.method == "permissions_path_pattern"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

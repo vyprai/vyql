@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding protocolStateReview240 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "pc.c.WriteMsg" and node.context.callPath contains "pc.c.ReadMsg" and node.context.callPath contains "pc.c.Close" and node.context.selector contains "state.Req.Id" and node.context.selector contains "ret.Id" and not (node.context.selector contains "net.Error") and not (node.context.binary contains "proto==\"udp\"")
+  emit issue code.ProtocolStateReview at node
+}

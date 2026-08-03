@@ -1,7 +1,0 @@
-adapter rust {
-  package "nohash-hasher" {
-    flag code.WeakHash on any {
-      method "finish"
-    }
-  }
-}

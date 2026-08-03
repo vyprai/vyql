@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m235818a8;
+
+binding deserialization1 {
+  requires {
+    dependency("org.apache.tomcat.embed:tomcat-embed-jasper")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

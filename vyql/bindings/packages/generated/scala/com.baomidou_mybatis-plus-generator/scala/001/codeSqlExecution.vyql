@@ -1,0 +1,9 @@
+module bindings.scala.generated.ma91ee222;
+
+binding sqlExecution1 {
+  requires {
+    dependency("com.baomidou:mybatis-plus-generator")
+  }
+  query pattern callExpr where callee.method == "tableFieldsSql"
+  emit sink code.SqlExecution at args[0]
+}

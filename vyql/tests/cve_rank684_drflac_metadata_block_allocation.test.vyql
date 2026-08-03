@@ -99,3 +99,47 @@ test "rank684: dr_flac metadata block size is bounded by remaining file size"
       return 1;
   }
   ```
+
+test "rank684: length-derived allocation generalizes across names"
+  lang c
+  expect VYQL-DOS-006
+  code
+  ```
+  int read_and_decode_block_header(int (*reader)(void*, void*, unsigned int), void *ctx, int *last, int *kind, unsigned int *payload_len);
+  void *malloc_from_callbacks(unsigned int n, void *callbacks);
+
+  int parse_block(int (*reader)(void*, void*, unsigned int), void *ctx, void *callbacks) {
+    unsigned int payload_len;
+    int last = 0;
+    int kind = 0;
+    char *payload;
+    if (!read_and_decode_block_header(reader, ctx, &last, &kind, &payload_len)) {
+      return 0;
+    }
+    payload = malloc_from_callbacks(payload_len, callbacks);
+    return reader(ctx, payload, payload_len);
+  }
+  ```
+
+test "rank684: length-derived allocation also labels cpp-routed headers"
+  lang cpp
+  expect VYQL-DOS-006
+  code
+  ```
+  int read_and_decode_block_header(int (*reader)(void*, void*, unsigned int), void *ctx, int *last, int *kind, unsigned int *payload_len);
+  void *malloc_from_callbacks(unsigned int n, void *callbacks);
+
+  namespace audio {
+  int parse_block(int (*reader)(void*, void*, unsigned int), void *ctx, void *callbacks) {
+    unsigned int payload_len;
+    int last = 0;
+    int kind = 0;
+    char *payload;
+    if (!read_and_decode_block_header(reader, ctx, &last, &kind, &payload_len)) {
+      return 0;
+    }
+    payload = (char *)malloc_from_callbacks(payload_len, callbacks);
+    return reader(ctx, payload, payload_len);
+  }
+  }
+  ```

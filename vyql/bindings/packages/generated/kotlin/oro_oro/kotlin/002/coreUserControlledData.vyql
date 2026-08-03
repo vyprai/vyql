@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.ma8d6c5d2;
+
+binding userControlledData2 {
+  requires {
+    dependency("oro:oro")
+  }
+  query pattern callExpr where callee.method == "contains"
+  emit source core.UserControlledData at call.result
+}

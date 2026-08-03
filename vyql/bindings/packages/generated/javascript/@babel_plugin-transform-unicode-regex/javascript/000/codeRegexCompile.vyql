@@ -1,0 +1,10 @@
+module bindings.javascript.generated.m94afb53c;
+
+binding regexCompile0 {
+  requires {
+    dependency("@babel/plugin-transform-unicode-regex")
+  }
+  query pattern callExpr where callee.method == "default"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

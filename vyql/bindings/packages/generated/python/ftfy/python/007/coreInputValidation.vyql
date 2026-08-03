@@ -1,0 +1,14 @@
+module bindings.python.generated.mfd6da6b3;
+
+binding inputValidation7 {
+  requires {
+    dependency("ftfy")
+  }
+  query pattern callExpr where callee.method == "remove_bom"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

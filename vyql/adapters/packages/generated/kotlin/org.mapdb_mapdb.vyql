@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter kotlin {
-  package "org.mapdb:mapdb" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

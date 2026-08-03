@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding storedHtmlWrite283 {
+  query pattern presenceNode where node.path ~= "$refItem.fromArray"
+  emit issue code.StoredHtmlWrite at node
+}

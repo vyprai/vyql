@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m1da433df;
+
+binding deserialization7 {
+  requires {
+    dependency("javax.json:javax.json-api")
+  }
+  query pattern callExpr where callee.method == "apply"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m6dfcc102;
+
+binding weakHash0 {
+  requires {
+    dependency("Amplify")
+  }
+  query pattern presenceNode where node.path ~= "amplify.hash"
+  emit issue code.WeakHash at node
+}

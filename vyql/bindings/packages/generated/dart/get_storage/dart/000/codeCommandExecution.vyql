@@ -1,0 +1,9 @@
+module bindings.dart.generated.m27ad3ba1;
+
+binding commandExecution0 {
+  requires {
+    dependency("get_storage")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

@@ -27,7 +27,7 @@ func init() {
 		Name{}, Const{}, Attr{}, Index{}, Call{}, Format{}, Seq{}, Pair{}, Lambda{}, Thru{},
 		BinOp{}, Unary{}, Ternary{},
 		Assign{}, AugAssign{}, Return{}, ExprStmt{}, FuncDef{}, ClassDef{}, Block{}, If{},
-		Loop{}, Switch{}, Try{},
+		Loop{}, Switch{}, Try{}, Validation{}, Terminate{},
 	} {
 		gob.Register(v)
 	}
@@ -46,12 +46,12 @@ type Name struct {
 type Const struct {
 	Loc string
 	// Value is the unquoted literal text for STRING constants, used by
-	// value-matching adapters (`val "..."`, e.g. option names or modes); empty otherwise.
+	// binding value matchers (`val "..."`, e.g. option names or modes); empty otherwise.
 	Value string
 }
 
 // Attr is an attribute access base.attr; Path is the dotted callee path for
-// adapter matching, e.g. "req.body".
+// binding matching, e.g. "req.body".
 type Attr struct {
 	Base Expr
 	Attr string
@@ -82,13 +82,15 @@ type Call struct {
 	IsCtor bool
 }
 
-// CallEffect is adapter-declared dataflow for calls with out-parameters or accumulator
-// arguments. It is intentionally generic: adapters name the API, while lowering only
+// CallEffect is binding-declared dataflow for calls with out-parameters or accumulator
+// arguments. It is intentionally generic: binding applicators name the API, while lowering only
 // applies "argument/result flows into destination argument".
 type CallEffect struct {
 	DestArg      int
 	SourceArg    int
 	SourceResult bool
+	Identity     bool
+	Receiver     bool
 }
 
 // Format is a taint-propagating string build (f-string, %, +, .format).
@@ -111,9 +113,10 @@ type Seq struct {
 // through Value. Used by named-value matching (`val "key=value"`); frontends that
 // don't emit Pair keep flattening such entries to their Value (no key).
 type Pair struct {
-	Key   string
-	Value Expr
-	Loc   string
+	Key        string
+	Value      Expr
+	Loc        string
+	DynamicKey bool // true when Key names an evaluated expression rather than a literal key
 }
 
 // Lambda is an inline anonymous function (e.g. an Express arrow handler).
@@ -191,6 +194,23 @@ type AugAssign struct {
 // Return returns Value from the enclosing function.
 type Return struct{ Value Expr }
 
+// Validation records a frontend-proven postcondition on Target. Evidence is
+// deliberately domain-neutral; bindings decide what security concept it means.
+type Validation struct {
+	Target   string
+	Evidence Expr
+	Kind     string
+	Loc      string
+}
+
+// Terminate evaluates Value and then exits the current function without a
+// normal return. Kind records syntax such as "raise" or framework "abort".
+type Terminate struct {
+	Value Expr
+	Kind  string
+	Loc   string
+}
+
 // ExprStmt is an expression evaluated for effect.
 type ExprStmt struct{ Value Expr }
 
@@ -203,18 +223,18 @@ type FuncDef struct {
 	Loc        string
 	// ContextTokens records syntax-level evidence attached to the enclosing function
 	// itself (for example its name or language-native annotations). Lowering preserves
-	// these on generic function-return events; adapters decide what any token means.
+	// these on generic function-return events; binding applicators decide what any token means.
 	ContextTokens []string
 	// Decorators records syntax-level annotation/decorator tokens attached to this function.
-	// Lowering preserves them on generic function-return events; adapters decide what any
+	// Lowering preserves them on generic function-return events; binding applicators decide what any
 	// specific decorator means for a domain.
 	Decorators []string
 	// ParamEntries records syntax-level evidence that a parameter is populated by an
 	// external caller or framework. Lowering emits generic parameter-entry events from this
-	// data; adapters decide which events are source concepts.
+	// data; binding applicators decide which events are source concepts.
 	ParamEntries []ParamEntry
 	// ResultEntries records syntax-level evidence attached to values returned by this
-	// function. Lowering emits generic result events; adapters decide which events are
+	// function. Lowering emits generic result events; binding applicators decide which events are
 	// controls, sinks, or other domain concepts.
 	ResultEntries []ResultEntry
 	// Exported marks a function/method as part of the PUBLIC API surface (per the
@@ -223,23 +243,6 @@ type FuncDef struct {
 	// parameters as an external-entry taint source; internal helpers are reached by
 	// ordinary interprocedural propagation, so they must NOT be entry points.
 	Exported bool
-	// The following fields carry function-identity METADATA for the graph-json CODE_MAPPER
-	// export only (stamped onto the code.Function node in lowering.makeFuncInfo). They do not
-	// affect taint/findings — purely descriptive, for the downstream VyPr reconciliation.
-	//
-	// EndLoc is the file:line of the function's last line (closing brace / dedent); with Loc it
-	// gives the full line range. Empty if the frontend doesn't emit it.
-	EndLoc string
-	// IsRoute marks a web request handler whose framework SENDS a raw string return as the
-	// response body (Flask/FastAPI route functions). Exported as is_route.
-	IsRoute bool
-	// IsValidator marks a function annotated `# vyql: validator` — a custom input-validator.
-	IsValidator bool
-	// HTTPMethod and HTTPPath carry route metadata for a handler detected from a call-registration
-	// framework (Express `app.get("/x", h)`). HTTPMethod is the upper-cased verb; HTTPPath is the
-	// literal route path (empty when not a string literal). Both empty for non-route functions.
-	HTTPMethod string
-	HTTPPath   string
 }
 
 type ParamEntry struct {
@@ -311,17 +314,19 @@ type Try struct {
 	Loc           string
 }
 
-func (Assign) isStmt()    {}
-func (AugAssign) isStmt() {}
-func (Return) isStmt()    {}
-func (ExprStmt) isStmt()  {}
-func (FuncDef) isStmt()   {}
-func (ClassDef) isStmt()  {}
-func (Block) isStmt()     {}
-func (If) isStmt()        {}
-func (Loop) isStmt()      {}
-func (Switch) isStmt()    {}
-func (Try) isStmt()       {}
+func (Assign) isStmt()     {}
+func (AugAssign) isStmt()  {}
+func (Return) isStmt()     {}
+func (Validation) isStmt() {}
+func (Terminate) isStmt()  {}
+func (ExprStmt) isStmt()   {}
+func (FuncDef) isStmt()    {}
+func (ClassDef) isStmt()   {}
+func (Block) isStmt()      {}
+func (If) isStmt()         {}
+func (Loop) isStmt()       {}
+func (Switch) isStmt()     {}
+func (Try) isStmt()        {}
 
 // Import is one import binding. Module is the target module key (source-root
 // key) or file path; Symbol is set for `from m import s` (empty for plain module

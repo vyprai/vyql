@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "net.sf.opencsv:opencsv" {
-    sink method "parseLineMulti" -> code.Deserialization
-    sink method "parseLine" -> code.Deserialization
-    sink method "readAll" -> code.Deserialization
-    sink method "readNext" -> code.Deserialization
-  }
-}

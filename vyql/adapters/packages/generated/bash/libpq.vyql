@@ -1,5 +1,0 @@
-adapter bash {
-  package "libpq" {
-    sink path "Makefile" arg all -> code.SqlExecution
-  }
-}

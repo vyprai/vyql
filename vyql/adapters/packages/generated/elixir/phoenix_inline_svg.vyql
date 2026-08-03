@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter elixir {
-  package "phoenix_inline_svg" {
-    sink method "read_svg_from_path" -> code.FilePathAccess
-    sink method "read_svg_file" -> code.FilePathAccess
-  }
-}

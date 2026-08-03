@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding dokuwikiRemoteAclMissingAdminCheck385 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "dokuwiki_remote_acl_missing_admin_check_add"
+  emit issue code.DokuwikiRemoteAclMissingAdminCheck at node
+}

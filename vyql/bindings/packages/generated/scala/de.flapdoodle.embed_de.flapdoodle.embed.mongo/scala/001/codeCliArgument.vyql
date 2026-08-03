@@ -1,0 +1,9 @@
+module bindings.scala.generated.m390a638f;
+
+binding cliArgument1 {
+  requires {
+    dependency("de.flapdoodle.embed:de.flapdoodle.embed.mongo")
+  }
+  query pattern callExpr where callee.method == "queryFile"
+  emit source code.CliArgument at call.result
+}

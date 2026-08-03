@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule DesktopProtocolRedirectWithoutAllowlist {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_601, CWE_20]
+    id: "VYQL-RF-041"
+    severity: medium
+  }
+  issue code.DesktopProtocolRedirectWithoutAllowlist as redirect
+}

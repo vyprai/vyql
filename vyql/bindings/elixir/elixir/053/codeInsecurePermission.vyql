@@ -1,0 +1,6 @@
+module bindings.elixir.generated.m728b8a72;
+
+binding insecurePermission53 {
+  query pattern callExpr where callee.path ~= "File.chmod" and args.any.literal contains "0o777"
+  emit issue code.InsecurePermission at call
+}

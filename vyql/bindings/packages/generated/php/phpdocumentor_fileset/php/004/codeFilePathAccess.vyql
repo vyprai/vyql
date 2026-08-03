@@ -1,0 +1,9 @@
+module bindings.php.generated.m009852a1;
+
+binding filePathAccess4 {
+  requires {
+    dependency("phpdocumentor/fileset")
+  }
+  query pattern callExpr where callee.method == "getMimeType"
+  emit sink code.FilePathAccess at args[0]
+}

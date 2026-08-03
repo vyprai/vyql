@@ -1,0 +1,9 @@
+module bindings.go.generated.m0323219b;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/mitchellh/mapstructure")
+  }
+  query pattern callExpr where callee.method == "StringToTimeDurationHookFunc"
+  emit sink code.Deserialization at args[0]
+}

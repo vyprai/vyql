@@ -1,0 +1,9 @@
+module bindings.perl.generated.mfd5f36b0;
+
+binding deserialization1 {
+  requires {
+    dependency("Shebangml")
+  }
+  query pattern callExpr where callee.method == "process"
+  emit sink code.Deserialization at args[0]
+}

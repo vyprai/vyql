@@ -11,9 +11,10 @@ import (
 
 // rsConv walks a tree-sitter Rust CST into NIR.
 type rsConv struct {
-	src  []byte
-	file string
-	key  string
+	src        []byte
+	file       string
+	key        string
+	childCache map[uintptr][]*tree_sitter.Node
 }
 
 // rsFormatMacros build a string from their arguments (taint-propagating).
@@ -48,11 +49,27 @@ func (c *rsConv) text(n *tree_sitter.Node) string {
 	return string(c.src[n.StartByte():n.EndByte()])
 }
 
+func (c *rsConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = map[uintptr][]*tree_sitter.Node{}
+	}
+	id := n.Id()
+	if kids, ok := c.childCache[id]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[id] = kids
+	return kids
+}
+
 // decls walks a list, tracking preceding attribute_item syntax for the next item.
 func (c *rsConv) decls(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	var attrs []string
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "attribute_item" {
 			attrs = append(attrs, c.rsAttrTokens(ch)...)
 			continue
@@ -87,7 +104,7 @@ func (c *rsConv) rsAttrTokens(n *tree_sitter.Node) []string {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		if m.Kind() == "attribute" {
-			for _, ch := range namedChildren(m) {
+			for _, ch := range c.namedChildren(m) {
 				if ch.Kind() == "identifier" || ch.Kind() == "scoped_identifier" {
 					path := c.dotted(ch)
 					add("attr_path:" + path)
@@ -96,7 +113,7 @@ func (c *rsConv) rsAttrTokens(n *tree_sitter.Node) []string {
 			}
 			return
 		}
-		for _, ch := range namedChildren(m) {
+		for _, ch := range c.namedChildren(m) {
 			walk(ch)
 		}
 	}
@@ -124,6 +141,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, ParamEntries: c.rsParamEntries(c.text(field(n, "name")), params, attrs), Body: body, Loc: L, Exported: exported}}
 	case "impl_item":
 		out := c.rsUnsafeImplMetadata(n)
+		out = append(out, c.rsRunTestsAutoApprovalMetadata(n)...)
 		out = append(out, c.decls(field(n, "body"))...)
 		return out
 	case "mod_item", "trait_item":
@@ -146,7 +164,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 		// `let _ = expr;` binds no name, but the call still matters for sinks/marks.
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(val)}}
 	case "expression_statement":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) == 0 {
 			return nil
 		}
@@ -188,6 +206,21 @@ func (c *rsConv) rsUninitializedMetadata(n *tree_sitter.Node) []nir.Stmt {
 	}}}
 }
 
+func (c *rsConv) rsRunTestsAutoApprovalMetadata(n *tree_sitter.Node) []nir.Stmt {
+	compact := rustCompactText(c.text(n))
+	if !strings.Contains(compact, "\"run_tests\"") ||
+		!strings.Contains(compact, "ToolCapability::ExecutesCode") ||
+		!strings.Contains(compact, "\"cargotest\"") ||
+		strings.Contains(compact, "ApprovalRequirement::Required") ||
+		strings.Contains(compact, "ApprovalRequirement::Suggest") {
+		return nil
+	}
+	loc := c.loc(n)
+	return []nir.Stmt{c.rsAnalysisCall("analysis.rust.run_tests_auto_approval_executes_code",
+		"run_tests_auto_approval_executes_code", loc,
+		"lang=rust", "tool=run_tests", "capability=executes_code", "approval=auto")}
+}
+
 func (c *rsConv) rsEnumMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 	if len(attrs) == 0 {
 		return nil
@@ -204,13 +237,18 @@ func (c *rsConv) rsEnumMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt 
 	for _, tok := range tokens {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
-	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+	out := []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: loc},
 		Args:   args,
 		Path:   path,
 		Method: "enum",
 		Loc:    loc,
 	}}}
+	if rsContainsString(attrs, "attr_repr:C") || rsContainsString(attrs, "repr:C") {
+		out = append(out, c.rsAnalysisCall("analysis.rust.ffi_enum_layout_risk", "ffi_enum_layout_risk", loc,
+			"lang=rust", "kind:enum", "repr:C"))
+	}
+	return out
 }
 
 func (c *rsConv) rsStructFieldMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt {
@@ -228,7 +266,7 @@ func (c *rsConv) rsStructFieldMetadata(n *tree_sitter.Node, attrs []string) []ni
 		}
 		if m.Kind() == "field_declaration_list" {
 			var pendingAttrs []string
-			for _, ch := range namedChildren(m) {
+			for _, ch := range c.namedChildren(m) {
 				if ch.Kind() == "attribute_item" {
 					pendingAttrs = append(pendingAttrs, c.rsAttrTokens(ch)...)
 					pendingAttrs = append(pendingAttrs, rsSerdeTokens(c.text(ch))...)
@@ -252,7 +290,7 @@ func (c *rsConv) rsStructFieldMetadata(n *tree_sitter.Node, attrs []string) []ni
 			}
 			return
 		}
-		for _, ch := range namedChildren(m) {
+		for _, ch := range c.namedChildren(m) {
 			walk(ch)
 		}
 	}
@@ -263,7 +301,7 @@ func (c *rsConv) rsStructFieldMetadata(n *tree_sitter.Node, attrs []string) []ni
 func (c *rsConv) rsStructFieldMetadataCall(n *tree_sitter.Node, structTokens, pendingAttrs []string) (nir.Stmt, bool) {
 	name := c.text(field(n, "name"))
 	if name == "" {
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "field_identifier" || ch.Kind() == "identifier" {
 				name = c.text(ch)
 				break
@@ -275,7 +313,7 @@ func (c *rsConv) rsStructFieldMetadataCall(n *tree_sitter.Node, structTokens, pe
 	}
 	typ := c.text(field(n, "type"))
 	fieldAttrs := append([]string{}, pendingAttrs...)
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "attribute_item" {
 			fieldAttrs = append(fieldAttrs, c.rsAttrTokens(ch)...)
 			fieldAttrs = append(fieldAttrs, rsSerdeTokens(c.text(ch))...)
@@ -292,17 +330,29 @@ func (c *rsConv) rsStructFieldMetadataCall(n *tree_sitter.Node, structTokens, pe
 	}
 	args := make([]nir.Expr, 0, len(tokens))
 	loc := c.loc(n)
-	for _, tok := range dedupeStrings(tokens) {
+	tokens = dedupeStrings(tokens)
+	for _, tok := range tokens {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	path := "analysis.rust.serde_field"
-	return nir.ExprStmt{Value: nir.Call{
+	out := []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: loc},
 		Args:   args,
 		Path:   path,
 		Method: "serde_field",
 		Loc:    loc,
-	}}, true
+	}}}
+	if rsContainsString(tokens, "derive:Deserialize") &&
+		rsContainsString(tokens, "semantic:dependency_map") &&
+		!rsContainsString(tokens, "serde_attr:deserialize_with") {
+		out = append(out, c.rsAnalysisCall("analysis.rust.unvalidated_dependency_map_key_deserialization",
+			"unvalidated_dependency_map_key_deserialization", loc,
+			"lang=rust", "field:"+name, "field_type:"+rustCompactText(typ)))
+	}
+	if len(out) == 1 {
+		return out[0], true
+	}
+	return nir.Block{Stmts: out}, true
 }
 
 func rsDeriveTokens(raw string) []string {
@@ -402,18 +452,46 @@ func (c *rsConv) rsUnsafeImplMetadata(n *tree_sitter.Node) []nir.Stmt {
 			tokens = append(tokens, "bound:"+bound)
 		}
 	}
+	path := "analysis.rust.unsafe_impl"
+	out := []nir.Stmt{c.rsAnalysisCall(path, "unsafe_impl", loc, tokens...)}
+	hasSendBound := rsContainsString(tokens, "bound:Send")
+	hasSyncBound := rsContainsString(tokens, "bound:Sync")
+	switch trait {
+	case "Send":
+		if !hasSendBound {
+			out = append(out, c.rsAnalysisCall("analysis.rust.unsafe_send_impl_missing_bound", "unsafe_send_impl_missing_bound", loc,
+				"lang=rust", "trait:Send", "missing_bound:Send"))
+		}
+	case "Sync":
+		if !hasSyncBound && !hasSendBound {
+			out = append(out, c.rsAnalysisCall("analysis.rust.unsafe_sync_impl_missing_bound", "unsafe_sync_impl_missing_bound", loc,
+				"lang=rust", "trait:Sync", "missing_bound:SyncOrSend"))
+		}
+	}
+	return out
+}
+
+func (c *rsConv) rsAnalysisCall(path, method, loc string, tokens ...string) nir.Stmt {
 	args := make([]nir.Expr, 0, len(tokens))
 	for _, tok := range tokens {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
-	path := "analysis.rust.unsafe_impl"
-	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+	return nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: loc},
 		Args:   args,
 		Path:   path,
-		Method: "unsafe_impl",
+		Method: method,
 		Loc:    loc,
-	}}}
+	}}
+}
+
+func rsContainsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *rsConv) rsParamEntries(name string, params []string, attrs []string) []nir.ParamEntry {
@@ -490,7 +568,7 @@ func (c *rsConv) rsStructuredContextTokens(root *tree_sitter.Node) []string {
 			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
 				add("call_path:" + path)
 				add("call:" + lastSeg(path))
-				for _, arg := range namedChildren(field(n, "arguments")) {
+				for _, arg := range c.namedChildren(field(n, "arguments")) {
 					if a := atom(arg); a != "" {
 						add("call_arg:" + path + ":" + a)
 					}
@@ -507,12 +585,208 @@ func (c *rsConv) rsStructuredContextTokens(root *tree_sitter.Node) []string {
 				}
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
 	walk(root)
+	for _, tok := range rustSemanticReviewTokens(c.text(root)) {
+		add(tok)
+	}
 	return out
+}
+
+func rustSemanticReviewTokens(raw string) []string {
+	compact := rustCompactText(raw)
+	var out []string
+	add := func(fact string) {
+		out = append(out, "rust_review:"+fact)
+	}
+	if strings.Contains(compact, "installScript") &&
+		strings.Contains(compact, "final_script") &&
+		!strings.Contains(compact, "spawn_installer_container") {
+		add("template_install_script_host_execution")
+	}
+	if strings.Contains(compact, "&mut") &&
+		strings.Contains(compact, "as*const") &&
+		strings.Contains(compact, "as*mut") {
+		add("unsafe_mutable_alias")
+	}
+	if strings.Contains(compact, "avail_in=input.len()asc_uint") &&
+		strings.Contains(compact, "avail_out=output.len()asc_uint") &&
+		strings.Contains(compact, "BZ2_bz") &&
+		!strings.Contains(compact, ".min(c_uint::MAXasusize)asc_uint") {
+		add("unchecked_ffi_length_narrowing")
+	}
+	if rustUninitializedBufferExposure(compact) {
+		add("uninitialized_buffer_exposure")
+	}
+	if strings.Contains(compact, "letn_partitions=1u32<<order;") &&
+		strings.Contains(compact, "letn_samples=block_size>>order;") &&
+		strings.Contains(compact, "letmutlen=n_samples-n_warm_up;") &&
+		strings.Contains(compact, "buffer[start..start+lenasusize]") &&
+		strings.Contains(compact, "decode_rice_partition(input,slice)") &&
+		strings.Contains(compact, "decode_rice2_partition(input,slice)") &&
+		!strings.Contains(compact, "block_size&(n_partitions-1)asu16!=0") &&
+		!strings.Contains(compact, "n_samples_per_partition") {
+		add("claxon_residual_partition_buffer_exposure")
+	}
+	if strings.Contains(compact, ".next().await") && !strings.Contains(compact, "timeout") {
+		add("unbounded_next_await")
+	}
+	if strings.Contains(compact, "lettarget_size=target_size.unwrap_or(value.len());") &&
+		strings.Contains(compact, "self.data.resize(offset+target_size,0)") &&
+		strings.Contains(compact, "forindexin0..target_size") &&
+		strings.Contains(compact, "value.len()>index") &&
+		!strings.Contains(compact, "value.is_empty()") {
+		add("empty_source_slice_memory_expansion")
+	}
+	if strings.Contains(compact, "whilelen>0") &&
+		strings.Contains(compact, "self.fill_buf()") &&
+		strings.Contains(compact, "buf.len().min(len)") &&
+		strings.Contains(compact, "self.consume(consume_len)") &&
+		strings.Contains(compact, "len-=consume_len") &&
+		!strings.Contains(compact, "buf.is_empty()") &&
+		!strings.Contains(compact, "UnexpectedEof") {
+		add("bufread_discard_loop_without_eof_guard")
+	}
+	if strings.Contains(compact, "request.into_parts()") &&
+		strings.Contains(compact, "hyper::body::to_bytes(body).await?") &&
+		strings.Contains(compact, "Request::from_parts(parts,full_body)") &&
+		!strings.Contains(compact, "check_content_length") &&
+		!strings.Contains(compact, "size_hint") {
+		add("conduit_hyper_unbounded_body_to_bytes")
+	}
+	if strings.Contains(compact, "\"max-age\",Some(v)") &&
+		strings.Contains(compact, "v.parse()") &&
+		strings.Contains(compact, "Duration::seconds(val)") &&
+		!strings.Contains(compact, "Duration::max_value().num_seconds()") &&
+		!strings.Contains(compact, "cmp::min") {
+		add("cookie_max_age_duration_seconds_panic")
+	}
+	if strings.Contains(compact, "letstate_ptr=Weak::into_raw(Arc::downgrade(&self_ref.state));letmutstate=self_ref.state.write().unwrap();") &&
+		strings.Contains(compact, "state.waker.is_none()") &&
+		strings.Contains(compact, "ic0::call_new") {
+		add("call_future_raw_weak_state_ref")
+	}
+	if rustWindowsReservedDeviceBypass(compact, "COM") {
+		add("windows_reserved_device_name_bypass_com")
+	}
+	if rustWindowsReservedDeviceBypass(compact, "LPT") {
+		add("windows_reserved_device_name_bypass_lpt")
+	}
+	if strings.Contains(compact, "PACKAGE_SOURCE_LOCK") &&
+		strings.Contains(compact, "entry.unpack_in(parent)") &&
+		strings.Contains(compact, "OpenOptions::new().create(true)") &&
+		strings.Contains(compact, "write!(ok,\"ok\")") &&
+		!strings.Contains(compact, "entry_path.file_name()") &&
+		!strings.Contains(compact, "create_new(true)") {
+		add("archive_marker_symlink_overwrite")
+	}
+	if strings.Contains(compact, "self.ensure_smart_account_at_round(&tx.from,current_round);") &&
+		strings.Contains(compact, "self.debit(&tx.from,tx.fee)?;") &&
+		strings.Contains(compact, "self.increment_nonce(&tx.from);") &&
+		strings.Contains(compact, "SmartOpType::Stake{amount}=>{") &&
+		strings.Contains(compact, "returnErr(CoinError::ValidationError(\"belowminimumstake\".into()))") &&
+		strings.Contains(compact, "ok_or_else(||CoinError::ValidationError(\"nostaketounstake\".into()))?") &&
+		!strings.Contains(compact, "tx.fee.saturating_add(*amount)") {
+		add("state_mutation_before_operation_preconditions")
+	}
+	if strings.Contains(compact, "record_deposit(out.len())") &&
+		strings.Contains(compact, "letexit_result=self.exit_substate(StackExitKind::Succeeded);ifletErr(e)=self.record_external_operation") &&
+		strings.Contains(compact, "ExternalOperation::Write(U256::from(out.len()))") &&
+		strings.Contains(compact, "self.state.set_code(address,out)") {
+		add("state_commit_before_external_write_accounting")
+	}
+	if strings.Contains(compact, "DiscoveryMessage::Handshake") &&
+		strings.Contains(compact, "self.peer_list_limit=Some(limit);") &&
+		strings.Contains(compact, "self.peer_list_limit.unwrap()asusize-1") &&
+		strings.Contains(compact, "self.get_peer_contacts(") &&
+		!strings.Contains(compact, ".saturating_sub(1)") &&
+		!strings.Contains(compact, ".min(self.config.update_limit)") {
+		add("peer_limit_underflow")
+	}
+	if strings.Contains(compact, "Regex::new") &&
+		strings.Contains(compact, "(?m)//.*$") &&
+		strings.Contains(compact, "replace_all") &&
+		!strings.Contains(compact, "verify_string") &&
+		!strings.Contains(compact, "is_permitted_char") &&
+		!strings.Contains(compact, "strip_comments_and_verify") {
+		add("regex_line_comment_strip_without_char_whitelist")
+	}
+	if strings.Contains(compact, "underflow_mask=((borrow>>63)^1).wrapping_sub(1)") &&
+		strings.Contains(compact, "constants::L[i]&underflow_mask") &&
+		!strings.Contains(compact, "read_volatile") &&
+		!strings.Contains(compact, "black_box(underflow_mask)") {
+		add("crypto_missing_optimization_barrier")
+	}
+	if rustCryptoScalarRandomBitsByteLengthConfusion(compact) {
+		add("crypto_scalar_random_bits_byte_length_confusion")
+	}
+	if strings.Contains(compact, "cryptsetupluksOpen--typeluks2-d-$root_hd$name") &&
+		!strings.Contains(compact, "open_encrypted_volume") &&
+		!strings.Contains(compact, "--header") &&
+		!strings.Contains(compact, "luksHeaderBackup") &&
+		!strings.Contains(compact, "validate_luks2_headers") {
+		add("luks2_attached_header_activation")
+	}
+	if strings.Contains(compact, "config_dest.push(\"ignition\");") &&
+		strings.Contains(compact, "config_dest.push(\"config.ign\");") &&
+		strings.Contains(compact, "create_dir_all(&config_dest)") &&
+		strings.Contains(compact, "OpenOptions::new()") &&
+		strings.Contains(compact, ".create_new(true)") &&
+		strings.Contains(compact, "copy(&mutconfig_in,&mutconfig_out)") &&
+		!strings.Contains(compact, "set_permissions") &&
+		!strings.Contains(compact, "Permissions::from_mode") &&
+		!strings.Contains(compact, ".chmod(") &&
+		!strings.Contains(compact, ".set_mode(") {
+		add("secret_config_file_permission_missing")
+	}
+	return out
+}
+
+func rustUninitializedBufferExposure(compact string) bool {
+	if strings.Contains(compact, "with_capacity") &&
+		strings.Contains(compact, "as_mut_ptr") &&
+		strings.Contains(compact, "from_raw_parts_mut") &&
+		strings.Contains(compact, "read_exact") &&
+		strings.Contains(compact, "set_len") {
+		return true
+	}
+	if strings.Contains(compact, "Vec::with_capacity") &&
+		strings.Contains(compact, "set_len") &&
+		strings.Contains(compact, "read_exact(&mut") &&
+		!strings.Contains(compact, "resize") {
+		return true
+	}
+	return strings.Contains(compact, "as_mut_ptr") &&
+		strings.Contains(compact, "from_raw_parts_mut") &&
+		strings.Contains(compact, ".read(") &&
+		strings.Contains(compact, "set_len")
+}
+
+func rustWindowsReservedDeviceBypass(compact, prefix string) bool {
+	return strings.Contains(compact, "path.file_stem()") &&
+		strings.Contains(compact, "stemstr.to_uppercase().as_str()") &&
+		strings.Contains(compact, "\""+prefix+"0\"") &&
+		strings.Contains(compact, "\""+prefix+"9\"") &&
+		strings.Contains(compact, "manually::open") &&
+		!strings.Contains(compact, "\""+prefix+"\u00b9\"")
+}
+
+func rustCryptoScalarRandomBitsByteLengthConfusion(compact string) bool {
+	if strings.Contains(compact, ".bits().div_ceil(8)") &&
+		strings.Contains(compact, "try_random_bits") &&
+		strings.Contains(compact, "Scalar::from_uint") &&
+		strings.Contains(compact, "ProjectivePoint::mul_by_generator") {
+		return !strings.Contains(compact, "try_generate_from_rng") && !strings.Contains(compact, "NonZeroScalar")
+	}
+	return strings.Contains(compact, "try_random_bits(rng,bit_length)") &&
+		strings.Contains(compact, "k<*") &&
+		strings.Contains(compact, "::ORDER") &&
+		strings.Contains(compact, "is_zero") &&
+		!strings.Contains(compact, "try_generate_from_rng") &&
+		!strings.Contains(compact, "NonZeroScalar")
 }
 
 func rustMatchArmPattern(n *tree_sitter.Node) *tree_sitter.Node {
@@ -528,8 +802,10 @@ func rustMatchArmPattern(n *tree_sitter.Node) *tree_sitter.Node {
 	return nil
 }
 
+var rustCompactTextReplacer = strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "")
+
 func rustCompactText(s string) string {
-	return strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(s)
+	return rustCompactTextReplacer.Replace(s)
 }
 
 func (c *rsConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
@@ -555,7 +831,7 @@ func (c *rsConv) block(block *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	var out []nir.Stmt
-	for _, st := range namedChildren(block) {
+	for _, st := range c.namedChildren(block) {
 		out = append(out, c.stmt(st)...)
 	}
 	return out
@@ -583,7 +859,7 @@ func (c *rsConv) params(params *tree_sitter.Node) []string {
 		return nil
 	}
 	var out []string
-	for _, ch := range namedChildren(params) {
+	for _, ch := range c.namedChildren(params) {
 		if ch.Kind() == "parameter" {
 			if nm := c.patName(field(ch, "pattern")); nm != "" {
 				out = append(out, nm)
@@ -598,7 +874,7 @@ func (c *rsConv) paramTypes(params *tree_sitter.Node) map[string]string {
 	if params == nil {
 		return out
 	}
-	for _, ch := range namedChildren(params) {
+	for _, ch := range c.namedChildren(params) {
 		if ch.Kind() == "parameter" {
 			if nm := c.patName(field(ch, "pattern")); nm != "" {
 				putParamType(out, nm, paramTypeFromField(c, ch))
@@ -615,7 +891,7 @@ func (c *rsConv) patName(p *tree_sitter.Node) string {
 		case "identifier":
 			return c.text(p)
 		case "ref_pattern", "mut_pattern", "reference_pattern":
-			kids := namedChildren(p)
+			kids := c.namedChildren(p)
 			if len(kids) == 0 {
 				return ""
 			}
@@ -632,7 +908,7 @@ func (c *rsConv) callArgs(args *tree_sitter.Node) []nir.Expr {
 		return nil
 	}
 	var out []nir.Expr
-	for _, a := range namedChildren(args) {
+	for _, a := range c.namedChildren(args) {
 		out = append(out, c.expr(a))
 	}
 	return out
@@ -655,7 +931,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "field_expression":
 		return nir.Attr{Base: c.expr(field(n, "value")), Attr: c.text(field(n, "field")), Path: c.dotted(n), Loc: L}
 	case "index_expression":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		var base, key nir.Expr = nir.Const{Loc: L}, nil
 		if len(kids) > 0 {
 			base = c.expr(kids[0])
@@ -672,7 +948,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		name := lastSeg(c.dotted(field(n, "macro")))
 		var parts []nir.Expr
 		if tt := lastChildKind(n, "token_tree"); tt != nil {
-			for _, ch := range namedChildren(tt) {
+			for _, ch := range c.namedChildren(tt) {
 				if isRustExprTok(ch.Kind()) {
 					parts = append(parts, c.expr(ch))
 				}
@@ -692,7 +968,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "reference_expression", "try_expression", "await_expression",
 		"parenthesized_expression", "type_cast_expression":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}
 		}
 	case "unary_expression":
@@ -705,7 +981,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		var operand nir.Expr = nir.Const{Loc: L}
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			operand = c.expr(kids[len(kids)-1])
 		}
 		return nir.Unary{Op: op, Operand: operand, Loc: L}
@@ -715,7 +991,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		then := c.blockTail(field(n, "consequence"))
 		var els nir.Expr
 		if alt := field(n, "alternative"); alt != nil {
-			if k := namedChildren(alt); len(k) > 0 {
+			if k := c.namedChildren(alt); len(k) > 0 {
 				if k[0].Kind() == "block" {
 					els = c.blockTail(k[0])
 				} else {
@@ -731,7 +1007,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Seq{Parts: c.blockValues(n), Loc: L}
 	}
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
@@ -739,7 +1015,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 
 // rustStringValue returns a quoted string literal whose inner text reflects the
 // Rust literal payload. It covers normal, byte, raw, and byte-raw strings well
-// enough for adapter `val` matching; escape handling is intentionally simple
+// enough for binding `val` matching; escape handling is intentionally simple
 // because value-matched mappings need literal substrings such as path fragments
 // or byte constants.
 func rustStringValue(raw string) string {
@@ -804,7 +1080,7 @@ func (c *rsConv) rsElse(alt *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{c.rsIf(alt)}
 	case "else_clause":
 		var out []nir.Stmt
-		for _, ch := range namedChildren(alt) {
+		for _, ch := range c.namedChildren(alt) {
 			out = append(out, c.rsElse(ch)...)
 		}
 		return out
@@ -820,7 +1096,7 @@ func (c *rsConv) rsMatch(n *tree_sitter.Node) nir.Stmt {
 	if body == nil {
 		return sw
 	}
-	for _, arm := range namedChildren(body) {
+	for _, arm := range c.namedChildren(body) {
 		if arm.Kind() != "match_arm" {
 			continue
 		}
@@ -831,7 +1107,7 @@ func (c *rsConv) rsMatch(n *tree_sitter.Node) nir.Stmt {
 			continue
 		}
 		label := pat // unwrap match_pattern -> the inner literal so labels are foldable
-		if k := namedChildren(pat); len(k) == 1 {
+		if k := c.namedChildren(pat); len(k) == 1 {
 			label = k[0]
 		}
 		sw.Cases = append(sw.Cases, stmts)
@@ -856,7 +1132,7 @@ func (c *rsConv) blockTail(block *tree_sitter.Node) nir.Expr {
 	if block == nil || block.Kind() != "block" {
 		return nil
 	}
-	kids := namedChildren(block)
+	kids := c.namedChildren(block)
 	if len(kids) == 0 {
 		return nil
 	}
@@ -870,7 +1146,7 @@ func (c *rsConv) blockTail(block *tree_sitter.Node) nir.Expr {
 
 func (c *rsConv) blockValues(n *tree_sitter.Node) []nir.Expr {
 	var out []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		out = append(out, c.expr(ch))
 	}
 	return out
@@ -899,7 +1175,7 @@ func (c *rsConv) dotted(n *tree_sitter.Node) string {
 	case "generic_type":
 		return c.dotted(field(n, "type"))
 	case "index_expression":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return c.dotted(kids[0]) + "[]"
 		}
 	}

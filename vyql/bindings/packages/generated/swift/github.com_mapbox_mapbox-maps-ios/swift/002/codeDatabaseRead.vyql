@@ -1,0 +1,9 @@
+module bindings.swift.generated.m74d7565f;
+
+binding databaseRead2 {
+  requires {
+    dependency("github.com/mapbox/mapbox-maps-ios")
+  }
+  query pattern callExpr where callee.method == "queryRenderedFeatures"
+  emit sink code.DatabaseReadSink at args[0]
+}

@@ -1,0 +1,13 @@
+module bindings.perl.generated.m1b5fccea;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("GSSAPI")
+  }
+  query pattern callExpr where callee.method == "GSSAPI::accept_sec_context"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

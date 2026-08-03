@@ -1,0 +1,9 @@
+module bindings.php.generated.m062b8050;
+
+binding deserialization1 {
+  requires {
+    dependency("setasign/fpdi")
+  }
+  query pattern callExpr where callee.method == "readValue"
+  emit sink code.Deserialization at args[0]
+}

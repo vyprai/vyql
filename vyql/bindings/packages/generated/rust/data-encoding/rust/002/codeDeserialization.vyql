@@ -1,0 +1,9 @@
+module bindings.rust.generated.m6784ef88;
+
+binding deserialization2 {
+  requires {
+    dependency("data-encoding")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.md5a3ebf1;
+
+binding expressionEval0 {
+  requires {
+    dependency("xpath")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.ExpressionEval at args[0]
+}

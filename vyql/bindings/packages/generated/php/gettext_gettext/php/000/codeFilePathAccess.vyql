@@ -1,0 +1,9 @@
+module bindings.php.generated.mdee1b9f3;
+
+binding filePathAccess0 {
+  requires {
+    dependency("gettext/gettext")
+  }
+  query pattern callExpr where callee.method == "loadFile"
+  emit sink code.FilePathAccess at args[0]
+}

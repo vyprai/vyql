@@ -1,0 +1,8 @@
+module code;
+
+review code.RandomSpreadModuloZeroDenominator {
+  category: numeric
+  expected: [core.ZeroValueExclusion]
+  kind: attention
+  text: "review randomized timeout or retry spread modulo operations for an explicit nonzero guard on the count-derived denominator"
+}

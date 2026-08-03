@@ -1,8 +1,0 @@
-import code.{FilePathAccess, HtmlRender}
-
-adapter swift {
-  package "github.com/NSHipster/SwiftSyntaxHighlighter" {
-    sink method "highlight(source:using:)" -> code.HtmlRender
-    sink method "highlight(file:using:)" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.dart.generated.mcd68bc0e;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("device_preview")
+  }
+  query pattern callExpr where callee.method == "save"
+  emit sink code.StoredDataWrite at args[0]
+}

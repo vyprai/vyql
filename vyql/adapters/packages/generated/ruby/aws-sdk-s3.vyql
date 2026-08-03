@@ -1,7 +1,0 @@
-import code.{StoredDataRead, StoredDataWrite}
-adapter ruby {
-  package "aws-sdk-s3" {
-    source method "get_object" -> code.StoredDataRead
-    sink method "put_object" -> code.StoredDataWrite
-  }
-}

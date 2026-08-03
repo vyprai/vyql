@@ -1,6 +1,0 @@
-adapter java {
-  package "com.vaadin.external.google:android-json" {
-    sink method "readEscapeCharacter" -> code.Deserialization
-    source path "com.vaadin.external.google.android.json.key" -> code.SecretValue
-  }
-}

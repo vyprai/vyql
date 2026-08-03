@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.apache.hadoop:hadoop-yarn-client" {
-    sink method "shellToContainer" -> code.CommandExecution
-  }
-}

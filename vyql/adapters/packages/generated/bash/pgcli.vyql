@@ -1,6 +1,0 @@
-adapter bash {
-  package "pgcli" {
-    source path "pgcli.argv" -> code.CliArgument
-    sink path "pgcli" arg all -> code.SqlExecution
-  }
-}

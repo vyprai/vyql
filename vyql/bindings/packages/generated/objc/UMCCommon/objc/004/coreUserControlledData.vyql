@@ -1,0 +1,9 @@
+module bindings.objc.generated.mb9c0c03c;
+
+binding userControlledData4 {
+  requires {
+    dependency("UMCCommon")
+  }
+  query pattern callExpr where callee.method == "handleUrl"
+  emit source core.UserControlledData at call.result
+}

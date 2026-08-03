@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding weakCipher361 {
+  query pattern callExpr where callee.path ~= "Cipher.getInstance" and args.any.literal contains "RC2"
+  emit issue code.WeakCipher at call
+}

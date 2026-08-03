@@ -1,6 +1,0 @@
-import code.{NetworkSend}
-adapter php {
-  package "laravel/slack-notification-channel" {
-    sink method "send" -> code.NetworkSend
-  }
-}

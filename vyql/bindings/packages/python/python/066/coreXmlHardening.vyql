@@ -1,0 +1,13 @@
+module bindings.python.generated.m3d9ccbad;
+
+binding xmlHardening66 {
+  requires {
+    dependency("lxml")
+  }
+  query pattern callExpr where callee.path ~= "lxml.etree.XMLParser" and args.any.context.resolveEntities contains "False"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}

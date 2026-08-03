@@ -1,8 +1,0 @@
-import code.{RedirectTarget}
-adapter java {
-  package "org.springdoc:springdoc-openapi-ui" {
-    flag code.RedirectTarget on any {
-      method "redirectToUi"
-    }
-  }
-}

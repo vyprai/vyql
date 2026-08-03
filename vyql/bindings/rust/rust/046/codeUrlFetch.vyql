@@ -1,0 +1,6 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding urlFetch46 {
+  query pattern callExpr where callee.path ~= "reqwest.post"
+  emit sink code.UrlFetch at args[0]
+}

@@ -1,0 +1,10 @@
+module bindings.dart.generated.m1c398214;
+
+pattern bindingMetadata {
+  binding: {
+    name: "dart"
+    meta: {
+      fidelity: "resolved"
+    }
+  }
+}

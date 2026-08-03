@@ -1,0 +1,6 @@
+module code;
+
+concept InheritedProcessEnvironmentLeak : issue {
+  cwe: [CWE_200, CWE_212]
+  vulnerableTo: [secrets.SecretLeak]
+}

@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "org.openapitools:jackson-databind-nullable" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

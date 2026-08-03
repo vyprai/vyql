@@ -1,0 +1,1835 @@
+package parser
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+)
+
+const v2Program = `
+module sample.v2;
+
+uses patterns.javascript.callExpr as jsCall;
+uses patterns.javascript.routeExpr;
+
+concept SqlParameterization : check {
+  neutralizes: [code.SqlExecution]
+  covers: [path]
+}
+
+pattern callExpr as call {
+  node: call
+  bind callee = call.callee
+  bind args = call.args
+  where callee.path ~= "db.query"
+}
+
+matcher secretTokenName {
+  containsAny: ["token", "secret", "key"]
+}
+
+binding requestBody {
+  requires {
+    language("javascript")
+    soft(any(dependency("express"), import("express")))
+  }
+
+  query pattern callExpr where callee.path ~= "req.body"
+  emit source code.HttpInput at call.result
+
+  fidelity: resolved
+  confidence: high
+}
+
+binding parameterizedQuery {
+  query pattern callExpr where callee.method == "execute" and args.count >= 2
+  emit check core.SqlParameterization at args[0] {
+    covers path {
+      from: args[0]
+      to: call
+    }
+  }
+  fidelity: resolved
+  confidence: high
+}
+
+binding decodeOutParam {
+  query call as c where c.callee.path ~= "json.Unmarshal"
+  propagate value from c.args[0] to c.args[1].pointee
+  fidelity: resolved
+}
+
+rule SqlInjection {
+  meta { id: "VYQL-INJ-001" severity: high cwe: [CWE89] }
+  taint taint.UntrustedData as input -> code.SqlExecution as sqlSink
+  unless sqlSink.path coveredBy core.SqlParameterization
+}
+
+rule LateralReachToSecretStore {
+  meta { id: "VYQL-CLOUD-014" severity: high cwe: [CWE285] }
+  query principal as actor where actor.concept == cloud.ExternalPrincipal
+    reaches asset as store where store.concept == cloud.SecretStore
+    select store
+  unless store.endpoint coveredBy core.AuthorizationCheck
+}
+
+review code.SecretComparisonReview {
+  mode: flag
+  category: security
+  text: "verify secret comparisons use constant time comparison"
+}
+`
+
+func TestV2FixturesDoNotUseMigrationModuleNames(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	dir := filepath.Dir(file)
+	forbiddenModule := "." + "mig" + "ration;"
+	forbiddenPath := "mig" + "ration.vyql"
+	for _, name := range []string{"v2_parser_test.go", "v2_lower_test.go"} {
+		raw, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		src := string(raw)
+		if strings.Contains(src, forbiddenModule) || strings.Contains(src, forbiddenPath) {
+			t.Fatalf("%s must use native/rejection fixture modules, not migration module names", name)
+		}
+	}
+}
+
+func TestParseV2ProgramContract(t *testing.T) {
+	prog, err := ParseV2(v2Program)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	if prog.Module != "sample.v2" || len(prog.Uses) != 2 || prog.Uses[0].Alias != "jsCall" {
+		t.Fatalf("program module/uses wrong: module=%q uses=%+v", prog.Module, prog.Uses)
+	}
+	if len(prog.Decls) != 9 {
+		t.Fatalf("decl count = %d, want 9", len(prog.Decls))
+	}
+	concept := prog.Decls[0].(*V2ConceptDecl)
+	if concept.Name != "SqlParameterization" || concept.Module != "sample.v2" || concept.Kind != "check" {
+		t.Fatalf("concept header wrong: %+v", concept)
+	}
+	if got := concept.Fields["covers"].([]string); len(got) != 1 || got[0] != "path" {
+		t.Fatalf("concept covers wrong: %#v", concept.Fields["covers"])
+	}
+	pattern := prog.Decls[1].(*V2PatternDecl)
+	if pattern.Name != "callExpr" || pattern.Alias != "call" || len(pattern.Items) != 4 {
+		t.Fatalf("pattern wrong: %+v", pattern)
+	}
+	matcher := prog.Decls[2].(*V2MatcherDecl)
+	if matcher.Name != "secretTokenName" || matcher.Items[0].Kind != "containsAny" {
+		t.Fatalf("matcher wrong: %+v", matcher)
+	}
+	requestBody := prog.Decls[3].(*V2BindingDecl)
+	if requestBody.Query.Pattern != "callExpr" {
+		t.Fatalf("pattern query not captured: %+v", requestBody.Query)
+	}
+	if len(requestBody.Requirements) != 2 || requestBody.Requirements[1].Name != "soft" {
+		t.Fatalf("requirements wrong: %+v", requestBody.Requirements)
+	}
+	if out := requestBody.Outputs[0]; out.Kind != "emit source" || out.Concept != "code.HttpInput" || out.Location != "call.result" {
+		t.Fatalf("source emit wrong: %+v", out)
+	}
+	param := prog.Decls[4].(*V2BindingDecl)
+	if len(param.Outputs[0].Covers) != 1 || param.Outputs[0].Covers[0].Mode != "path" {
+		t.Fatalf("coverage wrong: %+v", param.Outputs[0])
+	}
+	propagate := prog.Decls[5].(*V2BindingDecl)
+	if propagate.Query.Expr == nil || propagate.Query.Expr.Family != "call" {
+		t.Fatalf("inline query wrong: %+v", propagate.Query)
+	}
+	if out := propagate.Outputs[0]; out.Kind != "propagate value" || out.From != "c.args[0]" || out.To != "c.args[1].pointee" {
+		t.Fatalf("propagate wrong: %+v", out)
+	}
+	rule := prog.Decls[6].(*V2RuleDecl)
+	if rule.Body.Verb != "taint" || rule.Body.From.Alias != "input" || rule.Clauses[0].Coverage != "path" {
+		t.Fatalf("taint rule wrong: %+v", rule)
+	}
+	raw := prog.Decls[7].(*V2RuleDecl)
+	if raw.Body.Query == nil || raw.Body.Select != "store" || len(raw.Body.Query.Steps) != 1 {
+		t.Fatalf("raw query rule wrong: %+v", raw.Body)
+	}
+	review := prog.Decls[8].(*V2ReviewDecl)
+	if review.Concept != "code.SecretComparisonReview" || review.Fields["mode"] != "flag" {
+		t.Fatalf("review wrong: %+v", review)
+	}
+}
+
+func TestParseV2ProfileDetectPredicates(t *testing.T) {
+	prog, err := ParseV2(`module profiles;
+profile web {
+  priority: 80
+  detect: [
+    any(dependency("flask"), dependency("django"), file("config/routes.rb")),
+    project.has("ext:.py")
+  ]
+  entrypoints: [code.HttpInput, core.UserControlledData]
+}`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	if len(prog.Decls) != 1 {
+		t.Fatalf("decls = %d, want 1", len(prog.Decls))
+	}
+	profile, ok := prog.Decls[0].(*V2ProfileDecl)
+	if !ok {
+		t.Fatalf("decl = %T, want profile", prog.Decls[0])
+	}
+	detect, ok := profile.Fields["detect"].([]V2Expr)
+	if !ok || len(detect) != 2 {
+		t.Fatalf("detect = %#v, want two v2 expressions", profile.Fields["detect"])
+	}
+	call, ok := detect[0].(V2CallExpr)
+	if !ok || call.Name != "any" || len(call.Args) != 3 {
+		t.Fatalf("first detect expr = %#v, want any(...) call", detect[0])
+	}
+	entrypoints, ok := profile.Fields["entrypoints"].([]string)
+	if !ok || !stringListFieldEqual(entrypoints, []string{"code.HttpInput", "core.UserControlledData"}) {
+		t.Fatalf("entrypoints = %#v", profile.Fields["entrypoints"])
+	}
+	if got := profile.Fields["priority"]; got != 80 {
+		t.Fatalf("priority = %#v, want numeric 80", got)
+	}
+}
+
+func TestValidateV2RejectsLegacyProfileDetectStrings(t *testing.T) {
+	_, err := ParseV2(`module profiles;
+profile web {
+  detect: ["dep:flask"]
+}`)
+	if err == nil {
+		t.Fatal("ParseV2 succeeded, want legacy detect string rejection")
+	}
+	if !strings.Contains(err.Error(), "detect entries must be requirement predicate calls") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestParseV2PackTypedReferences(t *testing.T) {
+	prog, err := ParseV2(`
+module packs.web;
+pack webSecurity {
+  includes: [
+    profile web,
+    pack base,
+    rules.injection.SqlInjection
+  ]
+  excludes: [rules.experimental.NoisyRule]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	pack := prog.Decls[0].(*V2PackDecl)
+	if got := pack.Fields["includes"]; !stringListFieldEqual(got, []string{"profile.web", "pack.base", "rules.injection.SqlInjection"}) {
+		t.Fatalf("includes = %#v", got)
+	}
+	if got := pack.Fields["excludes"]; !stringListFieldEqual(got, []string{"rules.experimental.NoisyRule"}) {
+		t.Fatalf("excludes = %#v", got)
+	}
+}
+
+func TestParseV2RejectsMalformedPackReferences(t *testing.T) {
+	_, err := ParseV2(`
+module packs.web;
+pack webSecurity {
+  includes: "profile.web"
+}
+`)
+	if err == nil {
+		t.Fatal("ParseV2 succeeded, want malformed pack reference diagnostic")
+	}
+	if !strings.Contains(err.Error(), "includes must be a string reference list") {
+		t.Fatalf("error = %v, want pack reference list diagnostic", err)
+	}
+}
+
+func TestValidateV2CorpusRejectsPackCycles(t *testing.T) {
+	sources := parseV2CorpusForTest(t, `
+module packs.a;
+pack a {
+  includes: [pack b]
+}
+`, `
+module packs.b;
+pack b {
+  includes: [pack a]
+}
+`)
+	err := ValidateV2Corpus(sources)
+	if err == nil {
+		t.Fatal("ValidateV2Corpus succeeded, want pack cycle diagnostic")
+	}
+	if !strings.Contains(err.Error(), "pack cycle detected") {
+		t.Fatalf("error = %v, want pack cycle diagnostic", err)
+	}
+}
+
+func TestParseV2RejectsInvalidMatcherItems(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "unknown item",
+			src: `module patterns.test;
+matcher badName {
+  containsOne: ["token"]
+}
+`,
+			want: `unknown matcher item "containsOne"`,
+		},
+		{
+			name: "empty list",
+			src: `module patterns.test;
+matcher emptyName {
+  containsAny: []
+}
+`,
+			want: `containsAny requires a non-empty string list`,
+		},
+		{
+			name: "empty regex",
+			src: `module patterns.test;
+matcher emptyRegex {
+  matches: ""
+}
+`,
+			want: `matches requires one non-empty regex string`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseV2(tc.src)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("ParseV2 error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseV2RejectsV1Syntax(t *testing.T) {
+	bad := []string{
+		`adapter javascript { source "req.body" -> code.HttpInput }`,
+		`adapter javascript { sink method "query" -> code.SqlExecution }`,
+		`adapter javascript { flag code.SecretComparisonReview on binop { has "token" } }`,
+		`adapter javascript { mark method "danger" -> code.DynamicCodeExecution }`,
+		`adapter javascript { package "express" { source "req.body" -> code.HttpInput } }`,
+		`import code.HttpInput;`,
+		`module rules.old; rule OldUnless { taint code.HttpInput -> code.SqlExecution unless sanitized_by core.SqlParameterization }`,
+		`module rules.old; rule OldMatch { match code.XmlParserCreate as parser }`,
+		`module rules.old; rule OldFlow { flow code.HttpInput -> code.SqlExecution }`,
+	}
+	for _, src := range bad {
+		_, err := ParseV2(src)
+		if err == nil {
+			t.Fatalf("ParseV2(%q) succeeded, want v1 rejection", src)
+		}
+	}
+}
+
+func TestParseV2RejectsAmbiguousPatternQuery(t *testing.T) {
+	src := `module bindings.javascript.express; binding bad { query callExpr where callee.method == "query" emit sink code.SqlExecution at args[0] }`
+	_, err := ParseV2(src)
+	if err == nil {
+		t.Fatal("ambiguous named pattern query succeeded")
+	}
+	if !strings.Contains(err.Error(), "query pattern") {
+		t.Fatalf("error = %v, want query pattern guidance", err)
+	}
+}
+
+func TestParseV2RejectsSecondModule(t *testing.T) {
+	_, err := ParseV2(`module one; module two; concept X : issue {}`)
+	if err == nil {
+		t.Fatal("second module declaration succeeded")
+	}
+	if !strings.Contains(err.Error(), "module declaration must appear once") {
+		t.Fatalf("error = %v, want one-module diagnostic", err)
+	}
+}
+
+func TestParseV2RejectsUsesAfterDeclaration(t *testing.T) {
+	_, err := ParseV2(`module sample; concept X : issue {} uses code.HttpInput;`)
+	if err == nil {
+		t.Fatal("uses after declaration succeeded")
+	}
+	if !strings.Contains(err.Error(), "uses declarations must appear before") {
+		t.Fatalf("error = %v, want uses-before-declarations diagnostic", err)
+	}
+}
+
+func TestParseV2RejectsWildcardUses(t *testing.T) {
+	_, err := ParseV2(`module sample; uses code.*; concept X : issue {}`)
+	if err == nil {
+		t.Fatal("wildcard uses succeeded")
+	}
+	if !strings.Contains(err.Error(), "wildcard uses") {
+		t.Fatalf("error = %v, want wildcard uses diagnostic", err)
+	}
+}
+
+func TestParseV2RejectsImportNameConflicts(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "implicit import duplicate",
+			src: `module sample;
+uses one.HttpInput;
+uses two.HttpInput;
+concept X : issue {}`,
+			want: "local import name",
+		},
+		{
+			name: "alias duplicate",
+			src: `module sample;
+uses one.HttpInput as Input;
+uses two.BodyInput as Input;
+concept X : issue {}`,
+			want: "local import name",
+		},
+		{
+			name: "import shadows declaration",
+			src: `module sample;
+uses code.HttpInput;
+concept HttpInput : source {}`,
+			want: "shadows declaration",
+		},
+		{
+			name: "duplicate declaration",
+			src: `module sample;
+concept X : issue {}
+rule X { issue code.StaticIssue }`,
+			want: "local name",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseV2(tc.src)
+			if err == nil {
+				t.Fatal("ParseV2 succeeded, want name-resolution error")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want substring %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseV2RequirementNamedArgsAndExpressionPrecedence(t *testing.T) {
+	prog, err := ParseV2(`
+module bindings.javascript.express;
+binding bounded {
+  requires {
+    dependency("express", range: ">=4 <6")
+  }
+  query pattern callExpr where callee.method == "execute" and (args.count >= 2 or args.count in [3])
+  emit sink code.SqlExecution at args[0]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	b := prog.Decls[0].(*V2BindingDecl)
+	req := b.Requirements[0]
+	if got := req.Args[1].(V2NamedArg); got.Name != "range" || got.Value != ">=4 <6" {
+		t.Fatalf("named requirement arg wrong: %+v", req.Args[1])
+	}
+	and, ok := b.Query.Where.(V2BinaryExpr)
+	if !ok || and.Op != "and" {
+		t.Fatalf("top-level expr = %+v, want and", b.Query.Where)
+	}
+	or, ok := and.Right.(V2BinaryExpr)
+	if !ok || or.Op != "or" {
+		t.Fatalf("right expr = %+v, want parenthesized or", and.Right)
+	}
+	ge, ok := or.Left.(V2BinaryExpr)
+	if !ok || ge.Op != ">=" {
+		t.Fatalf("left expr = %+v, want >=", or.Left)
+	}
+	if lit, ok := ge.Right.(V2LiteralExpr); !ok || lit.Value != 2 {
+		t.Fatalf("numeric literal = %+v", ge.Right)
+	}
+}
+
+func TestParseV2BindingOutputKindEnums(t *testing.T) {
+	prog, err := ParseV2(`
+module sample;
+concept Input : source {}
+concept Target : sink {}
+concept Guard : check { covers: [path] }
+concept Finding : issue {}
+concept Fact : fact {}
+concept Asset : asset {}
+concept Exposure : exposure {}
+concept Principal : principal {}
+concept Privilege : privilege {}
+concept State : state {}
+pattern callExpr { node: call }
+binding outputs {
+  query pattern callExpr
+  emit source Input at call.result
+  emit sink Target at args[0]
+  emit check Guard at call {
+    covers path { from: call; to: args[0] }
+  }
+  emit issue Finding at call
+  emit fact Fact at call
+  emit fact Asset at call
+  emit fact Exposure at call
+  emit fact Principal at call
+  emit fact Privilege at call
+  emit fact State at call
+  propagate value from args[0] to args[1]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	binding := prog.Decls[len(prog.Decls)-1].(*V2BindingDecl)
+	if got := len(binding.Outputs); got != 11 {
+		t.Fatalf("binding outputs = %d, want 11", got)
+	}
+}
+
+func TestParseV2RejectsUnknownBindingOutputKinds(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "emit",
+			body: `emit label Input at call`,
+			want: `unknown emit kind "label"`,
+		},
+		{
+			name: "propagate",
+			body: `propagate alias from args[0] to args[1]`,
+			want: `unknown propagate kind "alias"`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseV2(`
+module sample;
+concept Input : source {}
+pattern callExpr { node: call }
+binding bad {
+  query pattern callExpr
+  ` + tc.body + `
+}
+`)
+			if err == nil {
+				t.Fatal("ParseV2 succeeded, want unknown output kind error")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("ParseV2 error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseV2PatternOperatorsAndNamedCallArgs(t *testing.T) {
+	prog, err := ParseV2(`
+module patterns.javascript;
+pattern sensitiveHandler as handler {
+  node: call
+  where callee.path startsWith "app."
+  where callee.path endsWith ".get"
+  where callee.path matches "^app\\."
+  where callee.receiver exists
+  where operands.any.identifier is secretTokenName
+  where scope.hasCall(path: "escapeHtml")
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	pat := prog.Decls[0].(*V2PatternDecl)
+	if len(pat.Items) != 7 {
+		t.Fatalf("pattern items = %d, want 7", len(pat.Items))
+	}
+	for i, want := range []string{"startsWith", "endsWith", "matches", "exists", "is"} {
+		expr, ok := pat.Items[i+1].Expr.(V2BinaryExpr)
+		if !ok || expr.Op != want {
+			t.Fatalf("where %d expr = %+v, want %s binary", i+1, pat.Items[i+1].Expr, want)
+		}
+	}
+	call, ok := pat.Items[6].Expr.(V2CallExpr)
+	if !ok || call.Name != "scope.hasCall" || len(call.NamedArgs) != 1 {
+		t.Fatalf("named call expr = %+v", pat.Items[6].Expr)
+	}
+	if call.NamedArgs[0].Name != "path" {
+		t.Fatalf("named arg = %+v, want path", call.NamedArgs[0])
+	}
+	if lit, ok := call.NamedArgs[0].Expr.(V2LiteralExpr); !ok || lit.Value != "escapeHtml" {
+		t.Fatalf("named arg value = %+v, want escapeHtml literal", call.NamedArgs[0].Expr)
+	}
+}
+
+func TestParseV2PolicyDeclarations(t *testing.T) {
+	prog, err := ParseV2(`
+module mechanics.sast;
+
+policy priority default {
+  score severity {
+    critical: 4
+    high: 3
+    medium: 2
+    low: 1
+    info: 0
+    default: 1
+  }
+
+  factor exposure {
+    when context.internetReachable
+    weight: 2
+  }
+
+  bands: [
+    { band: "P0", min: 8 },
+    { band: "P1", min: 6 }
+  ]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	if len(prog.Decls) != 1 {
+		t.Fatalf("decl count = %d, want 1", len(prog.Decls))
+	}
+	pol := prog.Decls[0].(*V2PolicyDecl)
+	if pol.Kind != "priority" || pol.Name != "default" || len(pol.Items) != 3 {
+		t.Fatalf("policy header/items wrong: %+v", pol)
+	}
+	score := pol.Items[0]
+	if strings.Join(score.Key, ".") != "score.severity" || len(score.Block) != 6 {
+		t.Fatalf("score block wrong: %+v", score)
+	}
+	factor := pol.Items[1]
+	if strings.Join(factor.Key, ".") != "factor.exposure" || len(factor.Block) != 2 {
+		t.Fatalf("factor block wrong: %+v", factor)
+	}
+	bands, ok := pol.Items[2].Value.([]any)
+	if !ok || len(bands) != 2 {
+		t.Fatalf("bands = %#v, want two block entries", pol.Items[2].Value)
+	}
+}
+
+func TestParseV2PriorityPolicyAllowsNegativeWeights(t *testing.T) {
+	prog, err := ParseV2(`
+module mechanics.policy;
+policy priority default {
+  factor confidenceLow {
+    when finding.confidence == low
+    weight: -2
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	pol := prog.Decls[0].(*V2PolicyDecl)
+	weight, ok := pol.Items[0].Block[1].Value.(V2LiteralExpr)
+	if !ok || weight.Value != -2 {
+		t.Fatalf("weight = %#v, want -2 literal", pol.Items[0].Block[1].Value)
+	}
+}
+
+func TestParseV2PolicyActionSequence(t *testing.T) {
+	prog, err := ParseV2(`
+module mechanics.sast;
+policy confidence default {
+  softRequirement missing: downgrade(1) annotate("missing evidence")
+  values: [low, medium, high]
+  order: [low, medium, high]
+  aggregate: min(rule, endpoints, propagation, requirements)
+  softRequirement unknown: downgrade(1)
+  softRequirement conflicting: downgrade(1)
+  softRequirement satisfied: keep
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	pol := prog.Decls[0].(*V2PolicyDecl)
+	seq, ok := pol.Items[0].Value.(V2SequenceExpr)
+	if !ok || len(seq.Items) != 2 {
+		t.Fatalf("softRequirement value = %#v, want two action expressions", pol.Items[0].Value)
+	}
+	if call, ok := seq.Items[1].(V2CallExpr); !ok || call.Name != "annotate" {
+		t.Fatalf("second action = %#v, want annotate call", seq.Items[1])
+	}
+}
+
+func TestParseV2ValidatesPolicyContracts(t *testing.T) {
+	_, err := ParseV2(`
+module mechanics.policy;
+policy resultLifecycle default {
+  flagWhen: emitted(issue) and hasReview(concept)
+  candidateWhen: matched(rule)
+  findingWhen: candidate and not covered
+  checkWhen: emitted(check) and (hasReview(concept) or explainsFinding)
+}
+policy resultIdentity default {
+  findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
+  flagKey: [concept, location, call.path, call.method]
+  fingerprint: [rule.id, primaryTarget.location, primaryTarget.concept]
+  stableAcross: [formatting, requirementDiagnosticText, traversalOrder]
+}
+policy confidence default {
+  values: [low, medium, high]
+  order: [low, medium, high]
+  aggregate: min(rule, endpoints, propagation, requirements)
+  softRequirement missing: downgrade(1)
+  softRequirement unknown: downgrade(1) annotate("uninspected evidence")
+  softRequirement conflicting: downgrade(1)
+  softRequirement satisfied: keep
+}
+policy display default {
+  scanAll: [findings, flags, checks, advisoryEvidence, requirementDiagnostics]
+  flagSort: [severity, category, location, concept]
+  includeNearbyChecks: true
+  nearbyCheckLimit: 5
+}
+policy diagnostic default {
+  format: "structured"
+  fields: [file, line, column, declarationId, code, message, why, suggestedFix]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2 valid policies: %v", err)
+	}
+}
+
+func TestParseV2RejectsInvalidPolicyContracts(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "unsupported lifecycle policy",
+			src: `module mechanics.policy;
+policy resultLifecycle default { findingWhen: heuristic(candidate) }`,
+			want: `unknown policy builtin "heuristic"`,
+		},
+		{
+			name: "unsupported lifecycle contract",
+			src: `module mechanics.policy;
+policy resultLifecycle default {
+  flagWhen: emitted(issue) and hasReview(concept)
+  candidateWhen: matched(rule)
+  findingWhen: candidate
+  checkWhen: emitted(check) and (hasReview(concept) or explainsFinding)
+}`,
+			want: `findingWhen must match the runtime-supported default lifecycle contract`,
+		},
+		{
+			name: "unsupported diagnostic policy",
+			src: `module mechanics.policy;
+policy diagnostic default { render: [findings] }`,
+			want: `unknown item render`,
+		},
+		{
+			name: "unsupported diagnostic fields",
+			src: `module mechanics.policy;
+policy diagnostic default { format: "structured" fields: [file, message] }`,
+			want: `fields must match runtime-supported fields`,
+		},
+		{
+			name: "unknown confidence state",
+			src: `module mechanics.policy;
+policy confidence default { softRequirement stale: downgrade(1) }`,
+			want: `unknown softRequirement state "stale"`,
+		},
+		{
+			name: "bad confidence action",
+			src: `module mechanics.policy;
+policy confidence default { softRequirement missing: downgrade("one") }`,
+			want: "downgrade argument must be an integer",
+		},
+		{
+			name: "unsupported confidence order",
+			src: `module mechanics.policy;
+policy confidence default {
+  values: [low, high]
+  order: [low, high]
+  aggregate: min(rule, endpoints, propagation, requirements)
+  softRequirement missing: downgrade(1)
+  softRequirement unknown: downgrade(1)
+  softRequirement conflicting: downgrade(1)
+  softRequirement satisfied: keep
+}`,
+			want: "must match runtime-supported order",
+		},
+		{
+			name: "unsupported confidence aggregate",
+			src: `module mechanics.policy;
+policy confidence default {
+  values: [low, medium, high]
+  order: [low, medium, high]
+  aggregate: max(rule, endpoints, propagation, requirements)
+  softRequirement missing: downgrade(1)
+  softRequirement unknown: downgrade(1)
+  softRequirement conflicting: downgrade(1)
+  softRequirement satisfied: keep
+}`,
+			want: "aggregate must be runtime-supported",
+		},
+		{
+			name: "unsupported soft requirement behavior",
+			src: `module mechanics.policy;
+policy confidence default {
+  values: [low, medium, high]
+  order: [low, medium, high]
+  aggregate: min(rule, endpoints, propagation, requirements)
+  softRequirement missing: keep
+  softRequirement unknown: downgrade(1)
+  softRequirement conflicting: downgrade(1)
+  softRequirement satisfied: keep
+}`,
+			want: "softRequirement missing must match runtime-supported",
+		},
+		{
+			name: "priority factor missing weight",
+			src: `module mechanics.policy;
+policy priority default { factor exposure { when context.internetReachable } }`,
+			want: "requires integer weight",
+		},
+		{
+			name: "display wrong boolean",
+			src: `module mechanics.policy;
+policy display default { includeNearbyChecks: maybe }`,
+			want: "includeNearbyChecks must be boolean",
+		},
+		{
+			name: "unsupported display scanAll",
+			src: `module mechanics.policy;
+policy display default { scanAll: [findings] flagSort: [severity] }`,
+			want: "scanAll must match runtime-supported outputs",
+		},
+		{
+			name: "unsupported result identity flag key",
+			src: `module mechanics.policy;
+policy resultIdentity default {
+  findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
+  flagKey: [concept, location]
+  fingerprint: [rule.id, primaryTarget.location, primaryTarget.concept]
+  stableAcross: [formatting, requirementDiagnosticText, traversalOrder]
+}`,
+			want: "flagKey must match runtime-supported key",
+		},
+		{
+			name: "unsupported result identity stableAcross",
+			src: `module mechanics.policy;
+policy resultIdentity default {
+  findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
+  flagKey: [concept, location, call.path, call.method]
+  fingerprint: [rule.id, primaryTarget.location, primaryTarget.concept]
+  stableAcross: [formatting]
+}`,
+			want: "stableAcross must match runtime-supported metadata",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseV2(tc.src)
+			if err == nil {
+				t.Fatal("ParseV2 succeeded, want policy validation error")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want substring %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseV2RejectsUnsupportedMechanicKinds(t *testing.T) {
+	cases := []string{
+		`module mechanics.policy; mechanic context internetExposure { when context.internetReachable }`,
+		`module mechanics.policy; mechanic requirement manifestEvidence { when project.has("manifest") }`,
+		`module mechanics.policy; mechanic ruleVerb observe { solver: fact.exists fromKinds: [issue] allowedClauses: [where] }`,
+	}
+	for _, src := range cases {
+		_, err := ParseV2(src)
+		if err == nil {
+			t.Fatalf("ParseV2(%q) succeeded, want unsupported mechanic diagnostic", src)
+		}
+		if !strings.Contains(err.Error(), "recognized by the v2 contract but is not implemented") &&
+			!strings.Contains(err.Error(), "extension rule verbs are recognized by the v2 contract but are not implemented") {
+			t.Fatalf("error = %v, want unsupported mechanic diagnostic", err)
+		}
+	}
+}
+
+func TestParseV2RejectsAuthoredBuiltInCoverageMechanics(t *testing.T) {
+	src := `
+module mechanics.sast;
+
+mechanic coverage path {
+  capability: coverage.path
+  coversWhen: solver.pathCovered(check.anchor, candidate.path)
+  targetParts: [path]
+  suppresses: true
+}
+
+mechanic coverage endpoint {
+  capability: coverage.endpoint
+  coversWhen: solver.sameEndpoint(check.anchor, candidate.endpoint)
+  targetParts: [endpoint]
+  suppresses: true
+}
+
+mechanic coverage sameReceiver {
+  capability: coverage.sameReceiver
+  coversWhen: solver.sameValue(check.anchor, candidate.sameReceiver)
+  targetParts: [sameReceiver]
+  suppresses: true
+}
+
+mechanic coverage sameScope {
+  capability: coverage.sameScope
+  coversWhen: solver.sameScope(check.anchor, candidate.sameScope)
+  targetParts: [sameScope]
+  suppresses: true
+}
+`
+	_, err := ParseV2(src)
+	if err == nil {
+		t.Fatal("ParseV2 succeeded, want built-in coverage mechanic rejection")
+	}
+	if !strings.Contains(err.Error(), "built-in language mechanics are implemented in Go") {
+		t.Fatalf("error = %v, want built-in mechanic diagnostic", err)
+	}
+}
+
+func TestParseV2RejectsEveryAuthoredBuiltInLanguageMechanic(t *testing.T) {
+	for verb := range v2BuiltInRuleVerbs {
+		src := fmt.Sprintf(`module mechanics.bad;
+mechanic ruleVerb %s {
+  solver: dataflow.taint
+  fromKinds: [source]
+  toKinds: [sink]
+  allowedClauses: [where]
+}`, verb)
+		_, err := ParseV2(src)
+		if err == nil {
+			t.Fatalf("ParseV2 authored built-in ruleVerb %s succeeded, want rejection", verb)
+		}
+		if !strings.Contains(err.Error(), "built-in language mechanics are implemented in Go") {
+			t.Fatalf("ruleVerb %s error = %v, want Go-owned built-in mechanic diagnostic", verb, err)
+		}
+	}
+	for mode := range v2CoverageModes {
+		src := fmt.Sprintf(`module mechanics.bad;
+mechanic coverage %s {
+  capability: coverage.%s
+  targetParts: [%s]
+  requiresAnchor: true
+}`, mode, mode, mode)
+		_, err := ParseV2(src)
+		if err == nil {
+			t.Fatalf("ParseV2 authored built-in coverage %s succeeded, want rejection", mode)
+		}
+		if !strings.Contains(err.Error(), "built-in language mechanics are implemented in Go") {
+			t.Fatalf("coverage %s error = %v, want Go-owned built-in mechanic diagnostic", mode, err)
+		}
+	}
+}
+
+func TestParseV2RejectsAuthoredCoverageMechanicForms(t *testing.T) {
+	cases := []string{
+		`module mechanics.sast; mechanic coverage path { capability: coverage.path coversWhen: project.has("custom") }`,
+		`module mechanics.sast; mechanic coverage path { capability: coverage.path coversWhen: solver.sameEndpoint(check.anchor, candidate.path) }`,
+		`module mechanics.sast; mechanic coverage path { capability: coverage.path coversWhen: solver.pathCovered(allChecks, candidate.path) }`,
+		`module mechanics.sast; mechanic coverage sameReceiver { capability: coverage.sameReceiver coversWhen: solver.sameValue(check.anchor) }`,
+		`module mechanics.sast; mechanic coverage path { capability: coverage.endpoint coversWhen: solver.pathCovered(check.anchor, candidate.path) targetParts: [path] }`,
+		`module mechanics.sast; mechanic coverage path { capability: coverage.path coversWhen: solver.pathCovered(check.anchor, candidate.path) }`,
+		`module mechanics.sast; mechanic coverage path { capability: coverage.path coversWhen: solver.pathCovered(check.anchor, candidate.endpoint) targetParts: [path] }`,
+		`module mechanics.sast; mechanic coverage global { capability: coverage.global coversWhen: solver.always(check.anchor) targetParts: [global] }`,
+		`module mechanics.sast; mechanic coverage endpoint { capability: coverage.endpoint requiresAnchor: false targetParts: [endpoint] }`,
+	}
+	for _, src := range cases {
+		_, err := ParseV2(src)
+		if err == nil {
+			t.Fatalf("ParseV2(%q) succeeded, want coverage mechanic validation error", src)
+		}
+		if !strings.Contains(err.Error(), "mechanic coverage") {
+			t.Fatalf("ParseV2(%q) error = %v, want mechanic coverage diagnostic", src, err)
+		}
+	}
+}
+
+func TestValidateV2CorpusRejectsAuthoredBuiltInCoverageMechanic(t *testing.T) {
+	sources := []V2Source{{
+		Name: "mechanics/custom.vyql",
+		Program: &V2Program{
+			Module: "mechanics.custom",
+			Decls: []V2Decl{
+				&V2MechanicDecl{Kind: "coverage", Name: "endpoint"},
+			},
+		},
+	}}
+	err := ValidateV2Corpus(sources)
+	if err == nil {
+		t.Fatal("ValidateV2Corpus succeeded, want duplicate built-in mechanic diagnostic")
+	}
+	if !strings.Contains(err.Error(), `duplicate v2 mechanic coverage.endpoint; first declared in <builtin>`) {
+		t.Fatalf("error = %v, want duplicate built-in mechanic diagnostic", err)
+	}
+}
+
+func TestValidateV2CorpusRejectsConfidenceWithoutPolicy(t *testing.T) {
+	sources := parseV2CorpusForTest(t, `
+module code;
+concept Review : issue {}
+`, `
+module rules.custom;
+rule HighConfidenceReview {
+  issue code.Review as r
+  with confidence >= high
+}
+`)
+	err := ValidateV2Corpus(sources)
+	if err == nil {
+		t.Fatal("ValidateV2Corpus succeeded, want confidence policy diagnostic")
+	}
+	if !strings.Contains(err.Error(), "confidence floor requires policy confidence default") {
+		t.Fatalf("error = %v, want confidence policy diagnostic", err)
+	}
+}
+
+func TestParseV2QueryWhereContainsIsExpressionOperator(t *testing.T) {
+	prog, err := ParseV2(`
+module rules.query;
+rule TagsContainHigh {
+  query concept as c where c.tags contains high select c
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	rule := prog.Decls[0].(*V2RuleDecl)
+	if len(rule.Body.Query.Steps) != 0 {
+		t.Fatalf("contains parsed as query relation step: %+v", rule.Body.Query.Steps)
+	}
+	cmp, ok := rule.Body.Query.Where.(V2BinaryExpr)
+	if !ok || cmp.Op != "contains" {
+		t.Fatalf("where = %#v, want contains expression", rule.Body.Query.Where)
+	}
+}
+
+func TestParseV2QueryWhereContainsRelationStep(t *testing.T) {
+	prog, err := ParseV2(`
+module bindings.javascript.composed;
+binding sqlLiteral {
+  query call as c where c.callee.method == "query" contains literal as lit where lit.value contains "SELECT"
+  emit sink code.SqlExecution at args[0]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	binding := prog.Decls[0].(*V2BindingDecl)
+	query := binding.Query.Expr
+	if query == nil || len(query.Steps) != 1 {
+		t.Fatalf("query = %+v, want one contains relation step", binding.Query)
+	}
+	step := query.Steps[0]
+	if step.Relation != "contains" || step.Family != "literal" || step.Alias != "lit" {
+		t.Fatalf("step = %+v, want contains literal as lit", step)
+	}
+	where, ok := step.Where.(V2BinaryExpr)
+	if !ok || where.Op != "contains" {
+		t.Fatalf("step where = %#v, want contains expression", step.Where)
+	}
+}
+
+func TestParseV2ValidationRejectsContractViolations(t *testing.T) {
+	cases := []struct {
+		name   string
+		src    string
+		want   string
+		wantOK bool
+	}{
+		{
+			name: "requirement in query",
+			src: `module bindings.javascript.express;
+binding bad {
+  query pattern callExpr where dependency("express")
+  emit source code.HttpInput at call.result
+}`,
+			want: "belong in requires",
+		},
+		{
+			name: "non advisory check without coverage",
+			src: `module bindings.javascript.express;
+binding bad {
+  query pattern callExpr where callee.method == "sanitize"
+  emit check core.HtmlEscape at call
+}`,
+			want: "requires concrete covers",
+		},
+		{
+			name: "raw rule query over code family",
+			src: `module rules.bad;
+rule Bad {
+  query call as c where c.callee.method == "danger" select c
+}`,
+			want: "not allowed in semantic-tier query",
+		},
+		{
+			name: "unknown binding fidelity",
+			src: `module bindings.javascript.evidence;
+binding bad {
+  query pattern callExpr where callee.method == "source"
+  emit source code.HttpInput at call.result
+  fidelity: fuzzy
+}`,
+			want: "unknown fidelity level",
+		},
+		{
+			name: "unknown binding confidence",
+			src: `module bindings.javascript.evidence;
+binding bad {
+  query pattern callExpr where callee.method == "source"
+  emit source code.HttpInput at call.result
+  confidence: certain
+}`,
+			want: "unknown confidence level",
+		},
+		{
+			name: "staged route query without schema",
+			src: `module bindings.javascript.routes;
+concept Input : source {}
+binding bad {
+  query route as r where r.public == true
+  emit source Input at r
+}`,
+			want: `query family "route" requires hard schema("nir", "2.0") requirement`,
+		},
+		{
+			name: "soft schema does not enable staged query",
+			src: `module bindings.javascript.routes;
+concept Input : source {}
+binding bad {
+  requires { soft(schema("nir", "2.0")) }
+  query config as c where c.key == "secret"
+  emit source Input at c
+}`,
+			want: `query family "config" requires hard schema("nir", "2.0") requirement`,
+		},
+		{
+			name: "binding query relation steps not implemented",
+			src: `module bindings.javascript.composed;
+binding bad {
+  query call as c where c.callee.method == "danger" importedBy call as other where other.callee.method == "safe"
+  emit sink code.CommandExecution at args[0]
+}`,
+			want: "query relation step importedBy call needs native production v2 lowering",
+		},
+		{
+			name: "binding query string literal relation supported",
+			src: `module bindings.javascript.composed;
+binding ok {
+  query call as c where c.callee.method == "danger" encloses stringLiteral as lit where lit.value contains "danger"
+  emit sink code.CommandExecution at args[0]
+}`,
+			wantOK: true,
+		},
+		{
+			name: "composed pattern use plus node is cartesian composition",
+			src: `module patterns.javascript.composed;
+pattern base { node: call }
+pattern composed {
+  use base as b
+  node: call
+}`,
+			want: "composed pattern use with additional node is an arbitrary Cartesian composition",
+		},
+		{
+			name: "unknown requirement",
+			src: `module bindings.javascript.express;
+binding bad {
+  requires { call("execute") }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}`,
+			want: "unknown requirement",
+		},
+		{
+			name: "unknown policy kind",
+			src: `module mechanics.sast;
+policy notARealPolicy default { findingWhen: candidate }`,
+			want: "unknown policy kind",
+		},
+		{
+			name: "unknown mechanic capability",
+			src: `module mechanics.sast;
+mechanic coverage path {
+  capability: coverage.magic
+  coversWhen: solver.pathCovered(check.anchor, candidate.path)
+}`,
+			want: "unknown capability",
+		},
+		{
+			name: "missing coverage mechanic capability",
+			src: `module mechanics.sast;
+mechanic coverage path {
+  coversWhen: solver.pathCovered(check.anchor, candidate.path)
+}`,
+			want: "missing capability",
+		},
+		{
+			name: "legacy control concept kind",
+			src: `module core;
+concept Assumption : control {}`,
+			want: "unknown v2 concept kind",
+		},
+		{
+			name: "emit source with check concept",
+			src: `module sample;
+concept Sanitized : check { covers: [path] }
+binding bad {
+  query pattern callExpr where callee.method == "sanitize"
+  emit source Sanitized at call.result
+}`,
+			want: "emit source uses concept Sanitized of kind check",
+		},
+		{
+			name: "emit fact with source concept",
+			src: `module sample;
+concept HttpInput : source {}
+binding bad {
+  query pattern callExpr where callee.method == "source"
+  emit fact HttpInput at call
+}`,
+			want: "emit fact uses concept HttpInput of kind source",
+		},
+		{
+			name: "issue rule with check concept",
+			src: `module sample;
+concept Sanitized : check { covers: [path] }
+rule Bad {
+  issue Sanitized
+}`,
+			want: "issue rule uses concept Sanitized of kind check",
+		},
+		{
+			name: "unknown concept coverage mode",
+			src: `module sample;
+concept Sanitized : check { covers: [magic] }`,
+			want: "unknown coverage mode",
+		},
+		{
+			name: "path coverage without endpoints",
+			src: `module sample;
+concept Sanitized : check { covers: [path] }
+binding bad {
+  query pattern callExpr where callee.method == "sanitize"
+  emit check Sanitized at call {
+    covers path {}
+  }
+}`,
+			want: "covers path requires from and to",
+		},
+		{
+			name: "same receiver coverage without anchor",
+			src: `module sample;
+concept Sanitized : check { covers: [sameReceiver] }
+binding bad {
+  query pattern callExpr where callee.method == "sanitize"
+  emit check Sanitized at call {
+    covers sameReceiver {}
+  }
+}`,
+			want: "covers sameReceiver requires anchor",
+		},
+		{
+			name: "global coverage with anchor",
+			src: `module sample;
+concept Sanitized : check { covers: [global] }
+binding bad {
+  query pattern callExpr where callee.method == "sanitize"
+  emit check Sanitized at call {
+    covers global { anchor: call }
+  }
+}`,
+			want: "covers global must not declare",
+		},
+		{
+			name: "unstable binding query",
+			src: `module bindings.javascript.rejection;
+binding bad {
+  query unstable.frameworkFlag as node where node.kind == "any"
+  emit issue code.Review at node
+}`,
+			want: "unsupported unstable query family",
+		},
+		{
+			name: "unstable binding query is unsupported even with metadata",
+			src: `module bindings.javascript.rejection;
+binding bad {
+  unstable: { owner: "frontend" reason: "experimental framework recognizer" }
+  query unstable.frameworkFlag as node where node.kind == "any"
+  emit issue code.Review at node
+}`,
+			want: "unsupported unstable query family",
+		},
+		{
+			name: "unstable binding query without metadata",
+			src: `module bindings.javascript.rejection;
+binding bad {
+  query unstable.frameworkFlag as node where node.kind == "any"
+  emit issue code.Review at node
+}`,
+			want: "unsupported unstable query family",
+		},
+		{
+			name: "unstable pattern node without metadata",
+			src: `module patterns.javascript;
+pattern bad {
+  node: unstable.frameworkRoute
+}`,
+			want: "requires owner and reason metadata",
+		},
+		{
+			name: "unstable pattern metadata missing reason",
+			src: `module patterns.javascript;
+pattern bad {
+  unstable: { owner: "frontend" }
+  node: unstable.frameworkRoute
+}`,
+			want: "unstable metadata requires owner and reason",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseV2(tc.src)
+			if tc.wantOK {
+				if err != nil {
+					t.Fatalf("ParseV2 error = %v, want success", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("ParseV2 succeeded, want validation error")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want substring %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseV2ValidationAllowsStagedQueryWithHardSchema(t *testing.T) {
+	_, err := ParseV2(`
+module bindings.javascript.routes;
+concept Input : source {}
+binding routeInput {
+  requires {
+    language("javascript")
+    schema("nir", "2.0")
+  }
+  query route as r where r.public == true
+  emit source Input at r
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2 rejected hard-schema staged query: %v", err)
+	}
+}
+
+func TestParseV2AllowsGlobalCoverageWithoutFields(t *testing.T) {
+	_, err := ParseV2(`
+module sample;
+concept Sanitized : check { covers: [global] }
+binding good {
+  query pattern callExpr where callee.method == "sanitize"
+  emit check Sanitized at call {
+    covers global {}
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2 rejected empty global coverage: %v", err)
+	}
+}
+
+func TestValidateV2CorpusRejectsCoverageNotDeclaredByCheckConcept(t *testing.T) {
+	sources := parseV2CorpusForTest(t, `
+module core;
+concept SqlParameterization : check { covers: [path] }
+concept HttpInput : source {}
+concept SqlExecution : sink {}
+`, `
+module bindings.javascript.sql;
+binding parameterized {
+  query pattern callExpr where callee.method == "execute"
+  emit check core.SqlParameterization at call {
+    covers endpoint { anchor: call }
+  }
+}
+`, `
+module rules.sql;
+rule SqlInjection {
+  taint core.HttpInput -> core.SqlExecution as sink
+  unless sink.endpoint coveredBy core.SqlParameterization
+}
+`)
+	err := ValidateV2Corpus(sources)
+	if err == nil {
+		t.Fatal("ValidateV2Corpus succeeded, want coverage mode diagnostic")
+	}
+	if !strings.Contains(err.Error(), `coverage mode "endpoint" not declared in concept covers [path]`) {
+		t.Fatalf("error = %v, want declared covers diagnostic", err)
+	}
+}
+
+func TestValidateV2CorpusRejectsCoverageWhenCheckDeclaresNoCovers(t *testing.T) {
+	sources := parseV2CorpusForTest(t, `
+module core;
+concept AuthorizationCheck : check {}
+concept HttpInput : source {}
+concept StateChange : sink {}
+`, `
+module rules.authz;
+rule MissingAuthorization {
+  taint core.HttpInput -> core.StateChange as op
+  unless op.endpoint coveredBy core.AuthorizationCheck
+}
+`)
+	err := ValidateV2Corpus(sources)
+	if err == nil {
+		t.Fatal("ValidateV2Corpus succeeded, want missing covers diagnostic")
+	}
+	if !strings.Contains(err.Error(), `check core.AuthorizationCheck uses coverage mode "endpoint" but the concept declares no covers modes`) {
+		t.Fatalf("error = %v, want missing covers diagnostic", err)
+	}
+}
+
+func TestValidateV2CorpusChecksCoverageThroughUsesAlias(t *testing.T) {
+	sources := parseV2CorpusForTest(t, `
+module core;
+concept XmlHardening : check { covers: [sameReceiver] }
+concept XmlInput : source {}
+concept XmlParser : sink {}
+`, `
+module rules.xml;
+uses core.XmlHardening as Hardening;
+rule XmlParserHardening {
+  taint core.XmlInput -> core.XmlParser as parser
+  unless parser.path coveredBy Hardening
+}
+`)
+	err := ValidateV2Corpus(sources)
+	if err == nil {
+		t.Fatal("ValidateV2Corpus succeeded, want alias coverage diagnostic")
+	}
+	if !strings.Contains(err.Error(), `coveredBy check Hardening uses coverage mode "path" not declared in concept covers [sameReceiver]`) {
+		t.Fatalf("error = %v, want alias coverage diagnostic", err)
+	}
+}
+
+func TestValidateV2CorpusRejectsAuthoredBuiltInRuleVerbMechanic(t *testing.T) {
+	sources := parseV2CorpusForTest(t, `
+module code;
+concept HttpInput : source {}
+concept SqlExecution : sink {}
+`, `
+module rules.sql;
+rule SqlInjection {
+  taint code.HttpInput -> code.SqlExecution
+}
+`)
+	sources = append([]V2Source{{
+		Name: "mechanics/custom.vyql",
+		Program: &V2Program{
+			Module: "mechanics.custom",
+			Decls: []V2Decl{
+				&V2MechanicDecl{Kind: "ruleVerb", Name: "taint"},
+			},
+		},
+	}}, sources...)
+	err := ValidateV2Corpus(sources)
+	if err == nil {
+		t.Fatal("ValidateV2Corpus succeeded, want duplicate built-in mechanic diagnostic")
+	}
+	if !strings.Contains(err.Error(), `duplicate v2 mechanic ruleVerb.taint; first declared in <builtin>`) {
+		t.Fatalf("error = %v, want duplicate built-in mechanic diagnostic", err)
+	}
+}
+
+func TestParseV2RejectsMechanicUnknownEndpointKind(t *testing.T) {
+	_, err := ParseV2(`
+module mechanics.bad;
+mechanic ruleVerb taint {
+  solver: dataflow.taint
+  fromKinds: [source, widget]
+  toKinds: [sink]
+  allowedClauses: [where, coveredBy]
+}
+`)
+	if err == nil {
+		t.Fatal("ParseV2 succeeded, want mechanic endpoint kind diagnostic")
+	}
+	if !strings.Contains(err.Error(), `unknown endpoint kind "widget"`) {
+		t.Fatalf("error = %v, want unknown endpoint kind diagnostic", err)
+	}
+}
+
+func TestParseV2RejectsAuthoredGoOwnedMechanic(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "rule verb assume",
+			src: `module mechanics.bad;
+mechanic ruleVerb assume {
+  solver: graph.grant
+  fromKinds: [principal]
+  toKinds: [privilege]
+  allowedClauses: [where]
+}`,
+		},
+		{
+			name: "coverage assume",
+			src: `module mechanics.bad;
+mechanic coverage assume {
+  capability: coverage.path
+  coversWhen: solver.pathCovered(check.anchor, candidate.path)
+  targetParts: [path]
+}`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseV2(tc.src)
+			if err == nil {
+				t.Fatal("ParseV2 succeeded, want Go-owned mechanic rejection")
+			}
+			if !strings.Contains(err.Error(), "Go-owned language mechanic") {
+				t.Fatalf("error = %v, want Go-owned mechanic diagnostic", err)
+			}
+		})
+	}
+}
+
+func TestParseV2RejectsAuthoredAnalysisRole(t *testing.T) {
+	_, err := ParseV2(`
+module core;
+concept CharFilter : check {
+  analysisRole: char_filter
+}
+`)
+	if err == nil {
+		t.Fatal("ParseV2 succeeded, want authored analysisRole rejection")
+	}
+	if !strings.Contains(err.Error(), "analysisRole is a Go-owned language mechanic") {
+		t.Fatalf("error = %v, want Go-owned analysisRole diagnostic", err)
+	}
+}
+
+func TestParseV2RejectsUnknownInternalRole(t *testing.T) {
+	_, err := ParseV2(`
+module core;
+concept CharFilter : check {
+  internalRoles: [custom_runtime_hook]
+}
+`)
+	if err == nil {
+		t.Fatal("ParseV2 succeeded, want internalRoles validation error")
+	}
+	if !strings.Contains(err.Error(), `unknown internal role "custom_runtime_hook"`) {
+		t.Fatalf("error = %v, want unknown internal role diagnostic", err)
+	}
+}
+
+func TestValidateV2CorpusRejectsAuthoredBuiltInRuleVerbClausePolicy(t *testing.T) {
+	sources := parseV2CorpusForTest(t, `
+module code;
+concept ConfigFact : fact {}
+concept Guard : check { covers: [path] }
+`, `
+module rules.config;
+rule ConfigGuard {
+  fact code.ConfigFact as f
+  unless f.path coveredBy code.Guard
+}
+`)
+	sources = append([]V2Source{{
+		Name: "mechanics/custom.vyql",
+		Program: &V2Program{
+			Module: "mechanics.custom",
+			Decls: []V2Decl{
+				&V2MechanicDecl{Kind: "ruleVerb", Name: "fact"},
+				&V2MechanicDecl{Kind: "coverage", Name: "path"},
+			},
+		},
+	}}, sources...)
+	err := ValidateV2Corpus(sources)
+	if err == nil {
+		t.Fatal("ValidateV2Corpus succeeded, want duplicate built-in mechanic diagnostic")
+	}
+	if !strings.Contains(err.Error(), `duplicate v2 mechanic ruleVerb.fact; first declared in <builtin>`) {
+		t.Fatalf("error = %v, want duplicate built-in mechanic diagnostic", err)
+	}
+}
+
+func TestValidateV2CorpusAllowsEmitFactConcept(t *testing.T) {
+	sources := parseV2CorpusForTest(t, `
+module code;
+concept PublicRouteObservation : fact {}
+`, `
+module bindings.web;
+binding publicRoute {
+  query pattern route where route.public == true
+  emit fact code.PublicRouteObservation at route
+}
+`)
+	if err := ValidateV2Corpus(sources); err != nil {
+		t.Fatalf("ValidateV2Corpus rejected fact emit: %v", err)
+	}
+}
+
+func TestValidateV2CorpusRejectsNonSpecObservationConceptKind(t *testing.T) {
+	_, err := ParseV2(`
+module code;
+concept PublicRouteObservation : observation {}
+`)
+	if err == nil {
+		t.Fatal("ParseV2 accepted observation concept kind")
+	}
+	if !strings.Contains(err.Error(), `unknown v2 concept kind "observation"`) {
+		t.Fatalf("error = %v, want observation kind diagnostic", err)
+	}
+}
+
+func TestValidateV2RejectsInvalidSourceReviewMetadata(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "authored source policy",
+			src: `
+module code;
+concept ExternalInput : source {
+  sourcePolicy: caller_conditional
+}
+`,
+			want: `sourcePolicy is a Go-owned source review mechanic`,
+		},
+		{
+			name: "unknown source confidence",
+			src: `
+module code;
+concept ExternalInput : source {
+  sourceConfidence: certain
+}
+`,
+			want: `unknown sourceConfidence "certain"`,
+		},
+		{
+			name: "unknown review confidence",
+			src: `
+module code;
+concept ExternalInput : source {
+  reviewConfidence: certain
+}
+`,
+			want: `unknown reviewConfidence "certain"`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseV2(tt.src)
+			if err == nil {
+				t.Fatal("ParseV2 succeeded, want metadata diagnostic")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateV2CorpusRejectsUnknownModelReferences(t *testing.T) {
+	sources := parseV2CorpusForTest(t, `
+module injection;
+threat SqlInjection {
+  cwe: [CWE_89]
+}
+`, `
+module code;
+concept SqlExecution : sink {
+  vulnerableTo: [injection.DoesNotExist]
+}
+`)
+	err := ValidateV2Corpus(sources)
+	if err == nil {
+		t.Fatal("ValidateV2Corpus succeeded, want model reference diagnostic")
+	}
+	if !strings.Contains(err.Error(), `vulnerableTo references unknown model injection.DoesNotExist`) {
+		t.Fatalf("error = %v, want unknown model diagnostic", err)
+	}
+}
+
+func TestValidateV2CorpusChecksReviewAndExpectedConceptReferences(t *testing.T) {
+	sources := parseV2CorpusForTest(t, `
+module code;
+concept SqlExecution : sink {}
+concept HttpInput : source {}
+`, `
+module review;
+review code.SqlExecution {
+  expected: [code.HttpInput]
+}
+`)
+	err := ValidateV2Corpus(sources)
+	if err == nil {
+		t.Fatal("ValidateV2Corpus succeeded, want expected check-kind diagnostic")
+	}
+	if !strings.Contains(err.Error(), `expected references concept code.HttpInput of kind source; want check`) {
+		t.Fatalf("error = %v, want expected kind diagnostic", err)
+	}
+}
+
+func TestValidateV2CorpusResolvesThreatUsesAliasesInModelReferences(t *testing.T) {
+	sources := parseV2CorpusForTest(t, `
+module injection;
+threat SqlInjection {
+  cwe: [CWE_89]
+}
+`, `
+module code;
+uses injection.SqlInjection as SQLi;
+concept SqlExecution : sink {
+  vulnerableTo: [SQLi]
+}
+`)
+	if err := ValidateV2Corpus(sources); err != nil {
+		t.Fatalf("ValidateV2Corpus rejected threat alias model reference: %v", err)
+	}
+}
+
+func TestParseV2RejectsMechanicUnknownAllowedClause(t *testing.T) {
+	_, err := ParseV2(`
+module mechanics.bad;
+mechanic ruleVerb taint {
+  solver: dataflow.taint
+  fromKinds: [source]
+  toKinds: [sink]
+  allowedClauses: [where, sparkle]
+}
+`)
+	if err == nil {
+		t.Fatal("ParseV2 succeeded, want mechanic allowed clause diagnostic")
+	}
+	if !strings.Contains(err.Error(), `unknown allowed clause "sparkle"`) {
+		t.Fatalf("error = %v, want unknown allowed clause diagnostic", err)
+	}
+}
+
+func TestValidateV2CorpusHandlesManyFilesWithoutGlobalScopeCopies(t *testing.T) {
+	const n = 250
+	sources := make([]V2Source, 0, n+2)
+	sources = append(sources, v2CoreMechanicsSourceForTest(t))
+	concepts := `module code;
+concept HttpInput : source {}
+concept SqlExecution : sink {}
+concept SqlParameterization : check { covers: [path] }
+`
+	for i := 0; i < n; i++ {
+		concepts += fmt.Sprintf("concept Extra%d : fact {}\n", i)
+	}
+	prog, err := ParseV2(concepts)
+	if err != nil {
+		t.Fatalf("ParseV2 concepts: %v", err)
+	}
+	sources = append(sources, V2Source{Name: "ontology/concepts/generated.vyql", Program: prog})
+	for i := 0; i < n; i++ {
+		src := fmt.Sprintf(`
+module rules.generated%d;
+uses code.SqlParameterization as Param;
+rule SqlInjection%d {
+  taint code.HttpInput -> code.SqlExecution as sink
+  unless sink.path coveredBy Param
+}
+`, i, i)
+		prog, err := ParseV2(src)
+		if err != nil {
+			t.Fatalf("ParseV2 generated %d: %v", i, err)
+		}
+		sources = append(sources, V2Source{Name: fmt.Sprintf("rule%d.vyql", i), Program: prog})
+	}
+	if err := ValidateV2Corpus(sources); err != nil {
+		t.Fatalf("ValidateV2Corpus: %v", err)
+	}
+}
+
+func parseV2CorpusForTest(t *testing.T, srcs ...string) []V2Source {
+	t.Helper()
+	sources := make([]V2Source, 0, len(srcs))
+	for i, src := range srcs {
+		prog, err := ParseV2(src)
+		if err != nil {
+			t.Fatalf("ParseV2 source %d: %v\n%s", i, err, src)
+		}
+		sources = append(sources, V2Source{Name: "source.vyql", Program: prog})
+	}
+	return sources
+}
+
+func v2CoreMechanicsSourceForTest(t *testing.T) V2Source {
+	t.Helper()
+	src := `module policies.core;
+policy resultLifecycle default {
+  flagWhen: emitted(issue) and hasReview(concept)
+  candidateWhen: matched(rule)
+  findingWhen: candidate and not covered
+  checkWhen: emitted(check) and (hasReview(concept) or explainsFinding)
+}
+policy resultIdentity default {
+  findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
+  flagKey: [concept, location, call.path, call.method]
+  fingerprint: [rule.id, primaryTarget.location, primaryTarget.concept]
+  stableAcross: [formatting, requirementDiagnosticText, traversalOrder]
+}
+policy confidence default {
+  values: [low, medium, high]
+  order: [low, medium, high]
+  aggregate: min(rule, endpoints, propagation, requirements)
+  softRequirement missing: downgrade(1)
+  softRequirement unknown: downgrade(1) annotate("uninspected evidence")
+  softRequirement conflicting: downgrade(1) annotate("conflicting evidence")
+  softRequirement satisfied: keep
+}
+policy diagnostic default {
+  format: "structured"
+  fields: [file, line, column, declarationId, code, message, why, suggestedFix]
+}
+`
+	prog, err := ParseV2(src)
+	if err != nil {
+		t.Fatalf("ParseV2 core policy fixture: %v", err)
+	}
+	return V2Source{Name: "policies/core.vyql", Program: prog}
+}

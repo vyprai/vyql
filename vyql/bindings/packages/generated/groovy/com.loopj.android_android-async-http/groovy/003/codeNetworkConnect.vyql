@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m6f8b4b74;
+
+binding networkConnect3 {
+  requires {
+    dependency("com.loopj.android:android-async-http")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkConnectSink at args[0]
+}

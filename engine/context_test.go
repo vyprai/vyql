@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -51,7 +50,7 @@ func buildContextGraph(exposed, important bool) usg.Store {
 
 func TestCrossDomainContext(t *testing.T) {
 	onto := contextTestOntology()
-	decls, err := parser.Parse(flowRule)
+	decls, err := parseV2DefinitionsForTest(flowRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -97,35 +96,37 @@ func TestCrossDomainContext(t *testing.T) {
 }
 
 func TestCrossDomainContextReachSourceComesFromOntology(t *testing.T) {
-	src := `
+	conceptsSrc := `
 module custom;
 concept PublicEdge : exposure {
-  context_reach_source: true
-  context_reach_label: "public-edge-reachable"
-  context_reach_target_prop: endpoint
+  contextReachSource: true
+  contextReachLabel: "public-edge-reachable"
+  contextReachTargetProp: endpoint
 }
-concept PublicEdgeObservation : observation {
-  context_confirm_dst_prop: target
-  context_confirm_flag_prop: observed
-  context_confirm_flag_value: yes
-  context_confirm_label: "confirmed by public edge observation"
+concept PublicEdgeObservation : fact {
+  contextConfirmDstProp: target
+  contextConfirmFlagProp: observed
+  contextConfirmFlagValue: yes
+  contextConfirmLabel: "confirmed by public edge observation"
 }
 concept Input : source { taint: [custom.Taint] }
-concept Target : sink { vulnerable_to: [custom.Condition] }
+concept Target : sink { vulnerableTo: [custom.Condition] }
+`
+	ruleSrc := `
 module t;
 rule Flow {
   taint custom.Input -> custom.Target
 }
 `
 	onto := ontology.New()
-	cs, err := ontology.LoadConceptText(src)
+	cs, err := ontology.LoadConceptText(conceptsSrc)
 	if err != nil {
 		t.Fatalf("load concepts: %v", err)
 	}
 	for _, c := range cs {
 		onto.Add(c)
 	}
-	decls, _ := parser.Parse(src)
+	decls, _ := parseV2DefinitionsForTest(ruleSrc)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)

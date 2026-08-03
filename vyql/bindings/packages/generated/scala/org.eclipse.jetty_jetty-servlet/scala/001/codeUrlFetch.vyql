@@ -1,0 +1,9 @@
+module bindings.scala.generated.m9f5011ec;
+
+binding urlFetch1 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-servlet")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit sink code.UrlFetch at args[0]
+}

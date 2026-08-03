@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding forOwnRecursiveDefaultsPrototypePollution582 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "lazy.forOwn" and node.context.subscript contains "target[key]" and node.context.callPath contains "defaultsDeep" and not (node.context.expr contains "key==='__proto__'")
+  emit issue code.ForOwnRecursiveDefaultsPrototypePollution at node
+}

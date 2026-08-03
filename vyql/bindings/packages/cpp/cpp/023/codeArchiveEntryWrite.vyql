@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m1c1357ee;
+
+binding archiveEntryWrite23 {
+  requires {
+    dependency("libarchive")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.generated.m1d7142cc;
+
+binding userControlledData0 {
+  requires {
+    dependency("opentelemetry-api")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit source core.UserControlledData at call.result
+}

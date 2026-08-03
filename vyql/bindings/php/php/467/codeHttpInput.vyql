@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding controllerRouteIdHttpInput467 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and containsAny(args.any.context.functionName, ["print", "show", "view", "edit", "update", "destroy", "delete", "download"]) and containsAny(args.any.context.paramName, ["$id", "$uuid", "$slug", "$key"])
+  emit source code.HttpInput at call.result
+}

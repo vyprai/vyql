@@ -1,5 +1,0 @@
-adapter elixir {
-  package "jiffy" {
-    sink method "load" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.ma4b2901c;
+
+binding deserialization2 {
+  requires {
+    dependency("javax.activation:javax.activation-api")
+  }
+  query pattern callExpr where callee.method == "writeExternal"
+  emit sink code.Deserialization at args[0]
+}

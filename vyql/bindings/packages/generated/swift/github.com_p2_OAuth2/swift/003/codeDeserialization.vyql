@@ -1,0 +1,9 @@
+module bindings.swift.generated.mf434d638;
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/p2/OAuth2")
+  }
+  query pattern callExpr where callee.method == "parseAccessTokenResponse"
+  emit sink code.Deserialization at args[0]
+}

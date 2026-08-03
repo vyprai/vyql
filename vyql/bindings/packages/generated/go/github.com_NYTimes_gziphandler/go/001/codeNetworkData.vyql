@@ -1,0 +1,9 @@
+module bindings.go.generated.m46077ab1;
+
+binding networkData1 {
+  requires {
+    dependency("github.com/NYTimes/gziphandler")
+  }
+  query pattern callExpr where callee.method == "GzipHandlerWithOpts"
+  emit source code.NetworkData at call.result
+}

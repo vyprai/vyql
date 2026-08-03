@@ -1,0 +1,9 @@
+module bindings.go.generated.m1ec1a13c;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/aws/smithy-go")
+  }
+  query pattern callExpr where callee.method == "ReadStruct"
+  emit sink code.Deserialization at args[0]
+}

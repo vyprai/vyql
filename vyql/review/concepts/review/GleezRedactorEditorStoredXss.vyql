@@ -1,0 +1,8 @@
+module code;
+
+review code.GleezRedactorEditorStoredXss {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review Gleez CMS Redactor editor enablement for stored HTML sanitization or disabled source-mode editing"
+}

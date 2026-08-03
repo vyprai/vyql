@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "pest_meta" {
-    sink method "parse" -> code.Deserialization
-  }
-}

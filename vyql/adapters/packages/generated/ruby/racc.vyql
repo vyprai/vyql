@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter ruby {
-  package "racc" {
-    sink method "parse" -> code.Deserialization
-    sink method "yyparse" -> code.Deserialization
-  }
-}

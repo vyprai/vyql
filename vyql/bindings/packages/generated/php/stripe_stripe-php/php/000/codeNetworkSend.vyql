@@ -1,0 +1,9 @@
+module bindings.php.generated.ma4465790;
+
+binding networkSend0 {
+  requires {
+    dependency("stripe/stripe-php")
+  }
+  query pattern callExpr where callee.method == "StripeApiRequestor::request"
+  emit sink code.NetworkSend at args[0]
+}

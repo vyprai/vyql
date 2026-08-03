@@ -1,0 +1,9 @@
+module bindings.python.generated.m0d09c3b2;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("django-storages")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.StoredDataWrite at args[0]
+}

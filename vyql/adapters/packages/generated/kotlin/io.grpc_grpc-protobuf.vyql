@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "io.grpc:grpc-protobuf" {
-    sink method "marshaller" -> code.Deserialization
-    sink method "marshallerWithRecursionLimit" -> code.Deserialization
-  }
-}

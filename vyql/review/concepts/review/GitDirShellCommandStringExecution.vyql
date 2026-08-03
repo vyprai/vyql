@@ -1,0 +1,8 @@
+module code;
+
+review code.GitDirShellCommandStringExecution {
+  category: command
+  expected: [core.ProcessArgVector, core.ShellEscape]
+  kind: target
+  text: "review git command helpers for execFile-style argv execution instead of shell command strings"
+}

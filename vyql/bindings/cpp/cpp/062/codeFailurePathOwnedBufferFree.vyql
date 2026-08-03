@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding failurePathOwnedBufferFree62 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "lifetime.release_then_return"
+  emit issue code.FailurePathOwnedBufferFree at node
+}

@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter dart {
-  package "device_info_plus_linux" {
-    sink method "linuxInfo" -> code.FilePathAccess
-  }
-}

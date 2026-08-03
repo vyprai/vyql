@@ -1,8 +1,0 @@
-import code.{SecretValue, CodeEval}
-
-adapter cpp {
-  package "apr" {
-    source method "apr_password_get" -> code.SecretValue
-    sink method "apr_dso_load" -> code.CodeEval
-  }
-}

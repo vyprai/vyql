@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding hardlinkedFileOverwriteWithoutClobber275 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "filepath.Abs" and node.context.callPath contains "os.Stat" and node.context.callPath contains "os.Create" and containsAny(node.context.identifier, ["filename", "filePath", "filepath", "path"]) and not (node.context.callPath contains "os.Lstat") and not (node.context.callPath contains "os.Remove") and not (node.context.callPath contains "os.OpenFile") and not (node.context.selector contains "os.O_EXCL")
+  emit issue code.HardlinkedFileOverwriteWithoutClobber at node
+}

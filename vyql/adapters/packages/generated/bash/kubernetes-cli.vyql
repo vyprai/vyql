@@ -1,5 +1,0 @@
-adapter bash {
-  package "kubernetes-cli" {
-    source path "kubectl.argv" -> code.CliArgument
-  }
-}

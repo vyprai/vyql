@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding sizeComputation42 {
+  query pattern callExpr where callee.path ~= "operator new"
+  emit sink code.SizeComputation at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.m1f45aed0;
+
+binding databaseRead5 {
+  requires {
+    dependency("MendeleySQLite")
+  }
+  query pattern callExpr where callee.method == "get_document"
+  emit sink code.DatabaseReadSink at args[0]
+}

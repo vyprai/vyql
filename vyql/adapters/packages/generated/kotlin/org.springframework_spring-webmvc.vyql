@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "org.springframework:spring-webmvc" {
-    source path "org.springframework.spring.webmvc.cookie" -> code.HttpInput
-  }
-}

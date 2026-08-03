@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter perl {
-  package "RPM4" {
-    sink method "parserpms" -> code.Deserialization
-  }
-}

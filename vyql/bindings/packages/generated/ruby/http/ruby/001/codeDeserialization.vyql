@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m2f9ad228;
+
+binding deserialization1 {
+  requires {
+    dependency("http")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.mda5bfed3;
+
+binding networkData2 {
+  requires {
+    dependency("github.com/kean/Pulse")
+  }
+  query pattern callExpr where callee.method == "downloadTask"
+  emit source code.NetworkData at call.result
+}

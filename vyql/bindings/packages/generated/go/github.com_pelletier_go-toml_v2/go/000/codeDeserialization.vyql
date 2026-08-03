@@ -1,0 +1,9 @@
+module bindings.go.generated.m72326e6a;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/pelletier/go-toml/v2")
+  }
+  query pattern callExpr where callee.method == "parseInteger"
+  emit sink code.Deserialization at args[0]
+}

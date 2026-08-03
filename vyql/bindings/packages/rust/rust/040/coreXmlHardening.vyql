@@ -1,0 +1,13 @@
+module bindings.rust.generated.m222602a5;
+
+binding xmlHardening40 {
+  requires {
+    dependency("quick-xml")
+  }
+  query pattern callExpr where callee.path ~= "quick_xml.Reader"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}

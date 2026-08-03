@@ -1,0 +1,9 @@
+module bindings.objc.generated.mb992950e;
+
+binding userControlledData4 {
+  requires {
+    dependency("GoogleAnalytics-iOS-SDK")
+  }
+  query pattern callExpr where callee.method == "pushValue"
+  emit source core.UserControlledData at call.result
+}

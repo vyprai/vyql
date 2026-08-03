@@ -1,0 +1,9 @@
+module bindings.objc.generated.m942721f9;
+
+binding htmlRender24 {
+  requires {
+    dependency("WebKit")
+  }
+  query pattern callExpr where callee.method == "loadHTMLString"
+  emit sink code.HtmlRender at args[0]
+}

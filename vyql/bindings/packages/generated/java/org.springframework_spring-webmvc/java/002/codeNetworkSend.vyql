@@ -1,0 +1,9 @@
+module bindings.java.generated.m9ba99d32;
+
+binding networkSend2 {
+  requires {
+    dependency("org.springframework:spring-webmvc")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit sink code.NetworkSend at args[0]
+}

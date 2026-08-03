@@ -1,0 +1,9 @@
+module bindings.rust.generated.mfcac2c50;
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("actix-web")
+  }
+  query pattern callExpr where callee.path ~= "response"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

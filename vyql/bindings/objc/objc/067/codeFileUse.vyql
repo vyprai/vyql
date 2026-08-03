@@ -1,0 +1,7 @@
+module bindings.objc.generated.mccadd221;
+
+binding fileUse67 {
+  query pattern presenceNode where node.path ~= "chmod"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}

@@ -1,7 +1,0 @@
-adapter ruby {
-  package "wikicloth" {
-    sink method "find_reference_by_name" -> code.NosqlQuery
-    sink method "add_current_char" -> code.StoredDataWrite
-    sink method "load" -> code.Deserialization
-  }
-}

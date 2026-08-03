@@ -1,0 +1,9 @@
+module bindings.groovy.generated.mabd4eead;
+
+binding deserialization1 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "nextString"
+  emit sink code.Deserialization at args[0]
+}

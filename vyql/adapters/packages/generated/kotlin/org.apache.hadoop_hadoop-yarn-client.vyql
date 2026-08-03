@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter kotlin {
-  package "org.apache.hadoop:hadoop-yarn-client" {
-    source method "SCMAdmin.run" -> CliArgument
-  }
-}

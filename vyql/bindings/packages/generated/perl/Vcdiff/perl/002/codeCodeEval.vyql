@@ -1,0 +1,9 @@
+module bindings.perl.generated.m27866dfd;
+
+binding codeEval2 {
+  requires {
+    dependency("Vcdiff")
+  }
+  query pattern callExpr where callee.method == "_load_backend"
+  emit sink code.CodeEval at args[0]
+}

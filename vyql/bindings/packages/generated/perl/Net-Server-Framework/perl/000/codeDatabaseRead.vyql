@@ -1,0 +1,9 @@
+module bindings.perl.generated.me89a58c5;
+
+binding databaseRead0 {
+  requires {
+    dependency("Net-Server-Framework")
+  }
+  query pattern callExpr where callee.method == "Net::Server::Framework::DB::dbconnect"
+  emit sink code.DatabaseReadSink at args[0]
+}

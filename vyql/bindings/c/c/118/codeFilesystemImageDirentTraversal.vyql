@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding filesystemImageDirentTraversal118 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "filesystem_image.dirent_traversal"
+  emit issue code.FilesystemImageDirentTraversal at node
+}

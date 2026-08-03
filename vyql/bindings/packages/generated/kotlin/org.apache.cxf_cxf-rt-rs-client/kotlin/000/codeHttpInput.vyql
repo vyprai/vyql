@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m18881a63;
+
+binding httpInput0 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.HttpInput at call.result
+}

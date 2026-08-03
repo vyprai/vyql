@@ -1,0 +1,10 @@
+module bindings.python.generated.m21017d75;
+
+binding pathAccessCheck549 {
+  query pattern callExpr where callee.method == "startswith" and args.any.literal contains "os.sep"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

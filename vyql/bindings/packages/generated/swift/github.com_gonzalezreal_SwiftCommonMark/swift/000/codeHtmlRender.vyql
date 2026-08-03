@@ -1,0 +1,9 @@
+module bindings.swift.generated.md4682c24;
+
+binding htmlRender0 {
+  requires {
+    dependency("github.com/gonzalezreal/SwiftCommonMark")
+  }
+  query pattern callExpr where callee.method == "renderHTML"
+  emit sink code.HtmlRender at args[0]
+}

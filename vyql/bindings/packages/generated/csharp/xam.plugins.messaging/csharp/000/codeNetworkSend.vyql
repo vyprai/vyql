@@ -1,0 +1,9 @@
+module bindings.csharp.generated.mac090037;
+
+binding networkSend0 {
+  requires {
+    dependency("xam.plugins.messaging")
+  }
+  query pattern callExpr where callee.method == "SendEmail"
+  emit sink code.NetworkSend at args[0]
+}

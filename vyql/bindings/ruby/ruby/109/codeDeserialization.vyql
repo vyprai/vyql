@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding deserialization109 {
+  query pattern callExpr where callee.path ~= "YAML.load"
+  emit sink code.Deserialization at args[0]
+}

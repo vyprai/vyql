@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "org.apache.cassandra:cassandra-all" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

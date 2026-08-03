@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m80a92453;
+
+binding deserialization0 {
+  requires {
+    dependency("rbdl")
+  }
+  query pattern callExpr where callee.method == "rbdl_loadmodel"
+  emit sink code.Deserialization at args[0]
+}

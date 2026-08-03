@@ -1,8 +1,0 @@
-adapter swift {
-  package "github.com/launchdarkly/ios-client-sdk" {
-    source method "credential" -> code.SecretValue
-    flag code.WeakHash on any {
-      method "hash"
-    }
-  }
-}

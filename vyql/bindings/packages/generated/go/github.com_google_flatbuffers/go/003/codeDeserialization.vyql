@@ -1,0 +1,9 @@
+module bindings.go.generated.mc2425dbf;
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/google/flatbuffers")
+  }
+  query pattern callExpr where callee.method == "GetSizePrefixedBufferIdentifier"
+  emit sink code.Deserialization at args[0]
+}

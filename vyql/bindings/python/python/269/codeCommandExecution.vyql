@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding commandExecution269 {
+  query pattern callExpr where callee.path ~= "os.execvp"
+  emit sink code.CommandExecution at args[0]
+}

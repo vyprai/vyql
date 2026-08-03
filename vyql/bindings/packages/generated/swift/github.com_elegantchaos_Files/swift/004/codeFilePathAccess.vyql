@@ -1,0 +1,9 @@
+module bindings.swift.generated.m24e2cc2e;
+
+binding filePathAccess4 {
+  requires {
+    dependency("github.com/elegantchaos/Files")
+  }
+  query pattern callExpr where callee.method == "merge"
+  emit sink code.FilePathAccess at args[0]
+}

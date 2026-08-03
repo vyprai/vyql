@@ -1,0 +1,6 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding modexpZeroExponentIterationUnderflow30 {
+  query pattern presenceNode where node.kind == "binop" and node.op contains "-" and operand(node, where: operand.path ~= "?.bits")
+  emit issue code.ModexpZeroExponentIterationUnderflow at node
+}

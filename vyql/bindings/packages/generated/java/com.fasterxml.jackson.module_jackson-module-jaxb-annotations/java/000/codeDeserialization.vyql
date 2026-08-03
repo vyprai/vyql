@@ -1,0 +1,9 @@
+module bindings.java.generated.m0f0bddbc;
+
+binding deserialization0 {
+  requires {
+    dependency("com.fasterxml.jackson.module:jackson-module-jaxb-annotations")
+  }
+  query pattern callExpr where callee.method == "DomElementJsonDeserializer.deserialize"
+  emit sink code.Deserialization at args[0]
+}

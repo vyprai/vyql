@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m20c46144;
+
+binding deserialization0 {
+  requires {
+    dependency("thread_safe")
+  }
+  query pattern callExpr where callee.method == "marshal_load"
+  emit sink code.Deserialization at args[0]
+}

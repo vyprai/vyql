@@ -1,0 +1,9 @@
+module bindings.objc.generated.ma3a84a11;
+
+binding userControlledData7 {
+  requires {
+    dependency("Amplitude")
+  }
+  query pattern callExpr where callee.method == "setUserId:startNewSession:"
+  emit source core.UserControlledData at call.result
+}

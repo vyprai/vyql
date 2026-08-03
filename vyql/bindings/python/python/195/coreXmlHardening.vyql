@@ -1,0 +1,10 @@
+module bindings.python.generated.m21017d75;
+
+binding xmlHardening195 {
+  query pattern callExpr where callee.path ~= "XMLParser" and args.any.context.resolveEntities contains "False"
+  emit check core.XmlHardening at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "miniz_oxide" {
-    sink method "decompress_to_vec" -> code.Deserialization
-    sink method "decompress_to_vec_zlib" -> code.Deserialization
-    sink method "decompress_to_vec_with_limit" -> code.Deserialization
-  }
-}

@@ -1,0 +1,11 @@
+module vypr.memory;
+
+rule ClamavWwpackStructsPointerOobWrite {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_787]
+    id: "VYQL-MEM-026"
+    severity: high
+  }
+  issue code.ClamavWwpackStructsPointerOobWrite as write
+}

@@ -1,0 +1,13 @@
+module bindings.rust.generated.m222602a5;
+
+binding redirectAllowlist41 {
+  requires {
+    dependency("validator")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

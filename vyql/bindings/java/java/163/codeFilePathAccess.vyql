@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding filePathAccess163 {
+  query pattern callExpr where callee.path ~= "Files.newBufferedReader"
+  emit sink code.FilePathAccess at args[0]
+}

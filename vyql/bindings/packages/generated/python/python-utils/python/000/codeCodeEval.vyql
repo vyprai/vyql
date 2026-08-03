@@ -1,0 +1,9 @@
+module bindings.python.generated.m56a43768;
+
+binding codeEval0 {
+  requires {
+    dependency("python-utils")
+  }
+  query pattern callExpr where callee.method == "import_global"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.m4314ea69;
+
+binding codeEval3 {
+  requires {
+    dependency("github.com/pvieito/PythonKit")
+  }
+  query pattern callExpr where callee.method == "dynamicallyCall"
+  emit sink code.CodeEval at args[0]
+}

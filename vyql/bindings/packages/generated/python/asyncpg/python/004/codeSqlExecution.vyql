@@ -1,0 +1,9 @@
+module bindings.python.generated.m4c31fa39;
+
+binding sqlExecution4 {
+  requires {
+    dependency("asyncpg")
+  }
+  query pattern callExpr where callee.method == "fetchrow"
+  emit sink code.SqlExecution at args[0]
+}

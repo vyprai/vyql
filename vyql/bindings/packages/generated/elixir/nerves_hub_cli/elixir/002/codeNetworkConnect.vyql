@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m7f651093;
+
+binding networkConnect2 {
+  requires {
+    dependency("nerves_hub_cli")
+  }
+  query pattern callExpr where callee.method == "NervesHubCLI.API.request"
+  emit sink code.NetworkConnectSink at args[0]
+}

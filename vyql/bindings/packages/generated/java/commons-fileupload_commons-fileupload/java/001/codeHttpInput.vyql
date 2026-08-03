@@ -1,0 +1,9 @@
+module bindings.java.generated.mdb6a1a73;
+
+binding httpInput1 {
+  requires {
+    dependency("commons-fileupload:commons-fileupload")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.HttpInput at call.result
+}

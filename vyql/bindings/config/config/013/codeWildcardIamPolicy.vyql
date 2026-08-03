@@ -1,0 +1,6 @@
+module bindings.config.generated.m2b6375a9;
+
+binding wildcardIamPolicy13 {
+  query pattern presenceNode where node.analysis ~= "config.terraform.wildcard_iam"
+  emit issue code.WildcardIamPolicy at node
+}

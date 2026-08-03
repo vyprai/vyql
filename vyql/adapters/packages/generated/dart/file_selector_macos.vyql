@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter dart {
-  package "file_selector_macos" {
-    sink method "displayOpenPanel" -> code.FilePathAccess
-    sink method "displaySavePanel" -> code.FilePathAccess
-  }
-}

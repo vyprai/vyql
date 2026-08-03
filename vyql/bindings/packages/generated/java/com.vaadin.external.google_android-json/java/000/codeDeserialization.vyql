@@ -1,0 +1,9 @@
+module bindings.java.generated.mfedc763b;
+
+binding deserialization0 {
+  requires {
+    dependency("com.vaadin.external.google:android-json")
+  }
+  query pattern callExpr where callee.method == "readEscapeCharacter"
+  emit sink code.Deserialization at args[0]
+}

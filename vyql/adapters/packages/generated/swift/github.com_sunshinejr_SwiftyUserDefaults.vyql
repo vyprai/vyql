@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter swift {
-  package "github.com/sunshinejr/SwiftyUserDefaults" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

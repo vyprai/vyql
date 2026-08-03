@@ -1,6 +1,0 @@
-adapter php {
-  package "symfony/security-acl" {
-    sink method "get" -> code.NosqlQuery
-    sink method "set" -> code.StoredDataWrite
-  }
-}

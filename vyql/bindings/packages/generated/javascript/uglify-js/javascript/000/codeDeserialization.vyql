@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m351d6703;
+
+binding deserialization0 {
+  requires {
+    dependency("uglify-js")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

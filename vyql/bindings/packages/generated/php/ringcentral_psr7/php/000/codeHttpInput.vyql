@@ -1,0 +1,9 @@
+module bindings.php.generated.mb2f75f38;
+
+binding httpInput0 {
+  requires {
+    dependency("ringcentral/psr7")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.HttpInput at call.result
+}

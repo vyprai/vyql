@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter perl {
-  package "Mojolicious" {
-    sink method "Mojo::DOM.parse" -> code.Deserialization
-  }
-}

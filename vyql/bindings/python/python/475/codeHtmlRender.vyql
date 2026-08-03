@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding htmlRender475 {
+  query pattern callExpr where callee.path ~= "mark_safe"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mfc9ceb84;
+
+binding httpInput1 {
+  requires {
+    dependency("acts_as_votable")
+  }
+  query pattern callExpr where callee.method == "votable_params"
+  emit source code.HttpInput at call.result
+}

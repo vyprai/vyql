@@ -1,0 +1,9 @@
+module bindings.java.generated.mdce6032a;
+
+binding expressionEval0 {
+  requires {
+    dependency("org.apache.tomcat.embed:tomcat-embed-el")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.ExpressionEval at args[0]
+}

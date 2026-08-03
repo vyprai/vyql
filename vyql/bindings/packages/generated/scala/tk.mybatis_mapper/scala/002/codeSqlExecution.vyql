@@ -1,0 +1,9 @@
+module bindings.scala.generated.m041affca;
+
+binding sqlExecution2 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andEqualTo"
+  emit sink code.SqlExecution at args[0]
+}

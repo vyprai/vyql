@@ -1,6 +1,0 @@
-import code.{NetworkConnect}
-adapter javascript {
-  package "detect-port-alt" {
-    sink method "module.exports" -> code.NetworkConnect
-  }
-}

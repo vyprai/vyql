@@ -1,0 +1,10 @@
+module bindings.swift.generated.m07c946ba;
+
+binding redirectTarget4 {
+  requires {
+    dependency("github.com/supabase-community/storage-swift")
+  }
+  query pattern callExpr where callee.method == "createSignedURL"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

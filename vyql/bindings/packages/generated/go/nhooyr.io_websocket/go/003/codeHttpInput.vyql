@@ -1,0 +1,9 @@
+module bindings.go.generated.m881fd3cb;
+
+binding httpInput3 {
+  requires {
+    dependency("nhooyr.io/websocket")
+  }
+  query pattern callExpr where callee.method == "Accept"
+  emit source code.HttpInput at call.result
+}

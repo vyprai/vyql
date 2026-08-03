@@ -6,9 +6,11 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/resultpolicy"
 	"github.com/vyprai/vyql/solvers"
 	"github.com/vyprai/vyql/usg"
 )
@@ -43,9 +45,112 @@ type reviewConceptInfo struct {
 	review   string
 }
 
-func loadReviewConcepts() (map[string]reviewConceptInfo, error) {
+type reviewDisplayPolicy struct {
+	scanAll             []string
+	flagSort            []string
+	includeNearbyChecks bool
+	nearbyCheckLimit    int
+}
+
+type cachedReviewConcepts struct {
+	concepts  map[string]reviewConceptInfo
+	display   reviewDisplayPolicy
+	lifecycle resultpolicy.LifecyclePolicy
+	err       error
+}
+
+var reviewConceptsCache sync.Map // map[data root]cachedReviewConcepts
+
+func loadReviewConfig() (map[string]reviewConceptInfo, reviewDisplayPolicy, resultpolicy.LifecyclePolicy, error) {
+	root := datadir.Root()
+	if cached, ok := reviewConceptsCache.Load(root); ok {
+		res := cached.(cachedReviewConcepts)
+		return res.concepts, res.display, res.lifecycle, res.err
+	}
+	concepts, display, lifecycle, err := loadReviewConfigFromRoot(root)
+	res := cachedReviewConcepts{concepts: concepts, display: display, lifecycle: lifecycle, err: err}
+	actual, _ := reviewConceptsCache.LoadOrStore(root, res)
+	actualRes := actual.(cachedReviewConcepts)
+	return actualRes.concepts, actualRes.display, actualRes.lifecycle, actualRes.err
+}
+
+func loadReviewConfigFromRoot(dataRoot string) (map[string]reviewConceptInfo, reviewDisplayPolicy, resultpolicy.LifecyclePolicy, error) {
 	out := map[string]reviewConceptInfo{}
-	root := filepath.Join(datadir.Root(), "review")
+	var sources []parser.V2DefinitionSource
+	if err := appendV2DefinitionSourcesFromRoot(&sources, dataRoot, "ontology/concepts"); err != nil {
+		return nil, reviewDisplayPolicy{}, resultpolicy.LifecyclePolicy{}, err
+	}
+	if err := appendV2DefinitionSourcesFromRoot(&sources, dataRoot, "ontology/threatkinds"); err != nil {
+		return nil, reviewDisplayPolicy{}, resultpolicy.LifecyclePolicy{}, err
+	}
+	if err := appendV2DefinitionSourcesFromRoot(&sources, dataRoot, "policies"); err != nil {
+		return nil, reviewDisplayPolicy{}, resultpolicy.LifecyclePolicy{}, err
+	}
+	selected := map[string]bool{}
+	beforeReview := len(sources)
+	if err := appendV2DefinitionSourcesFromRoot(&sources, dataRoot, "review"); err != nil {
+		return nil, reviewDisplayPolicy{}, resultpolicy.LifecyclePolicy{}, err
+	}
+	for _, source := range sources {
+		if strings.HasPrefix(source.Name, "policies/") {
+			selected[source.Name] = true
+		}
+	}
+	for _, source := range sources[beforeReview:] {
+		selected[source.Name] = true
+	}
+	decls, err := parser.ParseV2DefinitionSourcesSelected(sources, func(src parser.V2DefinitionSource) bool {
+		return selected[src.Name]
+	})
+	if err != nil {
+		return nil, reviewDisplayPolicy{}, resultpolicy.LifecyclePolicy{}, err
+	}
+	var display reviewDisplayPolicy
+	var lifecycle resultpolicy.LifecyclePolicy
+	hasDisplay := false
+	hasLifecycle := false
+	for _, d := range decls {
+		switch x := d.(type) {
+		case *parser.ReviewDecl:
+			out[x.Concept] = reviewConceptInfo{
+				category: reviewString(x.Fields, "category"),
+				kind:     reviewString(x.Fields, "kind"),
+				expected: reviewList(x.Fields, "expected"),
+				review:   reviewString(x.Fields, "text"),
+			}
+		case *parser.V2PolicyDecl:
+			if x.Name != "default" {
+				continue
+			}
+			switch x.Kind {
+			case "display":
+				policy, err := reviewDisplayPolicyFromDecl(x)
+				if err != nil {
+					return nil, reviewDisplayPolicy{}, resultpolicy.LifecyclePolicy{}, err
+				}
+				display = policy
+				hasDisplay = true
+			case "resultLifecycle":
+				policy, err := resultpolicy.LifecyclePolicyFromDecl(x)
+				if err != nil {
+					return nil, reviewDisplayPolicy{}, resultpolicy.LifecyclePolicy{}, err
+				}
+				lifecycle = policy
+				hasLifecycle = true
+			}
+		}
+	}
+	if !hasDisplay {
+		return nil, reviewDisplayPolicy{}, resultpolicy.LifecyclePolicy{}, fmt.Errorf("missing policy display default")
+	}
+	if !hasLifecycle {
+		return nil, reviewDisplayPolicy{}, resultpolicy.LifecyclePolicy{}, fmt.Errorf("missing policy resultLifecycle default")
+	}
+	return out, display, lifecycle, nil
+}
+
+func appendV2DefinitionSourcesFromRoot(dst *[]parser.V2DefinitionSource, dataRoot, rel string) error {
+	root := filepath.Join(dataRoot, filepath.FromSlash(rel))
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -57,28 +162,17 @@ func loadReviewConcepts() (map[string]reviewConceptInfo, error) {
 		if err != nil {
 			return err
 		}
-		decls, err := parser.Parse(string(data))
+		name, err := filepath.Rel(dataRoot, path)
 		if err != nil {
-			return err
+			name = path
 		}
-		for _, d := range decls {
-			rd, ok := d.(*parser.ReviewDecl)
-			if !ok {
-				continue
-			}
-			out[rd.Concept] = reviewConceptInfo{
-				category: reviewString(rd.Fields, "category"),
-				kind:     reviewString(rd.Fields, "kind"),
-				expected: reviewList(rd.Fields, "expected"),
-				review:   reviewString(rd.Fields, "text"),
-			}
-		}
+		*dst = append(*dst, parser.V2DefinitionSource{Name: filepath.ToSlash(name), Source: string(data)})
 		return nil
 	})
 	if os.IsNotExist(err) {
-		return out, nil
+		return nil
 	}
-	return out, err
+	return err
 }
 
 func reviewString(fields map[string]any, key string) string {
@@ -98,12 +192,87 @@ func reviewList(fields map[string]any, key string) []string {
 	return nil
 }
 
+func reviewDisplayPolicyFromDecl(p *parser.V2PolicyDecl) (reviewDisplayPolicy, error) {
+	out := reviewDisplayPolicy{}
+	for _, item := range p.Items {
+		if len(item.Key) != 1 {
+			continue
+		}
+		switch item.Key[0] {
+		case "scanAll":
+			out.scanAll = reviewPolicyStringList(item.Value)
+			if len(out.scanAll) == 0 {
+				return reviewDisplayPolicy{}, fmt.Errorf("policy display default: scanAll must be a non-empty string list")
+			}
+		case "flagSort":
+			out.flagSort = reviewPolicyStringList(item.Value)
+			if len(out.flagSort) == 0 {
+				return reviewDisplayPolicy{}, fmt.Errorf("policy display default: flagSort must be a non-empty string list")
+			}
+		case "includeNearbyChecks":
+			v, ok := reviewPolicyBool(item.Value)
+			if !ok {
+				return reviewDisplayPolicy{}, fmt.Errorf("policy display default: includeNearbyChecks must be boolean")
+			}
+			out.includeNearbyChecks = v
+		case "nearbyCheckLimit":
+			v, ok := reviewPolicyInt(item.Value)
+			if !ok {
+				return reviewDisplayPolicy{}, fmt.Errorf("policy display default: nearbyCheckLimit must be an integer")
+			}
+			out.nearbyCheckLimit = v
+		}
+	}
+	if len(out.flagSort) == 0 {
+		return reviewDisplayPolicy{}, fmt.Errorf("policy display default: missing flagSort")
+	}
+	if len(out.scanAll) == 0 {
+		return reviewDisplayPolicy{}, fmt.Errorf("policy display default: missing scanAll")
+	}
+	return out, nil
+}
+
+func reviewPolicyStringList(raw any) []string {
+	xs, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(xs))
+	for _, x := range xs {
+		switch v := x.(type) {
+		case string:
+			out = append(out, v)
+		case parser.V2RefExpr:
+			out = append(out, v.Name)
+		}
+	}
+	return out
+}
+
+func reviewPolicyBool(raw any) (bool, bool) {
+	lit, ok := raw.(parser.V2LiteralExpr)
+	if !ok {
+		return false, false
+	}
+	v, ok := lit.Value.(bool)
+	return v, ok
+}
+
+func reviewPolicyInt(raw any) (int, bool) {
+	lit, ok := raw.(parser.V2LiteralExpr)
+	if !ok {
+		return 0, false
+	}
+	v, ok := lit.Value.(int)
+	return v, ok
+}
+
 func collectReviewItems(g usg.Store) []reviewItem {
-	reviewConcepts, err := loadReviewConcepts()
+	reviewConcepts, display, lifecycle, err := loadReviewConfig()
 	if err != nil {
 		return nil
 	}
-	return collectReviewItemsWith(g, reviewConcepts)
+	return collectReviewItemsWithPolicy(g, reviewConcepts, display, lifecycle)
 }
 
 func filterReviewItems(rows []reviewItem, category, kind, loc string) []reviewItem {
@@ -129,7 +298,7 @@ func filterReviewItems(rows []reviewItem, category, kind, loc string) []reviewIt
 	return filtered
 }
 
-func collectReviewItemsWith(g usg.Store, reviewConcepts map[string]reviewConceptInfo) []reviewItem {
+func collectReviewItemsWithPolicy(g usg.Store, reviewConcepts map[string]reviewConceptInfo, display reviewDisplayPolicy, lifecycle resultpolicy.LifecyclePolicy) []reviewItem {
 	if g == nil {
 		return []reviewItem{}
 	}
@@ -140,14 +309,15 @@ func collectReviewItemsWith(g usg.Store, reviewConcepts map[string]reviewConcept
 	}
 	out := []reviewItem{}
 	seen := map[string]bool{}
+	identity := resultpolicy.MustDefaultIdentity()
 	for _, n := range nodes {
 		labels, _ := g.Labels(n.ID)
 		for _, l := range labels {
 			info, ok := reviewConcepts[l.Concept]
-			if !ok {
+			if !lifecycle.FlagWhenIssue(ok) {
 				continue
 			}
-			key := reviewDedupKey(l.Concept, n)
+			key := reviewDedupKey(identity, l.Concept, n)
 			if seen[key] {
 				continue
 			}
@@ -165,27 +335,33 @@ func collectReviewItemsWith(g usg.Store, reviewConcepts map[string]reviewConcept
 				Review:     info.review,
 				Provenance: labelProvenance(l),
 			}
-			if info.kind == "target" {
-				cp.NearbyChecks = relatedReviewChecks(g, byID, n.ID, info.expected, reviewConcepts)
+			if info.kind == "target" && display.includeNearbyChecks {
+				cp.NearbyChecks = relatedReviewChecks(g, byID, n.ID, info.expected, reviewConcepts, display.nearbyCheckLimit, lifecycle)
 			}
 			out = append(out, cp)
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool {
-		return reviewItemOrder(out[i]) < reviewItemOrder(out[j])
+		return reviewItemOrder(out[i], display.flagSort) < reviewItemOrder(out[j], display.flagSort)
 	})
 	return out
 }
 
-func reviewDedupKey(concept string, n usg.Node) string {
+func reviewDedupKey(identity resultpolicy.IdentityPolicy, concept string, n usg.Node) string {
 	loc := n.Prop("loc")
 	if loc == "" {
 		loc = n.ID
 	}
-	return concept + "\x00" + loc + "\x00" + n.Prop("path") + "\x00" + n.Prop("method")
+	return identity.FlagKeyFor(resultpolicy.FlagIdentity{
+		Concept:    concept,
+		Location:   loc,
+		CallPath:   n.Prop("path"),
+		CallMethod: n.Prop("method"),
+		NodeID:     n.ID,
+	})
 }
 
-func relatedReviewChecks(g usg.Store, nodes map[string]usg.Node, targetID string, expected []string, reviewConcepts map[string]reviewConceptInfo) []reviewRelatedCheck {
+func relatedReviewChecks(g usg.Store, nodes map[string]usg.Node, targetID string, expected []string, reviewConcepts map[string]reviewConceptInfo, limit int, lifecycle resultpolicy.LifecyclePolicy) []reviewRelatedCheck {
 	want := map[string]bool{}
 	for _, c := range expected {
 		want[c] = true
@@ -206,6 +382,10 @@ func relatedReviewChecks(g usg.Store, nodes map[string]usg.Node, targetID string
 	add := func(nodeID, concept, evidence string, l usg.Label) {
 		n, ok := nodes[nodeID]
 		if !ok || nodeID == targetID {
+			return
+		}
+		_, hasReview := reviewConcepts[concept]
+		if !lifecycle.CheckWhen(hasReview, false) {
 			return
 		}
 		key := nodeID + "\x00" + concept + "\x00" + evidence
@@ -246,8 +426,8 @@ func relatedReviewChecks(g usg.Store, nodes map[string]usg.Node, targetID string
 		}
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].key < rows[j].key })
-	if len(rows) > 8 {
-		rows = rows[:8]
+	if limit > 0 && len(rows) > limit {
+		rows = rows[:limit]
 	}
 	out := make([]reviewRelatedCheck, 0, len(rows))
 	for _, r := range rows {
@@ -269,8 +449,8 @@ func labelsOfConcepts(g usg.Store, nodeID string, want map[string]bool) []usg.La
 
 func labelProvenance(l usg.Label) string {
 	var parts []string
-	if l.Provenance.Adapter != "" {
-		parts = append(parts, l.Provenance.Adapter)
+	if l.Provenance.Applicator != "" {
+		parts = append(parts, l.Provenance.Applicator)
 	}
 	if l.Provenance.Fidelity != "" {
 		parts = append(parts, l.Provenance.Fidelity)
@@ -346,8 +526,31 @@ func printReviewItems(rows []reviewItem) {
 	}
 }
 
-func reviewItemOrder(r reviewItem) string {
-	return r.Loc + "\x00" + r.Category + "\x00" + r.Kind + "\x00" + r.Concept + "\x00" + r.Call + "\x00" + r.NodeID
+func reviewItemOrder(r reviewItem, fields []string) string {
+	if len(fields) == 0 {
+		fields = []string{"location", "category", "kind", "concept", "call", "nodeID"}
+	}
+	parts := make([]string, 0, len(fields)+3)
+	for _, field := range fields {
+		switch field {
+		case "severity":
+			parts = append(parts, "")
+		case "category":
+			parts = append(parts, r.Category)
+		case "kind":
+			parts = append(parts, r.Kind)
+		case "location", "loc":
+			parts = append(parts, r.Loc)
+		case "concept":
+			parts = append(parts, r.Concept)
+		case "call":
+			parts = append(parts, r.Call)
+		case "nodeID", "node":
+			parts = append(parts, r.NodeID)
+		}
+	}
+	parts = append(parts, r.Loc, r.Category, r.Kind, r.Concept, r.Call, r.NodeID)
+	return strings.Join(parts, "\x00")
 }
 
 func relatedCheckOrder(r reviewRelatedCheck) string {

@@ -1,0 +1,6 @@
+module bindings.objc.generated.mccadd221;
+
+binding fileCheck60 {
+  query pattern presenceNode where node.path ~= "lstat"
+  emit issue code.FileCheck at node
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m895f4b2b;
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("slim/slim")
+  }
+  query pattern callExpr where callee.method == "emit"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

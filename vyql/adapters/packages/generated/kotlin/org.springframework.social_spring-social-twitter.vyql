@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter kotlin {
-  package "org.springframework.social:spring-social-twitter" {
-    sink method "sendDirectMessage" -> code.NetworkSend
-  }
-}

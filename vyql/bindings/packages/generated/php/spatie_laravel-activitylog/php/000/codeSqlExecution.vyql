@@ -1,0 +1,9 @@
+module bindings.php.generated.m7ca6a008;
+
+binding sqlExecution0 {
+  requires {
+    dependency("spatie/laravel-activitylog")
+  }
+  query pattern callExpr where callee.method == "save"
+  emit sink code.SqlExecution at args[0]
+}

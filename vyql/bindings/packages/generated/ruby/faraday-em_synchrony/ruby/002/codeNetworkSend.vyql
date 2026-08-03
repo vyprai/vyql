@@ -1,0 +1,9 @@
+module bindings.ruby.generated.me8a8c411;
+
+binding networkSend2 {
+  requires {
+    dependency("faraday-em_synchrony")
+  }
+  query pattern callExpr where callee.method == "execute_parallel_request"
+  emit sink code.NetworkSend at args[0]
+}

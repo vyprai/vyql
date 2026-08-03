@@ -1,0 +1,11 @@
+module code;
+
+concept DefaultPermissiveCorsConfig : issue {
+  cwe: [CWE_942]
+  reviewAssumption: "default deployments expose authenticated or sensitive APIs to browser-origin requests before explicit hardening"
+  reviewCategory: misconfig
+  reviewCondition: "application defaults enable CORS and allow arbitrary or reflected origins unless operators override them"
+  reviewConfidence: high
+  reviewEvidence: "CORS defaults context {pattern} sets both the CORS enable flag and origin policy to permissive true values"
+  vulnerableTo: [access_control.PermissiveCors]
+}

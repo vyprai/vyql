@@ -1,0 +1,8 @@
+module code;
+
+review code.JenkinsStaplerStateChangeMissingPost {
+  category: csrf
+  expected: [core.CsrfProtection]
+  kind: attention
+  text: "review Jenkins Stapler state-changing actions for @RequirePOST/@POST and POST-backed forms before mutating templates or configuration"
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept ComrakDangerousUrlCaseSensitiveGrammar : issue {
+  cwe: [CWE_79, CWE_178]
+  reviewAssumption: "rendered Markdown links can carry mixed-case unsafe schemes such as Data: or Javascript: into HTML output"
+  reviewCategory: xss
+  reviewCondition: "Comrak dangerous URL scheme grammar matches unsafe schemes case-sensitively"
+  reviewConfidence: high
+  reviewEvidence: "Pest grammar context {pattern} defines dangerous_url with literal data/javascript/vbscript/file prefixes instead of case-insensitive matches"
+  vulnerableTo: [injection.Xss, validation.ImproperInputValidation]
+}

@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding codeceptionRunProcessDeserializationGadget123 {
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.className contains "RunProcess" and node.context.phpReview == "codeception_run_process_deserialization_gadget"
+  emit issue code.CodeceptionRunProcessDeserializationGadget at node
+}

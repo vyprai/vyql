@@ -1,0 +1,9 @@
+module bindings.swift.generated.mb02f6566;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("github.com/SvenTiigi/WhatsNewKit")
+  }
+  query pattern callExpr where callee.method == "UserDefaultsWhatsNewVersionStore.save"
+  emit sink code.StoredDataWrite at args[0]
+}

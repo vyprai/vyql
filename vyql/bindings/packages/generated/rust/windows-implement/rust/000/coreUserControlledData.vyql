@@ -1,0 +1,9 @@
+module bindings.rust.generated.m41baba31;
+
+binding userControlledData0 {
+  requires {
+    dependency("windows-implement")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}

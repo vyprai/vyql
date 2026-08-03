@@ -1,0 +1,9 @@
+module bindings.groovy.generated.md40e5fb5;
+
+binding deserialization7 {
+  requires {
+    dependency("com.facebook.fresco:webpsupport")
+  }
+  query pattern callExpr where callee.method == "hookDecodeResource"
+  emit sink code.Deserialization at args[0]
+}

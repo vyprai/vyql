@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "nanaimo" {
-    sink method "parse_object" -> code.Deserialization
-    sink method "parse_quotedstring" -> code.Deserialization
-  }
-}

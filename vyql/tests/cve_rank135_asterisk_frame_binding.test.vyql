@@ -1,0 +1,6 @@
+test "rank135: Asterisk full-frame destination requires protocol-frame binding review"
+  expect_review code.ProtocolFrameBindingReview
+  graph
+  ```
+  node op code.ProtocolFrameBindingReview
+  ```

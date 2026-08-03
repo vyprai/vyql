@@ -1,0 +1,9 @@
+module bindings.objc.generated.me5914404;
+
+binding networkSend0 {
+  requires {
+    dependency("Mixpanel-swift")
+  }
+  query pattern callExpr where callee.method == "sendRequest"
+  emit sink code.NetworkSend at args[0]
+}

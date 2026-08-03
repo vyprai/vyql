@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m05949344;
+
+binding cliArgument1 {
+  requires {
+    dependency("optparse")
+  }
+  query pattern callExpr where callee.method == "parse!"
+  emit source code.CliArgument at call.result
+}

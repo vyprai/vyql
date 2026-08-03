@@ -1,0 +1,11 @@
+module code;
+
+concept ZeroLengthRadiusAttributeValueParse : issue {
+  cwe: [CWE_20, CWE_248]
+  reviewAssumption: "a peer can send zero-length Tunnel-Password or vendor attributes that make value parsing crash or abort"
+  reviewCategory: input_validation
+  reviewCondition: "RADIUS vendor-specific attribute parsing creates a value pair from a zero-length attribute payload"
+  reviewConfidence: high
+  reviewEvidence: "RADIUS VSA parse context {pattern} derives attrlen from type/length fields and calls rad_attr2vp without skipping attrlen == 0"
+  vulnerableTo: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+}

@@ -1,7 +1,0 @@
-import code.{HttpInput}
-
-adapter python {
-  package "gradio" {
-    source method "parse" -> code.HttpInput
-  }
-}

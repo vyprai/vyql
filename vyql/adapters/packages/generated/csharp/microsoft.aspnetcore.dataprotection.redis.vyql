@@ -1,8 +1,0 @@
-import code.{StoredDataRead, StoredDataWrite}
-
-adapter csharp {
-  package "microsoft.aspnetcore.dataprotection.redis" {
-    sink method "StoreElement" -> code.StoredDataWrite
-    source method "GetAllElements" -> code.StoredDataRead
-  }
-}

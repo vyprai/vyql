@@ -1,0 +1,9 @@
+module bindings.perl.generated.m227799a1;
+
+binding networkData0 {
+  requires {
+    dependency("SNMP")
+  }
+  query pattern callExpr where callee.method == "snmp_get"
+  emit source code.NetworkData at call.result
+}

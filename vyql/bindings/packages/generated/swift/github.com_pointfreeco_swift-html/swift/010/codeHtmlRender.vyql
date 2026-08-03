@@ -1,0 +1,9 @@
+module bindings.swift.generated.mceef4e68;
+
+binding htmlRender10 {
+  requires {
+    dependency("github.com/pointfreeco/swift-html")
+  }
+  query pattern callExpr where callee.method == "_xmlRender"
+  emit sink code.HtmlRender at args[0]
+}

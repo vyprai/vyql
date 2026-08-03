@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "re2" {
-    sink method "Parse" -> code.Deserialization
-  }
-}

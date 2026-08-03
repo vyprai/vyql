@@ -1,5 +1,0 @@
-adapter javascript {
-  package "regjsparser" {
-    sink method "parse" -> code.Deserialization
-  }
-}

@@ -1,5 +1,0 @@
-adapter perl {
-  package "PerlX-QuoteOperator-Inescapable" {
-    source method "_parser" -> core.UserControlledData
-  }
-}

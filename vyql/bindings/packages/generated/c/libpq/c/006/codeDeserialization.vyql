@@ -1,0 +1,9 @@
+module bindings.c.generated.mf5b5c569;
+
+binding deserialization6 {
+  requires {
+    dependency("libpq")
+  }
+  query pattern callExpr where callee.method == "seg_yyparse"
+  emit sink code.Deserialization at args[0]
+}

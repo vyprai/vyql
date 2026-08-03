@@ -1,7 +1,0 @@
-import code.{NetworkBind}
-
-adapter go {
-  package "github.com/bradfitz/go-smtpd" {
-    sink method "ListenAndServe" -> code.NetworkBind
-  }
-}

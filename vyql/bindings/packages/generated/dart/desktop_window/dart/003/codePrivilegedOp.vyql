@@ -1,0 +1,10 @@
+module bindings.dart.generated.m3f72b36e;
+
+binding privilegedOp3 {
+  requires {
+    dependency("desktop_window")
+  }
+  query pattern callExpr where callee.method == "setFullScreen"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

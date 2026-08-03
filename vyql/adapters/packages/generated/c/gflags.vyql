@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter c {
-  package "gflags" {
-    source method "ParseCommandLineFlagsInternal" -> code.CliArgument
-  }
-}

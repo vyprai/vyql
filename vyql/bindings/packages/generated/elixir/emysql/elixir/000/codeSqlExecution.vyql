@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m88639bca;
+
+binding sqlExecution0 {
+  requires {
+    dependency("emysql")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

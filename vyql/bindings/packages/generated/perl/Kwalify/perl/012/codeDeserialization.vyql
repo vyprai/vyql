@@ -1,0 +1,9 @@
+module bindings.perl.generated.mf00bb792;
+
+binding deserialization12 {
+  requires {
+    dependency("Kwalify")
+  }
+  query pattern callExpr where callee.method == "validate_seq"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,5 +1,0 @@
-adapter rust {
-  package "zip" {
-    sink method "enclosed_name" -> code.ArchiveEntryWrite
-  }
-}

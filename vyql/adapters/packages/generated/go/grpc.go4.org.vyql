@@ -1,6 +1,0 @@
-adapter go {
-  package "grpc.go4.org" {
-    sink method "DialContext" -> code.NetworkConnect
-    source method "DecodeKeyValue" -> core.UserControlledData
-  }
-}

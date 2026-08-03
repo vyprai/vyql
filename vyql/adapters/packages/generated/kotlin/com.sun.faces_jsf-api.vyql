@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "com.sun.faces:jsf-api" {
-    control method "validate" -> core.InputValidation
-  }
-}

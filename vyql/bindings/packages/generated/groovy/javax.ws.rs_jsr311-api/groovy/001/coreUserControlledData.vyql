@@ -1,0 +1,9 @@
+module bindings.groovy.generated.md237ae6d;
+
+binding userControlledData1 {
+  requires {
+    dependency("javax.ws.rs:jsr311-api")
+  }
+  query pattern callExpr where callee.method == "getQueryParameters"
+  emit source core.UserControlledData at call.result
+}

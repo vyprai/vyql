@@ -1,0 +1,9 @@
+module bindings.go.generated.ma1932595;
+
+binding filePathAccess2 {
+  requires {
+    dependency("sigs.k8s.io/controller-tools")
+  }
+  query pattern callExpr where callee.method == "LoadRootsWithConfig"
+  emit sink code.FilePathAccess at args[0]
+}

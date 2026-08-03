@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding missingGuestFallbackForWebAuth184 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "missing_guest_fallback_for_web_auth"
+  emit issue code.MissingGuestFallbackForWebAuth at node
+}

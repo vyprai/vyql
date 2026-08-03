@@ -1,0 +1,13 @@
+module bindings.cpp.generated.m1c1357ee;
+
+binding authenticationCheck37 {
+  requires {
+    dependency("jwt-cpp")
+  }
+  query pattern callExpr where callee.path ~= "jwt.verify"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

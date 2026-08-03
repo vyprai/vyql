@@ -1,0 +1,9 @@
+module bindings.php.generated.mf8f59ec8;
+
+binding filePathAccess4 {
+  requires {
+    dependency("zetacomponents/base")
+  }
+  query pattern callExpr where callee.method == "ezcBase::addClassRepository"
+  emit sink code.FilePathAccess at args[0]
+}

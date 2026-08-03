@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m8591e683;
+
+binding deserialization1 {
+  requires {
+    dependency("libnop")
+  }
+  query pattern callExpr where callee.method == "ReadPayload"
+  emit sink code.Deserialization at args[0]
+}

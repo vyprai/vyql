@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m925b957f;
+
+binding userControlledData3 {
+  requires {
+    dependency("html-proofer")
+  }
+  query pattern callExpr where callee.method == "add_external"
+  emit source core.UserControlledData at call.result
+}

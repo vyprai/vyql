@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m628e5c29;
+
+binding userControlledData1 {
+  requires {
+    dependency("com.google.protobuf:protobuf-java-util")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}

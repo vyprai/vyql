@@ -1,8 +1,0 @@
-import core.{InputValidation}
-
-adapter swift {
-  package "github.com/vapor/validation" {
-    control method "validate" -> core.InputValidation
-    control method "add" -> core.InputValidation
-  }
-}

@@ -1,8 +1,0 @@
-import code.{NetworkSend, NetworkData, Deserialization}
-
-adapter python {
-  package "jupyter-client" {
-    sink method "send" -> code.NetworkSend
-    source method "recv" -> code.NetworkData
-  }
-}

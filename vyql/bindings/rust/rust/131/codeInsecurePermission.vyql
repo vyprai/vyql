@@ -1,0 +1,6 @@
+module bindings.rust.generated.mdc4f74cd;
+
+binding insecurePermission131 {
+  query pattern callExpr where callee.method == "mode" and args.any.literal contains "0o666"
+  emit issue code.InsecurePermission at call
+}

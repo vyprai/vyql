@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m613c6a6e;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("akavache.core")
+  }
+  query pattern callExpr where callee.method == "InsertObject``1"
+  emit sink code.StoredDataWrite at args[0]
+}

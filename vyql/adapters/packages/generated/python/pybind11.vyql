@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter python {
-  package "pybind11" {
-    sink method "exec" -> code.CodeEval
-  }
-}

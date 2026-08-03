@@ -1,0 +1,9 @@
+module bindings.c.generated.m2816daee;
+
+binding archiveEntryWrite20 {
+  requires {
+    dependency("libarchive")
+  }
+  query pattern callExpr where callee.path ~= "archive_read_extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

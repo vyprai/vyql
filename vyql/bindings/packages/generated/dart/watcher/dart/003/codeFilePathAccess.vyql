@@ -1,0 +1,9 @@
+module bindings.dart.generated.m996a60eb;
+
+binding filePathAccess3 {
+  requires {
+    dependency("watcher")
+  }
+  query pattern callExpr where callee.method == "modifyFile"
+  emit sink code.FilePathAccess at args[0]
+}

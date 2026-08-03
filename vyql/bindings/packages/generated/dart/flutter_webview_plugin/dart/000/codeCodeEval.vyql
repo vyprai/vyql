@@ -1,0 +1,9 @@
+module bindings.dart.generated.m2ea1b999;
+
+binding codeEval0 {
+  requires {
+    dependency("flutter_webview_plugin")
+  }
+  query pattern callExpr where callee.method == "evalJavascript"
+  emit sink code.CodeEval at args[0]
+}

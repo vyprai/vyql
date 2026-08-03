@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mee840174;
+
+binding networkSend8 {
+  requires {
+    dependency("io-like")
+  }
+  query pattern callExpr where callee.method == "syswrite"
+  emit sink code.NetworkSend at args[0]
+}

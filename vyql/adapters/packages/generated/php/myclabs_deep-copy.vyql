@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "myclabs/deep-copy" {
-    sink method "copy" -> code.Deserialization
-  }
-}

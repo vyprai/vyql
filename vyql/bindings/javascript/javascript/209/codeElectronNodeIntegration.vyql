@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding electronNodeIntegration209 {
+  query pattern presenceNode where node.context.language == "javascript" and node.context.selector contains "webPreferences" and node.context.assign contains "webPreferences.nodeIntegration=true"
+  emit issue code.ElectronNodeIntegration at node
+}

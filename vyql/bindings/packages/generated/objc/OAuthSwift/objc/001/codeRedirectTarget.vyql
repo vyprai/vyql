@@ -1,0 +1,10 @@
+module bindings.objc.generated.mc6062c70;
+
+binding redirectTarget1 {
+  requires {
+    dependency("OAuthSwift")
+  }
+  query pattern callExpr where callee.method == "authorize"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

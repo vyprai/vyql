@@ -1,0 +1,10 @@
+module bindings.javascript.generated.mfb63017a;
+
+pattern bindingMetadata {
+  binding: {
+    name: "javascript"
+    meta: {
+      fidelity: "resolved"
+    }
+  }
+}

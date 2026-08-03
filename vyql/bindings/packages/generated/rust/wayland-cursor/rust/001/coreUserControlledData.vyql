@@ -1,0 +1,9 @@
+module bindings.rust.generated.m27ec0943;
+
+binding userControlledData1 {
+  requires {
+    dependency("wayland-cursor")
+  }
+  query pattern callExpr where callee.method == "load_or"
+  emit source core.UserControlledData at call.result
+}

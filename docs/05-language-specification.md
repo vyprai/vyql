@@ -1,10 +1,10 @@
 # 05 — Language Specification
 
-Status: `DRAFT` — surface syntax and semantic core proposed for v0.1;
-grammar will be frozen after the Tier 1 vertical slice ships. The grammar and
-semantic core here were validated by a runnable prototype (`../poc/`): every
-rule form parses, and the compile-time checks below are implemented and tested
-(`poc/cases/case_02`, `case_03`, `case_07`).
+Status: `SUPERSEDED` — this file records the historical v1 prototype syntax.
+The production language contract is VyQL v2 in
+[21-vyql-v2-definition.md](21-vyql-v2-definition.md). Production parsers and
+shipped definitions must reject the v1 forms shown below, including `adapter`,
+`match`, `sanitized_by`, and `guarded_by`.
 
 ## Design constraints
 
@@ -66,7 +66,7 @@ exception   = "sanitized_by" concept_ref
 | `taint A -> B` | can attacker-controlled data from A reach B? | on-demand dataflow ([08](08-dataflow-and-taint.md)) | dataflow path |
 | `flow A -> B` | does a value from A reach B (taint-agnostic)? | dataflow | dataflow path |
 | `reach A -> B` | is there a network path from A to B? | reachability | network hop path |
-| `assume A -> B` | can principal A obtain the privileges of B? | privilege closure | grant/trust chain |
+| `grant A -> B` | can principal A obtain the privileges of B? | privilege closure | grant/trust chain |
 
 The verb selects the solver. `require reachability`-style clauses from the
 v0.1 draft are **removed**: the flow kind is never a bolt-on.
@@ -112,7 +112,7 @@ rule vypr.cloud.public_database {
 // Identity
 rule vypr.identity.external_to_admin {
   meta { id: "VYQL-IDN-002", severity: critical, attack: ["TA0004"] }
-  assume EXTERNAL_PRINCIPAL -> ADMIN_PRIVILEGE
+  grant EXTERNAL_PRINCIPAL -> ADMIN_PRIVILEGE
 }
 
 // Runtime

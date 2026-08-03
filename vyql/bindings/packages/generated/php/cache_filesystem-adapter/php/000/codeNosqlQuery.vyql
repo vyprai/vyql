@@ -1,0 +1,9 @@
+module bindings.php.generated.m58a90d88;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("cache/filesystem-adapter")
+  }
+  query pattern callExpr where callee.method == "getFilePath"
+  emit sink code.NosqlQuery at args[0]
+}

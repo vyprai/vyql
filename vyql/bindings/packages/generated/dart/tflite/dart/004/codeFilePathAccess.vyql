@@ -1,0 +1,9 @@
+module bindings.dart.generated.m97f3efaf;
+
+binding filePathAccess4 {
+  requires {
+    dependency("tflite")
+  }
+  query pattern callExpr where callee.method == "runPix2PixOnImage"
+  emit sink code.FilePathAccess at args[0]
+}

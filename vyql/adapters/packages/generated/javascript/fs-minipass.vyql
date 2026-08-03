@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-adapter javascript {
-  package "fs-minipass" {
-    sink method "ReadStream" -> code.FilePathAccess
-    sink method "ReadStreamSync" -> code.FilePathAccess
-    sink method "WriteStream" -> code.FilePathAccess
-    sink method "WriteStreamSync" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.m0baa5d5f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/AudioKit/AudioKit")
+  }
+  query pattern callExpr where callee.method == "loadMIDIFile"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.m175808fe;
+
+binding filePathAccess2 {
+  requires {
+    dependency("SwiftFormat")
+  }
+  query pattern callExpr where callee.method == "matchGlobs"
+  emit sink code.FilePathAccess at args[0]
+}

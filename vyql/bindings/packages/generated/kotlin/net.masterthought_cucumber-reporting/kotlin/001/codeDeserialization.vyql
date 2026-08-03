@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m697c2941;
+
+binding deserialization1 {
+  requires {
+    dependency("net.masterthought:cucumber-reporting")
+  }
+  query pattern callExpr where callee.method == "parseForFeature"
+  emit sink code.Deserialization at args[0]
+}

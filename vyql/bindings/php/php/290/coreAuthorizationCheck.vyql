@@ -1,0 +1,10 @@
+module bindings.php.generated.mfbe84119;
+
+binding authorizationCheck290 {
+  query pattern callExpr where callee.path ~= "current_user_can"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

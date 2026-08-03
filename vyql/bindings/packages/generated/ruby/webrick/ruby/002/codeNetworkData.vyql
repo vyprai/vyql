@@ -1,0 +1,9 @@
+module bindings.ruby.generated.me032aebf;
+
+binding networkData2 {
+  requires {
+    dependency("webrick")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

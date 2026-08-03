@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m84d9beb4;
+
+binding networkSend0 {
+  requires {
+    dependency("memcachex")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

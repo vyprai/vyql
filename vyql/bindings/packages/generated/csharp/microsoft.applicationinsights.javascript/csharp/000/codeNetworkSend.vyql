@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m13dc8ced;
+
+binding networkSend0 {
+  requires {
+    dependency("microsoft.applicationinsights.javascript")
+  }
+  query pattern callExpr where callee.method == "RemoteDependencyData"
+  emit sink code.NetworkSend at args[0]
+}

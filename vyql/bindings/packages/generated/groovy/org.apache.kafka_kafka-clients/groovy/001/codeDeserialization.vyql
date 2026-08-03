@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m9ba62e20;
+
+binding deserialization1 {
+  requires {
+    dependency("org.apache.kafka:kafka-clients")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

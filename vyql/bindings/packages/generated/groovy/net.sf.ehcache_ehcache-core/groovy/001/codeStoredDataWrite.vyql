@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m2635f7d9;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("net.sf.ehcache:ehcache-core")
+  }
+  query pattern callExpr where callee.method == "setBootstrapCacheLoader"
+  emit sink code.StoredDataWrite at args[0]
+}

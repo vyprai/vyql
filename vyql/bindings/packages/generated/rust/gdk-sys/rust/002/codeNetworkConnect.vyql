@@ -1,0 +1,9 @@
+module bindings.rust.generated.me5e3bd7a;
+
+binding networkConnect2 {
+  requires {
+    dependency("gdk-sys")
+  }
+  query pattern callExpr where callee.method == "gdk_display_open"
+  emit sink code.NetworkConnectSink at args[0]
+}

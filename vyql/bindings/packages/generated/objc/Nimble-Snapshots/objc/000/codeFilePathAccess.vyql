@@ -1,0 +1,9 @@
+module bindings.objc.generated.mca3d86d1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Nimble-Snapshots")
+  }
+  query pattern callExpr where callee.method == "parseFilename"
+  emit sink code.FilePathAccess at args[0]
+}

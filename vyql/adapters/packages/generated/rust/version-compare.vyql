@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "version-compare" {
-    sink method "Version::from" -> code.Deserialization
-  }
-}

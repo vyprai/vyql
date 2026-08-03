@@ -1,0 +1,9 @@
+module bindings.objc.generated.mcf19b29f;
+
+binding filePathAccess19 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "setDBName:"
+  emit sink code.FilePathAccess at args[0]
+}

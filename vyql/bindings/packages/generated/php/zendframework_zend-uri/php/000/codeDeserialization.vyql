@@ -1,0 +1,9 @@
+module bindings.php.generated.m71e2ab70;
+
+binding deserialization0 {
+  requires {
+    dependency("zendframework/zend-uri")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

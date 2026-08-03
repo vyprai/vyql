@@ -1,0 +1,9 @@
+module bindings.java.generated.m2b10c041;
+
+binding userControlledData2 {
+  requires {
+    dependency("org.testcontainers:postgresql")
+  }
+  query pattern callExpr where callee.method == "getUsername"
+  emit source core.UserControlledData at call.result
+}

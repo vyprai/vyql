@@ -1,0 +1,9 @@
+module bindings.bash.generated.m95627e41;
+
+binding cliArgument0 {
+  requires {
+    dependency("chrome-cli")
+  }
+  query pattern callExpr where callee.path ~= "arc-cli.argv"
+  emit source code.CliArgument at call.result
+}

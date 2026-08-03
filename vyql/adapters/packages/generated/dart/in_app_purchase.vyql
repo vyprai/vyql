@@ -1,5 +1,0 @@
-adapter dart {
-  package "in_app_purchase" {
-    source method "InAppPurchase.queryProductDetails" -> core.UserControlledData
-  }
-}

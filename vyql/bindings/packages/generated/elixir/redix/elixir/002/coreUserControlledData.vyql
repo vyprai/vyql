@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m624a3b43;
+
+binding userControlledData2 {
+  requires {
+    dependency("redix")
+  }
+  query pattern callExpr where callee.method == "Redix.URI.to_start_options"
+  emit source core.UserControlledData at call.result
+}

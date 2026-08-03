@@ -1,0 +1,9 @@
+module bindings.rust.generated.m06525a4f;
+
+binding userControlledData0 {
+  requires {
+    dependency("actix-service")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit source core.UserControlledData at call.result
+}

@@ -1,5 +1,0 @@
-adapter scala {
-  package "com.h2database:h2" {
-    sink method "load" -> code.Deserialization
-  }
-}

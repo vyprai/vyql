@@ -1,0 +1,9 @@
+module bindings.swift.generated.ma346e2e2;
+
+binding expressionEval0 {
+  requires {
+    dependency("github.com/firebase/firebase-ios-sdk")
+  }
+  query pattern callExpr where callee.method == "sendMessage"
+  emit sink code.ExpressionEval at args[0]
+}

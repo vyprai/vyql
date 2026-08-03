@@ -1,0 +1,9 @@
+module bindings.groovy.generated.ma6e4ec74;
+
+binding codeEval1 {
+  requires {
+    dependency("org.apache.tomcat.embed:tomcat-embed-el")
+  }
+  query pattern callExpr where callee.path ~= "jakarta.el.ELProcessor.eval"
+  emit sink code.CodeEval at args[0]
+}

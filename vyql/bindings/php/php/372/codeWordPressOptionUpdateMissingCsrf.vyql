@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding wordPressOptionUpdateMissingCsrf372 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.subscript contains "$_REQUEST" and node.context.call contains "update_option" and not (node.context.scopeCall contains "check_admin_referer") and not (node.context.scopeCall contains "wp_verify_nonce")
+  emit issue code.WordPressOptionUpdateMissingCsrf at node
+}

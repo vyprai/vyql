@@ -1,0 +1,9 @@
+module bindings.scala.generated.m31e3db5b;
+
+binding networkSend7 {
+  requires {
+    dependency("org.springframework.integration:spring-integration-http")
+  }
+  query pattern callExpr where callee.method == "outboundChannelAdapter"
+  emit sink code.NetworkSend at args[0]
+}

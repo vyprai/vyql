@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess, UrlFetch}
-
-adapter kotlin {
-  package "com.jayway.jsonpath:json-path" {
-    sink method "read" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-  }
-}

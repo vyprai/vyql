@@ -1,0 +1,9 @@
+module bindings.dart.generated.mab46ff19;
+
+binding nosqlQuery6 {
+  requires {
+    dependency("mongo_dart")
+  }
+  query pattern callExpr where callee.method == "createDistinctCommand"
+  emit sink code.NosqlQuery at args[0]
+}

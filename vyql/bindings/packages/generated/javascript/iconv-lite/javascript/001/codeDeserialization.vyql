@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m24ed3f7f;
+
+binding deserialization1 {
+  requires {
+    dependency("iconv-lite")
+  }
+  query pattern callExpr where callee.method == "decodeStream"
+  emit sink code.Deserialization at args[0]
+}

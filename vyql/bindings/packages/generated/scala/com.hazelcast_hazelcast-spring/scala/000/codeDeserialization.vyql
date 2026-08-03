@@ -1,0 +1,9 @@
+module bindings.scala.generated.m6dfe8afa;
+
+binding deserialization0 {
+  requires {
+    dependency("com.hazelcast:hazelcast-spring")
+  }
+  query pattern callExpr where callee.method == "readData"
+  emit sink code.Deserialization at args[0]
+}

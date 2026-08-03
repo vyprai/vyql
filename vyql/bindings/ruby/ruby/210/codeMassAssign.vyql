@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding massAssign210 {
+  query pattern callExpr where callee.method == "update_attributes"
+  emit sink code.MassAssign at args[0]
+}

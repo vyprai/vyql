@@ -1,0 +1,9 @@
+module bindings.rust.generated.m96dd8ad3;
+
+binding weakRandomValue3 {
+  requires {
+    dependency("rand_core")
+  }
+  query pattern callExpr where callee.method == "try_next_u32"
+  emit issue code.WeakRandomValue at call
+}

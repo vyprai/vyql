@@ -1,7 +1,0 @@
-import code.{NetworkConnect, NetworkSend}
-adapter swift {
-  package "github.com/apple/swift-nio-ssh" {
-    sink method "sendTCPForwardingRequest" -> code.NetworkConnect
-    sink method "sendTCPForwardingRequest" -> code.NetworkSend
-  }
-}

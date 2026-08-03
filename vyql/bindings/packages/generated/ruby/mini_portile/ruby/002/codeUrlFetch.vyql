@@ -1,0 +1,9 @@
+module bindings.ruby.generated.ma7992353;
+
+binding urlFetch2 {
+  requires {
+    dependency("mini_portile")
+  }
+  query pattern callExpr where callee.method == "download_file_ftp"
+  emit sink code.UrlFetch at args[0]
+}

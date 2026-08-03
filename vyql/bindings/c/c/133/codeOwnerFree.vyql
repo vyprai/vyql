@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding ownerFree133 {
+  query pattern presenceNode where node.path ~= "xmlFreeDoc"
+  emit issue code.OwnerFree at node
+}

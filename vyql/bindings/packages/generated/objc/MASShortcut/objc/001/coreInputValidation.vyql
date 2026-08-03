@@ -1,0 +1,14 @@
+module bindings.objc.generated.m15006c85;
+
+binding inputValidation1 {
+  requires {
+    dependency("MASShortcut")
+  }
+  query pattern callExpr where callee.method == "isShortcut:alreadyTakenInMenu:explanation:"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

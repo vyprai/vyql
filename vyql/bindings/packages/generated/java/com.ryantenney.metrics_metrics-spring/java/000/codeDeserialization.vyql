@@ -1,0 +1,9 @@
+module bindings.java.generated.m17f75351;
+
+binding deserialization0 {
+  requires {
+    dependency("com.ryantenney.metrics:metrics-spring")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

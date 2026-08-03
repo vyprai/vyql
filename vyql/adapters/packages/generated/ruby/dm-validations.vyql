@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter ruby {
-  package "dm-validations" {
-    control method "validates_format_of" -> core.InputValidation
-  }
-}

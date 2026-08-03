@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mc9ec4dc6;
+
+binding expressionEval2 {
+  requires {
+    dependency("docile")
+  }
+  query pattern callExpr where callee.method == "dsl_eval_immutable"
+  emit sink code.ExpressionEval at args[0]
+}

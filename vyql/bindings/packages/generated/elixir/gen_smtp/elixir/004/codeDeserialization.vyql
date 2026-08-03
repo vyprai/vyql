@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mcbf3d81a;
+
+binding deserialization4 {
+  requires {
+    dependency("gen_smtp")
+  }
+  query pattern callExpr where callee.method == "decode_body"
+  emit sink code.Deserialization at args[0]
+}

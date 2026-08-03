@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding protocolStatusVectorUnknownArgumentFallback75 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "protocol.status_vector_unknown_arg_fallback"
+  emit issue code.ProtocolStatusVectorUnknownArgumentFallback at node
+}

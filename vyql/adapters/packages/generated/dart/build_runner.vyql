@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter dart {
-  package "build_runner" {
-    sink method "run" -> code.CommandExecution
-  }
-}

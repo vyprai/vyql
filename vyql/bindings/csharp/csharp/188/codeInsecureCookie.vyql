@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding insecureCookie188 {
+  query pattern callExpr where callee.path ~= "SetSecure" and args.any.literal contains "false"
+  emit issue code.InsecureCookie at call
+}

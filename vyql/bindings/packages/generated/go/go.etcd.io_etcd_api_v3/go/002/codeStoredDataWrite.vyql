@@ -1,0 +1,9 @@
+module bindings.go.generated.m50dab3f4;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("go.etcd.io/etcd/api/v3")
+  }
+  query pattern callExpr where callee.method == "request_KV_DeleteRange_0"
+  emit sink code.StoredDataWrite at args[0]
+}

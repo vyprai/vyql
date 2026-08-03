@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter cpp {
-  package "minc" {
-    source method "ParseArgv" -> code.CliArgument
-  }
-}

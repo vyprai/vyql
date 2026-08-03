@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mce87f42b;
+
+binding responseHeaderWrite0 {
+  requires {
+    dependency("com.sun.jersey:jersey-server")
+  }
+  query pattern callExpr where callee.method == "ContainerResponse.write"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

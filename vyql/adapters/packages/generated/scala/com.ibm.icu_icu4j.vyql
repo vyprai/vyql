@@ -1,7 +1,0 @@
-adapter scala {
-  package "com.ibm.icu:icu4j" {
-    flag code.WeakHash on any {
-      method "hash"
-    }
-  }
-}

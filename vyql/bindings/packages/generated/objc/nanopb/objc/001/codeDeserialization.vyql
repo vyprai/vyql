@@ -1,0 +1,9 @@
+module bindings.objc.generated.m0f09610a;
+
+binding deserialization1 {
+  requires {
+    dependency("nanopb")
+  }
+  query pattern callExpr where callee.method == "pb_decode_noinit"
+  emit sink code.Deserialization at args[0]
+}

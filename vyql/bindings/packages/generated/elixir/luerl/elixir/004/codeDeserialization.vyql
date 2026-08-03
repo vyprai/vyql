@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m711a0255;
+
+binding deserialization4 {
+  requires {
+    dependency("luerl")
+  }
+  query pattern callExpr where callee.method == "decode_userdata"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mde7df98d;
+
+binding deserialization0 {
+  requires {
+    dependency("slime")
+  }
+  query pattern callExpr where callee.method == "Slime.Parser.parse"
+  emit sink code.Deserialization at args[0]
+}

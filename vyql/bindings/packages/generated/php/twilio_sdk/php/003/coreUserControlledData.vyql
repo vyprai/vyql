@@ -1,0 +1,9 @@
+module bindings.php.generated.m17bf60a7;
+
+binding userControlledData3 {
+  requires {
+    dependency("twilio/sdk")
+  }
+  query pattern callExpr where callee.method == "TwilioJwtJWT::decode"
+  emit source core.UserControlledData at call.result
+}

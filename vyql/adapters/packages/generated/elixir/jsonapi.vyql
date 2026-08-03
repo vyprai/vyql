@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "jsonapi" {
-    sink method "JSONAPI.Deserializer.call" -> code.Deserialization
-    sink method "JSONAPI.QueryParser.call" -> code.Deserialization
-  }
-}

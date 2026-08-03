@@ -1,0 +1,9 @@
+module bindings.perl.generated.ma2ec5935;
+
+binding htmlRender3 {
+  requires {
+    dependency("Kwiki-AuthorOnlyPageEditing")
+  }
+  query pattern callExpr where callee.method == "Kwiki::AuthorOnlyPageEditing::modify_form"
+  emit sink code.HtmlRender at args[0]
+}

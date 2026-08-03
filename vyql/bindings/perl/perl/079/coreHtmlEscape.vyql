@@ -1,0 +1,11 @@
+module bindings.perl.generated.mfca40a44;
+
+binding htmlEscape79 {
+  query pattern callExpr where callee.path ~= "encode_entities"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.m5d956e89;
+
+binding filePathAccess2 {
+  requires {
+    dependency("classpreloader/classpreloader")
+  }
+  query pattern callExpr where callee.method == "openFileForWriting"
+  emit sink code.FilePathAccess at args[0]
+}

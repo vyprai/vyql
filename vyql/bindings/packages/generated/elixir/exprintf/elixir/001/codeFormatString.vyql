@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m0545c2d9;
+
+binding formatString1 {
+  requires {
+    dependency("exprintf")
+  }
+  query pattern callExpr where callee.method == "sprintf"
+  emit sink code.FormatString at args[0]
+}

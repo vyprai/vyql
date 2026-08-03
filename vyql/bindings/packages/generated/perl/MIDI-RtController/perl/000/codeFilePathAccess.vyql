@@ -1,0 +1,9 @@
+module bindings.perl.generated.m7a9742b9;
+
+binding filePathAccess0 {
+  requires {
+    dependency("MIDI-RtController")
+  }
+  query pattern callExpr where callee.method == "_open_port"
+  emit sink code.FilePathAccess at args[0]
+}

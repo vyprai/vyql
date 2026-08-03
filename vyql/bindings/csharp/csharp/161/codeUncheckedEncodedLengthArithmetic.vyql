@@ -1,0 +1,6 @@
+module bindings.csharp.generated.m1caa8bf2;
+
+binding uncheckedEncodedLengthArithmetic161 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.callPath contains "ReadVarUInt32" and node.context.binaryShape contains "CALL<<INT" and not (node.context.checkedShape contains "CALL<<INT")
+  emit issue code.UncheckedEncodedLengthArithmetic at node
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.mb2944bfb;
+
+binding userControlledData0 {
+  requires {
+    dependency("scrutinizer/ocular")
+  }
+  query pattern callExpr where callee.method == "Scrutinizer\\Ocular\\Command\\CodeCoverage\\UploadCommand::execute"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.ma17b2b86;
+
+binding templateRender2 {
+  requires {
+    dependency("yell")
+  }
+  query pattern callExpr where callee.method == "format"
+  emit sink code.TemplateRender at args[0]
+}

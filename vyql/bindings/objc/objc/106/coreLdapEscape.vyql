@@ -1,0 +1,11 @@
+module bindings.objc.generated.mccadd221;
+
+binding ldapEscape106 {
+  query pattern callExpr where callee.path ~= "encode_for_ldap"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

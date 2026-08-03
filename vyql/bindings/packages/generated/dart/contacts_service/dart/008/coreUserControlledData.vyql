@@ -1,0 +1,9 @@
+module bindings.dart.generated.m3ee45a62;
+
+binding userControlledData8 {
+  requires {
+    dependency("contacts_service")
+  }
+  query pattern callExpr where callee.method == "openDeviceContactPicker"
+  emit source core.UserControlledData at call.result
+}

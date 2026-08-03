@@ -1,0 +1,14 @@
+module bindings.perl.generated.m64082567;
+
+binding inputValidation1 {
+  requires {
+    dependency("String-Util")
+  }
+  query pattern callExpr where callee.method == "jsquote"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

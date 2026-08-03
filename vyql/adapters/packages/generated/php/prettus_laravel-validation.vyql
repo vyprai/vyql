@@ -1,8 +1,0 @@
-import core.{InputValidation, UserControlledData}
-adapter php {
-  package "prettus/laravel-validation" {
-    source method "with" -> core.UserControlledData
-    source method "setRules" -> core.UserControlledData
-    control method "passes" -> core.InputValidation
-  }
-}

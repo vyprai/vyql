@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "python-multipart" {
-    sink method "parse_form" -> code.Deserialization
-    sink method "create_form_parser" -> code.Deserialization
-  }
-}

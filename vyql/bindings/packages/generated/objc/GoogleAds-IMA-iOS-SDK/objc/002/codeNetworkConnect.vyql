@@ -1,0 +1,9 @@
+module bindings.objc.generated.m714c8f84;
+
+binding networkConnect2 {
+  requires {
+    dependency("GoogleAds-IMA-iOS-SDK")
+  }
+  query pattern callExpr where callee.method == "requestAdsWithRequest"
+  emit sink code.NetworkConnectSink at args[0]
+}

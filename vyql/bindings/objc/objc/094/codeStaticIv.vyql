@@ -1,0 +1,6 @@
+module bindings.objc.generated.mccadd221;
+
+binding staticIv94 {
+  query pattern callExpr where callee.path ~= "CCCryptorCreate" and args.any.literal contains "0000000000000000"
+  emit issue code.StaticIv at call
+}

@@ -1,0 +1,9 @@
+module bindings.rust.generated.m8b00d86d;
+
+binding filePathAccess0 {
+  requires {
+    dependency("loom")
+  }
+  query pattern callExpr where callee.method == "checkpoint_file"
+  emit sink code.FilePathAccess at args[0]
+}

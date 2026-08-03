@@ -1,0 +1,9 @@
+module bindings.python.generated.mc2c938ab;
+
+binding codeEval0 {
+  requires {
+    dependency("ipdb")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CodeEval at args[0]
+}

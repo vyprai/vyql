@@ -1,0 +1,9 @@
+module bindings.objc.generated.m02aa3bb4;
+
+binding deserialization0 {
+  requires {
+    dependency("Flutter")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

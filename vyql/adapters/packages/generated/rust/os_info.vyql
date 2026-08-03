@@ -1,8 +1,0 @@
-import code.{StoredDataRead, Deserialization}
-
-adapter rust {
-  package "os_info" {
-    source method "get" -> code.StoredDataRead
-    sink method "parse_version" -> code.Deserialization
-  }
-}

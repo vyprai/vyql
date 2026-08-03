@@ -1,8 +1,0 @@
-adapter elixir {
-  package "eljiffy" {
-    sink method "decode_proplist" -> code.Deserialization
-    sink method "decode_maps" -> code.Deserialization
-    sink method "decode!" -> code.Deserialization
-    sink method "decode" -> code.Deserialization
-  }
-}

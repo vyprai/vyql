@@ -1,0 +1,9 @@
+module bindings.java.generated.mab1966f5;
+
+binding filePathAccess2 {
+  requires {
+    dependency("org.aspectj:aspectjweaver")
+  }
+  query pattern callExpr where callee.method == "FileUtil.copy"
+  emit sink code.FilePathAccess at args[0]
+}

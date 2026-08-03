@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m57621e61;
+
+binding filePathAccess0 {
+  requires {
+    dependency("vssdk.shell.interop.8")
+  }
+  query pattern callExpr where callee.method == "Microsoft.VisualStudio.Shell.Interop.IDirList.Add"
+  emit sink code.FilePathAccess at args[0]
+}

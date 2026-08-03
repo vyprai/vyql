@@ -1,7 +1,0 @@
-import code.{FilePathAccess, FileUse}
-adapter python {
-  package "certifi" {
-    sink method "where" -> code.FilePathAccess
-    sink method "contents" -> code.FileUse
-  }
-}

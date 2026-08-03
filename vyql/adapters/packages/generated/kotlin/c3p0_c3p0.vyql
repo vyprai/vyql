@@ -1,7 +1,0 @@
-adapter kotlin {
-  package "c3p0:c3p0" {
-    flag code.WeakHash on any {
-      path "c3p0.c3p0.hash"
-    }
-  }
-}

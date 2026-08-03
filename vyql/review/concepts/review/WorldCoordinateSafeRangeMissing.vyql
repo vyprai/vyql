@@ -1,0 +1,8 @@
+module code;
+
+review code.WorldCoordinateSafeRangeMissing {
+  category: resource
+  expected: [core.InputValidation]
+  kind: target
+  text: "review world-edit coordinate operations for safe world-border range checks before block or chunk access"
+}

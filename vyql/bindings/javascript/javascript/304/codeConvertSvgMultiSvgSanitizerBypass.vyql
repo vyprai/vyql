@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding convertSvgMultiSvgSanitizerBypass304 {
+  query pattern presenceNode where node.path == "analysis.function.context" and node.context.convertSvgMultiSvgSanitizerBypass == "true"
+  emit issue code.ConvertSvgMultiSvgSanitizerBypass at node
+}

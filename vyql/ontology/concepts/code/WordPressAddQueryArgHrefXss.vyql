@@ -1,0 +1,11 @@
+module code;
+
+concept WordPressAddQueryArgHrefXss : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "the generated URL may include request-controlled current-URL data and is served to a browser as HTML"
+  reviewCategory: xss
+  reviewCondition: "WordPress add_query_arg output is rendered into an HTML href attribute without URL or attribute escaping"
+  reviewConfidence: high
+  reviewEvidence: "function context {pattern} formats an anchor href placeholder with add_query_arg before esc_url or equivalent escaping"
+  vulnerableTo: [injection.Xss]
+}

@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter perl {
-  package "FLTK" {
-    sink method "fl_load_image" -> code.FilePathAccess
-    sink method "load_file" -> code.FilePathAccess
-  }
-}

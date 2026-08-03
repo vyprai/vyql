@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "com.alibaba:dubbo" {
-    sink method "decode" -> code.Deserialization
-  }
-}

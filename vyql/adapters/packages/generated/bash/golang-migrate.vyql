@@ -1,6 +1,0 @@
-adapter bash {
-  package "golang-migrate" {
-    source path "migrate.argv" -> code.CliArgument
-    sink path "migrate" arg all -> code.SqlExecution
-  }
-}

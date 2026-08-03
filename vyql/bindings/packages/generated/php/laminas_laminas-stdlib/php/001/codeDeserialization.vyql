@@ -1,0 +1,9 @@
+module bindings.php.generated.med27f848;
+
+binding deserialization1 {
+  requires {
+    dependency("laminas/laminas-stdlib")
+  }
+  query pattern callExpr where callee.method == "LaminasStdlibParameters::parse_str"
+  emit sink code.Deserialization at args[0]
+}

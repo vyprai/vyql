@@ -1,5 +1,0 @@
-adapter groovy {
-  package "net.sf.jopt-simple:jopt-simple" {
-    source method "parse" -> code.CliArgument
-  }
-}

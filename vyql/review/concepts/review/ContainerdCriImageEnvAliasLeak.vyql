@@ -1,0 +1,7 @@
+module code;
+
+review code.ContainerdCriImageEnvAliasLeak {
+  category: secret
+  kind: attention
+  text: "copy imageConfig.Env before appending CRI container environment variables"
+}

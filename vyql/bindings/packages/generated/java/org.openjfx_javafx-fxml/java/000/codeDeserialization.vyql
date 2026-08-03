@@ -1,0 +1,9 @@
+module bindings.java.generated.m4a40445f;
+
+binding deserialization0 {
+  requires {
+    dependency("org.openjfx:javafx-fxml")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

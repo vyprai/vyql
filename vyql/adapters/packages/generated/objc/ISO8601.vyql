@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter objc {
-  package "ISO8601" {
-    sink method "dateWithISO8601String" -> code.Deserialization
-    sink method "dateComponentsForString" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.m7a3c38f3;
+
+binding userControlledData2 {
+  requires {
+    dependency("Mozilla-Mechanize-GUITester")
+  }
+  query pattern callExpr where callee.method == "set_prompt_result"
+  emit source core.UserControlledData at call.result
+}

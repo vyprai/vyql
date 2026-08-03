@@ -1,0 +1,9 @@
+module bindings.ruby.generated.ma4c4e058;
+
+binding codeEval0 {
+  requires {
+    dependency("ejs")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.CodeEval at args[0]
+}

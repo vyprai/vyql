@@ -1,8 +1,0 @@
-adapter groovy {
-  package "org.hibernate.javax.persistence:hibernate-jpa-2.0-api" {
-    sink method "executeUpdate" -> code.SqlExecution
-    sink method "createQuery" -> code.SqlExecution
-    sink method "createNativeQuery" -> code.SqlExecution
-    control method "setParameter" -> core.SqlParameterization
-  }
-}

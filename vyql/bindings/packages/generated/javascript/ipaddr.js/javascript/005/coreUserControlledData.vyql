@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mbca90048;
+
+binding userControlledData5 {
+  requires {
+    dependency("ipaddr.js")
+  }
+  query pattern callExpr where callee.method == "isValidCIDRFourPartDecimal"
+  emit source core.UserControlledData at call.result
+}

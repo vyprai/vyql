@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m8656c654;
+
+binding databaseRead0 {
+  requires {
+    dependency("mongo-cxx-driver")
+  }
+  query pattern callExpr where callee.method == "run_command"
+  emit sink code.DatabaseReadSink at args[0]
+}

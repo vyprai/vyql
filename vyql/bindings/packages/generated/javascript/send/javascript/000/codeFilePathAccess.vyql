@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m13d71c21;
+
+binding filePathAccess0 {
+  requires {
+    dependency("send")
+  }
+  query pattern callExpr where callee.method == "createHtmlDocument"
+  emit sink code.FilePathAccess at args[0]
+}

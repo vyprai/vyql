@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "org.eclipse.jetty:jetty-annotations" {
-    sink method "AnnotationParser.parse" -> code.Deserialization
-  }
-}

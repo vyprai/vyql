@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "org.glassfish:javax.json" {
-    sink method "read" -> code.Deserialization
-    sink method "readObject" -> code.Deserialization
-    sink method "readArray" -> code.Deserialization
-  }
-}

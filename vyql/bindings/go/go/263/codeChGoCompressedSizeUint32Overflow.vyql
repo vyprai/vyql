@@ -1,0 +1,6 @@
+module bindings.go.generated.m48a985c1;
+
+binding chGoCompressedSizeUint32Overflow263 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "Compress" and node.context.callPath contains "binary.LittleEndian.PutUint32" and node.context.call contains "uint32" and not (node.context.selector contains "math.MaxUint32") and not (node.context.literal contains "compressed size overflows uint32")
+  emit issue code.ChGoCompressedSizeUint32Overflow at node
+}

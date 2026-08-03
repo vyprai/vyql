@@ -1,0 +1,6 @@
+module bindings.kotlin.generated.m304d1620;
+
+binding authFlowBypassReview25 {
+  query pattern callExpr where callee.method == "moveTaskToBack"
+  emit issue code.AuthFlowBypassReview at call
+}

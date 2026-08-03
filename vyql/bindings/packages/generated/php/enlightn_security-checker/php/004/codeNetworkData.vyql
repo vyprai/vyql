@@ -1,0 +1,9 @@
+module bindings.php.generated.me4f39690;
+
+binding networkData4 {
+  requires {
+    dependency("enlightn/security-checker")
+  }
+  query pattern callExpr where callee.method == "fetchAdvisories"
+  emit source code.NetworkData at call.result
+}

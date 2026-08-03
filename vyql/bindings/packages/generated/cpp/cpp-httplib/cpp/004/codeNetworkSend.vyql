@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mb7311fac;
+
+binding networkSend4 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

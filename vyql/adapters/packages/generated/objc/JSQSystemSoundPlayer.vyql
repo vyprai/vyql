@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-
-adapter objc {
-  package "JSQSystemSoundPlayer" {
-    sink method "playSoundWithFilename:" -> code.FilePathAccess
-    sink method "preloadSoundWithFilename:" -> code.FilePathAccess
-    sink method "playAlertSoundWithFilename:" -> code.FilePathAccess
-  }
-}

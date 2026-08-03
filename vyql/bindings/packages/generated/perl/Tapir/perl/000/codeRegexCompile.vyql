@@ -1,0 +1,10 @@
+module bindings.perl.generated.mf8d9c0b9;
+
+binding regexCompile0 {
+  requires {
+    dependency("Tapir")
+  }
+  query pattern callExpr where callee.method == "Tapir::Validator::Regex::new_from_string"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

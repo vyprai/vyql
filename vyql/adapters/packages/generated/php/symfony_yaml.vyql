@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter php {
-  package "symfony/yaml" {
-    sink method "parse" -> code.Deserialization
-    sink method "parseFile" -> code.Deserialization
-  }
-}

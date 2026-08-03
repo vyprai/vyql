@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m61b38642;
+
+binding cliArgument1 {
+  requires {
+    dependency("bullet3")
+  }
+  query pattern callExpr where callee.method == "GetCmdLineArgument"
+  emit source code.CliArgument at call.result
+}

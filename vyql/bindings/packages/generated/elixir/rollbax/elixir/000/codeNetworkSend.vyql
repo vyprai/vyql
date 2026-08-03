@@ -1,0 +1,9 @@
+module bindings.elixir.generated.me5092733;
+
+binding networkSend0 {
+  requires {
+    dependency("rollbax")
+  }
+  query pattern callExpr where callee.method == "report"
+  emit sink code.NetworkSend at args[0]
+}

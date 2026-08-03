@@ -1,0 +1,10 @@
+module bindings.c.generated.m1850c2bf;
+
+binding regexCompile2 {
+  requires {
+    dependency("grpc")
+  }
+  query pattern callExpr where callee.method == "CreateFromStringMatcher"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

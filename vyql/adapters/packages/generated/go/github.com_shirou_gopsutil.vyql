@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/shirou/gopsutil" {
-    sink method "parseSwapctlOutput" -> code.Deserialization
-  }
-}

@@ -1,7 +1,0 @@
-import code.{CliArgument}
-
-adapter python {
-  package "nose" {
-    source method "nose.core.parseArgs" -> code.CliArgument
-  }
-}

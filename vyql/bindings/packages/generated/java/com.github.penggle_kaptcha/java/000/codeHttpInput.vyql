@@ -1,0 +1,9 @@
+module bindings.java.generated.mb82bf2ed;
+
+binding httpInput0 {
+  requires {
+    dependency("com.github.penggle:kaptcha")
+  }
+  query pattern callExpr where callee.method == "doGet"
+  emit source code.HttpInput at call.result
+}

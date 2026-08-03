@@ -1,0 +1,9 @@
+module bindings.php.generated.m1e757c47;
+
+binding userControlledData7 {
+  requires {
+    dependency("jenssegers/agent")
+  }
+  query pattern callExpr where callee.method == "languages"
+  emit source core.UserControlledData at call.result
+}

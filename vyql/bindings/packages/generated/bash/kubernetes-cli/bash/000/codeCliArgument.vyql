@@ -1,0 +1,9 @@
+module bindings.bash.generated.m2473a7bb;
+
+binding cliArgument0 {
+  requires {
+    dependency("kubernetes-cli")
+  }
+  query pattern callExpr where callee.path ~= "kubectl.argv"
+  emit source code.CliArgument at call.result
+}

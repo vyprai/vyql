@@ -1,0 +1,11 @@
+module code;
+
+concept CloudStackBaremetalMacCommandInjection : issue {
+  cwe: [CWE_78, CWE_20]
+  reviewAssumption: "the baremetal virtual router endpoint is reachable and shell metacharacters in the mac path segment can break out of the quoted curl URL"
+  reviewCategory: command
+  reviewCondition: "CloudStack baremetal provision-done route forwards an unvalidated MAC path parameter into a shell curl command"
+  reviewConfidence: high
+  reviewEvidence: "baremetal-vr route context {pattern} accepts /baremetal/provisiondone/<mac> and calls server.notify_provisioning_done(mac) before a MAC-format allowlist"
+  vulnerableTo: [injection.CommandInjection]
+}

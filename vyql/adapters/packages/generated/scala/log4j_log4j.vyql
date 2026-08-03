@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter scala {
-  package "log4j:log4j" {
-    sink method "org.apache.log4j.FileAppender.setFile" -> code.FilePathAccess
-  }
-}

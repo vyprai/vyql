@@ -1,0 +1,9 @@
+module bindings.dart.generated.m3e5a1a80;
+
+binding networkConnect2 {
+  requires {
+    dependency("twitter_login")
+  }
+  query pattern callExpr where callee.method == "RequestToken.getRequestToken"
+  emit sink code.NetworkConnectSink at args[0]
+}

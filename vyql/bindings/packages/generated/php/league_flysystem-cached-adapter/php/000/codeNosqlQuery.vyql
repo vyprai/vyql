@@ -1,0 +1,9 @@
+module bindings.php.generated.m89c48b7d;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("league/flysystem-cached-adapter")
+  }
+  query pattern callExpr where callee.method == "getMetadata"
+  emit sink code.NosqlQuery at args[0]
+}

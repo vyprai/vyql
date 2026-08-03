@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "makeup_html" {
-    sink method "lex" -> code.Deserialization
-    sink method "postprocess" -> code.Deserialization
-  }
-}

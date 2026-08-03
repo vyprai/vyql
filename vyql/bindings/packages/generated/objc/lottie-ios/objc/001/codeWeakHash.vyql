@@ -1,0 +1,9 @@
+module bindings.objc.generated.m75ea5ac7;
+
+binding weakHash1 {
+  requires {
+    dependency("lottie-ios")
+  }
+  query pattern presenceNode where node.path ~= "lottie.ios.hash"
+  emit issue code.WeakHash at node
+}

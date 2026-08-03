@@ -1,0 +1,12 @@
+# Rank 27 / CVE-2024-53864: Ibexa Admin UI tooltip data reached innerHTML
+# before the fix switched measurement to text-only rendering.
+
+test "rank27: tooltip data reaches HTML rendering"
+  expect VYQL-INJ-004
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.HtmlRender
+  edge FLOWS src -> sink
+  ```
+

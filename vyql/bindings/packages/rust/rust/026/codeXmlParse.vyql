@@ -1,0 +1,9 @@
+module bindings.rust.generated.m222602a5;
+
+binding xmlParse26 {
+  requires {
+    dependency("roxmltree")
+  }
+  query pattern callExpr where callee.path ~= "roxmltree.Document.parse"
+  emit sink code.XmlParse at args[0]
+}

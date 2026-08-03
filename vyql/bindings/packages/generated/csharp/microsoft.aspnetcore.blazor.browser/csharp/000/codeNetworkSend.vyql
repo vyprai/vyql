@@ -1,0 +1,9 @@
+module bindings.csharp.generated.m05dca8db;
+
+binding networkSend0 {
+  requires {
+    dependency("microsoft.aspnetcore.blazor.browser")
+  }
+  query pattern callExpr where callee.method == "SendAsync"
+  emit sink code.NetworkSend at args[0]
+}

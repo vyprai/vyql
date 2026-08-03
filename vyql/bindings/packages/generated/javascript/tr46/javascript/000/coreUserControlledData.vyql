@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m65321687;
+
+binding userControlledData0 {
+  requires {
+    dependency("tr46")
+  }
+  query pattern callExpr where callee.method == "toASCII"
+  emit source core.UserControlledData at call.result
+}

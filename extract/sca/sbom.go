@@ -2,7 +2,7 @@
 // entrypoint projection (docs/20, docs/11), ported from poc/extract/sbom.py
 // and advisory.py. Dependency resolution is DECOUPLED from the AST extractor: a
 // manifest reader produces package nodes, package intelligence adds neutral
-// analysis tokens, and VyQL adapters map those tokens to concepts/rules.
+// analysis tokens, and VyQL binding applicators map those tokens to concepts/rules.
 package sca
 
 import (
@@ -199,6 +199,72 @@ func parseGoRequireLine(line string) (Dep, bool) {
 	return Dep{NormalizePackageName(name), version}, true
 }
 
+// ParseCargoLockGit reads git-sourced Cargo.lock packages into the generic git
+// ecosystem. Cargo.lock carries the immutable revision after '#', which is the
+// advisory identity for git dependencies.
+func ParseCargoLockGit(content string) []Dep {
+	var out []Dep
+	var source string
+	flush := func() {
+		if source == "" || !strings.HasPrefix(source, "git+") {
+			return
+		}
+		raw := strings.TrimPrefix(source, "git+")
+		url, rev, ok := strings.Cut(raw, "#")
+		if !ok || strings.TrimSpace(rev) == "" {
+			return
+		}
+		if name := normalizeGitURL(url); name != "" {
+			out = append(out, Dep{NormalizePackageName(name), strings.TrimSpace(rev)})
+		}
+	}
+	for _, raw := range strings.Split(content, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "[[package]]" {
+			flush()
+			source = ""
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok || strings.TrimSpace(key) != "source" {
+			continue
+		}
+		source = tomlStringValue(value)
+	}
+	flush()
+	return out
+}
+
+func tomlStringValue(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) < 2 {
+		return ""
+	}
+	quote := raw[0]
+	if quote != '"' && quote != '\'' {
+		return ""
+	}
+	var b strings.Builder
+	escaped := false
+	for i := 1; i < len(raw); i++ {
+		ch := raw[i]
+		if escaped {
+			b.WriteByte(ch)
+			escaped = false
+			continue
+		}
+		if ch == '\\' {
+			escaped = true
+			continue
+		}
+		if ch == quote {
+			return b.String()
+		}
+		b.WriteByte(ch)
+	}
+	return ""
+}
+
 func identifierBoundary(s string, start, end int) bool {
 	isIdent := func(b byte) bool {
 		return b == '_' || ('a' <= b && b <= 'z') || ('A' <= b && b <= 'Z') || ('0' <= b && b <= '9')
@@ -320,6 +386,79 @@ func ParsePackageJSON(content string) []Dep {
 	return out
 }
 
+// ParseNpmrc reads project-local npm runtime pins. Legacy Electron applications
+// often record the executable runtime in .npmrc rather than package.json; when
+// runtime=electron is present, the Brave Electron runtime version is dependency
+// evidence for SCA advisories.
+func ParseNpmrc(content string) []Dep {
+	values := map[string]string{}
+	for _, raw := range strings.Split(content, "\n") {
+		line := strings.TrimSpace(stripHashComment(raw))
+		if line == "" || strings.HasPrefix(line, ";") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.ToLower(strings.TrimSpace(key))
+		value = strings.TrimSpace(value)
+		if key == "" || value == "" {
+			continue
+		}
+		values[key] = value
+	}
+	if !strings.EqualFold(values["runtime"], "electron") {
+		return nil
+	}
+	version := values["brave_electron_version"]
+	if version == "" {
+		version = values["target"]
+	}
+	if version == "" {
+		return nil
+	}
+	return []Dep{{Name: "brave/electron", Version: version}}
+}
+
+func stripHashComment(line string) string {
+	if i := strings.Index(line, "#"); i >= 0 {
+		return line[:i]
+	}
+	return line
+}
+
+// ParseComposerLock reads package pins from Composer's lockfile. It uses the
+// resolved package versions rather than composer.json constraints so advisory
+// matching sees the exact installed PHP package revision.
+func ParseComposerLock(content string) []Dep {
+	var lock struct {
+		Packages    []composerPackage `json:"packages"`
+		PackagesDev []composerPackage `json:"packages-dev"`
+	}
+	if json.Unmarshal([]byte(content), &lock) != nil {
+		return nil
+	}
+	out := make([]Dep, 0, len(lock.Packages)+len(lock.PackagesDev))
+	for _, pkg := range append(lock.Packages, lock.PackagesDev...) {
+		name := NormalizePackageName(pkg.Name)
+		if name == "" {
+			continue
+		}
+		version := strings.TrimSpace(pkg.Version)
+		if version == "" {
+			version = "*"
+		}
+		out = append(out, Dep{name, version})
+	}
+	return out
+}
+
+type composerPackage struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
 // ParseGitmodules turns git submodule pins into SBOM dependencies. .gitmodules carries
 // identity (path/url); the checked-out git tree carries the immutable gitlink commit.
 func ParseGitmodules(content string, commits map[string]string) []Dep {
@@ -395,18 +534,25 @@ const scaPackageEvent = "analysis.sca.package"
 // explicit advisories map. Used where advisories come from an explicit set rather than
 // the loaded JSON feed (the entrypoint projector, tests).
 func MarkVulnerable(g usg.Store, advisories map[PkgKey]string) error {
-	nodes, err := g.AllNodes()
-	if err != nil {
-		return err
+	type tokenUpdate struct {
+		id     string
+		tokens []string
 	}
-	for _, n := range nodes {
+	var updates []tokenUpdate
+	if err := rangeStoreNodes(g, func(n usg.Node) bool {
 		if n.Type != "sbom.PackageVersion" {
-			continue
+			return true
 		}
 		if adv := advisories[PkgKey{n.Prop("name"), n.Prop("version")}]; adv != "" {
-			if err := addPackageTokens(g, n.ID, "status=vulnerable", "advisory="+adv); err != nil {
-				return err
-			}
+			updates = append(updates, tokenUpdate{n.ID, []string{"status=vulnerable", "advisory=" + adv}})
+		}
+		return true
+	}); err != nil {
+		return err
+	}
+	for _, update := range updates {
+		if err := addPackageTokens(g, update.id, update.tokens...); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -453,33 +599,36 @@ func normalizeSpecifier(v string) string {
 // code node's callee_path rooted at the package name) with a neutral reachability token.
 // It reuses the import-resolved call graph the SAST frontend already produced.
 func LinkReachability(g usg.Store) error {
-	nodes, err := g.AllNodes()
+	used, err := packageUsage(g)
 	if err != nil {
 		return err
 	}
-	used := packageUsage(nodes)
-	pkgsByID := map[string]usg.Node{}
-	for _, n := range nodes {
+	reachable := map[string]bool{}
+	if err := rangeStoreNodes(g, func(n usg.Node) bool {
 		if n.Type != "sbom.PackageVersion" {
-			continue
+			return true
 		}
-		pkgsByID[n.ID] = n
 		for _, imp := range used.imports {
 			if packageNodeMatches(n, imp) {
 				_ = g.AddEdge(usg.Edge{Type: "DEPENDS_ON", Src: imp.id, Dst: n.ID})
-				used.reachable[n.ID] = true
+				reachable[n.ID] = true
 			}
 		}
 		for callRoot := range used.callRoots {
 			if PackageMatches(callRoot, n.Prop("name")) || PackageMatches(callRoot, n.Prop("package")) {
-				used.reachable[n.ID] = true
+				reachable[n.ID] = true
 			}
 		}
+		return true
+	}); err != nil {
+		return err
 	}
-	for id := range used.reachable {
-		if _, ok := pkgsByID[id]; !ok {
-			continue
-		}
+	var ids []string
+	for id := range reachable {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
 		if err := addPackageTokens(g, id, "reachable=true"); err != nil {
 			return err
 		}
@@ -539,12 +688,11 @@ type importUse struct {
 type usageEvidence struct {
 	imports   []importUse
 	callRoots map[string]bool
-	reachable map[string]bool
 }
 
-func packageUsage(nodes []usg.Node) usageEvidence {
-	used := usageEvidence{callRoots: map[string]bool{}, reachable: map[string]bool{}}
-	for _, n := range nodes {
+func packageUsage(g usg.Store) (usageEvidence, error) {
+	used := usageEvidence{callRoots: map[string]bool{}}
+	err := rangeStoreNodes(g, func(n usg.Node) bool {
 		switch n.Type {
 		case "code.Import":
 			module := n.Prop("module")
@@ -561,8 +709,9 @@ func packageUsage(nodes []usg.Node) usageEvidence {
 				used.callRoots[root] = true
 			}
 		}
-	}
-	return used
+		return true
+	})
+	return used, err
 }
 
 func packageNodeMatches(n usg.Node, imp importUse) bool {

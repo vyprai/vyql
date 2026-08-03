@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-
-adapter go {
-  package "k8s.io/component-helpers" {
-    source method "ParseNodeIPArgument" -> core.UserControlledData
-    source method "ParseNodeIPAnnotation" -> core.UserControlledData
-  }
-}

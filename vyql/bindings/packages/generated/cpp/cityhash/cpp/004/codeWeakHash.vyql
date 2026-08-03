@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m9209981e;
+
+binding weakHash4 {
+  requires {
+    dependency("cityhash")
+  }
+  query pattern callExpr where callee.method == "CityHash128WithSeed"
+  emit issue code.WeakHash at call
+}

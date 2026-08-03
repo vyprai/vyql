@@ -1,9 +1,0 @@
-import code.{SqlExecution}
-import core.{SqlParameterization}
-
-adapter groovy {
-  package "org.xerial:sqlite-jdbc" {
-    sink method "exec" -> code.SqlExecution
-    control method "escape" -> core.SqlParameterization
-  }
-}

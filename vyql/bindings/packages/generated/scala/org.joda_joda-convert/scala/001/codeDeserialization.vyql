@@ -1,0 +1,9 @@
+module bindings.scala.generated.mf8b523ed;
+
+binding deserialization1 {
+  requires {
+    dependency("org.joda:joda-convert")
+  }
+  query pattern callExpr where callee.method == "parseRenameFile"
+  emit sink code.Deserialization at args[0]
+}

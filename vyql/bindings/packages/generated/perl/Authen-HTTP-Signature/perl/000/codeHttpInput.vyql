@@ -1,0 +1,9 @@
+module bindings.perl.generated.m5cdc92fa;
+
+binding httpInput0 {
+  requires {
+    dependency("Authen-HTTP-Signature")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.HttpInput at call.result
+}

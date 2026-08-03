@@ -1,0 +1,9 @@
+module bindings.dart.generated.m63a883b0;
+
+binding networkData0 {
+  requires {
+    dependency("shelf_web_socket")
+  }
+  query pattern callExpr where callee.method == "webSocketHandler"
+  emit source code.NetworkData at call.result
+}

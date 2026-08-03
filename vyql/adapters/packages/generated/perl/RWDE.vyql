@@ -1,5 +1,0 @@
-adapter perl {
-  package "RWDE" {
-    sink method "decode" -> code.Deserialization
-  }
-}

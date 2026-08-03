@@ -1,0 +1,9 @@
+module bindings.ruby.generated.maad4847d;
+
+binding commandExecution0 {
+  requires {
+    dependency("coveralls")
+  }
+  query pattern callExpr where callee.method == "CommandLine.push"
+  emit sink code.CommandExecution at args[0]
+}

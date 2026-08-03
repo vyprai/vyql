@@ -1,0 +1,9 @@
+module bindings.swift.generated.m98e3ffbb;
+
+binding nosqlQuery7 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NosqlQuery at args[0]
+}

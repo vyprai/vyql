@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{HtmlEscape}
-
-adapter elixir {
-  package "calliope" {
-    sink method "parse" -> code.Deserialization
-    control method "clean" -> core.HtmlEscape
-  }
-}

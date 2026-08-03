@@ -1,0 +1,9 @@
+module bindings.dart.generated.m3c2b05ac;
+
+binding userControlledData1 {
+  requires {
+    dependency("uuid")
+  }
+  query pattern callExpr where callee.method == "Uuid.parseAsByteList"
+  emit source core.UserControlledData at call.result
+}

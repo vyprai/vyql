@@ -1,0 +1,9 @@
+module bindings.elixir.generated.md0a5e4cb;
+
+binding httpInput0 {
+  requires {
+    dependency("remote_ip")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.md57970a0;
+
+binding httpInput0 {
+  requires {
+    dependency("passenger")
+  }
+  query pattern callExpr where callee.path ~= "disableRequestNote"
+  emit source code.HttpInput at call.result
+}

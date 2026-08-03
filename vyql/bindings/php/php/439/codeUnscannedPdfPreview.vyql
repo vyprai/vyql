@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding unscannedPdfPreview439 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "unscanned_pdf_preview"
+  emit issue code.UnscannedPdfPreview at node
+}

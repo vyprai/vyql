@@ -1,0 +1,11 @@
+module code;
+
+concept OwnerFree : issue {
+  cwe: [CWE_401]
+  reviewAssumption: "the release routine frees nested fields unless they are cleared first"
+  reviewCategory: resource
+  reviewCondition: "owner release follows a dominating field clear"
+  reviewConfidence: low
+  reviewEvidence: "owner release primitive {pattern} is reached after an owned field clear"
+  vulnerableTo: [resource.ResourceLeak]
+}

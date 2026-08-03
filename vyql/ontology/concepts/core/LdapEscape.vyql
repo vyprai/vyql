@@ -1,0 +1,8 @@
+module core;
+
+concept LdapEscape : check {
+  applies: path
+  covers: [path]
+  cwe: [CWE_90]
+  neutralizes: [injection.LdapInjection]
+}

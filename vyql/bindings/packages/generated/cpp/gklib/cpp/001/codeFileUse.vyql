@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m5d6a286e;
+
+binding fileUse1 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_fclose"
+  emit sink code.FileUseSink at args[0]
+}

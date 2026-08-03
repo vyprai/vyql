@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m8609ffa5;
+
+binding deserialization3 {
+  requires {
+    dependency("nimble_csv")
+  }
+  query pattern callExpr where callee.method == "define"
+  emit sink code.Deserialization at args[0]
+}

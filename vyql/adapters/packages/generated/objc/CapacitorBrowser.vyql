@@ -1,8 +1,0 @@
-import code.{RedirectTarget}
-adapter objc {
-  package "CapacitorBrowser" {
-    flag code.RedirectTarget on any {
-      method "open"
-    }
-  }
-}

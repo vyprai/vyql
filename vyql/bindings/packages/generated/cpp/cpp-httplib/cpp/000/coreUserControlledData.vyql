@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mb7311fac;
+
+binding userControlledData0 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "get_header_value"
+  emit source core.UserControlledData at call.result
+}

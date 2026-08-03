@@ -1,0 +1,9 @@
+module bindings.perl.generated.mc6d5a57d;
+
+binding commandExecution1 {
+  requires {
+    dependency("Mail-SpamAssassin-Contrib-Plugin-IPFilter")
+  }
+  query pattern callExpr where callee.method == "service_cmd"
+  emit sink code.CommandExecution at args[0]
+}

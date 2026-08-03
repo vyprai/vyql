@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m089c36d3;
+
+binding networkSend3 {
+  requires {
+    dependency("prometheus-cpp")
+  }
+  query pattern callExpr where callee.method == "async_push"
+  emit sink code.NetworkSend at args[0]
+}

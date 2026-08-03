@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mbad3401a;
+
+binding userControlledData0 {
+  requires {
+    dependency("@webassemblyjs/utf8")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit source core.UserControlledData at call.result
+}

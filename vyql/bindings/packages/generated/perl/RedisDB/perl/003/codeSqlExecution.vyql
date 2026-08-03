@@ -1,0 +1,9 @@
+module bindings.perl.generated.m2e3f45c8;
+
+binding sqlExecution3 {
+  requires {
+    dependency("RedisDB")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.SqlExecution at args[0]
+}

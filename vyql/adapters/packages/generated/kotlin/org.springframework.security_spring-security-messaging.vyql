@@ -1,7 +1,0 @@
-import core.{CsrfProtection}
-
-adapter kotlin {
-  package "org.springframework.security:spring-security-messaging" {
-    control method "CsrfChannelInterceptor.preSend" -> core.CsrfProtection
-  }
-}

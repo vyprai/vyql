@@ -1,0 +1,8 @@
+module code;
+
+review code.CommentUpdateMissingOwnershipConstraint {
+  category: auth
+  expected: [core.OwnershipCheck, core.AuthorizationCheck]
+  kind: attention
+  text: "review comment update queries for current-author or current-user ownership constraints"
+}

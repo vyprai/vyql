@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m450a9861;
+
+binding cliArgument0 {
+  requires {
+    dependency("ampl-mp")
+  }
+  query pattern callExpr where callee.path ~= "Parser.parse"
+  emit source code.CliArgument at call.result
+}

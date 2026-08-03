@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m4ca39d61;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("redis-activesupport")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.StoredDataWrite at args[0]
+}

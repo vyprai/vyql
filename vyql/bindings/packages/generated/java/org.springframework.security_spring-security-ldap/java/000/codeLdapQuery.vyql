@@ -1,0 +1,9 @@
+module bindings.java.generated.m87251a0e;
+
+binding ldapQuery0 {
+  requires {
+    dependency("org.springframework.security:spring-security-ldap")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.LdapQuery at args[0]
+}

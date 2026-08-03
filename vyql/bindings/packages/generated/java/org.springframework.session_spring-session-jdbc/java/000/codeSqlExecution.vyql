@@ -1,0 +1,9 @@
+module bindings.java.generated.mfe97f080;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.springframework.session:spring-session-jdbc")
+  }
+  query pattern callExpr where callee.method == "setCreateSessionQuery"
+  emit sink code.SqlExecution at args[0]
+}

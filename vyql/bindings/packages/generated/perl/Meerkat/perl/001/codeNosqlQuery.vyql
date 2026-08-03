@@ -1,0 +1,9 @@
+module bindings.perl.generated.m77118eb6;
+
+binding nosqlQuery1 {
+  requires {
+    dependency("Meerkat")
+  }
+  query pattern callExpr where callee.method == "find_id"
+  emit sink code.NosqlQuery at args[0]
+}

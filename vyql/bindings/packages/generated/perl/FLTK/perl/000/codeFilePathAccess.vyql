@@ -1,0 +1,9 @@
+module bindings.perl.generated.md98b53e8;
+
+binding filePathAccess0 {
+  requires {
+    dependency("FLTK")
+  }
+  query pattern callExpr where callee.method == "fl_load_image"
+  emit sink code.FilePathAccess at args[0]
+}

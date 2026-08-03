@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding deserialization283 {
+  query pattern callExpr where callee.path ~= "yaml.load"
+  emit sink code.Deserialization at args[0]
+}

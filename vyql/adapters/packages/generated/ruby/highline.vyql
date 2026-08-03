@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter ruby {
-  package "highline" {
-    source method "HighLine.agree" -> core.UserControlledData
-    source method "HighLine.ask" -> core.UserControlledData
-  }
-}

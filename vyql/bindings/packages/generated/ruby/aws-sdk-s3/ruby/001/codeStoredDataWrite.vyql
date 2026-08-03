@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m90b9fe8b;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("aws-sdk-s3")
+  }
+  query pattern callExpr where callee.method == "put_object"
+  emit sink code.StoredDataWrite at args[0]
+}

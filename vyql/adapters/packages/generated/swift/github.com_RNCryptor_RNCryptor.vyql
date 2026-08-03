@@ -1,8 +1,0 @@
-import code.{SecretValue}
-import core.{UserControlledData}
-
-adapter swift {
-  package "github.com/RNCryptor/RNCryptor" {
-    source method "decrypt" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule UnboundedAllocationReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_400, CWE_770]
+    id: "VYQL-DOS-041"
+    severity: high
+  }
+  issue code.UnboundedAllocationReview as sink
+}

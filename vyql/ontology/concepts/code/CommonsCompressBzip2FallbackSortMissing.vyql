@@ -1,0 +1,11 @@
+module code;
+
+concept CommonsCompressBzip2FallbackSortMissing : issue {
+  cwe: [CWE_400]
+  reviewAssumption: "attacker-controlled or remote file content can contain highly repetitive bytes and reach BZip2CompressorOutputStream compression"
+  reviewCategory: resource
+  reviewCondition: "bzip2 block sorting retries the original main sorter after excessive comparison work instead of switching to the bounded fallback sorter"
+  reviewConfidence: high
+  reviewEvidence: "Commons Compress bzip2 block sort context {pattern} calls mainSort and randomiseBlock when workDone exceeds workLimit without an observed fallbackSort call"
+  vulnerableTo: [dos.UncontrolledResourceConsumption]
+}

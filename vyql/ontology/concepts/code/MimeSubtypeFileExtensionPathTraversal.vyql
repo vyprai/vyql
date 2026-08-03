@@ -1,0 +1,11 @@
+module code;
+
+concept MimeSubtypeFileExtensionPathTraversal : issue {
+  cwe: [CWE_22]
+  reviewAssumption: "an attacker-controlled server can return a crafted Content-Type subtype containing path separators or dangerous extension text"
+  reviewCategory: path
+  reviewCondition: "a MIME subtype from response metadata is converted directly into a file extension used for writes"
+  reviewConfidence: high
+  reviewEvidence: "MIME extension context {pattern} splits content-type into subtype and assigns it to an output extension without using a registry allowlist such as mimetypes.guess_extension"
+  vulnerableTo: [path.PathTraversal]
+}

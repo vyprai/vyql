@@ -1,0 +1,11 @@
+module code;
+
+concept DebugMediaExposure : issue {
+  cwe: [CWE_552]
+  reviewAssumption: "the handler applies no access control to the files it serves"
+  reviewCategory: misconfig
+  reviewCondition: "user-uploaded media is served through the debug static handler"
+  reviewConfidence: medium
+  reviewEvidence: "media serving {pattern} runs through the debug static route"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

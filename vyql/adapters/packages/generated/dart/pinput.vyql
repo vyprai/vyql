@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter dart {
-  package "pinput" {
-    source method "autofill" -> core.UserControlledData
-  }
-}

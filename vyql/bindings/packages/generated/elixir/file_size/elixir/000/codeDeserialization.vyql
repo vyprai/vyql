@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m1689bc0f;
+
+binding deserialization0 {
+  requires {
+    dependency("file_size")
+  }
+  query pattern callExpr where callee.method == "FileSize.Parser.parse"
+  emit sink code.Deserialization at args[0]
+}

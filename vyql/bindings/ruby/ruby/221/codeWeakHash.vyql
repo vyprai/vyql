@@ -1,0 +1,6 @@
+module bindings.ruby.generated.m5a48bf47;
+
+binding weakHash221 {
+  query pattern presenceNode where node.path ~= "Digest.MD5"
+  emit issue code.WeakHash at node
+}

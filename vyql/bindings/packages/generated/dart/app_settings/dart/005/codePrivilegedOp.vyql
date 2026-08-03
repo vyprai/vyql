@@ -1,0 +1,10 @@
+module bindings.dart.generated.mc2ae0e2a;
+
+binding privilegedOp5 {
+  requires {
+    dependency("app_settings")
+  }
+  query pattern callExpr where callee.method == "handleOpenSettingsPanel"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

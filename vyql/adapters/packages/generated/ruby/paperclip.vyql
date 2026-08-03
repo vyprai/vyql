@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter ruby {
-  package "paperclip" {
-    sink method "run" -> code.CommandExecution
-  }
-}

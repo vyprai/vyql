@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m0144948c;
+
+binding filePathAccess2 {
+  requires {
+    dependency("console-bridge")
+  }
+  query pattern callExpr where callee.method == "OutputHandlerFile.OutputHandlerFile"
+  emit sink code.FilePathAccess at args[0]
+}

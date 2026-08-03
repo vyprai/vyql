@@ -1,0 +1,9 @@
+module bindings.elixir.generated.md39518e8;
+
+binding urlFetch3 {
+  requires {
+    dependency("hackney")
+  }
+  query pattern callExpr where callee.method == "do_request"
+  emit sink code.UrlFetch at args[0]
+}

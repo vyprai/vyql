@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "net.bytebuddy:byte-buddy" {
-    sink method "parse" -> code.Deserialization
-  }
-}

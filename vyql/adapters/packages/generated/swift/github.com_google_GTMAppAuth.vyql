@@ -1,7 +1,0 @@
-import core.{AuthenticationCheck}
-
-adapter swift {
-  package "github.com/google/GTMAppAuth" {
-    control method "authorizeRequest" -> core.AuthenticationCheck
-  }
-}

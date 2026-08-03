@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-
-adapter php {
-  package "vimeo/psalm" {
-    sink method "loadFromXMLFile" -> code.Deserialization
-    sink method "loadFromXML" -> code.Deserialization
-  }
-}

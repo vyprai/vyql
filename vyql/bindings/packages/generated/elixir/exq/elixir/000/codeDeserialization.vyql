@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mf677f249;
+
+binding deserialization0 {
+  requires {
+    dependency("exq")
+  }
+  query pattern callExpr where callee.method == "Exq.Support.Job.decode"
+  emit sink code.Deserialization at args[0]
+}

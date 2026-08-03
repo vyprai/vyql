@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m54a37f0f;
+
+binding deserialization1 {
+  requires {
+    dependency("org.openjdk.jmh:jmh-core")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

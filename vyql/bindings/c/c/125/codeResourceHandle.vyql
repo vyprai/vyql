@@ -1,0 +1,7 @@
+module bindings.c.generated.mce54b166;
+
+binding resourceHandle125 {
+  query pattern callExpr where callee.path ~= "ucsdet_open"
+  emit sink code.ResourceHandleSink at args[0]
+  emit issue code.ResourceHandle at call
+}

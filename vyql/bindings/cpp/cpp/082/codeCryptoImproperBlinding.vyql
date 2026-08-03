@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m4e783366;
+
+binding cryptoImproperBlinding82 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "crypto.improper_blinding_inversion"
+  emit issue code.CryptoImproperBlinding at node
+}

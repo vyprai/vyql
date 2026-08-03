@@ -1,0 +1,10 @@
+module bindings.elixir.generated.m60f1cf91;
+
+binding redirectTarget0 {
+  requires {
+    dependency("plug_canonical_host")
+  }
+  query pattern callExpr where callee.method == "redirect_location"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

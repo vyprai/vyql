@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-
-adapter ruby {
-  package "cucumber-core" {
-    source method "parse" -> core.UserControlledData
-    source method "process" -> core.UserControlledData
-  }
-}

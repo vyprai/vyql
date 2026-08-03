@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter javascript {
-  package "lodash.template" {
-    sink method "template" -> code.CodeEval
-  }
-}

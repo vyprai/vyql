@@ -1,9 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter java {
-  package "org.antlr:antlr4-runtime" {
-    sink method "parse" -> code.Deserialization
-    sink method "match" -> code.Deserialization
-    sink method "load" -> code.FilePathAccess
-    sink method "nextToken" -> code.Deserialization
-  }
-}

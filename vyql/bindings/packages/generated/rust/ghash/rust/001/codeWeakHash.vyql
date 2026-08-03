@@ -1,0 +1,9 @@
+module bindings.rust.generated.m47cebe39;
+
+binding weakHash1 {
+  requires {
+    dependency("ghash")
+  }
+  query pattern callExpr where callee.method == "finalize"
+  emit issue code.WeakHash at call
+}

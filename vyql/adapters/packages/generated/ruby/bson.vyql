@@ -1,5 +1,0 @@
-adapter ruby {
-  package "bson" {
-    sink method "rb_bson_byte_buffer_get_hash" -> code.Deserialization
-  }
-}

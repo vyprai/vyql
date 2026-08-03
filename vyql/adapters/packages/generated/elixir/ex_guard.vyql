@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter elixir {
-  package "ex_guard" {
-    sink method "command" -> code.CommandExecution
-  }
-}

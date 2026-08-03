@@ -1,0 +1,9 @@
+module bindings.php.generated.m477c4003;
+
+binding networkSend5 {
+  requires {
+    dependency("guzzlehttp/guzzle")
+  }
+  query pattern callExpr where callee.method == "requestAsync"
+  emit sink code.NetworkSend at args[0]
+}

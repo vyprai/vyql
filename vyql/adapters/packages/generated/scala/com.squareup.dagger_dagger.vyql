@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "com.squareup.dagger:dagger" {
-    sink method "createWith" -> code.Deserialization
-    sink method "makeGraph" -> code.Deserialization
-  }
-}

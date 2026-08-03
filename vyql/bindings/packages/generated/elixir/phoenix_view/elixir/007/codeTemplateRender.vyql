@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mea77056c;
+
+binding templateRender7 {
+  requires {
+    dependency("phoenix_view")
+  }
+  query pattern callExpr where callee.method == "render_to_string"
+  emit sink code.TemplateRender at args[0]
+}

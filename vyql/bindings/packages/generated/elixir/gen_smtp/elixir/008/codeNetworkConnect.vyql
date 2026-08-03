@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mcbf3d81a;
+
+binding networkConnect8 {
+  requires {
+    dependency("gen_smtp")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

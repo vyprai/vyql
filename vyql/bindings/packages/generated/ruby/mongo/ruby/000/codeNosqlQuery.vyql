@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mb1fc3a64;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("mongo")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NosqlQuery at args[0]
+}

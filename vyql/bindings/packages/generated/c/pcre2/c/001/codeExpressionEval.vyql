@@ -1,0 +1,9 @@
+module bindings.c.generated.mdbb65ebb;
+
+binding expressionEval1 {
+  requires {
+    dependency("pcre2")
+  }
+  query pattern callExpr where callee.method == "pcre2_regexec"
+  emit sink code.ExpressionEval at args[0]
+}

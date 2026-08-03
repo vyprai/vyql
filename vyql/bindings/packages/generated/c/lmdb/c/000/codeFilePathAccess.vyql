@@ -1,0 +1,9 @@
+module bindings.c.generated.m89f98ea8;
+
+binding filePathAccess0 {
+  requires {
+    dependency("lmdb")
+  }
+  query pattern callExpr where callee.method == "mdb_env_open"
+  emit sink code.FilePathAccess at args[0]
+}

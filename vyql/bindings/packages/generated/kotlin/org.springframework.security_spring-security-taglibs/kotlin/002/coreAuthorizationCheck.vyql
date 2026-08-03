@@ -1,0 +1,13 @@
+module bindings.kotlin.generated.m4f469e2e;
+
+binding authorizationCheck2 {
+  requires {
+    dependency("org.springframework.security:spring-security-taglibs")
+  }
+  query pattern callExpr where callee.method == "authorizeUsingUrlCheck"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

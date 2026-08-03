@@ -1,0 +1,6 @@
+module bindings.objc.generated.mccadd221;
+
+binding divisionDenominator51 {
+  query pattern callExpr where callee.path ~= "__binop.mod"
+  emit sink code.DivisionDenominator at args[1]
+}

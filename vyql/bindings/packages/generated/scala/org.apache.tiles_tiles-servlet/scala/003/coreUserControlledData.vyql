@@ -1,0 +1,9 @@
+module bindings.scala.generated.m18f0ea4d;
+
+binding userControlledData3 {
+  requires {
+    dependency("org.apache.tiles:tiles-servlet")
+  }
+  query pattern callExpr where callee.method == "mutate"
+  emit source core.UserControlledData at call.result
+}

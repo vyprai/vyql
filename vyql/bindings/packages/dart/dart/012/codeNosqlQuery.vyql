@@ -1,0 +1,9 @@
+module bindings.dart.generated.m5342780c;
+
+binding nosqlQuery12 {
+  requires {
+    dependency("mongo_dart")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}

@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-
-adapter rust {
-  package "prometheus" {
-    control method "escape_string" -> core.HtmlEscape
-  }
-}

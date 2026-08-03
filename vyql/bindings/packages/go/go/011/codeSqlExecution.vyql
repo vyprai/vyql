@@ -1,0 +1,9 @@
+module bindings.go.generated.m39efcd29;
+
+binding sqlExecution11 {
+  requires {
+    dependency("database/sql")
+  }
+  query pattern callExpr where callee.method == "Query"
+  emit sink code.SqlExecution at args[0]
+}

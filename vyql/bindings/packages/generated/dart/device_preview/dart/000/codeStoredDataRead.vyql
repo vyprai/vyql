@@ -1,0 +1,9 @@
+module bindings.dart.generated.mcd68bc0e;
+
+binding storedDataRead0 {
+  requires {
+    dependency("device_preview")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit source code.StoredDataRead at call.result
+}

@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding csvCell398 {
+  query pattern callExpr where callee.method == "writeNext"
+  emit sink code.CsvCell at args.any.collection
+}

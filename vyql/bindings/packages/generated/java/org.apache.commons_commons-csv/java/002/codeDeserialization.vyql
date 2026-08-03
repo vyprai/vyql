@@ -1,0 +1,9 @@
+module bindings.java.generated.m1c8fadda;
+
+binding deserialization2 {
+  requires {
+    dependency("org.apache.commons:commons-csv")
+  }
+  query pattern callExpr where callee.method == "CSVParser.parse"
+  emit sink code.Deserialization at args[0]
+}

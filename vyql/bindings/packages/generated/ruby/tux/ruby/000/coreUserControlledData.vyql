@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m4a50fb6f;
+
+binding userControlledData0 {
+  requires {
+    dependency("tux")
+  }
+  query pattern callExpr where callee.method == "Tux::Runner.parse_option"
+  emit source core.UserControlledData at call.result
+}

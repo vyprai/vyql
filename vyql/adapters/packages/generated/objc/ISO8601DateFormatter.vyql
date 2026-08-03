@@ -1,6 +1,0 @@
-adapter objc {
-  package "ISO8601DateFormatter" {
-    sink method "dateComponentsFromString:" -> code.Deserialization
-    sink method "dateFromString:" -> code.Deserialization
-  }
-}

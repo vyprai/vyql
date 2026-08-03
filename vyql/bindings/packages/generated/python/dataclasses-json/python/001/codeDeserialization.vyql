@@ -1,0 +1,9 @@
+module bindings.python.generated.m6980d701;
+
+binding deserialization1 {
+  requires {
+    dependency("dataclasses-json")
+  }
+  query pattern callExpr where callee.method == "from_dict"
+  emit sink code.Deserialization at args[0]
+}

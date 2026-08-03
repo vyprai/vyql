@@ -1,0 +1,6 @@
+module bindings.java.generated.m420f6b67;
+
+binding commandExecution125 {
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args.any
+}

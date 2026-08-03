@@ -1,0 +1,9 @@
+module bindings.c.generated.mb4f2a5a4;
+
+binding deserialization5 {
+  requires {
+    dependency("draco")
+  }
+  query pattern callExpr where callee.method == "DecodeFromFileToScene"
+  emit sink code.Deserialization at args[0]
+}

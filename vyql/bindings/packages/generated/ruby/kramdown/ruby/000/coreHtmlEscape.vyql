@@ -1,0 +1,14 @@
+module bindings.ruby.generated.m53ced9e5;
+
+binding htmlEscape0 {
+  requires {
+    dependency("kramdown")
+  }
+  query pattern callExpr where callee.method == "Kramdown::Utils::Html.escape_html"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

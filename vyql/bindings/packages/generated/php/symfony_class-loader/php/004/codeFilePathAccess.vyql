@@ -1,0 +1,9 @@
+module bindings.php.generated.m027bda08;
+
+binding filePathAccess4 {
+  requires {
+    dependency("symfony/class-loader")
+  }
+  query pattern callExpr where callee.method == "createMap"
+  emit sink code.FilePathAccess at args[0]
+}

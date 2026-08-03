@@ -1,0 +1,11 @@
+module code;
+
+concept JenkinsRemoteValidationMissingPostPermission : issue {
+  cwe: [CWE_352, CWE_862, CWE_918]
+  reviewAssumption: "a user with Overall/Read or a browser-backed request can invoke descriptor validation endpoints with attacker-controlled URL or proxy parameters"
+  reviewCategory: request_forgery
+  reviewCondition: "Jenkins descriptor form-validation endpoint connects to a supplied remote URL without POST and administrator permission checks"
+  reviewConfidence: high
+  reviewEvidence: "Jenkins descriptor endpoint context {pattern} accepts QueryParameter values, builds a remote client or configuration, and performs a test connection before observed @POST and checkPermission/hasPermission gates"
+  vulnerableTo: [request_forgery.Csrf, access_control.MissingAuthorization, request_forgery.Ssrf]
+}

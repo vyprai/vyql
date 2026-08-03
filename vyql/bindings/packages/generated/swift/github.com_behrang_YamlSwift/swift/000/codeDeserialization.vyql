@@ -1,0 +1,9 @@
+module bindings.swift.generated.m9ca2f468;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/behrang/YamlSwift")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.generated.m005cda50;
+
+binding deserialization0 {
+  requires {
+    dependency("spacy-legacy")
+  }
+  query pattern callExpr where callee.method == "load_model"
+  emit sink code.Deserialization at args[0]
+}

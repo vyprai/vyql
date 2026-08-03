@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding templateRender487 {
+  query pattern callExpr where callee.path ~= "render_template_string"
+  emit sink code.TemplateRender at args[0]
+}

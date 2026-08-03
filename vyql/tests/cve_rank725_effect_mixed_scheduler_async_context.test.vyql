@@ -1,0 +1,117 @@
+# Rank 725 / CVE-2026-32887: Effect MixedScheduler batched fiber continuations
+# through one shared queue/runner, so concurrent RPC/HTTP handlers could resume
+# in the wrong Node AsyncLocalStorage context. The selected corpus commit is a
+# package version/changelog release slice whose parent is already after the real
+# scheduler fix, so this spec is a runnable local regression but is skipped by
+# the current fresh-target verifier.
+#
+# verify_current_expected: skip-fresh-target
+
+test "rank725: MixedScheduler uses a shared runner queue for fiber continuations"
+  lang javascript
+  file packages/effect/src/Scheduler.ts
+  expect VYQL-RACE-008
+  expect_review code.EffectMixedSchedulerSharedRunner
+  code
+  ```
+  export type Task = () => void
+  export interface Scheduler {
+    shouldYield(fiber: RuntimeFiber<unknown, unknown>): number | false
+    scheduleTask(task: Task, priority: number): void
+  }
+
+  export class PriorityBuckets<in out T = Task> {
+    public buckets: Array<[number, Array<T>]> = []
+    scheduleTask(task: T, priority: number) {
+      this.buckets.push([priority, [task]])
+    }
+  }
+
+  export class MixedScheduler implements Scheduler {
+    running = false
+    tasks = new PriorityBuckets()
+    constructor(readonly maxNextTickBeforeTimer: number) {}
+
+    private starveInternal(depth: number) {
+      const tasks = this.tasks.buckets
+      this.tasks.buckets = []
+      for (const [_, toRun] of tasks) {
+        for (let i = 0; i < toRun.length; i++) {
+          toRun[i]()
+        }
+      }
+      if (this.tasks.buckets.length === 0) {
+        this.running = false
+      } else {
+        this.starve(depth)
+      }
+    }
+
+    private starve(depth = 0) {
+      if (depth >= this.maxNextTickBeforeTimer) {
+        setTimeout(() => this.starveInternal(0), 0)
+      } else {
+        Promise.resolve(void 0).then(() => this.starveInternal(depth + 1))
+      }
+    }
+
+    scheduleTask(task: Task, priority: number) {
+      this.tasks.scheduleTask(task, priority)
+      if (!this.running) {
+        this.running = true
+        this.starve()
+      }
+    }
+  }
+  ```
+
+test "rank725: SchedulerRunner cache isolates task drains by fiber"
+  lang javascript
+  file packages/effect/src/Scheduler.ts
+  reject VYQL-RACE-008
+  reject_review code.EffectMixedSchedulerSharedRunner
+  code
+  ```
+  export type Task = () => void
+  export interface Scheduler {
+    shouldYield(fiber: RuntimeFiber<unknown, unknown>): number | false
+    scheduleTask(task: Task, priority: number, fiber?: RuntimeFiber<unknown, unknown>): void
+  }
+
+  export class SchedulerRunner {
+    running = false
+    tasks = new PriorityBuckets()
+
+    constructor(readonly scheduleDrain: (depth: number, drain: (depth: number) => void) => void) {}
+
+    static cached(scheduleDrain: (depth: number, drain: (depth: number) => void) => void) {
+      const fallback = new SchedulerRunner(scheduleDrain)
+      const runners = new WeakMap<RuntimeFiber<unknown, unknown>, SchedulerRunner>()
+      return (fiber?: RuntimeFiber<unknown, unknown>) => {
+        if (fiber === undefined) return fallback
+        let runner = runners.get(fiber)
+        if (runner === undefined) {
+          runner = new SchedulerRunner(scheduleDrain)
+          runners.set(fiber, runner)
+        }
+        return runner
+      }
+    }
+  }
+
+  export class MixedScheduler implements Scheduler {
+    private readonly getRunner = SchedulerRunner.cached((depth, drain) => {
+      if (depth >= this.maxNextTickBeforeTimer) {
+        setTimeout(() => drain(0), 0)
+      } else {
+        Promise.resolve(void 0).then(() => drain(depth + 1))
+      }
+    })
+
+    constructor(readonly maxNextTickBeforeTimer: number) {}
+
+    scheduleTask(task: Task, priority: number, fiber?: RuntimeFiber<unknown, unknown>) {
+      this.getRunner(fiber).scheduleTask(task, priority)
+    }
+  }
+  ```

@@ -1,5 +1,0 @@
-adapter groovy {
-  package "org.apache.struts:struts2-spring-plugin" {
-    source method "setApplicationContextPath" -> core.UserControlledData
-  }
-}

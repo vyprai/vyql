@@ -1,8 +1,0 @@
-import code.{UrlFetch}
-
-adapter php {
-  package "maxmind/web-service-common" {
-    sink method "post" -> code.UrlFetch
-    sink method "get" -> code.UrlFetch
-  }
-}

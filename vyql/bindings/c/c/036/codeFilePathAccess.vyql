@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding filePathAccess36 {
+  query pattern callExpr where callee.path ~= "file_read"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-adapter php {
-  package "league/fractal" {
-    source method "parseIncludes" -> core.UserControlledData
-    source method "parseFieldsets" -> core.UserControlledData
-    source method "parseExcludes" -> core.UserControlledData
-  }
-}

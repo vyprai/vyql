@@ -1,0 +1,13 @@
+module bindings.dart.generated.ma2325e4f;
+
+binding authenticationCheck9 {
+  requires {
+    dependency("firebase_auth")
+  }
+  query pattern callExpr where callee.method == "verifyBeforeUpdateEmail"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

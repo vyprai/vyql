@@ -1,8 +1,0 @@
-import code.{NetworkSend, NetworkData}
-
-adapter scala {
-  package "org.apache.activemq:activemq-client" {
-    sink method "send" -> code.NetworkSend
-    source method "receiveBody" -> code.NetworkData
-  }
-}

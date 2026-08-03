@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "yard" {
-    sink method "YARD::Parser::SourceParser.parse" -> code.Deserialization
-    sink method "YARD::Parser::SourceParser.parse_string" -> code.Deserialization
-  }
-}

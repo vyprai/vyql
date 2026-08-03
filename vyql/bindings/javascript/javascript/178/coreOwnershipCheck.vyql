@@ -1,0 +1,10 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding ownershipCheck178 {
+  query pattern callExpr where callee.path ~= "checkOwnership"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

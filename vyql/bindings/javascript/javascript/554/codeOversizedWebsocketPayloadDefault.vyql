@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding oversizedWebsocketPayloadDefault554 {
+  query pattern presenceNode where node.scope == "class" and node.context.language == "javascript" and node.context.prop contains "maxHttpBufferSize=10e7" and node.context.prop contains "maxPayload=this.opts.maxHttpBufferSize" and not (node.context.prop contains "maxHttpBufferSize=1e6")
+  emit issue code.OversizedWebsocketPayloadDefault at node
+}

@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/vyprai/vyql/datadir"
 )
 
 func TestAdaptersAvoidLegacyStructuredTokenHasSyntax(t *testing.T) {
@@ -16,11 +18,11 @@ func TestAdaptersAvoidLegacyStructuredTokenHasSyntax(t *testing.T) {
 		t.Fatal("runtime.Caller failed")
 	}
 	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
-	adapterRoot := filepath.Join(root, "vyql", "adapters")
+	bindingRoot := filepath.Join(root, "vyql", "bindings")
 	legacy := regexp.MustCompile(`\b(?:has|lacks)\s+"(?:call_path|literal|selector|identifier|function_name|class_name|class_base|class_bases|attr_path|decorator_path|decorator_method|param_name|param_type|param_index|var_name|return):`)
 
 	var hits []string
-	err := filepath.WalkDir(adapterRoot, func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(bindingRoot, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -53,10 +55,10 @@ func TestSecretComparisonReviewUsesStructuredFlagPredicates(t *testing.T) {
 		t.Fatal("runtime.Caller failed")
 	}
 	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
-	adapterRoot := filepath.Join(root, "vyql", "adapters")
+	bindingRoot := filepath.Join(root, "vyql", "bindings")
 
 	var hits []string
-	err := filepath.WalkDir(adapterRoot, func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(bindingRoot, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -67,13 +69,13 @@ func TestSecretComparisonReviewUsesStructuredFlagPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := Parse(string(data))
+		decls, err := parseV2DefinitionsForTest(string(data))
 		if err != nil {
 			return err
 		}
 		rel, _ := filepath.Rel(root, path)
 		for _, decl := range decls {
-			ad, ok := decl.(*AdapterDecl)
+			ad, ok := decl.(*BindingSet)
 			if !ok {
 				continue
 			}
@@ -110,10 +112,10 @@ func TestMultipleDropdownScalarFallbackUsesAstPredicates(t *testing.T) {
 		t.Fatal("runtime.Caller failed")
 	}
 	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
-	adapterRoot := filepath.Join(root, "vyql", "adapters")
+	bindingRoot := filepath.Join(root, "vyql", "bindings")
 
 	var hits []string
-	err := filepath.WalkDir(adapterRoot, func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(bindingRoot, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -124,13 +126,13 @@ func TestMultipleDropdownScalarFallbackUsesAstPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := Parse(string(data))
+		decls, err := parseV2DefinitionsForTest(string(data))
 		if err != nil {
 			return err
 		}
 		rel, _ := filepath.Rel(root, path)
 		for _, decl := range decls {
-			ad, ok := decl.(*AdapterDecl)
+			ad, ok := decl.(*BindingSet)
 			if !ok {
 				continue
 			}
@@ -161,19 +163,17 @@ func TestMultipleDropdownScalarFallbackUsesAstPredicates(t *testing.T) {
 }
 
 func TestJavaScriptContextFlowFlagsUseAstPredicates(t *testing.T) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
-	path := filepath.Join(root, "vyql", "adapters", "javascript.vyql")
-	data, err := os.ReadFile(path)
+	sources, err := datadir.ReadVYQLDir("bindings/javascript")
 	if err != nil {
 		t.Fatal(err)
 	}
-	decls, err := Parse(string(data))
-	if err != nil {
-		t.Fatal(err)
+	var decls []Decl
+	for _, source := range sources {
+		parsed, err := parseV2DefinitionsForTest(string(source.Data))
+		if err != nil {
+			t.Fatalf("parse %s: %v", source.Name, err)
+		}
+		decls = append(decls, parsed...)
 	}
 	structuralConcepts := map[string]bool{
 		"code.StoredHtmlWrite":                          true,
@@ -202,7 +202,7 @@ func TestJavaScriptContextFlowFlagsUseAstPredicates(t *testing.T) {
 
 	var hits []string
 	for _, decl := range decls {
-		ad, ok := decl.(*AdapterDecl)
+		ad, ok := decl.(*BindingSet)
 		if !ok {
 			continue
 		}
@@ -233,10 +233,10 @@ func TestFlowAwareFlagsUseAstPredicates(t *testing.T) {
 		t.Fatal("runtime.Caller failed")
 	}
 	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
-	adapterRoot := filepath.Join(root, "vyql", "adapters")
+	bindingRoot := filepath.Join(root, "vyql", "bindings")
 
 	var hits []string
-	err := filepath.WalkDir(adapterRoot, func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(bindingRoot, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -247,13 +247,13 @@ func TestFlowAwareFlagsUseAstPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := Parse(string(data))
+		decls, err := parseV2DefinitionsForTest(string(data))
 		if err != nil {
 			return err
 		}
 		rel, _ := filepath.Rel(root, path)
 		for _, decl := range decls {
-			ad, ok := decl.(*AdapterDecl)
+			ad, ok := decl.(*BindingSet)
 			if !ok {
 				continue
 			}
@@ -301,7 +301,7 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 		t.Fatal("runtime.Caller failed")
 	}
 	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
-	adapterRoot := filepath.Join(root, "vyql", "adapters")
+	bindingRoot := filepath.Join(root, "vyql", "bindings")
 	structuralConcepts := map[string]bool{
 		"code.EnvFileVariableInjection":                       true,
 		"code.ForOwnRecursiveDefaultsPrototypePollution":      true,
@@ -319,7 +319,7 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 	}
 
 	var hits []string
-	err := filepath.WalkDir(adapterRoot, func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(bindingRoot, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -330,13 +330,13 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := Parse(string(data))
+		decls, err := parseV2DefinitionsForTest(string(data))
 		if err != nil {
 			return err
 		}
 		rel, _ := filepath.Rel(root, path)
 		for _, decl := range decls {
-			ad, ok := decl.(*AdapterDecl)
+			ad, ok := decl.(*BindingSet)
 			if !ok {
 				continue
 			}
@@ -366,7 +366,7 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 	}
 }
 
-func flagHasFlowPredicate(flag *AdapterFlag) bool {
+func flagHasFlowPredicate(flag *BindingPresence) bool {
 	for _, pred := range flag.Predicates {
 		if pred.Subject == "flow_to" {
 			return true
@@ -412,6 +412,8 @@ var structuredFlagTokenPrefixes = []string{
 	"param_name:",
 	"param_type:",
 	"prop:",
+	"python_review:",
+	"regex:",
 	"selector:",
 	"shell=",
 	"slice:",

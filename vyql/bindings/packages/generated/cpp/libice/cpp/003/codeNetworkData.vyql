@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m9b5ee6dd;
+
+binding networkData3 {
+  requires {
+    dependency("libice")
+  }
+  query pattern callExpr where callee.method == "IceProcessMessages"
+  emit source code.NetworkData at call.result
+}

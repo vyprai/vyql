@@ -1,5 +1,0 @@
-adapter python {
-  package "msgpack-python" {
-    sink method "PyEval_InitThreads" -> code.Deserialization
-  }
-}

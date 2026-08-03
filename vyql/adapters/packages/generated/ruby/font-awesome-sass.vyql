@@ -1,7 +1,0 @@
-import code.{HtmlRender}
-
-adapter ruby {
-  package "font-awesome-sass" {
-    sink method "icon" -> code.HtmlRender
-  }
-}

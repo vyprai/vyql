@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m0bd9f52b;
+
+binding deserialization0 {
+  requires {
+    dependency("libiconv")
+  }
+  query pattern callExpr where callee.method == "iconv_open"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{UrlFetch}
-adapter perl {
-  package "Egg-Release-XML-FeedPP" {
-    sink method "feed" -> code.UrlFetch
-  }
-}

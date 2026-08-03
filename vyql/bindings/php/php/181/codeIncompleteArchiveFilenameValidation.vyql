@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding incompleteArchiveFilenameValidation181 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "incomplete_archive_filename_validation"
+  emit issue code.IncompleteArchiveFilenameValidation at node
+}

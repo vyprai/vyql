@@ -1,0 +1,9 @@
+module bindings.php.generated.m34149734;
+
+binding filePathAccess0 {
+  requires {
+    dependency("composer/class-map-generator")
+  }
+  query pattern callExpr where callee.method == "scanPaths"
+  emit sink code.FilePathAccess at args[0]
+}

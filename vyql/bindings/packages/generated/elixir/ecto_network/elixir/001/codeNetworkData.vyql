@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m77ba0d23;
+
+binding networkData1 {
+  requires {
+    dependency("ecto_network")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit source code.NetworkData at call.result
+}

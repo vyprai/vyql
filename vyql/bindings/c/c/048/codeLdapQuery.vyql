@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding ldapQuery48 {
+  query pattern callExpr where callee.path ~= "ldap_search_s"
+  emit sink code.LdapQuery at args[3]
+}

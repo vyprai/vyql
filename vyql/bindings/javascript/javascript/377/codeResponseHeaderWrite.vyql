@@ -1,0 +1,6 @@
+module bindings.javascript.generated.mfb63017a;
+
+binding responseHeaderWrite377 {
+  query pattern callExpr where callee.path ~= "ctx.set"
+  emit sink code.ResponseHeaderWrite at args[1]
+}

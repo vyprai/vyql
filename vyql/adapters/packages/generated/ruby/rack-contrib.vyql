@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "rack-contrib" {
-    sink method "call" -> code.Deserialization
-  }
-}

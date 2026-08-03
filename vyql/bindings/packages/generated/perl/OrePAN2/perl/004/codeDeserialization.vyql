@@ -1,0 +1,9 @@
+module bindings.perl.generated.me25953b6;
+
+binding deserialization4 {
+  requires {
+    dependency("OrePAN2")
+  }
+  query pattern callExpr where callee.method == "_parser_for_url"
+  emit sink code.Deserialization at args[0]
+}

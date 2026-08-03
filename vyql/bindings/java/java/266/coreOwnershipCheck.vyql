@@ -1,0 +1,10 @@
+module bindings.java.generated.m420f6b67;
+
+binding ownershipCheck266 {
+  query pattern callExpr where callee.method == "isOwner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m049b7499;
+
+binding deserialization0 {
+  requires {
+    dependency("distorm")
+  }
+  query pattern callExpr where callee.method == "distorm_decode64"
+  emit sink code.Deserialization at args[0]
+}

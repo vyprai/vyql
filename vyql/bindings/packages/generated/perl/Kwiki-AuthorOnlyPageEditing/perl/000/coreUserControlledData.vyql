@@ -1,0 +1,9 @@
+module bindings.perl.generated.ma2ec5935;
+
+binding userControlledData0 {
+  requires {
+    dependency("Kwiki-AuthorOnlyPageEditing")
+  }
+  query pattern callExpr where callee.method == "Kwiki::AuthorOnlyPageEditing::CGI::token"
+  emit source core.UserControlledData at call.result
+}

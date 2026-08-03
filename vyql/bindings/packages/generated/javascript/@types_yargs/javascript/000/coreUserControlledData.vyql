@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mca4813c7;
+
+binding userControlledData0 {
+  requires {
+    dependency("@types/yargs")
+  }
+  query pattern callExpr where callee.method == "check"
+  emit source core.UserControlledData at call.result
+}

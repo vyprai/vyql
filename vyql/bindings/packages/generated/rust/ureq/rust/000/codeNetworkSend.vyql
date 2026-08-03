@@ -1,0 +1,9 @@
+module bindings.rust.generated.m337ce32d;
+
+binding networkSend0 {
+  requires {
+    dependency("ureq")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

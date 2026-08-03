@@ -1,0 +1,9 @@
+module bindings.c.generated.ma7c2e50a;
+
+binding networkBind10 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "tcp_bind"
+  emit sink code.NetworkBind at args[0]
+}

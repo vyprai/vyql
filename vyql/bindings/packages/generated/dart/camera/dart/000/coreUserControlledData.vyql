@@ -1,0 +1,9 @@
+module bindings.dart.generated.m286f4f80;
+
+binding userControlledData0 {
+  requires {
+    dependency("camera")
+  }
+  query pattern callExpr where callee.method == "takePicture"
+  emit source core.UserControlledData at call.result
+}

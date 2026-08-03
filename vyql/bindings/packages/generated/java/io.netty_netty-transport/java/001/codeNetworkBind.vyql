@@ -1,0 +1,9 @@
+module bindings.java.generated.maa48f2c3;
+
+binding networkBind1 {
+  requires {
+    dependency("io.netty:netty-transport")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit sink code.NetworkBind at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.rust.generated.mcef3b696;
+
+binding deserialization0 {
+  requires {
+    dependency("idna")
+  }
+  query pattern callExpr where callee.method == "decode_to_string"
+  emit sink code.Deserialization at args[0]
+}

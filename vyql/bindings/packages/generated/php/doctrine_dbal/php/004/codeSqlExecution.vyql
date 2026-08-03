@@ -1,0 +1,9 @@
+module bindings.php.generated.m917fc1c2;
+
+binding sqlExecution4 {
+  requires {
+    dependency("doctrine/dbal")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.generated.mc6005d88;
+
+binding externalApiResponse20 {
+  requires {
+    dependency("alamofire")
+  }
+  query pattern callExpr where callee.method == "responseDecodable"
+  emit source code.ExternalApiResponse at call.result
+}

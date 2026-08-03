@@ -1,0 +1,9 @@
+module bindings.php.generated.md7c84739;
+
+binding userControlledData2 {
+  requires {
+    dependency("drupal/core-utility")
+  }
+  query pattern callExpr where callee.method == "UrlHelper::parse"
+  emit source core.UserControlledData at call.result
+}
