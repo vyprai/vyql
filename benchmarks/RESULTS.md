@@ -197,49 +197,62 @@ Real-world Python applications rather than generated test cases. 66 repos, 1,896
 findings plus **280 false-positive traps**, Apache-2.0, ground truth as JSON per repo with
 file / line-range / CWE. Matching is `file` + `cwe ∈ acceptable_cwes` + line within ±10.
 
-Measured at `v2+fixes` on **5 of 66 repos** (see caveats), scored by RealVuln's own
-`scorer.matcher` / `scorer.metrics` — the same code that produces their published numbers —
-via a SARIF adapter for VyQL.
+Measured 2026-08-03 over **62 of 66 repos** — four (`owasp-web-playground`, `pygoat`,
+`python-app`, `vulnerable-api`) are 404 upstream and clone for nobody. Scored by
+RealVuln's own `scorer.matcher` / `scorer.metrics`, the same code that produces their
+published numbers, via a SARIF adapter for VyQL.
 
-| Scanner | TP | FP | FN | TN | Precision | Recall | Youden |
+Both rows below are the same 62 repos, so the delta is exact:
+
+| VyQL at | TP | FP | FN | TN | Precision | Recall | Youden |
 |---|---|---|---|---|---|---|---|
-| kolega-devsec-max (LLM agent) | 159 | 47 | 32 | 26 | 0.772 | 0.832 | +0.189 |
-| sonarqube | 5 | 4 | 186 | 26 | 0.556 | 0.026 | −0.107 |
-| semgrep | 35 | 82 | 156 | 26 | 0.299 | 0.183 | −0.576 |
-| **VyQL** | 22 | 108 | 169 | 26 | **0.169** | **0.115** | **−0.691** |
+| `main` (v2 base) | 426 | 2887 | 1336 | 239 | 0.1286 | 0.2418 | −0.6818 |
+| **+ RealVuln detectors** | **986** | 4127 | **776** | 232 | **0.1928** | **0.5596** | **−0.3872** |
 
-Per-repo:
+The detector port is worth **+0.32 recall on real-world code**, and precision rises with
+it (0.129 → 0.193) rather than being traded away. For scale: the entire v2 line — 241
+commits, the knowledge-layer restructure, +1.00 on BenchmarkJava — moved RealVuln recall
+by 0.001. This one port moves it by 0.318.
 
-| Repo | TP | FP | FN | TN | Precision | Recall |
-|---|---|---|---|---|---|---|
-| realvuln-djangoat | 12 | 56 | 40 | 6 | 0.176 | 0.231 |
-| realvuln-dsvpwa | 2 | 0 | 30 | 6 | 1.000 | 0.062 |
-| realvuln-dsvw | 3 | 0 | 24 | 4 | 1.000 | 0.111 |
-| realvuln-dvpwa | 2 | 23 | 21 | 4 | 0.080 | 0.087 |
-| realvuln-vulpy | 3 | 29 | 54 | 6 | 0.094 | 0.053 |
+Per bucket (`benchmarks/bucket_recall.py`, same 62 repos):
 
-**This is the most important result in this file.** VyQL scores **+0.86 on
-BenchmarkJava and −0.69 here**, and the gap is not a scoring artefact — the whole
+| Bucket | `main` | + detectors |
+|---|---|---|
+| taint | 50.1% | 63.1% |
+| **wrong-code** | **23.9%** | **70.4%** |
+| missing-code | 3.9% | 19.4% |
+| **access-control** | **0.0%** | **52.3%** |
+| other/context | 16.5% | 52.3% |
+| **TOTAL** | **24.2%** | **56.0%** |
+
+`wrong-code` is the bucket the detectors were built for — hardcoded secrets, debug
+defaults, weak crypto, insecure cookies — and it triples. `access-control` goes from
+finding *nothing* to finding half. Neither is reachable by taint analysis, which is why
+the v2 line's gains on the synthetic suites did not show up here.
+
+**This is the most important result in this file.** VyQL scores **+1.00 on
+BenchmarkJava and −0.39 here**, and the gap is not a scoring artefact — the whole
 static-analysis category collapses on real code. RealVuln's published full-corpus numbers
 put semgrep at 0.070 recall and sonarqube at 0.144, against 0.887 for the best LLM agent.
 Synthetic suites reward pattern coverage over a small, regular vocabulary; real
 applications do not.
 
-Within that band VyQL currently sits **below semgrep on both precision and recall** on
-these five repos. The per-repo split is informative: on the two single-file apps
-(`dsvw`, `dsvpwa`) precision is 1.000 with near-zero recall — VyQL is right when it fires
-and rarely fires. On the framework apps (`djangoat`, `dvpwa`, `vulpy`) precision collapses
-too, which points at the Django/Flask adapter surface rather than at the engine.
+At 0.560 recall VyQL is now **well clear of both published static scanners** and roughly
+two thirds of the way to the best LLM agent, at a fraction of the cost. Precision (0.193)
+remains the weak axis and is where the next work belongs — `VYQL-SMELL-*` is an
+`info`-severity candidate stream for agent review, not a finding stream, and it is a large
+share of the 4,127 false positives.
 
-**Caveats, and they are large:**
+**Caveats:**
 
-- **5 of 66 repos**, chosen as the ones that cloned cleanly. Not a representative sample;
-  the comparator rows above are recomputed on the *same* five, so the comparison is fair,
-  but the absolute numbers are not the corpus score.
-- Findings whose rule carries no CWE in its `meta` are dropped by the adapter (15 of 654
-  rules), slightly depressing recall.
+- **62 of 66 repos.** The four absent ones are deleted upstream, not skipped by choice.
+  Both rows are computed over the same 62.
+- Findings whose rule carries no CWE in its `meta` are dropped by the adapter, slightly
+  depressing recall on both rows equally.
 - Any finding not matching a ground-truth entry counts as FP, including classes RealVuln
   does not track. This penalises every scanner equally.
+- The comparator numbers published by RealVuln are over all 66, so they are not directly
+  comparable to these two rows case-for-case.
 
 Reproduce with `benchmarks/score_realvuln.py` (see §8).
 
