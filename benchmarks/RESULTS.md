@@ -188,7 +188,55 @@ has._
 
 ### 7.1 RealVuln — `kolega-ai/Real-Vuln-Benchmark`
 
-Status: **not yet measured.**
+Real-world Python applications rather than generated test cases. 66 repos, 1,896 real
+findings plus **280 false-positive traps**, Apache-2.0, ground truth as JSON per repo with
+file / line-range / CWE. Matching is `file` + `cwe ∈ acceptable_cwes` + line within ±10.
+
+Measured at `v2+fixes` on **5 of 66 repos** (see caveats), scored by RealVuln's own
+`scorer.matcher` / `scorer.metrics` — the same code that produces their published numbers —
+via a SARIF adapter for VyQL.
+
+| Scanner | TP | FP | FN | TN | Precision | Recall | Youden |
+|---|---|---|---|---|---|---|---|
+| kolega-devsec-max (LLM agent) | 159 | 47 | 32 | 26 | 0.772 | 0.832 | +0.189 |
+| sonarqube | 5 | 4 | 186 | 26 | 0.556 | 0.026 | −0.107 |
+| semgrep | 35 | 82 | 156 | 26 | 0.299 | 0.183 | −0.576 |
+| **VyQL** | 22 | 108 | 169 | 26 | **0.169** | **0.115** | **−0.691** |
+
+Per-repo:
+
+| Repo | TP | FP | FN | TN | Precision | Recall |
+|---|---|---|---|---|---|---|
+| realvuln-djangoat | 12 | 56 | 40 | 6 | 0.176 | 0.231 |
+| realvuln-dsvpwa | 2 | 0 | 30 | 6 | 1.000 | 0.062 |
+| realvuln-dsvw | 3 | 0 | 24 | 4 | 1.000 | 0.111 |
+| realvuln-dvpwa | 2 | 23 | 21 | 4 | 0.080 | 0.087 |
+| realvuln-vulpy | 3 | 29 | 54 | 6 | 0.094 | 0.053 |
+
+**This is the most important result in this file.** VyQL scores **+0.86 on
+BenchmarkJava and −0.69 here**, and the gap is not a scoring artefact — the whole
+static-analysis category collapses on real code. RealVuln's published full-corpus numbers
+put semgrep at 0.070 recall and sonarqube at 0.144, against 0.887 for the best LLM agent.
+Synthetic suites reward pattern coverage over a small, regular vocabulary; real
+applications do not.
+
+Within that band VyQL currently sits **below semgrep on both precision and recall** on
+these five repos. The per-repo split is informative: on the two single-file apps
+(`dsvw`, `dsvpwa`) precision is 1.000 with near-zero recall — VyQL is right when it fires
+and rarely fires. On the framework apps (`djangoat`, `dvpwa`, `vulpy`) precision collapses
+too, which points at the Django/Flask adapter surface rather than at the engine.
+
+**Caveats, and they are large:**
+
+- **5 of 66 repos**, chosen as the ones that cloned cleanly. Not a representative sample;
+  the comparator rows above are recomputed on the *same* five, so the comparison is fair,
+  but the absolute numbers are not the corpus score.
+- Findings whose rule carries no CWE in its `meta` are dropped by the adapter (15 of 654
+  rules), slightly depressing recall.
+- Any finding not matching a ground-truth entry counts as FP, including classes RealVuln
+  does not track. This penalises every scanner equally.
+
+Reproduce with `benchmarks/score_realvuln.py` (see §8).
 
 ### 7.2 XBOW validation benchmarks
 
@@ -216,3 +264,16 @@ selected case files plus the whole helper/lib tree.
 
 Each subset was validated by scoring `v2-shipped` on it first, then reused unchanged for
 every other commit — so the historical columns differ only by engine, never by corpus.
+
+## 8. Reproducing the RealVuln score
+
+```sh
+git clone --depth 1 https://github.com/kolega-ai/Real-Vuln-Benchmark.git /tmp/realvuln
+cd /tmp/realvuln && python3 clone_repos.py            # or --repo <ids> for a subset
+cd go && go build -o /tmp/vyql ./cmd/vyql
+python3 benchmarks/score_realvuln.py /tmp/realvuln /tmp/vyql "$PWD/vyql" "$PWD/vyql/packs"
+```
+
+The script emits one `NormalisedFinding` per (SARIF result × CWE of its rule) and defers
+all matching and metrics to RealVuln's own `scorer` package, so VyQL is scored by exactly
+the code that scores semgrep, snyk and the LLM agents.
