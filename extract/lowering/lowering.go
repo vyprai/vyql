@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/vyprai/vyql/extract/nir"
+	"github.com/vyprai/vyql/extract/regexambig"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -93,6 +94,22 @@ type lowerer struct {
 	// than the whole (over-approximated) container. Keyed by container node id.
 	containers map[string]*containerInfo
 	templates  map[string]templateInfo
+
+	// modStr maps a module-level (top-level) variable name to its string-constant value, so a
+	// regex call `re.match(PATTERN, x)` referring to a `PATTERN = r"..."` module constant can be
+	// resolved to its literal for catastrophic-backtracking (ReDoS) detection even from inside a
+	// function body that does not inherit the module scope's const map.
+	modStr map[string]string
+
+	// dynSqlVar tracks variables assigned a dynamically-built string (f-string/concat/format), so a
+	// later `execute(q)` on such a variable is recognised as dynamic SQL even when the query is
+	// built one statement earlier (`q = f"..."; cur.execute(q)`).
+	dynSqlVar map[string]bool
+
+	// debugPayloadVar tracks variables assigned a response payload that leaks internal config —
+	// `payload = {"module": os.environ.get(...), "base": str(BASE_DIR)}` — so a later
+	// `JsonResponse(payload)` is recognised as debug-info exposure (CWE-215).
+	debugPayloadVar map[string]bool
 
 	// lambdaParams maps a lowered function-value node (a passed callback) to its parameter
 	// node ids, so a higher-order call (arr.map(cb), p.then(cb)) can route the receiver's
@@ -1107,6 +1124,784 @@ func isPathResolveParents(expr nir.Expr) bool {
 	return strings.HasSuffix(attr.Path, ".resolve.parents")
 }
 
+// exprDotted returns the dotted path of an attribute/name expression ("" otherwise),
+// e.g. Attr{Path:"request.user"} → "request.user", Name{ID:"current_user"} → "current_user".
+func exprDotted(e nir.Expr) string {
+	switch v := e.(type) {
+	case nir.Attr:
+		return v.Path
+	case nir.Name:
+		return v.ID
+	}
+	return ""
+}
+
+// principalExpr reports whether e denotes the authenticated principal — the caller's identity —
+// as opposed to an object's owner field. These are the framework idioms for "the current user".
+func principalExpr(e nir.Expr) bool {
+	switch exprDotted(e) {
+	case "request.user", "self.request.user", "current_user", "g.user", "flask_login.current_user",
+		"request.user.id", "self.request.user.id", "current_user.id", "g.user.id",
+		"request.user.pk", "current_user.pk", "request.auth.user":
+		return true
+	}
+	if n, ok := e.(nir.Name); ok && n.ID == "current_user" {
+		return true
+	}
+	return false
+}
+
+// ownerFieldExpr reports whether e is an object's OWNERSHIP field access (obj.owner / obj.user /
+// obj.created_by / obj.owner_id …) — the field that ties a fetched object to a principal. It must
+// not itself be the principal (so `request.user` on either side is not mistaken for an owner field).
+func ownerFieldExpr(e nir.Expr) bool {
+	a, ok := e.(nir.Attr)
+	if !ok || principalExpr(e) {
+		return false
+	}
+	switch a.Attr {
+	case "owner", "user", "author", "created_by", "creator", "account", "assigned_to", "member",
+		"tenant", "org", "organization", "company", "workspace",
+		"owner_id", "user_id", "author_id", "created_by_id", "account_id", "assigned_to_id",
+		"tenant_id", "org_id", "organization_id", "company_id":
+		return true
+	}
+	return false
+}
+
+// isOwnershipComparison reports whether a `==`/`!=` compares an object's owner field to the caller
+// principal (obj.owner == request.user, current_user != note.author, …). This is the canonical
+// object-level authorization check ("does the caller own this object?"), enforced AFTER the fetch —
+// so it does not dominate the sink and is recognized here structurally, labelled OwnershipCheck via
+// the analysis.ownership.check binding, and credited by the function-scope guard.
+func isOwnershipComparison(ex nir.BinOp) bool {
+	if ex.Op != "==" && ex.Op != "!=" {
+		return false
+	}
+	return (ownerFieldExpr(ex.Left) && principalExpr(ex.Right)) ||
+		(ownerFieldExpr(ex.Right) && principalExpr(ex.Left))
+}
+
+// isOwnershipHelperCall reports whether a call is an object-level authorization predicate that takes
+// the fetched object as an argument — can_access_matter(user, obj), has_object_permission(request, obj),
+// obj.is_owner(user), _visible_to(user, obj). These are the app-specific ownership helpers that
+// bindings can't enumerate by exact name (each project names them `can_access_<resource>`). Crucially
+// it EXCLUDES bare role checks (`can_write_privileged_notes()`, `is_firm_admin()`) — those take no
+// object and gate on role, not on ownership of a specific object, so they must NOT suppress an IDOR.
+func isOwnershipHelperCall(ex nir.Call) bool {
+	if len(ex.Args) == 0 { // an ownership predicate is called WITH the object; role checks take none
+		return false
+	}
+	name := ex.Method
+	if name == "" {
+		d := exprDotted(ex.Callee)
+		if i := strings.LastIndex(d, "."); i >= 0 {
+			name = d[i+1:]
+		} else {
+			name = d
+		}
+	}
+	for _, pfx := range []string{"can_access", "can_view", "can_edit", "can_delete", "can_manage", "_can_"} {
+		if strings.HasPrefix(name, pfx) {
+			return true
+		}
+	}
+	switch name {
+	case "has_object_permission", "get_object_or_403", "check_object_permissions",
+		"is_owner", "check_ownership", "require_owner", "verify_owner", "ensure_owner",
+		"owns", "is_accessible_by", "user_can_access", "can_user_access":
+		return true
+	}
+	return strings.Contains(name, "_visible_to") || strings.Contains(name, "_is_owner") || strings.HasPrefix(name, "ensure_owns")
+}
+
+// bulkUpdateSafeReceiver reports whether a `.update(x)` receiver is a KNOWN non-model object
+// (a hash/digest, a template context/dict, a session/cache) — where .update is not mass assignment.
+// Used to suppress the mass-assignment sink on these, cutting the dominant AUTH-008 false positives
+// (hasher.update(chunk), context.update({...})).
+func bulkUpdateSafeReceiver(callee nir.Expr) bool {
+	attr, ok := callee.(nir.Attr)
+	if !ok {
+		return false
+	}
+	base := strings.ToLower(exprDotted(attr.Base))
+	if i := strings.LastIndex(base, "."); i >= 0 {
+		base = base[i+1:]
+	}
+	for _, k := range []string{"hash", "digest", "hmac", "sha", "md5", "blake", "hasher",
+		"ctx", "context", "session", "cache", "headers", "meta", "environ", "response"} {
+		if strings.Contains(base, k) {
+			return true
+		}
+	}
+	return false
+}
+
+// secretNamedTarget reports whether an assignment target name denotes a cryptographic secret /
+// credential — the kind of value that must never be a hardcoded literal (CWE-798/259).
+func secretNamedTarget(name string) bool {
+	n := strings.ToLower(name)
+	// NOTE: "password" is deliberately excluded — it dominates test fixtures/form fields with
+	// noise (input_password="12345"), and a hardcoded app password is a narrower concern than a
+	// hardcoded signing/API secret. Keep the crypto-key / signing-secret families only.
+	for _, k := range []string{"secret", "signing_key", "jwt", "hmac", "api_key", "apikey",
+		"private_key", "cipher_key", "encryption_key", "session_key", "signing_secret",
+		"access_token", "auth_token", "refresh_token", "token_salt"} {
+		if strings.Contains(n, k) {
+			return true
+		}
+	}
+	return false
+}
+
+// credentialConstName reports whether a target is an ALL-CAPS module-level credential constant
+// (PASSWORD/USERNAME/PWD family) — a hardcoded credential when assigned a literal (CWE-798).
+func credentialConstName(name string) bool {
+	if name == "" || name != strings.ToUpper(name) { // require SCREAMING_CASE module constant
+		return false
+	}
+	seg := name
+	if i := strings.LastIndexAny(seg, ".:"); i >= 0 {
+		seg = seg[i+1:]
+	}
+	if strings.Contains(seg, "HASH") || strings.Contains(seg, "FIELD") {
+		return false
+	}
+	return strings.Contains(seg, "PASSWORD") || strings.Contains(seg, "PASSWD") ||
+		seg == "PWD" || seg == "USERNAME" || seg == "ADMIN_USER" || strings.Contains(seg, "DB_PASS")
+}
+
+// keySignaledSecretLiteral is a laxer literal filter for the case where the assignment KEY (not the
+// value) already denotes a secret — e.g. `config['SECRET_KEY'] = 'dvga'`. Only clearly-non-secret
+// values (empty, None, booleans, env placeholders) are rejected; short weak secrets are accepted.
+func keySignaledSecretLiteral(v string) bool {
+	t := strings.Trim(v, "\"'` ")
+	if len(t) < 3 {
+		return false
+	}
+	switch strings.ToLower(t) {
+	case "none", "null", "true", "false", "nil", "undefined", "changeme", "":
+		return false
+	}
+	return true
+}
+
+// plausibleSecretLiteral filters out non-secret assignments a secret-named target may receive:
+// None/empty, booleans, short/numeric flags. A real hardcoded secret is a non-trivial string.
+func plausibleSecretLiteral(v string) bool {
+	t := strings.Trim(v, "\"'` ")
+	if len(t) < 6 {
+		return false
+	}
+	switch strings.ToLower(t) {
+	case "none", "null", "true", "false", "nil", "undefined":
+		return false
+	}
+	return true
+}
+
+// inTestOrSeedFile reports whether a loc ("file:line") is a test/seed/fixture file, where
+// hardcoded literals are expected and not a vulnerability.
+func inTestOrSeedFile(loc string) bool {
+	f := strings.ToLower(loc)
+	return strings.Contains(f, "/test") || strings.Contains(f, "test_") || strings.Contains(f, "_test") ||
+		strings.Contains(f, "conftest") || strings.Contains(f, "/seed") || strings.Contains(f, "seed_") ||
+		strings.Contains(f, "fixture") || strings.Contains(f, "/spec") || strings.Contains(f, "factories")
+}
+
+// debugNamedTarget reports whether the target is a DEBUG flag.
+func debugNamedTarget(name string) bool {
+	n := strings.ToLower(name)
+	return n == "debug" || strings.HasSuffix(n, "_debug") || strings.HasSuffix(n, ".debug")
+}
+
+// plaintextPasswordColumn reports whether an assignment declares an ORM model column that stores a
+// password/secret in the clear — `password = db.Column(...)` / `pwd = Column(String)` — where the
+// field name signals a password and does not indicate hashing (CWE-256/312/916).
+func plaintextPasswordColumn(target string, value nir.Expr) bool {
+	n := strings.ToLower(target)
+	if i := strings.LastIndexAny(n, ".:"); i >= 0 {
+		n = n[i+1:]
+	}
+	isPw := n == "password" || n == "passwd" || n == "pwd" ||
+		strings.HasSuffix(n, "_password") || strings.HasSuffix(n, "_passwd") || strings.HasSuffix(n, "_pwd")
+	if !isPw || strings.Contains(n, "hash") || strings.Contains(n, "digest") || strings.Contains(n, "encrypted") {
+		return false
+	}
+	c, ok := value.(nir.Call)
+	if !ok {
+		return false
+	}
+	return c.Method == "Column" || strings.HasSuffix(c.Path, ".Column") || c.Method == "CharField" || c.Method == "TextField"
+}
+
+// allowedHostsWildcard reports whether a Django `ALLOWED_HOSTS = ['*']` setting (or CORS/CSRF
+// origin allow-list) is assigned a wildcard element (CWE-16 security misconfiguration).
+func allowedHostsWildcard(target string, value nir.Expr) bool {
+	n := strings.ToUpper(target)
+	if i := strings.LastIndexAny(n, ".:"); i >= 0 {
+		n = n[i+1:]
+	}
+	if n != "ALLOWED_HOSTS" && n != "CORS_ORIGIN_WHITELIST" && n != "CORS_ALLOWED_ORIGINS" && n != "CSRF_TRUSTED_ORIGINS" {
+		return false
+	}
+	seq, ok := value.(nir.Seq)
+	if !ok {
+		return false
+	}
+	for _, el := range seq.Parts {
+		if v, ok := litVal(el); ok && (v == "*" || v == "*.*" || strings.HasPrefix(v, "*")) {
+			return true
+		}
+	}
+	return false
+}
+
+// certCheckDisabled reports whether TLS hostname/certificate checking is turned off via an
+// assignment `ctx.check_hostname = False` / `verify_mode = CERT_NONE` (CWE-295).
+func certCheckDisabled(target string, value nir.Expr) bool {
+	n := strings.ToLower(target)
+	if strings.HasSuffix(n, "check_hostname") {
+		if v, ok := litVal(value); ok && strings.EqualFold(v, "False") {
+			return true
+		}
+	}
+	if strings.HasSuffix(n, "verify_mode") {
+		if v, ok := litVal(value); ok && strings.Contains(strings.ToUpper(v), "CERT_NONE") {
+			return true
+		}
+		if nm, ok := value.(nir.Name); ok && strings.Contains(strings.ToUpper(nm.ID), "CERT_NONE") {
+			return true
+		}
+	}
+	return false
+}
+
+// litVal returns the unquoted value of a string/char literal expression and true, or ("", false)
+// when the expression is not a constant literal (e.g. a reflected request value).
+func litVal(e nir.Expr) (string, bool) {
+	if c, ok := e.(nir.Const); ok {
+		return unquoteLit(c.Value), true
+	}
+	return "", false
+}
+
+// insecureHeaderStore reports whether a `resp[headerName] = value` subscript store (lowered by the
+// frontend to __setitem__, args = [value, key]) configures a dangerous HTTP response header:
+// permissive CORS (CWE-942), clickjacking / disabled browser protections (CWE-1021/CWE-16), or a
+// weakened transport policy (CWE-319/CWE-693). Returns a short kind tag for the finding val, or ""
+// when the store is benign. A fixed allow-list value ("https://trusted") is treated as safe.
+func (l *lowerer) insecureHeaderStore(call nir.Call, sc *scope) string {
+	if call.Method != "__setitem__" || len(call.Args) < 2 {
+		return ""
+	}
+	// __setitem__ args = [value, key]
+	return l.insecureHeaderPair(call.Args[1], call.Args[0], sc)
+}
+
+// insecureHeaderPair evaluates a (headerName, value) pair — from a subscript store or a
+// send_header/set_header(name, value) method call — and returns a kind tag for a dangerous
+// configuration, or "".
+func (l *lowerer) insecureHeaderPair(keyExpr, valExpr nir.Expr, sc *scope) string {
+	key, ok := l.constKey(keyExpr, sc)
+	if !ok {
+		return ""
+	}
+	v, isConst := litVal(valExpr)
+	lv := strings.ToLower(strings.TrimSpace(v))
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "access-control-allow-origin":
+		// wildcard, or a reflected (non-constant) origin, is permissive CORS.
+		if (isConst && v == "*") || !isConst {
+			return "cors_wildcard_origin"
+		}
+	case "access-control-allow-credentials":
+		if lv == "true" {
+			return "cors_allow_credentials"
+		}
+	case "x-frame-options":
+		if lv == "allowall" || strings.HasPrefix(lv, "allow-from") {
+			return "clickjacking_frame_options"
+		}
+	case "x-xss-protection":
+		if isConst && v == "0" {
+			return "xss_protection_disabled"
+		}
+	case "content-security-policy", "content-security-policy-report-only":
+		if isConst && (v == "" || strings.Contains(lv, "unsafe-inline") || strings.Contains(lv, "default-src *") || strings.Contains(lv, "* 'unsafe")) {
+			return "weak_csp"
+		}
+	case "strict-transport-security":
+		if isConst && strings.Contains(lv, "max-age=0") {
+			return "hsts_disabled"
+		}
+	}
+	return ""
+}
+
+// isDynamicStringExpr reports whether an expression builds a string dynamically — an f-string /
+// printf with non-literal parts, a `+`/`%` string concatenation, or a `.format(...)` call. A plain
+// string literal (a static / parameterized query) is NOT dynamic.
+func isDynamicStringExpr(e nir.Expr) bool {
+	switch v := e.(type) {
+	case nir.Format:
+		for _, p := range v.Parts {
+			if _, ok := p.(nir.Const); !ok {
+				return true
+			}
+		}
+		return false
+	case nir.BinOp:
+		return v.Op == "+" || v.Op == "%"
+	case nir.Call:
+		return v.Method == "format" || v.Method == "join"
+	case nir.Thru:
+		return isDynamicStringExpr(v.Inner)
+	}
+	return false
+}
+
+// logsSensitiveIdentifier reports whether any argument value-token of a logging call names a
+// sensitive field (password/secret/token/ssn/…) — a plaintext-sensitive-data-in-log leak
+// (CWE-532). Hashed/redacted references are excluded.
+func logsSensitiveIdentifier(valToks []string) bool {
+	for _, tk := range valToks {
+		t := strings.ToLower(tk)
+		if strings.Contains(t, "hash") || strings.Contains(t, "digest") || strings.Contains(t, "redact") || strings.Contains(t, "mask") {
+			continue
+		}
+		for _, k := range []string{"password", "passwd", "secret", "ssn", "api_key", "apikey",
+			"private_key", "access_token", "credit_card", "creditcard", "cvv", "card_number",
+			"authorization", "bearer"} {
+			if strings.Contains(t, k) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// respLeaksSensitiveField reports whether a value-token names a clearly-sensitive field that must
+// not be serialized into an HTTP response (CWE-200/312). Narrower than the log variant: excludes
+// request-side auth headers, includes only fields that are secrets/PII by nature.
+func respLeaksSensitiveField(valToks []string) bool {
+	for _, tk := range valToks {
+		t := strings.ToLower(tk)
+		if strings.Contains(t, "hash") || strings.Contains(t, "digest") || strings.Contains(t, "redact") || strings.Contains(t, "mask") {
+			continue
+		}
+		for _, k := range []string{"password", "passwd", "ssn", "secret", "api_key", "apikey",
+			"private_key", "credit_card", "creditcard", "cvv", "card_number", "social_security"} {
+			if strings.Contains(t, k) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isResponseSinkCall reports whether a call constructs an HTTP response body from its arguments.
+func isResponseSinkCall(path, method string) bool {
+	switch method {
+	case "JsonResponse", "JSONResponse", "HttpResponse", "jsonify", "make_response", "Response", "HTTPResponse":
+		return true
+	}
+	return false
+}
+
+// isExceptionVarName reports whether an identifier is a conventional caught-exception variable.
+func isExceptionVarName(id string) bool {
+	switch strings.ToLower(id) {
+	case "e", "ex", "exc", "err", "error", "exception", "exp", "exce":
+		return true
+	}
+	return false
+}
+
+// exposesExceptionDetail reports whether an expression serializes internal exception detail —
+// `str(exc)`, `exc.__class__.__name__`, `traceback.format_exc()` — i.e. leaks an error message /
+// stack into an HTTP response (CWE-209).
+func exposesExceptionDetail(e nir.Expr, depth int) bool {
+	if e == nil || depth > 6 {
+		return false
+	}
+	switch v := e.(type) {
+	case nir.Call:
+		if (v.Method == "str" || v.Method == "repr") && len(v.Args) >= 1 {
+			if nm, ok := v.Args[0].(nir.Name); ok && isExceptionVarName(nm.ID) {
+				return true
+			}
+		}
+		if v.Method == "format_exc" || v.Method == "format_exception" || v.Method == "print_exc" {
+			return true
+		}
+		if exposesExceptionDetail(v.Callee, depth+1) {
+			return true
+		}
+		for _, a := range v.Args {
+			if exposesExceptionDetail(a, depth+1) {
+				return true
+			}
+		}
+	case nir.Attr:
+		if v.Attr == "__class__" || strings.Contains(v.Attr, "__traceback__") || v.Attr == "args" {
+			if nm, ok := v.Base.(nir.Name); ok && isExceptionVarName(nm.ID) {
+				return true
+			}
+		}
+		return exposesExceptionDetail(v.Base, depth+1)
+	case nir.Pair:
+		return exposesExceptionDetail(v.Value, depth+1)
+	case nir.Seq:
+		for _, p := range v.Parts {
+			if exposesExceptionDetail(p, depth+1) {
+				return true
+			}
+		}
+	case nir.Format:
+		for _, p := range v.Parts {
+			if exposesExceptionDetail(p, depth+1) {
+				return true
+			}
+		}
+	case nir.BinOp:
+		return exposesExceptionDetail(v.Left, depth+1) || exposesExceptionDetail(v.Right, depth+1)
+	case nir.Thru:
+		return exposesExceptionDetail(v.Inner, depth+1)
+	}
+	return false
+}
+
+// exposesRecordReturn reports whether a route return value serializes a DB record / model object to
+// the client — `return obj.serialize()`, `return Model.objects.get(...)`, `return cur.fetchone()` —
+// the shape where over-exposure of sensitive fields occurs (SMELL, agent confirms field sensitivity).
+func exposesRecordReturn(e nir.Expr, depth int) bool {
+	if e == nil || depth > 5 {
+		return false
+	}
+	switch v := e.(type) {
+	case nir.Call:
+		switch v.Method {
+		case "serialize", "dump", "to_dict", "model_dump", "as_dict", "to_json", "jsonify":
+			return true
+		case "fetchone", "fetchall", "fetchmany", "first", "one", "one_or_none", "get_object_or_404":
+			return true
+		}
+		if strings.Contains(v.Path, "objects.") || strings.Contains(v.Path, "query.") {
+			return true
+		}
+		for _, a := range v.Args {
+			if exposesRecordReturn(a, depth+1) {
+				return true
+			}
+		}
+	case nir.Thru:
+		return exposesRecordReturn(v.Inner, depth+1)
+	}
+	return false
+}
+
+// stateMutatingMethod reports whether a call method mutates persistent state — the shape an agent
+// should check for missing authorization / validation / CSRF (SMELL).
+func stateMutatingMethod(m string) bool {
+	// Tightened to higher-risk mutations of EXISTING resources (the BOLA-write / privilege-change /
+	// value-transfer shapes) — create/add/save/commit are dropped as they dominate benign signup /
+	// logging / persistence and swamp the candidate set with low-signal noise.
+	switch m {
+	case "update", "delete", "set_password", "make_transaction", "transfer", "approve",
+		"set_role", "grant", "revoke", "deactivate", "bulk_update":
+		return true
+	}
+	return false
+}
+
+// buildsRawHtmlString reports whether an expression is a dynamically-built string that embeds HTML
+// markup — the raw-string-response reflected-XSS shape (`return "<html>.." + user + "..</html>"`)
+// that template-render sinks don't see.
+func buildsRawHtmlString(e nir.Expr) bool {
+	if !isDynamicStringExpr(e) {
+		return false
+	}
+	var toks []string
+	collectValTokens(e, "", &toks)
+	for _, t := range toks {
+		lt := strings.ToLower(t)
+		for _, tag := range []string{"<body", "<html", "<div", "<br", "<p>", "<p ", "<h1", "<h2",
+			"<span", "<a ", "<a>", "<td", "<tr", "<li", "<table", "<form", "<script", "<img"} {
+			if strings.Contains(lt, tag) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isRouteDecorated reports whether a function's decorator tokens include a web route registration
+// (`@app.post`, `@router.get`, `@app.route`), meaning its return value is an HTTP response body.
+func isRouteDecorated(decs []string) bool {
+	for _, d := range decs {
+		switch d {
+		case "decorator_method:get", "decorator_method:post", "decorator_method:put",
+			"decorator_method:patch", "decorator_method:delete", "decorator_method:route",
+			"decorator_method:api_route", "decorator_method:websocket", "decorator_method:head",
+			"decorator_method:options":
+			return true
+		}
+	}
+	return false
+}
+
+// isInternalPathName reports whether an identifier denotes an internal filesystem path / settings
+// constant whose value should not be serialized to a client.
+func isInternalPathName(id string) bool {
+	u := strings.ToUpper(id)
+	return strings.Contains(u, "BASE") || strings.Contains(u, "_DIR") || strings.Contains(u, "_PATH") ||
+		strings.Contains(u, "ROOT") || u == "__FILE__" || strings.Contains(u, "SETTINGS")
+}
+
+// exposesInternalConfig reports whether an expression serializes internal environment/config/path
+// detail — `os.environ.get(...)`, `os.getenv(...)`, `str(BASE_DIR)` — i.e. debug-info exposure
+// (CWE-215) when it reaches an HTTP response.
+func exposesInternalConfig(e nir.Expr, depth int) bool {
+	if e == nil || depth > 6 {
+		return false
+	}
+	switch v := e.(type) {
+	case nir.Call:
+		if strings.Contains(v.Path, "os.environ") || strings.Contains(v.Path, "os.getenv") || v.Method == "getenv" {
+			return true
+		}
+		if (v.Method == "str" || v.Method == "repr") && len(v.Args) >= 1 {
+			if nm, ok := v.Args[0].(nir.Name); ok && isInternalPathName(nm.ID) {
+				return true
+			}
+		}
+		if exposesInternalConfig(v.Callee, depth+1) {
+			return true
+		}
+		for _, a := range v.Args {
+			if exposesInternalConfig(a, depth+1) {
+				return true
+			}
+		}
+	case nir.Attr:
+		if strings.Contains(v.Path, "os.environ") {
+			return true
+		}
+		return exposesInternalConfig(v.Base, depth+1)
+	case nir.Pair:
+		return exposesInternalConfig(v.Value, depth+1)
+	case nir.Seq:
+		for _, p := range v.Parts {
+			if exposesInternalConfig(p, depth+1) {
+				return true
+			}
+		}
+	case nir.Format:
+		for _, p := range v.Parts {
+			if exposesInternalConfig(p, depth+1) {
+				return true
+			}
+		}
+	case nir.BinOp:
+		return exposesInternalConfig(v.Left, depth+1) || exposesInternalConfig(v.Right, depth+1)
+	case nir.Thru:
+		return exposesInternalConfig(v.Inner, depth+1)
+	}
+	return false
+}
+
+// businessStateKey reports whether a subscript/attr key names a business-sensitive field whose value
+// should be validated before assignment — the business-logic-gap shape when set from user input.
+func businessStateKey(key string) bool {
+	k := strings.ToLower(strings.TrimSpace(key))
+	switch k {
+	case "state", "status", "balance", "amount", "price", "quantity", "qty", "role", "limit",
+		"discount", "credit", "total", "is_admin", "is_active", "approved", "permission",
+		"permissions", "verified", "is_verified", "level", "tier", "points", "rate":
+		return true
+	}
+	return false
+}
+
+// enumerationErrorResponse reports whether a response payload is an auth error (401/403/404) whose
+// message discloses account/identity EXISTENCE — the user-enumeration tell (SMELL, agent confirms
+// the response differs from the wrong-credential path).
+func enumerationErrorResponse(valToks []string) bool {
+	errStatus, existMsg := false, false
+	for _, tk := range valToks {
+		lt := strings.ToLower(tk)
+		for _, s := range []string{"status=404", "status=401", "status=403", "status_code=404", "status_code=401", "status_code=403"} {
+			if strings.Contains(lt, s) {
+				errStatus = true
+			}
+		}
+		for _, w := range []string{"unknown", "not found", "no such", "not registered", "does not exist",
+			"no account", "invalid handle", "invalid user", "invalid email", "invalid username",
+			"user not", "email not", "account not", "no user", "not exist"} {
+			if strings.Contains(lt, w) {
+				existMsg = true
+			}
+		}
+	}
+	return errStatus && existMsg
+}
+
+// isLogSinkCall reports whether a call is a logging/print output sink.
+func isLogSinkCall(path, method string) bool {
+	if path == "print" || method == "print" {
+		return true
+	}
+	if !strings.Contains(strings.ToLower(path), "log") {
+		return false
+	}
+	switch method {
+	case "debug", "info", "warning", "warn", "error", "critical", "exception", "log":
+		return true
+	}
+	return false
+}
+
+// isSqlSinkCall reports whether a call is a SQL-execution sink whose FIRST argument is the query.
+func isSqlSinkCall(path, method string) bool {
+	switch method {
+	case "execute", "executemany", "executescript", "execute_sql", "raw", "text":
+		return true
+	}
+	if strings.HasSuffix(path, ".execute") || strings.HasSuffix(path, ".text") || path == "sqlalchemy.text" {
+		return true
+	}
+	return false
+}
+
+// resolveRegexPattern folds a regex-pattern argument to its literal — an inline string, a
+// const-propped local, or a module-level constant (`PATTERN = r"..."`) referenced by name.
+func (l *lowerer) resolveRegexPattern(e nir.Expr, sc *scope) (string, bool) {
+	if s, ok := l.constStrVal(e, sc); ok {
+		return s, true
+	}
+	if nm, ok := e.(nir.Name); ok {
+		if s, ok := l.modStr[nm.ID]; ok {
+			return s, true
+		}
+	}
+	return "", false
+}
+
+// isRegexApply reports whether a call is a stdlib `re.<op>(pattern, ...)` / `re.compile(pattern)`
+// whose FIRST argument is the regex pattern. Only the `re.` origin is accepted, so an unrelated
+// object `.match()`/`.search()` is not misread as a regex application.
+func isRegexApply(path, method string) bool {
+	switch method {
+	case "match", "search", "sub", "subn", "findall", "finditer", "fullmatch", "compile", "split":
+	default:
+		return false
+	}
+	return path == "re."+method || path == "regex."+method || strings.HasSuffix(path, ".re."+method)
+}
+
+// catastrophicRegex reports whether a regex has textbook super-linear backtracking structure —
+// a quantifier applied to a group that itself contains a quantifier or an alternation:
+// (a+)+  (a*)*  (.*)*  ((a)+)+  (\d+)*  (a|a)*  (a|ab)*  — the classic ReDoS shapes (CWE-1333/400).
+func catastrophicRegex(pat string) bool {
+	// Defer to the shared ambiguity analysis. A structural test — "a quantified group
+	// whose body holds a quantifier or an alternation" — reports every unrolled loop and
+	// every disjoint alternation as catastrophic, which is a false positive whenever the
+	// branches cannot both match the same input.
+	return regexambig.Ambiguous(pat)
+}
+
+// containsRegexQuantifier reports whether a regex fragment contains an unbounded repeat operator.
+func containsRegexQuantifier(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' {
+			i++
+			continue
+		}
+		if s[i] == '+' || s[i] == '*' || s[i] == '{' {
+			return true
+		}
+	}
+	return false
+}
+
+// envDefaultConst returns the hardcoded DEFAULT literal of an os.getenv(name, default) /
+// os.environ.get(name, default) call — the fallback baked into source (CWE-798). "" if none.
+func envDefaultConst(e nir.Expr, l *lowerer) string {
+	c, ok := e.(nir.Call)
+	if !ok || len(c.Args) < 2 {
+		return ""
+	}
+	d := exprDotted(c.Callee)
+	if !(strings.HasSuffix(d, "getenv") || strings.HasSuffix(d, "environ.get") || strings.HasSuffix(d, "config.get")) {
+		return ""
+	}
+	return constStr(c.Args[1])
+}
+
+// truthyDefault reports whether e assigns/defaults DEBUG to an on value ("True"/"1"/true) —
+// either a direct truthy literal or os.getenv("DEBUG", "True")-style default.
+func truthyDefault(e nir.Expr, l *lowerer) bool {
+	isOn := func(s string) bool {
+		v := strings.ToLower(strings.Trim(s, "\"' "))
+		return v == "true" || v == "1" || v == "yes" || v == "on"
+	}
+	if isOn(constStr(e)) || isOn(envDefaultConst(e, l)) {
+		return true
+	}
+	// `DEBUG = os.getenv("DEBUG","True") == "True"` / `_env_bool("DBG", default=True)` — the truthy
+	// default is nested; check the operands of a comparison and the args of a *_bool/env helper.
+	switch v := e.(type) {
+	case nir.BinOp:
+		return truthyDefault(v.Left, l) || truthyDefault(v.Right, l)
+	case nir.Call:
+		d := strings.ToLower(exprDotted(v.Callee))
+		if strings.Contains(d, "bool") || strings.Contains(d, "env") || strings.Contains(d, "flag") {
+			for _, a := range v.Args {
+				if isOn(constStr(a)) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// privilegeLiteral reports whether e is a string constant naming a ROLE/PRIVILEGE tier — the kind of
+// value a security decision keys on (`badge == "lead"`, `role == "admin"`). Comparing a client-controlled
+// value (cookie/header/param) to one of these is the CWE-807 "reliance on untrusted input in a security
+// decision" pattern: the attacker just sets the header/cookie to the privileged tier.
+func privilegeLiteral(e nir.Expr) bool {
+	c, ok := e.(nir.Const)
+	if !ok {
+		return false
+	}
+	switch strings.ToLower(strings.Trim(c.Value, "\"'` ")) {
+	case "lead", "admin", "administrator", "superuser", "super", "superadmin", "staff", "manager",
+		"root", "owner", "privileged", "elevated", "internal", "ops", "moderator", "mod", "god",
+		"supervisor", "operator", "sysadmin", "poweruser", "premium", "enterprise", "vip":
+		return true
+	}
+	return false
+}
+
+// clientMarkerCompareOperand returns the NON-literal operand of a role-marker comparison
+// (`badge == "lead"`), or "" if this BinOp isn't one. That operand is the (possibly tainted)
+// client-controlled value; flowing it into a synthetic sink lets the taint solver confirm a
+// cookie/header/param reaches the security decision.
+func clientMarkerCompareOperand(ex nir.BinOp, left, right string) string {
+	if ex.Op != "==" && ex.Op != "!=" && ex.Op != "in" {
+		return ""
+	}
+	if privilegeLiteral(ex.Right) {
+		return left
+	}
+	if privilegeLiteral(ex.Left) {
+		return right
+	}
+	return ""
+}
+
 // Lower lowers a Program into a fresh in-memory USG. When resolveImports is
 // false, calls resolve by SHORT NAME (the over-connecting baseline that case 16
 // contrasts against).
@@ -1148,6 +1943,9 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		moduleGlobals:   map[string]map[string]string{},
 		containers:      map[string]*containerInfo{},
 		templates:       map[string]templateInfo{},
+		modStr:          map[string]string{},
+		dynSqlVar:       map[string]bool{},
+		debugPayloadVar: map[string]bool{},
 		lambdaParams:    map[string][]string{},
 		directMembers:   map[string]map[string]bool{},
 		classBaseNames:  map[string][]string{},
@@ -1853,6 +2651,62 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 		}
 		for _, t := range st.Targets {
+			// Hardcoded secret (CWE-798): a secret-named target assigned a NON-TRIVIAL string literal,
+			// directly or as an os.getenv(...,"default") fallback baked into source. Skip test/seed files.
+			if secretNamedTarget(t) && !inTestOrSeedFile(st.Loc) {
+				if plausibleSecretLiteral(cv) || plausibleSecretLiteral(envDefaultConst(st.Value, l)) {
+					l.syntheticCall("analysis.secret.hardcoded", "hardcoded_secret", val, st.Loc, "secret="+t)
+				}
+			}
+			// Debug enabled by default (CWE-489): DEBUG flag defaulting to a truthy value.
+			if debugNamedTarget(t) && truthyDefault(st.Value, l) {
+				l.syntheticCall("analysis.config.debug_on", "debug_on", val, st.Loc, "debug_default_true")
+			}
+			// Track module-level string constants (e.g. `PATTERN = r"((a)+)+"`) so a regex call
+			// that references the name by identifier can resolve the literal for ReDoS detection.
+			if l.region == "" && cv != "" {
+				l.modStr[t] = cv
+			}
+			// Track dynamically-built query strings for the deferred `q = f"..."; execute(q)` form.
+			if isDynamicStringExpr(st.Value) {
+				l.dynSqlVar[t] = true
+			} else if cv != "" {
+				delete(l.dynSqlVar, t)
+			}
+			// Track response payloads that leak internal config for the deferred
+			// `payload = {...os.environ...}; return JsonResponse(payload)` form.
+			if exposesInternalConfig(st.Value, 0) {
+				l.debugPayloadVar[t] = true
+			}
+			// Plaintext password storage (CWE-256/312/916): an ORM model column named password
+			// declared as a plain string type with no hashing.
+			if plaintextPasswordColumn(t, st.Value) {
+				l.syntheticCall("analysis.storage.plaintext_password", "plaintext_password", val, st.Loc, "password_column")
+			}
+			// Wildcard host/origin allow-list (CWE-16) and disabled TLS cert checking (CWE-295) —
+			// both routed through the insecure-config sink.
+			if allowedHostsWildcard(t, st.Value) {
+				l.syntheticCall("analysis.config.insecure_header", "insecure_header", val, st.Loc, "header=allowed_hosts_wildcard")
+			}
+			// Module-level credential constant (CWE-798): an ALL-CAPS module constant named
+			// PASSWORD/USERNAME/… assigned a plausible literal. Narrow (uppercase + module scope +
+			// non-test) so lowercase form fields / test fixtures don't add noise; "password" is
+			// otherwise excluded from secretNamedTarget for exactly that reason.
+			if l.region == "" && credentialConstName(t) && !inTestOrSeedFile(st.Loc) {
+				if plausibleSecretLiteral(cv) {
+					l.syntheticCall("analysis.secret.hardcoded", "hardcoded_secret", val, st.Loc, "credential_const="+t)
+				}
+			}
+			// Console email backend (CWE-532): reset/verification emails (with their tokens) are
+			// printed to stdout/logs — `EMAIL_BACKEND = "...console.EmailBackend"`.
+			if strings.EqualFold(t, "EMAIL_BACKEND") || strings.HasSuffix(strings.ToUpper(t), ".EMAIL_BACKEND") {
+				if v, ok := litVal(st.Value); ok && strings.Contains(strings.ToLower(v), "console") && strings.Contains(v, "EmailBackend") {
+					l.syntheticCall("analysis.disclosure.sensitive_log", "sensitive_log", val, st.Loc, "console_email_backend")
+				}
+			}
+			if certCheckDisabled(t, st.Value) {
+				l.syntheticCall("analysis.config.insecure_header", "insecure_header", val, st.Loc, "header=cert_check_disabled")
+			}
 			localDecl := st.Decl && l.region != ""
 			targetTyp, targetHasTyp := typ, hasTyp
 			if !targetHasTyp {
@@ -1945,6 +2799,31 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		retTokens := append([]string{}, l.curDecorators...)
 		collectValTokens(st.Value, "", &retTokens)
 		l.functionReturnAnalysisEvent(rv, "", retTokens)
+		// A route handler's return value IS the HTTP response body. Flag config/env exposure
+		// (CWE-215) and exception detail (CWE-209) in a bare `return {...}` — the FastAPI form
+		// that has no JsonResponse(...) wrapper for the sink detectors to key on.
+		if isRouteDecorated(l.curDecorators) {
+			retLoc := ""
+			if n, ok, _ := l.g.GetNode(rv); ok {
+				retLoc = n.Loc
+			}
+			if exposesInternalConfig(st.Value, 0) {
+				l.syntheticCall("analysis.disclosure.debug_info", "debug_info", rv, retLoc, "config_in_return")
+			}
+			if exposesExceptionDetail(st.Value, 0) {
+				l.syntheticCall("analysis.disclosure.error_detail", "error_detail", rv, retLoc, "exception_in_return")
+			}
+			// SMELL (sensitive-data exposure): route returns a DB record/model — agent verifies
+			// no over-exposed fields for this caller (CWE-200/201/359).
+			if exposesRecordReturn(st.Value, 0) {
+				l.syntheticCall("analysis.smell.data_exposure", "smell", rv, retLoc, "record_in_response")
+			}
+			// Reflected XSS via raw HTML string response (CWE-79): a route returns a dynamically
+			// built string embedding HTML markup — bypasses template auto-escaping entirely.
+			if buildsRawHtmlString(st.Value) {
+				l.syntheticCall("analysis.xss.raw_html_response", "raw_html", rv, retLoc, "html_string_return")
+			}
+		}
 	case nir.Terminate:
 		l.eval(st.Value, sc)
 	case nir.Validation:
@@ -2190,7 +3069,16 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		}
 		return n
 	case nir.Call:
-		return l.evalCall(ex, sc)
+		n := l.evalCall(ex, sc)
+		if isOwnershipHelperCall(ex) {
+			l.syntheticCall("analysis.ownership.check", "ownership_check", n, ex.Loc, "ownership_helper")
+		}
+		// mass assignment (CWE-915): x.update(payload) on a MODEL/record (not a hash/context/session)
+		// with a user-controlled arg. Emit a sink consuming the first arg so taint gates it.
+		if ex.Method == "update" && len(ex.Args) >= 1 && !bulkUpdateSafeReceiver(ex.Callee) {
+			l.syntheticCall("analysis.access.mass_assign", "mass_assign", l.eval(ex.Args[0], sc), ex.Loc, "bulk_update")
+		}
+		return n
 	case nir.Format:
 		var valToks []string
 		if ex.Text != "" {
@@ -2267,6 +3155,18 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		l.flow(right, n)
 		if ex.Op == "in" && isPathResolveParents(ex.Right) {
 			l.syntheticCall("analysis.path.access_check", "access_check", n, ex.Loc, "path.resolve.parents")
+		}
+		if isOwnershipComparison(ex) {
+			l.syntheticCall("analysis.ownership.check", "ownership_check", n, ex.Loc, "obj.owner==principal")
+		}
+		if op := clientMarkerCompareOperand(ex, left, right); op != "" {
+			// the client-controlled operand flows into the security-decision sink (CWE-807)
+			l.syntheticCall("analysis.access.role_marker_compare", "role_marker_compare", op, ex.Loc, "client_marker==privilege")
+		}
+		// SMELL (broken access control): any comparison against a hardcoded role/privilege literal
+		// (`x == "admin"`) is an authorization decision an agent should verify (CWE-285/863).
+		if (ex.Op == "==" || ex.Op == "!=" || ex.Op == "in") && (privilegeLiteral(ex.Left) || privilegeLiteral(ex.Right)) {
+			l.syntheticCall("analysis.smell.weak_authz", "smell", n, ex.Loc, "role_literal_compare")
 		}
 		return n
 	case nir.Unary:
@@ -2915,6 +3815,190 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	}
 	result := l.nodeInline("Call", call.Loc, props, call.Method, calleePath, strArgs, "")
 	l.rememberTemplate(call, result, sc)
+	// Insecure HTTP response-header configuration (CWE-942/1021/16/319): `resp[hdr] = val`
+	// stores lower to __setitem__; flag permissive CORS / disabled clickjacking & XSS
+	// protections / weak CSP / disabled HSTS.
+	if call.Method == "__setitem__" {
+		if kind := l.insecureHeaderStore(call, sc); kind != "" {
+			l.syntheticCall("analysis.config.insecure_header", "insecure_header", result, call.Loc, "header="+kind)
+		}
+	}
+	// Hardcoded secret in a config subscript store — `app.config['SECRET_KEY'] = 'lit'` /
+	// `cfg['JWT_SECRET_KEY'] = '...'` (CWE-798). The name-based assign check misses these because
+	// the secret name is the subscript KEY, not an assignment target.
+	if call.Method == "__setitem__" && len(call.Args) >= 2 && !inTestOrSeedFile(call.Loc) {
+		if key, ok := l.constKey(call.Args[1], sc); ok && secretNamedTarget(key) {
+			// the KEY already signals a secret, so accept any non-trivial literal (even a short
+			// weak one like 'dvga') — a laxer bar than the name-based check.
+			if v, isC := litVal(call.Args[0]); isC && keySignaledSecretLiteral(v) {
+				l.syntheticCall("analysis.secret.hardcoded", "hardcoded_secret", result, call.Loc, "secret_key="+key)
+			}
+		}
+	}
+	// send_header(name, value) / set_header / add_header — method-call form of an insecure header.
+	if (call.Method == "send_header" || call.Method == "set_header" || call.Method == "add_header") && len(call.Args) >= 2 {
+		if kind := l.insecureHeaderPair(call.Args[0], call.Args[1], sc); kind != "" {
+			l.syntheticCall("analysis.config.insecure_header", "insecure_header", result, call.Loc, "header="+kind)
+		}
+	}
+	// Template auto-escaping disabled — `autoescape=False` (CWE-79/16); or a session/cookie store
+	// created with `httponly=False` (CWE-1004/614). Both surface via a config kwarg token.
+	for _, tk := range valToks {
+		if strings.EqualFold(tk, "autoescape=false") {
+			l.syntheticCall("analysis.config.insecure_header", "insecure_header", result, call.Loc, "header=autoescape_off")
+			break
+		}
+		if strings.EqualFold(tk, "httponly=false") {
+			l.syntheticCall("analysis.config.insecure_header", "insecure_header", result, call.Loc, "header=httponly_false")
+			break
+		}
+	}
+	// Catastrophic-backtracking regex — ReDoS (CWE-1333/400): a `re.<op>(pattern, …)` or
+	// `re.compile(pattern)` whose pattern (inline, or a module-level constant referenced by name)
+	// has nested-quantifier / overlapping-alternation structure.
+	if len(call.Args) >= 1 && isRegexApply(calleePath, call.Method) {
+		if pat, ok := l.resolveRegexPattern(call.Args[0], sc); ok && catastrophicRegex(pat) {
+			l.syntheticCall("analysis.dos.catastrophic_regex", "catastrophic_regex", result, call.Loc, "redos")
+		}
+	}
+	// Dynamic SQL — a query built by f-string / concat / .format() passed straight to an execute()
+	// sink (CWE-89). Presence-based: f-stringed SQL is essentially never safe, so this fires even
+	// when the interpolated value is a function parameter the taint engine can't trace to a source.
+	if len(call.Args) >= 1 && isSqlSinkCall(calleePath, call.Method) {
+		dyn := isDynamicStringExpr(call.Args[0])
+		if !dyn {
+			if nm, ok := call.Args[0].(nir.Name); ok && l.dynSqlVar[nm.ID] {
+				dyn = true
+			}
+		}
+		if dyn {
+			l.syntheticCall("analysis.injection.dynamic_sql", "dynamic_sql", result, call.Loc, "dynamic_query")
+		}
+	}
+	// Dynamic OS-command execution (CWE-78) — a dynamically-built command string reaching a shell
+	// sink: os.system/os.popen (always a shell) or subprocess.<run|call|check_output|Popen>(…,
+	// shell=True). Presence-based, same rationale as dynamic SQL.
+	if len(call.Args) >= 1 {
+		dynArg := isDynamicStringExpr(call.Args[0])
+		if !dynArg {
+			if nm, ok := call.Args[0].(nir.Name); ok && l.dynSqlVar[nm.ID] {
+				dynArg = true
+			}
+		}
+		if dynArg {
+			// match the shell primitive by METHOD name too, so an aliased import
+			// (`import os as _os; _os.system(...)`) can't dodge a path-only check.
+			alwaysShell := calleePath == "os.system" || strings.HasPrefix(calleePath, "os.popen") ||
+				call.Method == "system" || strings.HasPrefix(call.Method, "popen")
+			subprocShell := false
+			switch call.Method {
+			case "run", "call", "check_output", "check_call", "Popen":
+				for _, tk := range valToks {
+					if strings.EqualFold(tk, "shell=true") {
+						subprocShell = true
+						break
+					}
+				}
+			}
+			if alwaysShell || subprocShell {
+				l.syntheticCall("analysis.injection.dynamic_command", "dynamic_command", result, call.Loc, "dynamic_cmd")
+			}
+		}
+	}
+	// Debug media exposure (CWE-552): serving user-uploaded media through Django's static() helper
+	// (`urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)`) bypasses
+	// document authorization.
+	if call.Method == "static" {
+		for _, tk := range valToks {
+			lt := strings.ToLower(tk)
+			if strings.Contains(lt, "media_url") || strings.Contains(lt, "media_root") {
+				l.syntheticCall("analysis.debug.media_exposure", "media_exposure", result, call.Loc, "static_media")
+				break
+			}
+		}
+	}
+	// Plaintext sensitive data written to a log/print sink (CWE-532) — presence-based: a logging
+	// call whose argument names a password/secret/token/PII field.
+	if isLogSinkCall(calleePath, call.Method) && logsSensitiveIdentifier(valToks) {
+		l.syntheticCall("analysis.disclosure.sensitive_log", "sensitive_log", result, call.Loc, "sensitive_in_log")
+	}
+	// Sensitive data serialized into an HTTP response body (CWE-200/312) — a response constructor
+	// whose payload names a secret/PII field (password/ssn/credit_card/…).
+	if isResponseSinkCall(calleePath, call.Method) && respLeaksSensitiveField(valToks) {
+		l.syntheticCall("analysis.disclosure.sensitive_response", "sensitive_response", result, call.Loc, "sensitive_in_response")
+	}
+	// SMELL (user enumeration): auth error response disclosing account existence.
+	if isResponseSinkCall(calleePath, call.Method) && enumerationErrorResponse(valToks) {
+		l.syntheticCall("analysis.smell.user_enum", "smell", result, call.Loc, "existence_disclosing_error")
+	}
+	// SMELL (business-logic gap): a user-controlled value assigned to a business-state field in a
+	// route (`ledger["state"] = payload.get("state")`) — agent verifies the transition is validated.
+	if call.Method == "__setitem__" && len(call.Args) >= 2 && isRouteDecorated(l.curDecorators) {
+		if key, ok := l.constKey(call.Args[1], sc); ok && businessStateKey(key) {
+			if _, isConst := litVal(call.Args[0]); !isConst {
+				l.syntheticCall("analysis.smell.business_logic", "smell", result, call.Loc, "unvalidated_state_field")
+			}
+		}
+	}
+	// Error/exception detail serialized into an HTTP response (CWE-209) — str(exc) /
+	// exc.__class__.__name__ / traceback.format_exc() reaching a response constructor.
+	if isResponseSinkCall(calleePath, call.Method) {
+		for _, a := range call.Args {
+			if exposesExceptionDetail(a, 0) {
+				l.syntheticCall("analysis.disclosure.error_detail", "error_detail", result, call.Loc, "exception_in_response")
+				break
+			}
+		}
+		// Debug/config info exposure (CWE-215): env/path detail serialized into a response,
+		// directly or via a payload variable built earlier.
+		for _, a := range call.Args {
+			leak := exposesInternalConfig(a, 0)
+			if !leak {
+				if nm, ok := a.(nir.Name); ok && l.debugPayloadVar[nm.ID] {
+					leak = true
+				}
+			}
+			if leak {
+				l.syntheticCall("analysis.disclosure.debug_info", "debug_info", result, call.Loc, "config_in_response")
+				break
+			}
+		}
+	}
+	// SMELL (missing authz / validation / CSRF): a state-mutating persistence call inside a route
+	// handler — agent verifies the mutation is authorized, validated, and CSRF-protected.
+	if stateMutatingMethod(call.Method) && isRouteDecorated(l.curDecorators) {
+		l.syntheticCall("analysis.smell.state_change", "smell", result, call.Loc, "mutation_in_route")
+	}
+	// Also a raw-SQL write (execute("UPDATE/INSERT/DELETE …")) — the CSRF/state-change shape even in
+	// undecorated HTTP handlers. Taint-gated downstream, so it stays tied to request-driven writes.
+	if isSqlSinkCall(calleePath, call.Method) {
+		for _, tk := range valToks {
+			u := strings.ToUpper(tk)
+			if strings.Contains(u, "UPDATE ") || strings.Contains(u, "INSERT ") || strings.Contains(u, "DELETE ") || strings.Contains(u, "INSERT\n") || strings.Contains(u, "UPDATE\n") {
+				l.syntheticCall("analysis.smell.state_change", "smell", result, call.Loc, "mutating_sql")
+				break
+			}
+		}
+	}
+	// XSS-escape bypass (CWE-79/80): marking NON-constant data as safe HTML — `mark_safe(field)`,
+	// `Markup(user_value)` — disables auto-escaping on attacker-influenced data.
+	if (call.Method == "mark_safe" || call.Method == "Markup") && len(call.Args) >= 1 {
+		if _, isConst := litVal(call.Args[0]); !isConst {
+			l.syntheticCall("analysis.xss.raw_html_response", "raw_html", result, call.Loc, "mark_safe_dynamic")
+		}
+	}
+	// TLS certificate validation disabled — ssl._create_unverified_context() (CWE-295/16).
+	if call.Method == "_create_unverified_context" {
+		l.syntheticCall("analysis.config.insecure_header", "insecure_header", result, call.Loc, "header=ssl_unverified")
+	}
+	// Debug mode enabled via a `debug=True` keyword argument to an app/server constructor or
+	// run() call (CWE-489/16) — complements the DEBUG=True module-assignment detection.
+	for _, tk := range valToks {
+		if strings.EqualFold(tk, "debug=true") {
+			l.syntheticCall("analysis.config.debug_on", "debug_on", result, call.Loc, "debug_kwarg_true")
+			break
+		}
+	}
 	if recvNode != "" { // receiver taint (chained calls)
 		// a container get with a CONSTANT key reads only that slot (element-sensitive), so
 		// `m.put("kB", p); m.get("kA")` stays clean. Anything else flows the whole receiver

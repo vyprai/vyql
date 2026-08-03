@@ -1785,8 +1785,46 @@ func (c *pyConv) pyDecoratorTokens(n *tree_sitter.Node) []string {
 		} else {
 			add("decorator_method:" + path)
 		}
+		// route-registration decorators carry the URL path as their first string argument
+		// (`@app.post("/api/auth/login")`, `@router.get("/password-reset")`). Surface it so
+		// rules can classify an endpoint by its path, not just its (fragile) function name.
+		if rp := c.pyDecoratorRouteArg(ch); rp != "" {
+			add("route_path:" + rp)
+		}
 	}
 	return out
+}
+
+// pyDecoratorRouteArg returns the first string-literal argument of a call-form decorator — the
+// route URL for web-framework route registrations — unquoted, or "" if the decorator takes no
+// string argument.
+func (c *pyConv) pyDecoratorRouteArg(dec *tree_sitter.Node) string {
+	var call *tree_sitter.Node
+	for _, ch := range namedChildren(dec) {
+		if ch.Kind() == "call" {
+			call = ch
+			break
+		}
+	}
+	if call == nil {
+		return ""
+	}
+	args := field(call, "arguments")
+	if args == nil {
+		return ""
+	}
+	for _, a := range namedChildren(args) {
+		if a.Kind() == "string" {
+			s := c.text(a)
+			// strip a string prefix (r/b/f/u) and surrounding quotes
+			for len(s) > 0 && (s[0] == 'r' || s[0] == 'b' || s[0] == 'f' || s[0] == 'u' || s[0] == 'R' || s[0] == 'B' || s[0] == 'F' || s[0] == 'U') {
+				s = s[1:]
+			}
+			s = strings.Trim(s, "\"'")
+			return s
+		}
+	}
+	return ""
 }
 
 func (c *pyConv) pyParamEntries(name string, params []string, base []string) []nir.ParamEntry {
@@ -1904,6 +1942,11 @@ func (c *pyConv) targets(left *tree_sitter.Node) []string {
 	switch left.Kind() {
 	case "identifier":
 		return []string{c.text(left)}
+	case "attribute":
+		// object attribute store `obj.attr = v` (e.g. app.secret_key = "...", app.debug = True):
+		// surface the dotted target so name-based assign recognizers (hardcoded secret, debug flag)
+		// and the field-mutation taint path can see it.
+		return []string{c.dotted(left)}
 	case "pattern_list", "tuple_pattern", "tuple":
 		var out []string
 		for _, ch := range c.namedChildren(left) {

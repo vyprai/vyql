@@ -1437,6 +1437,16 @@ func nodeHasConcept(labels []usg.Label, concept string) bool {
 	return false
 }
 
+// funcOf returns the id of the code.Function enclosing a node, via the `func_id` prop stamped
+// during lowering ("" if the node is top-level or carries no stamp).
+func (e *Engine) funcOf(nodeID string) string {
+	n, ok, err := e.Store.GetNode(nodeID)
+	if !ok || err != nil {
+		return ""
+	}
+	return n.Prop("func_id")
+}
+
 // flowGuarded reports whether a guard consumes the tainted value and dominates
 // a later node on this same source-to-sink path. This covers the common shape:
 //

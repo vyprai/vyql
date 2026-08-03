@@ -1131,20 +1131,6 @@ func rubyRegexPattern(raw string) string {
 	return strings.Trim(raw, "/")
 }
 
-func hasNestedBacktrackingQuantifier(pat string) bool {
-	for i := 0; i < len(pat); i++ {
-		if pat[i] != ')' || i+1 >= len(pat) || !isRegexQuantifier(pat[i+1]) || isPossessiveQuantifier(pat, i+1) {
-			continue
-		}
-		for j := i - 1; j >= 0 && pat[j] != '('; j-- {
-			if isRegexQuantifier(pat[j]) && !isEscaped(pat, j) && !isPossessiveQuantifier(pat, j) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func firstBacktrackingQuantifiedLiteral(alt string) (byte, bool) {
 	for i := 0; i+1 < len(alt); i++ {
 		if isEscaped(alt, i) || !isRegexLiteralByte(alt[i]) || !isRegexQuantifier(alt[i+1]) {
