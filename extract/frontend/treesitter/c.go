@@ -2049,10 +2049,10 @@ func (c *ccConv) ccStructPointerOOBWriteObservations(fn *tree_sitter.Node) []nir
 	if body == nil {
 		return nil
 	}
-	derivedPointers := map[string]bool{}
+	derivedPointerBases := map[string]string{}
 	writePointers := map[string]bool{}
 	incrementedPointers := map[string]bool{}
-	containedPointers := map[string]bool{}
+	containedPointerBases := map[string]map[string]bool{}
 
 	var walk func(*tree_sitter.Node)
 	walk = func(n *tree_sitter.Node) {
@@ -2065,8 +2065,10 @@ func (c *ccConv) ccStructPointerOOBWriteObservations(fn *tree_sitter.Node) []nir
 			right := field(n, "right")
 			switch c.assignmentOp(n) {
 			case "=":
-				if left != "" && c.ccPointerDerivedFromReadIndexedBuffer(right) {
-					derivedPointers[left] = true
+				if left != "" {
+					if base, ok := c.ccPointerDerivedReadBase(right); ok {
+						derivedPointerBases[left] = base
+					}
 				}
 				if left != "" {
 					if ptr, ok := c.ccPointerPlusOffsetBase(right); ok && ptr == left {
@@ -2080,11 +2082,13 @@ func (c *ccConv) ccStructPointerOOBWriteObservations(fn *tree_sitter.Node) []nir
 			}
 		case "init_declarator":
 			name := c.declName(field(n, "declarator"))
-			if name != "" && c.ccPointerDerivedFromReadIndexedBuffer(field(n, "value")) {
-				derivedPointers[name] = true
+			if name != "" {
+				if base, ok := c.ccPointerDerivedReadBase(field(n, "value")); ok {
+					derivedPointerBases[name] = base
+				}
 			}
 		case "call_expression":
-			c.ccRecordStructPointerCall(n, writePointers, containedPointers)
+			c.ccRecordStructPointerCall(n, writePointers, containedPointerBases)
 		}
 		for _, ch := range c.namedChildren(n) {
 			walk(ch)
@@ -2092,8 +2096,8 @@ func (c *ccConv) ccStructPointerOOBWriteObservations(fn *tree_sitter.Node) []nir
 	}
 	walk(body)
 
-	for ptr := range derivedPointers {
-		if !writePointers[ptr] || !incrementedPointers[ptr] || containedPointers[ptr] {
+	for ptr, base := range derivedPointerBases {
+		if !writePointers[ptr] || !incrementedPointers[ptr] || containedPointerBases[ptr][base] {
 			continue
 		}
 		loc := c.loc(body)
@@ -2113,19 +2117,25 @@ func (c *ccConv) ccStructPointerOOBWriteObservations(fn *tree_sitter.Node) []nir
 	return nil
 }
 
-func (c *ccConv) ccPointerDerivedFromReadIndexedBuffer(n *tree_sitter.Node) bool {
+func (c *ccConv) ccPointerDerivedReadBase(n *tree_sitter.Node) (string, bool) {
 	n = ccUnwrapCExpr(n)
 	if n == nil {
-		return false
+		return "", false
 	}
 	if n.Kind() == "pointer_expression" && c.unaryOp(n) == "&" {
-		return c.ccExprContainsCallName(field(n, "argument"), "readint32") &&
-			c.ccExprContainsSubscript(field(n, "argument"))
+		arg := field(n, "argument")
+		if !c.ccExprContainsCallName(arg, "readint32") {
+			return "", false
+		}
+		return c.ccSubscriptBase(arg)
 	}
-	return c.ccExprContainsCallName(n, "readint32") && c.ccExprContainsSubscript(n)
+	if !c.ccExprContainsCallName(n, "readint32") {
+		return "", false
+	}
+	return c.ccSubscriptBase(n)
 }
 
-func (c *ccConv) ccRecordStructPointerCall(n *tree_sitter.Node, writePointers, containedPointers map[string]bool) {
+func (c *ccConv) ccRecordStructPointerCall(n *tree_sitter.Node, writePointers map[string]bool, containedPointerBases map[string]map[string]bool) {
 	path := strings.ToLower(c.dotted(field(n, "function")))
 	args := c.namedChildren(field(n, "arguments"))
 	if strings.Contains(path, "writeint32") && len(args) > 0 {
@@ -2134,9 +2144,18 @@ func (c *ccConv) ccRecordStructPointerCall(n *tree_sitter.Node, writePointers, c
 		}
 	}
 	if strings.Contains(strings.ToUpper(path), "CONTAIN") {
-		for _, arg := range args {
-			if ptr := ccIdentifierText(c, arg); ptr != "" {
-				containedPointers[ptr] = true
+		base := ""
+		if len(args) > 0 {
+			base = ccIdentifierText(c, args[0])
+		}
+		if base != "" {
+			for _, arg := range args[1:] {
+				if ptr := ccIdentifierText(c, arg); ptr != "" {
+					if containedPointerBases[ptr] == nil {
+						containedPointerBases[ptr] = map[string]bool{}
+					}
+					containedPointerBases[ptr][base] = true
+				}
 			}
 		}
 	}
@@ -2198,6 +2217,27 @@ func (c *ccConv) ccExprContainsSubscript(n *tree_sitter.Node) bool {
 	}
 	walk(n)
 	return found
+}
+
+func (c *ccConv) ccSubscriptBase(n *tree_sitter.Node) (string, bool) {
+	var base string
+	var walk func(*tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		if m == nil || base != "" {
+			return
+		}
+		if m.Kind() == "subscript_expression" {
+			base = ccIdentifierText(c, field(m, "argument"))
+			if base != "" {
+				return
+			}
+		}
+		for _, ch := range c.namedChildren(m) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return base, base != ""
 }
 
 type ccSignedLengthCandidate struct {
