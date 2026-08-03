@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding dynamicSqlQuery680 {
+  query pattern callExpr where callee.analysis ~= "injection.dynamic_sql"
+  emit issue code.DynamicSqlQuery at call
+}

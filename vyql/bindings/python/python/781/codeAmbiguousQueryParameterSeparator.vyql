@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding ambiguousQueryParameterSeparator781 {
+  query pattern presenceNode where node.analysis == "function.context" and node.token contains "name=_parse_qsl" and node.token contains "qs.replace(';','&').split('&')"
+  emit issue code.AmbiguousQueryParameterSeparator at node
+}

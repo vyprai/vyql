@@ -1,0 +1,10 @@
+module bindings.python.generated.m21017d75;
+
+binding rateLimitCheck734 {
+  query pattern callExpr where callee.path ~= "throttle_classes"
+  emit check code.RateLimitCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

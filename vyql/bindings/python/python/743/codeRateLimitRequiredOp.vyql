@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding rateLimitRequiredOp743 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "name=password_reset_request"
+  emit issue code.RateLimitRequiredOp at node
+}

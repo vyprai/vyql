@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding stateChangeSmell692 {
+  query pattern callExpr where callee.analysis ~= "smell.state_change"
+  emit sink code.StateChangeSmell at args[0]
+}

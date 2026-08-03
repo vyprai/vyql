@@ -1,0 +1,11 @@
+module code;
+
+concept RateLimitRequiredOp : issue {
+  cwe: [CWE_307]
+  reviewAssumption: "the endpoint can be driven at machine speed"
+  reviewCategory: auth
+  reviewCondition: "an authentication-sensitive endpoint accepts attempts without a throttle"
+  reviewConfidence: medium
+  reviewEvidence: "auth endpoint {pattern} has no rate-limit control"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

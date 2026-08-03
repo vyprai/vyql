@@ -1,0 +1,10 @@
+module bindings.python.generated.m21017d75;
+
+binding rateLimitCheck735 {
+  query pattern callExpr where callee.path ~= "RateLimiter"
+  emit check code.RateLimitCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

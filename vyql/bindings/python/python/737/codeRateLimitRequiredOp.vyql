@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding rateLimitRequiredOp737 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "name=login"
+  emit issue code.RateLimitRequiredOp at node
+}

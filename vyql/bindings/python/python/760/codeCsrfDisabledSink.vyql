@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding csrfDisabledSink760 {
+  query pattern presenceNode where node.analysis ~= "parameter.entry" and node.token contains "decorator_method:csrf_exempt"
+  emit issue code.CsrfDisabledSink at node
+}

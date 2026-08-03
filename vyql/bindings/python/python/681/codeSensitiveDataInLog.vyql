@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding sensitiveDataInLog681 {
+  query pattern callExpr where callee.analysis ~= "disclosure.sensitive_log"
+  emit issue code.SensitiveDataInLog at call
+}

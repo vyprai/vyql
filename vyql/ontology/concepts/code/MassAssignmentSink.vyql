@@ -1,0 +1,12 @@
+module code;
+
+concept MassAssignmentSink : sink {
+  cwe: [CWE_915]
+  enabledBy: [taint.UntrustedData]
+  reviewAssumption: "the object carries fields the caller must not set"
+  reviewCategory: mass_assignment
+  reviewCondition: "user-controlled data is bulk-applied to an object or record without a field allowlist"
+  reviewConfidence: medium
+  reviewEvidence: "bulk assignment {pattern} receives tainted input"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

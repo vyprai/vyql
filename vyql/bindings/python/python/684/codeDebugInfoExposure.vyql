@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding debugInfoExposure684 {
+  query pattern callExpr where callee.analysis ~= "disclosure.debug_info"
+  emit issue code.DebugInfoExposure at call
+}
