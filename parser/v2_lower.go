@@ -664,7 +664,8 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 	if b.Query.Expr != nil && b.Query.Expr.Family == "param" {
 		return lowerV2ParamSourceBinding(b, names)
 	}
-	queryWhere := b.Query.Where
+	// Every branch below either assigns queryWhere or returns an error.
+	var queryWhere V2Expr
 	queryAlias := ""
 	queryNodeType := ""
 	queryFamily := ""

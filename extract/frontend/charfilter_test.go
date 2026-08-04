@@ -43,11 +43,11 @@ func TestOutputAlphabet(t *testing.T) {
 }
 
 func TestReplaceCharEffectsRemovedCharacters(t *testing.T) {
-	_, bounded, removed := replaceCharEffects(`[^\n\r]`, "_", true)
+	_, bounded, _ := replaceCharEffects(`[^\n\r]`, "_", true)
 	if !bounded {
 		t.Fatalf("negated class should still produce a bounded alphabet")
 	}
-	_, bounded, removed = replaceCharEffects(`[\n\r]`, "_", true)
+	_, bounded, removed := replaceCharEffects(`[\n\r]`, "_", true)
 	if bounded {
 		t.Fatalf("positive class replacement is not a bounded alphabet proof")
 	}

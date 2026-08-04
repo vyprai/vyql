@@ -494,7 +494,7 @@ func roots(paths []string) []string {
 }
 
 func projectRoot(p string) string {
-	base := filepath.Clean(p)
+	var base string
 	if info, err := os.Stat(p); err == nil && info.IsDir() {
 		base = p
 	} else {
