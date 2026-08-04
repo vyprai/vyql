@@ -9,4 +9,5 @@ rule Unsafe {
   }
   taint core.UserControlledData -> code.Deserialization
   unless path coveredBy core.SafeDeserialization
+  unless endpoint coveredBy core.SafeDeserialization
 }
