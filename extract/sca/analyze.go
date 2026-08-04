@@ -3,6 +3,7 @@
 // malware detection is NOT gated on a version being in the advisory feed — an
 // unreviewed version (neither marked trusted nor vulnerable) of a package with known
 // malicious releases is still scanned and flagged. docs/11.
+
 package sca
 
 import (

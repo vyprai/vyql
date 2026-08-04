@@ -271,11 +271,11 @@ type ClassDef struct {
 // (flow-approximate, like the per-language extractors).
 type Block struct{ Stmts []Stmt }
 
-// Structured control-flow nodes (B1 / WS0). Frontends emit these instead of a flat
-// Block when they preserve branch structure; the lowering builds a real CFG (CONTROL
-// edges) from them. For a frontend that has not
-// been converted — they are lowered like a Block (flatten), so they are fully additive
-// and behaviour-preserving. Cond is retained for taint and (later) path feasibility.
+// If is one of the structured control-flow nodes (B1 / WS0). Frontends emit these
+// instead of a flat Block when they preserve branch structure, and the lowering
+// builds a real CFG (CONTROL edges) from them. A frontend that has not been
+// converted lowers them like a Block (flatten), so they are fully additive and
+// behaviour-preserving. Cond is retained for taint and, later, path feasibility.
 type If struct {
 	Cond Expr
 	Then []Stmt

@@ -1,3 +1,5 @@
+// Package definitions inspects the shipped VyQL definition corpus -- concepts,
+// bindings, rule packs and reviews -- and reports what it contains.
 package definitions
 
 import (
@@ -333,8 +335,7 @@ func ruleConcepts(r *parser.Rule) []string {
 			seen[v] = true
 		}
 	}
-	var walkStmt func(parser.Stmt)
-	walkStmt = func(s parser.Stmt) {
+	walkStmt := func(s parser.Stmt) {
 		switch x := s.(type) {
 		case *parser.FlowStmt:
 			add(x.Src.Concept)

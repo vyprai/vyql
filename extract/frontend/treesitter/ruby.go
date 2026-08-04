@@ -299,6 +299,10 @@ func (c *rbConv) rbMethodBody(n *tree_sitter.Node) []nir.Stmt {
 		return stmts
 	}
 	if last, ok := stmts[len(stmts)-1].(nir.ExprStmt); ok {
+		// Named field rather than a nir.Return(last) conversion: the two structs
+		// happen to share a layout today, and a conversion would silently follow
+		// them apart if either gains a field.
+		//nolint:staticcheck // S1016
 		stmts[len(stmts)-1] = nir.Return{Value: last.Value}
 	}
 	return stmts

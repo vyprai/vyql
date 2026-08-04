@@ -3,6 +3,7 @@
 // so the lists refresh without a rebuild. A dependency one edit away from a popular
 // package — or on the known-bad list, or an unreviewed version of a package with
 // malicious history — is flagged.
+
 package sca
 
 import "github.com/vyprai/vyql/usg"

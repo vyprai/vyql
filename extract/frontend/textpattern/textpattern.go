@@ -155,10 +155,7 @@ func (cfg textPatternProfile) matchLine(line string) bool {
 				return false
 			}
 		}
-		if charClasses(raw) < cfg.MinValueClasses {
-			return false
-		}
-		return true
+		return charClasses(raw) >= cfg.MinValueClasses
 	}
 	return false
 }

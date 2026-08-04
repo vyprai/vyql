@@ -210,9 +210,10 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// Platform callback entry points seeded as external input:
 		// application(_:open:) URL param and userContentController(_:didReceive:) message.
 		var seedParam string
-		if name == "application" {
+		switch name {
+		case "application":
 			seedParam = labeledInternal(pairs, "open")
-		} else if name == "userContentController" {
+		case "userContentController":
 			seedParam = labeledInternal(pairs, "didReceive")
 		}
 		if seedParam != "" {
@@ -672,14 +673,15 @@ func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 	return nir.Seq{Parts: parts, Loc: L}
 }
 
+// swCallee returns the function part of a call expression: its first named child,
+// unless that child is already the argument list, in which case there is no
+// callee to return.
 func (c *swConv) swCallee(n *tree_sitter.Node) *tree_sitter.Node {
-	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "call_suffix" {
-			break
-		}
-		return ch
+	kids := c.namedChildren(n)
+	if len(kids) == 0 || kids[0].Kind() == "call_suffix" {
+		return nil
 	}
-	return nil
+	return kids[0]
 }
 
 func (c *swConv) navSuf(suf *tree_sitter.Node) string {

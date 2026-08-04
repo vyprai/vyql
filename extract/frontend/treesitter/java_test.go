@@ -757,8 +757,7 @@ func TestJavaEnhancedForBindsElementToIterable(t *testing.T) {
 
 func hasEnhancedForBinding(mods []nir.Module, target, source string) bool {
 	var walkStmts func([]nir.Stmt) bool
-	var exprName func(nir.Expr) string
-	exprName = func(e nir.Expr) string {
+	exprName := func(e nir.Expr) string {
 		if n, ok := e.(nir.Name); ok {
 			return n.ID
 		}
