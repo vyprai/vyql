@@ -136,7 +136,7 @@ func main() {
 func cmdScan(args []string) error {
 	fs := flag.NewFlagSet("scan", flag.ExitOnError)
 	rulesPath := fs.String("rules", "", "load rule(s) from a .vyql file or directory (default: vyql/packs)")
-	format := fs.String("format", "text", "output format: text | sarif | json")
+	format := fs.String("format", "text", "output format: text | sarif | json | graph-json")
 	profileName := fs.String("profile", "auto", "analysis profile: auto | "+profileNames())
 	stats := fs.Bool("stats", false, "print scan profile: per-phase timing, node/edge counts, taint-hub warnings")
 	allResults := fs.Bool("all", false, "include all result sections: findings and flags (json output becomes {findings, flags})")
@@ -598,7 +598,11 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	var graph usg.Store
 	hit := false
 	wantsFlags := opts.wantsFlags()
-	if cache != nil && syncCollector == nil && !wantsFlags {
+	// graph-json serialises the live graph, which the whole-scan findings cache
+	// cannot replay -- it stores findings, not the USG. Force the full pipeline,
+	// exactly as the flag paths do.
+	needsGraph := wantsFlags || format == "graph-json"
+	if cache != nil && syncCollector == nil && !needsGraph {
 		rkey = scanFingerprint(cache.Salt(), paths, ruleSources, prof.Name)
 		if cs, ok := loadCachedScan(cache, rkey); ok {
 			all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
@@ -610,15 +614,15 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 			func() {
 				restore := parsecache.SetShared(nil)
 				defer restore()
-				all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !wantsFlags)
+				all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !needsGraph)
 			}()
 		} else {
-			all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !wantsFlags)
+			all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !needsGraph)
 		}
 		if err != nil {
 			return err
 		}
-		if cache != nil && syncCollector == nil && !wantsFlags {
+		if cache != nil && syncCollector == nil && !needsGraph {
 			storeCachedScan(cache, rkey, all, stats)
 		}
 	}
@@ -642,6 +646,22 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	switch format {
 	case "sarif":
 		doc := sarif.ToSARIF(all, version, sarifRulesMeta(ruleSources))
+		b, _ := json.MarshalIndent(doc, "", "  ")
+		fmt.Println(string(b))
+	case "graph-json":
+		root := ""
+		if len(paths) > 0 {
+			root = paths[0]
+		}
+		doc := gjDocument{
+			SchemaVersion: gjSchemaVersion,
+			Tool:          gjTool{Name: "VyQL", Version: version},
+			Concepts:      conceptLegend(),
+			CodeMap:       gjCodeMap{Root: root},
+		}
+		if graph != nil {
+			doc = buildGraphJSON(graph, all, sarifRulesMeta(ruleSources), root)
+		}
 		b, _ := json.MarshalIndent(doc, "", "  ")
 		fmt.Println(string(b))
 	case "json":
