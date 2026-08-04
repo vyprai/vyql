@@ -8,8 +8,8 @@ Date: 2026-06 (relative; see git history).
 ## Context
 
 Direction from the product owner: **the final product is implemented in Go**,
-and **the graph database is BadgerDB**. The Python `poc/` (133 tests across 23
-cases) has validated the VyQL semantics end-to-end; it now serves as the
+and **the graph database is BadgerDB**. A Python prototype (133 tests across 23
+cases) validated the VyQL semantics end-to-end; it served as the
 **reference oracle / executable spec** for the Go port, not as the shipping
 artifact.
 
@@ -33,9 +33,9 @@ artifact.
    interface and are verified to return **identical results**
    (`go/usg/usg_test.go` `TestStoreEquivalence`) — so the engine is
    storage-agnostic and the partition loader can choose the backend per use.
-4. **Python `poc/` is the reference oracle.** Go behavior is ported against it;
-   the Python cases (`poc/cases/case_*`) are mirrored as Go tests so the Go
-   build is checked against the validated spec.
+4. **The Python prototype is the reference oracle.** Go behavior is ported
+   against it; its 23 semantics cases are mirrored as Go tests so the Go build
+   is checked against the validated spec.
 
 ## Why BadgerDB
 
@@ -57,7 +57,7 @@ artifact.
   (tree-sitter has Go bindings; acorn/Ripper can stay as shell-outs initially or
   become Go-native), adapters, and rule compiler are ported to Go incrementally,
   each checked against the Python oracle's tests.
-- **Re-benchmark.** The storage benchmark (ADR 0001 / `poc/bench/`) is re-run in
+- **Re-benchmark.** The storage benchmark (ADR 0001) is re-run in
   Go against BadgerDB before GA; the prototype numbers established the
   *architecture*, not Badger's absolute figures.
 - **Edge-sequence persistence.** The Badger store's edge `seq` counter is

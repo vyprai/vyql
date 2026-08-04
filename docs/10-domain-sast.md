@@ -92,8 +92,7 @@ from heuristic to `resolved`; resolution quality flows into finding confidence
 ([14](14-findings-explainability-output.md)). The Go lowering layer implements
 this shared resolution model for the current frontends; the prototype first
 proved the approach for Python, JavaScript, and Ruby and removed multiple false
-positives that name-based resolution produced (see `poc/FINDINGS.md`
-§"Call resolution", `poc/cases/case_16`).
+positives that name-based resolution produced.
 
 ## Rule pack: the cross-language injection family
 

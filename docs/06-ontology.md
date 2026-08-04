@@ -84,7 +84,7 @@ a SQL-injection sink, because suppressing an injection finding on the basis of a
 unrelated control is a false negative. Endpoint-scoped controls therefore still
 carry `neutralizes`, and the legitimate `guarded_by` pairings are threat-matched
 (e.g. `CSRF_PROTECTION` guarding a CSRF-vulnerable state-changing operation). The
-prototype confirmed this gap and the fix (`poc/FINDINGS.md` #3).
+prototype confirmed this gap and the fix.
 
 ## Core vocabulary (v1 seed)
 
@@ -177,7 +177,7 @@ because they live in **two layers** (implemented in `go/taxonomy/` + `go/ontolog
 
 1. **The taxonomy catalog** — the *complete* MITRE CWE (969) and CAPEC (615)
    catalogs are embedded as reference data (`go/taxonomy/`, generated from the
-   official CSVs by `poc/tools/gen_taxonomy.py`). Every weakness/attack-pattern
+   official MITRE CSVs). Every weakness/attack-pattern
    is queryable by id with hierarchy (ChildOf) and cross-references
    (CWE↔CAPEC). This is the full taxonomy.
 2. **The analysis vocabulary** — concepts (sources/sinks/controls) and a curated

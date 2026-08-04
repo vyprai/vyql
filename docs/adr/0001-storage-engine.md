@@ -19,8 +19,8 @@ dominant volume).
 
 ## Benchmark
 
-Harness: `poc/bench/` (`graph_gen.py`, `stores.py`, `storage_bench.py`),
-validated for result-equivalence by `poc/cases/case_22`. Code-heavy synthetic
+Harness: a synthetic graph generator plus per-store drivers, validated for
+result-equivalence across candidates. Code-heavy synthetic
 graphs; two candidates exercising the hottest engine/solver operations —
 concept-label lookup (rule/adapter binding), edge traversal (solvers), and
 6-hop BFS (reach/taint shape).
@@ -56,7 +56,7 @@ serve the hot path at the needed latency.
    partition-local (docs/04 §scale), so the active working set fits in RAM.
 3. **Class B virtual relations** (taint/reach/assume) are never stored —
    computed by solvers over the working set, cached with dependency
-   fingerprints (docs/04, solver contract `poc/vyql/solvers/__init__.py`).
+   fingerprints (docs/04, and the shared solver contract).
 4. **Cross-partition** traversal (attack paths) happens only through the few
    declared cross-domain edges, fetched on demand from the fact store.
 
