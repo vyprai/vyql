@@ -8,6 +8,9 @@
 //     running the binary from within the repo).
 //  3. the nearest such ancestor of the executable's directory (covers an
 //     installed binary shipped alongside its `vyql/` data dir).
+//  4. the module cache entry this binary was built from (covers `go install`,
+//     where the binary lands in GOBIN with nothing beside it -- but the module,
+//     data included, is already on disk).
 //
 // If none is found, Root panics with a message telling the user to set
 // $VYQL_HOME — the data is required, never silently empty.
@@ -17,6 +20,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"sync"
@@ -181,7 +185,68 @@ func resolve() string {
 			return d
 		}
 	}
+	if d := moduleCacheRoot(); d != "" {
+		return d
+	}
 	return ""
+}
+
+// moduleCacheRoot finds the data directory inside the module cache entry this
+// binary was built from. `go install example.com/x/cmd/y@v1` leaves the binary in
+// GOBIN with no data beside it, and the working directory is wherever the user
+// happens to be -- so the first three rules all miss, even though the module was
+// just downloaded and the data is sitting in the cache.
+//
+// Returns "" for a locally built binary, whose version reads "(devel)" and which
+// has no cache entry to find.
+func moduleCacheRoot() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok || info.Main.Path == "" {
+		return ""
+	}
+	version := info.Main.Version
+	if version == "" || version == "(devel)" {
+		return ""
+	}
+	base := os.Getenv("GOMODCACHE")
+	if base == "" {
+		if gopath := os.Getenv("GOPATH"); gopath != "" {
+			base = filepath.Join(gopath, "pkg", "mod")
+		} else if home, err := os.UserHomeDir(); err == nil {
+			base = filepath.Join(home, "go", "pkg", "mod")
+		}
+	}
+	if base == "" {
+		return ""
+	}
+	cand := moduleCachePath(base, info.Main.Path, version)
+	if isDataRoot(cand) {
+		return cand
+	}
+	return ""
+}
+
+// moduleCachePath builds the data directory's path inside the module cache. Split
+// out from the lookup so it can be tested without a binary that was actually go
+// install-ed, which is the only way ReadBuildInfo reports a real version.
+func moduleCachePath(base, modulePath, version string) string {
+	return filepath.Join(base, escapeModulePath(modulePath)+"@"+version, "vyql")
+}
+
+// escapeModulePath applies the module cache's case encoding: an upper-case letter
+// becomes "!" followed by its lower-case form, so that paths differing only in
+// case cannot collide on a case-insensitive filesystem.
+func escapeModulePath(p string) string {
+	var b strings.Builder
+	for _, r := range p {
+		if r >= 'A' && r <= 'Z' {
+			b.WriteByte('!')
+			b.WriteRune(r - 'A' + 'a')
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 // searchUp walks from start toward the filesystem root, returning the first
