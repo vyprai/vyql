@@ -98,7 +98,7 @@ func parseERBModules(
 		parser.Close()
 		if good {
 			m.Body = append(m.Body, erbUnescapedHrefInterpolationObservations(src, relPath(root, f)+"#erb.rb")...)
-			m.Body = append(m.Body, erbHtmlEscapedUrlHrefObservations(src, relPath(root, f)+"#erb.rb")...)
+			m.Body = append(m.Body, erbHTMLEscapedURLHrefObservations(src, relPath(root, f)+"#erb.rb")...)
 			m.Hash = contentHash(src)
 			out = append(out, m)
 		}
@@ -163,14 +163,14 @@ func erbHrefInterpolationExprNeedsEscaping(expr string) bool {
 		strings.HasPrefix(expr, "@")
 }
 
-func erbHtmlEscapedUrlHrefObservations(src []byte, rel string) []nir.Stmt {
+func erbHTMLEscapedURLHrefObservations(src []byte, rel string) []nir.Stmt {
 	var out []nir.Stmt
 	for i, line := range strings.Split(string(src), "\n") {
 		for _, m := range erbHrefOutputRe.FindAllStringSubmatch(line, -1) {
 			if len(m) < 2 {
 				continue
 			}
-			expr, helper, ok := erbHtmlEscapeCall(strings.TrimSpace(m[1]))
+			expr, helper, ok := erbHTMLEscapeCall(strings.TrimSpace(m[1]))
 			if !ok || !erbHrefExprLooksURLValue(expr) {
 				continue
 			}
@@ -195,7 +195,7 @@ func erbHtmlEscapedUrlHrefObservations(src []byte, rel string) []nir.Stmt {
 	return out
 }
 
-func erbHtmlEscapeCall(expr string) (string, string, bool) {
+func erbHTMLEscapeCall(expr string) (string, string, bool) {
 	for _, h := range []struct {
 		prefix string
 		name   string

@@ -914,7 +914,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			bodyStmts = append(bodyStmts, c.ccArrayBufferTransferMaxLengthObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccCompressedBlockCapacityObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccFragmentOffsetCopyObservations(n)...)
-			bodyStmts = append(bodyStmts, c.ccRubyCgiEscapeHtmlAllocationObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccRubyCgiEscapeHTMLAllocationObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccPythonUnicodeEscapeAllocationObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccFormattedPlaceholderAllocationObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccSniffCsvExternalAccessObservations(n)...)
@@ -948,7 +948,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			bodyStmts = append(bodyStmts, c.ccCryptoImproperBlindingObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccWindowsRemotePathCredentialObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccLibreOfficeDibHeaderUnderflowObservations(n)...)
-			bodyStmts = append(bodyStmts, c.ccDnsInterfaceNewlineValidationObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccDNSInterfaceNewlineValidationObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccCredentialProtocolNewlineObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccIcmpEchoPayloadLengthObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccIsolateLevelIncrementObservations(n)...)
@@ -956,7 +956,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			bodyStmts = append(bodyStmts, c.ccProtocolStatusVectorObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccChakraScopeSlotObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccBrOnReachableAssertionObservations(n)...)
-			bodyStmts = append(bodyStmts, c.ccHttpPersistentAuthReuseObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccHTTPPersistentAuthReuseObservations(n)...)
 		}
 		return []nir.Stmt{nir.FuncDef{
 			Name:          name,
@@ -2715,7 +2715,7 @@ func (c *ccConv) ccFragmentOffsetCopyObservations(fn *tree_sitter.Node) []nir.St
 	return nil
 }
 
-func (c *ccConv) ccRubyCgiEscapeHtmlAllocationObservations(fn *tree_sitter.Node) []nir.Stmt {
+func (c *ccConv) ccRubyCgiEscapeHTMLAllocationObservations(fn *tree_sitter.Node) []nir.Stmt {
 	body := field(fn, "body")
 	if body == nil {
 		return nil
@@ -3965,7 +3965,7 @@ func (c *ccConv) ccLibreOfficeDibHeaderUnderflowObservations(fn *tree_sitter.Nod
 	}}}
 }
 
-func (c *ccConv) ccDnsInterfaceNewlineValidationObservations(fn *tree_sitter.Node) []nir.Stmt {
+func (c *ccConv) ccDNSInterfaceNewlineValidationObservations(fn *tree_sitter.Node) []nir.Stmt {
 	body := field(fn, "body")
 	if body == nil {
 		return nil
@@ -4207,7 +4207,7 @@ func (c *ccConv) ccBrOnReachableAssertionObservations(fn *tree_sitter.Node) []ni
 	}}}
 }
 
-func (c *ccConv) ccHttpPersistentAuthReuseObservations(fn *tree_sitter.Node) []nir.Stmt {
+func (c *ccConv) ccHTTPPersistentAuthReuseObservations(fn *tree_sitter.Node) []nir.Stmt {
 	body := field(fn, "body")
 	if body == nil || c.lang != "c" {
 		return nil

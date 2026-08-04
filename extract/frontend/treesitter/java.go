@@ -157,7 +157,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		paramTypes := c.paramTypes(paramsNode)
 		body := c.block(field(n, "body"))
 		body = append(body, c.jvIntegerSizeArithmeticObservations(n)...)
-		body = append(body, c.jvUnverifiedKeyIdPathResolveObservations(n)...)
+		body = append(body, c.jvUnverifiedKeyIDPathResolveObservations(n)...)
 		annotationTokens := c.jvAnnotationTokens(n, "annotation:")
 		tokens := append([]string{}, c.classParamTokens...)
 		tokens = append(tokens, annotationTokens...)
@@ -1017,7 +1017,7 @@ func (c *jvConv) jvIntegerSizeArithmeticObservations(fn *tree_sitter.Node) []nir
 	return out
 }
 
-func (c *jvConv) jvUnverifiedKeyIdPathResolveObservations(fn *tree_sitter.Node) []nir.Stmt {
+func (c *jvConv) jvUnverifiedKeyIDPathResolveObservations(fn *tree_sitter.Node) []nir.Stmt {
 	body := field(fn, "body")
 	if body == nil {
 		return nil
