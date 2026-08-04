@@ -20,8 +20,8 @@ jobs:
       # them silently rather than failing, so this is not a default worth trusting.
       CGO_ENABLED: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -45,8 +45,8 @@ jobs:
     env:
       CGO_ENABLED: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -65,7 +65,7 @@ jobs:
       # refuses to run against a module targeting a newer Go than it was built
       # with. Pinned rather than `latest` so CI runs the same linter the
       # contributor documentation tells people to install.
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.1
 
@@ -98,8 +98,8 @@ jobs:
     env:
       CGO_ENABLED: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -160,7 +160,7 @@ jobs:
           echo "findings: $n"
           [ "$n" -ge 1 ] || { echo "built, ran, detected nothing"; exit 1; }
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: vyql-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/vyql

@@ -18,8 +18,8 @@ jobs:
     env:
       CGO_ENABLED: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -34,22 +34,22 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: go
-      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/autobuild@v4
       # Uploading results needs code scanning, which is free on public
       # repositories and a paid feature on private ones. While this repository is
       # private the upload fails with "Resource not accessible by integration",
       # and failing the workflow for that would train people to ignore it. The
       # analysis itself still runs, and this starts reporting the moment the
       # repository is public.
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
         continue-on-error: true
 
   scan-self:
@@ -59,8 +59,8 @@ jobs:
     env:
       CGO_ENABLED: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -88,7 +88,7 @@ jobs:
       # Same as above: the scan is the gate, the upload is best-effort. If VyQL
       # cannot scan its own source, the step above fails and this job fails with
       # it -- that is the signal worth having.
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         continue-on-error: true
         with:
           sarif_file: vyql-self.sarif
