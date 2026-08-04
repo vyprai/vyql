@@ -1032,3 +1032,112 @@ func TestLowerResultEntryCreatesControlEventFlow(t *testing.T) {
 	}
 	t.Fatalf("result entry event not found")
 }
+
+// A two-part-key container — configparser's `cfg.set(section, key, val)` /
+// `cfg.get(section, key)` — must resolve per (section, key) slot: reading a key that was
+// never written tainted stays clean, while reading the key that WAS written tainted still
+// flows. Before the composite-key model a 3-arg set() marked the container dirty, so every
+// later get() read the whole container and any config round-trip produced a false positive.
+func TestCompositeKeyContainerReadIsElementSensitive(t *testing.T) {
+	call := func(recv, method, path, loc string, args ...nir.Expr) nir.Call {
+		return nir.Call{
+			Callee: nir.Attr{Base: nir.Name{ID: recv, Loc: loc}, Attr: method, Loc: loc},
+			Args:   args, Path: path, Method: method, Loc: loc,
+		}
+	}
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app.py",
+		File: "app.py",
+		Body: []nir.Stmt{
+			nir.FuncDef{Name: "handler", Loc: "app.py:1", Params: []string{"payload"}, Body: []nir.Stmt{
+				// cfg.set("sec", "keyA", "constant")   → clean slot
+				nir.ExprStmt{Value: call("cfg", "set", "cfg.set", "app.py:2",
+					nir.Const{Value: "\"sec\"", Loc: "app.py:2"},
+					nir.Const{Value: "\"keyA\"", Loc: "app.py:2"},
+					nir.Const{Value: "\"constant\"", Loc: "app.py:2"})},
+				// cfg.set("sec", "keyB", payload)      → tainted slot
+				nir.ExprStmt{Value: call("cfg", "set", "cfg.set", "app.py:3",
+					nir.Const{Value: "\"sec\"", Loc: "app.py:3"},
+					nir.Const{Value: "\"keyB\"", Loc: "app.py:3"},
+					nir.Name{ID: "payload", Loc: "app.py:3"})},
+				// safe = cfg.get("sec", "keyA")  → must NOT be tainted
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: "sinkA", Loc: "app.py:4"},
+					Args: []nir.Expr{call("cfg", "get", "cfg.get", "app.py:14",
+						nir.Const{Value: "\"sec\"", Loc: "app.py:14"},
+						nir.Const{Value: "\"keyA\"", Loc: "app.py:14"})},
+					Path: "sinkA", Method: "sinkA", Loc: "app.py:4",
+				}},
+				// tainted = cfg.get("sec", "keyB") → MUST stay tainted
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: "sinkB", Loc: "app.py:5"},
+					Args: []nir.Expr{call("cfg", "get", "cfg.get", "app.py:15",
+						nir.Const{Value: "\"sec\"", Loc: "app.py:15"},
+						nir.Const{Value: "\"keyB\"", Loc: "app.py:15"})},
+					Path: "sinkB", Method: "sinkB", Loc: "app.py:5",
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := findNodeID(t, g, "code.Param", "name", "payload")
+	reachable, err := usg.BFS(g, payload, "FLOWS", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reachable[findNodeID(t, g, "code.Arg", "loc", "app.py:4")] {
+		t.Errorf("get(section, keyA) must read the clean slot, not the whole container")
+	}
+	if !reachable[findNodeID(t, g, "code.Arg", "loc", "app.py:5")] {
+		t.Errorf("get(section, keyB) must still carry the taint written to that slot")
+	}
+}
+
+// A plain dict's `d.get(key, default)` is NOT a two-part key — arg1 is a fallback value.
+// Only a 3-arg keyed write marks a container composite, so a dict written through
+// __setitem__ must keep flowing the whole container on a 2-arg get (no false negative).
+func TestPlainDictGetWithDefaultStillFlowsContainerTaint(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app.py",
+		File: "app.py",
+		Body: []nir.Stmt{
+			nir.FuncDef{Name: "handler", Loc: "app.py:1", Params: []string{"payload"}, Body: []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Attr{Base: nir.Name{ID: "d", Loc: "app.py:2"}, Attr: "__setitem__", Loc: "app.py:2"},
+					Args: []nir.Expr{
+						nir.Name{ID: "payload", Loc: "app.py:2"},
+						nir.Const{Value: "\"k\"", Loc: "app.py:2"},
+					},
+					Path: "d.__setitem__", Method: "__setitem__", Loc: "app.py:2",
+				}},
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: "sink", Loc: "app.py:3"},
+					Args: []nir.Expr{nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "d", Loc: "app.py:13"}, Attr: "get", Loc: "app.py:13"},
+						Args: []nir.Expr{
+							nir.Const{Value: "\"k\"", Loc: "app.py:13"},
+							nir.Const{Value: "\"fallback\"", Loc: "app.py:13"},
+						},
+						Path: "d.get", Method: "get", Loc: "app.py:13",
+					}},
+					Path: "sink", Method: "sink", Loc: "app.py:3",
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := findNodeID(t, g, "code.Param", "name", "payload")
+	reachable, err := usg.BFS(g, payload, "FLOWS", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[findNodeID(t, g, "code.Arg", "loc", "app.py:3")] {
+		t.Errorf("dict.get(key, default) must not be treated as a composite key read")
+	}
+}

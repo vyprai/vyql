@@ -1,0 +1,17 @@
+module bindings.python.generated.m21017d75;
+
+// OWASP "plain string literal" guard:
+//   if not bar.startswith("'") or not bar.endswith("'") or "'" in bar[1:-1]: return
+// Anything that is not a bare single-quoted literal is rejected before eval/exec/compile,
+// so only a quoted string literal is ever evaluated (it returns a string, runs no code).
+// Anchor CodeExecutionValidation at the startswith() call, which dominates the sink via the
+// early return; the paired endswith() in scope distinguishes this from an unrelated prefix
+// check. No codeinj true-positive in the corpus uses startswith/endswith -> adds no FNs.
+binding codeExecValidationPyQuotedLiteral901 {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "startswith" and containsAny(node.context.scopeCall, ["endswith"])
+  emit check core.CodeExecutionValidation at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}

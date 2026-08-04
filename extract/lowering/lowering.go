@@ -130,6 +130,10 @@ type containerInfo struct {
 	elems   map[string]string // constant key/index -> element node id holding that slot's taint
 	dirty   bool              // a write with a NON-constant key happened (any key may be tainted)
 	nextIdx int               // append counter for add()/append()/push()
+	// composite marks a two-part-key container — `cfg.set(section, key, val)` /
+	// `cfg.get(section, key)` (configparser and friends). Only a 3-arg keyed write sets
+	// it, which a dict/list never performs, so plain `d.get(key, default)` is unaffected.
+	composite bool
 }
 
 // inRegion lowers f inside a nested control region (then/else/loop/case/handler).
@@ -519,6 +523,22 @@ func (l *lowerer) constBool(e nir.Expr, sc *scope) (bool, bool) {
 	return false, false
 }
 
+// compositeKey joins a two-part container key — `cfg.set(section, key, v)` /
+// `cfg.get(section, key)` — into one slot name. Both parts must be constant; a dynamic
+// part means the slot is unknown and the caller falls back to the sound whole-container
+// behaviour. The separator cannot appear in a resolved constant key part.
+func (l *lowerer) compositeKey(a, b nir.Expr, sc *scope) (string, bool) {
+	ka, oka := l.constKey(a, sc)
+	if !oka {
+		return "", false
+	}
+	kb, okb := l.constKey(b, sc)
+	if !okb {
+		return "", false
+	}
+	return ka + "\x00" + kb, true
+}
+
 // containerRead resolves an element-sensitive read of recv[key] into result. Returns false
 // when it can't (recv was never written as a container, or a dirty container is read with a
 // dynamic key) so the caller falls back to conservative whole-container/key flow.
@@ -542,6 +562,19 @@ func (l *lowerer) containerRead(recv, result string, keyExpr nir.Expr, sc *scope
 		}
 		return true
 	}
+	return l.containerReadKey(recv, result, key, true)
+}
+
+// containerReadKey routes the taint of one resolved slot. ok=false (the key had a dynamic
+// part) means the slot is unknown, so the caller must fall back to the whole container.
+func (l *lowerer) containerReadKey(recv, result, key string, ok bool) bool {
+	if !ok {
+		return false
+	}
+	ci := l.containers[recv]
+	if ci == nil {
+		return false
+	}
 	switch {
 	case ci.dirty:
 		// a shift/invalidating op happened — slot taint is unreliable, read the whole
@@ -554,19 +587,55 @@ func (l *lowerer) containerRead(recv, result string, keyExpr nir.Expr, sc *scope
 	return true
 }
 
+// keyedContainerGet resolves a container `get` read element-sensitively, covering both the
+// single-key form (`m.get(key)`) and the two-part-key form (`cfg.get(section, key)`) on a
+// container a 3-arg keyed write marked composite. Reports whether it resolved the read; false
+// means the caller flows the whole receiver (chained call, dynamic key, untracked container).
+func (l *lowerer) keyedContainerGet(call nir.Call, recv, result string, sc *scope) bool {
+	if call.Method != "get" {
+		return false
+	}
+	switch len(call.Args) {
+	case 1:
+		return l.containerRead(recv, result, call.Args[0], sc)
+	case 2:
+		// Only for a composite container: on a plain dict this is `get(key, default)`,
+		// where arg1 is a fallback value, not part of the key.
+		ci := l.containers[recv]
+		if ci == nil || !ci.composite {
+			return false
+		}
+		key, ok := l.compositeKey(call.Args[0], call.Args[1], sc)
+		return l.containerReadKey(recv, result, key, ok)
+	}
+	return false
+}
+
 // containerWrite records an element-sensitive write into recv and keeps the whole container
 // tainted (for whole-container reads / dynamic-key gets). Recognised keyed/append mutators
 // taint a specific slot; any other mutator marks the container dirty (unknown slot).
 func (l *lowerer) containerWrite(call nir.Call, args []string, recv string, sc *scope) {
 	switch {
 	case keyedMutators[call.Method] && len(args) == 2:
-		// map.put(key, val) / list.set(i, val) — EXACTLY two args. Other arities (e.g.
-		// configparser.set(section, key, val)) fall through to the sound default.
+		// map.put(key, val) / list.set(i, val) — EXACTLY two args.
 		l.flow(args[1], recv)
 		if key, ok := l.constKey(call.Args[0], sc); ok {
 			l.flow(args[1], l.elemNode(recv, key, call.Loc))
 		} else {
 			l.cinfo(recv).dirty = true
+		}
+	case keyedMutators[call.Method] && len(args) == 3:
+		// two-part key: `cfg.set(section, key, val)` (configparser). The value lands in the
+		// (section, key) slot, so a later `cfg.get(section, otherKey)` reads clean. Marking
+		// the container composite keeps the matching 2-arg read element-sensitive; a dict or
+		// list never takes this branch, so their `get(key, default)` stays untouched.
+		l.flow(args[2], recv)
+		ci := l.cinfo(recv)
+		ci.composite = true
+		if key, ok := l.compositeKey(call.Args[0], call.Args[1], sc); ok {
+			l.flow(args[2], l.elemNode(recv, key, call.Loc))
+		} else {
+			ci.dirty = true
 		}
 	case call.Method == "__setitem__" && len(args) >= 1:
 		// synthetic subscript store, args = [value, key]
@@ -4019,7 +4088,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		// a container get with a CONSTANT key reads only that slot (element-sensitive), so
 		// `m.put("kB", p); m.get("kA")` stays clean. Anything else flows the whole receiver
 		// (chained-call taint / dynamic key — over-approximation).
-		if !(call.Method == "get" && len(call.Args) == 1 && l.containerRead(recvNode, result, call.Args[0], sc)) {
+		if !l.keyedContainerGet(call, recvNode, result, sc) {
 			l.flow(recvNode, result)
 		}
 		// a collection/builder MUTATOR taints its receiver from the added value, so a
