@@ -1,0 +1,143 @@
+name: action
+
+# Exercises the composite action the way a user consumes it: from the checkout,
+# against a deliberately vulnerable fixture, on both runner families. An action
+# that is only read and never run is an action that breaks on its first user.
+
+on:
+  pull_request:
+    paths:
+      - "action/**"
+      - ".github/workflows/action.yml"
+  push:
+    branches: [main]
+    paths:
+      - "action/**"
+      - ".github/workflows/action.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # The action downloads a published release, so it cannot run before one
+  # exists. Skip with a clear reason rather than failing on a missing tag.
+  release-exists:
+    runs-on: ubuntu-latest
+    outputs:
+      found: ${{ steps.check.outputs.found }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if tag="$(gh release view --repo vyprai/vyql --json tagName --jq .tagName 2>/dev/null)" && [ -n "$tag" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "latest release: $tag"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No published release yet, so the action cannot be exercised. This job is a no-op until the first tag."
+          fi
+
+  scan-a-vulnerable-fixture:
+    needs: release-exists
+    if: needs.release-exists.outputs.found == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Write a fixture with a known finding
+        run: |
+          mkdir -p /tmp/fixture
+          cat > /tmp/fixture/app.py <<'PY'
+          import sqlite3
+          from flask import Flask, request
+          app = Flask(__name__)
+
+          @app.route("/u")
+          def u():
+              name = request.args.get("name")
+              conn = sqlite3.connect("app.db")
+              return conn.execute("SELECT * FROM users WHERE name = '" + name + "'").fetchall()
+          PY
+
+      # The gate must fire. `continue-on-error` keeps the job alive so the
+      # assertion below can check that it fired for the right reason.
+      - name: Scan it, expecting failure
+        id: gated
+        continue-on-error: true
+        uses: ./action
+        with:
+          path: /tmp/fixture
+          output: /tmp/gated.sarif
+          upload-sarif: "false"
+
+      - name: The gate fired, and found something
+        env:
+          OUTCOME: ${{ steps.gated.outcome }}
+          CODE: ${{ steps.gated.outputs.exit-code }}
+          FINDINGS: ${{ steps.gated.outputs.findings }}
+        run: |
+          echo "outcome=$OUTCOME code=$CODE findings=$FINDINGS"
+          [ "$OUTCOME" = "failure" ] || { echo "the action passed on a SQL injection"; exit 1; }
+          [ "$CODE" = "1" ] || { echo "expected exit 1, got '$CODE'"; exit 1; }
+          [ "${FINDINGS:-0}" -ge 1 ] || { echo "no findings counted"; exit 1; }
+          python3 -c "
+          import json
+          d = json.load(open('/tmp/gated.sarif'))
+          assert d['version'] == '2.1.0', d['version']
+          n = sum(len(r.get('results') or []) for r in d['runs'])
+          assert n >= 1, 'SARIF carries no results'
+          print('SARIF ok:', n, 'result(s)')"
+
+      # The same fixture, reported rather than gated. This is the path a team
+      # adopting VyQL on an existing codebase uses, and it must exit 0.
+      - name: Scan it again, reporting only
+        id: ungated
+        uses: ./action
+        with:
+          path: /tmp/fixture
+          fail-on: none
+          output: /tmp/ungated.sarif
+          upload-sarif: "false"
+
+      - name: Reporting only stays green, and still reports
+        env:
+          CODE: ${{ steps.ungated.outputs.exit-code }}
+          FINDINGS: ${{ steps.ungated.outputs.findings }}
+        run: |
+          echo "code=$CODE findings=$FINDINGS"
+          [ "$CODE" = "0" ] || { echo "fail-on none exited $CODE"; exit 1; }
+          [ "${FINDINGS:-0}" -ge 1 ] || { echo "reported nothing"; exit 1; }
+
+      # A distinct -exit-code is how a pipeline tells findings apart from a
+      # scanner failure, so the plumbing for it has to work.
+      - name: A custom exit code is honoured
+        id: custom
+        continue-on-error: true
+        uses: ./action
+        with:
+          path: /tmp/fixture
+          exit-code: "3"
+          output: /tmp/custom.sarif
+          upload-sarif: "false"
+
+      - name: It exited 3
+        env:
+          CODE: ${{ steps.custom.outputs.exit-code }}
+        run: |
+          [ "$CODE" = "3" ] || { echo "expected exit 3, got '$CODE'"; exit 1; }
+          echo "exit-code honoured"
+
+      # Clean input must not fail a build. A scanner that flags everything is
+      # as useless as one that flags nothing.
+      - name: Clean code passes
+        uses: ./action
+        with:
+          path: action
+          output: ""
+          upload-sarif: "false"

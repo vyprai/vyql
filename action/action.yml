@@ -1,0 +1,243 @@
+name: "VyQL security scan"
+description: "Follow tainted data through your code and fail the build on what reaches a dangerous sink."
+author: "Vypr"
+
+branding:
+  icon: "shield"
+  color: "purple"
+
+# A composite action rather than a Docker one. VyQL already publishes a release
+# archive per platform carrying the binary and its security knowledge, so there
+# is nothing an image would add except a pull. Composite also runs on macOS
+# runners, which Docker actions cannot.
+
+inputs:
+  path:
+    description: "Path to scan, relative to the workspace."
+    required: false
+    default: "."
+  version:
+    description: "VyQL release to use, e.g. v0.2.0. 'latest' resolves the newest release."
+    required: false
+    default: "latest"
+  fail-on:
+    description: "Fail the build on a finding at or above this severity: none | info | low | medium | high | critical."
+    required: false
+    default: "high"
+  exit-code:
+    description: "Exit status to use when fail-on is met. Set it to something other than 1 to tell findings apart from a scanner failure."
+    required: false
+    default: "1"
+  format:
+    description: "Output format: sarif | json | text."
+    required: false
+    default: "sarif"
+  output:
+    description: "File to write the report to. Empty writes to the log instead."
+    required: false
+    default: "vyql-results.sarif"
+  exclude:
+    description: "Comma-separated path segments to skip, e.g. vendor,node_modules."
+    required: false
+    default: ""
+  profile:
+    description: "Analysis profile: auto | api | cli | web | library | worker | ..."
+    required: false
+    default: "auto"
+  upload-sarif:
+    description: "Upload the SARIF to GitHub code scanning. Needs `security-events: write`, and on a private repository, GitHub Advanced Security."
+    required: false
+    default: "true"
+  working-directory:
+    description: "Directory to run from."
+    required: false
+    default: "."
+
+outputs:
+  results-file:
+    description: "Path to the report that was written."
+    value: ${{ steps.scan.outputs.results-file }}
+  findings:
+    description: "Number of findings reported."
+    value: ${{ steps.scan.outputs.findings }}
+  exit-code:
+    description: "The scanner's exit status. 0 means nothing met the threshold."
+    value: ${{ steps.scan.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    # Inputs reach the shell through the environment, never by interpolation
+    # into a command. A workflow can feed an input from a pull request title or
+    # any other attacker-controlled string, and `${{ }}` would splice it in as
+    # code rather than data.
+    - name: Resolve the platform and release
+      id: resolve
+      shell: bash
+      env:
+        VERSION_INPUT: ${{ inputs.version }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+
+        case "$(uname -s)" in
+          Linux)  goos=linux  ;;
+          Darwin) goos=darwin ;;
+          *)
+            echo "::error::VyQL publishes Linux and macOS binaries only; this runner is $(uname -s)."
+            echo "Run the scan on ubuntu-latest or macos-latest."
+            exit 1
+            ;;
+        esac
+        case "$(uname -m)" in
+          x86_64|amd64)  goarch=amd64 ;;
+          arm64|aarch64) goarch=arm64 ;;
+          *)
+            echo "::error::unsupported architecture $(uname -m); VyQL publishes amd64 and arm64."
+            exit 1
+            ;;
+        esac
+
+        version="$VERSION_INPUT"
+        if [ "$version" = "latest" ]; then
+          version="$(gh release view --repo vyprai/vyql --json tagName --jq .tagName)"
+          if [ -z "$version" ]; then
+            echo "::error::could not resolve the latest VyQL release. Pin one with version: v0.2.0"
+            exit 1
+          fi
+        fi
+
+        echo "goos=$goos"       >> "$GITHUB_OUTPUT"
+        echo "goarch=$goarch"   >> "$GITHUB_OUTPUT"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "name=vyql_${version}_${goos}_${goarch}" >> "$GITHUB_OUTPUT"
+        echo "VyQL $version for $goos/$goarch"
+
+    # The archive is ~14 MB compressed and ~200 MB extracted, almost all of it
+    # the security knowledge base. Caching by exact version keeps a repeat run
+    # from re-downloading and re-extracting it.
+    - name: Restore the cached release
+      id: cache
+      uses: actions/cache@v6
+      with:
+        path: ~/.vyql-action/${{ steps.resolve.outputs.name }}
+        key: vyql-${{ steps.resolve.outputs.name }}
+
+    - name: Download and verify the release
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        NAME: ${{ steps.resolve.outputs.name }}
+        VERSION: ${{ steps.resolve.outputs.version }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        workdir="$(mktemp -d)"
+        cd "$workdir"
+
+        gh release download "$VERSION" --repo vyprai/vyql \
+          --pattern "${NAME}.tar.gz" --pattern "${NAME}.tar.gz.sha256"
+
+        # The checksum is published beside the archive and is the only thing
+        # standing between a corrupted or substituted download and running it.
+        if command -v sha256sum >/dev/null 2>&1; then
+          sha256sum -c "${NAME}.tar.gz.sha256"
+        else
+          shasum -a 256 -c "${NAME}.tar.gz.sha256"
+        fi
+
+        mkdir -p ~/.vyql-action
+        rm -rf ~/.vyql-action/"${NAME}"
+        tar -xzf "${NAME}.tar.gz" -C ~/.vyql-action
+        cd - >/dev/null
+        rm -rf "$workdir"
+
+        # An archive that extracts but carries no security knowledge produces a
+        # scanner that starts and finds nothing.
+        test -x ~/.vyql-action/"${NAME}"/bin/vyql
+        test -d ~/.vyql-action/"${NAME}"/vyql
+
+    - name: Scan
+      id: scan
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        NAME: ${{ steps.resolve.outputs.name }}
+        SCAN_PATH: ${{ inputs.path }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        EXIT_CODE: ${{ inputs.exit-code }}
+        FORMAT: ${{ inputs.format }}
+        OUTPUT: ${{ inputs.output }}
+        EXCLUDE: ${{ inputs.exclude }}
+        PROFILE: ${{ inputs.profile }}
+      run: |
+        set -uo pipefail
+        root=~/.vyql-action/"${NAME}"
+        # VYQL_HOME points at the data directory that shipped with this exact
+        # binary, so the scan cannot pick up a stray vyql/ from the repository
+        # being scanned.
+        export VYQL_HOME="$root/vyql"
+
+        args=(scan -fail-on "$FAIL_ON" -exit-code "$EXIT_CODE" -format "$FORMAT" -profile "$PROFILE")
+        [ -n "$EXCLUDE" ] && args+=(-exclude "$EXCLUDE")
+
+        "$root/bin/vyql" version
+
+        set +e
+        if [ -n "$OUTPUT" ]; then
+          "$root/bin/vyql" "${args[@]}" "$SCAN_PATH" > "$OUTPUT"
+          code=$?
+          echo "results-file=$OUTPUT" >> "$GITHUB_OUTPUT"
+        else
+          "$root/bin/vyql" "${args[@]}" "$SCAN_PATH"
+          code=$?
+          echo "results-file=" >> "$GITHUB_OUTPUT"
+        fi
+        set -e
+
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+
+        n=""
+        if [ -n "$OUTPUT" ] && [ -f "$OUTPUT" ]; then
+          case "$FORMAT" in
+            sarif) n="$(python3 -c "import json,sys;d=json.load(open('$OUTPUT'));print(sum(len(r.get('results') or []) for r in d.get('runs',[])))" 2>/dev/null || echo "")" ;;
+            json)  n="$(python3 -c "import json,sys;d=json.load(open('$OUTPUT'));print(len(d if isinstance(d,list) else d.get('findings',[])))" 2>/dev/null || echo "")" ;;
+          esac
+        fi
+        echo "findings=$n" >> "$GITHUB_OUTPUT"
+        [ -n "$n" ] && echo "findings: $n"
+
+        # The step must not fail here. The SARIF upload below runs next, and a
+        # gated build is more useful with its results visible than without.
+        exit 0
+
+    - name: Upload SARIF to code scanning
+      if: inputs.upload-sarif == 'true' && inputs.format == 'sarif' && inputs.output != ''
+      continue-on-error: true
+      uses: github/codeql-action/upload-sarif@v4
+      with:
+        sarif_file: ${{ inputs.working-directory }}/${{ inputs.output }}
+        category: vyql
+
+    # Deferred to the end so the report is written and uploaded first. Failing
+    # in the scan step would skip the upload and hide the very findings that
+    # caused the failure.
+    - name: Apply the result
+      shell: bash
+      env:
+        CODE: ${{ steps.scan.outputs.exit-code }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        FINDINGS: ${{ steps.scan.outputs.findings }}
+      run: |
+        set -euo pipefail
+        if [ "$CODE" = "0" ]; then
+          echo "No finding at or above ${FAIL_ON}."
+          exit 0
+        fi
+        if [ "$CODE" = "2" ]; then
+          echo "::error::VyQL was invoked incorrectly (exit 2). Check the inputs above."
+          exit 2
+        fi
+        echo "::error::VyQL found ${FINDINGS:-one or more} finding(s) at or above ${FAIL_ON}."
+        echo "Set fail-on: none to report without failing the build."
+        exit "$CODE"
