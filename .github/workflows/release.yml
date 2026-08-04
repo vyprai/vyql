@@ -186,7 +186,7 @@ jobs:
           fi
           # No VYQL_HOME: this is how someone who downloaded the archive runs it.
           env -u VYQL_HOME ./bin/vyql version
-          n="$(env -u VYQL_HOME ./bin/vyql scan --format json /tmp/sample | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d if isinstance(d,list) else d.get("findings",[])))')"
+          n="$(env -u VYQL_HOME ./bin/vyql scan -fail-on none --format json /tmp/sample | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d if isinstance(d,list) else d.get("findings",[])))')"
           echo "findings: $n"
           [ "$n" -ge 1 ] || { echo "the release archive detects nothing"; exit 1; }
 

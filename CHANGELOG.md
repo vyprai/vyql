@@ -29,6 +29,13 @@ First public release.
   directly.
 - **`--format json` and `--format sarif`** for CI, with a stable finding
   fingerprint.
+- **Build gating.** `scan` exits 1 on any HIGH or CRITICAL finding, so adding it
+  to a pipeline gates that pipeline with no further configuration. `-fail-on`
+  moves the threshold or turns it off with `none`; `-exit-code` sets the status,
+  which is how to distinguish "found something" from "VyQL could not run", since
+  a failed scan also exits 1.
+- **`diff`** compares two `--format json` runs by finding fingerprint, for
+  asking whether a branch introduced anything new.
 - **Release archives for linux/amd64, linux/arm64, darwin/amd64 and
   darwin/arm64**, each built on a native runner and carrying both the binary and
   the data directory, with SHA-256 sums. Two builds of the same commit from

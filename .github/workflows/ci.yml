@@ -155,7 +155,7 @@ jobs:
             exit 0
           fi
           ./dist/vyql version
-          n="$(VYQL_HOME=./vyql ./dist/vyql scan --format json /tmp/sample \
+          n="$(VYQL_HOME=./vyql ./dist/vyql scan -fail-on none --format json /tmp/sample \
                 | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d if isinstance(d,list) else d.get("findings",[])))')"
           echo "findings: $n"
           [ "$n" -ge 1 ] || { echo "built, ran, detected nothing"; exit 1; }

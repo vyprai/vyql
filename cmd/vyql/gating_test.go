@@ -19,6 +19,31 @@ func TestParseFailOnDefaultsToNoGating(t *testing.T) {
 	}
 }
 
+// Dropping the scanner into a pipeline must gate that pipeline. If this default
+// ever moves back to "none", a CI user gets a green build over CRITICAL findings
+// and nothing tells them.
+func TestDefaultFailOnGatesOnHigh(t *testing.T) {
+	rank, err := parseFailOn(defaultFailOn)
+	if err != nil {
+		t.Fatalf("the default %q is not a valid -fail-on: %v", defaultFailOn, err)
+	}
+	if rank == 0 {
+		t.Fatalf("the default %q disables gating", defaultFailOn)
+	}
+	all := []*findings.Finding{{Severity: "medium"}, {Severity: "high"}, {Severity: "critical"}}
+	n, highest := gateFindings(all, rank)
+	if n != 2 {
+		t.Errorf("default gate matched %d finding(s), want 2 (high + critical)", n)
+	}
+	if highest != "critical" {
+		t.Errorf("highest = %q, want critical", highest)
+	}
+	// Nothing at or above the threshold must not gate.
+	if n, _ := gateFindings([]*findings.Finding{{Severity: "medium"}}, rank); n != 0 {
+		t.Errorf("default gate matched %d medium finding(s), want 0", n)
+	}
+}
+
 func TestParseFailOnOrdersSeverities(t *testing.T) {
 	var last int
 	for _, name := range severityOrder {

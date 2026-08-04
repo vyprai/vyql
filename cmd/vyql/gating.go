@@ -13,6 +13,11 @@ import (
 // than not gating at all.
 var severityOrder = []string{"info", "low", "medium", "high", "critical"}
 
+// defaultFailOn is the threshold a plain `vyql scan` gates on. Dropping the
+// scanner into a pipeline should gate that pipeline without further
+// configuration; `-fail-on none` opts back out.
+const defaultFailOn = "high"
+
 func severityRank(s string) int {
 	s = strings.ToLower(strings.TrimSpace(s))
 	for i, name := range severityOrder {
@@ -23,10 +28,10 @@ func severityRank(s string) int {
 	return 0
 }
 
-// parseFailOn resolves -fail-on to a minimum rank. "none" -- the default --
-// disables gating, which is why a plain `vyql scan` exits 0 even with critical
-// findings: a scanner that fails a build by default breaks every pipeline that
-// adds it. Opting in is a deliberate act.
+// parseFailOn resolves -fail-on to a minimum rank. "none" disables gating and
+// returns 0; the default is "high", so a plain `vyql scan` exits non-zero on a
+// HIGH or CRITICAL finding. A pipeline that wants the report without the gate
+// asks for `-fail-on none` explicitly.
 func parseFailOn(v string) (int, error) {
 	v = strings.ToLower(strings.TrimSpace(v))
 	if v == "" || v == "none" {

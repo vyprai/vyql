@@ -111,24 +111,23 @@ vyql scan --format json  ./my-project | jq '.[].rule'
 
 ### Failing a build
 
-`scan` exits 0 by default, however many findings it reports — a scanner that
-fails a pipeline the moment it is added is a scanner people remove. Opt in with
-`-fail-on`:
+**`scan` exits 1 when it finds anything HIGH or CRITICAL.** Dropping it into a
+pipeline gates that pipeline, with no extra configuration.
 
 ```sh
-vyql scan -fail-on high .          # exit 1 if any HIGH or CRITICAL finding
+vyql scan .                        # exit 1 on HIGH or CRITICAL  (the default)
 vyql scan -fail-on critical .      # exit 1 only on CRITICAL
-vyql scan -fail-on high -exit-code 2 .   # ... with a different status
+vyql scan -fail-on none .          # report everything, always exit 0
 ```
 
-Severities, lowest to highest: `info low medium high critical`. `-fail-on none`
-is the default and never fails.
+Severities, lowest to highest: `info low medium high critical`. `-fail-on`
+takes any of them, or `none`.
 
 A failed scan also exits 1, so if your pipeline needs to tell "found something"
 apart from "could not run", give `-exit-code` a distinct value:
 
 ```sh
-vyql scan -fail-on high -exit-code 3 .   # 3 = findings, 1 = VyQL failed, 2 = bad usage
+vyql scan -exit-code 3 .   # 3 = findings, 1 = VyQL failed, 2 = bad usage
 ```
 
 ## Understand a finding

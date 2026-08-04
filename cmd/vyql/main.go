@@ -174,7 +174,7 @@ func cmdScan(args []string) error {
 	exclude := fs.String("exclude", "", "comma-separated path segments to skip, e.g. _vendor,node_modules,tests")
 	cacheDir := fs.String("cache", "auto", "persistent scan cache: auto | off | <dir>")
 	incrementalCache := fs.Bool("incremental-cache", false, "also populate per-file parse/lower/binding caches for edit-loop scans")
-	failOn := fs.String("fail-on", "none", "exit non-zero when a finding is at or above this severity: none | "+strings.Join(severityOrder, " | "))
+	failOn := fs.String("fail-on", defaultFailOn, "exit non-zero when a finding is at or above this severity: none | "+strings.Join(severityOrder, " | "))
 	exitCode := fs.Int("exit-code", 1, "exit status to use when -fail-on is met")
 	_ = fs.Parse(args)
 	paths := fs.Args()

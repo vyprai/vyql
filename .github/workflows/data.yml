@@ -77,7 +77,10 @@ jobs:
               conn = sqlite3.connect("app.db")
               return conn.execute("SELECT * FROM users WHERE name = '" + name + "'").fetchall()
           PY
-          VYQL_HOME=./vyql ./bin/vyql scan --format json /tmp/sample > /tmp/findings.json
+          # -fail-on none: the sample is deliberately vulnerable and the check
+          # below requires at least one finding. The gate would fail the step on
+          # exactly the outcome this asserts.
+          VYQL_HOME=./vyql ./bin/vyql scan -fail-on none --format json /tmp/sample > /tmp/findings.json
           n="$(python3 -c "import json;d=json.load(open('/tmp/findings.json'));print(len(d if isinstance(d,list) else d.get('findings',[])))")"
           echo "findings: $n"
           # An engine that loads its data but detects nothing passes every check
