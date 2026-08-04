@@ -855,16 +855,6 @@ func sameCNode(a, b *tree_sitter.Node) bool {
 	return a != nil && b != nil && a.StartByte() == b.StartByte() && a.EndByte() == b.EndByte()
 }
 
-func isCExprArg(k string) bool {
-	switch k {
-	case "identifier", "call_expression", "message_expression", "string_literal",
-		"binary_expression", "field_expression", "subscript_expression", "cast_expression",
-		"unary_expression", "number_literal", "concatenated_string":
-		return true
-	}
-	return false
-}
-
 // declName unwraps pointer/array/function/parenthesized declarators to the
 // underlying identifier name.
 func (c *ccConv) declName(d *tree_sitter.Node) string {
@@ -2189,25 +2179,6 @@ func (c *ccConv) ccExprContainsCallName(n *tree_sitter.Node, needle string) bool
 			return
 		}
 		if m.Kind() == "call_expression" && strings.Contains(strings.ToLower(c.dotted(field(m, "function"))), needle) {
-			found = true
-			return
-		}
-		for _, ch := range c.namedChildren(m) {
-			walk(ch)
-		}
-	}
-	walk(n)
-	return found
-}
-
-func (c *ccConv) ccExprContainsSubscript(n *tree_sitter.Node) bool {
-	found := false
-	var walk func(*tree_sitter.Node)
-	walk = func(m *tree_sitter.Node) {
-		if m == nil || found {
-			return
-		}
-		if m.Kind() == "subscript_expression" {
 			found = true
 			return
 		}

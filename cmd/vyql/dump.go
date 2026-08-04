@@ -72,13 +72,6 @@ func lowerCache() lowering.DeltaCache {
 	return nil
 }
 
-// buildGraphWith runs extract → lower → bindings → SCA against an explicit lowering cache
-// (nil = no caching / full lowering). Threading the cache makes the incremental path testable
-// (a findings-equivalence harness injects its own cache).
-func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanStats, error) {
-	return buildGraphWithOptions(paths, cache, graphBuildOptions{})
-}
-
 func buildGraphWithOptions(paths []string, cache lowering.DeltaCache, opts graphBuildOptions) (usg.Store, scanStats, error) {
 	restoreConcepts := frontend.SetActiveBindingConcepts(opts.BindingConcepts)
 	defer restoreConcepts()
@@ -197,30 +190,6 @@ func moduleHashes(prog nir.Program) map[string]string {
 
 // edgeTypes are the edge kinds dumped (data, control, guard, graph-domain).
 var edgeTypes = []string{"FLOWS", "CONTROL", "PROTECTS", "CHECKS", "NET", "STEP"}
-
-// dumpGraph prints the analysis graph for debugging instead of running rules.
-//
-//	graph — every node (id, type, loc, region@order, concept labels, callee_path) + edges
-//	taint — for each source node, the FLOWS-reachable labelled nodes (shows where a taint
-//	        chain reaches a sink, or dead-ends)
-func dumpGraph(paths []string, mode string) error {
-	g, _, err := buildGraph(paths)
-	if err != nil {
-		return err
-	}
-	if g == nil {
-		fmt.Println("(no analyzable source)")
-		return nil
-	}
-	switch mode {
-	case "graph":
-		return printUSG(g)
-	case "taint":
-		return printTaint(ontology.Seed(), g)
-	default:
-		return fmt.Errorf("unknown -dump mode %q (use: graph | taint)", mode)
-	}
-}
 
 func printUSG(g usg.Store) error {
 	nodes, err := g.AllNodes()

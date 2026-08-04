@@ -82,7 +82,6 @@ func toLabel(to string) string {
 // shortestToSink BFSes FLOWS edges and returns the shortest path (excluding the source) to the
 // first reachable sink-labelled node, or ("",[]) if none. `to` filters the sink concept.
 func shortestToSink(onto *ontology.Ontology, g usg.Store, src, to string) ([]string, string) {
-	type item struct{ id, prev string }
 	prev := map[string]string{src: ""}
 	queue := []string{src}
 	for len(queue) > 0 {

@@ -486,46 +486,6 @@ func functionRegionRoot(region string) string {
 	return region
 }
 
-func printReviewItems(rows []reviewItem) {
-	if len(rows) == 0 {
-		fmt.Println("No review items found.")
-		return
-	}
-	fmt.Printf("%d review item(s):\n", len(rows))
-	for _, r := range rows {
-		fmt.Printf("\n%s %-11s %s @ %s", strings.ToUpper(r.Kind), r.Category, r.Concept, r.Loc)
-		if r.Call != "" {
-			fmt.Printf("  call=%s", r.Call)
-		}
-		if r.Provenance != "" {
-			fmt.Printf("  via=%s", r.Provenance)
-		}
-		fmt.Println()
-		if len(r.Expected) > 0 {
-			fmt.Printf("  expects: %s\n", strings.Join(r.Expected, ", "))
-		}
-		if r.Review != "" {
-			fmt.Printf("  review: %s\n", r.Review)
-		}
-		if len(r.NearbyChecks) > 0 {
-			fmt.Println("  nearby checks:")
-			for _, c := range r.NearbyChecks {
-				fmt.Printf("    - %s @ %s", c.Concept, c.Loc)
-				if c.Call != "" {
-					fmt.Printf("  call=%s", c.Call)
-				}
-				if c.Evidence != "" {
-					fmt.Printf("  evidence=%s", c.Evidence)
-				}
-				if c.Provenance != "" {
-					fmt.Printf("  via=%s", c.Provenance)
-				}
-				fmt.Println()
-			}
-		}
-	}
-}
-
 func reviewItemOrder(r reviewItem, fields []string) string {
 	if len(fields) == 0 {
 		fields = []string{"location", "category", "kind", "concept", "call", "nodeID"}
