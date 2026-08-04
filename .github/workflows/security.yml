@@ -39,17 +39,17 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - uses: github/codeql-action/init@v4
+      - uses: github/codeql-action/init@v4.37.4
         with:
           languages: go
-      - uses: github/codeql-action/autobuild@v4
+      - uses: github/codeql-action/autobuild@v4.37.4
       # Uploading results needs code scanning, which is free on public
       # repositories and a paid feature on private ones. While this repository is
       # private the upload fails with "Resource not accessible by integration",
       # and failing the workflow for that would train people to ignore it. The
       # analysis itself still runs, and this starts reporting the moment the
       # repository is public.
-      - uses: github/codeql-action/analyze@v4
+      - uses: github/codeql-action/analyze@v4.37.4
         continue-on-error: true
 
   scan-self:
@@ -88,7 +88,7 @@ jobs:
       # Same as above: the scan is the gate, the upload is best-effort. If VyQL
       # cannot scan its own source, the step above fails and this job fails with
       # it -- that is the signal worth having.
-      - uses: github/codeql-action/upload-sarif@v4
+      - uses: github/codeql-action/upload-sarif@v4.37.4
         continue-on-error: true
         with:
           sarif_file: vyql-self.sarif
