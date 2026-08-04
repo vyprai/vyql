@@ -4,7 +4,7 @@ The measured record of what VyQL scores, on which corpus, at which commit. Every
 here was produced by `TestOWASPBenchmark`; none is carried over from memory or from a
 different corpus.
 
-Machine: MBP M3 Pro, 11 cores, 18 GB. Last updated 2026-08-03.
+Machine: MBP M3 Pro, 11 cores, 18 GB. Last updated 2026-08-04.
 
 > **Read the corpus column before comparing anything.** The single largest source of
 > confusion in this project has been treating scores from the synthetic ports as scores
@@ -84,14 +84,48 @@ Tagged so these comparisons can be rerun. No release was ever cut; these are mar
 
 Only `v2-shipped` and later can run these — see §4.3.
 
-| Corpus | v2-shipped | v2+fixes |
-|---|---|---|
-| BenchmarkJava (2,740) | +0.86 | **+0.86** |
-| BenchmarkPython (1,230) | +0.76 | **+0.76** |
-| owasp-js (2,740) | +0.79 | **+0.79** |
+| Corpus | v2-shipped | v2+fixes | + Python precision |
+|---|---|---|---|
+| BenchmarkJava (2,740) | +0.86 | +0.86 | **+1.00** |
+| BenchmarkPython (1,230) | +0.76 | +0.76 | **+0.90** |
+| owasp-js (2,740) | +0.79 | +0.79 | **+1.00** |
 
-**Per-category TP/FN/FP/TN are byte-identical** between the two. The 22 spec fixes changed
-no benchmark outcome in either direction.
+**Per-category TP/FN/FP/TN are byte-identical** between `v2-shipped` and `v2+fixes`. The 22
+spec fixes changed no benchmark outcome in either direction.
+
+The third column is measured on `main` with the Python precision work merged (see §4.1.1).
+Java and owasp-js reach +1.00 on `main` independently of that change; the earlier +0.86 and
++0.79 are v1-line figures and are kept here as the historical record, not as current
+numbers.
+
+#### 4.1.1 Python precision — every point was a false positive
+
+Measured on `main` + `precision/python-false-positives`, both legs on the same machine and
+corpus. Recall is unchanged: **TP=452, FN=0 before and after**, so nothing was traded away.
+
+| | before | after |
+|---|---|---|
+| Youden (macro) | +0.76 | **+0.90** |
+| TP / FN | 452 / 0 | 452 / 0 |
+| FP | 156 | **99** |
+| TN | 622 | **679** |
+
+| category | before | after | FP before → after |
+|---|---|---|---|
+| cmdi | +0.71 | **+1.00** | 2 → 0 |
+| codeinj | +0.42 | **+0.97** | 19 → 1 |
+| xxe | +0.35 | **+0.95** | 13 → 1 |
+| trustbound | +0.79 | **+0.95** | 4 → 1 |
+| xss | +0.95 | **+0.98** | 3 → 1 |
+| ldapi | +0.77 | **+0.85** | 3 → 2 |
+| pathtraver | +0.55 | **+0.65** | 46 → 36 |
+| xpathi | +0.60 | **+0.65** | 54 → 47 |
+| redirect | +0.48 | **+0.57** | 11 → 9 |
+| deserialization | +0.97 | +0.97 | 1 → 1 |
+| hash, securecookie, sqli, weakrand | +1.00 | +1.00 | 0 → 0 |
+
+`pathtraver` and `xpathi` still carry 83 of the remaining 99 false positives between them,
+so they are where the next Python precision work belongs.
 
 `v2-shipped` BenchmarkJava, for reference:
 
@@ -178,9 +212,14 @@ point below measured, to absorb upstream corpus revisions without a spurious red
 
 | Suite | Measured | Floor |
 |---|---|---|
-| BenchmarkJava | +0.86 | 0.85 |
-| BenchmarkPython | +0.76 | 0.75 |
-| owasp-js | +0.79 | *not gated yet* — see §5 |
+| BenchmarkJava | +1.00 | TP=1415, FN=0, FP=0, TN=1325, +1.00 |
+| BenchmarkPython | +0.90 | TP=452, FN=0, +0.90 |
+| owasp-js | +1.00 | *not gated yet* — see §5 |
+
+The BenchmarkPython floor asserted `TP=1415` until 2026-08-04. That is *BenchmarkJava's*
+true-positive count; this corpus has 452, so the gate failed on every commit it ever ran on
+and its failure carried no information. Corrected to the measured 452, and its Youden floor
+raised from 0.81 to the 0.90 this suite now scores.
 
 **Never use +1.00 / +0.81 / +0.78 as floors for the public suites.** Those figures come
 from the synthetic ports and the public corpora do not reach them on any commit.

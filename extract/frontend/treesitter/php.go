@@ -1461,10 +1461,6 @@ func phpSessionKeyReferenced(compact, key string) bool {
 	return strings.Contains(compact, "$_SESSION['"+key+"']") || strings.Contains(compact, "$_SESSION[\""+key+"\"]")
 }
 
-func phpHasOutputCall(calls map[string]bool) bool {
-	return calls["echo"] || calls["print"]
-}
-
 func phpHasAnyCall(calls map[string]bool, names ...string) bool {
 	for _, name := range names {
 		if calls[name] {

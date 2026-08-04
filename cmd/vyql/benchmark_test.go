@@ -261,7 +261,9 @@ func protectedOWASPBenchmarkExpectation(dir string) (benchmarkScore, bool) {
 	case base == "BenchmarkJava":
 		return benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, true
 	case base == "BenchmarkPython":
-		return benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.81}, true
+		// 452 is this corpus's true-positive count. The 1415 that stood here is
+		// BenchmarkJava's, so the gate could never pass on any commit.
+		return benchmarkScore{tp: 452, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.90}, true
 	case base == "benchjs":
 		return benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.78}, true
 	case strings.HasPrefix(base, "owasp-") && filepath.Dir(filepath.Clean(dir)) == owaspPortsDir():
@@ -312,7 +314,7 @@ func TestProtectedOWASPBenchmarkExpectation(t *testing.T) {
 		{dir: filepath.Join(owaspPortsDir(), "BenchmarkJava"), want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true},
 		{dir: filepath.Join(owaspPortsDir(), "owasp-python"), want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true},
 		{dir: "/tmp/bench/BenchmarkJava", want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true},
-		{dir: "/tmp/bench/BenchmarkPython", want: benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.81}, ok: true},
+		{dir: "/tmp/bench/BenchmarkPython", want: benchmarkScore{tp: 452, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.90}, ok: true},
 		{dir: "/tmp/benchjs", want: benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.78}, ok: true},
 		{dir: "/tmp/random-benchmark", ok: false},
 	}

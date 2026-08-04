@@ -230,29 +230,6 @@ mechanic ruleVerb observe {
 	}
 }
 
-func parseV2DefinitionSourcesForCompileTest(t *testing.T, raw []parser.V2DefinitionSource) []parser.Decl {
-	t.Helper()
-	sources := parseV2SourcesForCompileTest(t, raw)
-	decls, err := parser.LowerV2DefinitionSources(sources)
-	if err != nil {
-		t.Fatalf("LowerV2DefinitionSources: %v", err)
-	}
-	return decls
-}
-
-func parseV2SourcesForCompileTest(t *testing.T, raw []parser.V2DefinitionSource) []parser.V2Source {
-	t.Helper()
-	sources := make([]parser.V2Source, 0, len(raw))
-	for _, src := range raw {
-		prog, err := parser.ParseV2(src.Source)
-		if err != nil {
-			t.Fatalf("ParseV2 %s: %v", src.Name, err)
-		}
-		sources = append(sources, parser.V2Source{Name: src.Name, Program: prog})
-	}
-	return sources
-}
-
 func loadV2FingerprintGraph(t *testing.T, store usg.Store) {
 	t.Helper()
 	if err := store.AddNode(usg.Node{ID: "src", Type: "code.Call", Props: map[string]string{"loc": "app.py:10"}}); err != nil {

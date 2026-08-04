@@ -1384,15 +1384,6 @@ func labelIsAdvisory(l usg.Label) bool {
 	return l.Detail != nil && l.Detail["advisory"] == "true"
 }
 
-func nodeHasConcreteConcept(labels []usg.Label, concept string) bool {
-	for _, l := range labels {
-		if l.Concept == concept && !labelIsAdvisory(l) {
-			return true
-		}
-	}
-	return false
-}
-
 func labelHasConcreteCoverage(l usg.Label, concept, coverage string) bool {
 	return l.Concept == concept && !labelIsAdvisory(l) && l.Detail != nil && l.Detail["coverage"] == coverage
 }
@@ -1406,45 +1397,12 @@ func nodeHasConcreteCoverage(labels []usg.Label, concept, coverage string) bool 
 	return false
 }
 
-func (e *Engine) nodeHasAdvisoryConceptOnly(nodeID, concept string) bool {
-	seen := false
-	for _, l := range e.labels(nodeID) {
-		if l.Concept != concept {
-			continue
-		}
-		if !labelIsAdvisory(l) {
-			return false
-		}
-		seen = true
-	}
-	return seen
-}
-
 func receiverPrefix(path string) string {
 	i := strings.LastIndexByte(path, '.')
 	if i <= 0 {
 		return ""
 	}
 	return path[:i]
-}
-
-func nodeHasConcept(labels []usg.Label, concept string) bool {
-	for _, l := range labels {
-		if l.Concept == concept {
-			return true
-		}
-	}
-	return false
-}
-
-// funcOf returns the id of the code.Function enclosing a node, via the `func_id` prop stamped
-// during lowering ("" if the node is top-level or carries no stamp).
-func (e *Engine) funcOf(nodeID string) string {
-	n, ok, err := e.Store.GetNode(nodeID)
-	if !ok || err != nil {
-		return ""
-	}
-	return n.Prop("func_id")
 }
 
 // flowGuarded reports whether a guard consumes the tainted value and dominates

@@ -1,8 +1,6 @@
 package lowering
 
 import (
-	"strings"
-
 	"github.com/vyprai/vyql/extract/nir"
 )
 
@@ -40,36 +38,4 @@ func (l *lowerer) nonNegativeLenFact(expr nir.Expr, sc *scope) (bool, bool) {
 		return false, true
 	}
 	return false, false
-}
-
-func (l *lowerer) blockDefinitelyExits(stmts []nir.Stmt, sc *scope) bool {
-	for _, stmt := range stmts {
-		if l.stmtDefinitelyExits(stmt, sc) {
-			return true
-		}
-	}
-	return false
-}
-
-func (l *lowerer) stmtDefinitelyExits(stmt nir.Stmt, sc *scope) bool {
-	switch st := stmt.(type) {
-	case nir.Return, nir.Terminate:
-		return true
-	case nir.Block:
-		return false
-	case nir.If:
-		if live, ok := l.constBool(st.Cond, sc); ok {
-			if live {
-				return l.blockDefinitelyExits(st.Then, sc)
-			}
-			return l.blockDefinitelyExits(st.Else, sc)
-		}
-		return false
-	}
-	return false
-}
-
-func (l *lowerer) atFunctionRoot() bool {
-	marker := strings.Index(l.region, "/fn")
-	return marker >= 0 && !strings.Contains(l.region[marker+3:], "/")
 }

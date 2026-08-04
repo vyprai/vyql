@@ -1,0 +1,16 @@
+module bindings.python.generated.m21017d75;
+
+// Python stdlib XML parsers (xml.sax / xml.dom.minidom) do NOT resolve external
+// entities by default — expat only does so once feature_external_ges is enabled
+// via setFeature(...). So a make_parser() with no setFeature call anywhere in the
+// enclosing scope is a *hardened* (safe) parser. This mirrors the lxml hardening
+// (resolve_entities=False) but for the inverted stdlib default. Without it every
+// stdlib parse is a false-positive XXE. lxml/objectify are unaffected (no make_parser).
+binding xmlHardeningPySaxSafeDefault900 {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "make_parser" and not (containsAny(node.context.scopeCall, ["setFeature"]))
+  emit check core.XmlHardening at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}

@@ -39,10 +39,6 @@ func testOntology() *ontology.Ontology {
 	return addFlowConcepts(ontology.New())
 }
 
-func seededTestOntology() *ontology.Ontology {
-	return addFlowConcepts(ontology.Seed())
-}
-
 func addFlowConcepts(onto *ontology.Ontology) *ontology.Ontology {
 	onto.Add(ontology.Concept{
 		Name:    "ParentInput",

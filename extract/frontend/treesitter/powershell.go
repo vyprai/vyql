@@ -177,16 +177,6 @@ func (c *psConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	return []nir.Stmt{nir.ExprStmt{Value: c.outputCall(n, c.expr(n))}}
 }
 
-func psPipelineOutputExpr(kind string) bool {
-	switch kind {
-	case "variable", "string_literal", "expandable_string_literal", "literal_expression",
-		"additive_expression", "comparison_expression", "logical_expression", "bitwise_expression":
-		return true
-	default:
-		return false
-	}
-}
-
 func (c *psConv) outputCall(n *tree_sitter.Node, value nir.Expr) nir.Call {
 	L := c.loc(n)
 	raw := c.text(n)

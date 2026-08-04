@@ -431,15 +431,6 @@ func (c *swConv) paramPairs(n *tree_sitter.Node) [][2]string {
 	return out
 }
 
-func (c *swConv) params(n *tree_sitter.Node) []string {
-	pairs := c.paramPairs(n)
-	out := make([]string, 0, len(pairs))
-	for _, p := range pairs {
-		out = append(out, p[1]) // internal name (the body binding)
-	}
-	return out
-}
-
 func (c *swConv) paramTypes(n *tree_sitter.Node) map[string]string {
 	out := map[string]string{}
 	for _, ch := range c.namedChildren(n) {

@@ -861,11 +861,6 @@ func printScanFlags(rows []reviewItem) {
 	}
 }
 
-// printSummary reports what was scanned (languages + file counts) and the total.
-func printSummary(stats scanStats, n int) {
-	printSummaryWithFlags(stats, n, 0, false)
-}
-
 func printSummaryWithFlags(stats scanStats, findingsN, flagsN int, includeFlags bool) {
 	var parts []string
 	for _, lg := range stats.languages {
