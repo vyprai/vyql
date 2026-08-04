@@ -3,6 +3,7 @@
 package sarif
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -119,6 +120,108 @@ func withMessage(loc map[string]any, text string) map[string]any {
 	return loc
 }
 
+// sarifLevel maps a rule severity to the SARIF result level vocabulary.
+func sarifLevel(sev string) string {
+	switch strings.ToLower(sev) {
+	case "critical", "high":
+		return "error"
+	case "medium", "low":
+		return "warning"
+	default:
+		return "note"
+	}
+}
+
+// securitySeverity maps a rule severity to the numeric string consumers rank by.
+// The bands are the conventional CVSS-ish cutoffs SARIF consumers apply:
+// >=9.0 critical, >=7.0 high, >=4.0 medium, else low.
+func securitySeverity(sev string) string {
+	switch strings.ToLower(sev) {
+	case "critical":
+		return "9.3"
+	case "high":
+		return "7.5"
+	case "medium":
+		return "5.5"
+	case "low":
+		return "3.5"
+	default:
+		return ""
+	}
+}
+
+// cweTags renders a rule's CWE list in both the forms SARIF consumers look for:
+// the bare identifier and the `external/cwe/cwe-nnn` taxonomy path. Accepts the
+// `CWE_79` spelling used in rule metadata as well as `CWE-79` and a bare number.
+func cweTags(cwes []string) []string {
+	var out []string
+	for _, c := range cwes {
+		n := strings.TrimSpace(c)
+		n = strings.TrimPrefix(strings.TrimPrefix(strings.ToUpper(n), "CWE_"), "CWE-")
+		if n == "" {
+			continue
+		}
+		out = append(out, "CWE-"+n, "external/cwe/cwe-"+fmt.Sprintf("%03s", n))
+	}
+	return out
+}
+
+// ruleDescriptor builds one reportingDescriptor. Publishing CWE and severity here
+// is what lets a SARIF consumer — GitHub code scanning, or a benchmark scorer —
+// read a finding's weakness class from the tool's own output instead of parsing
+// the rule packs, whose layout and syntax are free to change.
+func ruleDescriptor(f *findings.Finding, meta map[string]any) map[string]any {
+	rule := map[string]any{"id": f.RuleID, "name": f.RuleID}
+	props := map[string]any{}
+
+	cwes := metaCWE(meta)
+	if len(cwes) > 0 {
+		props["cwe"] = cwes // retained: the pre-existing shape
+		props["tags"] = cweTags(cwes)
+	}
+	sev := f.Severity
+	if s, ok := meta["severity"].(string); ok && s != "" {
+		sev = s
+	}
+	if sev != "" {
+		props["severity"] = sev
+		if ss := securitySeverity(sev); ss != "" {
+			props["security-severity"] = ss
+		}
+		rule["defaultConfiguration"] = map[string]any{"level": sarifLevel(sev)}
+	}
+	if d, ok := meta["description"].(string); ok && d != "" {
+		rule["shortDescription"] = map[string]any{"text": d}
+	}
+	if len(props) > 0 {
+		rule["properties"] = props
+	}
+	return rule
+}
+
+// metaCWE reads the `cwe` entry, which rule metadata carries as a string or a
+// list depending on how it was authored.
+func metaCWE(meta map[string]any) []string {
+	switch v := meta["cwe"].(type) {
+	case []string:
+		return v
+	case string:
+		if v == "" {
+			return nil
+		}
+		return []string{v}
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, x := range v {
+			if s, ok := x.(string); ok && s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
+}
+
 // ToSARIF serializes findings to a SARIF 2.1.0 document.
 func ToSARIF(fs []*findings.Finding, toolVersion string, rulesMeta map[string]map[string]any) map[string]any {
 	seen := map[string]bool{}
@@ -128,13 +231,7 @@ func ToSARIF(fs []*findings.Finding, toolVersion string, rulesMeta map[string]ma
 			continue
 		}
 		seen[f.RuleID] = true
-		rule := map[string]any{"id": f.RuleID, "name": f.RuleID}
-		if m := rulesMeta[f.RuleID]; m != nil {
-			if cwe, ok := m["cwe"]; ok {
-				rule["properties"] = map[string]any{"cwe": cwe}
-			}
-		}
-		rules = append(rules, rule)
+		rules = append(rules, ruleDescriptor(f, rulesMeta[f.RuleID]))
 	}
 	var results []any
 	for _, f := range fs {
