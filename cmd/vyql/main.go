@@ -44,7 +44,14 @@ import (
 	"github.com/vyprai/vyql/usg"
 )
 
-const version = "0.1.0"
+// version is the release version. A release build stamps it with
+//
+//	-ldflags "-X main.version=v1.2.3"
+//
+// so it is a var rather than a const. Builds that do not stamp it -- go install,
+// go build, a local make -- report this default plus the VCS data the toolchain
+// records, which is more honest than a version string nobody set.
+var version = "0.1.0"
 
 type compiledRuleSet struct {
 	onto     *ontology.Ontology
@@ -128,6 +135,8 @@ func main() {
 		err = cmdValidateBinding(args)
 	case "diff":
 		err = cmdDiff(args)
+	case "version", "--version", "-version":
+		cmdVersion()
 	default:
 		usage()
 		os.Exit(2)
@@ -883,6 +892,37 @@ func printSummaryWithFlags(stats scanStats, findingsN, flagsN int, includeFlags 
 	fmt.Printf("scanned %s — %d finding(s)\n", scanned, findingsN)
 }
 
+// cmdVersion reports the version and everything needed to identify the exact
+// build: the revision, whether the tree was dirty, the Go toolchain, and the
+// platform. The VCS fields come from the toolchain, which stamps them for
+// `go build` and `go install` from a repository.
+func cmdVersion() {
+	fmt.Printf("vyql %s\n", version)
+
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return
+	}
+	settings := map[string]string{}
+	for _, s := range info.Settings {
+		settings[s.Key] = s.Value
+	}
+	if rev := settings["vcs.revision"]; rev != "" {
+		dirty := ""
+		if settings["vcs.modified"] == "true" {
+			dirty = " (dirty)"
+		}
+		fmt.Printf("commit: %s%s\n", rev, dirty)
+	}
+	if t := settings["vcs.time"]; t != "" {
+		fmt.Printf("built:  %s\n", t)
+	}
+	fmt.Printf("go:     %s\n", info.GoVersion)
+	if osA, arch := settings["GOOS"], settings["GOARCH"]; osA != "" && arch != "" {
+		fmt.Printf("platform: %s/%s\n", osA, arch)
+	}
+}
+
 func usage() {
 	fmt.Fprintln(os.Stderr, "vyql "+version+" — Vypr Query Language scanner")
 	fmt.Fprintln(os.Stderr, "")
@@ -900,4 +940,5 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  definitions inspect loaded VyQL concepts/rules/bindings/reviews; explain <concept|binding> traces a label's source; check-v2 verifies v2 definitions")
 	fmt.Fprintln(os.Stderr, "  validate-binding parse and summarize a VyQL binding file   [-file binding.vyql]")
 	fmt.Fprintln(os.Stderr, "  diff       diff two `scan -format json` outputs by fingerprint")
+	fmt.Fprintln(os.Stderr, "  version    print the version, revision and build information")
 }
