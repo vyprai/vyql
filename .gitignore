@@ -1,0 +1,33 @@
+# Build artifacts.
+#
+# Binaries go to bin/ and are never written to the repository root: the root
+# already has a vyql/ directory (the runtime data), so a root-level `vyql` entry
+# here would match that directory and silently drop the entire knowledge base.
+#
+# The same name collision has a second edge. `go build -o vyql` from the root
+# does not fail -- vyql/ is a directory, so Go writes the binary INSIDE it, as
+# vyql/vyql. That is a 70 MB artifact sitting in the middle of the data tree.
+/vyql/vyql
+/bin/
+*.test
+*.out
+
+# Go
+vendor/
+
+# Node (script tooling)
+node_modules/
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Agent session data
+.claude/
+
+# Secrets
+*.env
+*.pem
+*.key

@@ -1,0 +1,95 @@
+name: security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Advisories appear after a commit lands, so periodic re-checks catch what
+    # the PR run could not have known about.
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      # Reports only vulnerabilities in code paths this module actually reaches,
+      # so a finding here is a real exposure rather than a version match.
+      - run: govulncheck ./...
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: go
+      - uses: github/codeql-action/autobuild@v3
+      # Uploading results needs code scanning, which is free on public
+      # repositories and a paid feature on private ones. While this repository is
+      # private the upload fails with "Resource not accessible by integration",
+      # and failing the workflow for that would train people to ignore it. The
+      # analysis itself still runs, and this starts reporting the moment the
+      # repository is public.
+      - uses: github/codeql-action/analyze@v3
+        continue-on-error: true
+
+  scan-self:
+    # VyQL scans its own source. A security scanner that cannot be run against
+    # itself is making a claim it will not test.
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go build -o bin/vyql ./cmd/vyql
+      # Two directories are excluded, and both are cost rather than coverage:
+      # vyql/ is 34,000 data files, and extract/frontend/treesitter/grammars is
+      # 121 MB of generated C from upstream tree-sitter. Scanning the root
+      # without these took over twenty minutes; with them excluded it takes ten
+      # seconds and covers the code we actually write.
+      - name: Scan this repository
+        run: |
+          VYQL_HOME=./vyql ./bin/vyql scan --format sarif \
+            --exclude grammars,vyql,bin,docs,benchmarks . > vyql-self.sarif
+          # A scan that produces no SARIF, or SARIF with no runs, has not
+          # scanned anything -- and the upload below would happily accept it.
+          python3 - <<'CHECK'
+          import json, sys
+          d = json.load(open("vyql-self.sarif"))
+          runs = d.get("runs", [])
+          if not runs:
+              print("no runs in the SARIF output"); sys.exit(1)
+          n = len(runs[0].get("results", []))
+          print(f"SARIF {d.get('version')}, {n} result(s)")
+          CHECK
+      # Same as above: the scan is the gate, the upload is best-effort. If VyQL
+      # cannot scan its own source, the step above fails and this job fails with
+      # it -- that is the signal worth having.
+      - uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: vyql-self.sarif
+          category: vyql-self-scan

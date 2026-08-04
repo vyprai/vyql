@@ -1,0 +1,85 @@
+name: data
+
+# A Go-only pipeline would not notice that the security knowledge base is
+# broken, which for this project is the likelier regression: the engine is small
+# and the data is 30,000+ files.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go install github.com/google/go-licenses@latest
+      - run: ./scripts/check-hygiene.sh
+
+  data-integrity:
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build the scanner
+        run: go build -o bin/vyql ./cmd/vyql
+
+      # Loads and parses every shipped definition -- concepts, bindings, rule
+      # packs, reviews. A file that does not parse fails the command.
+      - name: The full definition set loads
+        run: VYQL_HOME=./vyql ./bin/vyql definitions -kind all > /tmp/defs.txt
+
+      # Loading zero of something is the failure that looks like success: a glob
+      # that stops matching reports a clean run over nothing at all. Assert
+      # floors rather than trusting the exit code.
+      - name: The definition counts are not silently zero
+        run: |
+          line="$(grep -m1 '^loaded:' /tmp/defs.txt)"
+          echo "$line"
+          get() { echo "$line" | grep -oE "$1=[0-9]+" | cut -d= -f2; }
+          fail=0
+          check() { # name, actual, floor
+            if [ -z "$2" ] || [ "$2" -lt "$3" ]; then
+              echo "FAIL: $1=$2, expected at least $3"; fail=1
+            fi
+          }
+          check concepts "$(get concepts)" 800
+          check rules    "$(get rules)"    700
+          check bindings "$(get bindings)" 30000
+          check reviews  "$(get reviews)"  500
+          exit $fail
+
+      - name: A scan produces findings on a known-vulnerable sample
+        run: |
+          mkdir -p /tmp/sample
+          cat > /tmp/sample/app.py <<'PY'
+          import sqlite3
+          from flask import Flask, request
+          app = Flask(__name__)
+
+          @app.route("/u")
+          def u():
+              name = request.args.get("name")
+              conn = sqlite3.connect("app.db")
+              return conn.execute("SELECT * FROM users WHERE name = '" + name + "'").fetchall()
+          PY
+          VYQL_HOME=./vyql ./bin/vyql scan --format json /tmp/sample > /tmp/findings.json
+          n="$(python3 -c "import json;d=json.load(open('/tmp/findings.json'));print(len(d if isinstance(d,list) else d.get('findings',[])))")"
+          echo "findings: $n"
+          # An engine that loads its data but detects nothing passes every check
+          # above. This is the one that notices.
+          [ "$n" -ge 1 ] || { echo "FAIL: no findings on an unmistakable SQL injection"; exit 1; }

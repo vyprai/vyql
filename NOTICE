@@ -1,0 +1,10 @@
+VyQL
+Copyright 2026 Vypr
+
+This product includes software developed at Vypr.
+
+This product bundles third-party components. See THIRD_PARTY_NOTICES.md for
+their licenses and attribution, including the vendored tree-sitter grammars
+under extract/frontend/treesitter/grammars/, the MITRE CWE and CAPEC taxonomies
+under vyql/taxonomy/, and the ecosyste.ms package snapshot under
+vyql/bindings/packages/, which is licensed CC-BY-SA 4.0.

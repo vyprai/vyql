@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # The tree-sitter grammars move together and are all the same kind of
+      # change; one PR per grammar per week would be noise.
+      tree-sitter:
+        patterns:
+          - "github.com/tree-sitter/*"
+          - "github.com/tree-sitter-grammars/*"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

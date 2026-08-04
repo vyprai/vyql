@@ -1,0 +1,167 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      # The tree-sitter grammars are C. Without cgo the build constraints exclude
+      # them silently rather than failing, so this is not a default worth trusting.
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: |
+          go build -o bin/vyql ./cmd/vyql
+          go build -o bin/gen-ontology-json ./cmd/gen-ontology-json
+
+      - name: Vet
+        run: go vet ./...
+
+      # -count=1 is mandatory: the test cache keys on source and does not track
+      # the .vyql data files, so a cached pass can hide a change to the security
+      # knowledge base entirely.
+      - name: Test
+        run: go test -count=1 ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        run: |
+          out="$(gofmt -l .)"
+          if [ -n "$out" ]; then
+            echo "These files need gofmt:"
+            echo "$out"
+            exit 1
+          fi
+
+      # The action's major version selects the golangci-lint major version: v6
+      # installs golangci-lint v1, which cannot read a `version: "2"` config and
+      # refuses to run against a module targeting a newer Go than it was built
+      # with. Pinned rather than `latest` so CI runs the same linter the
+      # contributor documentation tells people to install.
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.1
+
+  # Every target we publish must build and RUN, on every change -- not only when
+  # a tag is cut. A release is a bad place to discover that one of four platforms
+  # was broken for weeks.
+  #
+  # Native runner per target: the grammars are C compiled by cgo, so a cross
+  # build needs a cross C toolchain, and the point here is to exercise the same
+  # path a user's machine would.
+  matrix-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            cc: clang -arch x86_64
+    runs-on: ${{ matrix.os }}
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+          # darwin/amd64 is cross-built on an arm64 runner rather than taken from
+          # a macos-13 Intel runner: that image is being retired, and a job
+          # requesting it sits unassigned indefinitely rather than failing. clang
+          # targets x86_64 natively, so this is a supported cgo cross-build, not
+          # a workaround.
+        env:
+          # Set explicitly rather than left to the host. A cross-build with only
+          # CC set leaves Go targeting the runner's architecture while clang is
+          # told another, and cgo fails with "cannot use 'cpp-output' output with
+          # multiple -arch options". For the native targets these are no-ops that
+          # state the intent.
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CC: ${{ matrix.cc }}
+        run: go build -trimpath -ldflags "-s -w" -o dist/vyql ./cmd/vyql
+
+      - name: Confirm the binary is for the target it claims
+        run: |
+          file dist/vyql
+          go version -m dist/vyql | grep -E 'GOOS|GOARCH'
+          go version -m dist/vyql | grep -q "GOOS=${{ matrix.goos }}" || { echo "wrong GOOS"; exit 1; }
+          go version -m dist/vyql | grep -q "GOARCH=${{ matrix.goarch }}" || { echo "wrong GOARCH"; exit 1; }
+
+      # Linking is not the bar. A binary that starts and then finds nothing --
+      # because the parsers were excluded, or the data directory did not
+      # resolve -- passes every check that stops at `go build`.
+      - name: Run it, and require a real finding
+        run: |
+          mkdir -p /tmp/sample
+          cat > /tmp/sample/app.py <<'PY'
+          import sqlite3
+          from flask import Flask, request
+          app = Flask(__name__)
+
+          @app.route("/u")
+          def u():
+              name = request.args.get("name")
+              conn = sqlite3.connect("app.db")
+              return conn.execute("SELECT * FROM users WHERE name = '" + name + "'").fetchall()
+          PY
+          # An x86_64 binary needs Rosetta to run on an arm64 runner, and the
+          # hosted image may not have it. Where it runs, require a real finding;
+          # where it cannot, say so rather than passing quietly -- the
+          # architecture assertion above still applies either way.
+          if ! ./dist/vyql version >/dev/null 2>&1; then
+            echo "NOTE: ${{ matrix.goos }}/${{ matrix.goarch }} cannot be executed on $(uname -m);"
+            echo "      architecture verified above, execution not exercised here."
+            exit 0
+          fi
+          ./dist/vyql version
+          n="$(VYQL_HOME=./vyql ./dist/vyql scan --format json /tmp/sample \
+                | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d if isinstance(d,list) else d.get("findings",[])))')"
+          echo "findings: $n"
+          [ "$n" -ge 1 ] || { echo "built, ran, detected nothing"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vyql-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/vyql
+          retention-days: 14

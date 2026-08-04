@@ -1,0 +1,63 @@
+name: detection
+
+# Guards the thing this project exists to do. The Go suite proves the engine
+# behaves; this proves it still finds what it used to find. A refactor that keeps
+# every unit test green and quietly loses a category of vulnerability is the
+# failure mode worth spending CI minutes on.
+
+on:
+  pull_request:
+    # Only when something that can move a score changes. Documentation and
+    # workflow edits cannot.
+    paths:
+      - "**/*.go"
+      - "vyql/**"
+      - "go.mod"
+      - "go.sum"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owasp:
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [BenchmarkJava, BenchmarkPython]
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # The corpora are GPL and are never vendored here. They are also stable --
+      # pinned upstream repositories that change rarely -- so a cache hit is the
+      # normal case and a clone is the exception.
+      - name: Cache the corpus
+        id: corpus
+        uses: actions/cache@v4
+        with:
+          path: ~/benchmark-corpora/${{ matrix.suite }}
+          key: corpus-${{ matrix.suite }}-v1
+
+      - name: Fetch the corpus
+        if: steps.corpus.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/benchmark-corpora
+          git clone --depth 1 --quiet \
+            "https://github.com/OWASP-Benchmark/${{ matrix.suite }}.git" \
+            ~/benchmark-corpora/${{ matrix.suite }}
+
+      # The harness enforces the checked-in parity target for these suites, so a
+      # regression fails here rather than being reported and ignored.
+      - name: Score ${{ matrix.suite }}
+        run: |
+          VYQL_BENCH=1 BENCH_DIR=~/benchmark-corpora/${{ matrix.suite }} \
+            go test -count=1 -timeout 60m -v ./cmd/vyql/ -run TestOWASPBenchmark

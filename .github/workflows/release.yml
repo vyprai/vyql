@@ -1,0 +1,211 @@
+name: release
+
+# Builds natively on each target rather than cross-compiling. The tree-sitter
+# grammars are C compiled by cgo, so a cross build needs a cross C toolchain for
+# every target; a native runner per platform is simpler and is what actually gets
+# tested. Without cgo the build fails outright rather than silently producing a
+# binary that cannot parse anything.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (dry run; nothing is published)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Two builds of the same commit, from two different source paths, must produce
+  # byte-identical binaries. That is what -trimpath buys, and asserting it here
+  # means a release artifact can be rebuilt and checked by anyone.
+  #
+  # It holds only from a clean checkout: the Go toolchain embeds vcs.revision,
+  # vcs.time and vcs.modified, so a dirty tree or a missing .git changes the
+  # hash. Verified locally -- identical across paths with .git present, different
+  # without it.
+  reproducible:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Confirm the tree is clean
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "the checkout is dirty; vcs.modified would be stamped true"
+            git status --porcelain
+            exit 1
+          fi
+
+      - name: Build twice, from two different paths
+        run: |
+          VERSION="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
+          FLAGS=(-trimpath -ldflags "-s -w -X main.version=${VERSION}")
+          go build "${FLAGS[@]}" -o /tmp/build-a ./cmd/vyql
+
+          cp -R "$GITHUB_WORKSPACE" /tmp/elsewhere
+          cd /tmp/elsewhere
+          go build "${FLAGS[@]}" -o /tmp/build-b ./cmd/vyql
+
+      - name: The two builds must be byte-identical
+        run: |
+          a="$(shasum -a 256 /tmp/build-a | cut -d' ' -f1)"
+          b="$(shasum -a 256 /tmp/build-b | cut -d' ' -f1)"
+          echo "path A: $a"
+          echo "path B: $b"
+          if [ "$a" != "$b" ]; then
+            echo "build is not reproducible across source paths"
+            go version -m /tmp/build-a > /tmp/meta-a.txt
+            go version -m /tmp/build-b > /tmp/meta-b.txt
+            diff /tmp/meta-a.txt /tmp/meta-b.txt || true
+            exit 1
+          fi
+          echo "reproducible: $a"
+
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            cc: clang -arch x86_64
+    runs-on: ${{ matrix.os }}
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+          # darwin/amd64 is cross-built on an arm64 runner rather than taken from
+          # a macos-13 Intel runner: that image is being retired, and a job
+          # requesting it sits unassigned indefinitely rather than failing. clang
+          # targets x86_64 natively, so this is a supported cgo cross-build, not
+          # a workaround.
+        env:
+          # Set explicitly rather than left to the host. A cross-build with only
+          # CC set leaves Go targeting the runner's architecture while clang is
+          # told another, and cgo fails with "cannot use 'cpp-output' output with
+          # multiple -arch options". For the native targets these are no-ops that
+          # state the intent.
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CC: ${{ matrix.cc }}
+        run: |
+          VERSION="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
+          go build -trimpath \
+            -ldflags "-s -w -X main.version=${VERSION}" \
+            -o dist/vyql ./cmd/vyql
+
+      - name: Verify the binary reports the tag it was built from
+        run: |
+          VERSION="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
+          got="$(./dist/vyql version | head -1)"
+          echo "$got"
+          [ "$got" = "vyql ${VERSION}" ] || { echo "expected 'vyql ${VERSION}'"; exit 1; }
+
+      # The data directory ships with the binary. VyQL loads all of its security
+      # knowledge from it at startup, so a release archive without it produces a
+      # binary that starts and then cannot do anything.
+      - name: Assemble the archive
+        run: |
+          VERSION="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
+          NAME="vyql_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
+          # The binary goes in bin/. It cannot sit beside the data directory at
+          # the archive root: both are called "vyql", and the second copy
+          # overwrites the first. Running ./bin/vyql from the extracted
+          # directory still resolves ./vyql, because the data directory is
+          # found by searching the working directory and its ancestors.
+          mkdir -p "stage/${NAME}/bin"
+          cp dist/vyql "stage/${NAME}/bin/vyql"
+          cp -R vyql "stage/${NAME}/vyql"
+          cp LICENSE NOTICE THIRD_PARTY_NOTICES.md README.md "stage/${NAME}/"
+          tar -czf "${NAME}.tar.gz" -C stage "${NAME}"
+          shasum -a 256 "${NAME}.tar.gz" > "${NAME}.tar.gz.sha256"
+          ls -la "${NAME}.tar.gz"
+
+      # Prove the archive works the way a user will use it: extract somewhere
+      # unrelated, run it with no VYQL_HOME set, and require a real finding. A
+      # release that starts but detects nothing has failed in the way that
+      # matters.
+      - name: Smoke-test the archive as a user would
+        run: |
+          VERSION="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
+          NAME="vyql_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
+          mkdir -p /tmp/smoke && tar -xzf "${NAME}.tar.gz" -C /tmp/smoke
+          mkdir -p /tmp/sample
+          cat > /tmp/sample/app.py <<'PY'
+          import sqlite3
+          from flask import Flask, request
+          app = Flask(__name__)
+
+          @app.route("/u")
+          def u():
+              name = request.args.get("name")
+              conn = sqlite3.connect("app.db")
+              return conn.execute("SELECT * FROM users WHERE name = '" + name + "'").fetchall()
+          PY
+          cd /tmp/smoke/"${NAME}"
+          if ! ./bin/vyql version >/dev/null 2>&1; then
+            echo "NOTE: ${{ matrix.goos }}/${{ matrix.goarch }} cannot be executed on $(uname -m);"
+            echo "      the archive is assembled and checksummed, but not run here."
+            exit 0
+          fi
+          # No VYQL_HOME: this is how someone who downloaded the archive runs it.
+          env -u VYQL_HOME ./bin/vyql version
+          n="$(env -u VYQL_HOME ./bin/vyql scan --format json /tmp/sample | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d if isinstance(d,list) else d.get("findings",[])))')"
+          echo "findings: $n"
+          [ "$n" -ge 1 ] || { echo "the release archive detects nothing"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vyql-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            *.tar.gz
+            *.tar.gz.sha256
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - run: ls -la artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*.tar.gz
+            artifacts/*.tar.gz.sha256
+          generate_release_notes: true
