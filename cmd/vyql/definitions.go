@@ -48,6 +48,13 @@ func cmdDefinitions(args []string) error {
 	format := fs.String("format", "text", "output format: text | json")
 	_ = fs.Parse(args)
 
+	// An unrecognised kind selects nothing, and the report then states that zero
+	// concepts, rules and bindings are loaded -- which describes a broken
+	// installation, not a typo.
+	if err := validateDefinitionKind(*kind); err != nil {
+		return err
+	}
+
 	cat, err := definitions.Inspect(definitions.InspectOptions{
 		Kind:     *kind,
 		Language: *lang,

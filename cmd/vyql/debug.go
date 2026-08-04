@@ -34,6 +34,15 @@ func cmdTrace(args []string) error {
 	if len(paths) == 0 {
 		return fmt.Errorf("usage: vyql trace [-from CONCEPT] [-to CONCEPT] <path> [<path>...]")
 	}
+	// Checked before the graph is built: a filter that can never match would
+	// otherwise print "0 source(s)" after a full scan, which reads as good news.
+	onto := ontology.Seed()
+	if err := validateConceptFilter(onto, "from", *from); err != nil {
+		return err
+	}
+	if err := validateConceptFilter(onto, "to", *to); err != nil {
+		return err
+	}
 	applyProfile(paths, *profileName)
 	g, _, err := buildGraph(paths)
 	if err != nil {
@@ -43,7 +52,6 @@ func cmdTrace(args []string) error {
 		fmt.Println("(no analyzable source)")
 		return nil
 	}
-	onto := ontology.Seed()
 	nodes, _ := g.AllNodes()
 	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
 

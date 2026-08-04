@@ -15,6 +15,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -142,6 +143,15 @@ func main() {
 		os.Exit(2)
 	}
 	if err != nil {
+		// A met -fail-on threshold is a successful scan with a non-zero status,
+		// not a fault. It gets no "vyql:" diagnostic prefix and its own exit
+		// code, so a pipeline can tell "this code has findings" apart from "the
+		// scanner could not run".
+		var gated *thresholdMet
+		if errors.As(err, &gated) {
+			fmt.Fprintln(os.Stderr, gated.Error())
+			os.Exit(gated.code)
+		}
 		fmt.Fprintln(os.Stderr, "vyql: "+err.Error())
 		os.Exit(1)
 	}
@@ -164,11 +174,20 @@ func cmdScan(args []string) error {
 	exclude := fs.String("exclude", "", "comma-separated path segments to skip, e.g. _vendor,node_modules,tests")
 	cacheDir := fs.String("cache", "auto", "persistent scan cache: auto | off | <dir>")
 	incrementalCache := fs.Bool("incremental-cache", false, "also populate per-file parse/lower/binding caches for edit-loop scans")
+	failOn := fs.String("fail-on", "none", "exit non-zero when a finding is at or above this severity: none | "+strings.Join(severityOrder, " | "))
+	exitCode := fs.Int("exit-code", 1, "exit status to use when -fail-on is met")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
 		usage()
 		os.Exit(2)
+	}
+	// Resolved before the scan runs. A typo here should cost nothing; finding
+	// out after a multi-minute scan that the gate was never armed is the kind of
+	// silent no-op this flag exists to prevent.
+	failOnRank, err := parseFailOn(*failOn)
+	if err != nil {
+		return err
 	}
 	cleanup := applyMaxRAM(*maxRAM)
 	defer cleanup()
@@ -188,6 +207,9 @@ func cmdScan(args []string) error {
 		FlagKind:     *flagKind,
 		FlagLoc:      *flagLoc,
 		GraphCache:   *incrementalCache,
+		FailOnRank:   failOnRank,
+		FailOnName:   strings.ToLower(strings.TrimSpace(*failOn)),
+		ExitCode:     *exitCode,
 	})
 }
 
@@ -583,6 +605,11 @@ type scanRunOptions struct {
 	FlagKind     string
 	FlagLoc      string
 	GraphCache   bool
+	// Build gating. FailOnRank of 0 means -fail-on was not given, so the scan
+	// reports and exits 0 exactly as it always has.
+	FailOnRank int
+	FailOnName string
+	ExitCode   int
 }
 
 func (o scanRunOptions) wantsFlags() bool {
@@ -616,7 +643,10 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	// graph-json serialises the live graph, which the whole-scan findings cache
 	// cannot replay -- it stores findings, not the USG. Force the full pipeline,
 	// exactly as the flag paths do.
-	needsGraph := wantsFlags || format == "graph-json"
+	//
+	// -stats belongs in this set because it reports node and edge counts, which
+	// only exist while the graph is retained.
+	needsGraph := wantsFlags || format == "graph-json" || opts.ShowStats
 	if cache != nil && syncCollector == nil && !needsGraph {
 		rkey = scanFingerprint(cache.Salt(), paths, ruleSources, prof.Name)
 		if cs, ok := loadCachedScan(cache, rkey); ok {
@@ -704,6 +734,13 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	if opts.ShowStats {
 		fmt.Printf("[stats] profile %s (%s)\n", prof.Name, prof.Title)
 		printScanStats(graph, stats)
+	}
+	// Gating is the last thing that happens: the report is already on stdout, so
+	// a gated build still shows the operator what failed it.
+	if opts.FailOnRank > 0 {
+		if n, highest := gateFindings(all, opts.FailOnRank); n > 0 {
+			return &thresholdMet{code: opts.ExitCode, count: n, highest: highest, failOn: opts.FailOnName}
+		}
 	}
 	return nil
 }
