@@ -181,8 +181,8 @@ correct outcome for a performance change.
 
 PR #4 (`perf/graph-store-memory`) is worth ~7× on a small corpus and is the difference
 between *infeasible* and *17 seconds* on a full one. Neither v1 nor v2-pre-perf crashes —
-they simply never finish. This is consistent with [docs/GAPS.md](docs/GAPS.md),
-which records the same work taking a 170-file repo from a 600 s timeout to 11 s.
+they simply never finish. The same work is recorded elsewhere as taking a 170-file repo
+from a 600 s timeout to 11 s.
 
 **The biggest v1 → v2 difference is not detection quality — it is that v1 is unusable at
 benchmark scale.**
