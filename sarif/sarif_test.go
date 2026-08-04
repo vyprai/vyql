@@ -97,3 +97,57 @@ func TestSARIFSchemaShape(t *testing.T) {
 		t.Error("rule metadata does not carry the CWE")
 	}
 }
+
+// The rule descriptor is a consumed contract, not decoration: benchmark scorers read
+// a finding's weakness class from here instead of parsing vyql/packs, and GitHub code
+// scanning ranks by security-severity. Emitting a bare {id, name} — which this did
+// until the metadata was wired through — silently costs both.
+func TestRuleDescriptorPublishesCWEAndSeverity(t *testing.T) {
+	doc := ToSARIF([]*findings.Finding{sampleFinding()}, "0.1.0",
+		map[string]map[string]any{
+			"VYQL-INJ-001": {"cwe": []string{"CWE_89", "CWE-79"}, "severity": "critical"},
+		})
+	rules := doc["runs"].([]any)[0].(map[string]any)["tool"].(map[string]any)["driver"].(map[string]any)["rules"].([]any)
+	if len(rules) != 1 {
+		t.Fatalf("want 1 rule descriptor, got %d", len(rules))
+	}
+	rule := rules[0].(map[string]any)
+	props, ok := rule["properties"].(map[string]any)
+	if !ok {
+		t.Fatal("rule descriptor carries no properties — scorers cannot read its CWE")
+	}
+
+	// tags carry both the bare id and the taxonomy path, and normalise the CWE_nnn
+	// spelling rule metadata uses to the CWE-nnn spelling consumers expect.
+	tags := props["tags"].([]string)
+	want := []string{"CWE-89", "external/cwe/cwe-089", "CWE-79", "external/cwe/cwe-079"}
+	if strings.Join(tags, ",") != strings.Join(want, ",") {
+		t.Errorf("tags = %v, want %v", tags, want)
+	}
+	if props["security-severity"] != "9.3" {
+		t.Errorf("security-severity = %v, want 9.3 for critical", props["security-severity"])
+	}
+	if lvl := rule["defaultConfiguration"].(map[string]any)["level"]; lvl != "error" {
+		t.Errorf("level = %v, want error for critical", lvl)
+	}
+	if problems := ValidateSARIF(doc); len(problems) != 0 {
+		t.Fatalf("enriched document should still validate, got: %v", problems)
+	}
+}
+
+// A rule with no metadata must still produce a well-formed descriptor rather than
+// half-populated properties.
+func TestRuleDescriptorWithoutMetaStaysValid(t *testing.T) {
+	doc := ToSARIF([]*findings.Finding{sampleFinding()}, "0.1.0", nil)
+	rule := doc["runs"].([]any)[0].(map[string]any)["tool"].(map[string]any)["driver"].(map[string]any)["rules"].([]any)[0].(map[string]any)
+	if _, hasCWE := (rule["properties"].(map[string]any))["cwe"]; hasCWE {
+		t.Error("no rule metadata was supplied, so no cwe should be claimed")
+	}
+	// severity still comes off the finding itself
+	if rule["defaultConfiguration"].(map[string]any)["level"] != "error" {
+		t.Error("level should fall back to the finding's own severity")
+	}
+	if problems := ValidateSARIF(doc); len(problems) != 0 {
+		t.Fatalf("should validate, got: %v", problems)
+	}
+}

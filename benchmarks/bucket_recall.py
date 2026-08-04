@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
-"""Per-bucket recall on RealVuln: which of the v3 bug buckets did the detectors move?"""
-import sys, os, json, glob, re, subprocess, collections
-R, VYQL, HOME, PACKS = sys.argv[1:5]
+"""Per-bucket recall on RealVuln: which of the v3 bug buckets did the detectors move?
+
+Shares score_realvuln.py's scan and finding construction, so the rule -> CWE mapping
+comes from VyQL's own SARIF rule metadata rather than a second copy of a regex over
+vyql/packs/**.
+"""
+import sys, os, glob, collections
+R, VYQL, HOME = sys.argv[1:4]
 sys.path.insert(0, R)
-from parsers.base import NormalisedFinding, normalise_path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from scorer.matcher import load_ground_truth, match_findings
+import score_realvuln as srv
+
+srv.RV, srv.VYQL, srv.VYQL_HOME = R, VYQL, HOME
 
 TAINT={'sql_injection','stored_xss','reflected_xss','dom_xss','xss','path_traversal','command_injection',
        'open_redirect','insecure_deserialization','ssrf','xxe','code_injection','template_injection',
@@ -25,12 +33,6 @@ def bucket(c):
     if c in ACCESS: return 'access-control'
     return 'other/context'
 
-cwes={}
-for f in glob.glob(os.path.join(PACKS,'**','*.vyql'), recursive=True):
-    for m in re.finditer(r'meta \{([^}]*)\}', open(f).read()):
-        b=m.group(1); rid=re.search(r'id: "([^"]+)"',b); c=re.findall(r'CWE_(\d+)',b)
-        if rid and c: cwes[rid.group(1)]=['CWE-'+x for x in c]
-
 tot=collections.Counter(); hit=collections.Counter()
 for d in sorted(glob.glob(os.path.join(R,'repos','*'))):
     rid=os.path.basename(d)
@@ -39,25 +41,17 @@ for d in sorted(glob.glob(os.path.join(R,'repos','*'))):
     gt=load_ground_truth(gtp)
     cls={f['id']:f['vulnerability_class'] for f in gt['findings'] if f.get('is_vulnerable')}
     try:
-        p=subprocess.run([VYQL,'scan','--format','sarif',d],capture_output=True,text=True,
-                         env=dict(os.environ,VYQL_HOME=HOME),timeout=1800)
-        sar=json.loads(p.stdout)
+        fs, _ = srv.to_findings(srv.scan(d), {})
     except Exception:
-        sar={}
-    fs=[]
-    for run in sar.get('runs',[]):
-        for res in run.get('results') or []:
-            r=res.get('ruleId') or (res.get('message') or {}).get('text') or ''
-            L=res.get('locations') or []
-            if not L: continue
-            ph=L[0].get('physicalLocation',{})
-            for cwe in cwes.get(r,[]):
-                fs.append(NormalisedFinding(file=normalise_path((ph.get('artifactLocation') or {}).get('uri','')),
-                    cwe=cwe,line=(ph.get('region') or {}).get('startLine'),function=None,
-                    severity='medium',rule_id=r,message=None,scanner='vyql'))
+        fs = []
     for c in cls.values(): tot[bucket(c)]+=1
+    # one credit per ground-truth entry: a rule carrying N CWEs is fanned out to N
+    # findings for matching, and without this a single detection counts N times.
+    seen=set()
     for mr in match_findings(fs,gt):
         if mr.classification=='TP' and mr.ground_truth_id in cls:
+            if mr.ground_truth_id in seen: continue
+            seen.add(mr.ground_truth_id)
             hit[bucket(cls[mr.ground_truth_id])]+=1
 
 print(f'{"bucket":16s} {"detected":>9s} {"of":>6s} {"recall":>8s}')

@@ -495,6 +495,45 @@ func stringListMeta(raw any) []string {
 	}
 }
 
+// sarifRulesMeta collects the per-rule metadata the SARIF writer publishes, keyed by
+// the rule id findings carry. Consumers — GitHub code scanning, benchmark scorers —
+// then read a finding's weakness class and severity from the tool's own output rather
+// than parsing vyql/packs, whose layout and syntax are free to change.
+//
+// Best-effort: a rule set that fails to compile is a problem the scan itself reports,
+// and emitting SARIF without rule metadata beats failing the run here.
+func sarifRulesMeta(ruleSources []parser.V2DefinitionSource) map[string]map[string]any {
+	rules, err := compiledRulesFor(ruleSources)
+	if err != nil {
+		return nil
+	}
+	out := make(map[string]map[string]any, len(rules.compiled))
+	for _, cr := range rules.compiled {
+		if cr.Rule == nil {
+			continue
+		}
+		id, _ := cr.Rule.Meta["id"].(string)
+		if strings.TrimSpace(id) == "" {
+			continue
+		}
+		m := map[string]any{}
+		if cwe, ok := cr.Rule.Meta["cwe"]; ok {
+			m["cwe"] = cwe
+		}
+		sev := cr.Severity
+		if s, ok := cr.Rule.Meta["severity"].(string); ok && s != "" {
+			sev = s
+		}
+		if sev != "" {
+			m["severity"] = sev
+		}
+		if len(m) > 0 {
+			out[id] = m
+		}
+	}
+	return out
+}
+
 func compiledRulesFor(ruleSources []parser.V2DefinitionSource) (compiledRuleSet, error) {
 	cacheKey := compiledRulesCacheKey{src: ruleSourcesKey(ruleSources)}
 	if cached, ok := compiledRulesCache.Load(cacheKey); ok {
@@ -602,7 +641,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	}
 	switch format {
 	case "sarif":
-		doc := sarif.ToSARIF(all, version, nil)
+		doc := sarif.ToSARIF(all, version, sarifRulesMeta(ruleSources))
 		b, _ := json.MarshalIndent(doc, "", "  ")
 		fmt.Println(string(b))
 	case "json":

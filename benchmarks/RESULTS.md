@@ -209,6 +209,14 @@ Both rows below are the same 62 repos, so the delta is exact:
 | `main` (v2 base) | 426 | 2887 | 1336 | 239 | 0.1286 | 0.2418 | −0.6818 |
 | **+ RealVuln detectors** | **986** | 4127 | **776** | 232 | **0.1928** | **0.5596** | **−0.3872** |
 
+> **Both rows above predate the fan-out fix and overstate FP.** The scorer emitted one
+> finding per (result × CWE) and counted each as a separate verdict, so a rule's false
+> positives scaled with the length of its `cwe:` list. Re-measured with
+> `collapse_fanout()`, the detector row is **TP 958 / FP 3489, precision 0.2154**. Recall
+> is unaffected — the matcher already credits one detection per ground-truth entry, so the
+> 56.0% below stands. The `main` row is single-CWE-dominated and moves little. The *delta*
+> the port produced is unchanged; only the absolute FP scale was wrong.
+
 The detector port is worth **+0.32 recall on real-world code**, and precision rises with
 it (0.129 → 0.193) rather than being traded away. For scale: the entire v2 line — 241
 commits, the knowledge-layer restructure, +1.00 on BenchmarkJava — moved RealVuln recall
@@ -288,16 +296,28 @@ every other commit — so the historical columns differ only by engine, never by
 ```sh
 ./benchmarks/fetch-corpora.sh     # clones RealVuln and its 66 target repos, once
 cd go && go build -o /tmp/vyql ./cmd/vyql && cd ..
-python3 benchmarks/score_realvuln.py /tmp/bench/Real-Vuln-Benchmark /tmp/vyql \
-        "$PWD/vyql" "$PWD/vyql/packs"
+
+# pooled scorecard
+python3 benchmarks/score_realvuln.py /tmp/bench/Real-Vuln-Benchmark /tmp/vyql "$PWD/vyql"
+# same scan, ranked by which rules produce the false positives
+python3 benchmarks/score_realvuln.py /tmp/bench/Real-Vuln-Benchmark /tmp/vyql "$PWD/vyql" --by-rule
+# same scan, per bug-bucket recall
+python3 benchmarks/bucket_recall.py  /tmp/bench/Real-Vuln-Benchmark /tmp/vyql "$PWD/vyql"
 ```
 
-The rule-to-CWE lookup reads `vyql/packs/**` recursively, because v2 stores one rule
-per file under `packs/<domain>/vypr/<domain>/`. A non-recursive glob matches nothing
-there, every finding then loses its CWE and is dropped by the matcher, and the run
-reports a recall of zero that looks like a measurement. The script now refuses to run
-if it finds fewer than 100 rules.
+All three views share one scan and one matcher, so they cannot disagree with each other.
 
 The script emits one `NormalisedFinding` per (SARIF result × CWE of its rule) and defers
 all matching and metrics to RealVuln's own `scorer` package, so VyQL is scored by exactly
-the code that scores semgrep, snyk and the LLM agents.
+the code that scores semgrep, snyk and the LLM agents. The fan-out is a matching device,
+not several claims — `collapse_fanout()` folds the verdicts back to one per emitted
+result, so a rule's precision does not fall with the length of its `cwe:` list.
+
+**The rule → CWE mapping comes from the SARIF `tool.driver.rules` array**, which VyQL
+publishes with `properties.cwe`, `properties.tags`, `properties.security-severity` and a
+`defaultConfiguration.level`. It is deliberately not read out of `vyql/packs/**`: doing so
+coupled the scorer to the knowledge layer's directory layout and `meta { }` syntax, and
+broke silently when v2 moved rules from flat files into nested directories — matching zero
+of 728 rules and reporting a recall of zero that read like a measurement. A binary that
+predates the metadata emission now aborts the run with that reason rather than scoring
+zero.
