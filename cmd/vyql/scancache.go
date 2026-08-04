@@ -33,25 +33,29 @@ type cachedScan struct {
 // rebuild invalidates), the rule source, the active profile, every file under the vyql/ data
 // dir (bindings/packs/ontology), and every file under the scan paths. Uses size+mtime (a
 // stat, not a read), the conventional incremental-build change signal.
+// hashString mixes s into h. hash.Hash documents that Write never returns an
+// error, so there is no failure here to handle.
+func hashString(h hash.Hash, s string) { _, _ = io.WriteString(h, s) }
+
 func scanFingerprint(salt []byte, paths []string, ruleSources []parser.V2DefinitionSource, profile string) string {
 	h := sha256.New()
 	h.Write(salt)
-	io.WriteString(h, "\x00rules\x00")
-	io.WriteString(h, ruleSourcesKey(ruleSources))
-	io.WriteString(h, "\x00profile\x00")
-	io.WriteString(h, profile)
-	io.WriteString(h, "\x00data\x00")
+	hashString(h, "\x00rules\x00")
+	hashString(h, ruleSourcesKey(ruleSources))
+	hashString(h, "\x00profile\x00")
+	hashString(h, profile)
+	hashString(h, "\x00data\x00")
 	statWalk(h, datadir.Root())
 	if overlay := scanBindingOverlay; overlay != "" {
-		io.WriteString(h, "\x00binding-overlay\x00")
+		hashString(h, "\x00binding-overlay\x00")
 		statWalk(h, overlay)
 	}
 	for _, ex := range scanExcludes {
-		io.WriteString(h, "\x00exclude\x00")
-		io.WriteString(h, ex)
+		hashString(h, "\x00exclude\x00")
+		hashString(h, ex)
 	}
 	for _, p := range paths {
-		io.WriteString(h, "\x00src\x00")
+		hashString(h, "\x00src\x00")
 		statWalk(h, p)
 	}
 	return hex.EncodeToString(h.Sum(nil))
@@ -91,7 +95,7 @@ func statWalk(h hash.Hash, root string) {
 		if e != nil {
 			return nil
 		}
-		io.WriteString(h, p)
+		hashString(h, p)
 		fmt.Fprintf(h, "|%d|%d\x00", info.Size(), info.ModTime().UnixNano())
 		return nil
 	})
@@ -133,7 +137,7 @@ func statFile(h hash.Hash, path string) {
 	if err != nil || info.IsDir() {
 		return
 	}
-	io.WriteString(h, path)
+	hashString(h, path)
 	fmt.Fprintf(h, "|%d|%d\x00", info.Size(), info.ModTime().UnixNano())
 }
 
@@ -168,7 +172,7 @@ func statVYQLTreeExcept(h hash.Hash, root string, excludedRelDirs map[string]boo
 		if e != nil {
 			return nil
 		}
-		io.WriteString(h, p)
+		hashString(h, p)
 		fmt.Fprintf(h, "|%d|%d\x00", info.Size(), info.ModTime().UnixNano())
 		return nil
 	})

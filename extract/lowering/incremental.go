@@ -160,6 +160,9 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 		fmt.Fprintf(stderr, "[timing] lower.pass1 %7.1fms  lower.pass2 %7.1fms  (replay %d/%d)\n",
 			float64(t1-t0)/1e6, float64(t2-t1)/1e6, hits, total)
 	}
+	if l.storeErr != nil {
+		return nil, nil, fmt.Errorf("graph write: %w", l.storeErr)
+	}
 	return base, fresh, nil
 }
 

@@ -81,7 +81,13 @@ func main() {
 				fmt.Fprintln(os.Stderr, "vyql: memprofile: "+err.Error())
 				return
 			}
-			defer f.Close()
+			// The profile is written below, so a close failure can mean it was not
+			// flushed -- say so rather than exiting quietly with a truncated file.
+			defer func() {
+				if cerr := f.Close(); cerr != nil {
+					fmt.Fprintln(os.Stderr, "vyql: memprofile: "+cerr.Error())
+				}
+			}()
 			runtime.GC()
 			if err := pprof.WriteHeapProfile(f); err != nil {
 				fmt.Fprintln(os.Stderr, "vyql: memprofile: "+err.Error())
@@ -231,7 +237,7 @@ func applyMaxRAM(v string) func() {
 	// consumer); the resident structural core sits on top.
 	lowering.DiskCacheBytes = n * 3 / 4
 	lowering.DiskStorePath = dir
-	return func() { os.RemoveAll(dir) }
+	return func() { _ = os.RemoveAll(dir) } // best-effort temp cleanup
 }
 
 // parseBytes parses a human size like "8GB", "512MiB", "2G", "1048576". Decimal (KB/MB/GB) and

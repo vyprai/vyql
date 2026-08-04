@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"hash"
-	"io"
 	"path/filepath"
 	"sort"
 
@@ -250,23 +249,23 @@ func bindingFingerprint(deps map[string]bool) string {
 			h.Write(salt)
 		}
 	}
-	io.WriteString(h, "\x00sources\x00")
-	io.WriteString(h, frontend.ActiveSourcesKey())
-	io.WriteString(h, "\x00concepts\x00")
-	io.WriteString(h, frontend.ActiveBindingConceptsKey())
+	hashString(h, "\x00sources\x00")
+	hashString(h, frontend.ActiveSourcesKey())
+	hashString(h, "\x00concepts\x00")
+	hashString(h, frontend.ActiveBindingConceptsKey())
 
-	io.WriteString(h, "\x00deps\x00")
+	hashString(h, "\x00deps\x00")
 	keys := make([]string, 0, len(deps))
 	for k := range deps {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		io.WriteString(h, k)
-		io.WriteString(h, "\x00")
+		hashString(h, k)
+		hashString(h, "\x00")
 	}
 
-	io.WriteString(h, "\x00bdata\x00")
+	hashString(h, "\x00bdata\x00")
 	statBindingData(h, deps)
 	return hex.EncodeToString(h.Sum(nil))
 }
