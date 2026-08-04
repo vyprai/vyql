@@ -1,0 +1,41 @@
+# Sink concept -> downstream SinkType operation vocabulary. One row per sink concept:
+#   <concept short name>\t<SinkType enum value>
+# Consumed by `vyql scan -format graph-json` (cmd/vyql/graphjson.go) to stamp each
+# finding's sink with the consuming service's operation vocabulary. Kept as data so the
+# cmd runtime hardcodes no ontology or domain knowledge.
+#
+# Every left-hand name must resolve to a concept in ontology/concepts -- the
+# TestSinkOperationsExportResolves gate enforces it, because the loader treats a
+# missing or unreadable file as an empty mapping rather than an error.
+CommandExecution	command_exec
+CodeEval	code_eval
+ExpressionEval	code_eval
+ReflectionInvoke	code_eval
+SqlExecution	sql_query
+DatabaseRead	database_read
+NosqlQuery	nosql_query
+TemplateRender	template_render
+HtmlRender	html_output
+UrlFetch	http_request
+RedirectTarget	redirect
+ResponseHeaderWrite	header_injection
+MailHeaderWrite	header_injection
+Deserialization	deserialization
+XmlParse	xml_parse
+LdapQuery	ldap_query
+XpathQuery	xpath_query
+RegexCompile	regex_eval
+FormatString	format_string
+ProtoPollute	prototype_pollution
+WeakHash	weak_hash
+WeakCipher	crypto_op
+WeakRandomValue	weak_random
+LogOutput	log_write
+LogWrite	log_write
+InsecureCookie	insecure_cookie
+TrustBoundary	trust_boundary
+SecretValue	secret_access
+HardcodedSecret	credential_leak
+FilePathAccess	file_read
+FileInclude	file_read
+UnsafeUpload	file_write

@@ -1217,6 +1217,52 @@ func TestBindingDefinitionsUseStableQueryFamilies(t *testing.T) {
 	}
 }
 
+// The sink-operation export is data, and the loader treats a missing or unreadable
+// file as an empty mapping so a custom VYQL_HOME cannot crash a scan. That silence
+// is exactly how the file went missing for a whole engine version without anyone
+// noticing, so assert here what the loader will not.
+func TestSinkOperationsExportResolves(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(datadir.Root(), "exports", "sink_operations.tsv"))
+	if err != nil {
+		t.Fatalf("read sink operations export: %v", err)
+	}
+
+	defined := map[string]bool{}
+	for _, decls := range parseDataDecls(t, "ontology", "concepts") {
+		for _, decl := range decls {
+			if cd, ok := decl.(*parser.ConceptDecl); ok {
+				defined[cd.Name] = true
+				defined[shortConceptName(cd.QualifiedName())] = true
+			}
+		}
+	}
+
+	rows := 0
+	for i, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		concept, op, ok := strings.Cut(line, "\t")
+		if !ok {
+			t.Errorf("line %d is not <concept>\\t<operation>: %q", i+1, line)
+			continue
+		}
+		concept, op = strings.TrimSpace(concept), strings.TrimSpace(op)
+		if op == "" {
+			t.Errorf("line %d: %s has no operation", i+1, concept)
+		}
+		if !defined[concept] && !defined[shortConceptName(concept)] {
+			t.Errorf("line %d: %s does not resolve in ontology/concepts", i+1, concept)
+		}
+		rows++
+	}
+	if rows == 0 {
+		t.Fatal("sink operations export has no rows -- an empty mapping silently disables the graph-json sink vocabulary")
+	}
+	t.Logf("sink operations export: %d rows, all resolving", rows)
+}
+
 func TestMigrationLedgerDoesNotCarryStaleV1BridgeSuggestions(t *testing.T) {
 	root := testRepoRoot(t)
 	// The ledger records that the v1-to-v2 migration finished and the bridge was
