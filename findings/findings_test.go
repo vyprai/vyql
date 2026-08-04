@@ -14,7 +14,11 @@ func TestFingerprintStability(t *testing.T) {
 	a := mk("VYQL-INJ-001", Binding{Name: "sink", Loc: "app.py:42"})
 	b := mk("VYQL-INJ-001", Binding{Name: "sink", Loc: "app.py:42"})
 
-	// deterministic: same finding → same fingerprint, every time.
+	// Deterministic: the same finding yields the same fingerprint every time.
+	// Calling it twice on ONE finding is the point -- a fingerprint built from a
+	// map iteration or a seeded hash would differ between calls, and nothing else
+	// here would catch that.
+	//nolint:staticcheck // SA4000: the repeated call IS the assertion
 	if a.Fingerprint() != a.Fingerprint() {
 		t.Fatal("fingerprint is not deterministic across calls")
 	}

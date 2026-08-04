@@ -32,7 +32,7 @@ func cmdTrace(args []string) error {
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
-		return fmt.Errorf("usage: vyql trace [-from CONCEPT] [-to CONCEPT] <path>...")
+		return fmt.Errorf("usage: vyql trace [-from CONCEPT] [-to CONCEPT] <path> [<path>...]")
 	}
 	applyProfile(paths, *profileName)
 	g, _, err := buildGraph(paths)
@@ -225,7 +225,7 @@ func cmdExplain(args []string) error {
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
-		return fmt.Errorf("usage: vyql explain [-rules ...] <path>...")
+		return fmt.Errorf("usage: vyql explain [-rules ...] <path> [<path>...]")
 	}
 	prof := applyProfile(paths, *profileName)
 	ruleSources, err := loadRules(*rulesPath)
@@ -287,7 +287,7 @@ func cmdMatch(args []string) error {
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
-		return fmt.Errorf("usage: vyql match <path>...")
+		return fmt.Errorf("usage: vyql match <path> [<path>...]")
 	}
 	applyProfile(paths, *profileName)
 	g, _, err := buildGraph(paths)
@@ -361,7 +361,7 @@ func cmdResolve(args []string) error {
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
-		return fmt.Errorf("usage: vyql resolve <path>...")
+		return fmt.Errorf("usage: vyql resolve <path> [<path>...]")
 	}
 	applyProfile(paths, *profileName)
 	g, _, err := buildGraph(paths)
@@ -381,9 +381,6 @@ func cmdResolve(args []string) error {
 			continue
 		}
 		key := calleeKey(n)
-		if key == "" || strings.HasPrefix(key, ".") && n.Prop("callee_path") == "" {
-			// method-only call with no path — receiver-dispatched, treat as library
-		}
 		// a call is "resolved into a body" iff it has an outgoing FLOWS edge to a node OTHER
 		// than its own arg slots — i.e. the lowering wired a callee ret → result. Calls with no
 		// outgoing flow are library/external/cross-package (taint stops unless the engine treats
@@ -422,7 +419,7 @@ func cmdGraph(args []string) error {
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
-		return fmt.Errorf("usage: vyql graph [-taint] <path>...")
+		return fmt.Errorf("usage: vyql graph [-taint] <path> [<path>...]")
 	}
 	applyProfile(paths, *profileName)
 	g, _, err := buildGraph(paths)

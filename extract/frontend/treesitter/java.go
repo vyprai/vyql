@@ -701,8 +701,7 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node, params []str
 		}
 	}
 	prevCall := ""
-	var addReturnTokens func(*tree_sitter.Node)
-	addReturnTokens = func(ret *tree_sitter.Node) {
+	addReturnTokens := func(ret *tree_sitter.Node) {
 		kids := c.namedChildren(ret)
 		if len(kids) == 0 {
 			return
@@ -893,18 +892,20 @@ func (c *jvConv) jvPropertiesIterableBase(n *tree_sitter.Node) string {
 	}
 }
 
+// jvFirstStringArg returns the token of the call's FIRST argument when that
+// argument is a string literal, and "" otherwise. It deliberately does not search
+// past the first argument: a later string among the arguments is a different
+// argument with a different meaning, not a fallback for this one.
 func (c *jvConv) jvFirstStringArg(n *tree_sitter.Node) string {
 	args := field(n, "arguments")
 	if args == nil {
 		return ""
 	}
-	for _, ch := range c.namedChildren(args) {
-		if ch.Kind() == "string_literal" {
-			return javaStringToken(c.text(ch))
-		}
+	kids := c.namedChildren(args)
+	if len(kids) == 0 || kids[0].Kind() != "string_literal" {
 		return ""
 	}
-	return ""
+	return javaStringToken(c.text(kids[0]))
 }
 
 func javaPathBase(path string) string {

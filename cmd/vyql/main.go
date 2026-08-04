@@ -270,8 +270,8 @@ func applyProfile(paths []string, name string) profile.Profile {
 		fmt.Fprintf(os.Stderr, "vyql: %v; using generic profile\n", err)
 	}
 	var p profile.Profile
-	switch {
-	case name == "" || name == "auto":
+	switch name {
+	case "", "auto":
 		p = profile.Detect(paths, profiles)
 	default:
 		var ok bool

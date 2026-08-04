@@ -333,8 +333,7 @@ func ruleConcepts(r *parser.Rule) []string {
 			seen[v] = true
 		}
 	}
-	var walkStmt func(parser.Stmt)
-	walkStmt = func(s parser.Stmt) {
+	walkStmt := func(s parser.Stmt) {
 		switch x := s.(type) {
 		case *parser.FlowStmt:
 			add(x.Src.Concept)

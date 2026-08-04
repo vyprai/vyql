@@ -108,9 +108,10 @@ func parseVueModules(
 			continue
 		}
 		parserFactory := jsParserFor(tsjs.Language())
-		if lang == "ts" {
+		switch lang {
+		case "ts":
 			parserFactory = jsParserFor(tstypescript.LanguageTypescript())
-		} else if lang == "tsx" {
+		case "tsx":
 			parserFactory = jsParserFor(tstypescript.LanguageTSX())
 		}
 		parser := parserFactory()
@@ -326,8 +327,7 @@ func isHTMLFile(path string) bool {
 
 func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 	out := map[string]bool{}
-	var markObjectExports func(*tree_sitter.Node)
-	markObjectExports = func(obj *tree_sitter.Node) {
+	markObjectExports := func(obj *tree_sitter.Node) {
 		if obj == nil || obj.Kind() != "object" {
 			return
 		}
@@ -2349,9 +2349,7 @@ func (c *jsConv) jsFunctionContext(name string, n *tree_sitter.Node) []string {
 		bodyText,
 		strings.Join(strings.Fields(bodyText), ""),
 	}
-	for _, tok := range c.jsStructuredContextTokens(body) {
-		tokens = append(tokens, tok)
-	}
+	tokens = append(tokens, c.jsStructuredContextTokens(body)...)
 	return tokens
 }
 

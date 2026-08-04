@@ -4982,9 +4982,33 @@ func flagNodeKindAllows(fl flagSpec, n usg.Node) bool {
 		case "name", "identifier":
 			return n.Type == "code.Name"
 		default:
-			return n.Type == "code."+strings.Title(fl.NodeKind)
+			return n.Type == "code."+titleNodeKind(fl.NodeKind)
 		}
 	}
+}
+
+// titleNodeKind maps a binding's node kind ("call") to the concept type suffix
+// it names ("Call"). It replicates the word rule of the deprecated strings.Title
+// -- upper-case the first letter of every run of letters -- so a kind containing
+// a separator keeps the spelling it has always had. The kinds in the shipped
+// bindings are single ASCII words, which this handles identically.
+func titleNodeKind(kind string) string {
+	// strings.Title treats letters, digits and underscore as word characters, so
+	// "foo_bar" stays "Foo_bar" and "x1y" stays "X1y". Only a lower-case letter
+	// that follows something else starts a new word.
+	wordChar := func(r rune) bool {
+		return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') || r == '_'
+	}
+	out := []rune(kind)
+	prevWord := false
+	for i, r := range out {
+		if !prevWord && r >= 'a' && r <= 'z' {
+			out[i] = r - 'a' + 'A'
+		}
+		prevWord = wordChar(r)
+	}
+	return string(out)
 }
 
 func flagApplicatorNodeTypes(flags []flagSpec, crossLang bool) []string {
@@ -5032,7 +5056,7 @@ func flagApplicatorNodeTypes(flags []flagSpec, crossLang bool) []string {
 		case "name", "identifier":
 			add("code.Name")
 		default:
-			add("code." + strings.Title(fl.NodeKind))
+			add("code." + titleNodeKind(fl.NodeKind))
 		}
 	}
 	if crossLang {
@@ -5787,10 +5811,7 @@ func flagContextPredicateMatchesAST(s usg.Store, idx *flagMatchIndex, pred flagP
 
 func flagScopeBinopHit(s usg.Store, idx *flagMatchIndex, pred flagPredicate, n usg.Node, values []string, tech string, crossLang bool) bool {
 	return idx.scopedHit(s, "binop", pred, values, []string{"code.BinOp"}, n, tech, crossLang, true, func(cand usg.Node) bool {
-		if binopPredicateMatches(s, idx, pred.Op, values, cand) {
-			return true
-		}
-		return false
+		return binopPredicateMatches(s, idx, pred.Op, values, cand)
 	})
 }
 
@@ -5934,10 +5955,7 @@ func normalizeFlagExprFragment(s string) string {
 
 func flagScopeSubscriptHit(s usg.Store, idx *flagMatchIndex, pred flagPredicate, n usg.Node, values []string, tech string, crossLang bool) bool {
 	return idx.scopedHit(s, "subscript", pred, values, []string{"code.Subscript"}, n, tech, crossLang, true, func(cand usg.Node) bool {
-		if subscriptPredicateMatches(pred.Op, values, cand) {
-			return true
-		}
-		return false
+		return subscriptPredicateMatches(pred.Op, values, cand)
 	})
 }
 

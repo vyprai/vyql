@@ -368,9 +368,7 @@ func (c *solConv) solFunctionContext(name string, body *tree_sitter.Node) []stri
 		text,
 		solCompactText(text),
 	}
-	for _, tok := range solSemanticFunctionTokens(text) {
-		out = append(out, tok)
-	}
+	out = append(out, solSemanticFunctionTokens(text)...)
 	return out
 }
 

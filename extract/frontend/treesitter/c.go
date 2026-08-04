@@ -1726,7 +1726,7 @@ func (c *ccConv) ccNumericParserMissingProgressObservations(fn *tree_sitter.Node
 		tail := text[m[1]:]
 		resetRe := regexp.MustCompile(`\b` + regexp.QuoteMeta(cursor) + `=([A-Za-z_][A-Za-z0-9_]*)`)
 		reset := resetRe.FindStringSubmatchIndex(tail)
-		if reset == nil || len(reset) < 4 {
+		if len(reset) < 4 {
 			continue
 		}
 		base := tail[reset[2]:reset[3]]
@@ -3897,7 +3897,10 @@ func ccCryptoImproperBlindingText(raw string) bool {
 		if !strings.Contains(text, inv) || !strings.Contains(text, "Jacobi(") || !strings.Contains(text, "Multiply(") {
 			continue
 		}
-		if strings.Index(text, square) >= 0 && strings.Index(text, square) < strings.Index(text, inv) {
+		// Index is computed once per needle: the original called it three times for
+		// two distinct lookups.
+		sq := strings.Index(text, square)
+		if sq >= 0 && sq < strings.Index(text, inv) {
 			continue
 		}
 		return true

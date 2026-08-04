@@ -2098,7 +2098,7 @@ func (c *pyConv) comprehensionValue(n *tree_sitter.Node, loc string) nir.Expr {
 			parts = append(parts, c.expr(ch))
 		}
 	}
-	var out nir.Expr = parts[0]
+	out := parts[0]
 	if len(parts) > 1 {
 		out = nir.Seq{Parts: parts, Loc: loc}
 	}

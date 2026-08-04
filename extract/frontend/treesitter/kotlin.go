@@ -624,15 +624,19 @@ func (c *ktConv) navSuffix(n *tree_sitter.Node) string {
 	return ""
 }
 
-// callee returns the function part of a call_expression (the child before value_arguments).
+// callee returns the function part of a call_expression: its first named child,
+// unless that child is already the argument list, in which case there is no
+// callee to return.
 func (c *ktConv) callee(n *tree_sitter.Node) *tree_sitter.Node {
-	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "value_arguments" || ch.Kind() == "call_suffix" || ch.Kind() == "annotated_lambda" {
-			break
-		}
-		return ch
+	kids := c.namedChildren(n)
+	if len(kids) == 0 {
+		return nil
 	}
-	return nil
+	switch kids[0].Kind() {
+	case "value_arguments", "call_suffix", "annotated_lambda":
+		return nil
+	}
+	return kids[0]
 }
 
 func (c *ktConv) valueArgs(n *tree_sitter.Node) *tree_sitter.Node {

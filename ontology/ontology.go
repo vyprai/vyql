@@ -332,12 +332,12 @@ func (o *Ontology) CheckSanitizerTyping(source, sink, control string) (string, e
 	common := intersect(sinkThreats, neutralized)
 	if len(common) == 0 {
 		return "", fmt.Errorf("control '%s' neutralizes %v but sink '%s' is vulnerable to %v — "+
-			"no overlap. This sanitizer does not defend this sink.",
+			"no overlap; this sanitizer does not defend this sink",
 			control, sortedKeys(neutralized), sink, sortedKeys(sinkThreats))
 	}
 	if len(armed) > 0 && len(intersect(srcTaints, armed)) == 0 {
 		return "", fmt.Errorf("source '%s' carries taint %v but sink '%s' is only armed by %v — "+
-			"source taint kind does not arm this sink.",
+			"source taint kind does not arm this sink",
 			source, sortedKeys(srcTaints), sink, sortedKeys(armed))
 	}
 	c := sortedKeys(common)
