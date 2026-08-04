@@ -71,7 +71,7 @@ type gjCallEdge struct {
 type gjFinding struct {
 	Rule          string     `json:"rule"`
 	Kind          string     `json:"kind"`  // taint | reach | assume | presence
-	Scope         string     `json:"scope"` // function | module | unresolved (docs/21 §4)
+	Scope         string     `json:"scope"` // function | module | unresolved
 	Severity      string     `json:"severity"`
 	CWE           []string   `json:"cwe"`
 	FP            string     `json:"fp"` // stable across runs — VyPr dedup + diff key
@@ -277,7 +277,7 @@ func exportFindings(g usg.Store, all []*findings.Finding, ruleMeta map[string]ma
 			gf.PathFunctions = []gjPathFn{} // never null — VyPr path_length = len(path_functions), NOT NULL
 		}
 		gf.PathLength = len(gf.PathFunctions)
-		// scope (docs/21 §4): the routing anchor has an enclosing function?
+		// scope: the routing anchor has an enclosing function?
 		// taint anchors on the source (→ entrypoint); presence/reach on the sink.
 		// invariant: scope=="function" ⟺ anchor func_id != null. `unresolved` is
 		// not yet distinguished from `module` (deferred — inline-handler modeling).
@@ -525,9 +525,10 @@ func sinkOperation(concept string) *string {
 	return nil
 }
 
-// sinkOps maps a sink concept (short name) to its VyPr SinkType enum value. This is the
-// VyQL↔VyPr export contract (docs/21), kept as DATA (vyql/exports/sink_operations.tsv) and
-// loaded at runtime so the cmd binary hardcodes no ontology/domain knowledge. Loaded once.
+// sinkOps maps a sink concept (short name) to its downstream SinkType enum value. The
+// mapping is kept as DATA (the data directory's exports/sink_operations.tsv) and loaded
+// at runtime, so this binary hardcodes no ontology or domain knowledge. Loaded once; an
+// absent file leaves the mapping empty.
 var (
 	sinkOpsOnce sync.Once
 	sinkOpsData map[string]string
