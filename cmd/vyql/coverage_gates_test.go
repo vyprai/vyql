@@ -978,7 +978,7 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		"ResourceRelease",
 		"LockRelease",
 	}
-	err := filepath.WalkDir(filepath.Join(root, "go"), func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(testGoSourceRoot(t), func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -1054,6 +1054,50 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 	}
 }
 
+// testGoSourceRoot returns the directory the Go packages live under. This
+// repository keeps them in go/; the published tree puts them at the root.
+func testGoSourceRoot(t *testing.T) string {
+	t.Helper()
+	root := testRepoRoot(t)
+	if st, err := os.Stat(filepath.Join(root, "go")); err == nil && st.IsDir() {
+		return filepath.Join(root, "go")
+	}
+	return root
+}
+
+// checkDocsLackSnippets reports any of `forbidden` appearing in the listed docs.
+// A doc absent from this tree is skipped rather than fatal, because the two
+// layouts publish different subsets -- but at least one must be found, so a
+// wholesale rename cannot quietly turn the gate into a no-op.
+func checkDocsLackSnippets(t *testing.T, root string, docs, forbidden []string) {
+	t.Helper()
+	var hits []string
+	checked := 0
+	for _, rel := range docs {
+		data, err := os.ReadFile(filepath.Join(root, rel))
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			t.Fatalf("read %s: %v", rel, err)
+		}
+		checked++
+		src := string(data)
+		for _, snippet := range forbidden {
+			if strings.Contains(src, snippet) {
+				hits = append(hits, rel+": "+snippet)
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatalf("none of %v exist under %s -- the gate would pass vacuously", docs, root)
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("documents still use v1 terminology:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
 func TestPublicDocsUseV2BindingTerminology(t *testing.T) {
 	root := testRepoRoot(t)
 	docs := []string{"README.md", "go/README.md", "vyql/README.md", "CLAUDE.md", "AGENTS.md"}
@@ -1071,30 +1115,14 @@ func TestPublicDocsUseV2BindingTerminology(t *testing.T) {
 		"`mechanic` and `policy` declarations define the security semantics",
 		"v2 `mechanic` and `policy` declarations define the security semantics",
 	}
-	var hits []string
-	for _, rel := range docs {
-		data, err := os.ReadFile(filepath.Join(root, rel))
-		if err != nil {
-			t.Fatalf("read %s: %v", rel, err)
-		}
-		src := string(data)
-		for _, snippet := range forbidden {
-			if strings.Contains(src, snippet) {
-				hits = append(hits, rel+": "+snippet)
-			}
-		}
-	}
-	if len(hits) > 0 {
-		sort.Strings(hits)
-		t.Fatalf("public docs must describe v2 authored content as bindings, not adapters:\n%s", strings.Join(hits, "\n"))
-	}
+	checkDocsLackSnippets(t, root, docs, forbidden)
 }
 
 func TestProductionGoUsesV2BindingTerminology(t *testing.T) {
 	root := testRepoRoot(t)
 	legacyTerms := regexp.MustCompile(`\b[Aa]dapters?\b`)
 	var hits []string
-	err := filepath.WalkDir(filepath.Join(root, "go"), func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(testGoSourceRoot(t), func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -1124,10 +1152,19 @@ func TestProductionGoUsesV2BindingTerminology(t *testing.T) {
 
 func TestCurrentDesignDocsUseV2BindingTerminology(t *testing.T) {
 	root := testRepoRoot(t)
+	// The series lives at docs/ here and is published as docs/, so check both
+	// spellings and let the checker skip whichever this tree does not have.
+	//
+	// 18 is spelled through a variable deliberately. The projection rewrites the
+	// literal "docs/" to "docs/" everywhere, and 18 is not among the published
+	// documents -- a rewritten literal would assert a docs/18 that never exists.
+	designDir := "design"
 	docs := []string{
 		"docs/03-architecture-overview.md",
 		"docs/07-adapters-and-patterns.md",
-		"docs/18-ai-integration.md",
+		"docs/03-architecture-overview.md",
+		"docs/07-adapters-and-patterns.md",
+		designDir + "/18-ai-integration.md",
 	}
 	forbidden := []string{
 		"validate-adapter",
@@ -1142,25 +1179,14 @@ func TestCurrentDesignDocsUseV2BindingTerminology(t *testing.T) {
 		"AI adapters",
 		"│ ADAPTERS",
 	}
-	var hits []string
-	for _, rel := range docs {
-		data, err := os.ReadFile(filepath.Join(root, rel))
-		if err != nil {
-			t.Fatalf("read %s: %v", rel, err)
-		}
-		src := string(data)
-		for _, snippet := range forbidden {
-			if strings.Contains(src, snippet) {
-				hits = append(hits, rel+": "+snippet)
-			}
-		}
-	}
-	if len(hits) > 0 {
-		sort.Strings(hits)
-		t.Fatalf("current design docs must present v2 bindings, not v1 adapter syntax:\n%s", strings.Join(hits, "\n"))
-	}
+	checkDocsLackSnippets(t, root, docs, forbidden)
 
+	// The v1 language spec is kept for history and must stay marked as such. It is
+	// only present where the design series is.
 	legacySpec, err := os.ReadFile(filepath.Join(root, "docs/05-language-specification.md"))
+	if os.IsNotExist(err) {
+		return
+	}
 	if err != nil {
 		t.Fatalf("read legacy language spec: %v", err)
 	}
@@ -1193,7 +1219,13 @@ func TestBindingDefinitionsUseStableQueryFamilies(t *testing.T) {
 
 func TestMigrationLedgerDoesNotCarryStaleV1BridgeSuggestions(t *testing.T) {
 	root := testRepoRoot(t)
+	// The ledger records that the v1-to-v2 migration finished and the bridge was
+	// not reintroduced. Only a tree that had a v1 can regress that, so the
+	// published tree does not carry the file.
 	data, err := os.ReadFile(filepath.Join(root, "vyql", "migration-ledger.json"))
+	if os.IsNotExist(err) {
+		t.Skip("migration ledger is not part of this tree")
+	}
 	if err != nil {
 		t.Fatalf("read migration ledger: %v", err)
 	}
@@ -1269,6 +1301,9 @@ func countV2TaintEndpointMappings(t *testing.T, subs ...string) (int, int, int) 
 
 func TestCVE1000LedgerCoverageGate(t *testing.T) {
 	repo := testRepoRoot(t)
+	if _, err := os.Stat(filepath.Join(repo, "cve-1000")); os.IsNotExist(err) {
+		t.Skip("cve-1000 corpus is not part of this tree")
+	}
 	poolPath := filepath.Join(repo, "cve-1000", "pool.tsv")
 	ledgerPath := filepath.Join(repo, "cve-1000", "ledger.tsv")
 	poolRaw, err := os.ReadFile(poolPath)

@@ -12,12 +12,31 @@ import (
 	"github.com/vyprai/vyql/datadir"
 )
 
-func TestAdaptersAvoidLegacyStructuredTokenHasSyntax(t *testing.T) {
+// testRepoRoot walks up from this file until it finds the directory holding the
+// runtime data tree. Counting "../.." instead would pin the depth of this package
+// below the repository root, which differs between this repository (parser/ sits
+// under go/) and the published one (parser/ sits at the root).
+func testRepoRoot(t *testing.T) string {
+	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	dir := filepath.Dir(file)
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "vyql", "bindings")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatalf("locate repo root from %s: no ancestor contains vyql/bindings", file)
+		}
+		dir = parent
+	}
+}
+
+func TestAdaptersAvoidLegacyStructuredTokenHasSyntax(t *testing.T) {
+	root := testRepoRoot(t)
 	bindingRoot := filepath.Join(root, "vyql", "bindings")
 	legacy := regexp.MustCompile(`\b(?:has|lacks)\s+"(?:call_path|literal|selector|identifier|function_name|class_name|class_base|class_bases|attr_path|decorator_path|decorator_method|param_name|param_type|param_index|var_name|return):`)
 
@@ -50,11 +69,7 @@ func TestAdaptersAvoidLegacyStructuredTokenHasSyntax(t *testing.T) {
 }
 
 func TestSecretComparisonReviewUsesStructuredFlagPredicates(t *testing.T) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	root := testRepoRoot(t)
 	bindingRoot := filepath.Join(root, "vyql", "bindings")
 
 	var hits []string
@@ -107,11 +122,7 @@ func TestSecretComparisonReviewUsesStructuredFlagPredicates(t *testing.T) {
 }
 
 func TestMultipleDropdownScalarFallbackUsesAstPredicates(t *testing.T) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	root := testRepoRoot(t)
 	bindingRoot := filepath.Join(root, "vyql", "bindings")
 
 	var hits []string
@@ -228,11 +239,7 @@ func TestJavaScriptContextFlowFlagsUseAstPredicates(t *testing.T) {
 }
 
 func TestFlowAwareFlagsUseAstPredicates(t *testing.T) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	root := testRepoRoot(t)
 	bindingRoot := filepath.Join(root, "vyql", "bindings")
 
 	var hits []string
@@ -296,11 +303,7 @@ func TestFlowAwareFlagsUseAstPredicates(t *testing.T) {
 }
 
 func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	root := testRepoRoot(t)
 	bindingRoot := filepath.Join(root, "vyql", "bindings")
 	structuralConcepts := map[string]bool{
 		"code.EnvFileVariableInjection":                       true,
