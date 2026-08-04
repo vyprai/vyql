@@ -7354,7 +7354,8 @@ func matchPath(path string, patterns []string, mode string) bool {
 	return false
 }
 
-// Per-language binding applicator sets (loaded from vyql/bindings/<tech>/).
+// ConfigBindings and the accessors beside it are the per-language binding
+// applicator sets, loaded from vyql/bindings/<tech>/.
 func ConfigBindings() []bindings.Applicator      { return BindingsFor("config") }
 func TextPatternBindings() []bindings.Applicator { return BindingsFor("textpattern") }
 

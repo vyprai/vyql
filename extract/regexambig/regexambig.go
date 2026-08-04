@@ -309,7 +309,7 @@ func regexFirstSetOfAtoms(atoms []regexAtom) (regexCharSet, bool) {
 // catastrophic?" with the same analysis rather than its own structural approximation.
 func HasNestedBacktrackingQuantifier(pat string) bool { return Ambiguous(pat) }
 
-// hasNestedBacktrackingQuantifier reports a quantifier nested inside a repeat,
+// Ambiguous reports a quantifier nested inside a repeat,
 // unless the repeat's body is demonstrably unambiguous. The report stands on the
 // nesting alone, as it always has; the analysis below only withdraws it, so a
 // pattern whose shape cannot be reasoned about keeps its finding.

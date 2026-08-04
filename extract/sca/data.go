@@ -2,6 +2,7 @@
 // versions — is loaded from updateable JSON under vyql/sca/ at runtime (like the
 // MITRE catalogs in package taxonomy), NOT compiled in. Security teams refresh these
 // files without rebuilding. docs/11.
+
 package sca
 
 import (
