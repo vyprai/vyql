@@ -1,6 +1,6 @@
 package main
 
-// T12 (plan/test-coverage-tasklist.md): frontend robustness. Every frontend must
+// Frontend robustness. Every frontend must
 // survive adversarial/degenerate input — empty, syntactically broken, unicode, binary,
 // and deeply nested — without panicking or erroring. A panic here is a scanner crash on
 // a real repo. Drives every entry in the `languages` table (22 langs + config).

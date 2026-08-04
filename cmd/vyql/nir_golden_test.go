@@ -1,6 +1,6 @@
 package main
 
-// T0.7 (plan/test-coverage-tasklist.md): NIR/USG golden snapshots. For a representative
+// NIR/USG golden snapshots. For a representative
 // snippet per language, snapshot the lowered structural output (call/attr
 // callee paths) and assert it stays stable — catching silent frontend regressions that no
 // rule spec happens to exercise. Regenerate with VYQL_UPDATE_GOLDEN=1.

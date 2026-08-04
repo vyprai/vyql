@@ -82,8 +82,8 @@ matching code.
   framework/source/sink/check coverage.
 - After any edit, `cd go && go test -count=1 ./...` validates that every concept, threat-kind, and
   CWE/CAPEC id resolves and that every rule type-checks.
-- **Taxonomy** catalogs are generated from the official MITRE CSVs with
-  `poc/tools/gen_taxonomy.py`; don't hand-edit.
+- **Taxonomy** catalogs are generated from the official MITRE CSVs; don't
+  hand-edit. See [`taxonomy/ATTRIBUTION.md`](taxonomy/ATTRIBUTION.md).
 
 ## Running
 

@@ -1,5 +1,5 @@
 // Package pack is the rule-pack manifest + version pinning (docs/05 §module
-// system, docs/15), ported from poc/vyql/pack.py. A pack pins the ontology and
+// System, docs/15). A pack pins the ontology and
 // minimum engine versions and declares the concepts it depends on; the compiler
 // verifies those concepts resolve against the pinned ontology at build time.
 package pack

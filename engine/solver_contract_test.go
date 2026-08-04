@@ -1,6 +1,6 @@
 package engine
 
-// T0.8 (plan/test-coverage-tasklist.md): shared solver-contract conformance. Every
+// Shared solver-contract conformance. Every
 // solver kind, when it produces a finding, must stamp WitnessKind and carry a
 // non-empty reconstructable witness (the proof-tree surface). One table, all kinds.
 

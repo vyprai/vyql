@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// genGraph builds a deterministic code-heavy graph (mirrors poc/bench/graph_gen).
+// genGraph builds a deterministic code-heavy graph.
 func genGraph(nNodes, avgDeg, nConcepts int, seed int64) ([]Node, []Edge, [][2]string) {
 	rnd := rand.New(rand.NewSource(seed))
 	codeTypes := []string{"code.Call", "code.Attr", "code.Param", "code.Const", "code.Format"}

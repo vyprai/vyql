@@ -1,6 +1,6 @@
 package sca
 
-// T10 (plan/test-coverage-tasklist.md): SCA — SBOM parse, advisory match, reachability.
+// SCA — SBOM parse, advisory match, reachability.
 // The extract/sca package had no tests.
 
 import (

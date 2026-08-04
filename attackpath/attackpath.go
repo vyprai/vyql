@@ -1,5 +1,5 @@
 // Package attackpath composes typed step relations into cross-domain attack
-// paths (docs/13), ported from poc/vyql/attackpath.py. Rule FINDINGS feed back
+// Paths (docs/13). Rule FINDINGS feed back
 // as `exploits` step edges, so paths strengthen as each domain's rules improve;
 // the path engine itself stays small.
 package attackpath

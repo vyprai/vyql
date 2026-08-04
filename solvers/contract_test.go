@@ -68,7 +68,7 @@ func solverOntologyConceptNeedles(t *testing.T) []string {
 	return out
 }
 
-// Mirrors poc/cases/case_21 (a): the stub and the three real solvers all conform
+// The stub and the three real solvers all conform
 // to the versioned solver contract.
 func TestSolverContractConformance(t *testing.T) {
 	// stub conforms and declares the contract version

@@ -1,5 +1,5 @@
-// Package sarif emits VyQL findings as SARIF 2.1.0 (docs/14, /16), ported from
-// poc/vyql/sarif.py — the table-stakes output for code findings and CI.
+// Package sarif emits VyQL findings as SARIF 2.1.0 (docs/14, /16) — the
+// Table-stakes output for code findings and CI.
 package sarif
 
 import (

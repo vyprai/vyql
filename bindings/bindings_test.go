@@ -126,7 +126,7 @@ func TestBindingApplicatorPrecedenceAndConflict(t *testing.T) {
 	}
 }
 
-// Mirrors poc/cases/case_12_confidence.py — confidence = min over derivation.
+// Confidence = min over derivation.
 func TestConfidenceMinOverDerivation(t *testing.T) {
 	mkVuln := func() usg.Store {
 		s := usg.NewInMemStore()

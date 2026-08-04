@@ -1,5 +1,5 @@
 // Package nir is the Normalized IR (docs/20) — the coherent representation
-// every language frontend targets, ported from poc/extract/nir.py.
+// Every language frontend targets.
 //
 // This is where "AST node coherence" lives. Tree-sitter, go/ast, CPython ast,
 // acorn/ESTree, and Ripper produce structurally unrelated trees; each frontend

@@ -1,5 +1,5 @@
-// Package findings is the Finding + proof tree (docs/14), ported from
-// poc/vyql/findings.py. Every finding carries its derivation: bindings (with
+// Package findings is the Finding + proof tree (docs/14). Every finding
+// Carries its derivation: bindings (with
 // provenance), the solver witness, and negation evidence (what each `unless`
 // checked). Explainability is produced by the engine, not rule authors.
 package findings
