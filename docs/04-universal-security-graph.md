@@ -103,7 +103,7 @@ split into three classes — this classification is load-bearing:
 **Why virtual:** materializing these is either combinatorially explosive
 (all-pairs taint), instantly stale (reachability after any SG change), or
 imprecise (taint as edge transitive-closure loses context/field sensitivity —
-the core lesson from CPG systems, see [02](02-prior-art-and-positioning.md)).
+the core lesson from CPG systems, see 02).
 Solvers may cache results keyed by a dependency fingerprint of the input
 subgraph; the cache is an optimization, never the source of truth.
 

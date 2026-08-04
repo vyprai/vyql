@@ -5,7 +5,7 @@ Status: `DRAFT`
 The binding layer is where VyQL's universality claim is paid for. This
 document specifies the two technology-facing layers (patterns, bindings),
 their conflict/precedence model, and the content program that keeps them
-honest. Read [01](01-vision-and-scope.md) §"What VyQL actually claims" first:
+honest. Read 01 §"What VyQL actually claims" first:
 bindings are the relocated per-technology cost, and they are sized as a
 first-class product.
 
@@ -110,7 +110,7 @@ Key properties:
   a typed sink so the standard taint rules decide exploitability. They depend on
   import/type resolution to map an advisory's symbol to real call sites, and they
   are the prime target for AI generation from advisory text
-  ([18](18-ai-integration.md)). Like all bindings they carry provenance and
+  (18). Like all bindings they carry provenance and
   precedence, and AI-drafted ones run subordinate until reviewed.
 
 - **Sink-argument precision.** A sink mapping must identify *which argument
@@ -173,7 +173,7 @@ This is a product commitment, not an appendix:
 - **Telemetry-driven prioritization:** extraction can detect frameworks in
   customer code (package manifests) that have no binding — an "unknown
   framework" report ranks the backlog by real exposure.
-- **AI generation pipeline** ([18](18-ai-integration.md)): models draft
+- **AI generation pipeline** (18): models draft
   bindings from documentation and code corpora; drafts arrive with
   `origin: ai_generated`, evidence links, and fixtures; human review promotes
   them. Confidence and precedence rules above make unreviewed AI bindings
@@ -189,7 +189,7 @@ binding units**, each small (dozens of mappings) but each requiring fixtures
 and review. At a sustainable pace this is a multi-quarter content program
 even with AI drafting — which is why Tier 1 (cloud/identity, ~a dozen
 bindings total for three providers + K8s) ships first and proves the
-architecture ([19](19-roadmap.md)).
+architecture (19).
 
 ## Open questions
 

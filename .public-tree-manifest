@@ -49,6 +49,7 @@ cmd/vyql/v2_test_helpers_test.go
 cmd/vyql/vyqlspec_test.go
 datadir/datadir.go
 datadir/datadir_test.go
+datadir/modcache_test.go
 definitions/inspect.go
 definitions/inspect_test.go
 docs/03-architecture-overview.md

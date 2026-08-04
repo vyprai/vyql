@@ -56,7 +56,7 @@ Rule packs can carry control mappings:
 A compliance report is then a *query over findings* grouped by control —
 no separate compliance rule corpus, no drift between "security" and
 "compliance" results. OSCAL export packages this for GRC tooling. (VyQL
-remains not-a-GRC-platform, [01](01-vision-and-scope.md) non-goals; we emit
+remains not-a-GRC-platform, 01 non-goals; we emit
 evidence, we don't manage programs.)
 
 ## Where we deliberately deviate

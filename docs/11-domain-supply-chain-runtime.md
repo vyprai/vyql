@@ -145,7 +145,7 @@ having SCA and SAST in one graph.
    turns "is this library function exploitable here" into a cached cross-boundary
    taint join. Summaries are keyed to the advisory + version range and are a
    natural artifact for external assistants to draft and humans to review
-   ([18](18-ai-integration.md)).
+   (18).
 
 **Where the data comes from** ([16](16-standards-alignment.md)): OSV's
 increasingly function-level affected data, GitHub Security Advisories' affected

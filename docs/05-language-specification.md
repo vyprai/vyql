@@ -2,7 +2,7 @@
 
 Status: `SUPERSEDED` — this file records the historical v1 prototype syntax.
 The production language contract is VyQL v2 in
-[21-vyql-v2-definition.md](21-vyql-v2-definition.md). Production parsers and
+21-vyql-v2-definition.md. Production parsers and
 shipped definitions must reject the v1 forms shown below, including `adapter`,
 `match`, `sanitized_by`, and `guarded_by`.
 

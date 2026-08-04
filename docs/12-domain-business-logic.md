@@ -100,7 +100,7 @@ code, config, and runtime against them."
 External assistants can draft Mode 1 declarations from evidence the graph
 already holds: route names, handler names, OpenAPI specs, ORM models,
 state-enum definitions, audit-log schemas. A human confirms the draft (same
-trust pipeline as generated adapters, [18](18-ai-integration.md)). The bet:
+trust pipeline as generated adapters, 18). The bet:
 business models are *small*
 (dozens of actions, not thousands), so human confirmation scales where it
 wouldn't for code adapters. This remains behind review gates, with extraction

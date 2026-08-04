@@ -115,7 +115,7 @@ below its declared floor blocks.
 | New concept | ontology owners + one domain owner; standards-mapping check ([16](16-standards-alignment.md)) |
 | Concept typing change | ontology owners + impact report |
 | New adapter (human) | domain owner + fixtures green |
-| New adapter (AI-generated) | human promotion review ([18](18-ai-integration.md)); until promoted, runs at subordinate precedence |
+| New adapter (AI-generated) | human promotion review (18); until promoted, runs at subordinate precedence |
 | New rule | domain owner + tests in ≥2 technologies (or justified single-tech `domain_specific`) |
 | Severity/confidence change | domain owner; release-notes entry |
 | Tenant custom rule/concept | tenant-side approval only; quarantined namespace; cannot affect Vypr-shipped findings |
