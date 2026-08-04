@@ -69,14 +69,25 @@ jobs:
         with:
           version: v2.12.1
 
-  # Every target we publish must build and RUN, on every change -- not only when
-  # a tag is cut. A release is a bad place to discover that one of four platforms
-  # was broken for weeks.
+  # Every target we publish must build and RUN. A tag is a bad place to discover
+  # that one of four platforms has been broken for weeks, so this runs on every
+  # push to main rather than waiting for a release -- breakage surfaces within
+  # one merge.
+  #
+  # Not on pull requests: these four legs are portability checks, and a change
+  # that breaks a platform is nearly always one that breaks it on main too. The
+  # pull request keeps `build-test` and `lint`, which is where a logic error
+  # shows up. `release.yml` rebuilds all four natively before publishing, so a
+  # tag is covered independently of this.
+  #
+  # Required status checks must not include these: a pull request never runs
+  # them, and a required check that never runs blocks the pull request forever.
   #
   # Native runner per target: the grammars are C compiled by cgo, so a cross
   # build needs a cross C toolchain, and the point here is to exercise the same
   # path a user's machine would.
   matrix-build:
+    if: github.event_name == 'push'
     strategy:
       fail-fast: false
       matrix:
