@@ -146,7 +146,7 @@ func (c *pyConv) imports(root *tree_sitter.Node) []nir.Import {
 				if ch.Kind() == "aliased_import" {
 					nm := c.text(orSelf(field(ch, "name"), ch))
 					al := field(ch, "alias")
-					local := nm
+					var local string
 					if al != nil {
 						local = c.text(al)
 					} else {
