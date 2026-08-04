@@ -1152,13 +1152,19 @@ func TestProductionGoUsesV2BindingTerminology(t *testing.T) {
 
 func TestCurrentDesignDocsUseV2BindingTerminology(t *testing.T) {
 	root := testRepoRoot(t)
-	// docs/ in this repository; the published tree ports the same series to docs/.
+	// The series lives at docs/ here and is published as docs/, so check both
+	// spellings and let the checker skip whichever this tree does not have.
+	//
+	// 18 is spelled through a variable deliberately. The projection rewrites the
+	// literal "docs/" to "docs/" everywhere, and 18 is not among the published
+	// documents -- a rewritten literal would assert a docs/18 that never exists.
+	designDir := "design"
 	docs := []string{
 		"docs/03-architecture-overview.md",
 		"docs/07-adapters-and-patterns.md",
-		"docs/18-ai-integration.md",
 		"docs/03-architecture-overview.md",
 		"docs/07-adapters-and-patterns.md",
+		designDir + "/18-ai-integration.md",
 	}
 	forbidden := []string{
 		"validate-adapter",
