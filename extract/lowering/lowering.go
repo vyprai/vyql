@@ -108,10 +108,10 @@ type lowerer struct {
 	// function body that does not inherit the module scope's const map.
 	modStr map[string]string
 
-	// dynSqlVar tracks variables assigned a dynamically-built string (f-string/concat/format), so a
+	// dynSQLVar tracks variables assigned a dynamically-built string (f-string/concat/format), so a
 	// later `execute(q)` on such a variable is recognised as dynamic SQL even when the query is
 	// built one statement earlier (`q = f"..."; cur.execute(q)`).
-	dynSqlVar map[string]bool
+	dynSQLVar map[string]bool
 
 	// debugPayloadVar tracks variables assigned a response payload that leaks internal config —
 	// `payload = {"module": os.environ.get(...), "base": str(BASE_DIR)}` — so a later
@@ -1708,10 +1708,10 @@ func stateMutatingMethod(m string) bool {
 	return false
 }
 
-// buildsRawHtmlString reports whether an expression is a dynamically-built string that embeds HTML
+// buildsRawHTMLString reports whether an expression is a dynamically-built string that embeds HTML
 // markup — the raw-string-response reflected-XSS shape (`return "<html>.." + user + "..</html>"`)
 // that template-render sinks don't see.
-func buildsRawHtmlString(e nir.Expr) bool {
+func buildsRawHTMLString(e nir.Expr) bool {
 	if !isDynamicStringExpr(e) {
 		return false
 	}
@@ -1855,8 +1855,8 @@ func isLogSinkCall(path, method string) bool {
 	return false
 }
 
-// isSqlSinkCall reports whether a call is a SQL-execution sink whose FIRST argument is the query.
-func isSqlSinkCall(path, method string) bool {
+// isSQLSinkCall reports whether a call is a SQL-execution sink whose FIRST argument is the query.
+func isSQLSinkCall(path, method string) bool {
 	switch method {
 	case "execute", "executemany", "executescript", "execute_sql", "raw", "text":
 		return true
@@ -2034,7 +2034,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		containers:      map[string]*containerInfo{},
 		templates:       map[string]templateInfo{},
 		modStr:          map[string]string{},
-		dynSqlVar:       map[string]bool{},
+		dynSQLVar:       map[string]bool{},
 		debugPayloadVar: map[string]bool{},
 		lambdaParams:    map[string][]string{},
 		directMembers:   map[string]map[string]bool{},
@@ -2759,9 +2759,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 			// Track dynamically-built query strings for the deferred `q = f"..."; execute(q)` form.
 			if isDynamicStringExpr(st.Value) {
-				l.dynSqlVar[t] = true
+				l.dynSQLVar[t] = true
 			} else if cv != "" {
-				delete(l.dynSqlVar, t)
+				delete(l.dynSQLVar, t)
 			}
 			// Track response payloads that leak internal config for the deferred
 			// `payload = {...os.environ...}; return JsonResponse(payload)` form.
@@ -2910,7 +2910,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 			// Reflected XSS via raw HTML string response (CWE-79): a route returns a dynamically
 			// built string embedding HTML markup — bypasses template auto-escaping entirely.
-			if buildsRawHtmlString(st.Value) {
+			if buildsRawHTMLString(st.Value) {
 				l.syntheticCall("analysis.xss.raw_html_response", "raw_html", rv, retLoc, "html_string_return")
 			}
 		}
@@ -3954,10 +3954,10 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// Dynamic SQL — a query built by f-string / concat / .format() passed straight to an execute()
 	// sink (CWE-89). Presence-based: f-stringed SQL is essentially never safe, so this fires even
 	// when the interpolated value is a function parameter the taint engine can't trace to a source.
-	if len(call.Args) >= 1 && isSqlSinkCall(calleePath, call.Method) {
+	if len(call.Args) >= 1 && isSQLSinkCall(calleePath, call.Method) {
 		dyn := isDynamicStringExpr(call.Args[0])
 		if !dyn {
-			if nm, ok := call.Args[0].(nir.Name); ok && l.dynSqlVar[nm.ID] {
+			if nm, ok := call.Args[0].(nir.Name); ok && l.dynSQLVar[nm.ID] {
 				dyn = true
 			}
 		}
@@ -3971,7 +3971,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	if len(call.Args) >= 1 {
 		dynArg := isDynamicStringExpr(call.Args[0])
 		if !dynArg {
-			if nm, ok := call.Args[0].(nir.Name); ok && l.dynSqlVar[nm.ID] {
+			if nm, ok := call.Args[0].(nir.Name); ok && l.dynSQLVar[nm.ID] {
 				dynArg = true
 			}
 		}
@@ -4061,7 +4061,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	}
 	// Also a raw-SQL write (execute("UPDATE/INSERT/DELETE …")) — the CSRF/state-change shape even in
 	// undecorated HTTP handlers. Taint-gated downstream, so it stays tied to request-driven writes.
-	if isSqlSinkCall(calleePath, call.Method) {
+	if isSQLSinkCall(calleePath, call.Method) {
 		for _, tk := range valToks {
 			u := strings.ToUpper(tk)
 			if strings.Contains(u, "UPDATE ") || strings.Contains(u, "INSERT ") || strings.Contains(u, "DELETE ") || strings.Contains(u, "INSERT\n") || strings.Contains(u, "UPDATE\n") {
