@@ -166,7 +166,7 @@ func fileHasPythonShebang(path string) bool {
 	if err != nil {
 		return false
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }() // read-only; a close error is not actionable
 	buf := make([]byte, 160)
 	n, err := f.Read(buf)
 	if err != nil && n == 0 {

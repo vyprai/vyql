@@ -12,6 +12,7 @@
 package lowering
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -47,7 +48,14 @@ type lowerer struct {
 	resolveImports bool
 	ctorTypes      map[string]string // constructor callee-path -> returned type name
 	g              usg.Store
-	modCtr         map[string]int // per-module node-id counter (stable, module-local ids)
+	// storeErr holds the FIRST graph-write failure. Every node and edge the
+	// lowering produces goes through the two call sites that set it, and neither
+	// can report upward -- they are called from deep inside expression lowering,
+	// which returns node ids rather than errors. An in-memory store never fails,
+	// but a disk-backed one can, and dropping a node there yields a graph that is
+	// quietly missing part of the program. run() surfaces this.
+	storeErr error
+	modCtr   map[string]int // per-module node-id counter (stable, module-local ids)
 
 	funcQual      map[string]*funcInfo         // "modkey::qual" -> info
 	funcShort     map[string][]*funcInfo       // short name -> infos
@@ -1989,7 +1997,18 @@ func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 	if err := l.run(); err != nil {
 		return nil, err
 	}
+	if l.storeErr != nil {
+		return nil, fmt.Errorf("graph write: %w", l.storeErr)
+	}
 	return l.g, nil
+}
+
+// noteStoreErr keeps the first graph-write failure. Later ones are almost
+// certainly the same cause, and the first is the one with useful context.
+func (l *lowerer) noteStoreErr(err error) {
+	if err != nil && l.storeErr == nil {
+		l.storeErr = err
+	}
 }
 
 // newLowerer builds a fresh lowerer with all maps initialised. Shared by LowerTyped and the
@@ -2218,9 +2237,9 @@ func (l *lowerer) nodeInlineWithID(id, kind, loc string, props map[string]string
 	if !storeUsesInlineNodeProps(l.g) {
 		extras = propsWithInline(extras, method, calleePath, strArgs, vkind)
 	}
-	l.g.AddNode(usg.Node{ID: id, Type: "code." + kind, Loc: loc, Region: l.region,
+	l.noteStoreErr(l.g.AddNode(usg.Node{ID: id, Type: "code." + kind, Loc: loc, Region: l.region,
 		Order: int32(ord), HasOrder: true, Props: extras,
-		Method: method, CalleePath: calleePath, StrArgs: strArgs, Vkind: vkind})
+		Method: method, CalleePath: calleePath, StrArgs: strArgs, Vkind: vkind}))
 	return id
 }
 
@@ -2275,7 +2294,7 @@ func (l *lowerer) flow(a, b string) {
 	if !l.exists(a) || !l.exists(b) {
 		return
 	}
-	l.g.AddEdge(usg.Edge{Type: "FLOWS", Src: a, Dst: b})
+	l.noteStoreErr(l.g.AddEdge(usg.Edge{Type: "FLOWS", Src: a, Dst: b}))
 }
 
 // exists is an existence-only check; on a disk-backed store it uses Has (no detail decode) so the
