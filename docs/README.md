@@ -23,11 +23,8 @@ do.
 | Concepts and threat kinds — the vocabulary | [06 Ontology](06-ontology.md) |
 | How code shapes become concepts | [07 Adapters and patterns](07-adapters-and-patterns.md) |
 | Taint semantics, and why sanitization is a transfer function | [08 Dataflow and taint](08-dataflow-and-taint.md) |
-| Cloud and identity detection | [09 Cloud and identity](09-domain-cloud-identity.md) |
 | SAST detection | [10 SAST](10-domain-sast.md) |
 | Dependencies, SBOM, runtime | [11 Supply chain and runtime](11-domain-supply-chain-runtime.md) |
-| Business-logic detection | [12 Business logic](12-domain-business-logic.md) |
-| Cross-domain attack paths | [13 Attack-path analysis](13-attack-path-analysis.md) |
 | Findings, proof trees, output | [14 Findings and explainability](14-findings-explainability-output.md) |
 | Rule lifecycle and governance | [15 Rule lifecycle](15-rule-lifecycle-governance.md) |
 | CWE, CAPEC, SARIF alignment | [16 Standards alignment](16-standards-alignment.md) |
@@ -41,6 +38,23 @@ Nothing here cites them.
 [05 Language specification](05-language-specification.md) is marked
 **superseded**: it documents v1 syntax and is kept for history. The current
 binding language is [07](07-adapters-and-patterns.md).
+
+## Designed, not implemented
+
+These describe intent. Nothing in them ships today, and a scan will not produce
+what they describe -- no binding emits the concepts they are built on, so their
+rules cannot fire. They are published because the reasoning is useful, not
+because the capability exists.
+
+| Document | Why it does not run |
+|---|---|
+| [09 Cloud and identity](09-domain-cloud-identity.md) | no binding emits a `cloud.` or `identity.` concept |
+| [12 Business logic](12-domain-business-logic.md) | no binding emits a `business.` concept |
+| [13 Attack-path analysis](13-attack-path-analysis.md) | the `attackpath` package is not reachable from the CLI |
+
+[11 Supply chain and runtime](11-domain-supply-chain-runtime.md) is partly real:
+dependency and SBOM analysis runs, and the runtime concepts have bindings, but
+the document describes more than ships.
 
 ## Decisions
 

@@ -2,6 +2,10 @@
 
 Status: `DRAFT` (ships with Tier 1; deepens with each domain added)
 
+> **Not implemented.** This document is design, not a description of the shipped
+> scanner. The `attackpath` package has no callers outside itself and is not reachable from the CLI. Read it as intent; do not read it as a feature list.
+
+
 Attack path analysis is the payoff for the unified graph: traversals that
 cross domain boundaries — internet exposure (cloud) → vulnerable code (SAST)
 → over-privileged identity (IAM) → sensitive data (assets). Each hop is
