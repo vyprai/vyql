@@ -60,6 +60,42 @@ func TestReachesRegion(t *testing.T) {
 	}
 }
 
+// An inline callback ("#") runs somewhere after the code that passes it, so an
+// order rule can sequence across it — but it must not gain the dominance a "/"
+// nesting would confer, or a guard inside a callback would suppress findings in
+// the code around it.
+func TestInlineCallbackRegionSequencesButDoesNotDominate(t *testing.T) {
+	const outer, callback = "/fn1", "/fn1#fn2"
+
+	reaches := []struct {
+		rA, oA, rB, oB string
+		want           bool
+	}{
+		{callback, "2", outer, "6", true},                 // check in a callback, use after it
+		{outer, "2", callback, "6", true},                 // and the other way round
+		{callback, "6", outer, "2", false},                // order still decides direction
+		{"/fn1#fn2#fn3", "2", outer, "9", true},           // through two levels of nesting
+		{"/fn1#fn2", "2", "/fn1/if3.t", "6", true},        // callback and a branch of its owner
+		{"/fn4#fn5", "2", "/fn1#fn2", "6", false},         // callbacks of unrelated functions
+		{"/fn1/if3.t#fn4", "2", "/fn1/if3.e", "6", false}, // owners are disjoint branches
+	}
+	for _, c := range reaches {
+		if got := reachesRegion(c.rA, c.oA, c.rB, c.oB); got != c.want {
+			t.Errorf("reachesRegion(%q@%s -> %q@%s) = %v, want %v", c.rA, c.oA, c.rB, c.oB, got, c.want)
+		}
+	}
+
+	if dominatesRegion(outer, "2", callback, "6") {
+		t.Error("a function must not dominate the body of a callback it passes")
+	}
+	if dominatesRegion(callback, "2", outer, "6") {
+		t.Error("a callback body must not dominate the function that passes it")
+	}
+	if postDominatesRegion(outer, "6", callback, "2") {
+		t.Error("code after a callback is passed must not post-dominate the callback body")
+	}
+}
+
 func TestReachesFallsBackToSameFileSourceOrderWithoutRegions(t *testing.T) {
 	s := usg.NewInMemStore()
 	s.AddNode(usg.Node{ID: "first", Type: "code.Call", Loc: "app.swift:10", Order: 10, HasOrder: true})
