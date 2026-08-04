@@ -1780,3 +1780,45 @@ func exprPathEquals(expr nir.Expr, path string) bool {
 	}
 	return false
 }
+
+// TestJavaScriptObjectMethodsInCallArgumentsAreLowered pins the fix for a gap that
+// made a whole class of bindings unmatchable: object literals were only scanned for
+// methods when they were a variable's value, so a config object passed straight to
+// a call (`$.extend(defaults, { opts: { onCellHtmlData() {…} } })`) contributed no
+// function at all. Anything keyed on the method name could never fire.
+func TestJavaScriptObjectMethodsInCallArgumentsAreLowered(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "a.js")
+	src := []byte(`
+$.extend($.fn.bootstrapTable.defaults, {
+  exportOptions: {
+    onCellHtmlData (cell, rowIndex, colIndex, htmlData) {
+      return htmlData;
+    }
+  }
+});
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The method lowers to a function body of its own, which the graph carries as an
+	// analysis.function.context call naming it.
+	for _, n := range nodes {
+		if n.CalleePath == "analysis.function.context" && strings.Contains(n.StrArgs, "name=onCellHtmlData") {
+			return
+		}
+	}
+	t.Fatalf("no function lowered for the nested object method; nodes=%#v", nodes)
+}
