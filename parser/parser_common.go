@@ -3,10 +3,9 @@ package parser
 import "fmt"
 
 type parser struct {
-	toks            []tok
-	i               int
-	imports         map[string]string
-	wildcardImports []string
+	toks    []tok
+	i       int
+	imports map[string]string
 }
 
 type parseError struct{ msg string }

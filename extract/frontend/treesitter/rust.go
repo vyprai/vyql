@@ -837,23 +837,6 @@ func (c *rsConv) block(block *tree_sitter.Node) []nir.Stmt {
 	return out
 }
 
-func (c *rsConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
-	var out []nir.Stmt
-	var walk func(m *tree_sitter.Node)
-	walk = func(m *tree_sitter.Node) {
-		for _, ch := range children(m) {
-			switch ch.Kind() {
-			case "block":
-				out = append(out, c.block(ch)...)
-			case "else_clause", "match_block", "match_arm":
-				walk(ch)
-			}
-		}
-	}
-	walk(n)
-	return out
-}
-
 func (c *rsConv) params(params *tree_sitter.Node) []string {
 	if params == nil {
 		return nil

@@ -179,13 +179,6 @@ func (s v2ModelScope) lookupThreat(name string) bool {
 	return s.globalThreats[name]
 }
 
-func (s v2ModelScope) lookupModel(name string) bool {
-	if _, ok := s.concepts.lookup(name); ok {
-		return true
-	}
-	return s.lookupThreat(name)
-}
-
 func builtinV2RuleVerbMechanics() map[string]v2RuleVerbMechanic {
 	clauses := v2StringSet([]string{"where", "coveredBy", "confidence", "profile"})
 	return map[string]v2RuleVerbMechanic{
@@ -1550,10 +1543,6 @@ func v2ContainsString(xs []string, want string) bool {
 		}
 	}
 	return false
-}
-
-func v2CoverageRefAllowed(ref string) bool {
-	return strings.HasPrefix(ref, "check.") || strings.HasPrefix(ref, "candidate.")
 }
 
 func validateV2Pattern(pat *V2PatternDecl) []error {

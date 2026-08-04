@@ -11,7 +11,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/vyprai/vyql/datadir"
@@ -135,15 +134,6 @@ func statFile(h hash.Hash, path string) {
 	}
 	io.WriteString(h, path)
 	fmt.Fprintf(h, "|%d|%d\x00", info.Size(), info.ModTime().UnixNano())
-}
-
-// statGlob folds every file matching pattern into h, in sorted order (deterministic).
-func statGlob(h hash.Hash, pattern string) {
-	matches, _ := filepath.Glob(pattern)
-	sort.Strings(matches)
-	for _, m := range matches {
-		statFile(h, m)
-	}
 }
 
 func statVYQLTreeExcept(h hash.Hash, root string, excludedRelDirs map[string]bool) {

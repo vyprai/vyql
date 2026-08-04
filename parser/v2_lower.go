@@ -3702,37 +3702,6 @@ func v2CollectStrictQueryWhere(expr V2Expr, alias, baseAlias string, allowed map
 	return true
 }
 
-func v2QueryWhereIDEqualsBaseProp(expr V2Expr, stepAlias, baseAlias string) (string, bool) {
-	var out string
-	var visit func(V2Expr)
-	visit = func(e V2Expr) {
-		if out != "" {
-			return
-		}
-		x, ok := e.(V2BinaryExpr)
-		if !ok {
-			return
-		}
-		if x.Op == "and" {
-			visit(x.Left)
-			visit(x.Right)
-			return
-		}
-		if x.Op != "==" {
-			return
-		}
-		if prop, ok := v2IDBasePropJoin(x.Left, x.Right, stepAlias, baseAlias); ok {
-			out = prop
-			return
-		}
-		if prop, ok := v2IDBasePropJoin(x.Right, x.Left, stepAlias, baseAlias); ok {
-			out = prop
-		}
-	}
-	visit(expr)
-	return out, out != ""
-}
-
 func v2IDBasePropJoin(left, right V2Expr, stepAlias, baseAlias string) (string, bool) {
 	lref, lok := left.(V2RefExpr)
 	rref, rok := right.(V2RefExpr)
@@ -3748,49 +3717,6 @@ func v2IDBasePropJoin(left, right V2Expr, stepAlias, baseAlias string) (string, 
 		return "", false
 	}
 	return prop, true
-}
-
-func v2QueryWhereFieldEquals(expr V2Expr, alias, field string) (string, bool) {
-	fields := v2QueryWhereEqualities(expr, alias)
-	value, ok := fields[field]
-	return value, ok
-}
-
-func v2QueryWhereEqualities(expr V2Expr, alias string) map[string]string {
-	out := map[string]string{}
-	var visit func(V2Expr)
-	visit = func(e V2Expr) {
-		switch x := e.(type) {
-		case V2BinaryExpr:
-			if x.Op == "and" {
-				visit(x.Left)
-				visit(x.Right)
-				return
-			}
-			if x.Op != "==" {
-				return
-			}
-			left, ok := x.Left.(V2RefExpr)
-			if !ok {
-				return
-			}
-			prefix := alias + "."
-			if !strings.HasPrefix(left.Name, prefix) {
-				return
-			}
-			value, ok := v2RuleWhereValue(x.Right)
-			if !ok {
-				return
-			}
-			s, ok := value.(string)
-			if !ok {
-				return
-			}
-			out[strings.TrimPrefix(left.Name, prefix)] = s
-		}
-	}
-	visit(expr)
-	return out
 }
 
 func lowerV2RuleWhereExpr(expr V2Expr, names v2NameResolver) (Expr, error) {

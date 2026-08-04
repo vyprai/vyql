@@ -332,16 +332,10 @@ func valCondsFoldedNeedles(tokens string, valsLower, nvalsLower []string) bool {
 }
 
 type valueTokenCache struct {
-	shared              *flagMatchIndex
-	textLower           map[string]string
-	strArgsLower        map[string]string
-	directLower         map[string]string
-	flowLower           map[string]string
-	sinkLower           map[string]string
-	sinkRaw             map[string]string
-	directSinkSegments  map[string]directSinkSegments
-	directRawContains   map[string]bool
-	directLowerContains map[string]bool
+	shared             *flagMatchIndex
+	sinkRaw            map[string]string
+	directSinkSegments map[string]directSinkSegments
+	directRawContains  map[string]bool
 }
 
 func newValueTokenCache(s usg.Store) *valueTokenCache {
@@ -349,94 +343,6 @@ func newValueTokenCache(s usg.Store) *valueTokenCache {
 		return &valueTokenCache{}
 	}
 	return &valueTokenCache{shared: sharedFlagIndex(s)}
-}
-
-func (c *valueTokenCache) lowerText(text string) string {
-	if text == "" {
-		return ""
-	}
-	if c != nil && c.shared != nil {
-		return c.shared.lowerTextValue(text)
-	}
-	if c.textLower == nil {
-		c.textLower = map[string]string{}
-	}
-	if lower, ok := c.textLower[text]; ok {
-		return lower
-	}
-	lower := lowerString(text)
-	c.textLower[text] = lower
-	return lower
-}
-
-func (c *valueTokenCache) nodeStrArgsLower(n usg.Node) string {
-	text := n.Prop("str_args")
-	if text == "" {
-		return ""
-	}
-	if n.ID == "" {
-		return c.lowerText(text)
-	}
-	if c.strArgsLower == nil {
-		c.strArgsLower = map[string]string{}
-	}
-	if lower, ok := c.strArgsLower[n.ID]; ok {
-		return lower
-	}
-	lower := lowerString(text)
-	c.strArgsLower[n.ID] = lower
-	return lower
-}
-
-func (c *valueTokenCache) directNodeLower(n usg.Node) string {
-	if n.ID == "" {
-		return c.lowerText(nodeDirectValueTokens(n))
-	}
-	if c.directLower == nil {
-		c.directLower = map[string]string{}
-	}
-	if lower, ok := c.directLower[n.ID]; ok {
-		return lower
-	}
-	lower := c.lowerText(nodeDirectValueTokens(n))
-	c.directLower[n.ID] = lower
-	return lower
-}
-
-func (c *valueTokenCache) flowingLower(s usg.Store, idx *flowTokenIndex, n usg.Node) string {
-	if n.ID == "" {
-		return ""
-	}
-	if c.flowLower == nil {
-		c.flowLower = map[string]string{}
-	}
-	if lower, ok := c.flowLower[n.ID]; ok {
-		return lower
-	}
-	lower := c.lowerText(flowingStringTokens(s, idx, n.ID, n.Prop("str_args")))
-	c.flowLower[n.ID] = lower
-	return lower
-}
-
-func (c *valueTokenCache) sinkValueLower(s usg.Store, idx *flowTokenIndex, call usg.Node, argIndex int, includeFlow bool) string {
-	if call.ID != "" {
-		if c.sinkLower == nil {
-			c.sinkLower = map[string]string{}
-		}
-		key := call.ID + "\x00" + strconv.Itoa(argIndex)
-		if includeFlow {
-			key += "\x00flow"
-		} else {
-			key += "\x00direct"
-		}
-		if lower, ok := c.sinkLower[key]; ok {
-			return lower
-		}
-		lower := c.buildSinkValueLower(s, idx, call, argIndex, includeFlow)
-		c.sinkLower[key] = lower
-		return lower
-	}
-	return c.buildSinkValueLower(s, idx, call, argIndex, includeFlow)
 }
 
 func (c *valueTokenCache) sinkValueRaw(s usg.Store, idx *flowTokenIndex, call usg.Node, argIndex int, includeFlow bool) string {
@@ -496,46 +402,6 @@ func buildSinkValueRaw(s usg.Store, idx *flowTokenIndex, call usg.Node, argIndex
 	}
 	if includeFlow {
 		addRaw(flowingStringTokens(s, idx, call.ID, call.Prop("str_args")))
-	}
-	return b.String()
-}
-
-func (c *valueTokenCache) buildSinkValueLower(s usg.Store, idx *flowTokenIndex, call usg.Node, argIndex int, includeFlow bool) string {
-	var b strings.Builder
-	addLower := func(lower string) {
-		if lower == "" {
-			return
-		}
-		if b.Len() > 0 {
-			b.WriteByte(0)
-		}
-		b.WriteString(lower)
-	}
-	addLower(c.lowerText(call.Prop("str_args")))
-	addArg := func(arg string) {
-		if arg == "" {
-			return
-		}
-		if n, ok, err := s.GetNode(arg); err == nil && ok {
-			addLower(c.lowerText(n.Prop("str_args")))
-			if includeFlow {
-				addLower(c.flowingLower(s, idx, n))
-			}
-		}
-	}
-	if argIndex >= 0 {
-		addArg(call.Prop(usg.ArgPropKey(argIndex)))
-	} else {
-		for ai := 0; ; ai++ {
-			arg := call.Prop(usg.ArgPropKey(ai))
-			if arg == "" {
-				break
-			}
-			addArg(arg)
-		}
-	}
-	if includeFlow {
-		addLower(c.flowingLower(s, idx, call))
 	}
 	return b.String()
 }
@@ -643,35 +509,6 @@ func (c *valueTokenCache) directRawContainsFolded(call usg.Node, argIndex int, r
 	hit := rawSegmentsContainFolded(rawSegments, needle)
 	c.directRawContains[cacheKey] = hit
 	return hit
-}
-
-func (c *valueTokenCache) directContainsLower(call usg.Node, argIndex int, lowerSegments []string, needle string) bool {
-	if needle == "" {
-		return true
-	}
-	key := directSinkSegmentKey(call, argIndex)
-	if key == "" {
-		return lowerSegmentsContain(lowerSegments, needle)
-	}
-	cacheKey := key + "\x00lower\x00" + needle
-	if c.directLowerContains == nil {
-		c.directLowerContains = map[string]bool{}
-	}
-	if hit, ok := c.directLowerContains[cacheKey]; ok {
-		return hit
-	}
-	hit := lowerSegmentsContain(lowerSegments, needle)
-	c.directLowerContains[cacheKey] = hit
-	return hit
-}
-
-func lowerSegmentsContain(segments []string, needle string) bool {
-	for _, segment := range segments {
-		if valContainsLowerNeedle(segment, needle) {
-			return true
-		}
-	}
-	return false
 }
 
 func lowerStrings(values []string) []string {
@@ -963,41 +800,6 @@ func contentGram(s string) uint32 {
 	return uint32(s[0])<<16 | uint32(s[1])<<8 | uint32(s[2])
 }
 
-func storeTextContainsAnyLower(s usg.Store, missing map[string]bool) {
-	check := func(v string) bool {
-		if v == "" {
-			return len(missing) == 0
-		}
-		lower := lowerString(v)
-		for needle, hit := range missing {
-			if !hit && strings.Contains(lower, needle) {
-				missing[needle] = true
-			}
-		}
-		return allContentNeedlesFound(missing)
-	}
-	rangeNodes(s, func(n usg.Node) bool {
-		if check(n.ID) || check(n.Type) || check(n.Loc) || check(n.Region) || check(n.Scope) {
-			return false
-		}
-		for _, v := range n.Props {
-			if check(v) {
-				return false
-			}
-		}
-		return true
-	})
-}
-
-func allContentNeedlesFound(missing map[string]bool) bool {
-	for _, hit := range missing {
-		if !hit {
-			return false
-		}
-	}
-	return true
-}
-
 type flagMatchIndex struct {
 	once            sync.Once // guards the read-only index build (ensure)
 	built           atomic.Bool
@@ -1026,40 +828,12 @@ type flagMatchIndex struct {
 	predHitSets sync.Map // key -> scopedPredicateHitSet
 }
 
-// nodesOfTechType returns the nodes of nodeType that a binding of the given technology must
-// consider: only that technology's nodes (plus unknown-technology nodes, which every language
-// binding kept), or all nodes for a cross-language binding. This replaces scanning every node of
-// the type and skipping by technology per node — the cost that made a polyglot tree (the kernel
-// has a few .py/.php files) run every present language's bindings over all ~millions of nodes.
-// techNodes returns, across the given node types, the nodes a binding of the given technology must
-// consider (its own technology's nodes plus unknown-technology nodes, or all for cross-language).
-// Applicators iterate this instead of every node of the type followed by a per-node technology
-// skip, so a language with few files (a handful of .py in a C tree) costs a handful of nodes, not a
-// full-graph scan.
-func (idx *flagMatchIndex) techNodes(s usg.Store, tech string, crossLang bool, types ...string) []usg.Node {
-	var out []usg.Node
-	idx.rangeTechNodes(s, tech, crossLang, func(n usg.Node) bool {
-		out = append(out, n)
-		return true
-	}, types...)
-	return out
-}
-
 func (idx *flagMatchIndex) rangeTechNodes(s usg.Store, tech string, crossLang bool, fn func(usg.Node) bool, types ...string) {
 	for _, t := range types {
 		if !idx.rangeNodesOfTechType(s, tech, t, crossLang, fn) {
 			return
 		}
 	}
-}
-
-func (idx *flagMatchIndex) nodesOfTechType(s usg.Store, tech, nodeType string, crossLang bool) []usg.Node {
-	var out []usg.Node
-	idx.rangeNodesOfTechType(s, tech, nodeType, crossLang, func(n usg.Node) bool {
-		out = append(out, n)
-		return true
-	})
-	return out
 }
 
 func (idx *flagMatchIndex) rangeNodesOfTechType(s usg.Store, tech, nodeType string, crossLang bool, fn func(usg.Node) bool) bool {
@@ -1272,24 +1046,6 @@ func callIndexTerms(n usg.Node) []string {
 	return terms
 }
 
-func (idx *flagMatchIndex) nodesOfType(s usg.Store, typ string) []usg.Node {
-	return collectNodesOfType(s, typ)
-}
-
-func (idx *flagMatchIndex) nodesOfTypeInFile(s usg.Store, typ, file string) []usg.Node {
-	idx.ensure(s)
-	if file == "" {
-		return collectNodesOfType(s, typ)
-	}
-	if idx.intNodes {
-		is := s.(interface {
-			NodeAtIndex(int32) (usg.Node, bool)
-		})
-		return collectNodesByIndex(is, idx.typesByFileI[typ][file])
-	}
-	return collectNodesByID(s, idx.typesByFile[typ][file])
-}
-
 func (idx *flagMatchIndex) rangeNodesOfTypeInFile(s usg.Store, typ, file string, fn func(usg.Node) bool) bool {
 	idx.ensure(s)
 	if idx.intNodes {
@@ -1305,55 +1061,6 @@ func (idx *flagMatchIndex) rangeNodesOfTypeInFile(s usg.Store, typ, file string,
 		return rangeNodeIDs(s, idx.types[typ], fn)
 	}
 	return rangeNodeIDs(s, idx.typesByFile[typ][file], fn)
-}
-
-func (idx *flagMatchIndex) binopsInFileForValues(s usg.Store, file string, values []string) []usg.Node {
-	idx.ensure(s)
-	ops, ok := binaryPredicateOps(values)
-	if !ok {
-		return idx.nodesOfTypeInFile(s, "code.BinOp", file)
-	}
-	if file == "" {
-		var out []usg.Node
-		for _, op := range ops {
-			if idx.intNodes {
-				is := s.(interface {
-					NodeAtIndex(int32) (usg.Node, bool)
-				})
-				for _, byOp := range idx.binopsByFileI {
-					out = append(out, collectNodesByIndex(is, byOp[op])...)
-				}
-			} else {
-				for _, byOp := range idx.binopsByFile {
-					out = append(out, collectNodesByID(s, byOp[op])...)
-				}
-			}
-		}
-		return out
-	}
-	if idx.intNodes {
-		byOp := idx.binopsByFileI[file]
-		if len(byOp) == 0 {
-			return nil
-		}
-		is := s.(interface {
-			NodeAtIndex(int32) (usg.Node, bool)
-		})
-		var out []usg.Node
-		for _, op := range ops {
-			out = append(out, collectNodesByIndex(is, byOp[op])...)
-		}
-		return out
-	}
-	byOp := idx.binopsByFile[file]
-	if len(byOp) == 0 {
-		return nil
-	}
-	var out []usg.Node
-	for _, op := range ops {
-		out = append(out, collectNodesByID(s, byOp[op])...)
-	}
-	return out
 }
 
 func (idx *flagMatchIndex) rangeBinopsInFileForValues(s usg.Store, file string, values []string, fn func(usg.Node) bool) bool {
@@ -1409,12 +1116,6 @@ func (idx *flagMatchIndex) node(s usg.Store, id string) (usg.Node, bool) {
 		return usg.Node{}, false
 	}
 	return n, ok
-}
-
-func (idx *flagMatchIndex) ensureFlow(s usg.Store) *flowTokenIndex {
-	idx.ensure(s)
-	idx.flow.ensure(s)
-	return &idx.flow
 }
 
 func (idx *flagMatchIndex) normalizedScope(n usg.Node) string {
@@ -1739,13 +1440,6 @@ func valCondsForNode(s usg.Store, idx *flowTokenIndex, n usg.Node, vals, nvals [
 	return valConds(flowingStringTokens(s, idx, n.ID, direct), vals, nvals)
 }
 
-func valCondsDirectForNode(n usg.Node, vals, nvals []string) bool {
-	if len(vals) == 0 && len(nvals) == 0 {
-		return true
-	}
-	return valConds(nodeDirectValueTokens(n), vals, nvals)
-}
-
 func valCondsDirectForNodeCached(cache *valueTokenCache, n usg.Node, valsLower, nvalsLower []string) bool {
 	if len(valsLower) == 0 && len(nvalsLower) == 0 {
 		return true
@@ -1807,40 +1501,6 @@ func callArgCountMatches(n usg.Node, set bool, min, max int) bool {
 		return false
 	}
 	return max < 0 || count <= max
-}
-
-func valCondsForSink(s usg.Store, idx *flowTokenIndex, call usg.Node, sk sinkSpec) bool {
-	if len(sk.ValMatches) == 0 && len(sk.ValAbsents) == 0 {
-		return true
-	}
-
-	tokens := []string{call.Prop("str_args")}
-	addArg := func(arg string) {
-		if arg == "" {
-			return
-		}
-		if n, ok, err := s.GetNode(arg); err == nil && ok {
-			tokens = append(tokens, n.Prop("str_args"))
-			if len(sk.ValMatches) > 0 {
-				tokens = append(tokens, flowingStringTokens(s, idx, n.ID, n.Prop("str_args")))
-			}
-		}
-	}
-	if sk.ArgIndex >= 0 {
-		addArg(call.Prop(usg.ArgPropKey(sk.ArgIndex)))
-	} else {
-		for ai := 0; ; ai++ {
-			arg := call.Prop(usg.ArgPropKey(ai))
-			if arg == "" {
-				break
-			}
-			addArg(arg)
-		}
-	}
-	if len(sk.ValMatches) > 0 {
-		tokens = append(tokens, flowingStringTokens(s, idx, call.ID, call.Prop("str_args")))
-	}
-	return valConds(strings.Join(tokens, "\x00"), sk.ValMatches, sk.ValAbsents)
 }
 
 func valCondsForSinkCached(s usg.Store, idx *flowTokenIndex, cache *valueTokenCache, call usg.Node, sk sinkSpec, valsLower, nvalsLower []string) bool {
@@ -2003,54 +1663,6 @@ var callablePropTypes = []string{
 	"code.Import",
 }
 
-// rangeTechCallablePropNodes is rangeCallablePropNodes restricted to a binding's technology (plus
-// unknown-technology nodes), or all nodes for a cross-language binding — so a language applicator
-// visits only its own nodes instead of scanning every callable node and skipping by technology.
-func rangeTechCallablePropNodes(idx *flagMatchIndex, s usg.Store, tech string, crossLang bool, fn func(usg.Node) bool) {
-	idx.rangeTechNodes(s, tech, crossLang, fn, callablePropTypes...)
-}
-
-func collectNodesOfType(s usg.Store, typ string) []usg.Node {
-	var out []usg.Node
-	rangeNodesOfTypeDirect(s, typ, func(n usg.Node) bool {
-		out = append(out, n)
-		return true
-	})
-	return out
-}
-
-func collectNodesByID(s usg.Store, ids []string) []usg.Node {
-	if len(ids) == 0 {
-		return nil
-	}
-	out := make([]usg.Node, 0, len(ids))
-	for _, id := range ids {
-		n, ok, err := s.GetNode(id)
-		if err != nil || !ok {
-			continue
-		}
-		out = append(out, n)
-	}
-	return out
-}
-
-func collectNodesByIndex(is interface {
-	NodeAtIndex(int32) (usg.Node, bool)
-}, idxs []int32) []usg.Node {
-	if len(idxs) == 0 {
-		return nil
-	}
-	out := make([]usg.Node, 0, len(idxs))
-	for _, idx := range idxs {
-		n, ok := is.NodeAtIndex(idx)
-		if !ok {
-			continue
-		}
-		out = append(out, n)
-	}
-	return out
-}
-
 func rangeNodeIDs(s usg.Store, ids []string, fn func(usg.Node) bool) bool {
 	for _, id := range ids {
 		n, ok, err := s.GetNode(id)
@@ -2077,51 +1689,6 @@ func rangeNodeIndexes(is interface {
 		}
 	}
 	return true
-}
-
-func rangeNodesOfTypeDirect(s usg.Store, typ string, fn func(usg.Node) bool) bool {
-	if rg, ok := s.(interface {
-		RangeNodesOfType(string, func(usg.Node) bool)
-	}); ok {
-		stopped := false
-		rg.RangeNodesOfType(typ, func(n usg.Node) bool {
-			if !fn(n) {
-				stopped = true
-				return false
-			}
-			return true
-		})
-		return !stopped
-	}
-	ids, _ := s.NodesOfType(typ)
-	for _, id := range ids {
-		n, ok, err := s.GetNode(id)
-		if err != nil || !ok {
-			continue
-		}
-		if !fn(n) {
-			return false
-		}
-	}
-	return true
-}
-
-func nodeAllowedForBindingTech(n usg.Node, fileTech map[string]string, tech string, crossLang bool) bool {
-	if crossLang || tech == "" {
-		return true
-	}
-	nt := nodeTechFromNodeWithFileContext(n, fileTech)
-	return nt == "" || nt == tech
-}
-
-func rangeNodesOfTechTypeDirect(s usg.Store, tech, typ string, crossLang bool, fn func(usg.Node) bool) bool {
-	fileTech := sharedFileContextTechs(s)
-	return rangeNodesOfTypeDirect(s, typ, func(n usg.Node) bool {
-		if !nodeAllowedForBindingTech(n, fileTech, tech, crossLang) {
-			return true
-		}
-		return fn(n)
-	})
 }
 
 func rangeTechNodesDirect(s usg.Store, tech string, crossLang bool, fn func(usg.Node) bool, types ...string) {
@@ -2163,21 +1730,6 @@ func rangeTechNodesDirect(s usg.Store, tech string, crossLang bool, fn func(usg.
 				if nt := nodeTechFromNode(n); nt != "" && nt != tech {
 					continue
 				}
-			}
-			if !fn(n) {
-				return
-			}
-		}
-	}
-}
-
-func rangeCallablePropNodes(s usg.Store, fn func(usg.Node) bool) {
-	for _, typ := range callablePropTypes {
-		ids, _ := s.NodesOfType(typ)
-		for _, id := range ids {
-			n, ok, err := s.GetNode(id)
-			if err != nil || !ok {
-				continue
 			}
 			if !fn(n) {
 				return
@@ -4113,10 +3665,6 @@ func (g *packageGate) matches(want string) bool {
 	return false
 }
 
-func packageInEvidence(want string, have map[string]bool) bool {
-	return newPackageGate(have).inEvidence(want)
-}
-
 type requirementGate struct {
 	packages   *packageGate
 	imports    *packageGate
@@ -4206,10 +3754,6 @@ func (g *requirementGate) effect(packages []string, req *parser.BindingRequireme
 		return requirementEffect{Allowed: false, State: requirementStateMissing}
 	}
 	return g.evalEffect(*req)
-}
-
-func (g *requirementGate) eval(req parser.BindingRequirement) bool {
-	return g.evalEffect(req).Allowed
 }
 
 func (g *requirementGate) evalEffect(req parser.BindingRequirement) requirementEffect {
@@ -4537,10 +4081,6 @@ func addPackageVersionEvidence(out map[string][]string, raw, version string) {
 	for _, alias := range sca.ImportAliases(name) {
 		add(alias)
 	}
-}
-
-func (g *requirementGate) dependencyVersionSatisfies(pkg, expr string) bool {
-	return g.dependencyVersionEffect(pkg, expr).Allowed
 }
 
 func (g *requirementGate) dependencyVersionEffect(pkg, expr string) requirementEffect {
@@ -5098,30 +4638,6 @@ func flagPredicatesMatchNode(s usg.Store, idx *flagMatchIndex, preds []flagPredi
 	return true
 }
 
-func flagOperandsMatch(specs []flagOperandSpec, operands [][]usg.Node) bool {
-	used := make([]bool, len(operands))
-	var matchOperand func(int) bool
-	matchOperand = func(i int) bool {
-		if i == len(specs) {
-			return true
-		}
-		for oi, opNodes := range operands {
-			if used[oi] {
-				continue
-			}
-			if flagOperandMatches(specs[i], opNodes) {
-				used[oi] = true
-				if matchOperand(i + 1) {
-					return true
-				}
-				used[oi] = false
-			}
-		}
-		return false
-	}
-	return matchOperand(0)
-}
-
 func flagOperandsMatchNode(s usg.Store, idx *flagMatchIndex, specs []flagOperandSpec, n usg.Node, includeFlow bool) bool {
 	var groups [][]bool
 	addGroup := func(argID string) {
@@ -5335,32 +4851,6 @@ func flagOperandCandidatesCached(s usg.Store, idx *flagMatchIndex, n usg.Node, i
 	operands := flagOperandCandidates(s, idx, n, includeFlow)
 	idx.operands.Store(key, operands)
 	return operands
-}
-
-func flagOperandMatches(spec flagOperandSpec, nodes []usg.Node) bool {
-	if len(spec.PredicateOrder) > 0 {
-		for _, i := range spec.PredicateOrder {
-			if !flagOperandPredicateMatches(spec.Predicates[i], nodes) {
-				return false
-			}
-		}
-		return true
-	}
-	for _, pred := range spec.Predicates {
-		if !flagOperandPredicateMatches(pred, nodes) {
-			return false
-		}
-	}
-	return true
-}
-
-func flagOperandPredicateMatches(pred flagPredicate, nodes []usg.Node) bool {
-	for _, n := range nodes {
-		if flagPredicateMatchesNodeOnly(pred, n) {
-			return true
-		}
-	}
-	return false
 }
 
 func flagPredicateMatches(s usg.Store, idx *flagMatchIndex, pred flagPredicate, n usg.Node, tech string, crossLang bool, fileTech map[string]string) bool {
@@ -6263,26 +5753,11 @@ func flagScopeNodeHit(s usg.Store, idx *flagMatchIndex, pred flagPredicate, n us
 	return hit
 }
 
-func unscopedNodeBelongsToScopedContext(candidate, anchor usg.Node) bool {
-	if candidate.Type != "code.Param" {
-		return false
-	}
-	cFile, cLine := splitLocFileLine(candidate.Prop("loc"))
-	aFile, aLine := splitLocFileLine(anchor.Prop("loc"))
-	return cFile != "" && cFile == aFile && cLine != 0 && cLine == aLine
-}
-
 func nodeLexicalScope(n usg.Node) string {
 	if n.Scope != "" {
 		return n.Scope
 	}
 	return n.Prop("region")
-}
-
-func sameOrNestedScope(candidate, anchor string) bool {
-	candidate = scopeWithoutOrder(candidate)
-	anchor = scopeWithoutOrder(anchor)
-	return sameOrNestedNormalizedScope(candidate, anchor)
 }
 
 func sameOrNestedNormalizedScope(candidate, anchor string) bool {
@@ -6381,14 +5856,6 @@ func contextTokenValuePredicate(op string, values []string, text string) bool {
 
 func flagContextTokenValuePredicate(pred flagPredicate, text string) bool {
 	return contextTokenValuePredicateLowerValues(pred.Op, pred.Values, pred.lowerValues(), text)
-}
-
-// flagContextTokenValuePredicateWithLowerText is flagContextTokenValuePredicate with a
-// caller-supplied lowercased text, so a hot loop can reuse an epoch-cached
-// idx.lowerTextValue(text) instead of re-lowercasing the node's str_args every call. It
-// is byte-for-byte equivalent to the uncached form (which passes lowerString(text)).
-func flagContextTokenValuePredicateWithLowerText(pred flagPredicate, text, lowerText string) bool {
-	return contextTokenValuePredicateLowerValuesWithLowerText(pred.Op, pred.Values, pred.lowerValues(), text, lowerText)
 }
 
 func flagContextTokenValuePredicateCached(idx *flagMatchIndex, pred flagPredicate, text string) bool {
@@ -6590,10 +6057,6 @@ func contextTokenEqualsPredicateCached(op string, values []string, text string, 
 		}
 	}
 	return all
-}
-
-func contextTokenContainsPredicate(op string, values []string, text string) bool {
-	return contextTokenContainsPredicateLowerValues(op, values, lowerStrings(values), text)
 }
 
 func contextTokenContainsPredicateLowerValues(op string, values, valuesLower []string, text string) bool {
@@ -6798,10 +6261,6 @@ func contextTokensByPrefix(text string) map[string][]string {
 		out[prefix] = append(out[prefix], value)
 	}
 	return out
-}
-
-func contextTokenContains(prefix, got, want string) bool {
-	return contextTokenContainsLower(prefix, got, want, lowerString(want))
 }
 
 func contextTokenContainsLower(prefix, got, want, wantLower string) bool {

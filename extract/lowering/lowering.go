@@ -1827,20 +1827,6 @@ func catastrophicRegex(pat string) bool {
 	return regexambig.Ambiguous(pat)
 }
 
-// containsRegexQuantifier reports whether a regex fragment contains an unbounded repeat operator.
-func containsRegexQuantifier(s string) bool {
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\\' {
-			i++
-			continue
-		}
-		if s[i] == '+' || s[i] == '*' || s[i] == '{' {
-			return true
-		}
-	}
-	return false
-}
-
 // envDefaultConst returns the hardcoded DEFAULT literal of an os.getenv(name, default) /
 // os.environ.get(name, default) call — the fallback baked into source (CWE-798). "" if none.
 func envDefaultConst(e nir.Expr, l *lowerer) string {
@@ -4738,15 +4724,6 @@ func splitClassQual(qual string) (modkey, class string, ok bool) {
 		return "", "", false
 	}
 	return qual[:i], qual[i+2:], true
-}
-
-func classBasesInclude(class string, bases []string) bool {
-	for _, base := range bases {
-		if base == class || strings.HasSuffix(base, "."+class) || strings.HasSuffix(base, "::"+class) {
-			return true
-		}
-	}
-	return false
 }
 
 func (l *lowerer) resolveBaseMethods(modkey, class, method string) []*funcInfo {

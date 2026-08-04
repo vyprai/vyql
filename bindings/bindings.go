@@ -286,20 +286,6 @@ func attach(store usg.Store, m Mapping, applicator, fidelity, confidence string)
 	})
 }
 
-// maxProposal returns the highest-precedence proposal (per-mapping tiering), keeping
-// the first on ties for determinism. Subsumes the old binding-then-fidelity selection:
-// specificity (package > native > general) dominates, then fidelity, then origin.
-func maxProposal(ps []proposal) proposal {
-	best := ps[0]
-	bestK := proposalKey(best)
-	for _, p := range ps[1:] {
-		if k := proposalKey(p); less(bestK, k) {
-			best, bestK = p, k
-		}
-	}
-	return best
-}
-
 func maxNeg(apps []Applicator) Applicator {
 	best := apps[0]
 	for _, a := range apps[1:] {
