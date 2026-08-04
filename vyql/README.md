@@ -94,3 +94,8 @@ go run ./go/cmd/vyql scan <path>
 # from anywhere (installed binary):
 VYQL_HOME=/path/to/vyql vyql scan <path>
 ```
+
+## Third-party data
+
+`taxonomy/cwe.json` and `taxonomy/capec.json` derive from the MITRE CWE and
+CAPEC catalogs. See [taxonomy/ATTRIBUTION.md](taxonomy/ATTRIBUTION.md).
