@@ -352,7 +352,12 @@ func manifestPublishable(paths []string) bool {
 }
 
 func depMatch(manifests, dep string) bool {
-	pat := `(^|[^A-Za-z0-9_])` + regexp.QuoteMeta(dep) + `($|[^A-Za-z0-9_])`
+	// Case-insensitive: PyPI, npm and most package ecosystems treat names that way,
+	// and `pip freeze` writes canonical caps -- Flask, Django, SQLAlchemy -- which must
+	// still match the lowercase-authored `dep:` fingerprints. Without (?i) a pinned
+	// requirements.txt silently fails web-framework detection and the repo is profiled
+	// as something else, which changes which rules run at all.
+	pat := `(?i)(^|[^A-Za-z0-9_])` + regexp.QuoteMeta(dep) + `($|[^A-Za-z0-9_])`
 	return regexp.MustCompile(pat).FindStringIndex(manifests) != nil
 }
 
