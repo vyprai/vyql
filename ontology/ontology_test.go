@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Mirrors poc/cases/case_02 (typing) + case_03: control<->threat<->sink typing.
+// Control<->threat<->sink typing.
 // Names follow VyQL conventions: <namespace>.<PascalCase>, threat kinds
 // <family>.<PascalCase>, CWE refs CWE_NNN.
 func TestSanitizerTyping(t *testing.T) {
@@ -30,7 +30,7 @@ func TestSanitizerTyping(t *testing.T) {
 	}
 }
 
-// Mirrors poc/cases/case_02: unknown concept resolution.
+// Unknown concept resolution.
 func TestUnknownConcept(t *testing.T) {
 	o := Seed()
 	if o.Exists("aws_s3_bucket") {
@@ -41,7 +41,7 @@ func TestUnknownConcept(t *testing.T) {
 	}
 }
 
-// Mirrors poc/cases/case_11: refinement matching is downward-closed.
+// Refinement matching is downward-closed.
 func TestRefinement(t *testing.T) {
 	o := Seed()
 	d := o.Descendants("core.UserControlledData")
@@ -53,7 +53,7 @@ func TestRefinement(t *testing.T) {
 	}
 }
 
-// Mirrors poc/cases/case_23: aliases + deprecation.
+// Aliases + deprecation.
 func TestAliasDeprecation(t *testing.T) {
 	o := Seed()
 	o.Alias("code.HttpInput", "code.UserInput")

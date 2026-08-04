@@ -19,7 +19,7 @@ type Dep struct {
 // a negative (`unless`) edge — the compile-time guarantee that makes `unless`
 // well-defined and incremental evaluation sound (docs/05 §negation). Returns
 // strata in evaluation order, or a StratError naming the offending cycle.
-// (Tarjan SCC; port of poc/vyql/stratify.py.)
+// (Tarjan SCC.)
 func Stratify(preds []string, deps []Dep) ([][]string, error) {
 	adj := map[string][]string{}
 	for _, p := range preds {

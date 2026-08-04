@@ -7,9 +7,8 @@
 // None of this is duplicated per language. A frontend's only job is to translate
 // its parser's tree into NIR; resolution and dataflow live here, once. This is
 // what lets the project add a language — or swap a parser (tree-sitter, native,
-// LSP/SCIP) — without touching resolution or rules. Ported from
-// poc/extract/lowering.py; the algorithm is docs/10 §"Call resolution"
-// generalized over NIR.
+// LSP/SCIP) — without touching resolution or rules. The algorithm is
+// docs/10 §"Call resolution" generalized over NIR.
 package lowering
 
 import (

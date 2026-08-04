@@ -121,7 +121,7 @@ Key properties:
   sanitizer label required. Parameterization-by-placeholder is thus handled by
   sink precision; explicit escaping/validation is modeled as `emit check ...`
   plus `unless sink.path coveredBy ...`. The two mechanisms compose. (Validated on real Flask/
-  aiohttp code; see `poc/FINDINGS.md` §"Real-repo extraction" #1.)
+  aiohttp code.)
 
 ### Binding tests are mandatory
 

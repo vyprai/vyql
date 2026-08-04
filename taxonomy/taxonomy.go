@@ -7,8 +7,8 @@
 //
 // The catalogs live in the standalone `vyql/taxonomy/{cwe,capec}.json` and are
 // loaded from disk at runtime (see package datadir) — not embedded in the binary.
-// Regenerate them with poc/tools/gen_taxonomy.py from the official MITRE
-// comprehensive CSVs.
+// They are generated from the official MITRE comprehensive CSVs; do not
+// hand-edit them.
 package taxonomy
 
 import (

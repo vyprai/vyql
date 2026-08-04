@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Mirrors poc/cases/case_07: cyclic negation rejected, valid programs ordered.
+// Cyclic negation rejected, valid programs ordered.
 func TestStratify(t *testing.T) {
 	// valid: finding :- taint, NOT suppressed ; suppressed :- sanitizer
 	strata, err := Stratify(

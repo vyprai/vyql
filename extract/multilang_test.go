@@ -70,7 +70,7 @@ func crossesFile(fs []*findings.Finding) bool {
 	return false
 }
 
-// Mirrors poc/cases/case_15_multilang.py — ONE rule + ONE ontology over THREE
+// ONE rule + ONE ontology over THREE
 // frontends (Python/Flask, JavaScript/Express, Ruby/Rails). Only the per-language
 // adapters and input/sink idioms differ; the compiled SQLi rule is unchanged.
 // Each: vulnerable fixture → interprocedural cross-file findings; parameterized
@@ -177,7 +177,7 @@ func treeSitterFrontend() nir.Program {
 	return nir.Program{Modules: []nir.Module{routes, db}}
 }
 
-// Mirrors poc/cases/case_17_parser_swap.py — two different "parsers" (a compact
+// Two different "parsers" (a compact
 // ast-style frontend and a verbose tree-sitter/CST-style frontend) translate the
 // same code into NIR that lowers, through the SAME engine and rule, to IDENTICAL
 // findings. The parser is swappable; resolution and rules are untouched.

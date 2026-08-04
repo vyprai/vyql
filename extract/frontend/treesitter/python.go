@@ -4,7 +4,7 @@
 // shape, but every frontend targets the SAME NIR and runs through the SAME
 // lowering engine, so resolution and rules are untouched (ADR 0003).
 //
-// This file is the Python frontend, ported from poc/extract/frontend_ts.py.
+// This file is the Python frontend.
 package treesitter
 
 import (

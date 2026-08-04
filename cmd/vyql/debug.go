@@ -56,14 +56,14 @@ func cmdTrace(args []string) error {
 		fmt.Printf("\nSOURCE %s @ %s {%s}\n", n.ID, n.Prop("loc"), conceptsOf(g, n.ID))
 		if sink != "" {
 			connected++
-			fmt.Printf("  ✓ reaches SINK %s @ %s {%s}\n", sink, locOf(g, sink), conceptsOf(g, sink))
+			fmt.Printf("  reaches SINK %s @ %s {%s}\n", sink, locOf(g, sink), conceptsOf(g, sink))
 			for _, step := range path {
 				fmt.Printf("      → %s\n", traceNode(g, step))
 			}
 			continue
 		}
 		dead++
-		fmt.Printf("  ✗ reaches no %ssink — taint stops at:\n", toLabel(*to))
+		fmt.Printf("  reaches no %ssink — taint stops at:\n", toLabel(*to))
 		for _, f := range frontier(onto, g, n.ID) {
 			fmt.Printf("      ⊣ %s\n", traceNode(g, f))
 		}
@@ -250,9 +250,9 @@ func cmdExplain(args []string) error {
 			fmt.Printf("  witness: %s\n", strings.Join(f.Witness, " → "))
 		}
 		for _, ne := range f.NegationEvidence {
-			mark := "✗"
+			mark := "-"
 			if ne.Satisfied {
-				mark = "✓"
+				mark = "+"
 			}
 			fmt.Printf("  %s %s: %s\n", mark, ne.Clause, ne.Detail)
 		}

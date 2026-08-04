@@ -92,7 +92,7 @@ func appCallingLib(key, file, lib string) nir.Module {
 		}}}}
 }
 
-// Mirrors poc/cases/case_16_resolution.py — import/type resolution removes the
+// Import/type resolution removes the
 // name-collision false positive. safe_lib.query and vuln_lib.query share a short
 // name; only one is a sink. Name-based resolution over-connects the safe and
 // vulnerable callers to the shared sink; import resolution keeps only the true
@@ -166,7 +166,7 @@ rule VulnerableDependency {
 }
 `
 
-// Mirrors poc/cases/case_18_sca_dependency.py — decoupled SBOM path with
+// Decoupled SBOM path with
 // reachability-gated SCA: requests is vulnerable AND called (finding); leftpad
 // is vulnerable but never called (suppressed); flask is called but not
 // vulnerable. The gate is a cross-domain join over the same graph.
@@ -235,7 +235,7 @@ rule ExploitableVulnerableDependency {
 }
 `
 
-// Mirrors poc/cases/case_19_vuln_entrypoint.py — vulnerable-library entrypoint
+// Vulnerable-library entrypoint
 // projected to a typed sink, the existing taint rule deciding EXPLOITABILITY.
 // Funnel: present (1) ⊇ reachable (1) ⊇ exploitable (1: only the tainted site).
 func TestVulnerableEntrypointExploitabilityFunnel(t *testing.T) {
@@ -375,7 +375,7 @@ func dbQueryModule() nir.Module {
 	}
 }
 
-// Mirrors poc/cases/case_14_real_extraction.py — interprocedural, cross-file
+// Interprocedural, cross-file
 // SQLi: routes.py sources flow through to a db.py execute() sink. Built from NIR
 // (a frontend's output) so this validates the lowering + resolution + adapter +
 // rule pipeline exactly as the Python oracle does on real ASTs.

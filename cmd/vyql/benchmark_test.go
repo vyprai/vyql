@@ -28,12 +28,22 @@ func TestOWASPBenchmark(t *testing.T) {
 	runOWASPBenchmarkDir(t, dir)
 }
 
+// owaspPortsDir is the directory holding the generated owasp-<lang> port corpora.
+// They are large and not vendored, so the location is a local choice rather than
+// a property of the repository -- set VYQL_OWASP_PORTS_DIR to point at yours.
+func owaspPortsDir() string {
+	if d := os.Getenv("VYQL_OWASP_PORTS_DIR"); d != "" {
+		return filepath.Clean(d)
+	}
+	return filepath.Join(os.Getenv("HOME"), "workspace", "owasp-ports")
+}
+
 // TestLocalOWASPPortBenchmarks scores every generated local OWASP language port
 // and enforces the exact protected parity target for each. It is intentionally
 // opt-in because it scans 22 full benchmark corpora.
 func TestLocalOWASPPortBenchmarks(t *testing.T) {
 	if os.Getenv("VYQL_BENCH_ALL_OWASP") == "" {
-		t.Skip("set VYQL_BENCH_ALL_OWASP=1 to score every /Users/rizqme/Workspace/owasp-* port")
+		t.Skip("set VYQL_BENCH_ALL_OWASP=1 to score every owasp-* port under $VYQL_OWASP_PORTS_DIR")
 	}
 	for _, dir := range localOWASPPortDirs() {
 		dir := dir
@@ -254,7 +264,7 @@ func protectedOWASPBenchmarkExpectation(dir string) (benchmarkScore, bool) {
 		return benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.81}, true
 	case base == "benchjs":
 		return benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.78}, true
-	case strings.HasPrefix(base, "owasp-") && filepath.Dir(filepath.Clean(dir)) == "/Users/rizqme/Workspace":
+	case strings.HasPrefix(base, "owasp-") && filepath.Dir(filepath.Clean(dir)) == owaspPortsDir():
 		return benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, true
 	default:
 		return benchmarkScore{}, false
@@ -288,7 +298,7 @@ func localOWASPPortDirs() []string {
 	}
 	out := make([]string, 0, len(ports))
 	for _, port := range ports {
-		out = append(out, filepath.Join("/Users/rizqme/Workspace", "owasp-"+port))
+		out = append(out, filepath.Join(owaspPortsDir(), "owasp-"+port))
 	}
 	return out
 }
@@ -299,8 +309,8 @@ func TestProtectedOWASPBenchmarkExpectation(t *testing.T) {
 		want benchmarkScore
 		ok   bool
 	}{
-		{dir: "/Users/rizqme/Workspace/BenchmarkJava", want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true},
-		{dir: "/Users/rizqme/Workspace/owasp-python", want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true},
+		{dir: filepath.Join(owaspPortsDir(), "BenchmarkJava"), want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true},
+		{dir: filepath.Join(owaspPortsDir(), "owasp-python"), want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true},
 		{dir: "/tmp/bench/BenchmarkJava", want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true},
 		{dir: "/tmp/bench/BenchmarkPython", want: benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.81}, ok: true},
 		{dir: "/tmp/benchjs", want: benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.78}, ok: true},

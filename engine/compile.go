@@ -1,5 +1,5 @@
-// Package engine compiles and evaluates VyQL rules (docs/03, /05), ported from
-// poc/vyql/engine.py. The hard boundary enforced here: every concept a rule
+// Package engine compiles and evaluates VyQL rules (docs/03, /05). The hard
+// Boundary enforced here: every concept a rule
 // references must resolve in the ontology, endpoints are kind-checked, and
 // v2 coveredBy controls are typed against control<->threat<->sink at COMPILE time.
 package engine

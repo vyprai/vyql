@@ -8,7 +8,7 @@ import (
 	"github.com/vyprai/vyql/usg"
 )
 
-// Mirrors poc/cases/case_06: a cross-domain path internet -reach-> svc
+// A cross-domain path internet -reach-> svc
 // -exploits-> db -can_access-> data, with choke-point analysis. The exploits hop
 // carries the real SQLi finding (nested taint proof, case 06c); the can_access
 // hop is produced by the effective-permission solver, not a literal.

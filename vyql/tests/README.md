@@ -121,9 +121,9 @@ The lowering resolves imports + function calls to trace taint across files. Reac
 
 | Language | Cross-file trace |
 |---|---|
-| Python, Ruby, PHP, Go | ✅ 2–3 hop chains, sanitizers in any file, framework-parameterized forms |
-| Java | ✅ cross-class controller → service → repo: static calls, `new T().m()`, fields (incl. Spring `@Autowired` DI), and `@RequestParam`/handler params as sources |
-| JavaScript | ✅ CommonJS `require('./x')` with `exports.fn = …`, `module.exports.fn = …`, and `module.exports = { fn: … }` |
+| Python, Ruby, PHP, Go | 2–3 hop chains, sanitizers in any file, framework-parameterized forms |
+| Java | cross-class controller → service → repo: static calls, `new T().m()`, fields (incl. Spring `@Autowired` DI), and `@RequestParam`/handler params as sources |
+| JavaScript | CommonJS `require('./x')` with `exports.fn = …`, `module.exports.fn = …`, and `module.exports = { fn: … }` |
 
 Imported aliases resolve to their dotted paths, so both bare-imported **sinks** and
 **sanitizers** are recognized — e.g. `from markupsafe import escape; escape(x)` neutralizes

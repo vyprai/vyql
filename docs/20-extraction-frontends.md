@@ -54,8 +54,8 @@ build/skin resolution separately; create coherence in your own IR.
 Adding a language = one **frontend** (parse + translate to NIR) plus adapter
 content. Resolution, dataflow, and rules are untouched. Swapping a parser
 (tree-sitter → native → LSP) = swapping a frontend; everything downstream is
-unchanged. The PoC proved this on three languages and parser-swap parity
-(`poc/cases/case_17`); the Go implementation now applies the same architecture
+unchanged. The PoC proved this on three languages and parser-swap parity;
+the Go implementation now applies the same architecture
 across the current 22-language source set.
 
 ### Tier 1 — Parsing: tree-sitter by default
@@ -114,7 +114,7 @@ import-resolved, type-resolved interprocedural `CALLS` edges; resolution quality
 sets edge confidence ([14](14-findings-explainability-output.md)). Unresolved
 targets are left **unconnected** (a bounded false negative) rather than
 over-connected (an unbounded false-positive source) — see docs/10 and the
-measured FP removal in `poc/cases/case_16`.
+measured FP removal the prototype recorded.
 
 ### The precision ceiling is language-dependent
 
@@ -140,8 +140,8 @@ extractor:
   cross-domain join: a vulnerable `sbom.PackageVersion` **whose symbols are
   actually called** in resolved code. This needs the same call graph the SAST
   taint solver uses — which is exactly why resolution must be import/type-aware,
-  not name-based. The PoC demonstrates this end to end (`poc/extract/sbom.py`,
-  `poc/cases/case_18`): a vulnerable-and-called dependency is a finding; a
+  not name-based. The PoC demonstrated this end to end: a
+  vulnerable-and-called dependency is a finding; a
   vulnerable-but-unused one is not.
 
 So the dependency story reuses two things the frontend/resolution tiers already

@@ -1,6 +1,6 @@
 package main
 
-// T11 (plan/test-coverage-tasklist.md): CLI surface. main_test covers dispatch/no-source;
+// CLI surface. main_test covers dispatch/no-source;
 // this covers the output formats, the --profile flag, and invalid-rules error handling.
 
 import (

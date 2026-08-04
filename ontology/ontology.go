@@ -1,5 +1,5 @@
-// Package ontology is the VyQL security ontology + type system (docs/06),
-// ported from poc/vyql/ontology.py. Controls declare which threat kinds they
+// Package ontology is the VyQL security ontology + type system (docs/06).
+// Controls declare which threat kinds they
 // neutralize; sinks declare what they are vulnerable to; sources declare their
 // taint kinds. The type checker uses these to reject ill-typed rules at compile
 // time — the ontology "paying rent".

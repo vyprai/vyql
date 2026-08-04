@@ -1,5 +1,5 @@
-// Package solvers implements the flow solvers (docs/08), ported from
-// poc/vyql/solvers/. The taint solver realises the normative semantics:
+// Package solvers implements the flow solvers (docs/08). The taint solver
+// Realises the normative semantics:
 // sanitization is a transfer function on the dataflow fact (not a structural
 // "exists" check). A finding exists iff a live tainted fact reaches a sink along
 // some path with no neutralizing control on it.

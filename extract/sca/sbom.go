@@ -1,6 +1,6 @@
 // Package sca implements the dependency/SBOM path and the vulnerable-library
-// entrypoint projection (docs/20, docs/11), ported from poc/extract/sbom.py
-// and advisory.py. Dependency resolution is DECOUPLED from the AST extractor: a
+// Entrypoint projection (docs/20, docs/11). Dependency resolution is
+// DECOUPLED from the AST extractor: a
 // manifest reader produces package nodes, package intelligence adds neutral
 // analysis tokens, and VyQL binding applicators map those tokens to concepts/rules.
 package sca

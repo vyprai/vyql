@@ -1,6 +1,6 @@
 package main
 
-// Coverage GATES (plan/test-coverage-tasklist.md T0). These meta-tests enforce that
+// These meta-tests enforce that
 // every rule/concept/threat/binding stays tested and internally consistent — so a new
 // feature cannot ship untested. They read the shipped VyQL data (vyql/) directly.
 

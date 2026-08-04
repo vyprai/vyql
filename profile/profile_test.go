@@ -1,6 +1,6 @@
 package profile
 
-// T8 (plan/test-coverage-tasklist.md): profile auto-detection. Each archetype is
+// Profile auto-detection. Each archetype is
 // detected from an unambiguous project fingerprint; an empty project → generic.
 
 import (

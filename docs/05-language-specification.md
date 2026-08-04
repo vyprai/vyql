@@ -87,7 +87,7 @@ typed sink:** the guard must neutralize a threat the sink is vulnerable to, so
 an authz check cannot "guard" (silently suppress) a SQL-injection finding — that
 is a compile error. Typing is skipped only when the match target is an untyped
 business action (where `guarded_by` is a pure authorization gate). This was a
-gap found during prototyping; see `poc/FINDINGS.md` #3.
+gap found during prototyping.
 
 A bare predicate `unless <expr>` covers residual cases (e.g. state-machine
 guards). All three compile to stratified negation.
@@ -239,8 +239,7 @@ keeps the semantics classical while letting consumers filter.
   `reach` requires `exposure|asset → asset|exposure`; `assume` requires
   `principal → privilege|principal`. This rejects nonsense like a sink concept
   used as a taint source (`taint SQL_EXECUTION -> HTTP_INPUT`) or `assume`
-  between non-identity concepts. Found missing during prototyping; see
-  `poc/FINDINGS.md` #4.
+  between non-identity concepts. Found missing during prototyping.
 
 ## Queries vs. rules
 

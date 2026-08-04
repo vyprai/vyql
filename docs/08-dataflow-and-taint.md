@@ -94,7 +94,7 @@ sink."** A finding exists iff some path carries a live (un-killed) fact to the
 sink; if every path passes through a neutralizing control, all facts die and
 there is no finding. This is cleaner than computing graph dominators and yields
 the table below directly — confirmed by the prototype, which implements exactly
-this (`poc/solvers/taint.py`, `poc/FINDINGS.md` #1).
+this.
 
 Consequences (these are the cases that distinguish a real engine):
 
@@ -102,7 +102,7 @@ Consequences (these are the cases that distinguish a real engine):
 |---|---|---|
 | Sanitizer exists elsewhere in program, not on path | **finding** | never touched the flow |
 | Sanitizer on one branch, tainted value flows around it on the other | **finding** | the surviving fact reaches the sink via the unsanitized branch |
-| Value sanitized, then *re-tainted* (concatenated with fresh taint) | **finding** | the fresh taint is a *distinct source*; its fact never met the sanitizer (no special "re-taint" node needed — per-source propagation handles it; `poc/FINDINGS.md` #2) |
+| Value sanitized, then *re-tainted* (concatenated with fresh taint) | **finding** | the fresh taint is a *distinct source*; its fact never met the sanitizer (no special "re-taint" node needed — per-source propagation handles it) |
 | Sanitizer applied to a different field of the same object | **finding** (within access-path depth) | field-sensitive facts |
 | Sanitizer wraps the sink call itself (parameterized API) | **no finding** | adapter maps the API to a control with `applies: path` at the sink boundary, or simply doesn't map it as a sink |
 | Wrong-type sanitizer (`HTML_ESCAPE` on SQLi rule) | **compile error** | ontology typing ([06](06-ontology.md)) |

@@ -1,6 +1,6 @@
 package findings
 
-// T9.3 (plan/test-coverage-tasklist.md): finding fingerprint stability. The fingerprint
+// Finding fingerprint stability. The fingerprint
 // is content-anchored (rule id + binding name/location) so equivalent findings collapse
 // and survive line drift elsewhere — and is deterministic across runs.
 

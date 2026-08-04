@@ -6,8 +6,7 @@ materialized-facts-vs-virtual-relations split were validated by real AST
 extractors (Python, JavaScript, Ruby) that parse actual repositories into this
 schema and feed the engine unchanged. Interprocedural `CALLS`/dataflow edges are
 built with import + type resolution, not bare names — see
-[10](10-domain-sast.md) §"Call resolution" (`../poc/extract/`, `poc/FINDINGS.md`
-§§"Real-repo extraction" / "Call resolution").
+[10](10-domain-sast.md) §"Call resolution".
 
 ## Principles
 
