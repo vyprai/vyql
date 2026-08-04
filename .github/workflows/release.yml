@@ -12,11 +12,22 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to build (dry run; nothing is published)"
+        # A dispatch runs from a branch, so github.ref_name is that branch, not a
+        # version. This input is what makes the dry run rehearse the real thing:
+        # it names the version to stamp and to build the archive names from.
+        description: "Version to build, e.g. v0.2.0 (dry run; nothing is published)"
         required: true
 
 permissions:
   contents: read
+
+# Resolved once, here, rather than in each step. A dispatch runs from a branch,
+# so github.ref_name is that branch and the input is what carries the version; a
+# tag push has no input and ref_name is the tag. Steps read $VERSION from the
+# environment instead of interpolating it, so the value is never substituted into
+# a shell command as text.
+env:
+  VERSION: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   # Two builds of the same commit, from two different source paths, must produce
@@ -52,7 +63,6 @@ jobs:
 
       - name: Build twice, from two different paths
         run: |
-          VERSION="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
           FLAGS=(-trimpath -ldflags "-s -w -X main.version=${VERSION}")
           go build "${FLAGS[@]}" -o /tmp/build-a ./cmd/vyql
 
@@ -119,14 +129,12 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CC: ${{ matrix.cc }}
         run: |
-          VERSION="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
           go build -trimpath \
             -ldflags "-s -w -X main.version=${VERSION}" \
             -o dist/vyql ./cmd/vyql
 
       - name: Verify the binary reports the tag it was built from
         run: |
-          VERSION="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
           got="$(./dist/vyql version | head -1)"
           echo "$got"
           [ "$got" = "vyql ${VERSION}" ] || { echo "expected 'vyql ${VERSION}'"; exit 1; }
@@ -136,7 +144,6 @@ jobs:
       # binary that starts and then cannot do anything.
       - name: Assemble the archive
         run: |
-          VERSION="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
           NAME="vyql_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
           # The binary goes in bin/. It cannot sit beside the data directory at
           # the archive root: both are called "vyql", and the second copy
@@ -157,7 +164,6 @@ jobs:
       # matters.
       - name: Smoke-test the archive as a user would
         run: |
-          VERSION="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
           NAME="vyql_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
           mkdir -p /tmp/smoke && tar -xzf "${NAME}.tar.gz" -C /tmp/smoke
           mkdir -p /tmp/sample
