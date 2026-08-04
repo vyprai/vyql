@@ -1,0 +1,6 @@
+module bindings.python.generated.m21017d75;
+
+binding unsafeUpload784 {
+  query pattern callExpr where callee.method == "save"
+  emit sink code.UnsafeUpload at args.any
+}

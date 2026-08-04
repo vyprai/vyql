@@ -34,6 +34,11 @@ func TestProfileAutoDetect(t *testing.T) {
 		{"worker", map[string]string{"requirements.txt": "celery==5.3\n"}},
 		{"api", map[string]string{"requirements.txt": "fastapi==0.110\n"}},
 		{"web", map[string]string{"requirements.txt": "flask==1.0.2\nclick==6.7\ncelery==4.2.1\n"}},
+		// `pip freeze` writes canonical caps (Flask, Django, SQLAlchemy); dep matching is
+		// case-insensitive (PyPI names are), so these must still detect web — not fall through
+		// to cli via the lowercase `click`. Regression: without (?i) these picked cli → 0 findings.
+		{"web", map[string]string{"requirements.txt": "Flask==3.1.1\nclick==8.1.7\nSQLAlchemy==2.0.46\nWerkzeug==3.1.5\n"}},
+		{"web", map[string]string{"requirements.txt": "Django==4.2.1\n"}},
 		{"web", map[string]string{"Pipfile": "[packages]\nflask = \"*\"\n"}},
 		{"library", map[string]string{"setup.py": "from setuptools import setup\n"}},
 		{"library", map[string]string{"package.json": `{"name":"pkg","main":"index.js"}`}},
