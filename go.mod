@@ -2,6 +2,16 @@ module github.com/vyprai/vyql
 
 go 1.26.4
 
+// A published version cannot be removed from the module proxy, only retracted:
+// proxy.golang.org has it cached and sum.golang.org has recorded its hash, both
+// permanently. Retracting stops the toolchain selecting it and carries the
+// reason to anyone who pinned it.
+retract (
+	// `go install` produces a binary that cannot locate its data directory: it
+	// lands in GOBIN alone, and that version does not look in the module cache.
+	v0.1.0
+)
+
 require (
 	github.com/dgraph-io/badger/v4 v4.9.2
 	github.com/tree-sitter-grammars/tree-sitter-kotlin v1.1.0

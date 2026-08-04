@@ -31,3 +31,6 @@ node_modules/
 *.env
 *.pem
 *.key
+
+# Bookkeeping from the tree-projection tooling; not part of the source.
+.public-tree-manifest

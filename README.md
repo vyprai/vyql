@@ -20,13 +20,35 @@ is usually a new binding, not new Go.
 
 ## Install
 
+### Download a release
+
+The scanner loads its security knowledge from a `vyql/` directory at startup. The
+release archive carries both halves, so it works on a machine that has never seen
+VyQL:
+
+```sh
+# platforms: linux_amd64, linux_arm64, darwin_arm64, darwin_amd64
+V=v0.2.0; P=darwin_arm64
+curl -fsSLO https://github.com/vyprai/vyql/releases/download/$V/vyql_${V}_${P}.tar.gz
+curl -fsSLO https://github.com/vyprai/vyql/releases/download/$V/vyql_${V}_${P}.tar.gz.sha256
+shasum -a 256 -c vyql_${V}_${P}.tar.gz.sha256
+
+tar -xzf vyql_${V}_${P}.tar.gz
+cd vyql_${V}_${P}
+./bin/vyql scan .
+```
+
+### go install
+
 Requires Go 1.26+ and a C toolchain (the parsers are C).
 
 ```sh
 go install github.com/vyprai/vyql/cmd/vyql@latest
 ```
 
-Or from source:
+The binary finds its data in the module cache, so no further setup is needed.
+
+### From source
 
 ```sh
 git clone https://github.com/vyprai/vyql
@@ -65,19 +87,74 @@ vyql scan --format json  ./my-project | jq '.[].rule'
 
 ## Understand a finding
 
-The debugging commands are the point of the design — you can interrogate the
-graph rather than guess at it.
+The diagnostic commands are the point of the design: you interrogate the analysis
+instead of guessing at it. Every one takes paths just as `scan` does, so `.` scans
+the current directory.
+
+**`explain`** — each finding's full proof tree, including the negation evidence:
+every `unless` clause the rule carries and whether it was satisfied. Usually the
+fastest answer to "why did this fire".
 
 ```sh
-vyql explain ./my-project                    # full proof tree per finding
-vyql trace -from HttpInput -to SqlExecution ./my-project
-vyql match ./my-project                      # what matched which concept
-vyql resolve ./my-project                    # which calls did not resolve
-vyql graph ./my-project                      # dump the graph itself
+vyql explain .
+vyql explain -rules vyql/packs/injection .   # narrow to one pack or file
 ```
 
-`vyql explain` is usually the fastest way to understand why something did or did
-not fire.
+**`match`** — every node a binding attached a concept to. If your source or sink
+is not listed, no rule can fire, because rules match concepts.
+
+```sh
+vyql match .
+```
+
+**`resolve`** — which calls resolved to a body and which did not. Taint stops at
+an unresolved call, so this is where a missing cross-function flow shows up.
+
+```sh
+vyql resolve .
+```
+
+**`trace`** — follows taint from source to sink, or shows where it stops. Both
+filters match on a substring of the concept name.
+
+```sh
+vyql trace .
+vyql trace -from HttpInput -to SqlExecution .
+vyql trace -to FilePathAccess .              # every path into file access
+```
+
+**`query`** — the graph by predicate, for when you want to look rather than be
+told.
+
+```sh
+vyql query -type code.Call .                 # by node type
+vyql query -concept HttpInput .              # by concept label
+vyql query -call db.Query .                  # by callee path or method
+vyql query -loc handlers.go .                # by location substring
+vyql query -concept SqlExecution -edges .    # include outgoing edges
+vyql query -concept HttpInput -count .       # just how many
+vyql query -from HttpInput -to SqlExecution .  # reachability between concepts
+```
+
+**`graph`** — the whole graph, or taint reachability per source. Verbose, and
+definitive when the others all look right.
+
+```sh
+vyql graph .
+vyql graph -taint .
+```
+
+Two more worth knowing:
+
+```sh
+vyql definitions -kind all                   # what concepts, rules and bindings loaded
+vyql definitions explain code.SqlExecution   # which binding produced a label
+vyql bindings -lang python                   # one language's source/sink/check vocabulary
+```
+
+A missed finding is nearly always one of three things, and `match`, `resolve` and
+`explain` distinguish them in that order: nothing was labelled, the call did not
+resolve, or an `unless` clause was satisfied.
 
 ## Languages
 
@@ -126,6 +203,27 @@ binding language.
 [docs/README.md](docs/README.md) is the index. The design series (`docs/03`
 through `docs/20`) is the reference for how the engine works; read it before
 changing the engine or the language.
+
+## Stability
+
+**The CLI is stable.** Commands, flags and output formats follow semantic
+versioning: `scan`, its `--format` values, the JSON and SARIF shapes, and the
+finding fingerprint will not change incompatibly within a major version. Build
+tooling against them.
+
+**The rule and binding language is not.** It is still moving, and a future
+version changes parts of the syntax. Concepts get renamed and clauses get added,
+so a rule pack written today may need edits to keep working. The specs in
+`vyql/tests/` are what tell you when something breaks.
+
+**The knowledge base evolves.** A newer release can report findings an older one
+did not -- that is the point of it -- but it means pinning a version is the only
+way to get identical output twice.
+
+**Some documents describe design rather than behaviour.** The reference series in
+[docs/](docs/README.md) includes work that is not implemented; those documents say
+so at the top, and the index lists them separately. What a scan actually does is
+whatever `vyql definitions -kind all` reports as loaded.
 
 ## Contributing
 
