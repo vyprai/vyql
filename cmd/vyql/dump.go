@@ -89,9 +89,10 @@ func buildGraphWithOptions(paths []string, cache lowering.DeltaCache, opts graph
 		return nil, stats, err
 	}
 	tk.mark("extract")
-	if len(stats.files) == 0 {
-		return nil, stats, fmt.Errorf("no supported source found under %s", strings.Join(paths, ", "))
-	}
+	// A tree with nothing parseable can still carry dependency evidence: applySCA does its own
+	// walk and reads manifests and vendored library banners without needing a parsed module. A
+	// project that vendors only minified bundles lands here, because the walker skips those as
+	// unparseable — so run SCA before concluding there is nothing to report.
 	if len(prog.Modules) == 0 {
 		g := usg.NewInMemStore()
 		applySCA(g, paths)
@@ -100,6 +101,12 @@ func buildGraphWithOptions(paths []string, cache lowering.DeltaCache, opts graph
 			return nil, stats, err
 		}
 		if len(nodes) == 0 {
+			// Nothing parseable AND no dependency evidence. Distinguish "you pointed me at a
+			// tree I cannot read" from "I read it and it is clean", so the former stays a
+			// diagnosable error rather than a silent zero-finding pass.
+			if len(stats.files) == 0 {
+				return nil, stats, fmt.Errorf("no supported source found under %s", strings.Join(paths, ", "))
+			}
 			return nil, stats, nil
 		}
 		if _, _, err := bindings.Apply(g, frontend.AutoBindings(), nil); err != nil {
