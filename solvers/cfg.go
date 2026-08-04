@@ -104,8 +104,7 @@ func reachesRegion(rA, oA, rB, oB string) bool {
 	if rA == "" || rB == "" {
 		return false // no CFG metadata → not decidable
 	}
-	comparable := rA == rB || strings.HasPrefix(rB, rA+"/") || strings.HasPrefix(rA, rB+"/")
-	if !comparable {
+	if !regionsSequenced(rA, rB) {
 		return false // disjoint sibling branches — no path from a to b
 	}
 	a, err1 := strconv.Atoi(oA)
@@ -114,6 +113,37 @@ func reachesRegion(rA, oA, rB, oB string) bool {
 		return false
 	}
 	return a < b
+}
+
+// regionsSequenced reports whether two regions can lie on one execution path.
+// Control regions nest with "/", so a prefix relation puts one inside the other;
+// disjoint sibling branches never both run. A function body written inline hangs
+// off its enclosing region with "#", and its code runs somewhere after the code
+// that passes it, so it is sequenced with that region and with everything that
+// region is sequenced with.
+func regionsSequenced(a, b string) bool {
+	for _, ra := range regionScopeChain(a) {
+		for _, rb := range regionScopeChain(b) {
+			if ra == rb || strings.HasPrefix(rb, ra+"/") || strings.HasPrefix(ra, rb+"/") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// regionScopeChain returns r followed by each region it is nested inside as an
+// inline function body, outermost last.
+func regionScopeChain(r string) []string {
+	out := []string{r}
+	for {
+		i := strings.LastIndex(r, "#")
+		if i < 0 {
+			return out
+		}
+		r = r[:i]
+		out = append(out, r)
+	}
 }
 
 // dominatesRegion is the pure structural check (split out for testing).
