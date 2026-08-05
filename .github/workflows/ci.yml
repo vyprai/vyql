@@ -17,41 +17,47 @@ jobs:
   # A job skipped by a conditional does report, as success.
   changes:
     runs-on: ubuntu-latest
+    # Granted here rather than at the workflow level: only this job reads the
+    # pull request's file list, and nothing else needs the scope.
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       code: ${{ steps.detect.outputs.code }}
     steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
       - id: detect
         env:
           EVENT: ${{ github.event_name }}
-          BASE: ${{ github.event.pull_request.base.sha }}
+          PR: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Anything that is not a pull request -- a push to main, a schedule, a
-          # manual run -- gets the full suite. Only a pull request has a base to
-          # compare against, and only there is the saving worth the machinery.
+          # Anything that is not a pull request -- a push to main, the security
+          # schedule, a manual run -- gets the full suite. Only a pull request
+          # has a base to compare against.
           if [ "$EVENT" != "pull_request" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "not a pull request: running everything"
             exit 0
           fi
-          changed="$(git diff --name-only "$BASE"...HEAD)"
+          # Asked of the API rather than computed from a checkout: the working
+          # tree is 34,000 files and this job exists to save time, not spend it
+          # cloning three times over. --paginate covers pull requests with more
+          # than one page of files.
+          changed="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --jq '.[].filename')"
           echo "changed files:"; echo "$changed" | sed 's/^/  /'
-          # Deliberately inverted: anything NOT matching the docs patterns means
-          # run everything. A new kind of file defaults to being treated as code,
-          # which is the safe direction to be wrong in.
-          if printf '%s\n' "$changed" | grep -qvE '^(docs/|CHANGELOG\.md|README\.md|.*\.md|LICENSE|NOTICE)$'; then
+          # Inverted on purpose: anything that is not recognisably documentation
+          # counts as code, so a new kind of file runs the full suite. Being
+          # wrong that way costs runner minutes; the other way ships untested.
+          if printf '%s\n' "$changed" | grep -qvE '^(docs/.*|.*\.md|LICENSE|NOTICE)$'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "-> code changed; running everything"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
-            echo "-> documentation only; the expensive jobs will report success without running"
+            echo "-> documentation only; the expensive steps will be skipped"
           fi
   build-test:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -69,22 +75,24 @@ jobs:
           cache: true
 
       - name: Build
+        if: needs.changes.outputs.code == 'true'
         run: |
           go build -o bin/vyql ./cmd/vyql
           go build -o bin/gen-ontology-json ./cmd/gen-ontology-json
 
       - name: Vet
+        if: needs.changes.outputs.code == 'true'
         run: go vet ./...
 
       # -count=1 is mandatory: the test cache keys on source and does not track
       # the .vyql data files, so a cached pass can hide a change to the security
       # knowledge base entirely.
       - name: Test
+        if: needs.changes.outputs.code == 'true'
         run: go test -count=1 ./...
 
   lint:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: "1"
@@ -96,6 +104,7 @@ jobs:
           cache: true
 
       - name: gofmt
+        if: needs.changes.outputs.code == 'true'
         run: |
           out="$(gofmt -l .)"
           if [ -n "$out" ]; then
@@ -110,6 +119,7 @@ jobs:
       # with. Pinned rather than `latest` so CI runs the same linter the
       # contributor documentation tells people to install.
       - uses: golangci/golangci-lint-action@v9
+        if: needs.changes.outputs.code == 'true'
         with:
           version: v2.12.1
 
