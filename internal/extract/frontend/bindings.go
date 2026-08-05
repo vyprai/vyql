@@ -3023,6 +3023,9 @@ func (spec bindingSpec) sinkApplicator() bindings.Applicator {
 					}
 					hit := sk.ByMethod && method == sk.Pattern ||
 						!sk.ByMethod && ((sk.Exact && path == sk.Pattern) || (!sk.Exact && matchSinkPath(path, sk.Pattern)))
+					if hit && sk.ByMethod && !receiverScopeSatisfied(n.Prop("recv_package"), path, sk.Packages, scopePolicy) {
+						hit = false
+					}
 					if sinkTimingOn {
 						sinkStats[i].MatchDuration += time.Since(statStart)
 					}
@@ -3378,6 +3381,9 @@ func (spec bindingSpec) checkApplicator() bindings.Applicator {
 					// no break: a single call can be MULTIPLE controls, so attach every match.
 					hit := c.ByMethod && method == c.Pattern ||
 						!c.ByMethod && ((c.Exact && path == c.Pattern) || (!c.Exact && matchPath(path, []string{c.Pattern}, "prefix")))
+					if hit && c.ByMethod && !receiverScopeSatisfied(n.Prop("recv_package"), path, c.Packages, scopePolicy) {
+						hit = false
+					}
 					if hit && !callArgCountMatches(n, c.ArgCountSet, c.ArgCountMin, c.ArgCountMax) {
 						hit = false
 					}
@@ -6532,6 +6538,9 @@ func (spec bindingSpec) matchPresenceApplicator() bindings.Applicator {
 					}
 					hit := m.ByMethod && method == m.Pattern ||
 						!m.ByMethod && ((m.Pattern == "" && m.NodeType != "") || (m.Exact && path == m.Pattern) || (!m.Exact && matchSinkPath(path, m.Pattern)))
+					if hit && m.ByMethod && !receiverScopeSatisfied(n.Prop("recv_package"), path, m.Packages, scopePolicy) {
+						hit = false
+					}
 					if !hit {
 						continue
 					}
@@ -7346,4 +7355,72 @@ func containsStr(xs []string, v string) bool {
 		}
 	}
 	return false
+}
+
+// unresolvedPolicy decides whether a package-gated bare-method spec matches a
+// call whose receiver does not resolve to any import -- a builtin, a dynamic
+// receiver, or a language whose frontend has no import table.
+type unresolvedPolicy int
+
+const (
+	// Reject only a receiver that resolves to a different package; an
+	// unresolved receiver still matches, because nothing says it is foreign.
+	unresolvedMatches unresolvedPolicy = iota
+	// Reject anything that does not positively resolve to the gated package.
+	// Stricter, and it discards instance-method calls.
+	unresolvedSkipsResolvedOnly
+)
+
+// scopePolicy governs bare-method specs whose receiver does not resolve.
+// VYQL_UNRESOLVED_RECEIVER=skip tightens it, which exists so the choice can be
+// measured against a corpus rather than argued about.
+var scopePolicy = func() unresolvedPolicy {
+	if os.Getenv("VYQL_UNRESOLVED_RECEIVER") == "skip" {
+		return unresolvedSkipsResolvedOnly
+	}
+	return unresolvedMatches
+}()
+
+// receiverScopeSatisfied reports whether a call is in scope for a spec gated on
+// packages. A spec with no package gate is unscoped and always satisfied, so
+// this only ever narrows bindings that named a package in the first place.
+//
+// Two pieces of evidence, in order. `recv_package` is the receiver resolved
+// through the module import table, which is the only thing that can see through
+// an alias -- `Bourne.parse` is a call on @hapi/bourne and the callee path
+// cannot say so. When it is absent the root of the callee path is used instead:
+// a node built by hand, one from a graph lowered before the property existed,
+// or a frontend with no import table all still carry a path, and treating the
+// missing property as "no match" would silently drop every package-gated
+// binding on those.
+func receiverScopeSatisfied(nodePkg, calleePath string, packages []string, policy unresolvedPolicy) bool {
+	if len(packages) == 0 {
+		return true
+	}
+	root := calleePathRoot(calleePath)
+	for _, p := range packages {
+		for _, name := range importNamesForPackage(p) {
+			if name == nodePkg || name == root {
+				return true
+			}
+		}
+	}
+	// Rejection needs positive evidence. A resolved receiver that belongs to a
+	// different package is that evidence. An unresolved one is not: `const zip
+	// = new AdmZip(...); zip.extractAllTo(...)` calls into adm-zip through an
+	// instance, and the import table cannot see through a variable. Rejecting
+	// those would discard every instance-method binding in the corpus.
+	if nodePkg != "" {
+		return false
+	}
+	return policy != unresolvedSkipsResolvedOnly
+}
+
+// calleePathRoot is the first dotted segment of a callee path: the receiver as
+// the source text spells it.
+func calleePathRoot(path string) string {
+	if i := strings.IndexByte(path, '.'); i > 0 {
+		return path[:i]
+	}
+	return ""
 }
