@@ -10,7 +10,7 @@ behaviour change even when no code changed.
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-08-04
+## [0.2.0] - 2026-08-05
 
 First public release.
 
@@ -36,6 +36,21 @@ First public release.
   a failed scan also exits 1.
 - **`diff`** compares two `--format json` runs by finding fingerprint, for
   asking whether a branch introduced anything new.
+- **Triage baselines.** `-baseline` keeps already-triaged findings out of the
+  report and the gate, keyed on the fingerprint, so a scan reports what is new;
+  `-baseline-write` records the current findings as accepted, which is how a
+  codebase with a backlog adopts the scanner. Entries that stop matching are
+  reported rather than left to outlive the code they excused.
+- **Coverage reporting.** Files no frontend read are reported unconditionally,
+  because a clean result over a tree that was mostly skipped reads exactly like
+  a clean result over one that was fully read. `-coverage` gives the full
+  account of what was parsed, excluded and left unanalysed.
+- **An [Agent Skill](skills/vyql-security-scan/)** for scanning and triage,
+  written to the open SKILL.md format so it works across agent tools rather than
+  one vendor's.
+- **A [GitHub Action](https://github.com/vyprai/vyql-action)**:
+  `uses: vyprai/vyql-action@v1`.
+- **`vyql scan` with no path** scans the working directory and says so.
 - **Release archives for linux/amd64, linux/arm64, darwin/amd64 and
   darwin/arm64**, each built on a native runner and carrying both the binary and
   the data directory, with SHA-256 sums. Two builds of the same commit from
@@ -53,6 +68,9 @@ First public release.
   is not** — see [Stability](README.md#stability) before writing bindings.
 - Requires a C toolchain to build from source; the parsers are C compiled by
   cgo.
+- Every Go package except `cmd/` is under `internal/`. The command is the
+  supported interface; the packages stay free to change. Promoting one out of
+  `internal/` later is not a breaking change, so nothing is foreclosed.
 
 ### Retracted
 - **0.1.0** produced a binary that could not locate its data directory when
