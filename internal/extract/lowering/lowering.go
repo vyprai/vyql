@@ -3883,6 +3883,13 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	if recvType != "" {
 		propCount++
 	}
+	// Which package this call is made on, so a binding gated on package P can
+	// require the call to be on P rather than on any receiver sharing the
+	// method name.
+	recvPackage := resolveReceiverPackage(calleePath, l.importTables[l.curModule])
+	if recvPackage != "" {
+		propCount++
+	}
 	var props map[string]string
 	if propCount > 0 {
 		props = make(map[string]string, propCount)
@@ -3901,6 +3908,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		}
 		if recvType != "" {
 			props["recv_type"] = recvType
+		}
+		if recvPackage != "" {
+			props["recv_package"] = recvPackage
 		}
 	}
 	result := l.nodeInline("Call", call.Loc, props, call.Method, calleePath, strArgs, "")
