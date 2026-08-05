@@ -7,10 +7,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/vyprai/vyql/engine"
-	"github.com/vyprai/vyql/extract/nir"
-	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/internal/engine"
+	"github.com/vyprai/vyql/internal/extract/nir"
+	"github.com/vyprai/vyql/internal/ontology"
+	"github.com/vyprai/vyql/internal/parser"
 )
 
 func TestScanPathsNoSource(t *testing.T) {

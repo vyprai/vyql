@@ -14,9 +14,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/datadir"
-	"github.com/vyprai/vyql/extract/frontend"
-	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/internal/datadir"
+	"github.com/vyprai/vyql/internal/extract/frontend"
+	"github.com/vyprai/vyql/internal/parser"
 )
 
 // readDataFiles returns {relpath: content} for every *.vyql under vyql/<sub>.
@@ -1003,7 +1003,7 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 			return err
 		}
 		src := string(data)
-		importsVyqlParser := strings.Contains(src, `"github.com/vyprai/vyql/parser"`)
+		importsVyqlParser := strings.Contains(src, `"github.com/vyprai/vyql/internal/parser"`)
 		usesLegacy := false
 		for _, snippet := range legacyCoverageClauses {
 			if strings.Contains(src, snippet) {

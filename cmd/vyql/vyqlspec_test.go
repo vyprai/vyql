@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	bindingapply "github.com/vyprai/vyql/bindings"
-	"github.com/vyprai/vyql/datadir"
-	"github.com/vyprai/vyql/engine"
-	"github.com/vyprai/vyql/extract/frontend"
-	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/parser"
-	"github.com/vyprai/vyql/usg"
+	bindingapply "github.com/vyprai/vyql/internal/bindings"
+	"github.com/vyprai/vyql/internal/datadir"
+	"github.com/vyprai/vyql/internal/engine"
+	"github.com/vyprai/vyql/internal/extract/frontend"
+	"github.com/vyprai/vyql/internal/ontology"
+	"github.com/vyprai/vyql/internal/parser"
+	"github.com/vyprai/vyql/internal/usg"
 )
 
 // VyQL test specs (`vyql/tests/*.test.vyql`) are declarative, language-agnostic

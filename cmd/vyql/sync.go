@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/vyprai/vyql/extract/parsecache"
-	"github.com/vyprai/vyql/graphsync"
+	"github.com/vyprai/vyql/internal/extract/parsecache"
+	"github.com/vyprai/vyql/internal/graphsync"
 )
 
 // syncCollector, when non-nil, makes buildGraphWithOptions assemble a graph-database change-feed

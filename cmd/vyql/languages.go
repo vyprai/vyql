@@ -5,13 +5,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/vyprai/vyql/bindings"
-	"github.com/vyprai/vyql/extract/frontend"
-	cfgfront "github.com/vyprai/vyql/extract/frontend/config"
-	"github.com/vyprai/vyql/extract/frontend/golang"
-	"github.com/vyprai/vyql/extract/frontend/textpattern"
-	"github.com/vyprai/vyql/extract/frontend/treesitter"
-	"github.com/vyprai/vyql/extract/nir"
+	"github.com/vyprai/vyql/internal/bindings"
+	"github.com/vyprai/vyql/internal/extract/frontend"
+	cfgfront "github.com/vyprai/vyql/internal/extract/frontend/config"
+	"github.com/vyprai/vyql/internal/extract/frontend/golang"
+	"github.com/vyprai/vyql/internal/extract/frontend/textpattern"
+	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
+	"github.com/vyprai/vyql/internal/extract/nir"
 )
 
 // language ties a file extension set to its real source->NIR frontend and the

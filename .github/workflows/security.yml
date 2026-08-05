@@ -66,7 +66,7 @@ jobs:
           cache: true
       - run: go build -o bin/vyql ./cmd/vyql
       # Two directories are excluded, and both are cost rather than coverage:
-      # vyql/ is 34,000 data files, and extract/frontend/treesitter/grammars is
+      # vyql/ is the data corpus, and internal/extract/frontend/treesitter/grammars is
       # 121 MB of generated C from upstream tree-sitter. Scanning the root
       # without these took over twenty minutes; with them excluded it takes ten
       # seconds and covers the code we actually write.

@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/bindings"
-	"github.com/vyprai/vyql/engine"
-	"github.com/vyprai/vyql/extract/frontend"
-	"github.com/vyprai/vyql/extract/lowering"
-	"github.com/vyprai/vyql/findings"
-	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/usg"
+	"github.com/vyprai/vyql/internal/bindings"
+	"github.com/vyprai/vyql/internal/engine"
+	"github.com/vyprai/vyql/internal/extract/frontend"
+	"github.com/vyprai/vyql/internal/extract/lowering"
+	"github.com/vyprai/vyql/internal/findings"
+	"github.com/vyprai/vyql/internal/ontology"
+	"github.com/vyprai/vyql/internal/usg"
 )
 
 // fakeDelta is an in-memory lowering.DeltaCache for the findings-equivalence harness.

@@ -44,7 +44,7 @@ linters:
   exclusions:
     rules:
       # Generated tree-sitter parsers: vendored C with thin Go bindings.
-      - path: extract/frontend/treesitter/grammars
+      - path: internal/extract/frontend/treesitter/grammars
         linters: [errcheck, govet, ineffassign, staticcheck, unused, misspell]
       # 682 of the 720 errcheck findings are test setup calling AddNode/AddEdge/
       # AddLabel on an in-memory store whose implementations return nil

@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/vyprai/vyql/datadir"
-	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/internal/datadir"
+	"github.com/vyprai/vyql/internal/findings"
 )
 
 type corpusSpec struct {

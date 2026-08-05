@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/vyprai/vyql/datadir"
-	"github.com/vyprai/vyql/definitions"
-	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/internal/datadir"
+	"github.com/vyprai/vyql/internal/definitions"
+	"github.com/vyprai/vyql/internal/parser"
 )
 
 func cmdDefinitions(args []string) error {

@@ -67,7 +67,7 @@ if [ -n "$stray" ]; then
 fi
 
 echo "== grammar licenses present =="
-for d in extract/frontend/treesitter/grammars/*/; do
+for d in internal/extract/frontend/treesitter/grammars/*/; do
   [ -s "$d/LICENSE" ] || { echo "FAIL: missing license for $(basename "$d")"; fail=1; }
 done
 

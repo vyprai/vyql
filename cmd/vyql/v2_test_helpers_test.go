@@ -1,6 +1,6 @@
 package main
 
-import "github.com/vyprai/vyql/parser"
+import "github.com/vyprai/vyql/internal/parser"
 
 const v2CorePoliciesForCmdTest = `
 module policies.core;

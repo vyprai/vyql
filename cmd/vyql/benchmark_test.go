@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/findings"
-	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/internal/findings"
+	"github.com/vyprai/vyql/internal/parser"
 )
 
 // TestOWASPBenchmark scores VyQL against an OWASP Benchmark suite and prints a

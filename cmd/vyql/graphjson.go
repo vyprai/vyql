@@ -8,10 +8,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/vyprai/vyql/datadir"
-	"github.com/vyprai/vyql/findings"
-	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/usg"
+	"github.com/vyprai/vyql/internal/datadir"
+	"github.com/vyprai/vyql/internal/findings"
+	"github.com/vyprai/vyql/internal/ontology"
+	"github.com/vyprai/vyql/internal/usg"
 )
 
 // graph-json is VyQL's structured CODE_MAPPER export: one cross-referenced document

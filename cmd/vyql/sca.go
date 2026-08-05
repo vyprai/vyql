@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/vyprai/vyql/extract/frontend/treesitter"
-	"github.com/vyprai/vyql/extract/sca"
-	"github.com/vyprai/vyql/usg"
+	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
+	"github.com/vyprai/vyql/internal/extract/sca"
+	"github.com/vyprai/vyql/internal/usg"
 )
 
 // manifestParsers maps a dependency-manifest basename to its ecosystem and reader.
