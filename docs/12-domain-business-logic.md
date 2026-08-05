@@ -1,13 +1,15 @@
 # 12 — Domain: Business Logic Analysis
 
 Status: `RESEARCH` — do not build against this document without a separate
+design review.
 
 > **Not implemented.** This document is design, not a description of the shipped
-> scanner. No binding emits a `business.` concept, so the rules in this area cannot fire. Read it as intent; do not read it as a feature list.
+> scanner. No binding emits a `business.` concept, so the rules in this area
+> cannot fire. Read it as intent; do not read it as a feature list.
 
-design review. This is the most ambitious and least proven part of the VyQL
-vision, and this document is deliberately honest about which parts are
-engineering and which parts are open research.
+This is the most ambitious and least proven part of the VyQL vision, and this
+document is deliberately honest about which parts are engineering and which
+parts are open research.
 
 ## The model
 

@@ -3,8 +3,9 @@
 Status: `DESIGN` — not implemented
 
 > **Not implemented.** This document is design, not a description of the shipped
-> scanner. No binding emits a `cloud.` or `identity.` concept, so the rules in this area cannot fire and a scan will never report one. Read it as intent; do not read it as a feature list.
-
+> scanner. No binding emits a `cloud.` or `identity.` concept, so the rules in
+> this area cannot fire and a scan will never report one. Read it as intent; do
+> not read it as a feature list.
 
 Cloud + identity + attack paths are VyQL's Tier 1 flagship: the domain where
 "everything is a graph traversal" is literally true, the adapter surface is
