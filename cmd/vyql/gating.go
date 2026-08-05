@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/internal/findings"
 )
 
 // Severity ordering for -fail-on, lowest first. These are the severities rules

@@ -1,16 +1,30 @@
-// Command vyql is the VyQL command-line scanner. It runs the full pipeline on
-// real source: native frontend (go/ast) -> NIR -> shared lowering with
-// import/type resolution -> framework bindings -> rule evaluation -> findings,
-// rendered as a human report or SARIF 2.1.0.
+// Command vyql is a multi-language security scanner. It follows tainted data
+// from where it enters a program to where it does something dangerous, and
+// reports the neutralizing controls it looked for and did not find.
+//
+// The pipeline is: source -> frontend -> NIR -> lowering with import and type
+// resolution -> framework bindings -> rule evaluation -> findings, rendered as
+// a report, JSON or SARIF 2.1.0. Go has a native frontend; the other 21
+// languages are parsed by tree-sitter.
 //
 // Usage:
 //
-//	vyql scan [flags] <path>...
-//	  -rules <file|dir>   load rule(s) from .vyql file(s)
-//	  -format text|sarif  output format (default: text)
+//	vyql scan [flags] [path...]      # no path scans the working directory
+//	  -fail-on   severity at or above which to exit non-zero (default: high)
+//	  -format    text | sarif | json | graph-json
+//	  -baseline  triaged findings to exclude from the report and the gate
+//	  -coverage  report what was parsed, excluded and left unanalysed
 //
-// Other languages and a tree-sitter frontend are the documented next step; this
-// build ships the native Go frontend.
+//	vyql explain | trace | query | match | resolve | graph | diff | definitions
+//
+// Run vyql with no arguments for the full command list, or see
+// https://github.com/vyprai/vyql for the guide.
+//
+// All security knowledge -- concepts, bindings, rule packs -- is loaded at
+// startup from a vyql/ data directory rather than compiled in.
+//
+// The command is the supported interface. Everything under internal/ is
+// deliberately not importable, so it stays free to change.
 package main
 
 import (

@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/internal/findings"
 )
 
 // Triage is expensive and, without somewhere to record it, worthless the moment

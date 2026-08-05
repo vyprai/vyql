@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/internal/findings"
 )
 
 func TestParseFailOnDefaultsToNoGating(t *testing.T) {

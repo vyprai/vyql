@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/internal/findings"
 )
 
 func writeTemp(t *testing.T, name, body string) string {
