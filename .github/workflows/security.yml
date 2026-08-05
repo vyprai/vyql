@@ -13,7 +13,55 @@ permissions:
   contents: read
 
 jobs:
+  # Docs-only pull requests still have to satisfy the required checks, so the
+  # workflow always runs and the expensive jobs decide for themselves. Path
+  # filtering at the `on:` level would leave those checks Pending forever --
+  # GitHub is explicit that a workflow skipped by a path filter never reports.
+  #
+  # A job skipped by a conditional does report, as success.
+  changes:
+    runs-on: ubuntu-latest
+    # Granted here rather than at the workflow level: only this job reads the
+    # pull request's file list, and nothing else needs the scope.
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.detect.outputs.code }}
+    steps:
+      - id: detect
+        env:
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Anything that is not a pull request -- a push to main, the security
+          # schedule, a manual run -- gets the full suite. Only a pull request
+          # has a base to compare against.
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "not a pull request: running everything"
+            exit 0
+          fi
+          # Asked of the API rather than computed from a checkout: the working
+          # tree is 34,000 files and this job exists to save time, not spend it
+          # cloning three times over. --paginate covers pull requests with more
+          # than one page of files.
+          changed="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --jq '.[].filename')"
+          echo "changed files:"; echo "$changed" | sed 's/^/  /'
+          # Inverted on purpose: anything that is not recognisably documentation
+          # counts as code, so a new kind of file runs the full suite. Being
+          # wrong that way costs runner minutes; the other way ships untested.
+          if printf '%s\n' "$changed" | grep -qvE '^(docs/.*|.*\.md|LICENSE|NOTICE)$'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "-> code changed; running everything"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "-> documentation only; the expensive steps will be skipped"
+          fi
   govulncheck:
+    needs: changes
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: "1"
@@ -24,11 +72,14 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        if: needs.changes.outputs.code == 'true'
       # Reports only vulnerabilities in code paths this module actually reaches,
       # so a finding here is a real exposure rather than a version match.
       - run: govulncheck ./...
+        if: needs.changes.outputs.code == 'true'
 
   codeql:
+    needs: changes
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -40,9 +91,11 @@ jobs:
           go-version-file: go.mod
           cache: true
       - uses: github/codeql-action/init@v4
+        if: needs.changes.outputs.code == 'true'
         with:
           languages: go
       - uses: github/codeql-action/autobuild@v4
+        if: needs.changes.outputs.code == 'true'
       # Uploading results needs code scanning, which is free on public
       # repositories and a paid feature on private ones. While this repository is
       # private the upload fails with "Resource not accessible by integration",
@@ -50,9 +103,11 @@ jobs:
       # analysis itself still runs, and this starts reporting the moment the
       # repository is public.
       - uses: github/codeql-action/analyze@v4
+        if: needs.changes.outputs.code == 'true'
         continue-on-error: true
 
   scan-self:
+    needs: changes
     # VyQL scans its own source. A security scanner that cannot be run against
     # itself is making a claim it will not test.
     runs-on: ubuntu-latest
@@ -65,12 +120,14 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: go build -o bin/vyql ./cmd/vyql
+        if: needs.changes.outputs.code == 'true'
       # Two directories are excluded, and both are cost rather than coverage:
       # vyql/ is the data corpus, and internal/extract/frontend/treesitter/grammars is
       # 121 MB of generated C from upstream tree-sitter. Scanning the root
       # without these took over twenty minutes; with them excluded it takes ten
       # seconds and covers the code we actually write.
       - name: Scan this repository
+        if: needs.changes.outputs.code == 'true'
         run: |
           # -fail-on none: this step produces SARIF for the upload below and the
           # assertion that follows it. Gating here would fail the job on a
@@ -92,6 +149,7 @@ jobs:
       # cannot scan its own source, the step above fails and this job fails with
       # it -- that is the signal worth having.
       - uses: github/codeql-action/upload-sarif@v4
+        if: needs.changes.outputs.code == 'true'
         continue-on-error: true
         with:
           sarif_file: vyql-self.sarif
