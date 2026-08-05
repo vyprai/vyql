@@ -28,7 +28,7 @@ is usually a new binding, not new Go.
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/vyprai/vyql/main/scripts/install.sh | sh
+curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh
 ```
 
 Picks the right build for your platform, verifies its published SHA-256, unpacks

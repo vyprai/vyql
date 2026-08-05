@@ -1,7 +1,11 @@
 #!/bin/sh
 # Install VyQL.
 #
-#   curl -fsSL https://raw.githubusercontent.com/vyprai/vyql/main/scripts/install.sh | sh
+#   curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh
+#
+# This file is also served at that URL. A copy that drifts from this one is a
+# copy that installs something nobody reviewed, so publishing it is a step in
+# release automation rather than a manual upload.
 #
 # Environment:
 #   VYQL_VERSION           release to install (default: the latest)
