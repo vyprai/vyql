@@ -1,9 +1,0 @@
-module bindings.go.generated.m69474f76;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/google/certificate-transparency-go")
-  }
-  query pattern callExpr where callee.method == "parseInt64"
-  emit sink code.Deserialization at args[0]
-}

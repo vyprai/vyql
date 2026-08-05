@@ -1,9 +1,0 @@
-module bindings.swift.generated.mcf8769cc;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/google/JacquardSDKiOS")
-  }
-  query pattern callExpr where callee.method == "parseNotification"
-  emit sink code.Deserialization at args[0]
-}

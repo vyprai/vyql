@@ -1,9 +1,0 @@
-module bindings.java.generated.m00e366aa;
-
-binding httpInput0 {
-  requires {
-    dependency("org.zalando:problem-spring-web")
-  }
-  query pattern callExpr where callee.method == "negotiate"
-  emit source code.HttpInput at call.result
-}

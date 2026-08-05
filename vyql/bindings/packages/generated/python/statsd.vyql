@@ -1,0 +1,41 @@
+module bindings.python.generated.m0b3f5f0d;
+
+binding networkSend0 {
+  requires {
+    dependency("statsd")
+  }
+  query pattern callExpr where callee.method == "timing"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("statsd")
+  }
+  query pattern callExpr where callee.method == "incr"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("statsd")
+  }
+  query pattern callExpr where callee.method == "decr"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("statsd")
+  }
+  query pattern callExpr where callee.method == "gauge"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("statsd")
+  }
+  query pattern callExpr where callee.method == "set"
+  emit sink code.NetworkSend at args[0]
+}

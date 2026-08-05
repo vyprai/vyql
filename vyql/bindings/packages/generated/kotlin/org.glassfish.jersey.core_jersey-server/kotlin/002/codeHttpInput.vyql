@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m971d5e41;
-
-binding httpInput2 {
-  requires {
-    dependency("org.glassfish.jersey.core:jersey-server")
-  }
-  query pattern callExpr where callee.method == "ContainerRequest.getUriInfo"
-  emit source code.HttpInput at call.result
-}

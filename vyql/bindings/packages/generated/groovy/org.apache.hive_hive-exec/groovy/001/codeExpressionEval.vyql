@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m007c12d5;
-
-binding expressionEval1 {
-  requires {
-    dependency("org.apache.hive:hive-exec")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.ExpressionEval at args[0]
-}

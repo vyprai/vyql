@@ -1,9 +1,0 @@
-module bindings.swift.generated.m2b59743c;
-
-binding httpInput4 {
-  requires {
-    dependency("github.com/envoy/Embassy")
-  }
-  query pattern callExpr where callee.method == "HTTPRequest.headers"
-  emit source code.HttpInput at call.result
-}

@@ -1,0 +1,105 @@
+module bindings.swift.generated.m49bc2eb2;
+
+binding secretValue0 {
+  requires {
+    dependency("github.com/auth0/Auth0.swift")
+  }
+  query pattern callExpr where callee.method == "authentication"
+  emit source code.SecretValue at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/auth0/Auth0.swift")
+  }
+  query pattern callExpr where callee.method == "webAuth"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("github.com/auth0/Auth0.swift")
+  }
+  query pattern callExpr where callee.method == "authorizeWithRequestUri"
+  emit source core.UserControlledData at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("github.com/auth0/Auth0.swift")
+  }
+  query pattern callExpr where callee.method == "credentials"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("github.com/auth0/Auth0.swift")
+  }
+  query pattern callExpr where callee.method == "store"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("github.com/auth0/Auth0.swift")
+  }
+  query pattern callExpr where callee.method == "sessionTransferToken"
+  emit source code.SecretValue at call.result
+}
+
+binding authenticationCheck6 {
+  requires {
+    dependency("github.com/auth0/Auth0.swift")
+  }
+  query pattern callExpr where callee.method == "clearSession"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding storedDataRead7 {
+  requires {
+    dependency("github.com/auth0/Auth0.swift")
+  }
+  query pattern callExpr where callee.method == "getEntry"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataWrite8 {
+  requires {
+    dependency("github.com/auth0/Auth0.swift")
+  }
+  query pattern callExpr where callee.method == "setEntry"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite9 {
+  requires {
+    dependency("github.com/auth0/Auth0.swift")
+  }
+  query pattern callExpr where callee.method == "deleteEntry"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding authenticationCheck10 {
+  requires {
+    dependency("github.com/auth0/Auth0.swift")
+  }
+  query pattern callExpr where callee.method == "mfa"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding secretValue11 {
+  requires {
+    dependency("github.com/auth0/Auth0.swift")
+  }
+  query pattern callExpr where callee.method == "users"
+  emit source code.SecretValue at call.result
+}

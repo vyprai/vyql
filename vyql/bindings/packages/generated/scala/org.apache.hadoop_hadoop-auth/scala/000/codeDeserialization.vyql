@@ -1,9 +1,0 @@
-module bindings.scala.generated.md22be8dc;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.hadoop:hadoop-auth")
-  }
-  query pattern callExpr where callee.method == "AuthToken.parse"
-  emit sink code.Deserialization at args[0]
-}

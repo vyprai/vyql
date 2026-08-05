@@ -1,9 +1,0 @@
-module bindings.perl.generated.m9a80f6a4;
-
-binding stdinInput2 {
-  requires {
-    dependency("App-htmlcat")
-  }
-  query pattern callExpr where callee.method == "run"
-  emit source code.StdinInput at call.result
-}

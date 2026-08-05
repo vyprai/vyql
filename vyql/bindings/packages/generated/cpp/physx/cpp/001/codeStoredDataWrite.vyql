@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m5d9888a9;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("physx")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.StoredDataWrite at args[0]
-}

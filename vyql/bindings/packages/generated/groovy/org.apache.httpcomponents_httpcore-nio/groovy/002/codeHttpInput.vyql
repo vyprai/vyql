@@ -1,9 +1,0 @@
-module bindings.groovy.generated.ma54663b1;
-
-binding httpInput2 {
-  requires {
-    dependency("org.apache.httpcomponents:httpcore-nio")
-  }
-  query pattern callExpr where callee.method == "requestReceived"
-  emit source code.HttpInput at call.result
-}

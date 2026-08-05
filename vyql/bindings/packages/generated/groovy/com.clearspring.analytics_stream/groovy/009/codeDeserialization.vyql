@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mff8ced10;
-
-binding deserialization9 {
-  requires {
-    dependency("com.clearspring.analytics:stream")
-  }
-  query pattern callExpr where callee.method == "readSignedVarLong"
-  emit sink code.Deserialization at args[0]
-}

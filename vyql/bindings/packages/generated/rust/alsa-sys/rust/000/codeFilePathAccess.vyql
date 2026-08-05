@@ -1,9 +1,0 @@
-module bindings.rust.generated.m6d7f9c5d;
-
-binding filePathAccess0 {
-  requires {
-    dependency("alsa-sys")
-  }
-  query pattern callExpr where callee.method == "snd_user_file"
-  emit sink code.FilePathAccess at args[0]
-}

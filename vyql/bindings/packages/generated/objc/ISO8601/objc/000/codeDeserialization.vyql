@@ -1,9 +1,0 @@
-module bindings.objc.generated.m21e6d872;
-
-binding deserialization0 {
-  requires {
-    dependency("ISO8601")
-  }
-  query pattern callExpr where callee.method == "dateWithISO8601String"
-  emit sink code.Deserialization at args[0]
-}

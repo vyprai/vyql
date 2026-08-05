@@ -1,0 +1,17 @@
+module bindings.perl.generated.mcc73f8cb;
+
+binding userControlledData0 {
+  requires {
+    dependency("Proc-WaitStat")
+  }
+  query pattern callExpr where callee.method == "close_die"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("Proc-WaitStat")
+  }
+  query pattern callExpr where callee.method == "waitstat_die"
+  emit source core.UserControlledData at call.result
+}

@@ -1,9 +1,0 @@
-module bindings.bash.generated.m04a48a24;
-
-binding cliArgument0 {
-  requires {
-    dependency("xmlstarlet")
-  }
-  query pattern callExpr where callee.method == "xmlstarlet"
-  emit source code.CliArgument at call.result
-}

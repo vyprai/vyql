@@ -1,9 +1,0 @@
-module bindings.java.generated.m6e8c528a;
-
-binding sqlExecution4 {
-  requires {
-    dependency("org.eclipse.persistence:javax.persistence")
-  }
-  query pattern callExpr where callee.method == "createStoredProcedureQuery"
-  emit sink code.SqlExecution at args[0]
-}

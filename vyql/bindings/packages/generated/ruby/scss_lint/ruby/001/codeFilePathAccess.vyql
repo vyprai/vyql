@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m63009774;
-
-binding filePathAccess1 {
-  requires {
-    dependency("scss_lint")
-  }
-  query pattern callExpr where callee.method == "SCSSLint::Config.load"
-  emit sink code.FilePathAccess at args[0]
-}

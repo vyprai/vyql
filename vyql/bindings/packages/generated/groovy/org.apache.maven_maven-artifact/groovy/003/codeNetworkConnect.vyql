@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m8100a046;
-
-binding networkConnect3 {
-  requires {
-    dependency("org.apache.maven:maven-artifact")
-  }
-  query pattern callExpr where callee.method == "getHost"
-  emit sink code.NetworkConnectSink at args[0]
-}

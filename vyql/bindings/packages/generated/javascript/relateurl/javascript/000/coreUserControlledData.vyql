@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mf38f3817;
-
-binding userControlledData0 {
-  requires {
-    dependency("relateurl")
-  }
-  query pattern callExpr where callee.method == "RelateUrl"
-  emit source core.UserControlledData at call.result
-}

@@ -1,0 +1,41 @@
+module bindings.swift.generated.mef276195;
+
+binding sqlExecution0 {
+  requires {
+    dependency("github.com/vapor/database-kit")
+  }
+  query pattern callExpr where callee.method == "makeConnectionPool"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("github.com/vapor/database-kit")
+  }
+  query pattern callExpr where callee.method == "withConnection"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("github.com/vapor/database-kit")
+  }
+  query pattern callExpr where callee.method == "add"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("github.com/vapor/database-kit")
+  }
+  query pattern callExpr where callee.method == "requireDatabase"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution4 {
+  requires {
+    dependency("github.com/vapor/database-kit")
+  }
+  query pattern callExpr where callee.method == "database"
+  emit sink code.SqlExecution at args[0]
+}

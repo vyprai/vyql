@@ -1,0 +1,17 @@
+module bindings.objc.generated.m9e322360;
+
+binding deserialization0 {
+  requires {
+    dependency("TensorFlow-experimental")
+  }
+  query pattern callExpr where callee.method == "PackFrom"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("TensorFlow-experimental")
+  }
+  query pattern callExpr where callee.method == "ParseAnyTypeUrl"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,17 @@
+module bindings.java.generated.ma6899150;
+
+binding deserialization0 {
+  requires {
+    dependency("com.caucho:hessian")
+  }
+  query pattern callExpr where callee.method == "readObject"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.caucho:hessian")
+  }
+  query pattern callExpr where callee.method == "readMap"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.m0111f4d0;
-
-binding sqlExecution1 {
-  requires {
-    dependency("org.hibernate.javax.persistence:hibernate-jpa-2.0-api")
-  }
-  query pattern callExpr where callee.method == "createNamedQuery"
-  emit sink code.SqlExecution at args[0]
-}

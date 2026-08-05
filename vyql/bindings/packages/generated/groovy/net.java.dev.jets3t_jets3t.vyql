@@ -1,0 +1,33 @@
+module bindings.groovy.generated.mc8a9bc67;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("net.java.dev.jets3t:jets3t")
+  }
+  query pattern callExpr where callee.method == "getTotalPutRequests"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("net.java.dev.jets3t:jets3t")
+  }
+  query pattern callExpr where callee.method == "getTotalDeleteRequests"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite2 {
+  requires {
+    dependency("net.java.dev.jets3t:jets3t")
+  }
+  query pattern callExpr where callee.method == "getTotalCopyRequests"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataRead3 {
+  requires {
+    dependency("net.java.dev.jets3t:jets3t")
+  }
+  query pattern callExpr where callee.method == "getTotalCopyRequests"
+  emit source code.StoredDataRead at call.result
+}

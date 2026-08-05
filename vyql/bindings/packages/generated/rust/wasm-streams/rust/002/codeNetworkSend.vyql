@@ -1,9 +1,0 @@
-module bindings.rust.generated.me233ceca;
-
-binding networkSend2 {
-  requires {
-    dependency("wasm-streams")
-  }
-  query pattern callExpr where callee.method == "WritableStreamDefaultWriter.write"
-  emit sink code.NetworkSend at args[0]
-}

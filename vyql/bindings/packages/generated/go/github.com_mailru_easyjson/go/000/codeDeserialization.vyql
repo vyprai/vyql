@@ -1,9 +1,0 @@
-module bindings.go.generated.mea5da136;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/mailru/easyjson")
-  }
-  query pattern callExpr where callee.method == "Unmarshal"
-  emit sink code.Deserialization at args[0]
-}

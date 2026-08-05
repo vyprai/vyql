@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m5bbff6cc;
-
-binding userControlledData6 {
-  requires {
-    dependency("configparser_ex")
-  }
-  query pattern callExpr where callee.method == "getboolean"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m0c8d7d3d;
-
-binding filePathAccess0 {
-  requires {
-    dependency("mail")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.FilePathAccess at args[0]
-}

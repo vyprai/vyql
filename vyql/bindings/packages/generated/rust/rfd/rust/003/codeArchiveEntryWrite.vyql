@@ -1,9 +1,0 @@
-module bindings.rust.generated.mb7a130a2;
-
-binding archiveEntryWrite3 {
-  requires {
-    dependency("rfd")
-  }
-  query pattern callExpr where callee.method == "save_file"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

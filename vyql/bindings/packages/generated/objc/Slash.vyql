@@ -1,0 +1,25 @@
+module bindings.objc.generated.m981475ed;
+
+binding deserialization0 {
+  requires {
+    dependency("Slash")
+  }
+  query pattern callExpr where callee.method == "attributedStringWithMarkup:style:error:"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("Slash")
+  }
+  query pattern callExpr where callee.method == "attributedStringWithMarkup:error:"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("Slash")
+  }
+  query pattern callExpr where callee.method == "parseMarkup:error:"
+  emit sink code.Deserialization at args[0]
+}

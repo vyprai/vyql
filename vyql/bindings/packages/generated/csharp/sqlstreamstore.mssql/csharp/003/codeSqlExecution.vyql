@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m0e52ebfa;
-
-binding sqlExecution3 {
-  requires {
-    dependency("sqlstreamstore.mssql")
-  }
-  query pattern callExpr where callee.method == "CreateSchemaIfNotExists"
-  emit sink code.SqlExecution at args[0]
-}

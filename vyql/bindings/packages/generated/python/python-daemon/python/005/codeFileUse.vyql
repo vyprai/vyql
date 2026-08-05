@@ -1,9 +1,0 @@
-module bindings.python.generated.m2a5e00b5;
-
-binding fileUse5 {
-  requires {
-    dependency("python-daemon")
-  }
-  query pattern callExpr where callee.method == "redirect_stream"
-  emit sink code.FileUseSink at args[0]
-}

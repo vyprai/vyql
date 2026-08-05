@@ -1,9 +1,0 @@
-module bindings.swift.generated.mc507311d;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/amzn/smoke-http")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

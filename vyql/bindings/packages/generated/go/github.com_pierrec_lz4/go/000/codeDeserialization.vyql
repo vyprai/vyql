@@ -1,9 +1,0 @@
-module bindings.go.generated.me292c376;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/pierrec/lz4")
-  }
-  query pattern callExpr where callee.method == "UncompressBlock"
-  emit sink code.Deserialization at args[0]
-}

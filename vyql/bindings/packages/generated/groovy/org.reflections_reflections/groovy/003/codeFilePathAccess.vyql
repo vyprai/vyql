@@ -1,9 +1,0 @@
-module bindings.groovy.generated.md397e5bf;
-
-binding filePathAccess3 {
-  requires {
-    dependency("org.reflections:reflections")
-  }
-  query pattern callExpr where callee.method == "getFile"
-  emit sink code.FilePathAccess at args[0]
-}

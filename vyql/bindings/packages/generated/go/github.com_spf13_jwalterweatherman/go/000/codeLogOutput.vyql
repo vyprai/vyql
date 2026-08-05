@@ -1,9 +1,0 @@
-module bindings.go.generated.mea98a4f0;
-
-binding logOutput0 {
-  requires {
-    dependency("github.com/spf13/jwalterweatherman")
-  }
-  query pattern callExpr where callee.method == "SetLogOutput"
-  emit sink code.LogOutput at args[0]
-}

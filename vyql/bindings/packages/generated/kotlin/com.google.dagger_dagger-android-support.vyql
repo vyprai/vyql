@@ -1,0 +1,17 @@
+module bindings.kotlin.generated.m72182cd6;
+
+binding codeEval0 {
+  requires {
+    dependency("com.google.dagger:dagger-android-support")
+  }
+  query pattern callExpr where callee.method == "inject"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("com.google.dagger:dagger-android-support")
+  }
+  query pattern callExpr where callee.method == "androidInjector"
+  emit sink code.CodeEval at args[0]
+}

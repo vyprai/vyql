@@ -1,9 +1,0 @@
-module bindings.rust.generated.me6b2d92a;
-
-binding codeEval0 {
-  requires {
-    dependency("javascriptcore-rs")
-  }
-  query pattern callExpr where callee.method == "evaluate_with_source_uri"
-  emit sink code.CodeEval at args[0]
-}

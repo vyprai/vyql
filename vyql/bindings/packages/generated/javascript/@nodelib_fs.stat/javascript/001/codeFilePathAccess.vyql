@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m9bc82c40;
-
-binding filePathAccess1 {
-  requires {
-    dependency("@nodelib/fs.stat")
-  }
-  query pattern callExpr where callee.method == "statSync"
-  emit sink code.FilePathAccess at args[0]
-}

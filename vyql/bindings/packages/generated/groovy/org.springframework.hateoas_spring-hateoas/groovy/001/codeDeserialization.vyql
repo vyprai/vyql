@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mce8498a2;
-
-binding deserialization1 {
-  requires {
-    dependency("org.springframework.hateoas:spring-hateoas")
-  }
-  query pattern callExpr where callee.method == "parseLink"
-  emit sink code.Deserialization at args[0]
-}

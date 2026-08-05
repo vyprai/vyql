@@ -1,9 +1,0 @@
-module bindings.php.generated.mf61a2630;
-
-binding deserialization0 {
-  requires {
-    dependency("jms/metadata")
-  }
-  query pattern callExpr where callee.method == "unserialize"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.dart.generated.medf6299a;
-
-binding filePathAccess5 {
-  requires {
-    dependency("storage_client")
-  }
-  query pattern callExpr where callee.method == "deleteBucket"
-  emit sink code.FilePathAccess at args[0]
-}

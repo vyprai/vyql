@@ -1,9 +1,0 @@
-module bindings.objc.generated.mea34866a;
-
-binding networkData4 {
-  requires {
-    dependency("YTKNetwork")
-  }
-  query pattern callExpr where callee.method == "responseString"
-  emit source code.NetworkData at call.result
-}

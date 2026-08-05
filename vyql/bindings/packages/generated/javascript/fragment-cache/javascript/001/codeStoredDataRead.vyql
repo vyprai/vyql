@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m60db8bfa;
-
-binding storedDataRead1 {
-  requires {
-    dependency("fragment-cache")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit source code.StoredDataRead at call.result
-}

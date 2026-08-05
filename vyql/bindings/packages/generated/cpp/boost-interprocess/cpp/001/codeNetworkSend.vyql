@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mb54676b8;
-
-binding networkSend1 {
-  requires {
-    dependency("boost-interprocess")
-  }
-  query pattern callExpr where callee.method == "close_file"
-  emit sink code.NetworkSend at args[0]
-}

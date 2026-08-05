@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mef761836;
-
-binding deserialization1 {
-  requires {
-    dependency("adjust-sourcemap-loader")
-  }
-  query pattern callExpr where callee.method == "decodeSourcesWith"
-  emit sink code.Deserialization at args[0]
-}

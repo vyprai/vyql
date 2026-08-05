@@ -1,9 +1,0 @@
-module bindings.swift.generated.mdb7d904e;
-
-binding deserialization3 {
-  requires {
-    dependency("github.com/awslabs/smithy-swift")
-  }
-  query pattern callExpr where callee.method == "readBlob"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,0 +1,17 @@
+module bindings.java.generated.m4cc637c2;
+
+binding httpInput0 {
+  requires {
+    dependency("io.dropwizard.metrics:metrics-servlets")
+  }
+  query pattern callExpr where callee.method == "doGet"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("io.dropwizard.metrics:metrics-servlets")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit source code.HttpInput at call.result
+}

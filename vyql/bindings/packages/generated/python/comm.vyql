@@ -1,0 +1,33 @@
+module bindings.python.generated.mc480e38e;
+
+binding networkConnect0 {
+  requires {
+    dependency("comm")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("comm")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("comm")
+  }
+  query pattern callExpr where callee.method == "comm_open"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("comm")
+  }
+  query pattern callExpr where callee.method == "comm_msg"
+  emit source code.NetworkData at call.result
+}

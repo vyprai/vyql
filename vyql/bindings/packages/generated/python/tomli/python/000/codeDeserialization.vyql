@@ -1,9 +1,0 @@
-module bindings.python.generated.ma9bcc2ff;
-
-binding deserialization0 {
-  requires {
-    dependency("tomli")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

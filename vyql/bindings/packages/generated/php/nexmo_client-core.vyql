@@ -1,0 +1,85 @@
+module bindings.php.generated.mecdba9b5;
+
+binding networkSend0 {
+  requires {
+    dependency("nexmo/client-core")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("nexmo/client-core")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("nexmo/client-core")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("nexmo/client-core")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("nexmo/client-core")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding authenticationCheck5 {
+  requires {
+    dependency("nexmo/client-core")
+  }
+  query pattern callExpr where callee.method == "signRequest"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck6 {
+  requires {
+    dependency("nexmo/client-core")
+  }
+  query pattern callExpr where callee.method == "authRequest"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck7 {
+  requires {
+    dependency("nexmo/client-core")
+  }
+  query pattern callExpr where callee.method == "generateJwt"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding secretValue8 {
+  requires {
+    dependency("nexmo/client-core")
+  }
+  query pattern callExpr where callee.method == "getCredentials"
+  emit source code.SecretValue at call.result
+}

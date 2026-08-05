@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m711a0255;
-
-binding userControlledData0 {
-  requires {
-    dependency("luerl")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit source core.UserControlledData at call.result
-}

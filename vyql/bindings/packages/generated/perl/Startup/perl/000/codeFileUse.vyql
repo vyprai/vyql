@@ -1,9 +1,0 @@
-module bindings.perl.generated.m766d64ac;
-
-binding fileUse0 {
-  requires {
-    dependency("Startup")
-  }
-  query pattern callExpr where callee.method == "open_log"
-  emit sink code.FileUseSink at args[0]
-}

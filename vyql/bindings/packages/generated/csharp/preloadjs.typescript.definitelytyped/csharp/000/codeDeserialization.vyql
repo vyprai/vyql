@@ -1,9 +1,0 @@
-module bindings.csharp.generated.mcbb61f6f;
-
-binding deserialization0 {
-  requires {
-    dependency("preloadjs.typescript.definitelytyped")
-  }
-  query pattern callExpr where callee.method == "parseJSON"
-  emit sink code.Deserialization at args[0]
-}

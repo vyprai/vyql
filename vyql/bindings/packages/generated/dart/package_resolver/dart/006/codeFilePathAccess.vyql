@@ -1,9 +1,0 @@
-module bindings.dart.generated.ma7a79070;
-
-binding filePathAccess6 {
-  requires {
-    dependency("package_resolver")
-  }
-  query pattern callExpr where callee.method == "resolveUri"
-  emit sink code.FilePathAccess at args[0]
-}

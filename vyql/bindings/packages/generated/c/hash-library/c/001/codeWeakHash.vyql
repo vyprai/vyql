@@ -1,9 +1,0 @@
-module bindings.c.generated.me42e1aa9;
-
-binding weakHash1 {
-  requires {
-    dependency("hash-library")
-  }
-  query pattern callExpr where callee.method == "getHash"
-  emit issue code.WeakHash at call
-}

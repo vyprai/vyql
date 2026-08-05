@@ -1,9 +1,0 @@
-module bindings.rust.generated.m227b985b;
-
-binding networkData6 {
-  requires {
-    dependency("mio")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit source code.NetworkData at call.result
-}

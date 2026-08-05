@@ -1,9 +1,0 @@
-module bindings.php.generated.mef04ba93;
-
-binding networkData2 {
-  requires {
-    dependency("laravel/socialite")
-  }
-  query pattern callExpr where callee.method == "getAccessTokenResponse"
-  emit source code.NetworkData at call.result
-}

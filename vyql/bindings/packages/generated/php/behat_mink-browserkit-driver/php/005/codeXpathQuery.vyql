@@ -1,9 +1,0 @@
-module bindings.php.generated.m26dcc6cc;
-
-binding xpathQuery5 {
-  requires {
-    dependency("behat/mink-browserkit-driver")
-  }
-  query pattern callExpr where callee.method == "click"
-  emit sink code.XpathQuery at args[0]
-}

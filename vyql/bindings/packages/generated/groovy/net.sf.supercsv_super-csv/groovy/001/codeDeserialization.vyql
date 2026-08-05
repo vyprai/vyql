@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m55660526;
-
-binding deserialization1 {
-  requires {
-    dependency("net.sf.supercsv:super-csv")
-  }
-  query pattern callExpr where callee.method == "readIntoBean"
-  emit sink code.Deserialization at args[0]
-}

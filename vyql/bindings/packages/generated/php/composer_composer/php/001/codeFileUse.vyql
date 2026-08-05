@@ -1,9 +1,0 @@
-module bindings.php.generated.m116f8cc1;
-
-binding fileUse1 {
-  requires {
-    dependency("composer/composer")
-  }
-  query pattern callExpr where callee.method == "ComposerCache.write"
-  emit sink code.FileUseSink at args[0]
-}

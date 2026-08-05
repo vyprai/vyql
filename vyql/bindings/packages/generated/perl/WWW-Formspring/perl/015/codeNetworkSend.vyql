@@ -1,9 +1,0 @@
-module bindings.perl.generated.mbe603286;
-
-binding networkSend15 {
-  requires {
-    dependency("WWW-Formspring")
-  }
-  query pattern callExpr where callee.method == "inbox_random"
-  emit sink code.NetworkSend at args[0]
-}

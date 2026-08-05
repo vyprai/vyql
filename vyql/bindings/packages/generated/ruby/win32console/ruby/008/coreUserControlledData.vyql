@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m6a0cf9c8;
-
-binding userControlledData8 {
-  requires {
-    dependency("win32console")
-  }
-  query pattern callExpr where callee.method == "WriteConsoleOutputAttribute"
-  emit source core.UserControlledData at call.result
-}

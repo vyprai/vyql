@@ -1,9 +1,0 @@
-module bindings.csharp.generated.mf3693dec;
-
-binding deserialization0 {
-  requires {
-    dependency("bundletransformer.microsoftajax")
-  }
-  query pattern callExpr where callee.method == "BundleTransformer.MicrosoftAjax.Minifiers.MicrosoftAjaxCssMinifier.Minify"
-  emit sink code.Deserialization at args[0]
-}

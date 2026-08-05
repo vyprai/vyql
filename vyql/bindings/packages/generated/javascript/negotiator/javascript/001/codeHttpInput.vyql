@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mcb8eafcb;
-
-binding httpInput1 {
-  requires {
-    dependency("negotiator")
-  }
-  query pattern callExpr where callee.method == "preferredCharsets"
-  emit source code.HttpInput at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m7083342f;
-
-binding deserialization2 {
-  requires {
-    dependency("thrift")
-  }
-  query pattern callExpr where callee.method == "readByte"
-  emit sink code.Deserialization at args[0]
-}

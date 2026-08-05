@@ -1,9 +1,0 @@
-module bindings.c.generated.m7c6729a3;
-
-binding networkData3 {
-  requires {
-    dependency("zeromq")
-  }
-  query pattern callExpr where callee.method == "recvpipe"
-  emit source code.NetworkData at call.result
-}

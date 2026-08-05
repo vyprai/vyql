@@ -1,9 +1,0 @@
-module bindings.php.generated.mc235c2c4;
-
-binding networkData0 {
-  requires {
-    dependency("nyholm/psr7")
-  }
-  query pattern callExpr where callee.method == "Stream.read"
-  emit source code.NetworkData at call.result
-}

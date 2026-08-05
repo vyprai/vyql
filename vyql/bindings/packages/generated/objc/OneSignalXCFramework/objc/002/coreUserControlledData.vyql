@@ -1,9 +1,0 @@
-module bindings.objc.generated.m725dbc57;
-
-binding userControlledData2 {
-  requires {
-    dependency("OneSignalXCFramework")
-  }
-  query pattern callExpr where callee.method == "didReceiveNotificationExtensionRequest:withMutableNotificationContent:"
-  emit source core.UserControlledData at call.result
-}

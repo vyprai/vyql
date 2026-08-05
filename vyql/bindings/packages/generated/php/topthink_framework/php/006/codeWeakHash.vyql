@@ -1,9 +1,0 @@
-module bindings.php.generated.mb928c19c;
-
-binding weakHash6 {
-  requires {
-    dependency("topthink/framework")
-  }
-  query pattern presenceNode where node.path ~= "topthink.framework.hash"
-  emit issue code.WeakHash at node
-}

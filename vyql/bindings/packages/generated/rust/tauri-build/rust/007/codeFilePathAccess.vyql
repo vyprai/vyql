@@ -1,9 +1,0 @@
-module bindings.rust.generated.m4c35e160;
-
-binding filePathAccess7 {
-  requires {
-    dependency("tauri-build")
-  }
-  query pattern callExpr where callee.method == "symlink_dir"
-  emit sink code.FilePathAccess at args[0]
-}

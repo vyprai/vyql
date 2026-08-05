@@ -1,0 +1,25 @@
+module bindings.go.generated.mffc629b8;
+
+binding commandExecution0 {
+  requires {
+    dependency("github.com/containerd/zfs")
+  }
+  query pattern callExpr where callee.method == "createFilesystem"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("github.com/containerd/zfs")
+  }
+  query pattern callExpr where callee.method == "cloneFilesystem"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/containerd/zfs")
+  }
+  query pattern callExpr where callee.method == "NewSnapshotter"
+  emit sink code.FilePathAccess at args[0]
+}

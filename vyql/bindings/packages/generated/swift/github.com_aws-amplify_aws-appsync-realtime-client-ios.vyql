@@ -1,0 +1,25 @@
+module bindings.swift.generated.mf29f2323;
+
+binding networkData0 {
+  requires {
+    dependency("github.com/aws-amplify/aws-appsync-realtime-client-ios")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/aws-amplify/aws-appsync-realtime-client-ios")
+  }
+  query pattern callExpr where callee.method == "add"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("github.com/aws-amplify/aws-appsync-realtime-client-ios")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

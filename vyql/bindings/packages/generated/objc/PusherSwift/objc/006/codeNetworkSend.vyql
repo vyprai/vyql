@@ -1,9 +1,0 @@
-module bindings.objc.generated.m0fbc1edc;
-
-binding networkSend6 {
-  requires {
-    dependency("PusherSwift")
-  }
-  query pattern callExpr where callee.method == "subscribeToPresenceChannel"
-  emit sink code.NetworkSend at args[0]
-}

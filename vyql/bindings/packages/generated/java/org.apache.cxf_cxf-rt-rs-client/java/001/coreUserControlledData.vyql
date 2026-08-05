@@ -1,9 +1,0 @@
-module bindings.java.generated.mb2560d14;
-
-binding userControlledData1 {
-  requires {
-    dependency("org.apache.cxf:cxf-rt-rs-client")
-  }
-  query pattern callExpr where callee.method == "WebClient.header"
-  emit source core.UserControlledData at call.result
-}

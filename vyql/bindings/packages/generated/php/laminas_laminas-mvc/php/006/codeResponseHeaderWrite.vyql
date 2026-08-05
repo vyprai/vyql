@@ -1,9 +1,0 @@
-module bindings.php.generated.mad065374;
-
-binding responseHeaderWrite6 {
-  requires {
-    dependency("laminas/laminas-mvc")
-  }
-  query pattern callExpr where callee.method == "getResponse"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

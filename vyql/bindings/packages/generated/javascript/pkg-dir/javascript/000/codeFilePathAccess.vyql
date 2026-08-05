@@ -1,9 +1,0 @@
-module bindings.javascript.generated.md2f5fe5d;
-
-binding filePathAccess0 {
-  requires {
-    dependency("pkg-dir")
-  }
-  query pattern callExpr where callee.method == "packageDirectory"
-  emit sink code.FilePathAccess at args[0]
-}

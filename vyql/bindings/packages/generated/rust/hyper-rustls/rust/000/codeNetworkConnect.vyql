@@ -1,9 +1,0 @@
-module bindings.rust.generated.m3d5f2ee0;
-
-binding networkConnect0 {
-  requires {
-    dependency("hyper-rustls")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

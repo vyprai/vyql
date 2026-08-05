@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m4013f612;
-
-binding filePathAccess0 {
-  requires {
-    dependency("rome:rome")
-  }
-  query pattern callExpr where callee.method == "XmlReader"
-  emit sink code.FilePathAccess at args[0]
-}

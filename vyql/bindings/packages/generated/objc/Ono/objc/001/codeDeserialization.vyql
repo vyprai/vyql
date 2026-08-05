@@ -1,9 +1,0 @@
-module bindings.objc.generated.medb00db8;
-
-binding deserialization1 {
-  requires {
-    dependency("Ono")
-  }
-  query pattern callExpr where callee.method == "XMLDocumentWithData:"
-  emit sink code.Deserialization at args[0]
-}

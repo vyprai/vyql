@@ -1,9 +1,0 @@
-module bindings.python.generated.m5e1b11ff;
-
-binding codeEval2 {
-  requires {
-    dependency("fastjsonschema")
-  }
-  query pattern callExpr where callee.method == "compile_to_code"
-  emit sink code.CodeEval at args[0]
-}

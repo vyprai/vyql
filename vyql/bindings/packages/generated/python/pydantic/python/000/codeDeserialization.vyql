@@ -1,9 +1,0 @@
-module bindings.python.generated.m1119118c;
-
-binding deserialization0 {
-  requires {
-    dependency("pydantic")
-  }
-  query pattern callExpr where callee.method == "model_validate_json"
-  emit sink code.Deserialization at args[0]
-}

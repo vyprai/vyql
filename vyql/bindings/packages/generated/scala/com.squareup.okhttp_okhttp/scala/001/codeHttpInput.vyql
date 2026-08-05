@@ -1,9 +1,0 @@
-module bindings.scala.generated.md8b105ec;
-
-binding httpInput1 {
-  requires {
-    dependency("com.squareup.okhttp:okhttp")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit source code.HttpInput at call.result
-}

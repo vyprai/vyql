@@ -1,0 +1,17 @@
+module bindings.swift.generated.m000012aa;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/tid-kijyun/Kanna")
+  }
+  query pattern callExpr where callee.method == "XML"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/tid-kijyun/Kanna")
+  }
+  query pattern callExpr where callee.method == "HTML"
+  emit sink code.Deserialization at args[0]
+}

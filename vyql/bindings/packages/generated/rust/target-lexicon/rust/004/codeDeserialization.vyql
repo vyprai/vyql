@@ -1,9 +1,0 @@
-module bindings.rust.generated.mf32ebf06;
-
-binding deserialization4 {
-  requires {
-    dependency("target-lexicon")
-  }
-  query pattern callExpr where callee.method == "Environment::from_str"
-  emit sink code.Deserialization at args[0]
-}

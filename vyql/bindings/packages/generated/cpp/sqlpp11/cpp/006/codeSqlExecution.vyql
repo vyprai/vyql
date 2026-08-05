@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mb204f76f;
-
-binding sqlExecution6 {
-  requires {
-    dependency("sqlpp11")
-  }
-  query pattern callExpr where callee.method == "cross_join"
-  emit sink code.SqlExecution at args[0]
-}

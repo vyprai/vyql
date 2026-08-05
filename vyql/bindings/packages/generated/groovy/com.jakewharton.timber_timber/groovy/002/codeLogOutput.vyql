@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m03fb46b2;
-
-binding logOutput2 {
-  requires {
-    dependency("com.jakewharton.timber:timber")
-  }
-  query pattern callExpr where callee.method == "i"
-  emit sink code.LogOutput at args[0]
-}

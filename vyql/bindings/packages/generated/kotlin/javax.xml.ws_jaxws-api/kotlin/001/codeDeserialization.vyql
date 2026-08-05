@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m83926d3f;
-
-binding deserialization1 {
-  requires {
-    dependency("javax.xml.ws:jaxws-api")
-  }
-  query pattern callExpr where callee.method == "invoke"
-  emit sink code.Deserialization at args[0]
-}

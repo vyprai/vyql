@@ -1,0 +1,33 @@
+module bindings.elixir.generated.m4e1fb66d;
+
+binding userControlledData0 {
+  requires {
+    dependency("table_rex")
+  }
+  query pattern callExpr where callee.method == "quick_render"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("table_rex")
+  }
+  query pattern callExpr where callee.method == "quick_render!"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("table_rex")
+  }
+  query pattern callExpr where callee.method == "Table.render"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("table_rex")
+  }
+  query pattern callExpr where callee.method == "Table.render!"
+  emit source core.UserControlledData at call.result
+}

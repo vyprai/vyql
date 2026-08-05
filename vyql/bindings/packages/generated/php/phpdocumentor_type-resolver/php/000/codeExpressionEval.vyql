@@ -1,9 +1,0 @@
-module bindings.php.generated.mb80b1c34;
-
-binding expressionEval0 {
-  requires {
-    dependency("phpdocumentor/type-resolver")
-  }
-  query pattern callExpr where callee.method == "resolve"
-  emit sink code.ExpressionEval at args[0]
-}

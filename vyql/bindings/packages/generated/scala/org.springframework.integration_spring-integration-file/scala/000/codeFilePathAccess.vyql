@@ -1,9 +1,0 @@
-module bindings.scala.generated.mf1a0f139;
-
-binding filePathAccess0 {
-  requires {
-    dependency("org.springframework.integration:spring-integration-file")
-  }
-  query pattern callExpr where callee.method == "writeMessageToFile"
-  emit sink code.FilePathAccess at args[0]
-}

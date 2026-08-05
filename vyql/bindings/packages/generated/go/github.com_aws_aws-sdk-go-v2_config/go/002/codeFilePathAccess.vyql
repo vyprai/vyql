@@ -1,9 +1,0 @@
-module bindings.go.generated.maa96c7f6;
-
-binding filePathAccess2 {
-  requires {
-    dependency("github.com/aws/aws-sdk-go-v2/config")
-  }
-  query pattern callExpr where callee.method == "getSharedConfigFiles"
-  emit sink code.FilePathAccess at args[0]
-}

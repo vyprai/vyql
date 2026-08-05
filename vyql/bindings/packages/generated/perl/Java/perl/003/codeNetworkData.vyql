@@ -1,9 +1,0 @@
-module bindings.perl.generated.me3c54fcd;
-
-binding networkData3 {
-  requires {
-    dependency("Java")
-  }
-  query pattern callExpr where callee.method == "new"
-  emit source code.NetworkData at call.result
-}

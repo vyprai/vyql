@@ -1,9 +1,0 @@
-module bindings.swift.generated.m243b5584;
-
-binding commandExecution0 {
-  requires {
-    dependency("github.com/eneko/ProcessRunner")
-  }
-  query pattern callExpr where callee.method == "system"
-  emit sink code.CommandExecution at args[0]
-}

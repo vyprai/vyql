@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m18f63b07;
-
-binding userControlledData2 {
-  requires {
-    dependency("microsoft.lightswitch.client.javascript.runtime")
-  }
-  query pattern callExpr where callee.method == "getCookieValue"
-  emit source core.UserControlledData at call.result
-}

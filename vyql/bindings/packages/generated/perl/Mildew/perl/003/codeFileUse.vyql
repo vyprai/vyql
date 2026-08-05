@@ -1,9 +1,0 @@
-module bindings.perl.generated.mc7c5ed1b;
-
-binding fileUse3 {
-  requires {
-    dependency("Mildew")
-  }
-  query pattern callExpr where callee.method == "output"
-  emit sink code.FileUseSink at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.mb190fccd;
-
-binding filePathAccess2 {
-  requires {
-    dependency("github.com/MakeAWishFoundation/SwiftyMocky")
-  }
-  query pattern callExpr where callee.method == "doctor"
-  emit sink code.FilePathAccess at args[0]
-}

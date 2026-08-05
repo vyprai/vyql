@@ -1,0 +1,33 @@
+module bindings.php.generated.m61a688ee;
+
+binding codeEval0 {
+  requires {
+    dependency("amphp/parallel-functions")
+  }
+  query pattern callExpr where callee.method == "parallel"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("amphp/parallel-functions")
+  }
+  query pattern callExpr where callee.method == "parallelMap"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval2 {
+  requires {
+    dependency("amphp/parallel-functions")
+  }
+  query pattern callExpr where callee.method == "parallelFilter"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval3 {
+  requires {
+    dependency("amphp/parallel-functions")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CodeEval at args[0]
+}

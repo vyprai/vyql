@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m925b957f;
-
-binding cliArgument0 {
-  requires {
-    dependency("html-proofer")
-  }
-  query pattern callExpr where callee.method == "run"
-  emit source code.CliArgument at call.result
-}

@@ -1,0 +1,17 @@
+module bindings.go.generated.m32eea1ac;
+
+binding urlFetch0 {
+  requires {
+    dependency("github.com/stretchr/objx")
+  }
+  query pattern callExpr where callee.method == "FromURLQuery"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch1 {
+  requires {
+    dependency("github.com/stretchr/objx")
+  }
+  query pattern callExpr where callee.method == "MustFromURLQuery"
+  emit sink code.UrlFetch at args[0]
+}

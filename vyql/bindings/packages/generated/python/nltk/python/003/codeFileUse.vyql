@@ -1,9 +1,0 @@
-module bindings.python.generated.mb80d6ebf;
-
-binding fileUse3 {
-  requires {
-    dependency("nltk")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.FileUseSink at args[0]
-}

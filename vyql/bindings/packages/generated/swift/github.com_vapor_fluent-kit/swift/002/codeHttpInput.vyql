@@ -1,9 +1,0 @@
-module bindings.swift.generated.m9c81201c;
-
-binding httpInput2 {
-  requires {
-    dependency("github.com/vapor/fluent-kit")
-  }
-  query pattern callExpr where callee.path ~= "database"
-  emit source code.HttpInput at call.result
-}

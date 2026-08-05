@@ -1,0 +1,33 @@
+module bindings.swift.generated.mcbb7ef31;
+
+binding networkData0 {
+  requires {
+    dependency("github.com/apple/swift-nio")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/apple/swift-nio")
+  }
+  query pattern callExpr where callee.method == "close"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("github.com/apple/swift-nio")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding weakHash3 {
+  requires {
+    dependency("github.com/apple/swift-nio")
+  }
+  query pattern callExpr where callee.method == "hash"
+  emit issue code.WeakHash at call
+}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m3b3da65e;
-
-binding filePathAccess7 {
-  requires {
-    dependency("spatie/flysystem-dropbox")
-  }
-  query pattern callExpr where callee.method == "copy"
-  emit sink code.FilePathAccess at args[0]
-}

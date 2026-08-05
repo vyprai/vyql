@@ -1,9 +1,0 @@
-module bindings.swift.generated.m3347c693;
-
-binding filePathAccess6 {
-  requires {
-    dependency("github.com/mac-cain13/R.swift")
-  }
-  query pattern callExpr where callee.method == "path"
-  emit sink code.FilePathAccess at args[0]
-}

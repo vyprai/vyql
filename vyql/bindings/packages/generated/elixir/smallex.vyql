@@ -1,0 +1,105 @@
+module bindings.elixir.generated.m9bacb8bf;
+
+binding networkData0 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit source code.NetworkData at call.result
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect3 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect5 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend6 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect7 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "patch"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend8 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "patch"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect9 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend10 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect11 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend12 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.NetworkSend at args[0]
+}

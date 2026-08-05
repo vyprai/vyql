@@ -1,9 +1,0 @@
-module bindings.perl.generated.mce95b754;
-
-binding deserialization1 {
-  requires {
-    dependency("OpenFrame")
-  }
-  query pattern callExpr where callee.method == "params2hash"
-  emit sink code.Deserialization at args[0]
-}

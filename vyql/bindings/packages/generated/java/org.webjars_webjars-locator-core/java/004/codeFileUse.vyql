@@ -1,9 +1,0 @@
-module bindings.java.generated.m760e00bc;
-
-binding fileUse4 {
-  requires {
-    dependency("org.webjars:webjars-locator-core")
-  }
-  query pattern callExpr where callee.method == "extractWebJarsTo"
-  emit sink code.FileUseSink at args[0]
-}

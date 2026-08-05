@@ -1,0 +1,75 @@
+module bindings.ruby.generated.m6d4a3af2;
+
+binding sqlExecution0 {
+  requires {
+    dependency("dm-aggregates")
+  }
+  query pattern callExpr where callee.method == "aggregate"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("dm-aggregates")
+  }
+  query pattern callExpr where callee.method == "count"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("dm-aggregates")
+  }
+  query pattern callExpr where callee.method == "min"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("dm-aggregates")
+  }
+  query pattern callExpr where callee.method == "max"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution4 {
+  requires {
+    dependency("dm-aggregates")
+  }
+  query pattern callExpr where callee.method == "avg"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution5 {
+  requires {
+    dependency("dm-aggregates")
+  }
+  query pattern callExpr where callee.method == "sum"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding inputValidation6 {
+  requires {
+    dependency("dm-aggregates")
+  }
+  query pattern callExpr where callee.method == "assert_property_type"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation7 {
+  requires {
+    dependency("dm-aggregates")
+  }
+  query pattern callExpr where callee.method == "assert_valid_fields_with_operator"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

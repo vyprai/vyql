@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m59af96ee;
-
-binding networkSend7 {
-  requires {
-    dependency("tirexs")
-  }
-  query pattern callExpr where callee.method == "put"
-  emit sink code.NetworkSend at args[0]
-}

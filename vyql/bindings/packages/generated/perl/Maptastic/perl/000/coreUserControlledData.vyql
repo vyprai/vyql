@@ -1,9 +1,0 @@
-module bindings.perl.generated.m2fbca02d;
-
-binding userControlledData0 {
-  requires {
-    dependency("Maptastic")
-  }
-  query pattern callExpr where callee.method == "readline"
-  emit source core.UserControlledData at call.result
-}

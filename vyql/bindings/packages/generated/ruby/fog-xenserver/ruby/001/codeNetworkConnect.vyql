@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m3fb3ec3b;
-
-binding networkConnect1 {
-  requires {
-    dependency("fog-xenserver")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit sink code.NetworkConnectSink at args[0]
-}

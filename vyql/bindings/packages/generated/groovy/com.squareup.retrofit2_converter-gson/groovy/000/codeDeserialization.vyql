@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m8711b7f7;
-
-binding deserialization0 {
-  requires {
-    dependency("com.squareup.retrofit2:converter-gson")
-  }
-  query pattern callExpr where callee.method == "responseBodyConverter"
-  emit sink code.Deserialization at args[0]
-}

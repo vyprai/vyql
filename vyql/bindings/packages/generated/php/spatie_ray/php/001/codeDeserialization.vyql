@@ -1,9 +1,0 @@
-module bindings.php.generated.mfb751f63;
-
-binding deserialization1 {
-  requires {
-    dependency("spatie/ray")
-  }
-  query pattern callExpr where callee.method == "json_decode"
-  emit sink code.Deserialization at args[0]
-}

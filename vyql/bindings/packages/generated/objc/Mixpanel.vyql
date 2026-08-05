@@ -1,0 +1,25 @@
+module bindings.objc.generated.m515659be;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Mixpanel")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding databaseRead1 {
+  requires {
+    dependency("Mixpanel")
+  }
+  query pattern callExpr where callee.method == "readRows"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding fileUse2 {
+  requires {
+    dependency("Mixpanel")
+  }
+  query pattern callExpr where callee.method == "initWithToken"
+  emit sink code.FileUseSink at args[0]
+}

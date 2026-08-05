@@ -1,0 +1,17 @@
+module bindings.perl.generated.m9a0f972f;
+
+binding commandExecution0 {
+  requires {
+    dependency("Argv")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("Argv")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

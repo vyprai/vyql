@@ -1,9 +1,0 @@
-module bindings.dart.generated.ma3767baf;
-
-binding userControlledData0 {
-  requires {
-    dependency("cli_repl")
-  }
-  query pattern callExpr where callee.method == "Repl.run"
-  emit source core.UserControlledData at call.result
-}

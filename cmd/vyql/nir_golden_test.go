@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/extract/lowering"
+	"github.com/vyprai/vyql/internal/extract/lowering"
 )
 
 // nirGoldenCases: a representative snippet per language exercising source/assign/concat/call.

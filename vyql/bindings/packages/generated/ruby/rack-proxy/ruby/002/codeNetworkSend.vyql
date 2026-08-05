@@ -1,9 +1,0 @@
-module bindings.ruby.generated.me8cc1b86;
-
-binding networkSend2 {
-  requires {
-    dependency("rack-proxy")
-  }
-  query pattern callExpr where callee.method == "perform_request"
-  emit sink code.NetworkSend at args[0]
-}

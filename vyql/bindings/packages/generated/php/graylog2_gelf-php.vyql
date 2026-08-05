@@ -1,0 +1,25 @@
+module bindings.php.generated.m75f46b77;
+
+binding networkSend0 {
+  requires {
+    dependency("graylog2/gelf-php")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("graylog2/gelf-php")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("graylog2/gelf-php")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.NetworkConnectSink at args[0]
+}

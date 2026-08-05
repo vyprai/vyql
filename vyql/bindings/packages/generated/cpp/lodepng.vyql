@@ -1,0 +1,41 @@
+module bindings.cpp.generated.m307a18ba;
+
+binding deserialization0 {
+  requires {
+    dependency("lodepng")
+  }
+  query pattern callExpr where callee.method == "lodepng_decode_memory"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("lodepng")
+  }
+  query pattern callExpr where callee.method == "lodepng_decode_file"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("lodepng")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("lodepng")
+  }
+  query pattern callExpr where callee.method == "lodepng_encode_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("lodepng")
+  }
+  query pattern callExpr where callee.method == "encode"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m52626b25;
-
-binding codeEval0 {
-  requires {
-    dependency("export")
-  }
-  query pattern callExpr where callee.method == "Export.Python.call"
-  emit sink code.CodeEval at args[0]
-}

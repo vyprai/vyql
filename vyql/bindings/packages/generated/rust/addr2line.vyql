@@ -1,0 +1,17 @@
+module bindings.rust.generated.m39cbd991;
+
+binding filePathAccess0 {
+  requires {
+    dependency("addr2line")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("addr2line")
+  }
+  query pattern callExpr where callee.method == "new_with_sup"
+  emit sink code.FilePathAccess at args[0]
+}

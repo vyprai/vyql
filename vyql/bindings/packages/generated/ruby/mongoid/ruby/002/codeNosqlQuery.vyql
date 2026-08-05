@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m942d4423;
-
-binding nosqlQuery2 {
-  requires {
-    dependency("mongoid")
-  }
-  query pattern callExpr where callee.method == "where"
-  emit sink code.NosqlQuery at args[0]
-}

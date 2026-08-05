@@ -1,0 +1,41 @@
+module bindings.dart.generated.m1b732e90;
+
+binding stdinInput0 {
+  requires {
+    dependency("dartz")
+  }
+  query pattern callExpr where callee.method == "readln"
+  emit source code.StdinInput at call.result
+}
+
+binding logOutput1 {
+  requires {
+    dependency("dartz")
+  }
+  query pattern callExpr where callee.method == "println"
+  emit sink code.LogOutput at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("dartz")
+  }
+  query pattern callExpr where callee.method == "openFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse3 {
+  requires {
+    dependency("dartz")
+  }
+  query pattern callExpr where callee.method == "readBytes"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse4 {
+  requires {
+    dependency("dartz")
+  }
+  query pattern callExpr where callee.method == "writeBytes"
+  emit sink code.FileUseSink at args[0]
+}

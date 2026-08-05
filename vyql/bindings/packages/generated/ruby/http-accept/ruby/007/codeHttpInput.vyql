@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m2f4e9035;
-
-binding httpInput7 {
-  requires {
-    dependency("http-accept")
-  }
-  query pattern callExpr where callee.method == "HTTP::Accept::MediaTypes.browser_preferred_media_types"
-  emit source code.HttpInput at call.result
-}

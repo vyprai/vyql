@@ -1,9 +1,0 @@
-module bindings.python.generated.me761b794;
-
-binding httpInput0 {
-  requires {
-    dependency("daphne")
-  }
-  query pattern callExpr where callee.method == "process"
-  emit source code.HttpInput at call.result
-}

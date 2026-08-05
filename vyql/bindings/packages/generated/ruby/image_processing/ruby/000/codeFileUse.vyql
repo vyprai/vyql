@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mf9aabcb3;
-
-binding fileUse0 {
-  requires {
-    dependency("image_processing")
-  }
-  query pattern callExpr where callee.method == "load_image"
-  emit sink code.FileUseSink at args[0]
-}

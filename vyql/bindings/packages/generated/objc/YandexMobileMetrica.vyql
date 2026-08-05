@@ -1,0 +1,81 @@
+module bindings.objc.generated.m6998ce18;
+
+binding userControlledData0 {
+  requires {
+    dependency("YandexMobileMetrica")
+  }
+  query pattern callExpr where callee.method == "handleOpenURL"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("YandexMobileMetrica")
+  }
+  query pattern callExpr where callee.method == "reportReferralUrl"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("YandexMobileMetrica")
+  }
+  query pattern callExpr where callee.method == "reportEvent:parameters:"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("YandexMobileMetrica")
+  }
+  query pattern callExpr where callee.method == "reportError:exception:"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("YandexMobileMetrica")
+  }
+  query pattern callExpr where callee.method == "setUserProfileID:"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("YandexMobileMetrica")
+  }
+  query pattern callExpr where callee.method == "reportUserProfile:"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("YandexMobileMetrica")
+  }
+  query pattern callExpr where callee.method == "initWithSearchQuery:"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("YandexMobileMetrica")
+  }
+  query pattern callExpr where callee.method == "initWithPayload:"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData8 {
+  requires {
+    dependency("YandexMobileMetrica")
+  }
+  query pattern callExpr where callee.method == "withValue:"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData9 {
+  requires {
+    dependency("YandexMobileMetrica")
+  }
+  query pattern callExpr where callee.method == "withValueIfUndefined:"
+  emit source core.UserControlledData at call.result
+}

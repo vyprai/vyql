@@ -1,0 +1,34 @@
+module bindings.groovy.generated.me6f0b9f3;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("org.springframework.security:spring-security-web")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding inputValidation1 {
+  requires {
+    dependency("org.springframework.security:spring-security-web")
+  }
+  query pattern callExpr where callee.method == "encode"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding deserialization2 {
+  requires {
+    dependency("org.springframework.security:spring-security-web")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

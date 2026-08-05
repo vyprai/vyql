@@ -1,9 +1,0 @@
-module bindings.objc.generated.mdcbba98f;
-
-binding networkSend1 {
-  requires {
-    dependency("OMGHTTPURLRQ")
-  }
-  query pattern callExpr where callee.method == "GET:parameters:error:"
-  emit sink code.NetworkSend at args[0]
-}

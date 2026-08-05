@@ -1,9 +1,0 @@
-module bindings.dart.generated.m8b7a80f0;
-
-binding deserialization0 {
-  requires {
-    dependency("ffigen")
-  }
-  query pattern callExpr where callee.method == "generate"
-  emit sink code.Deserialization at args[0]
-}

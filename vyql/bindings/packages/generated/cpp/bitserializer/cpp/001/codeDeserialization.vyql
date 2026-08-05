@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m36688c38;
-
-binding deserialization1 {
-  requires {
-    dependency("bitserializer")
-  }
-  query pattern callExpr where callee.method == "ParseNextRow"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m2f84ffdb;
-
-binding networkSend1 {
-  requires {
-    dependency("httpcore")
-  }
-  query pattern callExpr where callee.method == "stream"
-  emit sink code.NetworkSend at args[0]
-}

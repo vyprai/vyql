@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m269b87f9;
-
-binding deserialization1 {
-  requires {
-    dependency("io.springfox:springfox-swagger2")
-  }
-  query pattern callExpr where callee.method == "getDocumentation"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,0 +1,145 @@
+module bindings.ruby.generated.m6a0cf9c8;
+
+binding userControlledData0 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "Write"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "WriteChar"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "WriteFile"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "WriteInput"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "WriteRect"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "WriteConsole"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "WriteConsoleInput"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "WriteConsoleOutput"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData8 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "WriteConsoleOutputAttribute"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData9 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "WriteConsoleOutputCharacter"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData10 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "ReadChar"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData11 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "ReadAttr"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData12 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "ReadRect"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData13 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "ReadConsole"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData14 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "ReadConsoleInput"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData15 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "ReadConsoleOutput"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData16 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "ReadConsoleOutputAttribute"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData17 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "ReadConsoleOutputCharacter"
+  emit source core.UserControlledData at call.result
+}

@@ -1,9 +1,0 @@
-module bindings.go.generated.mea5da136;
-
-binding htmlRender2 {
-  requires {
-    dependency("github.com/mailru/easyjson")
-  }
-  query pattern callExpr where callee.method == "MarshalToHTTPResponseWriter"
-  emit sink code.HtmlRender at args[0]
-}

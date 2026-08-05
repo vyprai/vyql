@@ -1,9 +1,0 @@
-module bindings.python.generated.m5d2093cb;
-
-binding envVariable4 {
-  requires {
-    dependency("httplib2")
-  }
-  query pattern callExpr where callee.method == "proxy_info_from_environment"
-  emit source code.EnvVariable at call.result
-}

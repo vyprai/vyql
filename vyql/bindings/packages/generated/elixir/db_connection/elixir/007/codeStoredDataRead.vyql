@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m63f99da8;
-
-binding storedDataRead7 {
-  requires {
-    dependency("db_connection")
-  }
-  query pattern callExpr where callee.method == "run"
-  emit source code.StoredDataRead at call.result
-}

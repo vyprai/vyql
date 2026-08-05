@@ -1,9 +1,0 @@
-module bindings.go.generated.mec084e86;
-
-binding weakRandomValue2 {
-  requires {
-    dependency("github.com/Masterminds/goutils")
-  }
-  query pattern callExpr where callee.method == "RandomNumeric"
-  emit issue code.WeakRandomValue at call
-}

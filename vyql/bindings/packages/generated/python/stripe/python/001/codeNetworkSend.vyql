@@ -1,9 +1,0 @@
-module bindings.python.generated.mf63958f9;
-
-binding networkSend1 {
-  requires {
-    dependency("stripe")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit sink code.NetworkSend at args[0]
-}

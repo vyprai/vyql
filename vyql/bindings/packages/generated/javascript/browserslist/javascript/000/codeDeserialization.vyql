@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mac720eb8;
-
-binding deserialization0 {
-  requires {
-    dependency("browserslist")
-  }
-  query pattern callExpr where callee.method == "parsePackage"
-  emit sink code.Deserialization at args[0]
-}

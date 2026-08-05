@@ -1,9 +1,0 @@
-module bindings.objc.generated.md0deae94;
-
-binding filePathAccess0 {
-  requires {
-    dependency("EVReflection")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.FilePathAccess at args[0]
-}

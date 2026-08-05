@@ -1,9 +1,0 @@
-module bindings.php.generated.mf48d19e2;
-
-binding weakRandomValue0 {
-  requires {
-    dependency("paragonie/random-lib")
-  }
-  query pattern callExpr where callee.method == "RandomLib\\Generator::generate"
-  emit issue code.WeakRandomValue at call
-}

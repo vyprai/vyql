@@ -1,9 +1,0 @@
-module bindings.scala.generated.m041affca;
-
-binding sqlExecution20 {
-  requires {
-    dependency("tk.mybatis:mapper")
-  }
-  query pattern callExpr where callee.method == "orLessThan"
-  emit sink code.SqlExecution at args[0]
-}

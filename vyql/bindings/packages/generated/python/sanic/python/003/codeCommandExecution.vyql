@@ -1,9 +1,0 @@
-module bindings.python.generated.m5ee83b68;
-
-binding commandExecution3 {
-  requires {
-    dependency("sanic")
-  }
-  query pattern callExpr where callee.method == "spawn"
-  emit sink code.CommandExecution at args[0]
-}

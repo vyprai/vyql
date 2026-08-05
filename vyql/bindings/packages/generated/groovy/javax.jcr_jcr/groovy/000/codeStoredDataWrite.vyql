@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mb2829d39;
-
-binding storedDataWrite0 {
-  requires {
-    dependency("javax.jcr:jcr")
-  }
-  query pattern callExpr where callee.method == "addNode"
-  emit sink code.StoredDataWrite at args[0]
-}

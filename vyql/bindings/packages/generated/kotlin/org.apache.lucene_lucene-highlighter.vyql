@@ -1,0 +1,33 @@
+module bindings.kotlin.generated.ma1ee5524;
+
+binding htmlRender0 {
+  requires {
+    dependency("org.apache.lucene:lucene-highlighter")
+  }
+  query pattern callExpr where callee.method == "getBestFragment"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender1 {
+  requires {
+    dependency("org.apache.lucene:lucene-highlighter")
+  }
+  query pattern callExpr where callee.method == "getBestFragments"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("org.apache.lucene:lucene-highlighter")
+  }
+  query pattern callExpr where callee.method == "highlightTerm"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("org.apache.lucene:lucene-highlighter")
+  }
+  query pattern callExpr where callee.method == "QueryScorer"
+  emit source core.UserControlledData at call.result
+}

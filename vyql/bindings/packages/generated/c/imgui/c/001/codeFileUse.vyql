@@ -1,9 +1,0 @@
-module bindings.c.generated.m690a0f7e;
-
-binding fileUse1 {
-  requires {
-    dependency("imgui")
-  }
-  query pattern callExpr where callee.method == "WindowSettingsHandler_WriteAll"
-  emit sink code.FileUseSink at args[0]
-}

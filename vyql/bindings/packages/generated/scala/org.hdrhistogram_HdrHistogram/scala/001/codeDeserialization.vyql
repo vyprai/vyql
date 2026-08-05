@@ -1,9 +1,0 @@
-module bindings.scala.generated.me05b050f;
-
-binding deserialization1 {
-  requires {
-    dependency("org.hdrhistogram:HdrHistogram")
-  }
-  query pattern callExpr where callee.method == "decodeFromCompressedByteBuffer"
-  emit sink code.Deserialization at args[0]
-}

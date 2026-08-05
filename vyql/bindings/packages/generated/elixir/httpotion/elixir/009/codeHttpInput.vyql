@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma152eb54;
-
-binding httpInput9 {
-  requires {
-    dependency("httpotion")
-  }
-  query pattern callExpr where callee.method == "process_request_body"
-  emit source code.HttpInput at call.result
-}

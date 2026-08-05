@@ -1,0 +1,17 @@
+module bindings.objc.generated.me12f8b0d;
+
+binding deserialization0 {
+  requires {
+    dependency("iOSDFULibrary")
+  }
+  query pattern callExpr where callee.method == "unzip"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("iOSDFULibrary")
+  }
+  query pattern callExpr where callee.method == "createTemporaryFile"
+  emit sink code.FilePathAccess at args[0]
+}

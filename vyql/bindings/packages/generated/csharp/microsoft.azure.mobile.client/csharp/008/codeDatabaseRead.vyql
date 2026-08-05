@@ -1,9 +1,0 @@
-module bindings.csharp.generated.me666ff19;
-
-binding databaseRead8 {
-  requires {
-    dependency("microsoft.azure.mobile.client")
-  }
-  query pattern callExpr where callee.method == "ReadAsync"
-  emit sink code.DatabaseReadSink at args[0]
-}

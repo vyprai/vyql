@@ -1,9 +1,0 @@
-module bindings.perl.generated.m008a507f;
-
-binding networkSend5 {
-  requires {
-    dependency("Starman")
-  }
-  query pattern callExpr where callee.method == "_http_error"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.mc0b69c8c;
-
-binding userControlledData0 {
-  requires {
-    dependency("graphene-django")
-  }
-  query pattern callExpr where callee.method == "parse_body"
-  emit source core.UserControlledData at call.result
-}

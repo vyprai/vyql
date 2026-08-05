@@ -1,9 +1,0 @@
-module bindings.dart.generated.mac6759df;
-
-binding deserialization0 {
-  requires {
-    dependency("coverage")
-  }
-  query pattern callExpr where callee.method == "HitMap.parseJsonSync"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.rust.generated.m798bf7ec;
-
-binding codeEval0 {
-  requires {
-    dependency("gloo-timers")
-  }
-  query pattern callExpr where callee.method == "set_timeout"
-  emit sink code.CodeEval at args[0]
-}

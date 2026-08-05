@@ -1,9 +1,0 @@
-module bindings.python.generated.mcd43ef2a;
-
-binding deserialization3 {
-  requires {
-    dependency("tomlkit")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

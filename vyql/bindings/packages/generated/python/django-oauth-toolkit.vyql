@@ -1,0 +1,45 @@
+module bindings.python.generated.m243518c4;
+
+binding secretValue0 {
+  requires {
+    dependency("django-oauth-toolkit")
+  }
+  query pattern callExpr where callee.method == "get_access_token_model"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("django-oauth-toolkit")
+  }
+  query pattern callExpr where callee.method == "get_id_token_model"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("django-oauth-toolkit")
+  }
+  query pattern callExpr where callee.method == "get_refresh_token_model"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("django-oauth-toolkit")
+  }
+  query pattern callExpr where callee.method == "ClientSecretField"
+  emit source code.SecretValue at call.result
+}
+
+binding authenticationCheck4 {
+  requires {
+    dependency("django-oauth-toolkit")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

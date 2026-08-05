@@ -1,0 +1,49 @@
+module bindings.scala.generated.m8af0e195;
+
+binding secretValue0 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-commons")
+  }
+  query pattern callExpr where callee.method == "getKeyStorePassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-commons")
+  }
+  query pattern callExpr where callee.method == "keyStorePassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-commons")
+  }
+  query pattern callExpr where callee.method == "getKeyPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-commons")
+  }
+  query pattern callExpr where callee.method == "keyPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-commons")
+  }
+  query pattern callExpr where callee.method == "getTrustStorePassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-commons")
+  }
+  query pattern callExpr where callee.method == "trustStorePassword"
+  emit source code.SecretValue at call.result
+}

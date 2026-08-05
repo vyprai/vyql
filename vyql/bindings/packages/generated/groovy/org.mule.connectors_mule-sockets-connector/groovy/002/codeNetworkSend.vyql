@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m9b3dd07c;
-
-binding networkSend2 {
-  requires {
-    dependency("org.mule.connectors:mule-sockets-connector")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkSend at args[0]
-}

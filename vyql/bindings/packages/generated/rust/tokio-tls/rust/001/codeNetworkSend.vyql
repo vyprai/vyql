@@ -1,9 +1,0 @@
-module bindings.rust.generated.medcbc650;
-
-binding networkSend1 {
-  requires {
-    dependency("tokio-tls")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mef03db68;
-
-binding deserialization0 {
-  requires {
-    dependency("miniz")
-  }
-  query pattern callExpr where callee.method == "tinfl_decompress"
-  emit sink code.Deserialization at args[0]
-}

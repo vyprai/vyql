@@ -1,9 +1,0 @@
-module bindings.csharp.generated.me666ff19;
-
-binding weakHash4 {
-  requires {
-    dependency("microsoft.azure.mobile.client")
-  }
-  query pattern callExpr where callee.method == "GetSha256Hash"
-  emit issue code.WeakHash at call
-}

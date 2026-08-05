@@ -1,9 +1,0 @@
-module bindings.cpp.generated.me1be6155;
-
-binding filePathAccess3 {
-  requires {
-    dependency("acl")
-  }
-  query pattern callExpr where callee.method == "acl_extended_file"
-  emit sink code.FilePathAccess at args[0]
-}

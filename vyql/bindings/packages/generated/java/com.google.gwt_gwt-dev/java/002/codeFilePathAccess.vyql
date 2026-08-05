@@ -1,9 +1,0 @@
-module bindings.java.generated.m7b173373;
-
-binding filePathAccess2 {
-  requires {
-    dependency("com.google.gwt:gwt-dev")
-  }
-  query pattern callExpr where callee.method == "getExtraDir"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.m76c30cad;
-
-binding deserialization2 {
-  requires {
-    dependency("XMLDictionary")
-  }
-  query pattern callExpr where callee.method == "dictionaryWithData"
-  emit sink code.Deserialization at args[0]
-}

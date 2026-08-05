@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m16e42457;
-
-binding deserialization4 {
-  requires {
-    dependency("safe_yaml")
-  }
-  query pattern callExpr where callee.method == "unsafe_load_file"
-  emit sink code.Deserialization at args[0]
-}

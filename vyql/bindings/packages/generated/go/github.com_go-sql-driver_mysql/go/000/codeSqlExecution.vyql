@@ -1,9 +1,0 @@
-module bindings.go.generated.mb7d23d90;
-
-binding sqlExecution0 {
-  requires {
-    dependency("github.com/go-sql-driver/mysql")
-  }
-  query pattern callExpr where callee.method == "TestDSNServerPubKeyQueryEscape"
-  emit sink code.SqlExecution at args[0]
-}

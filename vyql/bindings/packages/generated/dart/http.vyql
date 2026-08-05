@@ -1,0 +1,89 @@
+module bindings.dart.generated.m63ed77d5;
+
+binding urlFetch0 {
+  requires {
+    dependency("http")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch1 {
+  requires {
+    dependency("http")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch2 {
+  requires {
+    dependency("http")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("http")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding urlFetch4 {
+  requires {
+    dependency("http")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("http")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding urlFetch6 {
+  requires {
+    dependency("http")
+  }
+  query pattern callExpr where callee.method == "patch"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding networkSend7 {
+  requires {
+    dependency("http")
+  }
+  query pattern callExpr where callee.method == "patch"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding urlFetch8 {
+  requires {
+    dependency("http")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch9 {
+  requires {
+    dependency("http")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch10 {
+  requires {
+    dependency("http")
+  }
+  query pattern callExpr where callee.method == "readBytes"
+  emit sink code.UrlFetch at args[0]
+}

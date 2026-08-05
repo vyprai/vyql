@@ -1,0 +1,25 @@
+module bindings.java.generated.mc23c7a77;
+
+binding deserialization0 {
+  requires {
+    dependency("com.google.protobuf:protobuf-java-util")
+  }
+  query pattern callExpr where callee.method == "merge"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.google.protobuf:protobuf-java-util")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("com.google.protobuf:protobuf-java-util")
+  }
+  query pattern callExpr where callee.method == "parseUnchecked"
+  emit sink code.Deserialization at args[0]
+}

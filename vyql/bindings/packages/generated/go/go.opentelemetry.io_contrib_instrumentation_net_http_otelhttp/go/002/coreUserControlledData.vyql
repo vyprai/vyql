@@ -1,9 +1,0 @@
-module bindings.go.generated.mb7f23eae;
-
-binding userControlledData2 {
-  requires {
-    dependency("go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp")
-  }
-  query pattern callExpr where callee.method == "WithSpanNameFormatter"
-  emit source core.UserControlledData at call.result
-}

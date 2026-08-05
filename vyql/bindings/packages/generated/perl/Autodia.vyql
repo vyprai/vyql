@@ -1,0 +1,38 @@
+module bindings.perl.generated.m14546802;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Autodia")
+  }
+  query pattern callExpr where callee.method == "add_inputfile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("Autodia")
+  }
+  query pattern callExpr where callee.method == "_parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("Autodia")
+  }
+  query pattern callExpr where callee.method == "_parse_file"
+  emit sink code.Deserialization at args[0]
+}
+
+binding htmlEscape3 {
+  requires {
+    dependency("Autodia")
+  }
+  query pattern callExpr where callee.method == "xml_escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

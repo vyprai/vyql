@@ -1,0 +1,25 @@
+module bindings.php.generated.m3d5275a3;
+
+binding userControlledData0 {
+  requires {
+    dependency("league/fractal")
+  }
+  query pattern callExpr where callee.method == "parseIncludes"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("league/fractal")
+  }
+  query pattern callExpr where callee.method == "parseFieldsets"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("league/fractal")
+  }
+  query pattern callExpr where callee.method == "parseExcludes"
+  emit source core.UserControlledData at call.result
+}

@@ -1,9 +1,0 @@
-module bindings.python.generated.mc480e38e;
-
-binding networkData2 {
-  requires {
-    dependency("comm")
-  }
-  query pattern callExpr where callee.method == "comm_open"
-  emit source code.NetworkData at call.result
-}

@@ -1,0 +1,57 @@
+module bindings.ruby.generated.me5a43a74;
+
+binding filePathAccess0 {
+  requires {
+    dependency("sprockets-helpers")
+  }
+  query pattern callExpr where callee.method == "asset_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("sprockets-helpers")
+  }
+  query pattern callExpr where callee.method == "audio_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("sprockets-helpers")
+  }
+  query pattern callExpr where callee.method == "font_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("sprockets-helpers")
+  }
+  query pattern callExpr where callee.method == "image_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("sprockets-helpers")
+  }
+  query pattern callExpr where callee.method == "javascript_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("sprockets-helpers")
+  }
+  query pattern callExpr where callee.method == "stylesheet_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("sprockets-helpers")
+  }
+  query pattern callExpr where callee.method == "video_path"
+  emit sink code.FilePathAccess at args[0]
+}

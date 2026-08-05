@@ -1,9 +1,0 @@
-module bindings.dart.generated.m04aede6a;
-
-binding userControlledData0 {
-  requires {
-    dependency("ffi")
-  }
-  query pattern callExpr where callee.method == "toNativeUtf8"
-  emit source core.UserControlledData at call.result
-}

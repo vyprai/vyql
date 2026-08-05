@@ -1,9 +1,0 @@
-module bindings.objc.generated.m58067ca3;
-
-binding userControlledData5 {
-  requires {
-    dependency("Objection")
-  }
-  query pattern callExpr where callee.method == "bindProvider"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.csharp.generated.mac090037;
-
-binding networkSend3 {
-  requires {
-    dependency("xam.plugins.messaging")
-  }
-  query pattern callExpr where callee.method == "SendSmsInBackground"
-  emit sink code.NetworkSend at args[0]
-}

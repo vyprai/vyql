@@ -1,9 +1,0 @@
-module bindings.rust.generated.mb9f01a9d;
-
-binding deserialization1 {
-  requires {
-    dependency("tonic")
-  }
-  query pattern callExpr where callee.path ~= "tonic::codec::decode::decode"
-  emit sink code.Deserialization at args[0]
-}

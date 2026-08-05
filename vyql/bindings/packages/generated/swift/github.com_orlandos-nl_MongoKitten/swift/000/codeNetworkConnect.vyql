@@ -1,9 +1,0 @@
-module bindings.swift.generated.m64cf68f9;
-
-binding networkConnect0 {
-  requires {
-    dependency("github.com/orlandos-nl/MongoKitten")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

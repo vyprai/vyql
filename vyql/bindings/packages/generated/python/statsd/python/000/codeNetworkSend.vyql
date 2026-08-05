@@ -1,9 +1,0 @@
-module bindings.python.generated.m0b3f5f0d;
-
-binding networkSend0 {
-  requires {
-    dependency("statsd")
-  }
-  query pattern callExpr where callee.method == "timing"
-  emit sink code.NetworkSend at args[0]
-}

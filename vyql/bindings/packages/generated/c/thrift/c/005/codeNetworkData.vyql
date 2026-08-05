@@ -1,9 +1,0 @@
-module bindings.c.generated.ma7c2e50a;
-
-binding networkData5 {
-  requires {
-    dependency("thrift")
-  }
-  query pattern callExpr where callee.method == "socket_accept"
-  emit source code.NetworkData at call.result
-}

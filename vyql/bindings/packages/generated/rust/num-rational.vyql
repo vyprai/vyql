@@ -1,0 +1,17 @@
+module bindings.rust.generated.m5906ebe1;
+
+binding deserialization0 {
+  requires {
+    dependency("num-rational")
+  }
+  query pattern callExpr where callee.method == "from_str_radix"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("num-rational")
+  }
+  query pattern callExpr where callee.method == "from_str"
+  emit sink code.Deserialization at args[0]
+}

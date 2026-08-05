@@ -1,9 +1,0 @@
-module bindings.perl.generated.mc61d3835;
-
-binding httpInput0 {
-  requires {
-    dependency("Flea")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit source code.HttpInput at call.result
-}

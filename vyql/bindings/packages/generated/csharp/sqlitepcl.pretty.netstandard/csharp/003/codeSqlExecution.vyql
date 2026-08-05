@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m11aa2dee;
-
-binding sqlExecution3 {
-  requires {
-    dependency("sqlitepcl.pretty.netstandard")
-  }
-  query pattern callExpr where callee.method == "PrepareAll"
-  emit sink code.SqlExecution at args[0]
-}

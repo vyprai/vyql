@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mad63a117;
-
-binding deserialization0 {
-  requires {
-    dependency("qt-advanced-docking-system")
-  }
-  query pattern callExpr where callee.method == "restoreState"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m83150d36;
-
-binding deserialization1 {
-  requires {
-    dependency("bigint")
-  }
-  query pattern callExpr where callee.method == "stringToBigInteger"
-  emit sink code.Deserialization at args[0]
-}

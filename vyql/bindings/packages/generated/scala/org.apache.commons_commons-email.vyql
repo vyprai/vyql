@@ -1,0 +1,33 @@
+module bindings.scala.generated.m81ddb6fa;
+
+binding networkSend0 {
+  requires {
+    dependency("org.apache.commons:commons-email")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("org.apache.commons:commons-email")
+  }
+  query pattern callExpr where callee.method == "sendMimeMessage"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding secretValue2 {
+  requires {
+    dependency("org.apache.commons:commons-email")
+  }
+  query pattern callExpr where callee.method == "setAuthentication"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("org.apache.commons:commons-email")
+  }
+  query pattern callExpr where callee.method == "setPopPassword"
+  emit source code.SecretValue at call.result
+}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m0c858cd1;
-
-binding networkSend0 {
-  requires {
-    dependency("io.searchbox:jest")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.NetworkSend at args[0]
-}

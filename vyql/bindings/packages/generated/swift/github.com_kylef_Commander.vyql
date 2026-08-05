@@ -1,0 +1,73 @@
+module bindings.swift.generated.m05efabc2;
+
+binding cliArgument0 {
+  requires {
+    dependency("github.com/kylef/Commander")
+  }
+  query pattern callExpr where callee.method == "ArgumentParser.init"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("github.com/kylef/Commander")
+  }
+  query pattern callExpr where callee.method == "ArgumentParser.shift"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument2 {
+  requires {
+    dependency("github.com/kylef/Commander")
+  }
+  query pattern callExpr where callee.method == "ArgumentParser.shiftValue"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument3 {
+  requires {
+    dependency("github.com/kylef/Commander")
+  }
+  query pattern callExpr where callee.method == "ArgumentParser.shiftValues"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument4 {
+  requires {
+    dependency("github.com/kylef/Commander")
+  }
+  query pattern callExpr where callee.method == "ArgumentParser.hasOption"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument5 {
+  requires {
+    dependency("github.com/kylef/Commander")
+  }
+  query pattern callExpr where callee.method == "ArgumentParser.hasFlag"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument6 {
+  requires {
+    dependency("github.com/kylef/Commander")
+  }
+  query pattern callExpr where callee.method == "ArgumentParser.parse"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument7 {
+  requires {
+    dependency("github.com/kylef/Commander")
+  }
+  query pattern callExpr where callee.method == "Group.run"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument8 {
+  requires {
+    dependency("github.com/kylef/Commander")
+  }
+  query pattern callExpr where callee.method == "CommandRunner.run"
+  emit source code.CliArgument at call.result
+}

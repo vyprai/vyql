@@ -1,9 +1,0 @@
-module bindings.go.generated.m6e96d314;
-
-binding deserialization2 {
-  requires {
-    dependency("github.com/clbanning/x2j")
-  }
-  query pattern callExpr where callee.method == "XmlMsgsFromFileAsJson"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,0 +1,49 @@
+module bindings.objc.generated.m3ccc533c;
+
+binding deserialization0 {
+  requires {
+    dependency("JSONKit")
+  }
+  query pattern callExpr where callee.method == "parseUTF8String"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("JSONKit")
+  }
+  query pattern callExpr where callee.method == "parseJSONData"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("JSONKit")
+  }
+  query pattern callExpr where callee.method == "objectFromJSONStringWithParseOptions"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("JSONKit")
+  }
+  query pattern callExpr where callee.method == "mutableObjectFromJSONStringWithParseOptions"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("JSONKit")
+  }
+  query pattern callExpr where callee.method == "objectFromJSONDataWithParseOptions"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("JSONKit")
+  }
+  query pattern callExpr where callee.method == "mutableObjectFromJSONDataWithParseOptions"
+  emit sink code.Deserialization at args[0]
+}

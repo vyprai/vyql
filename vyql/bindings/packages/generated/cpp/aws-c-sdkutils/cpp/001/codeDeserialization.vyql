@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m16f3f42c;
-
-binding deserialization1 {
-  requires {
-    dependency("aws-c-sdkutils")
-  }
-  query pattern callExpr where callee.method == "aws_profile_collection_new_from_file"
-  emit sink code.Deserialization at args[0]
-}

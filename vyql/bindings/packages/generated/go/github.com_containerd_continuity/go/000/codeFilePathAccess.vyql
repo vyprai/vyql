@@ -1,9 +1,0 @@
-module bindings.go.generated.mdaa846ab;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/containerd/continuity")
-  }
-  query pattern callExpr where callee.method == "CopyDir"
-  emit sink code.FilePathAccess at args[0]
-}

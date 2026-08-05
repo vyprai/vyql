@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m19503caa;
-
-binding commandExecution1 {
-  requires {
-    dependency("mixlib-shellout")
-  }
-  query pattern callExpr where callee.method == "shell_out!"
-  emit sink code.CommandExecution at args[0]
-}

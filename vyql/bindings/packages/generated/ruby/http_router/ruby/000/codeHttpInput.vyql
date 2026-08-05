@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m02e745e0;
-
-binding httpInput0 {
-  requires {
-    dependency("http_router")
-  }
-  query pattern callExpr where callee.method == "add_route"
-  emit source code.HttpInput at call.result
-}

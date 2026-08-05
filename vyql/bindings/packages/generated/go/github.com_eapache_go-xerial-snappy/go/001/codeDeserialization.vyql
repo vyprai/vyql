@@ -1,9 +1,0 @@
-module bindings.go.generated.mddbfb989;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/eapache/go-xerial-snappy")
-  }
-  query pattern callExpr where callee.method == "DecodeInto"
-  emit sink code.Deserialization at args[0]
-}

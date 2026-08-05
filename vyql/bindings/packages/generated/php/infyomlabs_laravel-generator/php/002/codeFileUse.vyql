@@ -1,9 +1,0 @@
-module bindings.php.generated.mc68437fe;
-
-binding fileUse2 {
-  requires {
-    dependency("infyomlabs/laravel-generator")
-  }
-  query pattern callExpr where callee.method == "createDirectoryIfNotExist"
-  emit sink code.FileUseSink at args[0]
-}

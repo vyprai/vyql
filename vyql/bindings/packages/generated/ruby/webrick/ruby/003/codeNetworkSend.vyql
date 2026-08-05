@@ -1,9 +1,0 @@
-module bindings.ruby.generated.me032aebf;
-
-binding networkSend3 {
-  requires {
-    dependency("webrick")
-  }
-  query pattern callExpr where callee.method == "add"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m5f396801;
-
-binding networkSend2 {
-  requires {
-    dependency("scenic_driver_nerves_rpi")
-  }
-  query pattern callExpr where callee.method == "send_inspect"
-  emit sink code.NetworkSend at args[0]
-}

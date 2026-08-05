@@ -1,9 +1,0 @@
-module bindings.python.generated.me717aba2;
-
-binding filePathAccess3 {
-  requires {
-    dependency("importlib-resources")
-  }
-  query pattern callExpr where callee.method == "open"
-  emit sink code.FilePathAccess at args[0]
-}

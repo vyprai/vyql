@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m76cd4605;
-
-binding xmlParse2 {
-  requires {
-    dependency("org.apache.taglibs:taglibs-standard-impl")
-  }
-  query pattern callExpr where callee.method == "newInputSource"
-  emit sink code.XmlParse at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.m29559e25;
-
-binding templateRender6 {
-  requires {
-    dependency("KakaoSDKTalk")
-  }
-  query pattern callExpr where callee.method == "sendCustomMessage"
-  emit sink code.TemplateRender at args[0]
-}

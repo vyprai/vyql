@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m2e645e1a;
-
-binding nosqlQuery0 {
-  requires {
-    dependency("org.mongodb:mongodb-driver-sync")
-  }
-  query pattern callExpr where callee.method == "runCommand"
-  emit sink code.NosqlQuery at args[0]
-}

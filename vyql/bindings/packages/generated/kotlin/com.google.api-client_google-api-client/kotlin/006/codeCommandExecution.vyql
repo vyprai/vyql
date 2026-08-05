@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.ma5d53358;
-
-binding commandExecution6 {
-  requires {
-    dependency("com.google.api-client:google-api-client")
-  }
-  query pattern callExpr where callee.method == "extractCertificateProviderCommand"
-  emit sink code.CommandExecution at args[0]
-}

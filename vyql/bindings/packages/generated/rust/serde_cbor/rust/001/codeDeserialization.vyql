@@ -1,9 +1,0 @@
-module bindings.rust.generated.m10442018;
-
-binding deserialization1 {
-  requires {
-    dependency("serde_cbor")
-  }
-  query pattern callExpr where callee.method == "from_slice"
-  emit sink code.Deserialization at args[0]
-}

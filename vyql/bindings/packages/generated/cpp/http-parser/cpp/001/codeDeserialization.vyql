@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m62bee769;
-
-binding deserialization1 {
-  requires {
-    dependency("http-parser")
-  }
-  query pattern callExpr where callee.method == "http_parser_parse_url"
-  emit sink code.Deserialization at args[0]
-}

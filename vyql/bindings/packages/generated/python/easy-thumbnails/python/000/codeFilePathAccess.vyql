@@ -1,9 +1,0 @@
-module bindings.python.generated.ma406a0a6;
-
-binding filePathAccess0 {
-  requires {
-    dependency("easy-thumbnails")
-  }
-  query pattern callExpr where callee.method == "open"
-  emit sink code.FilePathAccess at args[0]
-}

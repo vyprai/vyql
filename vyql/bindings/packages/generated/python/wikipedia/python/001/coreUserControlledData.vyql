@@ -1,9 +1,0 @@
-module bindings.python.generated.m7b761a9b;
-
-binding userControlledData1 {
-  requires {
-    dependency("wikipedia")
-  }
-  query pattern callExpr where callee.method == "geosearch"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.c.generated.m018a403d;
-
-binding userControlledData1 {
-  requires {
-    dependency("libmagic")
-  }
-  query pattern callExpr where callee.method == "buffer"
-  emit source core.UserControlledData at call.result
-}

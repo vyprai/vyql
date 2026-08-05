@@ -1,9 +1,0 @@
-module bindings.python.generated.ma352f771;
-
-binding filePathAccess0 {
-  requires {
-    dependency("datasets")
-  }
-  query pattern callExpr where callee.method == "load_dataset"
-  emit sink code.FilePathAccess at args[0]
-}

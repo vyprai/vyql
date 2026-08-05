@@ -1,0 +1,33 @@
+module bindings.kotlin.generated.ma95f9599;
+
+binding urlFetch0 {
+  requires {
+    dependency("org.jboss.resteasy:resteasy-client")
+  }
+  query pattern callExpr where callee.method == "createClientInvocation"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("org.jboss.resteasy:resteasy-client")
+  }
+  query pattern callExpr where callee.method == "invoke"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("org.jboss.resteasy:resteasy-client")
+  }
+  query pattern callExpr where callee.method == "invoke"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding httpInput3 {
+  requires {
+    dependency("org.jboss.resteasy:resteasy-client")
+  }
+  query pattern callExpr where callee.method == "readFrom"
+  emit source code.HttpInput at call.result
+}

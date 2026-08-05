@@ -1,9 +1,0 @@
-module bindings.scala.generated.mbc07a9bf;
-
-binding sqlExecution1 {
-  requires {
-    dependency("com.datastax.cassandra:cassandra-driver-core")
-  }
-  query pattern callExpr where callee.method == "executeAsync"
-  emit sink code.SqlExecution at args[0]
-}

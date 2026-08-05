@@ -1,9 +1,0 @@
-module bindings.objc.generated.m59d0bf4c;
-
-binding networkSend1 {
-  requires {
-    dependency("CapacitorPreferences")
-  }
-  query pattern callExpr where callee.method == "sendPending"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,0 +1,33 @@
+module bindings.elixir.generated.mbfd06dfa;
+
+binding htmlRender0 {
+  requires {
+    dependency("swoosh")
+  }
+  query pattern callExpr where callee.method == "html_body"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("swoosh")
+  }
+  query pattern callExpr where callee.method == "text_body"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("swoosh")
+  }
+  query pattern callExpr where callee.method == "header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("swoosh")
+  }
+  query pattern callExpr where callee.method == "attachment"
+  emit sink code.FilePathAccess at args[0]
+}

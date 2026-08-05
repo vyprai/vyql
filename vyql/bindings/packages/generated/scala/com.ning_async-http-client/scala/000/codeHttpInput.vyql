@@ -1,9 +1,0 @@
-module bindings.scala.generated.mbeef8f9f;
-
-binding httpInput0 {
-  requires {
-    dependency("com.ning:async-http-client")
-  }
-  query pattern callExpr where callee.method == "prepareGet"
-  emit source code.HttpInput at call.result
-}

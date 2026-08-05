@@ -1,9 +1,0 @@
-module bindings.php.generated.mb7514d44;
-
-binding filePathAccess0 {
-  requires {
-    dependency("doctrine/persistence")
-  }
-  query pattern callExpr where callee.method == "findMappingFile"
-  emit sink code.FilePathAccess at args[0]
-}

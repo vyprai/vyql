@@ -1,9 +1,0 @@
-module bindings.swift.generated.m220cd6e9;
-
-binding httpInput1 {
-  requires {
-    dependency("github.com/swift-server/swift-aws-lambda-events")
-  }
-  query pattern callExpr where callee.method == "queryStringParameters"
-  emit source code.HttpInput at call.result
-}

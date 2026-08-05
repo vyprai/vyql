@@ -1,9 +1,0 @@
-module bindings.python.generated.m40d3cdd1;
-
-binding xmlParse8 {
-  requires {
-    dependency("imageio")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.XmlParse at args[0]
-}

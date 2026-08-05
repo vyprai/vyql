@@ -1,9 +1,0 @@
-module bindings.dart.generated.mbbfbe74e;
-
-binding deserialization1 {
-  requires {
-    dependency("convert")
-  }
-  query pattern callExpr where callee.method == "PercentDecoder.convert"
-  emit sink code.Deserialization at args[0]
-}

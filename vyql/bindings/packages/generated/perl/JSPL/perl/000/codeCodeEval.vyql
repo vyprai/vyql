@@ -1,9 +1,0 @@
-module bindings.perl.generated.m0695b1c0;
-
-binding codeEval0 {
-  requires {
-    dependency("JSPL")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.CodeEval at args[0]
-}

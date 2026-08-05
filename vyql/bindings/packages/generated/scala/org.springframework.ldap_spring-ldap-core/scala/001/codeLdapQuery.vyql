@@ -1,9 +1,0 @@
-module bindings.scala.generated.m64696240;
-
-binding ldapQuery1 {
-  requires {
-    dependency("org.springframework.ldap:spring-ldap-core")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit sink code.LdapQuery at args[0]
-}

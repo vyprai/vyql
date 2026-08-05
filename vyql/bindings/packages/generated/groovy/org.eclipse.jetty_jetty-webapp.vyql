@@ -1,0 +1,35 @@
+module bindings.groovy.generated.m76159498;
+
+binding xmlParse0 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-webapp")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding inputValidation1 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-webapp")
+  }
+  query pattern callExpr where callee.method == "setValidateXml"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-webapp")
+  }
+  query pattern callExpr where callee.method == "addDescriptorProcessor"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

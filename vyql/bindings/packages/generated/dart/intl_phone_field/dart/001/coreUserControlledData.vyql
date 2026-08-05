@@ -1,9 +1,0 @@
-module bindings.dart.generated.mbcdcfd28;
-
-binding userControlledData1 {
-  requires {
-    dependency("intl_phone_field")
-  }
-  query pattern callExpr where callee.method == "PhoneNumber"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.dart.generated.mbd1efa1e;
-
-binding userControlledData1 {
-  requires {
-    dependency("sensors")
-  }
-  query pattern callExpr where callee.method == "UserAccelerometerEvent"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.ma606e784;
-
-binding filePathAccess1 {
-  requires {
-    dependency("SlateURLProtocol")
-  }
-  query pattern callExpr where callee.method == "writeCacheWithPath:data:responseHeaders:requestURL:redirectRequestURL:"
-  emit sink code.FilePathAccess at args[0]
-}

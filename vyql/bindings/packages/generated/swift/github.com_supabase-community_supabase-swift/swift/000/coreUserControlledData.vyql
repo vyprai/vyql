@@ -1,9 +1,0 @@
-module bindings.swift.generated.m9fb65a21;
-
-binding userControlledData0 {
-  requires {
-    dependency("github.com/supabase-community/supabase-swift")
-  }
-  query pattern callExpr where callee.method == "session"
-  emit source core.UserControlledData at call.result
-}

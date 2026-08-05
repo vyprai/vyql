@@ -1,9 +1,0 @@
-module bindings.ruby.generated.med7e12a4;
-
-binding userControlledData5 {
-  requires {
-    dependency("github_api")
-  }
-  query pattern callExpr where callee.method == "Utils::Url.parse_query_for_param"
-  emit source core.UserControlledData at call.result
-}

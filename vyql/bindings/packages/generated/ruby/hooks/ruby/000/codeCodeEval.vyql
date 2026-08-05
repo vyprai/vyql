@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m1d2e62a8;
-
-binding codeEval0 {
-  requires {
-    dependency("hooks")
-  }
-  query pattern callExpr where callee.method == "run_hook"
-  emit sink code.CodeEval at args[0]
-}

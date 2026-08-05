@@ -1,9 +1,0 @@
-module bindings.objc.generated.mf243987b;
-
-binding deserialization0 {
-  requires {
-    dependency("KissXML")
-  }
-  query pattern callExpr where callee.method == "initWithXMLString:options:error:"
-  emit sink code.Deserialization at args[0]
-}

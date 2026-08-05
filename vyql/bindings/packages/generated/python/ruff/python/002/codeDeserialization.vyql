@@ -1,9 +1,0 @@
-module bindings.python.generated.md6d022b9;
-
-binding deserialization2 {
-  requires {
-    dependency("ruff")
-  }
-  query pattern callExpr where callee.method == "parse_ref"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m4a9bc8cc;
-
-binding networkData2 {
-  requires {
-    dependency("aws-sdk-sqs")
-  }
-  query pattern callExpr where callee.method == "receive_message"
-  emit source code.NetworkData at call.result
-}

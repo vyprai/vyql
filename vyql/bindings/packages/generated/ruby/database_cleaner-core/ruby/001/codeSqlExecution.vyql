@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m3d3d1864;
-
-binding sqlExecution1 {
-  requires {
-    dependency("database_cleaner-core")
-  }
-  query pattern callExpr where callee.method == "clean_with"
-  emit sink code.SqlExecution at args[0]
-}

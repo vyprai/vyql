@@ -1,9 +1,0 @@
-module bindings.go.generated.mce2ab4c6;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/godbus/dbus")
-  }
-  query pattern callExpr where callee.method == "ParseSignature"
-  emit sink code.Deserialization at args[0]
-}

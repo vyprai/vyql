@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m944a22ed;
-
-binding networkSend4 {
-  requires {
-    dependency("sendgrid")
-  }
-  query pattern callExpr where callee.method == "delete"
-  emit sink code.NetworkSend at args[0]
-}

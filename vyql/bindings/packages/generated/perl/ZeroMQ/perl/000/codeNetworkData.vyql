@@ -1,9 +1,0 @@
-module bindings.perl.generated.m7b5a4479;
-
-binding networkData0 {
-  requires {
-    dependency("ZeroMQ")
-  }
-  query pattern callExpr where callee.method == "recv"
-  emit source code.NetworkData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.go.generated.m69f29d0c;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/containerd/go-cni")
-  }
-  query pattern callExpr where callee.method == "WithConfFile"
-  emit sink code.FilePathAccess at args[0]
-}

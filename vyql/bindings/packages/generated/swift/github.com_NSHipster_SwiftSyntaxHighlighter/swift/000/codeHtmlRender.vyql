@@ -1,9 +1,0 @@
-module bindings.swift.generated.m48b016b2;
-
-binding htmlRender0 {
-  requires {
-    dependency("github.com/NSHipster/SwiftSyntaxHighlighter")
-  }
-  query pattern callExpr where callee.method == "highlight(source:using:)"
-  emit sink code.HtmlRender at args[0]
-}

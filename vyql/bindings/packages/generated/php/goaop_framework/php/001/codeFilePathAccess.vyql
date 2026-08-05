@@ -1,9 +1,0 @@
-module bindings.php.generated.m801e6e81;
-
-binding filePathAccess1 {
-  requires {
-    dependency("goaop/framework")
-  }
-  query pattern callExpr where callee.method == "mkdir"
-  emit sink code.FilePathAccess at args[0]
-}

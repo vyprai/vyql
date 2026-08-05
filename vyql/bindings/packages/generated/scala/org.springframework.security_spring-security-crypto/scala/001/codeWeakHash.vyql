@@ -1,9 +1,0 @@
-module bindings.scala.generated.m8b566f62;
-
-binding weakHash1 {
-  requires {
-    dependency("org.springframework.security:spring-security-crypto")
-  }
-  query pattern callExpr where callee.method == "digest"
-  emit issue code.WeakHash at call
-}

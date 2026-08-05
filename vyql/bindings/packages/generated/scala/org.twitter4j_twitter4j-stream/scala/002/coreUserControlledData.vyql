@@ -1,9 +1,0 @@
-module bindings.scala.generated.m6fb8787a;
-
-binding userControlledData2 {
-  requires {
-    dependency("org.twitter4j:twitter4j-stream")
-  }
-  query pattern callExpr where callee.method == "track"
-  emit source core.UserControlledData at call.result
-}

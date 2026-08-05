@@ -1,9 +1,0 @@
-module bindings.swift.generated.mceef4e68;
-
-binding expressionEval7 {
-  requires {
-    dependency("github.com/pointfreeco/swift-html")
-  }
-  query pattern callExpr where callee.method == "onloadeddata"
-  emit sink code.ExpressionEval at args[0]
-}

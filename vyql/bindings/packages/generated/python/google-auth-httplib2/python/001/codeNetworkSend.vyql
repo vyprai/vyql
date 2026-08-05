@@ -1,9 +1,0 @@
-module bindings.python.generated.m81d1f3b6;
-
-binding networkSend1 {
-  requires {
-    dependency("google-auth-httplib2")
-  }
-  query pattern callExpr where callee.method == "Request.__call__"
-  emit sink code.NetworkSend at args[0]
-}

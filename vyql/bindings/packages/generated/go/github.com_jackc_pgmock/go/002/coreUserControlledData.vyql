@@ -1,9 +1,0 @@
-module bindings.go.generated.m54dce16f;
-
-binding userControlledData2 {
-  requires {
-    dependency("github.com/jackc/pgmock")
-  }
-  query pattern callExpr where callee.method == "AcceptUnauthenticatedConnRequestSteps"
-  emit source core.UserControlledData at call.result
-}

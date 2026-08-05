@@ -1,0 +1,49 @@
+module bindings.go.generated.m802ba669;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/docker/libtrust")
+  }
+  query pattern callExpr where callee.method == "UnmarshalPublicKeyPEM"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/docker/libtrust")
+  }
+  query pattern callExpr where callee.method == "UnmarshalPublicKeyPEMBundle"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/docker/libtrust")
+  }
+  query pattern callExpr where callee.method == "UnmarshalPrivateKeyPEM"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/docker/libtrust")
+  }
+  query pattern callExpr where callee.method == "UnmarshalPublicKeyJWK"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/docker/libtrust")
+  }
+  query pattern callExpr where callee.method == "UnmarshalPublicKeyJWKSet"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("github.com/docker/libtrust")
+  }
+  query pattern callExpr where callee.method == "UnmarshalPrivateKeyJWK"
+  emit sink code.Deserialization at args[0]
+}

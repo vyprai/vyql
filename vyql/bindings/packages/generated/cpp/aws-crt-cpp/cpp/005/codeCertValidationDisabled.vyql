@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m4fa6ca30;
-
-binding certValidationDisabled5 {
-  requires {
-    dependency("aws-crt-cpp")
-  }
-  query pattern callExpr where callee.method == "SetBYOCryptoClientTlsCallback"
-  emit issue code.CertValidationDisabled at call
-}

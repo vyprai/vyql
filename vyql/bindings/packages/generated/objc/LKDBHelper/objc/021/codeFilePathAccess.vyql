@@ -1,9 +1,0 @@
-module bindings.objc.generated.mcf19b29f;
-
-binding filePathAccess21 {
-  requires {
-    dependency("LKDBHelper")
-  }
-  query pattern callExpr where callee.method == "setDBPath:"
-  emit sink code.FilePathAccess at args[0]
-}

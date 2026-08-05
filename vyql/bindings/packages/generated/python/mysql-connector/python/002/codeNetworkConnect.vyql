@@ -1,9 +1,0 @@
-module bindings.python.generated.me0dce8aa;
-
-binding networkConnect2 {
-  requires {
-    dependency("mysql-connector")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

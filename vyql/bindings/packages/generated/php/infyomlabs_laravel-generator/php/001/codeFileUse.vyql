@@ -1,9 +1,0 @@
-module bindings.php.generated.mc68437fe;
-
-binding fileUse1 {
-  requires {
-    dependency("infyomlabs/laravel-generator")
-  }
-  query pattern callExpr where callee.method == "createFile"
-  emit sink code.FileUseSink at args[0]
-}

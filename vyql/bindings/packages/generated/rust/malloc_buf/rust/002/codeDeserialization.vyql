@@ -1,9 +1,0 @@
-module bindings.rust.generated.m4a1ec390;
-
-binding deserialization2 {
-  requires {
-    dependency("malloc_buf")
-  }
-  query pattern callExpr where callee.method == "from_c_str"
-  emit sink code.Deserialization at args[0]
-}

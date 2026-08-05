@@ -1,0 +1,130 @@
+module bindings.php.generated.mde571bb4;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "authenticateUser"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "authorizeChannel"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck2 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "authorizePresenceChannel"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "verifySignature"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding networkSend4 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "trigger"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "triggerAsync"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend6 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "sendToUserAsync"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect7 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "make_request"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect8 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "make_batch_request"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend9 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "triggerBatchAsync"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect10 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "terminateUserConnectionsAsync"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect11 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect12 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect13 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "postAsync"
+  emit sink code.NetworkConnectSink at args[0]
+}

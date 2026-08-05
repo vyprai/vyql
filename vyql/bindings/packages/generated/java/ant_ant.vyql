@@ -1,0 +1,46 @@
+module bindings.java.generated.ma182ced9;
+
+binding cliArgument0 {
+  requires {
+    dependency("ant:ant")
+  }
+  query pattern callExpr where callee.method == "startAnt"
+  emit source code.CliArgument at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("ant:ant")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding deserialization2 {
+  requires {
+    dependency("ant:ant")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding networkData3 {
+  requires {
+    dependency("ant:ant")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit source code.NetworkData at call.result
+}
+
+binding inputValidation4 {
+  requires {
+    dependency("ant:ant")
+  }
+  query pattern callExpr where callee.method == "match"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

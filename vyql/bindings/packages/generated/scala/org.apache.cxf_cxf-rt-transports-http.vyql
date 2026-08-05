@@ -1,0 +1,17 @@
+module bindings.scala.generated.m6aafd4e0;
+
+binding networkSend0 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-transports-http")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData1 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-transports-http")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

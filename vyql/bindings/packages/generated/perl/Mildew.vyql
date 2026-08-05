@@ -1,0 +1,33 @@
+module bindings.perl.generated.mc7c5ed1b;
+
+binding commandExecution0 {
+  requires {
+    dependency("Mildew")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("Mildew")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("Mildew")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}
+
+binding fileUse3 {
+  requires {
+    dependency("Mildew")
+  }
+  query pattern callExpr where callee.method == "output"
+  emit sink code.FileUseSink at args[0]
+}

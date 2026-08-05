@@ -1,9 +1,0 @@
-module bindings.swift.generated.m64b3d865;
-
-binding weakHash1 {
-  requires {
-    dependency("github.com/mattpolzin/JSONAPI")
-  }
-  query pattern callExpr where callee.method == "hash"
-  emit issue code.WeakHash at call
-}

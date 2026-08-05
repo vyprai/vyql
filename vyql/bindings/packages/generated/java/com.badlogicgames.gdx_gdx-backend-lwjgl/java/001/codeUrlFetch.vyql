@@ -1,9 +1,0 @@
-module bindings.java.generated.m265161be;
-
-binding urlFetch1 {
-  requires {
-    dependency("com.badlogicgames.gdx:gdx-backend-lwjgl")
-  }
-  query pattern callExpr where callee.method == "openURI"
-  emit sink code.UrlFetch at args[0]
-}

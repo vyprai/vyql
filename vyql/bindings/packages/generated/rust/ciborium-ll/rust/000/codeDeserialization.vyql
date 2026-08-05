@@ -1,9 +1,0 @@
-module bindings.rust.generated.m46f2b65f;
-
-binding deserialization0 {
-  requires {
-    dependency("ciborium-ll")
-  }
-  query pattern callExpr where callee.method == "pull"
-  emit sink code.Deserialization at args[0]
-}

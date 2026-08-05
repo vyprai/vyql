@@ -1,9 +1,0 @@
-module bindings.rust.generated.m79289f93;
-
-binding userControlledData4 {
-  requires {
-    dependency("flume")
-  }
-  query pattern callExpr where callee.method == "recv_deadline"
-  emit source core.UserControlledData at call.result
-}

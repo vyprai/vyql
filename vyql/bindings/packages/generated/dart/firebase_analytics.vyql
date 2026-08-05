@@ -1,0 +1,33 @@
+module bindings.dart.generated.me53cda8b;
+
+binding logOutput0 {
+  requires {
+    dependency("firebase_analytics")
+  }
+  query pattern callExpr where callee.method == "logEvent"
+  emit sink code.LogOutput at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("firebase_analytics")
+  }
+  query pattern callExpr where callee.method == "setUserId"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("firebase_analytics")
+  }
+  query pattern callExpr where callee.method == "setUserProperty"
+  emit source core.UserControlledData at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("firebase_analytics")
+  }
+  query pattern callExpr where callee.method == "getSessionId"
+  emit source code.SecretValue at call.result
+}

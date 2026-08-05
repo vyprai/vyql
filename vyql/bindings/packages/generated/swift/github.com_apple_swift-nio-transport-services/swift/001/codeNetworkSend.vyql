@@ -1,9 +1,0 @@
-module bindings.swift.generated.mf201a5b2;
-
-binding networkSend1 {
-  requires {
-    dependency("github.com/apple/swift-nio-transport-services")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkSend at args[0]
-}

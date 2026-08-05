@@ -1,9 +1,0 @@
-module bindings.perl.generated.mac97a6e3;
-
-binding userControlledData2 {
-  requires {
-    dependency("App-ansifold")
-  }
-  query pattern callExpr where callee.method == "ansicolrm"
-  emit source core.UserControlledData at call.result
-}

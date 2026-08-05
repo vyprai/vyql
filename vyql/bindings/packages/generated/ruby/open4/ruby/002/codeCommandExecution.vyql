@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m05c448f8;
-
-binding commandExecution2 {
-  requires {
-    dependency("open4")
-  }
-  query pattern callExpr where callee.method == "popen4ext"
-  emit sink code.CommandExecution at args[0]
-}

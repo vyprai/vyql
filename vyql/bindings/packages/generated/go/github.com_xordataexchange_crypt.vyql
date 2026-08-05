@@ -1,0 +1,25 @@
+module bindings.go.generated.m60d3ca0e;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/xordataexchange/crypt")
+  }
+  query pattern callExpr where callee.method == "Decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding secretValue1 {
+  requires {
+    dependency("github.com/xordataexchange/crypt")
+  }
+  query pattern callExpr where callee.method == "NewEtcdConfigManager"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("github.com/xordataexchange/crypt")
+  }
+  query pattern callExpr where callee.method == "NewConsulConfigManager"
+  emit source code.SecretValue at call.result
+}

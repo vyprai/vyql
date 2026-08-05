@@ -1,9 +1,0 @@
-module bindings.dart.generated.mad9163af;
-
-binding deserialization1 {
-  requires {
-    dependency("gql")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vyprai/vyql/ontology"
+	"github.com/vyprai/vyql/internal/ontology"
 )
 
 // Filters that match nothing are the dangerous case in a security tool: the

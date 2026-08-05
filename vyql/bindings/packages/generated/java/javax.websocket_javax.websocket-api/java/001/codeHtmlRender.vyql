@@ -1,9 +1,0 @@
-module bindings.java.generated.mdbed4a0a;
-
-binding htmlRender1 {
-  requires {
-    dependency("javax.websocket:javax.websocket-api")
-  }
-  query pattern callExpr where callee.method == "sendText"
-  emit sink code.HtmlRender at args[0]
-}

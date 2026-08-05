@@ -1,9 +1,0 @@
-module bindings.objc.generated.mef2186dc;
-
-binding storedDataWrite2 {
-  requires {
-    dependency("RHCategoryKit")
-  }
-  query pattern callExpr where callee.method == "RSAEncryptWithPublicKey"
-  emit sink code.StoredDataWrite at args[0]
-}

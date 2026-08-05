@@ -1,9 +1,0 @@
-module bindings.php.generated.mfbf8bb99;
-
-binding commandExecution0 {
-  requires {
-    dependency("consolidation/robo")
-  }
-  query pattern callExpr where callee.method == "process"
-  emit sink code.CommandExecution at args[0]
-}

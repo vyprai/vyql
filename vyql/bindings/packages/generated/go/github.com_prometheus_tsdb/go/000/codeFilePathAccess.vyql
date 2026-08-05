@@ -1,9 +1,0 @@
-module bindings.go.generated.m9375e369;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/prometheus/tsdb")
-  }
-  query pattern callExpr where callee.method == "OpenDBReadOnly"
-  emit sink code.FilePathAccess at args[0]
-}

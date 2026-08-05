@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mb80e1451;
-
-binding nosqlQuery5 {
-  requires {
-    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
-  }
-  query pattern callExpr where callee.method == "deleteAutoFollowPattern"
-  emit sink code.NosqlQuery at args[0]
-}

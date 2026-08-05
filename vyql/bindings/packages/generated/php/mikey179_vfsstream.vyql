@@ -1,0 +1,41 @@
+module bindings.php.generated.mf44fbe20;
+
+binding filePathAccess0 {
+  requires {
+    dependency("mikey179/vfsstream")
+  }
+  query pattern callExpr where callee.method == "copyFromFileSystem"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("mikey179/vfsstream")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse2 {
+  requires {
+    dependency("mikey179/vfsstream")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse3 {
+  requires {
+    dependency("mikey179/vfsstream")
+  }
+  query pattern callExpr where callee.method == "newFile"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse4 {
+  requires {
+    dependency("mikey179/vfsstream")
+  }
+  query pattern callExpr where callee.method == "newDirectory"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mbaedb6e4;
-
-binding deserialization4 {
-  requires {
-    dependency("yaml_elixir")
-  }
-  query pattern callExpr where callee.method == "read_all_from_string!"
-  emit sink code.Deserialization at args[0]
-}

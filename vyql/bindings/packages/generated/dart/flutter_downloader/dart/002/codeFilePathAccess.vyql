@@ -1,9 +1,0 @@
-module bindings.dart.generated.m252beaed;
-
-binding filePathAccess2 {
-  requires {
-    dependency("flutter_downloader")
-  }
-  query pattern callExpr where callee.method == "open"
-  emit sink code.FilePathAccess at args[0]
-}

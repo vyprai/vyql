@@ -1,9 +1,0 @@
-module bindings.php.generated.m9daecf9b;
-
-binding storedDataRead2 {
-  requires {
-    dependency("cakephp/cakephp")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source code.StoredDataRead at call.result
-}

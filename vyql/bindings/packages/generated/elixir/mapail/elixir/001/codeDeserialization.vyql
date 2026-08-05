@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m7d66774b;
-
-binding deserialization1 {
-  requires {
-    dependency("mapail")
-  }
-  query pattern callExpr where callee.method == "map_to_struct!"
-  emit sink code.Deserialization at args[0]
-}

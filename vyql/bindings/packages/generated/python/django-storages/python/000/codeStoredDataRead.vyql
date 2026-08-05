@@ -1,9 +1,0 @@
-module bindings.python.generated.m0d09c3b2;
-
-binding storedDataRead0 {
-  requires {
-    dependency("django-storages")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source code.StoredDataRead at call.result
-}

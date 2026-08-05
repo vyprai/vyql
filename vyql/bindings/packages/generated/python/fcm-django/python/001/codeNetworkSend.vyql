@@ -1,9 +1,0 @@
-module bindings.python.generated.m6750d278;
-
-binding networkSend1 {
-  requires {
-    dependency("fcm-django")
-  }
-  query pattern callExpr where callee.method == "send_messages"
-  emit sink code.NetworkSend at args[0]
-}

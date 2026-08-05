@@ -1,0 +1,49 @@
+module bindings.elixir.generated.m86ad4718;
+
+binding userControlledData0 {
+  requires {
+    dependency("ueberauth_google")
+  }
+  query pattern callExpr where callee.method == "handle_callback!"
+  emit source core.UserControlledData at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("ueberauth_google")
+  }
+  query pattern callExpr where callee.method == "get_access_token"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("ueberauth_google")
+  }
+  query pattern callExpr where callee.method == "get_token"
+  emit source code.SecretValue at call.result
+}
+
+binding networkSend3 {
+  requires {
+    dependency("ueberauth_google")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding secretValue4 {
+  requires {
+    dependency("ueberauth_google")
+  }
+  query pattern callExpr where callee.method == "credentials"
+  emit source code.SecretValue at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("ueberauth_google")
+  }
+  query pattern callExpr where callee.method == "info"
+  emit source core.UserControlledData at call.result
+}

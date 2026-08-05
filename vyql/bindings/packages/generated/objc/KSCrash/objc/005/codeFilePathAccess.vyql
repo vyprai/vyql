@@ -1,9 +1,0 @@
-module bindings.objc.generated.m9c238305;
-
-binding filePathAccess5 {
-  requires {
-    dependency("KSCrash")
-  }
-  query pattern callExpr where callee.method == "kscrs_getRunSidecarFilePathForRunID"
-  emit sink code.FilePathAccess at args[0]
-}

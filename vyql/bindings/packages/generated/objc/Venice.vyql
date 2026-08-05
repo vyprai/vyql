@@ -1,0 +1,49 @@
+module bindings.objc.generated.m37c79026;
+
+binding networkBind0 {
+  requires {
+    dependency("Venice")
+  }
+  query pattern callExpr where callee.method == "tcplisten"
+  emit sink code.NetworkBind at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("Venice")
+  }
+  query pattern callExpr where callee.method == "tcpconnect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("Venice")
+  }
+  query pattern callExpr where callee.method == "tcpsend"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData3 {
+  requires {
+    dependency("Venice")
+  }
+  query pattern callExpr where callee.method == "tcprecv"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData4 {
+  requires {
+    dependency("Venice")
+  }
+  query pattern callExpr where callee.method == "tcprecvlh"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData5 {
+  requires {
+    dependency("Venice")
+  }
+  query pattern callExpr where callee.method == "tcprecvuntil"
+  emit source code.NetworkData at call.result
+}

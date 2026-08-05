@@ -1,9 +1,0 @@
-module bindings.php.generated.mda56f594;
-
-binding codeEval1 {
-  requires {
-    dependency("umpirsky/twig-php-function")
-  }
-  query pattern callExpr where callee.method == "allowFunctions"
-  emit sink code.CodeEval at args[0]
-}

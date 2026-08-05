@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m8ca7cd51;
-
-binding sqlExecution2 {
-  requires {
-    dependency("org.springframework:spring-jdbc")
-  }
-  query pattern callExpr where callee.method == "batchUpdate"
-  emit sink code.SqlExecution at args[0]
-}

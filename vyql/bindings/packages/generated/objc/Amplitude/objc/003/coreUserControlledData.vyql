@@ -1,9 +1,0 @@
-module bindings.objc.generated.ma3a84a11;
-
-binding userControlledData3 {
-  requires {
-    dependency("Amplitude")
-  }
-  query pattern callExpr where callee.method == "logEvent:withEventProperties:withUserProperties:withMiddlewareExtra:"
-  emit source core.UserControlledData at call.result
-}

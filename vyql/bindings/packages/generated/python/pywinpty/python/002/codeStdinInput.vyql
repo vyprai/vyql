@@ -1,9 +1,0 @@
-module bindings.python.generated.ma7acf84c;
-
-binding stdinInput2 {
-  requires {
-    dependency("pywinpty")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit source code.StdinInput at call.result
-}

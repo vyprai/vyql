@@ -1,9 +1,0 @@
-module bindings.c.generated.m13ca74f7;
-
-binding deserialization0 {
-  requires {
-    dependency("expat")
-  }
-  query pattern callExpr where callee.method == "XML_Parse"
-  emit sink code.Deserialization at args[0]
-}

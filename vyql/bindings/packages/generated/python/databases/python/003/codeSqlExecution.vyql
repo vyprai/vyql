@@ -1,9 +1,0 @@
-module bindings.python.generated.mb74d5d6c;
-
-binding sqlExecution3 {
-  requires {
-    dependency("databases")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.SqlExecution at args[0]
-}

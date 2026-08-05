@@ -1,9 +1,0 @@
-module bindings.python.generated.m2b2b7e1b;
-
-binding fileUse1 {
-  requires {
-    dependency("python-docx")
-  }
-  query pattern callExpr where callee.method == "docx.document.Document.save"
-  emit sink code.FileUseSink at args[0]
-}

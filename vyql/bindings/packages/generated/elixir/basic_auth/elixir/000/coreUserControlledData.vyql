@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m6669a5d0;
-
-binding userControlledData0 {
-  requires {
-    dependency("basic_auth")
-  }
-  query pattern callExpr where callee.method == "BasicAuth.call"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m5873f70c;
-
-binding codeEval2 {
-  requires {
-    dependency("Async-Util")
-  }
-  query pattern callExpr where callee.method == "achain"
-  emit sink code.CodeEval at args[0]
-}

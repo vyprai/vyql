@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mf2ac47d5;
-
-binding networkData1 {
-  requires {
-    dependency("geolix")
-  }
-  query pattern callExpr where callee.method == "Geolix.metadata"
-  emit source code.NetworkData at call.result
-}

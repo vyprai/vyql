@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m9c63ffa2;
-
-binding codeEval1 {
-  requires {
-    dependency("org.seleniumhq.selenium:selenium-htmlunit-driver")
-  }
-  query pattern callExpr where callee.method == "executeAsyncScript"
-  emit sink code.CodeEval at args[0]
-}

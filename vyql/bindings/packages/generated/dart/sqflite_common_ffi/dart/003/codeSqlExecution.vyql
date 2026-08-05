@@ -1,9 +1,0 @@
-module bindings.dart.generated.m5a58048f;
-
-binding sqlExecution3 {
-  requires {
-    dependency("sqflite_common_ffi")
-  }
-  query pattern callExpr where callee.method == "handleQuery"
-  emit sink code.SqlExecution at args[0]
-}

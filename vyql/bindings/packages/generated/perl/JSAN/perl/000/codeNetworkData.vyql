@@ -1,9 +1,0 @@
-module bindings.perl.generated.mdd98cc15;
-
-binding networkData0 {
-  requires {
-    dependency("JSAN")
-  }
-  query pattern callExpr where callee.method == "_read_script"
-  emit source code.NetworkData at call.result
-}

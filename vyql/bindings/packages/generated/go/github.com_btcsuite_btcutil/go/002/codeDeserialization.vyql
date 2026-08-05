@@ -1,9 +1,0 @@
-module bindings.go.generated.mca5e322a;
-
-binding deserialization2 {
-  requires {
-    dependency("github.com/btcsuite/btcutil")
-  }
-  query pattern callExpr where callee.method == "NewBlockFromBytes"
-  emit sink code.Deserialization at args[0]
-}

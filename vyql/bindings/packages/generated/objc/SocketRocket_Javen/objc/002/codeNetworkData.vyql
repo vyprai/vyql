@@ -1,9 +1,0 @@
-module bindings.objc.generated.mf026a2aa;
-
-binding networkData2 {
-  requires {
-    dependency("SocketRocket_Javen")
-  }
-  query pattern callExpr where callee.method == "webSocket:didReceiveMessage:"
-  emit source code.NetworkData at call.result
-}

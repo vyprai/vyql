@@ -1,9 +1,0 @@
-module bindings.java.generated.mb5554c62;
-
-binding networkConnect2 {
-  requires {
-    dependency("org.jboss.shrinkwrap.resolver:shrinkwrap-resolver-impl-maven")
-  }
-  query pattern callExpr where callee.method == "resolve"
-  emit sink code.NetworkConnectSink at args[0]
-}

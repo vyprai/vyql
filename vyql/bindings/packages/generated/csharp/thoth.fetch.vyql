@@ -1,0 +1,97 @@
+module bindings.csharp.generated.m4c791c58;
+
+binding networkSend0 {
+  requires {
+    dependency("thoth.fetch")
+  }
+  query pattern callExpr where callee.method == "tryPut``2"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("thoth.fetch")
+  }
+  query pattern callExpr where callee.method == "tryPost``2"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("thoth.fetch")
+  }
+  query pattern callExpr where callee.method == "tryPatch``2"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("thoth.fetch")
+  }
+  query pattern callExpr where callee.method == "tryGet``2"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("thoth.fetch")
+  }
+  query pattern callExpr where callee.method == "tryFetchAs``2"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("thoth.fetch")
+  }
+  query pattern callExpr where callee.method == "tryDelete``2"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend6 {
+  requires {
+    dependency("thoth.fetch")
+  }
+  query pattern callExpr where callee.method == "put``2"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend7 {
+  requires {
+    dependency("thoth.fetch")
+  }
+  query pattern callExpr where callee.method == "post``2"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend8 {
+  requires {
+    dependency("thoth.fetch")
+  }
+  query pattern callExpr where callee.method == "patch``2"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend9 {
+  requires {
+    dependency("thoth.fetch")
+  }
+  query pattern callExpr where callee.method == "get``2"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend10 {
+  requires {
+    dependency("thoth.fetch")
+  }
+  query pattern callExpr where callee.method == "fetchAs``2"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend11 {
+  requires {
+    dependency("thoth.fetch")
+  }
+  query pattern callExpr where callee.method == "delete``2"
+  emit sink code.NetworkSend at args[0]
+}

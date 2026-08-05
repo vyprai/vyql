@@ -1,0 +1,81 @@
+module bindings.scala.generated.m68f24c15;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.apache.maven.plugins:maven-surefire-plugin")
+  }
+  query pattern callExpr where callee.method == "getSystemPropertiesFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("org.apache.maven.plugins:maven-surefire-plugin")
+  }
+  query pattern callExpr where callee.method == "setSystemPropertiesFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("org.apache.maven.plugins:maven-surefire-plugin")
+  }
+  query pattern callExpr where callee.method == "getBasedir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("org.apache.maven.plugins:maven-surefire-plugin")
+  }
+  query pattern callExpr where callee.method == "setBasedir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("org.apache.maven.plugins:maven-surefire-plugin")
+  }
+  query pattern callExpr where callee.method == "getTestClassesDirectory"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("org.apache.maven.plugins:maven-surefire-plugin")
+  }
+  query pattern callExpr where callee.method == "setTestClassesDirectory"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("org.apache.maven.plugins:maven-surefire-plugin")
+  }
+  query pattern callExpr where callee.method == "getMainBuildPath"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("org.apache.maven.plugins:maven-surefire-plugin")
+  }
+  query pattern callExpr where callee.method == "setMainBuildPath"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("org.apache.maven.plugins:maven-surefire-plugin")
+  }
+  query pattern callExpr where callee.method == "getReportsDirectory"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess9 {
+  requires {
+    dependency("org.apache.maven.plugins:maven-surefire-plugin")
+  }
+  query pattern callExpr where callee.method == "setReportsDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

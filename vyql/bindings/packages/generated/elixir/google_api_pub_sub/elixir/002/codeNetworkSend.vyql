@@ -1,9 +1,0 @@
-module bindings.elixir.generated.meaa83594;
-
-binding networkSend2 {
-  requires {
-    dependency("google_api_pub_sub")
-  }
-  query pattern callExpr where callee.method == "pubsub_projects_subscriptions_acknowledge"
-  emit sink code.NetworkSend at args[0]
-}

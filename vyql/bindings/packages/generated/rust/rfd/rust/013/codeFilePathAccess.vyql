@@ -1,9 +1,0 @@
-module bindings.rust.generated.mb7a130a2;
-
-binding filePathAccess13 {
-  requires {
-    dependency("rfd")
-  }
-  query pattern callExpr where callee.method == "pick_files_or_folders_async"
-  emit sink code.FilePathAccess at args[0]
-}

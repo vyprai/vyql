@@ -1,9 +1,0 @@
-module bindings.rust.generated.m480c6b70;
-
-binding cliArgument0 {
-  requires {
-    dependency("structopt")
-  }
-  query pattern callExpr where callee.method == "from_clap"
-  emit source code.CliArgument at call.result
-}

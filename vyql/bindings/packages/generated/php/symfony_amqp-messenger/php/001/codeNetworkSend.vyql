@@ -1,9 +1,0 @@
-module bindings.php.generated.m44204587;
-
-binding networkSend1 {
-  requires {
-    dependency("symfony/amqp-messenger")
-  }
-  query pattern callExpr where callee.method == "publishWithDelay"
-  emit sink code.NetworkSend at args[0]
-}

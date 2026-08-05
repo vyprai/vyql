@@ -1,9 +1,0 @@
-module bindings.java.generated.m314d4390;
-
-binding codeEval3 {
-  requires {
-    dependency("com.sun.faces:jsf-api")
-  }
-  query pattern callExpr where callee.method == "javax.faces.component.UIComponent.setValueExpression"
-  emit sink code.CodeEval at args[0]
-}

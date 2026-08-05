@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m0e4212d5;
-
-binding userControlledData2 {
-  requires {
-    dependency("simpleidn")
-  }
-  query pattern callExpr where callee.method == "to_ascii"
-  emit source core.UserControlledData at call.result
-}

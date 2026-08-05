@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mb8c1157b;
-
-binding nosqlQuery2 {
-  requires {
-    dependency("ecto_psql_extras")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit sink code.NosqlQuery at args[0]
-}

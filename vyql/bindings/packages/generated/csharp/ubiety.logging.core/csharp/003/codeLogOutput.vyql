@@ -1,9 +1,0 @@
-module bindings.csharp.generated.mba4a391f;
-
-binding logOutput3 {
-  requires {
-    dependency("ubiety.logging.core")
-  }
-  query pattern callExpr where callee.method == "Error"
-  emit sink code.LogOutput at args[0]
-}

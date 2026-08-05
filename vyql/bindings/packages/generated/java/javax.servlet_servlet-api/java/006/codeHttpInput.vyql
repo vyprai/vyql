@@ -1,9 +1,0 @@
-module bindings.java.generated.m92038514;
-
-binding httpInput6 {
-  requires {
-    dependency("javax.servlet:servlet-api")
-  }
-  query pattern callExpr where callee.method == "getCookies"
-  emit source code.HttpInput at call.result
-}

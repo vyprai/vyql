@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m590c1f57;
-
-binding userControlledData1 {
-  requires {
-    dependency("microsoft.kinect")
-  }
-  query pattern callExpr where callee.method == "ProcessMoveEvents"
-  emit source core.UserControlledData at call.result
-}

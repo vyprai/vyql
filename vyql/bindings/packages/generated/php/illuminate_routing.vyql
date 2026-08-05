@@ -1,0 +1,41 @@
+module bindings.php.generated.m24b29a83;
+
+binding deserialization0 {
+  requires {
+    dependency("illuminate/routing")
+  }
+  query pattern callExpr where callee.method == "RouteUri::parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("illuminate/routing")
+  }
+  query pattern callExpr where callee.method == "UrlGenerator::query"
+  emit source core.UserControlledData at call.result
+}
+
+binding commandExecution2 {
+  requires {
+    dependency("illuminate/routing")
+  }
+  query pattern callExpr where callee.method == "Route::run"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution3 {
+  requires {
+    dependency("illuminate/routing")
+  }
+  query pattern callExpr where callee.method == "Route::runCallable"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution4 {
+  requires {
+    dependency("illuminate/routing")
+  }
+  query pattern callExpr where callee.method == "Route::runController"
+  emit sink code.CommandExecution at args[0]
+}

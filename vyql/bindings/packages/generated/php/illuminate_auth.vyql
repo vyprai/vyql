@@ -1,0 +1,17 @@
+module bindings.php.generated.m00733b29;
+
+binding secretValue0 {
+  requires {
+    dependency("illuminate/auth")
+  }
+  query pattern callExpr where callee.method == "token"
+  emit source code.SecretValue at call.result
+}
+
+binding weakHash1 {
+  requires {
+    dependency("illuminate/auth")
+  }
+  query pattern presenceNode where node.path ~= "illuminate.auth.hash"
+  emit issue code.WeakHash at node
+}

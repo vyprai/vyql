@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m948c362a;
-
-binding codeEval2 {
-  requires {
-    dependency("shotgun")
-  }
-  query pattern callExpr where callee.method == "Loader.call!"
-  emit sink code.CodeEval at args[0]
-}

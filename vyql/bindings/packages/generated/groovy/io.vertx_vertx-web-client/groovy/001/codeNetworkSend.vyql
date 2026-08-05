@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m0f3934f4;
-
-binding networkSend1 {
-  requires {
-    dependency("io.vertx:vertx-web-client")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit sink code.NetworkSend at args[0]
-}

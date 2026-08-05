@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m8fee42b5;
-
-binding deserialization1 {
-  requires {
-    dependency("racc")
-  }
-  query pattern callExpr where callee.method == "yyparse"
-  emit sink code.Deserialization at args[0]
-}

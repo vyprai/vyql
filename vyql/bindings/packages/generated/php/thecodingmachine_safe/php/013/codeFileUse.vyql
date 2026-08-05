@@ -1,9 +1,0 @@
-module bindings.php.generated.mdc1ba520;
-
-binding fileUse13 {
-  requires {
-    dependency("thecodingmachine/safe")
-  }
-  query pattern callExpr where callee.method == "eio_readahead"
-  emit sink code.FileUseSink at args[0]
-}

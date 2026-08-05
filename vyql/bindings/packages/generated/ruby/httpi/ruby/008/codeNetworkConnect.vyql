@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m0f13fa05;
-
-binding networkConnect8 {
-  requires {
-    dependency("httpi")
-  }
-  query pattern callExpr where callee.method == "delete"
-  emit sink code.NetworkConnectSink at args[0]
-}

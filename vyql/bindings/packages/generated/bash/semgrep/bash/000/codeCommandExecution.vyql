@@ -1,9 +1,0 @@
-module bindings.bash.generated.mb77f0ad3;
-
-binding commandExecution0 {
-  requires {
-    dependency("semgrep")
-  }
-  query pattern callExpr where callee.path ~= "semgrep-core"
-  emit sink code.CommandExecution at args[0]
-}

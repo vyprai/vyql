@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mb81e8809;
-
-binding fileUse11 {
-  requires {
-    dependency("pathutil")
-  }
-  query pattern callExpr where callee.method == "safe_copy_directory"
-  emit sink code.FileUseSink at args[0]
-}

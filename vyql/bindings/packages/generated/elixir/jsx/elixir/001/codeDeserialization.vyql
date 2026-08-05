@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m9497e142;
-
-binding deserialization1 {
-  requires {
-    dependency("jsx")
-  }
-  query pattern callExpr where callee.method == "value"
-  emit sink code.Deserialization at args[0]
-}

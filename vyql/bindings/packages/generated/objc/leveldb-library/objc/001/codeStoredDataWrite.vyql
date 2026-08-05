@@ -1,9 +1,0 @@
-module bindings.objc.generated.mf143615c;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("leveldb-library")
-  }
-  query pattern callExpr where callee.method == "Delete"
-  emit sink code.StoredDataWrite at args[0]
-}

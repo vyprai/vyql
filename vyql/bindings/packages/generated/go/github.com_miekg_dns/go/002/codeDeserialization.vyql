@@ -1,9 +1,0 @@
-module bindings.go.generated.m474e534a;
-
-binding deserialization2 {
-  requires {
-    dependency("github.com/miekg/dns")
-  }
-  query pattern callExpr where callee.method == "NewZoneParser"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m32da63f9;
-
-binding networkConnect8 {
-  requires {
-    dependency("doctrine/couchdb")
-  }
-  query pattern callExpr where callee.method == "replicate"
-  emit sink code.NetworkConnectSink at args[0]
-}

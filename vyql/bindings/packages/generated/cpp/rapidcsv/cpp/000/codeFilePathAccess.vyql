@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m7b5f7815;
-
-binding filePathAccess0 {
-  requires {
-    dependency("rapidcsv")
-  }
-  query pattern callExpr where callee.method == "Load"
-  emit sink code.FilePathAccess at args[0]
-}

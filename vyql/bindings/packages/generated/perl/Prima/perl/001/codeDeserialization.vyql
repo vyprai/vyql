@@ -1,9 +1,0 @@
-module bindings.perl.generated.mc1a0aeb2;
-
-binding deserialization1 {
-  requires {
-    dependency("Prima")
-  }
-  query pattern callExpr where callee.method == "Prima::IniFile::read"
-  emit sink code.Deserialization at args[0]
-}

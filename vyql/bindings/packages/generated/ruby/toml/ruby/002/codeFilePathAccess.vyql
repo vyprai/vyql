@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m68a02bb4;
-
-binding filePathAccess2 {
-  requires {
-    dependency("toml")
-  }
-  query pattern callExpr where callee.method == "load_file"
-  emit sink code.FilePathAccess at args[0]
-}

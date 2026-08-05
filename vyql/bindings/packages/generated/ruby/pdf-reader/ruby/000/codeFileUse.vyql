@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m8eefbb4a;
-
-binding fileUse0 {
-  requires {
-    dependency("pdf-reader")
-  }
-  query pattern callExpr where callee.method == "PDF::Reader.open"
-  emit sink code.FileUseSink at args[0]
-}

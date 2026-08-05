@@ -1,0 +1,47 @@
+module bindings.dart.generated.me0c7bf86;
+
+binding cliArgument0 {
+  requires {
+    dependency("flutter_modular")
+  }
+  query pattern callExpr where callee.method == "getArguments"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("flutter_modular")
+  }
+  query pattern callExpr where callee.method == "setArguments"
+  emit source code.CliArgument at call.result
+}
+
+binding redirectTarget2 {
+  requires {
+    dependency("flutter_modular")
+  }
+  query pattern callExpr where callee.method == "setInitialRoute"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget3 {
+  requires {
+    dependency("flutter_modular")
+  }
+  query pattern callExpr where callee.method == "getRoute"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding authorizationCheck4 {
+  requires {
+    dependency("flutter_modular")
+  }
+  query pattern callExpr where callee.method == "canActivate"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

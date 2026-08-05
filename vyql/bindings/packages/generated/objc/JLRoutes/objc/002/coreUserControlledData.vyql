@@ -1,9 +1,0 @@
-module bindings.objc.generated.m2db34a9e;
-
-binding userControlledData2 {
-  requires {
-    dependency("JLRoutes")
-  }
-  query pattern callExpr where callee.method == "addRoutes:handler:"
-  emit source core.UserControlledData at call.result
-}

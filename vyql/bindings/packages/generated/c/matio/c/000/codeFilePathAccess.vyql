@@ -1,9 +1,0 @@
-module bindings.c.generated.m1b9b358f;
-
-binding filePathAccess0 {
-  requires {
-    dependency("matio")
-  }
-  query pattern callExpr where callee.method == "Mat_Open"
-  emit sink code.FilePathAccess at args[0]
-}

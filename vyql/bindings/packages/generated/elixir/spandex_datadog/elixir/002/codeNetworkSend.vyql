@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m73e4dca1;
-
-binding networkSend2 {
-  requires {
-    dependency("spandex_datadog")
-  }
-  query pattern callExpr where callee.method == "send_trace"
-  emit sink code.NetworkSend at args[0]
-}

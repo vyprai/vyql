@@ -1,9 +1,0 @@
-module bindings.objc.generated.mcab5780f;
-
-binding nosqlQuery0 {
-  requires {
-    dependency("AWSAutoScaling")
-  }
-  query pattern callExpr where callee.method == "testInvokePathWithQueryString"
-  emit sink code.NosqlQuery at args[0]
-}

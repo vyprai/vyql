@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mec622833;
-
-binding deserialization2 {
-  requires {
-    dependency("net.sf.supercsv:super-csv")
-  }
-  query pattern callExpr where callee.method == "ParseBigDecimal"
-  emit sink code.Deserialization at args[0]
-}

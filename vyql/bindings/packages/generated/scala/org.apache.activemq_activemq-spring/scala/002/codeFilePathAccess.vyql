@@ -1,9 +1,0 @@
-module bindings.scala.generated.mf9b36ce7;
-
-binding filePathAccess2 {
-  requires {
-    dependency("org.apache.activemq:activemq-spring")
-  }
-  query pattern callExpr where callee.method == "setTrustStore"
-  emit sink code.FilePathAccess at args[0]
-}

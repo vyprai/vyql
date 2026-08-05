@@ -1,9 +1,0 @@
-module bindings.rust.generated.m52982397;
-
-binding storedDataWrite9 {
-  requires {
-    dependency("fuchsia-zircon-sys")
-  }
-  query pattern callExpr where callee.method == "zx_fifo_write"
-  emit sink code.StoredDataWrite at args[0]
-}

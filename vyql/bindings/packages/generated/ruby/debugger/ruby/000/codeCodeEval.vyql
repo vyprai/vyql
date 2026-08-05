@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m506f786d;
-
-binding codeEval0 {
-  requires {
-    dependency("debugger")
-  }
-  query pattern callExpr where callee.method == "debug_eval"
-  emit sink code.CodeEval at args[0]
-}

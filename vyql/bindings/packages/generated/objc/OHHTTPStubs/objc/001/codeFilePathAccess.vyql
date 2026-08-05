@@ -1,9 +1,0 @@
-module bindings.objc.generated.m959fd886;
-
-binding filePathAccess1 {
-  requires {
-    dependency("OHHTTPStubs")
-  }
-  query pattern callExpr where callee.method == "responseWithFileAtPath:statusCode:headers:"
-  emit sink code.FilePathAccess at args[0]
-}

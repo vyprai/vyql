@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m0c36a8fb;
-
-binding networkSend1 {
-  requires {
-    dependency("maxwell")
-  }
-  query pattern callExpr where callee.method == "Maxwell.Conn.put_query_string"
-  emit sink code.NetworkSend at args[0]
-}

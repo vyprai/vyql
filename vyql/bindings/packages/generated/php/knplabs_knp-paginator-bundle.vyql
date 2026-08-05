@@ -1,0 +1,41 @@
+module bindings.php.generated.m3aabedbe;
+
+binding httpInput0 {
+  requires {
+    dependency("knplabs/knp-paginator-bundle")
+  }
+  query pattern callExpr where callee.method == "KnpBundlePaginatorBundleHelperProcessor::render"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("knplabs/knp-paginator-bundle")
+  }
+  query pattern callExpr where callee.method == "KnpBundlePaginatorBundleHelperProcessor::sortable"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("knplabs/knp-paginator-bundle")
+  }
+  query pattern callExpr where callee.method == "KnpBundlePaginatorBundleHelperProcessor::filter"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("knplabs/knp-paginator-bundle")
+  }
+  query pattern callExpr where callee.method == "KnpBundlePaginatorBundlePaginationSlidingPagination::getParams"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("knplabs/knp-paginator-bundle")
+  }
+  query pattern callExpr where callee.method == "KnpBundlePaginatorBundlePaginationSlidingPagination::getQuery"
+  emit source code.HttpInput at call.result
+}

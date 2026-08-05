@@ -1,0 +1,49 @@
+module bindings.objc.generated.m0f09610a;
+
+binding deserialization0 {
+  requires {
+    dependency("nanopb")
+  }
+  query pattern callExpr where callee.method == "pb_decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("nanopb")
+  }
+  query pattern callExpr where callee.method == "pb_decode_noinit"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("nanopb")
+  }
+  query pattern callExpr where callee.method == "pb_decode_delimited"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("nanopb")
+  }
+  query pattern callExpr where callee.method == "pb_decode_delimited_noinit"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("nanopb")
+  }
+  query pattern callExpr where callee.method == "pb_decode_nullterminated"
+  emit sink code.Deserialization at args[0]
+}
+
+binding storedDataRead5 {
+  requires {
+    dependency("nanopb")
+  }
+  query pattern callExpr where callee.method == "pb_istream_from_buffer"
+  emit source code.StoredDataRead at call.result
+}

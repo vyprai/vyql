@@ -1,9 +1,0 @@
-module bindings.php.generated.mdc1ba520;
-
-binding filePathAccess7 {
-  requires {
-    dependency("thecodingmachine/safe")
-  }
-  query pattern callExpr where callee.method == "eio_rename"
-  emit sink code.FilePathAccess at args[0]
-}

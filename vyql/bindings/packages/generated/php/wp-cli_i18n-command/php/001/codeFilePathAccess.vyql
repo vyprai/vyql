@@ -1,9 +1,0 @@
-module bindings.php.generated.m321695dd;
-
-binding filePathAccess1 {
-  requires {
-    dependency("wp-cli/i18n-command")
-  }
-  query pattern callExpr where callee.method == "JsonSchemaExtractor::load_schema"
-  emit sink code.FilePathAccess at args[0]
-}

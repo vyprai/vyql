@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mf069e28b;
-
-binding httpInput5 {
-  requires {
-    dependency("org.eclipse.jetty:jetty-servlet")
-  }
-  query pattern callExpr where callee.method == "service"
-  emit source code.HttpInput at call.result
-}

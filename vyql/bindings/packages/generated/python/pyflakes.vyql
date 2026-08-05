@@ -1,0 +1,17 @@
+module bindings.python.generated.m757f9725;
+
+binding codeEval0 {
+  requires {
+    dependency("pyflakes")
+  }
+  query pattern callExpr where callee.method == "check"
+  emit sink code.CodeEval at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("pyflakes")
+  }
+  query pattern callExpr where callee.method == "checkPath"
+  emit sink code.FilePathAccess at args[0]
+}

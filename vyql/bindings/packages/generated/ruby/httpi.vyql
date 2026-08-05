@@ -1,0 +1,97 @@
+module bindings.ruby.generated.m0f13fa05;
+
+binding networkConnect0 {
+  requires {
+    dependency("httpi")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("httpi")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("httpi")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("httpi")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("httpi")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("httpi")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect6 {
+  requires {
+    dependency("httpi")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend7 {
+  requires {
+    dependency("httpi")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect8 {
+  requires {
+    dependency("httpi")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend9 {
+  requires {
+    dependency("httpi")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect10 {
+  requires {
+    dependency("httpi")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend11 {
+  requires {
+    dependency("httpi")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}

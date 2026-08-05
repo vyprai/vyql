@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m614e39f6;
-
-binding networkData1 {
-  requires {
-    dependency("sdl2-net")
-  }
-  query pattern callExpr where callee.method == "NET_ReceiveDatagram"
-  emit source code.NetworkData at call.result
-}

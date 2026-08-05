@@ -1,9 +1,0 @@
-module bindings.objc.generated.me3e9bb7d;
-
-binding codeEval0 {
-  requires {
-    dependency("Typhoon")
-  }
-  query pattern callExpr where callee.method == "inject:"
-  emit sink code.CodeEval at args[0]
-}

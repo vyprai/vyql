@@ -1,0 +1,41 @@
+module bindings.ruby.generated.mc2203c1e;
+
+binding userControlledData0 {
+  requires {
+    dependency("babosa")
+  }
+  query pattern callExpr where callee.method == "initialize"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("babosa")
+  }
+  query pattern callExpr where callee.method == "transliterate!"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("babosa")
+  }
+  query pattern callExpr where callee.method == "normalize!"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("babosa")
+  }
+  query pattern callExpr where callee.method == "truncate!"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("babosa")
+  }
+  query pattern callExpr where callee.method == "with_separators!"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,33 @@
+module bindings.go.generated.m881fd3cb;
+
+binding networkConnect0 {
+  requires {
+    dependency("nhooyr.io/websocket")
+  }
+  query pattern callExpr where callee.method == "Dial"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkData1 {
+  requires {
+    dependency("nhooyr.io/websocket")
+  }
+  query pattern callExpr where callee.method == "Read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData2 {
+  requires {
+    dependency("nhooyr.io/websocket")
+  }
+  query pattern callExpr where callee.method == "Write"
+  emit source code.NetworkData at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("nhooyr.io/websocket")
+  }
+  query pattern callExpr where callee.method == "Accept"
+  emit source code.HttpInput at call.result
+}

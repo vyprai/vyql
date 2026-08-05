@@ -1,9 +1,0 @@
-module bindings.php.generated.mcc603099;
-
-binding codeEval4 {
-  requires {
-    dependency("laracasts/generators")
-  }
-  query pattern callExpr where callee.method == "compileMigrationStub"
-  emit sink code.CodeEval at args[0]
-}

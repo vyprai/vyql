@@ -1,9 +1,0 @@
-module bindings.perl.generated.m21559073;
-
-binding filePathAccess9 {
-  requires {
-    dependency("Evo")
-  }
-  query pattern callExpr where callee.method == "remove_tree"
-  emit sink code.FilePathAccess at args[0]
-}

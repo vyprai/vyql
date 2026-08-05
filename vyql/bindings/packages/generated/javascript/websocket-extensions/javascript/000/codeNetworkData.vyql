@@ -1,9 +1,0 @@
-module bindings.javascript.generated.me0cf8173;
-
-binding networkData0 {
-  requires {
-    dependency("websocket-extensions")
-  }
-  query pattern callExpr where callee.method == "parseHeader"
-  emit source code.NetworkData at call.result
-}

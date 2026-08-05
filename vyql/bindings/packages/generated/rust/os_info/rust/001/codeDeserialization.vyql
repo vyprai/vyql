@@ -1,9 +1,0 @@
-module bindings.rust.generated.m8ac5b0cf;
-
-binding deserialization1 {
-  requires {
-    dependency("os_info")
-  }
-  query pattern callExpr where callee.method == "parse_version"
-  emit sink code.Deserialization at args[0]
-}

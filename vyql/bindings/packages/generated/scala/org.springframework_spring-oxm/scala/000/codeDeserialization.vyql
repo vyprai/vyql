@@ -1,9 +1,0 @@
-module bindings.scala.generated.m90b5ebce;
-
-binding deserialization0 {
-  requires {
-    dependency("org.springframework:spring-oxm")
-  }
-  query pattern callExpr where callee.method == "unmarshal"
-  emit sink code.Deserialization at args[0]
-}

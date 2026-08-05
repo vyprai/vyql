@@ -1,0 +1,19 @@
+module bindings.dart.generated.mcb5af206;
+
+binding privilegedOp0 {
+  requires {
+    dependency("in_app_purchase_android")
+  }
+  query pattern callExpr where callee.method == "acknowledgePurchase"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp1 {
+  requires {
+    dependency("in_app_purchase_android")
+  }
+  query pattern callExpr where callee.method == "consumeAsync"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

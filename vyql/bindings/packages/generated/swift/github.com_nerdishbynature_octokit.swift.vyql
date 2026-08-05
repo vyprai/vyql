@@ -1,0 +1,41 @@
+module bindings.swift.generated.mffd03dc4;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("github.com/nerdishbynature/octokit.swift")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("github.com/nerdishbynature/octokit.swift")
+  }
+  query pattern callExpr where callee.method == "authorize"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("github.com/nerdishbynature/octokit.swift")
+  }
+  query pattern callExpr where callee.method == "handleOpenURL"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("github.com/nerdishbynature/octokit.swift")
+  }
+  query pattern callExpr where callee.method == "accessTokenFromResponse"
+  emit source core.UserControlledData at call.result
+}

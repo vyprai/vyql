@@ -1,9 +1,0 @@
-module bindings.python.generated.maf509f95;
-
-binding filePathAccess3 {
-  requires {
-    dependency("srsly")
-  }
-  query pattern callExpr where callee.method == "read_gzip_jsonl"
-  emit sink code.FilePathAccess at args[0]
-}

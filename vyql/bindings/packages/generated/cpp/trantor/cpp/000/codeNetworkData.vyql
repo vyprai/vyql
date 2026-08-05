@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m9fac3143;
-
-binding networkData0 {
-  requires {
-    dependency("trantor")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source code.NetworkData at call.result
-}

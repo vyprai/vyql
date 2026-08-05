@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.me099a3fc;
-
-binding deserialization4 {
-  requires {
-    dependency("jdom:jdom")
-  }
-  query pattern callExpr where callee.method == "build(java.net.URL)"
-  emit sink code.Deserialization at args[0]
-}

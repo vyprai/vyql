@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m7b46012f;
-
-binding deserialization0 {
-  requires {
-    dependency("snappyer")
-  }
-  query pattern callExpr where callee.method == "RawUncompress"
-  emit sink code.Deserialization at args[0]
-}

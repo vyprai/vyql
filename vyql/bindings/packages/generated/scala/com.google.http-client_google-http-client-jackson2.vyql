@@ -1,0 +1,73 @@
+module bindings.scala.generated.mb34f7181;
+
+binding deserialization0 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "JacksonParser.nextToken"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "JacksonParser.getCurrentToken"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "JacksonParser.skipChildren"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "JacksonParser.getByteValue"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "JacksonParser.getDoubleValue"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "JacksonParser.getText"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "JacksonParser.getFloatValue"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "JacksonParser.getIntValue"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization8 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "JacksonFactory.createJsonParser"
+  emit sink code.Deserialization at args[0]
+}

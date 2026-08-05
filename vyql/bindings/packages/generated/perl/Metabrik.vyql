@@ -1,0 +1,25 @@
+module bindings.perl.generated.mc2679962;
+
+binding commandExecution0 {
+  requires {
+    dependency("Metabrik")
+  }
+  query pattern callExpr where callee.method == "cmd"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("Metabrik")
+  }
+  query pattern callExpr where callee.method == "cmd_to_code"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding codeEval2 {
+  requires {
+    dependency("Metabrik")
+  }
+  query pattern callExpr where callee.method == "run_code"
+  emit sink code.CodeEval at args[0]
+}

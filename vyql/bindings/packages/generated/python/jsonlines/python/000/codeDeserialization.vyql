@@ -1,9 +1,0 @@
-module bindings.python.generated.mca826e69;
-
-binding deserialization0 {
-  requires {
-    dependency("jsonlines")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,0 +1,177 @@
+module bindings.objc.generated.mcf19b29f;
+
+binding sqlExecution0 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "executeSQL:arguments:"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "executeScalarWithSQL:arguments:"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "executeDB:"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "searchWithSQL:toClass:"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution4 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "searchWithRAWSQL:toClass:"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "createDirectoryWithFilePath:"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "getPathForDocuments:"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "deleteWithFilepath:"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "backupDBFilesToDirectory:"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess9 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "restoreDBFilesFromDirectory:"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess10 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "removeDBFiles"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse11 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "isFileExists:"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse12 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "getFilenamesWithDir:"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding sqlExecution13 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "insertToDB:callback:"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution14 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "updateToDB:callback:"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution15 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "deleteToDB:callback:"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution16 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "search:where:orderBy:offset:count:"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution17 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "searchWithParams:"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution18 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "search:"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding filePathAccess19 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "setDBName:"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess20 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "initWithDBPath:"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess21 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "setDBPath:"
+  emit sink code.FilePathAccess at args[0]
+}

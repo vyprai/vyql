@@ -1,9 +1,0 @@
-module bindings.swift.generated.mb63ccca5;
-
-binding userControlledData6 {
-  requires {
-    dependency("github.com/Mattijah/QKMRZParser")
-  }
-  query pattern callExpr where callee.method == "nationalityCountryCode"
-  emit source core.UserControlledData at call.result
-}

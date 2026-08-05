@@ -1,9 +1,0 @@
-module bindings.go.generated.md4534e8d;
-
-binding deserialization0 {
-  requires {
-    dependency("golang.org/x/tools")
-  }
-  query pattern callExpr where callee.method == "parseCode"
-  emit sink code.Deserialization at args[0]
-}

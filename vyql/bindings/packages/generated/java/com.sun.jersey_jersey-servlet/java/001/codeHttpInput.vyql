@@ -1,9 +1,0 @@
-module bindings.java.generated.mdfe57a12;
-
-binding httpInput1 {
-  requires {
-    dependency("com.sun.jersey:jersey-servlet")
-  }
-  query pattern callExpr where callee.method == "filterFormParameters"
-  emit source code.HttpInput at call.result
-}

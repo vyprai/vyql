@@ -1,9 +1,0 @@
-module bindings.swift.generated.m168183f8;
-
-binding deserialization2 {
-  requires {
-    dependency("github.com/segmentio/analytics-swift")
-  }
-  query pattern callExpr where callee.method == "add"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m24b29a83;
-
-binding commandExecution4 {
-  requires {
-    dependency("illuminate/routing")
-  }
-  query pattern callExpr where callee.method == "Route::runController"
-  emit sink code.CommandExecution at args[0]
-}

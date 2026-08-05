@@ -1,9 +1,0 @@
-module bindings.ruby.generated.made672ab;
-
-binding sqlExecution5 {
-  requires {
-    dependency("dm-do-adapter")
-  }
-  query pattern callExpr where callee.method == "delete"
-  emit sink code.SqlExecution at args[0]
-}

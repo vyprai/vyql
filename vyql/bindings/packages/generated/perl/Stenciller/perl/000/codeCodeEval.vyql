@@ -1,9 +1,0 @@
-module bindings.perl.generated.m9611fbe0;
-
-binding codeEval0 {
-  requires {
-    dependency("Stenciller")
-  }
-  query pattern callExpr where callee.method == "eval_to_hashref"
-  emit sink code.CodeEval at args[0]
-}

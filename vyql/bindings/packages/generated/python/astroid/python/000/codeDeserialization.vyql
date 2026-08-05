@@ -1,9 +1,0 @@
-module bindings.python.generated.mf746e5f4;
-
-binding deserialization0 {
-  requires {
-    dependency("astroid")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

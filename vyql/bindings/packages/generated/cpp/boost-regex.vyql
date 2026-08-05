@@ -1,0 +1,65 @@
+module bindings.cpp.generated.m685ec8c6;
+
+binding deserialization0 {
+  requires {
+    dependency("boost-regex")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("boost-regex")
+  }
+  query pattern callExpr where callee.method == "regex_match"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("boost-regex")
+  }
+  query pattern callExpr where callee.method == "regex_search"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("boost-regex")
+  }
+  query pattern callExpr where callee.method == "do_regex_match"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("boost-regex")
+  }
+  query pattern callExpr where callee.method == "u32regex_match"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("boost-regex")
+  }
+  query pattern callExpr where callee.method == "do_regex_search"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("boost-regex")
+  }
+  query pattern callExpr where callee.method == "u32regex_search"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("boost-regex")
+  }
+  query pattern callExpr where callee.method == "regexecA"
+  emit sink code.Deserialization at args[0]
+}

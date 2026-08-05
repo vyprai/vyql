@@ -1,9 +1,0 @@
-module bindings.swift.generated.m3aedab92;
-
-binding networkConnect0 {
-  requires {
-    dependency("github.com/Kitura/BlueSocket")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

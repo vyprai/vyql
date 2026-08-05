@@ -1,9 +1,0 @@
-module bindings.go.generated.m367b892c;
-
-binding userControlledData0 {
-  requires {
-    dependency("github.com/apparentlymart/go-textseg/v13")
-  }
-  query pattern callExpr where callee.method == "AllTokens"
-  emit source core.UserControlledData at call.result
-}

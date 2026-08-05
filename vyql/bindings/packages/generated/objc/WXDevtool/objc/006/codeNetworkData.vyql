@@ -1,9 +1,0 @@
-module bindings.objc.generated.mc71e0e8a;
-
-binding networkData6 {
-  requires {
-    dependency("WXDevtool")
-  }
-  query pattern callExpr where callee.method == "webSocketHandshakeResponseReceivedWithRequestId"
-  emit source code.NetworkData at call.result
-}

@@ -1,0 +1,89 @@
+module bindings.scala.generated.me44b1ac9;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "create"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "create"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "setData"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding storedDataWrite4 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "setData"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "getChildren"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "getData"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding storedDataRead7 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "getData"
+  emit source code.StoredDataRead at call.result
+}
+
+binding commandExecution8 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "getGroupsCommand"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution9 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "getGroupsForUserCommand"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution10 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "getUlimitMemoryCommand"
+  emit sink code.CommandExecution at args[0]
+}

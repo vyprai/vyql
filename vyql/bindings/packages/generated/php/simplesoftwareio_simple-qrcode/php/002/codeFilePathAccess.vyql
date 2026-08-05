@@ -1,9 +1,0 @@
-module bindings.php.generated.me155afc7;
-
-binding filePathAccess2 {
-  requires {
-    dependency("simplesoftwareio/simple-qrcode")
-  }
-  query pattern callExpr where callee.method == "mergeString"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m2a5e00b5;
-
-binding filePathAccess0 {
-  requires {
-    dependency("python-daemon")
-  }
-  query pattern callExpr where callee.method == "change_root_directory"
-  emit sink code.FilePathAccess at args[0]
-}

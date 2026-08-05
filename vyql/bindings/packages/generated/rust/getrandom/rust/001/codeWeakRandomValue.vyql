@@ -1,9 +1,0 @@
-module bindings.rust.generated.m943bf737;
-
-binding weakRandomValue1 {
-  requires {
-    dependency("getrandom")
-  }
-  query pattern callExpr where callee.method == "fill_uninit"
-  emit issue code.WeakRandomValue at call
-}

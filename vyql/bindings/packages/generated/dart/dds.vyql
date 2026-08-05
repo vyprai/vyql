@@ -1,0 +1,25 @@
+module bindings.dart.generated.mc2c1e8dc;
+
+binding networkConnect0 {
+  requires {
+    dependency("dds")
+  }
+  query pattern callExpr where callee.method == "listen"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("dds")
+  }
+  query pattern callExpr where callee.method == "sendNotification"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("dds")
+  }
+  query pattern callExpr where callee.method == "sendRequest"
+  emit sink code.NetworkSend at args[0]
+}

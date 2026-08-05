@@ -1,9 +1,0 @@
-module bindings.ruby.generated.maa0244ed;
-
-binding codeEval0 {
-  requires {
-    dependency("sprockets-es6")
-  }
-  query pattern callExpr where callee.method == "call"
-  emit sink code.CodeEval at args[0]
-}

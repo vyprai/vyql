@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m8ee75fb0;
-
-binding userControlledData1 {
-  requires {
-    dependency("phoenix_live_dashboard")
-  }
-  query pattern callExpr where callee.method == "assign_params"
-  emit source core.UserControlledData at call.result
-}

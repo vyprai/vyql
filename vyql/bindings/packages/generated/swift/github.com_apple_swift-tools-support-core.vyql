@@ -1,0 +1,17 @@
+module bindings.swift.generated.m23bb5af0;
+
+binding commandExecution0 {
+  requires {
+    dependency("github.com/apple/swift-tools-support-core")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/apple/swift-tools-support-core")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

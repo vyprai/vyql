@@ -1,9 +1,0 @@
-module bindings.scala.generated.m27896d22;
-
-binding deserialization1 {
-  requires {
-    dependency("net.minidev:json-smart")
-  }
-  query pattern callExpr where callee.method == "parseKeepingOrder"
-  emit sink code.Deserialization at args[0]
-}

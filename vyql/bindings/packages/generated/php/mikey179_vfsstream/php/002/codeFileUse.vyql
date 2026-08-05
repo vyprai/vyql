@@ -1,9 +1,0 @@
-module bindings.php.generated.mf44fbe20;
-
-binding fileUse2 {
-  requires {
-    dependency("mikey179/vfsstream")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.FileUseSink at args[0]
-}

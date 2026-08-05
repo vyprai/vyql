@@ -11,7 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/vyprai/vyql/ontology"
+	"github.com/vyprai/vyql/internal/ontology"
 )
 
 func main() {

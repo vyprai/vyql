@@ -1,9 +1,0 @@
-module bindings.cpp.generated.me8b04d03;
-
-binding filePathAccess0 {
-  requires {
-    dependency("minizip")
-  }
-  query pattern callExpr where callee.method == "gzopen"
-  emit sink code.FilePathAccess at args[0]
-}

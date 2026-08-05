@@ -1,0 +1,25 @@
+module bindings.rust.generated.m7686c0d0;
+
+binding deserialization0 {
+  requires {
+    dependency("borsh-derive-internal")
+  }
+  query pattern callExpr where callee.method == "enum_de"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("borsh-derive-internal")
+  }
+  query pattern callExpr where callee.method == "struct_de"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("borsh-derive-internal")
+  }
+  query pattern callExpr where callee.method == "union_de"
+  emit sink code.Deserialization at args[0]
+}

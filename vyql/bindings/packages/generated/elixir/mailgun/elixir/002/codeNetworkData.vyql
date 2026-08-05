@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m3012d484;
-
-binding networkData2 {
-  requires {
-    dependency("mailgun")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit source code.NetworkData at call.result
-}

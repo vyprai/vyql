@@ -1,9 +1,0 @@
-module bindings.swift.generated.m88ea3d50;
-
-binding networkSend16 {
-  requires {
-    dependency("github.com/mironal/TwitterAPIKit")
-  }
-  query pattern callExpr where callee.method == "postOAuth2RefreshToken"
-  emit sink code.NetworkSend at args[0]
-}

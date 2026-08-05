@@ -1,9 +1,0 @@
-module bindings.swift.generated.m07c946ba;
-
-binding storedDataWrite10 {
-  requires {
-    dependency("github.com/supabase-community/storage-swift")
-  }
-  query pattern callExpr where callee.method == "createBucket"
-  emit sink code.StoredDataWrite at args[0]
-}

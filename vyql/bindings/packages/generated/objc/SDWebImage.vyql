@@ -1,0 +1,25 @@
+module bindings.objc.generated.m826b8d26;
+
+binding deserialization0 {
+  requires {
+    dependency("SDWebImage")
+  }
+  query pattern callExpr where callee.method == "SDImageLoaderDecodeImageData"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("SDWebImage")
+  }
+  query pattern callExpr where callee.method == "SDImageLoaderDecodeProgressiveImageData"
+  emit sink code.Deserialization at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("SDWebImage")
+  }
+  query pattern callExpr where callee.method == "sd_setImageWithURL"
+  emit source code.NetworkData at call.result
+}

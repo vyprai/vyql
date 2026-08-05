@@ -1,9 +1,0 @@
-module bindings.objc.generated.mf5582be2;
-
-binding weakHash0 {
-  requires {
-    dependency("AliyunOSSiOS")
-  }
-  query pattern callExpr where callee.method == "calBase64Sha1WithData"
-  emit issue code.WeakHash at call
-}

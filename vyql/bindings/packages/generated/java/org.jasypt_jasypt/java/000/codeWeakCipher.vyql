@@ -1,9 +1,0 @@
-module bindings.java.generated.med1ac799;
-
-binding weakCipher0 {
-  requires {
-    dependency("org.jasypt:jasypt")
-  }
-  query pattern callExpr where callee.method == "encrypt"
-  emit issue code.WeakCipher at call
-}

@@ -1,9 +1,0 @@
-module bindings.dart.generated.mfca7f1af;
-
-binding commandExecution0 {
-  requires {
-    dependency("melos")
-  }
-  query pattern callExpr where callee.method == "ExecCommand.run"
-  emit sink code.CommandExecution at args[0]
-}

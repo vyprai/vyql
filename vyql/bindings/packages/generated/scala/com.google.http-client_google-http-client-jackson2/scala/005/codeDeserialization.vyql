@@ -1,9 +1,0 @@
-module bindings.scala.generated.mb34f7181;
-
-binding deserialization5 {
-  requires {
-    dependency("com.google.http-client:google-http-client-jackson2")
-  }
-  query pattern callExpr where callee.method == "JacksonParser.getText"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.m661b4130;
-
-binding userControlledData0 {
-  requires {
-    dependency("MultiplatformBleAdapter")
-  }
-  query pattern callExpr where callee.method == "startDeviceScan"
-  emit source core.UserControlledData at call.result
-}

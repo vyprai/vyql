@@ -1,9 +1,0 @@
-module bindings.swift.generated.m586c3899;
-
-binding fileUse13 {
-  requires {
-    dependency("github.com/RxSwiftCommunity/RxAlamofire")
-  }
-  query pattern callExpr where callee.method == "download"
-  emit sink code.FileUseSink at args[0]
-}

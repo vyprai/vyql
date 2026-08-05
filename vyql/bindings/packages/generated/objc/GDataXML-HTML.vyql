@@ -1,0 +1,33 @@
+module bindings.objc.generated.mf91e3ece;
+
+binding deserialization0 {
+  requires {
+    dependency("GDataXML-HTML")
+  }
+  query pattern callExpr where callee.method == "initWithXMLString:error:"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("GDataXML-HTML")
+  }
+  query pattern callExpr where callee.method == "initWithHTMLString:error:"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("GDataXML-HTML")
+  }
+  query pattern callExpr where callee.method == "initWithXMLString:encoding:error:"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("GDataXML-HTML")
+  }
+  query pattern callExpr where callee.method == "initWithHTMLString:encoding:error:"
+  emit sink code.Deserialization at args[0]
+}

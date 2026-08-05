@@ -1,0 +1,17 @@
+module bindings.go.generated.m0ac730f2;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/vmware/govmomi")
+  }
+  query pattern callExpr where callee.method == "Unmarshal"
+  emit sink code.Deserialization at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("github.com/vmware/govmomi")
+  }
+  query pattern callExpr where callee.method == "NewClient"
+  emit sink code.NetworkConnectSink at args[0]
+}

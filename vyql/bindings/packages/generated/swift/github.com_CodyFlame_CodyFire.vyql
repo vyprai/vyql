@@ -1,0 +1,33 @@
+module bindings.swift.generated.m04e1e46c;
+
+binding networkSend0 {
+  requires {
+    dependency("github.com/CodyFlame/CodyFire")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/CodyFlame/CodyFire")
+  }
+  query pattern callExpr where callee.method == "start"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("github.com/CodyFlame/CodyFire")
+  }
+  query pattern callExpr where callee.method == "emit"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding httpInput3 {
+  requires {
+    dependency("github.com/CodyFlame/CodyFire")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.HttpInput at call.result
+}

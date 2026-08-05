@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m874a0730;
-
-binding deserialization0 {
-  requires {
-    dependency("fuzzyurl")
-  }
-  query pattern callExpr where callee.method == "Fuzzyurl.from_string"
-  emit sink code.Deserialization at args[0]
-}

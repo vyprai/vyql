@@ -1,9 +1,0 @@
-module bindings.perl.generated.mf98bb4e8;
-
-binding networkSend1 {
-  requires {
-    dependency("Net-Ethereum")
-  }
-  query pattern callExpr where callee.method == "sendTransaction"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,0 +1,33 @@
+module bindings.perl.generated.m49a679e1;
+
+binding networkData0 {
+  requires {
+    dependency("Hijk")
+  }
+  query pattern callExpr where callee.method == "_read_http_message"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("Hijk")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("Hijk")
+  }
+  query pattern callExpr where callee.method == "_build_http_message"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect3 {
+  requires {
+    dependency("Hijk")
+  }
+  query pattern callExpr where callee.method == "_construct_socket"
+  emit sink code.NetworkConnectSink at args[0]
+}

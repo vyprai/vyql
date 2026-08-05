@@ -1,9 +1,0 @@
-module bindings.dart.generated.md8c1a8a1;
-
-binding storedDataRead6 {
-  requires {
-    dependency("clipboard")
-  }
-  query pattern callExpr where callee.method == "pasteRichText"
-  emit source code.StoredDataRead at call.result
-}

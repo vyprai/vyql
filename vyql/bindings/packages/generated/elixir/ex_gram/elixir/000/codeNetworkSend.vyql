@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m5f1d42d6;
-
-binding networkSend0 {
-  requires {
-    dependency("ex_gram")
-  }
-  query pattern callExpr where callee.method == "ExGram.Adapter.Req.request"
-  emit sink code.NetworkSend at args[0]
-}

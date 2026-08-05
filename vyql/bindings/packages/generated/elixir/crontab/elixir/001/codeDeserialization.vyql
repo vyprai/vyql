@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma9511b04;
-
-binding deserialization1 {
-  requires {
-    dependency("crontab")
-  }
-  query pattern callExpr where callee.method == "parse!"
-  emit sink code.Deserialization at args[0]
-}

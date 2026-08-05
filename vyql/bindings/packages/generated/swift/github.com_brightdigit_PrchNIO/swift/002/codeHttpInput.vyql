@@ -1,9 +1,0 @@
-module bindings.swift.generated.m4ba7f8dd;
-
-binding httpInput2 {
-  requires {
-    dependency("github.com/brightdigit/PrchNIO")
-  }
-  query pattern callExpr where callee.method == "statusCode"
-  emit source code.HttpInput at call.result
-}

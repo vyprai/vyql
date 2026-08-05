@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m3378656a;
-
-binding filePathAccess0 {
-  requires {
-    dependency("@nodelib/fs.scandir")
-  }
-  query pattern callExpr where callee.method == "scandir"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,0 +1,41 @@
+module bindings.ruby.generated.m63009774;
+
+binding cliArgument0 {
+  requires {
+    dependency("scss_lint")
+  }
+  query pattern callExpr where callee.method == "SCSSLint::Options.parse"
+  emit source code.CliArgument at call.result
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("scss_lint")
+  }
+  query pattern callExpr where callee.method == "SCSSLint::Config.load"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("scss_lint")
+  }
+  query pattern callExpr where callee.method == "SCSSLint::Config.load_options_hash_from_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("scss_lint")
+  }
+  query pattern callExpr where callee.method == "SCSSLint::Config.load_file_contents"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("scss_lint")
+  }
+  query pattern callExpr where callee.method == "SCSSLint::CLI.run"
+  emit source core.UserControlledData at call.result
+}

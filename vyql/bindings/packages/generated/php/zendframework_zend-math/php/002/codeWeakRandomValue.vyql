@@ -1,9 +1,0 @@
-module bindings.php.generated.m7cea5654;
-
-binding weakRandomValue2 {
-  requires {
-    dependency("zendframework/zend-math")
-  }
-  query pattern callExpr where callee.method == "ZendMathRand::getInteger"
-  emit issue code.WeakRandomValue at call
-}

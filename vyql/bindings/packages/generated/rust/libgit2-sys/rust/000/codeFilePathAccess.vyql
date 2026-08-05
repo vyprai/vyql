@@ -1,9 +1,0 @@
-module bindings.rust.generated.m540f56d1;
-
-binding filePathAccess0 {
-  requires {
-    dependency("libgit2-sys")
-  }
-  query pattern callExpr where callee.method == "git_repository_open"
-  emit sink code.FilePathAccess at args[0]
-}

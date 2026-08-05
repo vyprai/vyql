@@ -1,9 +1,0 @@
-module bindings.cpp.generated.meedb05b2;
-
-binding filePathAccess1 {
-  requires {
-    dependency("vcglib")
-  }
-  query pattern callExpr where callee.method == "openNativeFormat"
-  emit sink code.FilePathAccess at args[0]
-}

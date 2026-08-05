@@ -1,0 +1,57 @@
+module bindings.groovy.generated.m0294a815;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.springframework.security:spring-security-acl")
+  }
+  query pattern callExpr where callee.method == "readAclsById"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.springframework.security:spring-security-acl")
+  }
+  query pattern callExpr where callee.method == "createAcl"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("org.springframework.security:spring-security-acl")
+  }
+  query pattern callExpr where callee.method == "deleteAcl"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("org.springframework.security:spring-security-acl")
+  }
+  query pattern callExpr where callee.method == "updateAcl"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution4 {
+  requires {
+    dependency("org.springframework.security:spring-security-acl")
+  }
+  query pattern callExpr where callee.method == "computeRepeatingSql"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution5 {
+  requires {
+    dependency("org.springframework.security:spring-security-acl")
+  }
+  query pattern callExpr where callee.method == "setLookupPrimaryKeysWhereClause"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution6 {
+  requires {
+    dependency("org.springframework.security:spring-security-acl")
+  }
+  query pattern callExpr where callee.method == "setLookupObjectIdentitiesWhereClause"
+  emit sink code.SqlExecution at args[0]
+}

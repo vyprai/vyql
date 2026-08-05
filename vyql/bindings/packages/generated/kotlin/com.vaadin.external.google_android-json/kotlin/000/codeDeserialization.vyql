@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m6437d7e8;
-
-binding deserialization0 {
-  requires {
-    dependency("com.vaadin.external.google:android-json")
-  }
-  query pattern callExpr where callee.method == "readObject"
-  emit sink code.Deserialization at args[0]
-}

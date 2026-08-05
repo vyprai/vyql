@@ -1,9 +1,0 @@
-module bindings.scala.generated.m68f24c15;
-
-binding filePathAccess2 {
-  requires {
-    dependency("org.apache.maven.plugins:maven-surefire-plugin")
-  }
-  query pattern callExpr where callee.method == "getBasedir"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.dart.generated.m4583475a;
-
-binding sqlExecution3 {
-  requires {
-    dependency("drift")
-  }
-  query pattern callExpr where callee.method == "runInsert"
-  emit sink code.SqlExecution at args[0]
-}

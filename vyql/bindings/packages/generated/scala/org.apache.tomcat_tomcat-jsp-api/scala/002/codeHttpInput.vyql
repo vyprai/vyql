@@ -1,9 +1,0 @@
-module bindings.scala.generated.mbd30aee8;
-
-binding httpInput2 {
-  requires {
-    dependency("org.apache.tomcat:tomcat-jsp-api")
-  }
-  query pattern callExpr where callee.method == "getRequestURI"
-  emit source code.HttpInput at call.result
-}

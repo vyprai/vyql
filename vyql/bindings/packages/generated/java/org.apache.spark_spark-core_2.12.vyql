@@ -1,0 +1,25 @@
+module bindings.java.generated.ma7dec98b;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.apache.spark:spark-core_2.12")
+  }
+  query pattern callExpr where callee.method == "testCommandAvailable"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("org.apache.spark:spark-core_2.12")
+  }
+  query pattern callExpr where callee.method == "getAbsolutePathFromExecutable"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("org.apache.spark:spark-core_2.12")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

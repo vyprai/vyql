@@ -1,9 +1,0 @@
-module bindings.javascript.generated.ma96665e3;
-
-binding storedDataWrite2 {
-  requires {
-    dependency("workbox-strategies")
-  }
-  query pattern callExpr where callee.method == "StrategyHandler.prototype.cachePut"
-  emit sink code.StoredDataWrite at args[0]
-}

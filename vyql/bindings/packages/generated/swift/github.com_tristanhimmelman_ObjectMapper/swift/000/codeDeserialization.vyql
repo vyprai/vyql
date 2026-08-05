@@ -1,9 +1,0 @@
-module bindings.swift.generated.m3bcd46e2;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/tristanhimmelman/ObjectMapper")
-  }
-  query pattern callExpr where callee.method == "parseJSONStringIntoDictionary"
-  emit sink code.Deserialization at args[0]
-}

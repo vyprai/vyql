@@ -1,9 +1,0 @@
-module bindings.php.generated.ma4465790;
-
-binding deserialization1 {
-  requires {
-    dependency("stripe/stripe-php")
-  }
-  query pattern callExpr where callee.method == "StripeUtilRequestOptions::parse"
-  emit sink code.Deserialization at args[0]
-}

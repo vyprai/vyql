@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mfb949fbd;
-
-binding nosqlQuery1 {
-  requires {
-    dependency("redis")
-  }
-  query pattern callExpr where callee.method == "call_v"
-  emit sink code.NosqlQuery at args[0]
-}

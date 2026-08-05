@@ -1,9 +1,0 @@
-module bindings.objc.generated.m484e8ca1;
-
-binding deserialization3 {
-  requires {
-    dependency("libwebp")
-  }
-  query pattern callExpr where callee.method == "ReadTIFF"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.mcbb7ef31;
-
-binding networkSend1 {
-  requires {
-    dependency("github.com/apple/swift-nio")
-  }
-  query pattern callExpr where callee.method == "close"
-  emit sink code.NetworkSend at args[0]
-}

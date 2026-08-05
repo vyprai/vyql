@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mbe357b56;
-
-binding httpInput0 {
-  requires {
-    dependency("io.quarkus:quarkus-resteasy")
-  }
-  query pattern callExpr where callee.method == "extractUriInfo"
-  emit source code.HttpInput at call.result
-}

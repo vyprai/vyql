@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mf932fff7;
-
-binding responseHeaderWrite7 {
-  requires {
-    dependency("spdy")
-  }
-  query pattern callExpr where callee.method == "writeHead"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

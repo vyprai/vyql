@@ -1,9 +1,0 @@
-module bindings.cpp.generated.me1be6155;
-
-binding filePathAccess7 {
-  requires {
-    dependency("acl")
-  }
-  query pattern callExpr where callee.method == "acl_delete_file"
-  emit sink code.FilePathAccess at args[0]
-}

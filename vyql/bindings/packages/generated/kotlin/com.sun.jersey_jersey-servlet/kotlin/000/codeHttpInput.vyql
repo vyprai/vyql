@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m2e1ff025;
-
-binding httpInput0 {
-  requires {
-    dependency("com.sun.jersey:jersey-servlet")
-  }
-  query pattern callExpr where callee.method == "service"
-  emit source code.HttpInput at call.result
-}

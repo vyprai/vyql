@@ -1,0 +1,33 @@
+module bindings.rust.generated.m71bca162;
+
+binding secretValue0 {
+  requires {
+    dependency("rust-argon2")
+  }
+  query pattern callExpr where callee.method == "hash_encoded"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("rust-argon2")
+  }
+  query pattern callExpr where callee.method == "hash_raw"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("rust-argon2")
+  }
+  query pattern callExpr where callee.method == "verify_encoded_ext"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("rust-argon2")
+  }
+  query pattern callExpr where callee.method == "verify_raw"
+  emit source code.SecretValue at call.result
+}

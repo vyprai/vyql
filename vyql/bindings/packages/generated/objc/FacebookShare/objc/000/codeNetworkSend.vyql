@@ -1,9 +1,0 @@
-module bindings.objc.generated.m6b2b1a9f;
-
-binding networkSend0 {
-  requires {
-    dependency("FacebookShare")
-  }
-  query pattern callExpr where callee.method == "sharer"
-  emit sink code.NetworkSend at args[0]
-}

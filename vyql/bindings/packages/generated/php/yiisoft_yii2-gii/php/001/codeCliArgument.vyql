@@ -1,9 +1,0 @@
-module bindings.php.generated.m6f0d9635;
-
-binding cliArgument1 {
-  requires {
-    dependency("yiisoft/yii2-gii")
-  }
-  query pattern callExpr where callee.method == "run"
-  emit source code.CliArgument at call.result
-}

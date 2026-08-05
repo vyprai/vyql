@@ -1,9 +1,0 @@
-module bindings.scala.generated.m437b5465;
-
-binding userControlledData2 {
-  requires {
-    dependency("org.apache.commons:commons-exec")
-  }
-  query pattern callExpr where callee.method == "addArguments"
-  emit source core.UserControlledData at call.result
-}

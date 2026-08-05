@@ -1,0 +1,17 @@
+module bindings.objc.generated.ma2778cf7;
+
+binding codeEval0 {
+  requires {
+    dependency("EarlGrey")
+  }
+  query pattern callExpr where callee.method == "actionForJavaScriptExecution"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("EarlGrey")
+  }
+  query pattern callExpr where callee.method == "grey_javaScriptExecution"
+  emit sink code.CodeEval at args[0]
+}

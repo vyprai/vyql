@@ -1,0 +1,25 @@
+module bindings.elixir.generated.m3012d484;
+
+binding networkSend0 {
+  requires {
+    dependency("mailgun")
+  }
+  query pattern callExpr where callee.method == "send_email"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData1 {
+  requires {
+    dependency("mailgun")
+  }
+  query pattern callExpr where callee.method == "get_attachment"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData2 {
+  requires {
+    dependency("mailgun")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit source code.NetworkData at call.result
+}

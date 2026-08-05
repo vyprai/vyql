@@ -1,9 +1,0 @@
-module bindings.python.generated.mdbe7978b;
-
-binding deserialization0 {
-  requires {
-    dependency("natsort")
-  }
-  query pattern callExpr where callee.method == "natsort_keygen"
-  emit sink code.Deserialization at args[0]
-}

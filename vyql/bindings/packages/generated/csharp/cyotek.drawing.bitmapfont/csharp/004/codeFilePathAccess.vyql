@@ -1,9 +1,0 @@
-module bindings.csharp.generated.mdbb4bf36;
-
-binding filePathAccess4 {
-  requires {
-    dependency("cyotek.drawing.bitmapfont")
-  }
-  query pattern callExpr where callee.method == "LoadFontFromBinaryFile"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m2830a609;
-
-binding responseHeaderWrite3 {
-  requires {
-    dependency("Squatting")
-  }
-  query pattern callExpr where callee.method == "headers"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

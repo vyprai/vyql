@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m26e194b2;
-
-binding networkData16 {
-  requires {
-    dependency("com.mashape.unirest:unirest-java")
-  }
-  query pattern callExpr where callee.method == "getRawBody"
-  emit source code.NetworkData at call.result
-}

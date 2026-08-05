@@ -1,9 +1,0 @@
-module bindings.perl.generated.m9fefdd51;
-
-binding filePathAccess0 {
-  requires {
-    dependency("Hal-Cdroms")
-  }
-  query pattern callExpr where callee.method == "mount"
-  emit sink code.FilePathAccess at args[0]
-}

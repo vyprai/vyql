@@ -1,0 +1,65 @@
+module bindings.c.generated.m48d31d47;
+
+binding deserialization0 {
+  requires {
+    dependency("libxmlpp")
+  }
+  query pattern callExpr where callee.method == "XsdSchema::parse_file"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("libxmlpp")
+  }
+  query pattern callExpr where callee.method == "XsdSchema::parse_memory"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("libxmlpp")
+  }
+  query pattern callExpr where callee.method == "RelaxNGSchema::parse_file"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("libxmlpp")
+  }
+  query pattern callExpr where callee.method == "RelaxNGSchema::parse_memory"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("libxmlpp")
+  }
+  query pattern callExpr where callee.method == "SaxParser::parse_chunk"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("libxmlpp")
+  }
+  query pattern callExpr where callee.method == "SaxParser::parse_stream"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("libxmlpp")
+  }
+  query pattern callExpr where callee.method == "TextReader::read"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("libxmlpp")
+  }
+  query pattern callExpr where callee.method == "DomParser::parse_memory"
+  emit sink code.Deserialization at args[0]
+}

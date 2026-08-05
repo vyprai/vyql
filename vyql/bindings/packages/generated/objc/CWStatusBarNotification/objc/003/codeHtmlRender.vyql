@@ -1,9 +1,0 @@
-module bindings.objc.generated.m3b5cdde0;
-
-binding htmlRender3 {
-  requires {
-    dependency("CWStatusBarNotification")
-  }
-  query pattern callExpr where callee.method == "displayNotificationWithAttributedString:forDuration:"
-  emit sink code.HtmlRender at args[0]
-}

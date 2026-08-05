@@ -1,9 +1,0 @@
-module bindings.php.generated.ma239e78f;
-
-binding expressionEval0 {
-  requires {
-    dependency("php-parallel-lint/php-console-highlighter")
-  }
-  query pattern callExpr where callee.method == "getWholeFile"
-  emit sink code.ExpressionEval at args[0]
-}

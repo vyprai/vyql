@@ -1,9 +1,0 @@
-module bindings.python.generated.m228ea0ce;
-
-binding networkSend1 {
-  requires {
-    dependency("tweepy")
-  }
-  query pattern callExpr where callee.method == "API.request"
-  emit sink code.NetworkSend at args[0]
-}

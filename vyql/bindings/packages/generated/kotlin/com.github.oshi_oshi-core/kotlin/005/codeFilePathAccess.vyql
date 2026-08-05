@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mebc22b58;
-
-binding filePathAccess5 {
-  requires {
-    dependency("com.github.oshi:oshi-core")
-  }
-  query pattern callExpr where callee.method == "getIntFromFile"
-  emit sink code.FilePathAccess at args[0]
-}

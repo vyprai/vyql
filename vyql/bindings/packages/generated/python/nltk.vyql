@@ -1,0 +1,41 @@
+module bindings.python.generated.mb80d6ebf;
+
+binding deserialization0 {
+  requires {
+    dependency("nltk")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("nltk")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse2 {
+  requires {
+    dependency("nltk")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse3 {
+  requires {
+    dependency("nltk")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("nltk")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

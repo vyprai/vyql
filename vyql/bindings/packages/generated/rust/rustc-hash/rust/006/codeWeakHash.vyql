@@ -1,9 +1,0 @@
-module bindings.rust.generated.mac101614;
-
-binding weakHash6 {
-  requires {
-    dependency("rustc-hash")
-  }
-  query pattern callExpr where callee.method == "FxHasher.write_usize"
-  emit issue code.WeakHash at call
-}

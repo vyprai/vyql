@@ -1,9 +1,0 @@
-module bindings.perl.generated.m054af486;
-
-binding sqlExecution2 {
-  requires {
-    dependency("Data-Phrasebook")
-  }
-  query pattern callExpr where callee.method == "prepare"
-  emit sink code.SqlExecution at args[0]
-}

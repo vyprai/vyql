@@ -1,9 +1,0 @@
-module bindings.rust.generated.m49bea96b;
-
-binding weakRandomValue3 {
-  requires {
-    dependency("rustix")
-  }
-  query pattern presenceNode where node.path ~= "rustix.random"
-  emit issue code.WeakRandomValue at node
-}

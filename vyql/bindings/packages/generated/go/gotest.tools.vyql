@@ -1,0 +1,25 @@
+module bindings.go.generated.m266a2bfb;
+
+binding commandExecution0 {
+  requires {
+    dependency("gotest.tools")
+  }
+  query pattern callExpr where callee.method == "Command"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("gotest.tools")
+  }
+  query pattern callExpr where callee.method == "RunCommand"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution2 {
+  requires {
+    dependency("gotest.tools")
+  }
+  query pattern callExpr where callee.method == "RunCmd"
+  emit sink code.CommandExecution at args[0]
+}

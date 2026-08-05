@@ -1,0 +1,321 @@
+module bindings.perl.generated.mec98890c;
+
+binding deserialization0 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readMessageBegin"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readMessageEnd"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readStructBegin"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readStructEnd"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readFieldBegin"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readFieldEnd"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readMapBegin"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readListBegin"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization8 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readSetBegin"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization9 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readBool"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization10 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readByte"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization11 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readI16"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization12 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readI32"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization13 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readI64"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization14 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readDouble"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization15 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding networkData16 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "__recv"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData17 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "__send"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData18 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeMessageBegin"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData19 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeMessageEnd"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData20 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeStructBegin"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData21 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeStructEnd"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData22 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeFieldBegin"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData23 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeFieldEnd"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData24 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeFieldStop"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData25 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeMapBegin"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData26 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeListBegin"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData27 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeSetBegin"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData28 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeBool"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData29 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeByte"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData30 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeI16"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData31 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeI32"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData32 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeI64"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData33 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeDouble"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData34 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeString"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData35 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "send_addValue"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData36 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "recv_addValue"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData37 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "send_getValues"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData38 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "recv_getValues"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData39 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readAll"
+  emit source code.NetworkData at call.result
+}

@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/internal/parser"
 )
 
 // explainView is the provenance answer for "where does this label come from".

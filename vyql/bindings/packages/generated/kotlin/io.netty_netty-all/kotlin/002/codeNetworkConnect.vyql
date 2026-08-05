@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.me2e5bdec;
-
-binding networkConnect2 {
-  requires {
-    dependency("io.netty:netty-all")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

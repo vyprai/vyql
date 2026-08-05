@@ -1,9 +1,0 @@
-module bindings.perl.generated.m1f45aed0;
-
-binding databaseRead6 {
-  requires {
-    dependency("MendeleySQLite")
-  }
-  query pattern callExpr where callee.method == "get_all_document_ids"
-  emit sink code.DatabaseReadSink at args[0]
-}

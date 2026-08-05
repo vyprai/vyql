@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m23562f2c;
-
-binding filePathAccess1 {
-  requires {
-    dependency("exleveldb")
-  }
-  query pattern callExpr where callee.method == "destroy"
-  emit sink code.FilePathAccess at args[0]
-}

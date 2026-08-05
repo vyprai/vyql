@@ -1,9 +1,0 @@
-module bindings.objc.generated.m96e56e78;
-
-binding filePathAccess0 {
-  requires {
-    dependency("MLKitCommon")
-  }
-  query pattern callExpr where callee.method == "initWithPath"
-  emit sink code.FilePathAccess at args[0]
-}

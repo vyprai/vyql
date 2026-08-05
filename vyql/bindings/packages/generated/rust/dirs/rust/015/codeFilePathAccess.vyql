@@ -1,9 +1,0 @@
-module bindings.rust.generated.mff40dc02;
-
-binding filePathAccess15 {
-  requires {
-    dependency("dirs")
-  }
-  query pattern callExpr where callee.method == "picture_dir"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.mac82bc87;
-
-binding networkSend0 {
-  requires {
-    dependency("github.com/Moya/Moya")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit sink code.NetworkSend at args[0]
-}

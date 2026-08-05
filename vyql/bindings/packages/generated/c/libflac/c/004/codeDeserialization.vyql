@@ -1,9 +1,0 @@
-module bindings.c.generated.m16c74daa;
-
-binding deserialization4 {
-  requires {
-    dependency("libflac")
-  }
-  query pattern callExpr where callee.method == "utf8_decode"
-  emit sink code.Deserialization at args[0]
-}

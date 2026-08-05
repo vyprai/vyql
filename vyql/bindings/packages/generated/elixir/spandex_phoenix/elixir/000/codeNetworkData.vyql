@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m739b11aa;
-
-binding networkData0 {
-  requires {
-    dependency("spandex_phoenix")
-  }
-  query pattern callExpr where callee.method == "customize_metadata"
-  emit source code.NetworkData at call.result
-}

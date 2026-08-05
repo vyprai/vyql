@@ -1,9 +1,0 @@
-module bindings.python.generated.m07efbf27;
-
-binding deserialization0 {
-  requires {
-    dependency("gast")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

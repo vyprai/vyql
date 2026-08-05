@@ -1,9 +1,0 @@
-module bindings.scala.generated.mdacb1de9;
-
-binding networkSend1 {
-  requires {
-    dependency("org.springframework.social:spring-social-facebook")
-  }
-  query pattern callExpr where callee.method == "post"
-  emit sink code.NetworkSend at args[0]
-}

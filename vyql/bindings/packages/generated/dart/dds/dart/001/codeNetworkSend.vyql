@@ -1,9 +1,0 @@
-module bindings.dart.generated.mc2c1e8dc;
-
-binding networkSend1 {
-  requires {
-    dependency("dds")
-  }
-  query pattern callExpr where callee.method == "sendNotification"
-  emit sink code.NetworkSend at args[0]
-}

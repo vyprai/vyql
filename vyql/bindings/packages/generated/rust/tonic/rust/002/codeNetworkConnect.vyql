@@ -1,9 +1,0 @@
-module bindings.rust.generated.mb9f01a9d;
-
-binding networkConnect2 {
-  requires {
-    dependency("tonic")
-  }
-  query pattern callExpr where callee.path ~= "tonic::transport::channel::endpoint::connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

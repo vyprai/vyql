@@ -1,9 +1,0 @@
-module bindings.dart.generated.m16e0950c;
-
-binding codeEval3 {
-  requires {
-    dependency("plugin")
-  }
-  query pattern callExpr where callee.method == "processPlugins"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.mb2f466b0;
-
-binding deserialization3 {
-  requires {
-    dependency("com.caucho:hessian")
-  }
-  query pattern callExpr where callee.method == "parseString"
-  emit sink code.Deserialization at args[0]
-}

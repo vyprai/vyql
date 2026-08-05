@@ -1,9 +1,0 @@
-module bindings.swift.generated.mec30a9b7;
-
-binding userControlledData1 {
-  requires {
-    dependency("github.com/nathantannar4/InputBarAccessoryView")
-  }
-  query pattern callExpr where callee.method == "inputTextViewDidChange"
-  emit source core.UserControlledData at call.result
-}

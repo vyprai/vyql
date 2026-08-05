@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m7aeb7b9c;
-
-binding networkConnect0 {
-  requires {
-    dependency("com.sun.jersey:jersey-client")
-  }
-  query pattern callExpr where callee.method == "head"
-  emit sink code.NetworkConnectSink at args[0]
-}

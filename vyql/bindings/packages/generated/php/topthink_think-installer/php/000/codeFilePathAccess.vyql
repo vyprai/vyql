@@ -1,9 +1,0 @@
-module bindings.php.generated.mc16d5d23;
-
-binding filePathAccess0 {
-  requires {
-    dependency("topthink/think-installer")
-  }
-  query pattern callExpr where callee.method == "copy"
-  emit sink code.FilePathAccess at args[0]
-}

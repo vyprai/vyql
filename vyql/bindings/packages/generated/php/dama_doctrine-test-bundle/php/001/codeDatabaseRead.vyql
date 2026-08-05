@@ -1,9 +1,0 @@
-module bindings.php.generated.meb96413c;
-
-binding databaseRead1 {
-  requires {
-    dependency("dama/doctrine-test-bundle")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.DatabaseReadSink at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mabc190b8;
-
-binding filePathAccess0 {
-  requires {
-    dependency("org.codehaus.plexus:plexus-archiver")
-  }
-  query pattern callExpr where callee.method == "addDirectory"
-  emit sink code.FilePathAccess at args[0]
-}

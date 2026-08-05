@@ -1,9 +1,0 @@
-module bindings.swift.generated.mda5bfed3;
-
-binding filePathAccess10 {
-  requires {
-    dependency("github.com/kean/Pulse")
-  }
-  query pattern callExpr where callee.method == "export"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mc0662e30;
-
-binding urlFetch0 {
-  requires {
-    dependency("elasticsearch")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit sink code.UrlFetch at args[0]
-}

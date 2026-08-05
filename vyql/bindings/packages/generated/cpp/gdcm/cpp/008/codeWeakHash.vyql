@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m56a368d6;
-
-binding weakHash8 {
-  requires {
-    dependency("gdcm")
-  }
-  query pattern callExpr where callee.method == "ComputeFile"
-  emit issue code.WeakHash at call
-}

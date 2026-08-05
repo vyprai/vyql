@@ -1,9 +1,0 @@
-module bindings.php.generated.m80caef93;
-
-binding filePathAccess1 {
-  requires {
-    dependency("darkaonline/l5-swagger")
-  }
-  query pattern callExpr where callee.method == "saveJson"
-  emit sink code.FilePathAccess at args[0]
-}

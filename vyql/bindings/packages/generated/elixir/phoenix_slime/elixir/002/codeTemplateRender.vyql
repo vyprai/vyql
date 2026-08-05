@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m62fb0bc5;
-
-binding templateRender2 {
-  requires {
-    dependency("phoenix_slime")
-  }
-  query pattern callExpr where callee.method == "PhoenixSlime.LiveViewEngine.compile"
-  emit sink code.TemplateRender at args[0]
-}

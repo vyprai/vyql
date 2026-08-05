@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m942d4423;
-
-binding deserialization10 {
-  requires {
-    dependency("mongoid")
-  }
-  query pattern callExpr where callee.method == "execute_build"
-  emit sink code.Deserialization at args[0]
-}

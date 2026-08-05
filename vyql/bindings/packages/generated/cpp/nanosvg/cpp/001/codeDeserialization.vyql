@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m47af3081;
-
-binding deserialization1 {
-  requires {
-    dependency("nanosvg")
-  }
-  query pattern callExpr where callee.method == "nsvgParse"
-  emit sink code.Deserialization at args[0]
-}

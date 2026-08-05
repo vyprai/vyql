@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m3e48d717;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.rocketmq:rocketmq-client")
-  }
-  query pattern callExpr where callee.method == "getYamlDataObject"
-  emit sink code.Deserialization at args[0]
-}

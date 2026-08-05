@@ -1,0 +1,33 @@
+module bindings.ruby.generated.m925b957f;
+
+binding cliArgument0 {
+  requires {
+    dependency("html-proofer")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source code.CliArgument at call.result
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("html-proofer")
+  }
+  query pattern callExpr where callee.method == "check_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("html-proofer")
+  }
+  query pattern callExpr where callee.method == "add_internal"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("html-proofer")
+  }
+  query pattern callExpr where callee.method == "add_external"
+  emit source core.UserControlledData at call.result
+}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m9ac101a6;
-
-binding deserialization8 {
-  requires {
-    dependency("libraw")
-  }
-  query pattern callExpr where callee.method == "libraw_open_bayer"
-  emit sink code.Deserialization at args[0]
-}

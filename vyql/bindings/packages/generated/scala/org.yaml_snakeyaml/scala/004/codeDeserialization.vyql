@@ -1,9 +1,0 @@
-module bindings.scala.generated.m04c5a245;
-
-binding deserialization4 {
-  requires {
-    dependency("org.yaml:snakeyaml")
-  }
-  query pattern callExpr where callee.method == "compose"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.m74d7565f;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/mapbox/mapbox-maps-ios")
-  }
-  query pattern callExpr where callee.method == "loadStyleJSON"
-  emit sink code.Deserialization at args[0]
-}

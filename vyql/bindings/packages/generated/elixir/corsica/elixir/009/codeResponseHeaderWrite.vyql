@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m1bd8beb9;
-
-binding responseHeaderWrite9 {
-  requires {
-    dependency("corsica")
-  }
-  query pattern callExpr where callee.method == "put_allow_headers_header"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

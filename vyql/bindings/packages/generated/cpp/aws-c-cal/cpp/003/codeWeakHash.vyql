@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m0e4711e9;
-
-binding weakHash3 {
-  requires {
-    dependency("aws-c-cal")
-  }
-  query pattern callExpr where callee.method == "aws_sha1_compute"
-  emit issue code.WeakHash at call
-}

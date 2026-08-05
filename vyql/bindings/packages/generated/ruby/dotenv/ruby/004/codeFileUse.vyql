@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mab3c1daa;
-
-binding fileUse4 {
-  requires {
-    dependency("dotenv")
-  }
-  query pattern callExpr where callee.method == "overwrite!"
-  emit sink code.FileUseSink at args[0]
-}

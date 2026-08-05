@@ -1,9 +1,0 @@
-module bindings.perl.generated.m2350773e;
-
-binding networkData1 {
-  requires {
-    dependency("Net-SNMP-HostInfo")
-  }
-  query pattern callExpr where callee.method == "getTable"
-  emit source code.NetworkData at call.result
-}

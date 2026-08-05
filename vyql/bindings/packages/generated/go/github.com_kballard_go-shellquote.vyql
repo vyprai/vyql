@@ -1,0 +1,22 @@
+module bindings.go.generated.m69685fd2;
+
+binding shellEscape0 {
+  requires {
+    dependency("github.com/kballard/go-shellquote")
+  }
+  query pattern callExpr where callee.method == "Join"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("github.com/kballard/go-shellquote")
+  }
+  query pattern callExpr where callee.method == "Split"
+  emit source code.CliArgument at call.result
+}

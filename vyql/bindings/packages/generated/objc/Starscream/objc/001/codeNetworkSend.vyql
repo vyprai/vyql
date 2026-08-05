@@ -1,9 +1,0 @@
-module bindings.objc.generated.md3c1f255;
-
-binding networkSend1 {
-  requires {
-    dependency("Starscream")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkSend at args[0]
-}

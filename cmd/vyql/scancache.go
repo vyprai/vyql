@@ -13,10 +13,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/vyprai/vyql/datadir"
-	"github.com/vyprai/vyql/extract/parsecache"
-	"github.com/vyprai/vyql/findings"
-	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/internal/datadir"
+	"github.com/vyprai/vyql/internal/extract/parsecache"
+	"github.com/vyprai/vyql/internal/findings"
+	"github.com/vyprai/vyql/internal/parser"
 )
 
 // cachedScan is the gob-serialized whole-scan result stored under a scan fingerprint, so an

@@ -1,0 +1,62 @@
+module bindings.c.generated.m3c4a9620;
+
+binding deserialization0 {
+  requires {
+    dependency("parson")
+  }
+  query pattern callExpr where callee.method == "json_parse_file"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("parson")
+  }
+  query pattern callExpr where callee.method == "json_parse_file_with_comments"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("parson")
+  }
+  query pattern callExpr where callee.method == "json_parse_string"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("parson")
+  }
+  query pattern callExpr where callee.method == "json_parse_string_with_comments"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("parson")
+  }
+  query pattern callExpr where callee.method == "json_serialize_to_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("parson")
+  }
+  query pattern callExpr where callee.method == "json_serialize_to_file_pretty"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding inputValidation6 {
+  requires {
+    dependency("parson")
+  }
+  query pattern callExpr where callee.method == "json_validate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

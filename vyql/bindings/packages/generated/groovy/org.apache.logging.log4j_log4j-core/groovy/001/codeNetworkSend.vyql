@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mac1b5746;
-
-binding networkSend1 {
-  requires {
-    dependency("org.apache.logging.log4j:log4j-core")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

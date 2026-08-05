@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mc80e0066;
-
-binding codeEval0 {
-  requires {
-    dependency("html-webpack-plugin")
-  }
-  query pattern callExpr where callee.method == "evaluateCompilationResult"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m941efb0e;
-
-binding filePathAccess0 {
-  requires {
-    dependency("libp7client")
-  }
-  query pattern callExpr where callee.method == "Write"
-  emit sink code.FilePathAccess at args[0]
-}

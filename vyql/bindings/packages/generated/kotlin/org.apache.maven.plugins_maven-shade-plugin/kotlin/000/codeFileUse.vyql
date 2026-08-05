@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m3e07bf32;
-
-binding fileUse0 {
-  requires {
-    dependency("org.apache.maven.plugins:maven-shade-plugin")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.FileUseSink at args[0]
-}

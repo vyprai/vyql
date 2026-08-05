@@ -1,9 +1,0 @@
-module bindings.dart.generated.m97f3efaf;
-
-binding filePathAccess3 {
-  requires {
-    dependency("tflite")
-  }
-  query pattern callExpr where callee.method == "runModelOnFrame"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,0 +1,57 @@
+module bindings.groovy.generated.m03fb46b2;
+
+binding logOutput0 {
+  requires {
+    dependency("com.jakewharton.timber:timber")
+  }
+  query pattern callExpr where callee.method == "v"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput1 {
+  requires {
+    dependency("com.jakewharton.timber:timber")
+  }
+  query pattern callExpr where callee.method == "d"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput2 {
+  requires {
+    dependency("com.jakewharton.timber:timber")
+  }
+  query pattern callExpr where callee.method == "i"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput3 {
+  requires {
+    dependency("com.jakewharton.timber:timber")
+  }
+  query pattern callExpr where callee.method == "w"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput4 {
+  requires {
+    dependency("com.jakewharton.timber:timber")
+  }
+  query pattern callExpr where callee.method == "e"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput5 {
+  requires {
+    dependency("com.jakewharton.timber:timber")
+  }
+  query pattern callExpr where callee.method == "wtf"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput6 {
+  requires {
+    dependency("com.jakewharton.timber:timber")
+  }
+  query pattern callExpr where callee.method == "log"
+  emit sink code.LogOutput at args[0]
+}

@@ -1,0 +1,31 @@
+module bindings.objc.generated.m7db30fcf;
+
+binding regexCompile0 {
+  requires {
+    dependency("SwiftValidator")
+  }
+  query pattern callExpr where callee.method == "RegexRule.init"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding inputValidation1 {
+  requires {
+    dependency("SwiftValidator")
+  }
+  query pattern callExpr where callee.method == "RegexRule.validate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("SwiftValidator")
+  }
+  query pattern callExpr where callee.method == "Validator.validateField"
+  emit source core.UserControlledData at call.result
+}

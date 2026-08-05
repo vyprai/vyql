@@ -1,9 +1,0 @@
-module bindings.c.generated.m9fcabd2b;
-
-binding networkConnect6 {
-  requires {
-    dependency("hiredis")
-  }
-  query pattern callExpr where callee.method == "redisContextConnectUnix"
-  emit sink code.NetworkConnectSink at args[0]
-}

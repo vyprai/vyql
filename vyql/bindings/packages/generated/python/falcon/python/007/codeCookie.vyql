@@ -1,9 +1,0 @@
-module bindings.python.generated.m2982b66d;
-
-binding cookie7 {
-  requires {
-    dependency("falcon")
-  }
-  query pattern callExpr where callee.method == "falcon.response.Response.set_cookie"
-  emit source code.Cookie at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.m92038514;
-
-binding httpInput1 {
-  requires {
-    dependency("javax.servlet:servlet-api")
-  }
-  query pattern callExpr where callee.method == "getParameterValues"
-  emit source code.HttpInput at call.result
-}

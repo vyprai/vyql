@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m80fe1f0e;
-
-binding filePathAccess1 {
-  requires {
-    dependency("org.springframework.integration:spring-integration-file")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.FilePathAccess at args[0]
-}

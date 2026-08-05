@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m615ca6e9;
-
-binding filePathAccess3 {
-  requires {
-    dependency("boost-sort")
-  }
-  query pattern callExpr where callee.method == "fill_vector_uint64"
-  emit sink code.FilePathAccess at args[0]
-}

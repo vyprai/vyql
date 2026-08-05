@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mb32d0a46;
-
-binding userControlledData13 {
-  requires {
-    dependency("io.rest-assured:json-path")
-  }
-  query pattern callExpr where callee.method == "getByte"
-  emit source core.UserControlledData at call.result
-}

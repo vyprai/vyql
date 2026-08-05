@@ -1,9 +1,0 @@
-module bindings.go.generated.mde2a4ee5;
-
-binding networkConnect1 {
-  requires {
-    dependency("github.com/gorilla/websocket")
-  }
-  query pattern callExpr where callee.method == "NewClient"
-  emit sink code.NetworkConnectSink at args[0]
-}

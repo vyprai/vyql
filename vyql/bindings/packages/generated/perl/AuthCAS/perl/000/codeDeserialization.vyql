@@ -1,9 +1,0 @@
-module bindings.perl.generated.m8a4090f2;
-
-binding deserialization0 {
-  requires {
-    dependency("AuthCAS")
-  }
-  query pattern callExpr where callee.method == "_parse_xml"
-  emit sink code.Deserialization at args[0]
-}

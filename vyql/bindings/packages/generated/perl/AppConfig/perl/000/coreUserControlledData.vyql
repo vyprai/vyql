@@ -1,9 +1,0 @@
-module bindings.perl.generated.m2c9668b4;
-
-binding userControlledData0 {
-  requires {
-    dependency("AppConfig")
-  }
-  query pattern callExpr where callee.method == "file"
-  emit source core.UserControlledData at call.result
-}

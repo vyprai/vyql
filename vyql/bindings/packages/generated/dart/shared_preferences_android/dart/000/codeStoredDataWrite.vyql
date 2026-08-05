@@ -1,9 +1,0 @@
-module bindings.dart.generated.me435d651;
-
-binding storedDataWrite0 {
-  requires {
-    dependency("shared_preferences_android")
-  }
-  query pattern callExpr where callee.method == "dataStoreSetString"
-  emit sink code.StoredDataWrite at args[0]
-}

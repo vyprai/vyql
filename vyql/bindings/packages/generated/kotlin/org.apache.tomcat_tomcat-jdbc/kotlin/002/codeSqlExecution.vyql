@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.md9c93f0c;
-
-binding sqlExecution2 {
-  requires {
-    dependency("org.apache.tomcat:tomcat-jdbc")
-  }
-  query pattern callExpr where callee.method == "reportFailedQuery"
-  emit sink code.SqlExecution at args[0]
-}

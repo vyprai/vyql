@@ -1,0 +1,65 @@
+module bindings.go.generated.m90840e9a;
+
+binding htmlRender0 {
+  requires {
+    dependency("github.com/gookit/color")
+  }
+  query pattern callExpr where callee.method == "Fprint"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender1 {
+  requires {
+    dependency("github.com/gookit/color")
+  }
+  query pattern callExpr where callee.method == "Fprintf"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("github.com/gookit/color")
+  }
+  query pattern callExpr where callee.method == "Fprintln"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender3 {
+  requires {
+    dependency("github.com/gookit/color")
+  }
+  query pattern callExpr where callee.method == "RenderCode"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender4 {
+  requires {
+    dependency("github.com/gookit/color")
+  }
+  query pattern callExpr where callee.method == "RenderWithSpaces"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender5 {
+  requires {
+    dependency("github.com/gookit/color")
+  }
+  query pattern callExpr where callee.method == "RenderString"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender6 {
+  requires {
+    dependency("github.com/gookit/color")
+  }
+  query pattern callExpr where callee.method == "ReplaceTag"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("github.com/gookit/color")
+  }
+  query pattern callExpr where callee.method == "ParseCodeFromAttr"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m84d9beb4;
-
-binding networkData1 {
-  requires {
-    dependency("memcachex")
-  }
-  query pattern callExpr where callee.method == "recv"
-  emit source code.NetworkData at call.result
-}

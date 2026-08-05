@@ -1,9 +1,0 @@
-module bindings.swift.generated.mf29f2323;
-
-binding networkConnect2 {
-  requires {
-    dependency("github.com/aws-amplify/aws-appsync-realtime-client-ios")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

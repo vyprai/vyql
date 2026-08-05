@@ -1,9 +1,0 @@
-module bindings.perl.generated.me97ae6d2;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("MMapDB")
-  }
-  query pattern callExpr where callee.method == "delete_by_id"
-  emit sink code.StoredDataWrite at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m55dfca5a;
-
-binding userControlledData3 {
-  requires {
-    dependency("core")
-  }
-  query pattern callExpr where callee.method == "call"
-  emit source core.UserControlledData at call.result
-}

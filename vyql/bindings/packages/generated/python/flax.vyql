@@ -1,0 +1,81 @@
+module bindings.python.generated.m3a7d1447;
+
+binding filePathAccess0 {
+  requires {
+    dependency("flax")
+  }
+  query pattern callExpr where callee.method == "GFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("flax")
+  }
+  query pattern callExpr where callee.method == "listdir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("flax")
+  }
+  query pattern callExpr where callee.method == "isdir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse3 {
+  requires {
+    dependency("flax")
+  }
+  query pattern callExpr where callee.method == "copy"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse4 {
+  requires {
+    dependency("flax")
+  }
+  query pattern callExpr where callee.method == "rename"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("flax")
+  }
+  query pattern callExpr where callee.method == "exists"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("flax")
+  }
+  query pattern callExpr where callee.method == "makedirs"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse7 {
+  requires {
+    dependency("flax")
+  }
+  query pattern callExpr where callee.method == "remove"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse8 {
+  requires {
+    dependency("flax")
+  }
+  query pattern callExpr where callee.method == "rmtree"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding filePathAccess9 {
+  requires {
+    dependency("flax")
+  }
+  query pattern callExpr where callee.method == "getsize"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,17 @@
+module bindings.elixir.generated.me1a678d4;
+
+binding deserialization0 {
+  requires {
+    dependency("meeseeks_html5ever")
+  }
+  query pattern callExpr where callee.method == "parse_html"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("meeseeks_html5ever")
+  }
+  query pattern callExpr where callee.method == "parse_xml"
+  emit sink code.Deserialization at args[0]
+}

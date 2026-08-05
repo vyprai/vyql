@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m0dc0968e;
-
-binding deserialization1 {
-  requires {
-    dependency("erlavro")
-  }
-  query pattern callExpr where callee.method == "make_simple_decoder"
-  emit sink code.Deserialization at args[0]
-}

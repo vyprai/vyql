@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mc1d498ef;
-
-binding nosqlQuery5 {
-  requires {
-    dependency("org.mongodb:mongodb-driver-sync")
-  }
-  query pattern callExpr where callee.method == "updateMany"
-  emit sink code.NosqlQuery at args[0]
-}

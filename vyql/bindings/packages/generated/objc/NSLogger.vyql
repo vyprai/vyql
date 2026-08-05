@@ -1,0 +1,121 @@
+module bindings.objc.generated.mfd249e23;
+
+binding filePathAccess0 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LoggerSetBufferFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LoggerStart"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LogDataF"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LogImageDataF"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LogMessageRaw"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LogMessageRawF"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend6 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LogMessageRawToF"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend7 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LogMessageF"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend8 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LogMessageToF"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend9 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LogMessageF_va"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend10 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LogMessageToF_va"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend11 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LogDataToF"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend12 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LogImageDataToF"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend13 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LogStartBlock"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend14 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LogStartBlockTo"
+  emit sink code.NetworkSend at args[0]
+}

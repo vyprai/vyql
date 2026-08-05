@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mae52a612;
-
-binding userControlledData1 {
-  requires {
-    dependency("caniuse-api")
-  }
-  query pattern callExpr where callee.method == "find"
-  emit source core.UserControlledData at call.result
-}

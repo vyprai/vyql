@@ -1,9 +1,0 @@
-module bindings.go.generated.m675c09f5;
-
-binding userControlledData5 {
-  requires {
-    dependency("github.com/subosito/gotenv")
-  }
-  query pattern callExpr where callee.method == "StrictParse"
-  emit source core.UserControlledData at call.result
-}

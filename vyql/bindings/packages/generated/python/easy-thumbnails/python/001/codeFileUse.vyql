@@ -1,9 +1,0 @@
-module bindings.python.generated.ma406a0a6;
-
-binding fileUse1 {
-  requires {
-    dependency("easy-thumbnails")
-  }
-  query pattern callExpr where callee.method == "save"
-  emit sink code.FileUseSink at args[0]
-}

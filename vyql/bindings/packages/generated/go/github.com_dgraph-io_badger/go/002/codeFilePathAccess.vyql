@@ -1,9 +1,0 @@
-module bindings.go.generated.m02f9f864;
-
-binding filePathAccess2 {
-  requires {
-    dependency("github.com/dgraph-io/badger")
-  }
-  query pattern callExpr where callee.method == "OpenSyncedFile"
-  emit sink code.FilePathAccess at args[0]
-}

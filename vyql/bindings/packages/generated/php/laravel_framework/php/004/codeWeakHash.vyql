@@ -1,9 +1,0 @@
-module bindings.php.generated.mec5dfadc;
-
-binding weakHash4 {
-  requires {
-    dependency("laravel/framework")
-  }
-  query pattern presenceNode where node.path ~= "laravel.framework.hash"
-  emit issue code.WeakHash at node
-}

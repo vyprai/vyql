@@ -1,9 +1,0 @@
-module bindings.rust.generated.mcd10808f;
-
-binding filePathAccess1 {
-  requires {
-    dependency("ndk")
-  }
-  query pattern callExpr where callee.method == "open_dir"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,0 +1,25 @@
+module bindings.kotlin.generated.mc405d334;
+
+binding deserialization0 {
+  requires {
+    dependency("net.sf.ehcache:ehcache")
+  }
+  query pattern callExpr where callee.method == "MimeType"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("net.sf.ehcache:ehcache")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("net.sf.ehcache:ehcache")
+  }
+  query pattern callExpr where callee.method == "readExternal"
+  emit sink code.Deserialization at args[0]
+}

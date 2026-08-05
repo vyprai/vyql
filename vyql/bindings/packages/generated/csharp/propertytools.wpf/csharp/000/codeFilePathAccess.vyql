@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m7ad4061a;
-
-binding filePathAccess0 {
-  requires {
-    dependency("propertytools.wpf")
-  }
-  query pattern callExpr where callee.method == "InputFilePathAttribute"
-  emit sink code.FilePathAccess at args[0]
-}

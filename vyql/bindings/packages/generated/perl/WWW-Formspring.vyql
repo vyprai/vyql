@@ -1,0 +1,145 @@
+module bindings.perl.generated.mbe603286;
+
+binding cliArgument0 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "profile_ask"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "get_request_token"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument2 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "get_access_token"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument3 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "inbox_block"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument4 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "inbox_random"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument5 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "profile_details"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument6 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "search_profiles"
+  emit source code.CliArgument at call.result
+}
+
+binding networkConnect7 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "_unauth_connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect8 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "_auth_connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend9 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "_unauth_connect"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend10 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "_auth_connect"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend11 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "profile_ask"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend12 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "get_request_token"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend13 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "get_access_token"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend14 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "inbox_block"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend15 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "inbox_random"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend16 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "profile_details"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend17 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "search_profiles"
+  emit sink code.NetworkSend at args[0]
+}

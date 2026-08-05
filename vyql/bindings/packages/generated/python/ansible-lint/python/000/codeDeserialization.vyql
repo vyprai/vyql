@@ -1,9 +1,0 @@
-module bindings.python.generated.mc0597870;
-
-binding deserialization0 {
-  requires {
-    dependency("ansible-lint")
-  }
-  query pattern callExpr where callee.method == "parse_yaml_from_file"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.md8c32dbd;
-
-binding networkData2 {
-  requires {
-    dependency("github.com/vapor/websocket-kit")
-  }
-  query pattern callExpr where callee.method == "onBinary"
-  emit source code.NetworkData at call.result
-}

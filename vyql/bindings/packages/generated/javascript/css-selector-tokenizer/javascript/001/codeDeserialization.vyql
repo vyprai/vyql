@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m5349aade;
-
-binding deserialization1 {
-  requires {
-    dependency("css-selector-tokenizer")
-  }
-  query pattern callExpr where callee.method == "parseValues"
-  emit sink code.Deserialization at args[0]
-}

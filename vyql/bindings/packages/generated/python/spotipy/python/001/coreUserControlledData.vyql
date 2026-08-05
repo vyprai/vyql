@@ -1,9 +1,0 @@
-module bindings.python.generated.m742487fe;
-
-binding userControlledData1 {
-  requires {
-    dependency("spotipy")
-  }
-  query pattern callExpr where callee.method == "parse_response_code"
-  emit source core.UserControlledData at call.result
-}

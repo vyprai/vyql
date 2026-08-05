@@ -1,0 +1,17 @@
+module bindings.objc.generated.mb0fe5665;
+
+binding networkConnect0 {
+  requires {
+    dependency("FirebaseMLCommon")
+  }
+  query pattern callExpr where callee.method == "downloadModel"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding urlFetch1 {
+  requires {
+    dependency("FirebaseMLCommon")
+  }
+  query pattern callExpr where callee.method == "downloadModel"
+  emit sink code.UrlFetch at args[0]
+}

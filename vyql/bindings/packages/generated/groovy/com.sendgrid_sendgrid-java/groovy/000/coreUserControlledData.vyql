@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mb9c3d8a9;
-
-binding userControlledData0 {
-  requires {
-    dependency("com.sendgrid:sendgrid-java")
-  }
-  query pattern callExpr where callee.method == "addQueryParam"
-  emit source core.UserControlledData at call.result
-}

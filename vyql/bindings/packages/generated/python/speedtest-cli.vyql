@@ -1,0 +1,49 @@
+module bindings.python.generated.mc2fad8fe;
+
+binding cliArgument0 {
+  requires {
+    dependency("speedtest-cli")
+  }
+  query pattern callExpr where callee.method == "parse_args"
+  emit source code.CliArgument at call.result
+}
+
+binding urlFetch1 {
+  requires {
+    dependency("speedtest-cli")
+  }
+  query pattern callExpr where callee.method == "http_open"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch2 {
+  requires {
+    dependency("speedtest-cli")
+  }
+  query pattern callExpr where callee.method == "https_open"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding networkData3 {
+  requires {
+    dependency("speedtest-cli")
+  }
+  query pattern callExpr where callee.method == "download"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend4 {
+  requires {
+    dependency("speedtest-cli")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding commandExecution5 {
+  requires {
+    dependency("speedtest-cli")
+  }
+  query pattern callExpr where callee.method == "shell"
+  emit sink code.CommandExecution at args[0]
+}

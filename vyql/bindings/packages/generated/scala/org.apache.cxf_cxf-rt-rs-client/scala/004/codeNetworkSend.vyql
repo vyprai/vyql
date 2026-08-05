@@ -1,9 +1,0 @@
-module bindings.scala.generated.m0046f374;
-
-binding networkSend4 {
-  requires {
-    dependency("org.apache.cxf:cxf-rt-rs-client")
-  }
-  query pattern callExpr where callee.method == "put"
-  emit sink code.NetworkSend at args[0]
-}

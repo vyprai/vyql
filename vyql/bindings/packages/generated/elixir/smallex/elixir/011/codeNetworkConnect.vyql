@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m9bacb8bf;
-
-binding networkConnect11 {
-  requires {
-    dependency("smallex")
-  }
-  query pattern callExpr where callee.method == "head"
-  emit sink code.NetworkConnectSink at args[0]
-}

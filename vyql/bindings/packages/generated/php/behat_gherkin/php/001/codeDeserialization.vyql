@@ -1,9 +1,0 @@
-module bindings.php.generated.me02547f3;
-
-binding deserialization1 {
-  requires {
-    dependency("behat/gherkin")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,0 +1,33 @@
+module bindings.go.generated.m5e716c8a;
+
+binding secretValue0 {
+  requires {
+    dependency("github.com/Azure/azure-sdk-for-go")
+  }
+  query pattern callExpr where callee.method == "NewClientFromConnectionString"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("github.com/Azure/azure-sdk-for-go")
+  }
+  query pattern callExpr where callee.method == "NewClient"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("github.com/Azure/azure-sdk-for-go")
+  }
+  query pattern callExpr where callee.method == "NewAccountSASClient"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("github.com/Azure/azure-sdk-for-go")
+  }
+  query pattern callExpr where callee.method == "NewAccountSASClientFromEndpointToken"
+  emit source code.SecretValue at call.result
+}

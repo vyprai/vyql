@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m9ec18a80;
-
-binding networkSend3 {
-  requires {
-    dependency("fog-brightbox")
-  }
-  query pattern callExpr where callee.method == "authenticated_request"
-  emit sink code.NetworkSend at args[0]
-}

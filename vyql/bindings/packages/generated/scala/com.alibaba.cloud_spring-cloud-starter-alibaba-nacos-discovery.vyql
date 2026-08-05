@@ -1,0 +1,33 @@
+module bindings.scala.generated.mf71de9e3;
+
+binding secretValue0 {
+  requires {
+    dependency("com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery")
+  }
+  query pattern callExpr where callee.method == "getSecretKey"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery")
+  }
+  query pattern callExpr where callee.method == "setSecretKey"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery")
+  }
+  query pattern callExpr where callee.method == "getPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery")
+  }
+  query pattern callExpr where callee.method == "setPassword"
+  emit source code.SecretValue at call.result
+}

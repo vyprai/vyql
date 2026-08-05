@@ -1,9 +1,0 @@
-module bindings.rust.generated.m153a3999;
-
-binding fileUse2 {
-  requires {
-    dependency("io-lifetimes")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.FileUseSink at args[0]
-}

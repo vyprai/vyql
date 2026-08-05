@@ -1,0 +1,109 @@
+module bindings.rust.generated.m4c35e160;
+
+binding pathAccessCheck0 {
+  requires {
+    dependency("tauri-build")
+  }
+  query pattern callExpr where callee.method == "permissions_path_pattern"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("tauri-build")
+  }
+  query pattern callExpr where callee.method == "save_capabilities"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("tauri-build")
+  }
+  query pattern callExpr where callee.method == "save_acl_manifests"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("tauri-build")
+  }
+  query pattern callExpr where callee.method == "read_plugins_manifests"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("tauri-build")
+  }
+  query pattern callExpr where callee.method == "copy_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("tauri-build")
+  }
+  query pattern callExpr where callee.method == "copy_binaries"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("tauri-build")
+  }
+  query pattern callExpr where callee.method == "copy_resources"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("tauri-build")
+  }
+  query pattern callExpr where callee.method == "symlink_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("tauri-build")
+  }
+  query pattern callExpr where callee.method == "symlink_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess9 {
+  requires {
+    dependency("tauri-build")
+  }
+  query pattern callExpr where callee.method == "copy_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess10 {
+  requires {
+    dependency("tauri-build")
+  }
+  query pattern callExpr where callee.method == "copy_framework_from"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess11 {
+  requires {
+    dependency("tauri-build")
+  }
+  query pattern callExpr where callee.method == "copy_frameworks"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess12 {
+  requires {
+    dependency("tauri-build")
+  }
+  query pattern callExpr where callee.method == "config_path"
+  emit sink code.FilePathAccess at args[0]
+}

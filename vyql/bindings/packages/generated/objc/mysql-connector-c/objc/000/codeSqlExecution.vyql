@@ -1,9 +1,0 @@
-module bindings.objc.generated.m14eb2252;
-
-binding sqlExecution0 {
-  requires {
-    dependency("mysql-connector-c")
-  }
-  query pattern callExpr where callee.method == "mysql_query"
-  emit sink code.SqlExecution at args[0]
-}

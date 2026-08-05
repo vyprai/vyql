@@ -1,0 +1,89 @@
+module bindings.elixir.generated.ma152eb54;
+
+binding networkConnect0 {
+  requires {
+    dependency("httpotion")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("httpotion")
+  }
+  query pattern callExpr where callee.method == "request!"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("httpotion")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect3 {
+  requires {
+    dependency("httpotion")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("httpotion")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect5 {
+  requires {
+    dependency("httpotion")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect6 {
+  requires {
+    dependency("httpotion")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect7 {
+  requires {
+    dependency("httpotion")
+  }
+  query pattern callExpr where callee.method == "patch"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect8 {
+  requires {
+    dependency("httpotion")
+  }
+  query pattern callExpr where callee.method == "options"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding httpInput9 {
+  requires {
+    dependency("httpotion")
+  }
+  query pattern callExpr where callee.method == "process_request_body"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput10 {
+  requires {
+    dependency("httpotion")
+  }
+  query pattern callExpr where callee.method == "process_request_headers"
+  emit source code.HttpInput at call.result
+}

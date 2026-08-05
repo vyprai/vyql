@@ -1,9 +1,0 @@
-module bindings.go.generated.m474e534a;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/miekg/dns")
-  }
-  query pattern callExpr where callee.method == "UnpackRRWithHeader"
-  emit sink code.Deserialization at args[0]
-}

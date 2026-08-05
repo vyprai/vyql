@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m2c76e9ed;
-
-binding deserialization0 {
-  requires {
-    dependency("microsoft.reportviewer.vs2015.winforms")
-  }
-  query pattern callExpr where callee.method == "LoadReportDefinition"
-  emit sink code.Deserialization at args[0]
-}

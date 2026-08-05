@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m4aae079d;
-
-binding httpInput2 {
-  requires {
-    dependency("org.springframework:spring-webflux")
-  }
-  query pattern callExpr where callee.method == "getHeaders"
-  emit source code.HttpInput at call.result
-}

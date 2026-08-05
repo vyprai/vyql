@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m7046b0a8;
-
-binding filePathAccess4 {
-  requires {
-    dependency("org.easytesting:fest-assert-core")
-  }
-  query pattern callExpr where callee.method == "isAbsolute"
-  emit sink code.FilePathAccess at args[0]
-}

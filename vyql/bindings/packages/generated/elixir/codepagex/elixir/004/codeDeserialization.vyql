@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mabadd313;
-
-binding deserialization4 {
-  requires {
-    dependency("codepagex")
-  }
-  query pattern callExpr where callee.method == "translate"
-  emit sink code.Deserialization at args[0]
-}

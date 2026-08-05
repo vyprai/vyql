@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mdf088dd3;
-
-binding codeEval1 {
-  requires {
-    dependency("io.lettuce:lettuce-core")
-  }
-  query pattern callExpr where callee.method == "evalsha"
-  emit sink code.CodeEval at args[0]
-}

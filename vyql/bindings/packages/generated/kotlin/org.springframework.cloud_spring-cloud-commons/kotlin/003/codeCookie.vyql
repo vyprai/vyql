@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mc202cc7c;
-
-binding cookie3 {
-  requires {
-    dependency("org.springframework.cloud:spring-cloud-commons")
-  }
-  query pattern callExpr where callee.method == "getCookies"
-  emit source code.Cookie at call.result
-}

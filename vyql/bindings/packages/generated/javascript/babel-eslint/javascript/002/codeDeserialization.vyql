@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m77877b7d;
-
-binding deserialization2 {
-  requires {
-    dependency("babel-eslint")
-  }
-  query pattern callExpr where callee.method == "parseNoPatch"
-  emit sink code.Deserialization at args[0]
-}

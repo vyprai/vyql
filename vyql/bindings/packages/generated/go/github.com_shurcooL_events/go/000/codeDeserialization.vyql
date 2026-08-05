@@ -1,9 +1,0 @@
-module bindings.go.generated.m8262d9fe;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/shurcooL/events")
-  }
-  query pattern callExpr where callee.method == "jsonDecodeFile"
-  emit sink code.Deserialization at args[0]
-}

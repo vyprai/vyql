@@ -1,9 +1,0 @@
-module bindings.go.generated.me8febf58;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/anmitsu/go-shlex")
-  }
-  query pattern callExpr where callee.method == "NewLexer"
-  emit sink code.Deserialization at args[0]
-}

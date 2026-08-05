@@ -1,9 +1,0 @@
-module bindings.swift.generated.mcfba857c;
-
-binding networkConnect0 {
-  requires {
-    dependency("github.com/manolofdez/AsyncBluetooth")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

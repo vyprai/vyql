@@ -1,9 +1,0 @@
-module bindings.java.generated.m44b3cafd;
-
-binding xmlParse2 {
-  requires {
-    dependency("org.apache.maven.plugin-testing:maven-plugin-testing-harness")
-  }
-  query pattern callExpr where callee.method == "XmlPlexusConfiguration"
-  emit sink code.XmlParse at args[0]
-}

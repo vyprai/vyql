@@ -1,9 +1,0 @@
-module bindings.php.generated.m8a7b8379;
-
-binding fileUse1 {
-  requires {
-    dependency("incenteev/composer-parameter-handler")
-  }
-  query pattern callExpr where callee.method == "processFile"
-  emit sink code.FileUseSink at args[0]
-}

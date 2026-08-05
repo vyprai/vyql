@@ -1,9 +1,0 @@
-module bindings.php.generated.mf0404b66;
-
-binding sqlExecution6 {
-  requires {
-    dependency("laravel/scout")
-  }
-  query pattern callExpr where callee.method == "withRawResults"
-  emit sink code.SqlExecution at args[0]
-}

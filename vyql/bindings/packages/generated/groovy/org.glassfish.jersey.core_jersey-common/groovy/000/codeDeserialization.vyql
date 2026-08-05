@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m7973741a;
-
-binding deserialization0 {
-  requires {
-    dependency("org.glassfish.jersey.core:jersey-common")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m7bbf023a;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("identityserver4.keymanagement")
-  }
-  query pattern callExpr where callee.method == "StoreKeyAsync"
-  emit sink code.StoredDataWrite at args[0]
-}

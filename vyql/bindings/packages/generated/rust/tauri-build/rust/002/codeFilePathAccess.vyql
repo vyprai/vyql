@@ -1,9 +1,0 @@
-module bindings.rust.generated.m4c35e160;
-
-binding filePathAccess2 {
-  requires {
-    dependency("tauri-build")
-  }
-  query pattern callExpr where callee.method == "save_acl_manifests"
-  emit sink code.FilePathAccess at args[0]
-}

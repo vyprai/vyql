@@ -1,9 +1,0 @@
-module bindings.php.generated.m7c3e16db;
-
-binding httpInput0 {
-  requires {
-    dependency("yajra/laravel-datatables-buttons")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit source code.HttpInput at call.result
-}

@@ -1,0 +1,89 @@
+module bindings.swift.generated.m9fb65a21;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/supabase-community/supabase-swift")
+  }
+  query pattern callExpr where callee.method == "session"
+  emit source core.UserControlledData at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("github.com/supabase-community/supabase-swift")
+  }
+  query pattern callExpr where callee.method == "signInWithIdToken"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("github.com/supabase-community/supabase-swift")
+  }
+  query pattern callExpr where callee.method == "exchangeCodeForSession"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("github.com/supabase-community/supabase-swift")
+  }
+  query pattern callExpr where callee.method == "setSession"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("github.com/supabase-community/supabase-swift")
+  }
+  query pattern callExpr where callee.method == "generateLink"
+  emit source code.SecretValue at call.result
+}
+
+binding authenticationCheck5 {
+  requires {
+    dependency("github.com/supabase-community/supabase-swift")
+  }
+  query pattern callExpr where callee.method == "enroll"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck6 {
+  requires {
+    dependency("github.com/supabase-community/supabase-swift")
+  }
+  query pattern callExpr where callee.method == "challenge"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck7 {
+  requires {
+    dependency("github.com/supabase-community/supabase-swift")
+  }
+  query pattern callExpr where callee.method == "verify"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck8 {
+  requires {
+    dependency("github.com/supabase-community/supabase-swift")
+  }
+  query pattern callExpr where callee.method == "unenroll"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

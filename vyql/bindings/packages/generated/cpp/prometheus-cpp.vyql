@@ -1,0 +1,37 @@
+module bindings.cpp.generated.m089c36d3;
+
+binding httpInput0 {
+  requires {
+    dependency("prometheus-cpp")
+  }
+  query pattern callExpr where callee.method == "handleGet"
+  emit source code.HttpInput at call.result
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("prometheus-cpp")
+  }
+  query pattern callExpr where callee.method == "authorize"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding networkSend2 {
+  requires {
+    dependency("prometheus-cpp")
+  }
+  query pattern callExpr where callee.method == "push"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("prometheus-cpp")
+  }
+  query pattern callExpr where callee.method == "async_push"
+  emit sink code.NetworkSend at args[0]
+}

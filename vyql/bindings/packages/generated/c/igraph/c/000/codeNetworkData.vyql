@@ -1,9 +1,0 @@
-module bindings.c.generated.m07707a64;
-
-binding networkData0 {
-  requires {
-    dependency("igraph")
-  }
-  query pattern callExpr where callee.method == "igraph_fatal_handler_t"
-  emit source code.NetworkData at call.result
-}

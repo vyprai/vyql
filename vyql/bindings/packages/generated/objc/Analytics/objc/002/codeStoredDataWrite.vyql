@@ -1,9 +1,0 @@
-module bindings.objc.generated.m69249d62;
-
-binding storedDataWrite2 {
-  requires {
-    dependency("Analytics")
-  }
-  query pattern callExpr where callee.method == "setDictionary:forKey:"
-  emit sink code.StoredDataWrite at args[0]
-}

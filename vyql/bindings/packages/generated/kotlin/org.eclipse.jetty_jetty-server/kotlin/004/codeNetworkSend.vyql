@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m261450d9;
-
-binding networkSend4 {
-  requires {
-    dependency("org.eclipse.jetty:jetty-server")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

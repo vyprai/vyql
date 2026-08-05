@@ -1,9 +1,0 @@
-module bindings.java.generated.m92038514;
-
-binding filePathAccess11 {
-  requires {
-    dependency("javax.servlet:servlet-api")
-  }
-  query pattern callExpr where callee.method == "getRealPath"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m49a679e1;
-
-binding networkSend2 {
-  requires {
-    dependency("Hijk")
-  }
-  query pattern callExpr where callee.method == "_build_http_message"
-  emit sink code.NetworkSend at args[0]
-}

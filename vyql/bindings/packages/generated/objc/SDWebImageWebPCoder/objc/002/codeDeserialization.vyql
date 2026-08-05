@@ -1,9 +1,0 @@
-module bindings.objc.generated.ma6f83bf3;
-
-binding deserialization2 {
-  requires {
-    dependency("SDWebImageWebPCoder")
-  }
-  query pattern callExpr where callee.method == "incrementalDecodedImageWithOptions"
-  emit sink code.Deserialization at args[0]
-}

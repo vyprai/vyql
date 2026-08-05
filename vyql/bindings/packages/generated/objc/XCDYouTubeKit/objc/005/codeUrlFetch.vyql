@@ -1,9 +1,0 @@
-module bindings.objc.generated.mdefa03ba;
-
-binding urlFetch5 {
-  requires {
-    dependency("XCDYouTubeKit")
-  }
-  query pattern callExpr where callee.method == "start"
-  emit sink code.UrlFetch at args[0]
-}

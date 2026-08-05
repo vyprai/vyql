@@ -1,9 +1,0 @@
-module bindings.python.generated.me5b1aa4f;
-
-binding userControlledData0 {
-  requires {
-    dependency("sphinxcontrib-websupport")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.m4b11c1f6;
-
-binding networkSend3 {
-  requires {
-    dependency("org.apache.tomcat.embed:tomcat-embed-websocket")
-  }
-  query pattern callExpr where callee.method == "sendObject"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.m7b506522;
-
-binding urlFetch1 {
-  requires {
-    dependency("github.com/zcash/ZcashLightClientKit")
-  }
-  query pattern callExpr where callee.method == "httpRequest"
-  emit sink code.UrlFetch at args[0]
-}

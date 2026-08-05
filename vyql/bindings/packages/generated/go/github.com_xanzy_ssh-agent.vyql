@@ -1,0 +1,17 @@
+module bindings.go.generated.m2468096e;
+
+binding secretValue0 {
+  requires {
+    dependency("github.com/xanzy/ssh-agent")
+  }
+  query pattern callExpr where callee.method == "New"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("github.com/xanzy/ssh-agent")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.SecretValue at call.result
+}

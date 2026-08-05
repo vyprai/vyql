@@ -1,9 +1,0 @@
-module bindings.php.generated.mc24cc569;
-
-binding filePathAccess5 {
-  requires {
-    dependency("symfony/filesystem")
-  }
-  query pattern callExpr where callee.method == "rename"
-  emit sink code.FilePathAccess at args[0]
-}

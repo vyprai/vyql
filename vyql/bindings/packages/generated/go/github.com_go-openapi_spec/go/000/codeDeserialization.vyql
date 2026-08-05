@@ -1,9 +1,0 @@
-module bindings.go.generated.m8b1b950e;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/go-openapi/spec")
-  }
-  query pattern callExpr where callee.method == "ExpandSchemaWithBasePath"
-  emit sink code.Deserialization at args[0]
-}

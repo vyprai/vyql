@@ -1,0 +1,41 @@
+module bindings.perl.generated.m2d32aa40;
+
+binding userControlledData0 {
+  requires {
+    dependency("NetHack-NAOdash")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source core.UserControlledData at call.result
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("NetHack-NAOdash")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("NetHack-NAOdash")
+  }
+  query pattern callExpr where callee.method == "naodash_xlog"
+  emit sink code.Deserialization at args[0]
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("NetHack-NAOdash")
+  }
+  query pattern callExpr where callee.method == "naodash_user"
+  emit source core.UserControlledData at call.result
+}
+
+binding deserialization4 {
+  requires {
+    dependency("NetHack-NAOdash")
+  }
+  query pattern callExpr where callee.method == "naodash_user"
+  emit sink code.Deserialization at args[0]
+}

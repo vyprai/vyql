@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m102c0472;
-
-binding networkData4 {
-  requires {
-    dependency("qt5-websockets")
-  }
-  query pattern callExpr where callee.method == "QWebSocket::binaryMessageReceived"
-  emit source code.NetworkData at call.result
-}

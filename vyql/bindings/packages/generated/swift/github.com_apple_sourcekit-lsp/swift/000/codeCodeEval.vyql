@@ -1,9 +1,0 @@
-module bindings.swift.generated.m49ede556;
-
-binding codeEval0 {
-  requires {
-    dependency("github.com/apple/sourcekit-lsp")
-  }
-  query pattern callExpr where callee.method == "rewriteSourceKitPlaceholders"
-  emit sink code.CodeEval at args[0]
-}

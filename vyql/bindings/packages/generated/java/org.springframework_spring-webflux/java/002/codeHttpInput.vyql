@@ -1,9 +1,0 @@
-module bindings.java.generated.mce5e8387;
-
-binding httpInput2 {
-  requires {
-    dependency("org.springframework:spring-webflux")
-  }
-  query pattern callExpr where callee.method == "getCookies"
-  emit source code.HttpInput at call.result
-}

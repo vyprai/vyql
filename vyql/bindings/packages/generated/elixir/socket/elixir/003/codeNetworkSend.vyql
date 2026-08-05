@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m0319cc00;
-
-binding networkSend3 {
-  requires {
-    dependency("socket")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

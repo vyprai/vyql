@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m25573968;
-
-binding userControlledData0 {
-  requires {
-    dependency("io.dropwizard.metrics:metrics-servlet")
-  }
-  query pattern callExpr where callee.method == "doFilter"
-  emit source core.UserControlledData at call.result
-}

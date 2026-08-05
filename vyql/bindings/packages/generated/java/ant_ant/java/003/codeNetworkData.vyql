@@ -1,9 +1,0 @@
-module bindings.java.generated.ma182ced9;
-
-binding networkData3 {
-  requires {
-    dependency("ant:ant")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit source code.NetworkData at call.result
-}

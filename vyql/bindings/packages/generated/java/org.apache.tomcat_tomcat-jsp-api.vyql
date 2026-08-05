@@ -1,0 +1,59 @@
+module bindings.java.generated.m97f81708;
+
+binding userControlledData0 {
+  requires {
+    dependency("org.apache.tomcat:tomcat-jsp-api")
+  }
+  query pattern callExpr where callee.method == "getRequestURI"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("org.apache.tomcat:tomcat-jsp-api")
+  }
+  query pattern callExpr where callee.method == "getQueryString"
+  emit source core.UserControlledData at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("org.apache.tomcat:tomcat-jsp-api")
+  }
+  query pattern callExpr where callee.method == "getRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding htmlRender3 {
+  requires {
+    dependency("org.apache.tomcat:tomcat-jsp-api")
+  }
+  query pattern callExpr where callee.method == "print"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender4 {
+  requires {
+    dependency("org.apache.tomcat:tomcat-jsp-api")
+  }
+  query pattern callExpr where callee.method == "println"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding redirectTarget5 {
+  requires {
+    dependency("org.apache.tomcat:tomcat-jsp-api")
+  }
+  query pattern callExpr where callee.method == "forward"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget6 {
+  requires {
+    dependency("org.apache.tomcat:tomcat-jsp-api")
+  }
+  query pattern callExpr where callee.method == "include"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

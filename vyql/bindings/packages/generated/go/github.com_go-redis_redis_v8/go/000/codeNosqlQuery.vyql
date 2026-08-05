@@ -1,9 +1,0 @@
-module bindings.go.generated.ma589c2b6;
-
-binding nosqlQuery0 {
-  requires {
-    dependency("github.com/go-redis/redis/v8")
-  }
-  query pattern callExpr where callee.method == "getUserPassword"
-  emit sink code.NosqlQuery at args[0]
-}

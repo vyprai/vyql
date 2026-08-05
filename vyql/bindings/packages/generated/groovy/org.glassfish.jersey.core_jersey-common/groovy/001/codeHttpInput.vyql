@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m7973741a;
-
-binding httpInput1 {
-  requires {
-    dependency("org.glassfish.jersey.core:jersey-common")
-  }
-  query pattern callExpr where callee.method == "isReadable"
-  emit source code.HttpInput at call.result
-}

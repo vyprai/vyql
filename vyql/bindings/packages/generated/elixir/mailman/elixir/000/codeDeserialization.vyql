@@ -1,9 +1,0 @@
-module bindings.elixir.generated.md7c272ea;
-
-binding deserialization0 {
-  requires {
-    dependency("mailman")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

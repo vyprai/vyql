@@ -1,0 +1,73 @@
+module bindings.go.generated.mca5e322a;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/btcsuite/btcutil")
+  }
+  query pattern callExpr where callee.method == "DecodeAddress"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/btcsuite/btcutil")
+  }
+  query pattern callExpr where callee.method == "DecodeWIF"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/btcsuite/btcutil")
+  }
+  query pattern callExpr where callee.method == "NewBlockFromBytes"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/btcsuite/btcutil")
+  }
+  query pattern callExpr where callee.method == "NewBlockFromReader"
+  emit sink code.Deserialization at args[0]
+}
+
+binding weakHash4 {
+  requires {
+    dependency("github.com/btcsuite/btcutil")
+  }
+  query pattern callExpr where callee.method == "Hash160"
+  emit issue code.WeakHash at call
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("github.com/btcsuite/btcutil")
+  }
+  query pattern callExpr where callee.method == "NewAddressPubKeyHash"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("github.com/btcsuite/btcutil")
+  }
+  query pattern callExpr where callee.method == "NewAddressScriptHash"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("github.com/btcsuite/btcutil")
+  }
+  query pattern callExpr where callee.method == "NewAddressWitnessPubKeyHash"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData8 {
+  requires {
+    dependency("github.com/btcsuite/btcutil")
+  }
+  query pattern callExpr where callee.method == "NewAddressWitnessScriptHash"
+  emit source core.UserControlledData at call.result
+}

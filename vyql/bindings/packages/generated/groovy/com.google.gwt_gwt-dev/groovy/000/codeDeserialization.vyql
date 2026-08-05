@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m5e117159;
-
-binding deserialization0 {
-  requires {
-    dependency("com.google.gwt:gwt-dev")
-  }
-  query pattern callExpr where callee.method == "GwtVersion.parse"
-  emit sink code.Deserialization at args[0]
-}

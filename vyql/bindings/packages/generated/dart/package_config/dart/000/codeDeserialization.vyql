@@ -1,9 +1,0 @@
-module bindings.dart.generated.m52f4cdf4;
-
-binding deserialization0 {
-  requires {
-    dependency("package_config")
-  }
-  query pattern callExpr where callee.method == "parseBytes"
-  emit sink code.Deserialization at args[0]
-}

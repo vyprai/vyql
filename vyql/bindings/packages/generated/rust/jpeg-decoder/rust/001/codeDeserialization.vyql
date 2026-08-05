@@ -1,9 +1,0 @@
-module bindings.rust.generated.md3a20eef;
-
-binding deserialization1 {
-  requires {
-    dependency("jpeg-decoder")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

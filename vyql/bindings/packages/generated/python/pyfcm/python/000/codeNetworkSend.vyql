@@ -1,9 +1,0 @@
-module bindings.python.generated.m457fbe87;
-
-binding networkSend0 {
-  requires {
-    dependency("pyfcm")
-  }
-  query pattern callExpr where callee.method == "notify"
-  emit sink code.NetworkSend at args[0]
-}

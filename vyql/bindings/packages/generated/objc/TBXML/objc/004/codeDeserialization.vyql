@@ -1,9 +1,0 @@
-module bindings.objc.generated.m23c6a1d7;
-
-binding deserialization4 {
-  requires {
-    dependency("TBXML")
-  }
-  query pattern callExpr where callee.method == "initWithXMLData"
-  emit sink code.Deserialization at args[0]
-}

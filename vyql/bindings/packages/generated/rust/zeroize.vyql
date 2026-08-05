@@ -1,0 +1,17 @@
+module bindings.rust.generated.mf9cbb0ca;
+
+binding secretValue0 {
+  requires {
+    dependency("zeroize")
+  }
+  query pattern callExpr where callee.method == "zeroize"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("zeroize")
+  }
+  query pattern callExpr where callee.method == "try_zeroize"
+  emit source code.SecretValue at call.result
+}

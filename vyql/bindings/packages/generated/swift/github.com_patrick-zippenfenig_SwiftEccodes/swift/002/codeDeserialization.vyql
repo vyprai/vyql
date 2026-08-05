@@ -1,9 +1,0 @@
-module bindings.swift.generated.m4f823696;
-
-binding deserialization2 {
-  requires {
-    dependency("github.com/patrick-zippenfenig/SwiftEccodes")
-  }
-  query pattern callExpr where callee.method == "seekGrib"
-  emit sink code.Deserialization at args[0]
-}

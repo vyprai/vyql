@@ -1,0 +1,33 @@
+module bindings.rust.generated.m7a315a1d;
+
+binding filePathAccess0 {
+  requires {
+    dependency("gdk-pixbuf-sys")
+  }
+  query pattern callExpr where callee.method == "gdk_pixbuf_new_from_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("gdk-pixbuf-sys")
+  }
+  query pattern callExpr where callee.method == "gdk_pixbuf_new_from_file_at_scale"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("gdk-pixbuf-sys")
+  }
+  query pattern callExpr where callee.method == "gdk_pixbuf_new_from_file_at_size"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("gdk-pixbuf-sys")
+  }
+  query pattern callExpr where callee.method == "gdk_pixbuf_animation_new_from_file"
+  emit sink code.FilePathAccess at args[0]
+}

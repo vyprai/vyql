@@ -1,9 +1,0 @@
-module bindings.elixir.generated.md0a5e4cb;
-
-binding httpInput1 {
-  requires {
-    dependency("remote_ip")
-  }
-  query pattern callExpr where callee.method == "call"
-  emit source code.HttpInput at call.result
-}

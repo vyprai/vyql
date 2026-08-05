@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m7c1cd297;
-
-binding userControlledData1 {
-  requires {
-    dependency("vintage_net_wizard")
-  }
-  query pattern callExpr where callee.method == "VintageNetWizard.WiFiConfiguration.json_to_network_config"
-  emit source core.UserControlledData at call.result
-}

@@ -1,0 +1,50 @@
+module bindings.groovy.generated.m4f20c1a4;
+
+binding cookie0 {
+  requires {
+    dependency("javax.servlet:javax.servlet-api")
+  }
+  query pattern callExpr where callee.method == "getCookies"
+  emit source code.Cookie at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("javax.servlet:javax.servlet-api")
+  }
+  query pattern callExpr where callee.method == "getHeader"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("javax.servlet:javax.servlet-api")
+  }
+  query pattern callExpr where callee.method == "getQueryString"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("javax.servlet:javax.servlet-api")
+  }
+  query pattern callExpr where callee.method == "getRequestURI"
+  emit source code.HttpInput at call.result
+}
+
+binding sessionId4 {
+  requires {
+    dependency("javax.servlet:javax.servlet-api")
+  }
+  query pattern callExpr where callee.method == "getSession"
+  emit issue code.SessionId at call
+  emit sink code.SessionIdSink at call
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("javax.servlet:javax.servlet-api")
+  }
+  query pattern callExpr where callee.method == "getSubmittedFileName"
+  emit source core.UserControlledData at call.result
+}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m676b3c51;
-
-binding networkSend3 {
-  requires {
-    dependency("qtconnectivity")
-  }
-  query pattern callExpr where callee.method == "QBluetoothSocket::writeData"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,0 +1,33 @@
+module bindings.dart.generated.m883133c9;
+
+binding userControlledData0 {
+  requires {
+    dependency("smart_auth")
+  }
+  query pattern callExpr where callee.method == "getAppSignature"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("smart_auth")
+  }
+  query pattern callExpr where callee.method == "getSmsWithRetrieverApi"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("smart_auth")
+  }
+  query pattern callExpr where callee.method == "getSmsWithUserConsentApi"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("smart_auth")
+  }
+  query pattern callExpr where callee.method == "requestPhoneNumberHint"
+  emit source core.UserControlledData at call.result
+}

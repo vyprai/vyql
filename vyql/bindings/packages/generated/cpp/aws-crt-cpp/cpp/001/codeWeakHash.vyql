@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m4fa6ca30;
-
-binding weakHash1 {
-  requires {
-    dependency("aws-crt-cpp")
-  }
-  query pattern callExpr where callee.method == "SetBYOCryptoNewMD5Callback"
-  emit issue code.WeakHash at call
-}

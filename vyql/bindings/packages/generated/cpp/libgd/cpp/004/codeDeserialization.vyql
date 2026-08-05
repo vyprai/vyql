@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m9eba5595;
-
-binding deserialization4 {
-  requires {
-    dependency("libgd")
-  }
-  query pattern callExpr where callee.method == "gdImageCreateFromWBMPCtx"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.md0ee70ef;
-
-binding filePathAccess1 {
-  requires {
-    dependency("Plugins")
-  }
-  query pattern callExpr where callee.method == "file_plugin"
-  emit sink code.FilePathAccess at args[0]
-}

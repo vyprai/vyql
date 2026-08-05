@@ -1,9 +1,0 @@
-module bindings.php.generated.m3388e338;
-
-binding commandExecution1 {
-  requires {
-    dependency("consolidation/site-process")
-  }
-  query pattern callExpr where callee.method == "process"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.m57026d76;
-
-binding codeEval1 {
-  requires {
-    dependency("io.cucumber:cucumber-java")
-  }
-  query pattern callExpr where callee.method == "Invoker.doInvoke"
-  emit sink code.CodeEval at args[0]
-}

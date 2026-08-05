@@ -1,9 +1,0 @@
-module bindings.php.generated.m98423128;
-
-binding filePathAccess1 {
-  requires {
-    dependency("drupal/core-composer-scaffold")
-  }
-  query pattern callExpr where callee.method == "scaffoldOverExistingTarget"
-  emit sink code.FilePathAccess at args[0]
-}

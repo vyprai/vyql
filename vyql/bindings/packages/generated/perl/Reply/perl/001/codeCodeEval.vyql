@@ -1,9 +1,0 @@
-module bindings.perl.generated.m71a8aeab;
-
-binding codeEval1 {
-  requires {
-    dependency("Reply")
-  }
-  query pattern callExpr where callee.method == "_eval"
-  emit sink code.CodeEval at args[0]
-}

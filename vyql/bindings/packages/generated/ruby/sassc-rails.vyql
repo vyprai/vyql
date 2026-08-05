@@ -1,0 +1,33 @@
+module bindings.ruby.generated.m1aec25d5;
+
+binding filePathAccess0 {
+  requires {
+    dependency("sassc-rails")
+  }
+  query pattern callExpr where callee.method == "import_for"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("sassc-rails")
+  }
+  query pattern callExpr where callee.method == "imports"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("sassc-rails")
+  }
+  query pattern callExpr where callee.method == "glob_imports"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("sassc-rails")
+  }
+  query pattern callExpr where callee.method == "globbed_files"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,22 @@
+module bindings.objc.generated.m0233744e;
+
+binding urlFetch0 {
+  requires {
+    dependency("ARChromeActivity")
+  }
+  query pattern callExpr where callee.method == "performActivity"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding inputValidation1 {
+  requires {
+    dependency("ARChromeActivity")
+  }
+  query pattern callExpr where callee.method == "encodeByAddingPercentEscapes"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

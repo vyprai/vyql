@@ -1,9 +1,0 @@
-module bindings.objc.generated.mb551c984;
-
-binding logOutput7 {
-  requires {
-    dependency("XCGLogger")
-  }
-  query pattern callExpr where callee.method == "error"
-  emit sink code.LogOutput at args[0]
-}

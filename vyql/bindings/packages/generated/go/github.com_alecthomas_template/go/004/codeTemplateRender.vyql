@@ -1,9 +1,0 @@
-module bindings.go.generated.m1afd114b;
-
-binding templateRender4 {
-  requires {
-    dependency("github.com/alecthomas/template")
-  }
-  query pattern callExpr where callee.method == "ParseGlob"
-  emit sink code.TemplateRender at args[0]
-}

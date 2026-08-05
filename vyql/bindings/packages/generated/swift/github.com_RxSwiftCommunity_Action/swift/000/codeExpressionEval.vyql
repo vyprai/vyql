@@ -1,9 +1,0 @@
-module bindings.swift.generated.m73c4a9ef;
-
-binding expressionEval0 {
-  requires {
-    dependency("github.com/RxSwiftCommunity/Action")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.ExpressionEval at args[0]
-}

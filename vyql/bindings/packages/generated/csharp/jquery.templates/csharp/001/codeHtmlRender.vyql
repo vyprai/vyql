@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m1dbc2ee2;
-
-binding htmlRender1 {
-  requires {
-    dependency("jquery.templates")
-  }
-  query pattern callExpr where callee.method == "tmpl"
-  emit sink code.HtmlRender at args[0]
-}

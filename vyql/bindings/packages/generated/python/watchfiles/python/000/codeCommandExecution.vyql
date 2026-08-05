@@ -1,9 +1,0 @@
-module bindings.python.generated.mdadccbdc;
-
-binding commandExecution0 {
-  requires {
-    dependency("watchfiles")
-  }
-  query pattern callExpr where callee.method == "run_process"
-  emit sink code.CommandExecution at args[0]
-}

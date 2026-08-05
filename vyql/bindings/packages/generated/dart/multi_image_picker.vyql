@@ -1,0 +1,33 @@
+module bindings.dart.generated.m0f765ad7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("multi_image_picker")
+  }
+  query pattern callExpr where callee.method == "getPath"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("multi_image_picker")
+  }
+  query pattern callExpr where callee.method == "getPath_API19"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("multi_image_picker")
+  }
+  query pattern callExpr where callee.method == "getPath_API11to18"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("multi_image_picker")
+  }
+  query pattern callExpr where callee.method == "getPath_BelowAPI11"
+  emit sink code.FilePathAccess at args[0]
+}

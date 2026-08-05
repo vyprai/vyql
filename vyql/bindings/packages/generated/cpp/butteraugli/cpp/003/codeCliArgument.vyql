@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m20487d8b;
-
-binding cliArgument3 {
-  requires {
-    dependency("butteraugli")
-  }
-  query pattern callExpr where callee.method == "Run"
-  emit source code.CliArgument at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.md683c7a4;
-
-binding deserialization11 {
-  requires {
-    dependency("com.mashape.unirest:unirest-java")
-  }
-  query pattern callExpr where callee.method == "readValue"
-  emit sink code.Deserialization at args[0]
-}

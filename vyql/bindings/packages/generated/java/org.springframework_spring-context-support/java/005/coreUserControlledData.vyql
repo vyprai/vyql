@@ -1,9 +1,0 @@
-module bindings.java.generated.m85297d63;
-
-binding userControlledData5 {
-  requires {
-    dependency("org.springframework:spring-context-support")
-  }
-  query pattern callExpr where callee.method == "setBcc"
-  emit source core.UserControlledData at call.result
-}

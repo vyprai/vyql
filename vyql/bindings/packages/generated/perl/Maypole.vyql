@@ -1,0 +1,25 @@
+module bindings.perl.generated.m586d2dfa;
+
+binding httpInput0 {
+  requires {
+    dependency("Maypole")
+  }
+  query pattern callExpr where callee.method == "CGI::Maypole::run"
+  emit source code.HttpInput at call.result
+}
+
+binding htmlRender1 {
+  requires {
+    dependency("Maypole")
+  }
+  query pattern callExpr where callee.method == "CGI::Maypole::run"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding httpInput2 {
+  requires {
+    dependency("Maypole")
+  }
+  query pattern callExpr where callee.method == "CGI::Maypole::get_request"
+  emit source code.HttpInput at call.result
+}

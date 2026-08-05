@@ -1,9 +1,0 @@
-module bindings.perl.generated.m3766ff8f;
-
-binding codeEval2 {
-  requires {
-    dependency("WebDyne")
-  }
-  query pattern callExpr where callee.method == "WebDyne::eval_require"
-  emit sink code.CodeEval at args[0]
-}

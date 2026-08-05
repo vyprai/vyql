@@ -1,9 +1,0 @@
-module bindings.php.generated.m23dc3db6;
-
-binding codeEval3 {
-  requires {
-    dependency("slim/php-view")
-  }
-  query pattern callExpr where callee.method == "protectedIncludeScope"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.m7543c90f;
-
-binding deserialization0 {
-  requires {
-    dependency("io.grpc:grpc-protobuf")
-  }
-  query pattern callExpr where callee.method == "marshaller"
-  emit sink code.Deserialization at args[0]
-}

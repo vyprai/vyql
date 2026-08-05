@@ -1,0 +1,33 @@
+module bindings.php.generated.mae4bb781;
+
+binding deserialization0 {
+  requires {
+    dependency("symfony/polyfill-intl-icu")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("symfony/polyfill-intl-icu")
+  }
+  query pattern callExpr where callee.method == "parseCurrency"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("symfony/polyfill-intl-icu")
+  }
+  query pattern callExpr where callee.method == "parseLocale"
+  emit sink code.Deserialization at args[0]
+}
+
+binding httpInput3 {
+  requires {
+    dependency("symfony/polyfill-intl-icu")
+  }
+  query pattern callExpr where callee.method == "acceptFromHttp"
+  emit source code.HttpInput at call.result
+}

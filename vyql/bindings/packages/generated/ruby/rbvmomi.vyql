@@ -1,0 +1,25 @@
+module bindings.ruby.generated.m691da200;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("rbvmomi")
+  }
+  query pattern callExpr where callee.method == "findByUuid"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("rbvmomi")
+  }
+  query pattern callExpr where callee.method == "LeaseTool"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("rbvmomi")
+  }
+  query pattern callExpr where callee.method == "load_x509"
+  emit sink code.Deserialization at args[0]
+}

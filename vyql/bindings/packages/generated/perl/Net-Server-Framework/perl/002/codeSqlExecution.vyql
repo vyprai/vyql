@@ -1,9 +1,0 @@
-module bindings.perl.generated.me89a58c5;
-
-binding sqlExecution2 {
-  requires {
-    dependency("Net-Server-Framework")
-  }
-  query pattern callExpr where callee.method == "Net::Server::Framework::DB::execute"
-  emit sink code.SqlExecution at args[0]
-}

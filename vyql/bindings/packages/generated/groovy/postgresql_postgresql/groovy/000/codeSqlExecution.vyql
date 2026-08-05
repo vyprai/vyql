@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m71bf7d49;
-
-binding sqlExecution0 {
-  requires {
-    dependency("postgresql:postgresql")
-  }
-  query pattern callExpr where callee.method == "createSimpleQuery"
-  emit sink code.SqlExecution at args[0]
-}

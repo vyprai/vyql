@@ -1,9 +1,0 @@
-module bindings.python.generated.mbc0437ed;
-
-binding networkData5 {
-  requires {
-    dependency("websocket-client")
-  }
-  query pattern callExpr where callee.method == "recv"
-  emit source code.NetworkData at call.result
-}

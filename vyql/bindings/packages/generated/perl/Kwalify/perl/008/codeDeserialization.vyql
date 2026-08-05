@@ -1,9 +1,0 @@
-module bindings.perl.generated.mf00bb792;
-
-binding deserialization8 {
-  requires {
-    dependency("Kwalify")
-  }
-  query pattern callExpr where callee.method == "validate_date"
-  emit sink code.Deserialization at args[0]
-}

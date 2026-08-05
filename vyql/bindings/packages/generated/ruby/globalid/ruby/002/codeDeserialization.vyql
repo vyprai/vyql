@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m09350e3a;
-
-binding deserialization2 {
-  requires {
-    dependency("globalid")
-  }
-  query pattern callExpr where callee.method == "locate"
-  emit sink code.Deserialization at args[0]
-}

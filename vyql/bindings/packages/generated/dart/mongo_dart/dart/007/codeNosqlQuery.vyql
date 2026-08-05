@@ -1,9 +1,0 @@
-module bindings.dart.generated.mab46ff19;
-
-binding nosqlQuery7 {
-  requires {
-    dependency("mongo_dart")
-  }
-  query pattern callExpr where callee.method == "createAggregateCommand"
-  emit sink code.NosqlQuery at args[0]
-}

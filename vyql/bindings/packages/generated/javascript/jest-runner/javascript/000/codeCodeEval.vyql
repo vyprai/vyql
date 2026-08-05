@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m57806108;
-
-binding codeEval0 {
-  requires {
-    dependency("jest-runner")
-  }
-  query pattern callExpr where callee.method == "runTestInternal"
-  emit sink code.CodeEval at args[0]
-}

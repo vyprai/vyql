@@ -1,9 +1,0 @@
-module bindings.php.generated.mf0879722;
-
-binding networkSend0 {
-  requires {
-    dependency("braintree/braintree_php")
-  }
-  query pattern callExpr where callee.method == "delete"
-  emit sink code.NetworkSend at args[0]
-}

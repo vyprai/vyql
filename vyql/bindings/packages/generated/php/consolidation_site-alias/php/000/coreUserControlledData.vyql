@@ -1,9 +1,0 @@
-module bindings.php.generated.md404ea8f;
-
-binding userControlledData0 {
-  requires {
-    dependency("consolidation/site-alias")
-  }
-  query pattern callExpr where callee.method == "SiteAliasName::parse"
-  emit source core.UserControlledData at call.result
-}

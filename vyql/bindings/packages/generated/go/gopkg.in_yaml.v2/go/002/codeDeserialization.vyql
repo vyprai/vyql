@@ -1,9 +1,0 @@
-module bindings.go.generated.m0fe3d655;
-
-binding deserialization2 {
-  requires {
-    dependency("gopkg.in/yaml.v2")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

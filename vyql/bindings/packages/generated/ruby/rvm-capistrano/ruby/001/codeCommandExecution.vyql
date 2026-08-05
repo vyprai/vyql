@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mdf341254;
-
-binding commandExecution1 {
-  requires {
-    dependency("rvm-capistrano")
-  }
-  query pattern callExpr where callee.method == "run_without_rvm"
-  emit sink code.CommandExecution at args[0]
-}

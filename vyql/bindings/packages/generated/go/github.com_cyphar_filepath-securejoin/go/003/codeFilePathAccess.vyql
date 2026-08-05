@@ -1,9 +1,0 @@
-module bindings.go.generated.m92403cbe;
-
-binding filePathAccess3 {
-  requires {
-    dependency("github.com/cyphar/filepath-securejoin")
-  }
-  query pattern callExpr where callee.method == "MkdirAll"
-  emit sink code.FilePathAccess at args[0]
-}

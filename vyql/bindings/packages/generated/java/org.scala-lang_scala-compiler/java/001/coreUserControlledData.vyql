@@ -1,9 +1,0 @@
-module bindings.java.generated.m03731e0e;
-
-binding userControlledData1 {
-  requires {
-    dependency("org.scala-lang:scala-compiler")
-  }
-  query pattern callExpr where callee.method == "parseFilter"
-  emit source core.UserControlledData at call.result
-}

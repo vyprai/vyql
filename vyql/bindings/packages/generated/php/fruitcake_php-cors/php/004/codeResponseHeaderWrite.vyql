@@ -1,9 +1,0 @@
-module bindings.php.generated.ma10f8a15;
-
-binding responseHeaderWrite4 {
-  requires {
-    dependency("fruitcake/php-cors")
-  }
-  query pattern callExpr where callee.method == "addActualRequestHeaders"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

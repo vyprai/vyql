@@ -1,9 +1,0 @@
-module bindings.go.generated.mceaf7e3a;
-
-binding userControlledData4 {
-  requires {
-    dependency("github.com/mattn/go-tty/ttyutil")
-  }
-  query pattern callExpr where callee.method == "ReadLine"
-  emit source core.UserControlledData at call.result
-}

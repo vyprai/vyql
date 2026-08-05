@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m88ed018c;
-
-binding httpInput0 {
-  requires {
-    dependency("org.apache.cxf:cxf-rt-frontend-jaxrs")
-  }
-  query pattern callExpr where callee.method == "invoke"
-  emit source code.HttpInput at call.result
-}

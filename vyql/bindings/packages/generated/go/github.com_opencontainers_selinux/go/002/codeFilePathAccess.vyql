@@ -1,9 +1,0 @@
-module bindings.go.generated.m56c12cbe;
-
-binding filePathAccess2 {
-  requires {
-    dependency("github.com/opencontainers/selinux")
-  }
-  query pattern callExpr where callee.method == "LsetFileLabel"
-  emit sink code.FilePathAccess at args[0]
-}

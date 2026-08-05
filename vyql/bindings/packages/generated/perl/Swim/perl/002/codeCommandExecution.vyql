@@ -1,9 +1,0 @@
-module bindings.perl.generated.m03e3243d;
-
-binding commandExecution2 {
-  requires {
-    dependency("Swim")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.CommandExecution at args[0]
-}

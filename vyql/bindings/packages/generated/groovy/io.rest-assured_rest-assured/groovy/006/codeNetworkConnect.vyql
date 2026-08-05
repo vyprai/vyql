@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m9ceef9fb;
-
-binding networkConnect6 {
-  requires {
-    dependency("io.rest-assured:rest-assured")
-  }
-  query pattern callExpr where callee.method == "options"
-  emit sink code.NetworkConnectSink at args[0]
-}

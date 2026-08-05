@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mdd984bf2;
-
-binding weakHash0 {
-  requires {
-    dependency("argon2_elixir")
-  }
-  query pattern callExpr where callee.method == "hash_pwd_salt"
-  emit issue code.WeakHash at call
-}

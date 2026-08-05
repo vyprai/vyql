@@ -1,9 +1,0 @@
-module bindings.rust.generated.m448854f2;
-
-binding templateRender1 {
-  requires {
-    dependency("handlebars")
-  }
-  query pattern callExpr where callee.method == "compile"
-  emit sink code.TemplateRender at args[0]
-}

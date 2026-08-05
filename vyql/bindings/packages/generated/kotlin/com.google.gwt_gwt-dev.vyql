@@ -1,0 +1,17 @@
+module bindings.kotlin.generated.md3def842;
+
+binding deserialization0 {
+  requires {
+    dependency("com.google.gwt:gwt-dev")
+  }
+  query pattern callExpr where callee.method == "GwtVersion.parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("com.google.gwt:gwt-dev")
+  }
+  query pattern callExpr where callee.method == "Link.ArgProcessor"
+  emit source code.CliArgument at call.result
+}

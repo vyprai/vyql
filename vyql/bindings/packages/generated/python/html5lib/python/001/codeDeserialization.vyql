@@ -1,9 +1,0 @@
-module bindings.python.generated.m8801c7d3;
-
-binding deserialization1 {
-  requires {
-    dependency("html5lib")
-  }
-  query pattern callExpr where callee.method == "parseFragment"
-  emit sink code.Deserialization at args[0]
-}

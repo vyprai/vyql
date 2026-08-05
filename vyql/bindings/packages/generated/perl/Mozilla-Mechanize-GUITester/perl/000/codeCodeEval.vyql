@@ -1,9 +1,0 @@
-module bindings.perl.generated.m7a3c38f3;
-
-binding codeEval0 {
-  requires {
-    dependency("Mozilla-Mechanize-GUITester")
-  }
-  query pattern callExpr where callee.method == "run_js"
-  emit sink code.CodeEval at args[0]
-}

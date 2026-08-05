@@ -1,9 +1,0 @@
-module bindings.go.generated.mf909ad49;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/opencontainers/image-spec")
-  }
-  query pattern callExpr where callee.method == "validateDescriptor"
-  emit sink code.Deserialization at args[0]
-}

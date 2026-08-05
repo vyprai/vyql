@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mba04978c;
-
-binding weakCipher6 {
-  requires {
-    dependency("libxcrypt")
-  }
-  query pattern callExpr where callee.method == "des_crypt_block"
-  emit issue code.WeakCipher at call
-}

@@ -1,0 +1,145 @@
+module bindings.cpp.generated.m3e3aad71;
+
+binding filePathAccess0 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chaseat"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chaseat_prefix_root"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_extract_filename"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_opendir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_stat"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_access"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_fopen_unlocked"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess9 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_unlink"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess10 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_open_parent"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess11 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_openat"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess12 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_opendirat"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess13 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_statat"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess14 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_accessat"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess15 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_fopenat_unlocked"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess16 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_unlinkat"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess17 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_open_parent_at"
+  emit sink code.FilePathAccess at args[0]
+}

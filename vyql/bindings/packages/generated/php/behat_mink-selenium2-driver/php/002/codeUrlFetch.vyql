@@ -1,9 +1,0 @@
-module bindings.php.generated.me7183244;
-
-binding urlFetch2 {
-  requires {
-    dependency("behat/mink-selenium2-driver")
-  }
-  query pattern callExpr where callee.method == "visit"
-  emit sink code.UrlFetch at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m9638f916;
-
-binding userControlledData0 {
-  requires {
-    dependency("middleman-autoprefixer")
-  }
-  query pattern callExpr where callee.method == "extract_styles"
-  emit source core.UserControlledData at call.result
-}

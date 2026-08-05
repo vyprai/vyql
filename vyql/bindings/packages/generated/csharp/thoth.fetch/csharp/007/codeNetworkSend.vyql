@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m4c791c58;
-
-binding networkSend7 {
-  requires {
-    dependency("thoth.fetch")
-  }
-  query pattern callExpr where callee.method == "post``2"
-  emit sink code.NetworkSend at args[0]
-}

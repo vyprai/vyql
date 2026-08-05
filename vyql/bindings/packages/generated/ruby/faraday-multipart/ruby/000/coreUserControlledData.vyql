@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mb3e7f5e9;
-
-binding userControlledData0 {
-  requires {
-    dependency("faraday-multipart")
-  }
-  query pattern callExpr where callee.method == "CompositeReadIO.read"
-  emit source core.UserControlledData at call.result
-}

@@ -1,0 +1,30 @@
+module bindings.python.generated.m1891bbe2;
+
+binding deserialization0 {
+  requires {
+    dependency("babel")
+  }
+  query pattern callExpr where callee.method == "babel.messages.pofile.parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("babel")
+  }
+  query pattern callExpr where callee.method == "babel.messages.jslexer.tokenize"
+  emit sink code.Deserialization at args[0]
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("babel")
+  }
+  query pattern callExpr where callee.method == "babel.messages.pofile.escape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

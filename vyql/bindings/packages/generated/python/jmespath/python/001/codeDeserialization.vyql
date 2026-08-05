@@ -1,9 +1,0 @@
-module bindings.python.generated.meeba7410;
-
-binding deserialization1 {
-  requires {
-    dependency("jmespath")
-  }
-  query pattern callExpr where callee.method == "search"
-  emit sink code.Deserialization at args[0]
-}

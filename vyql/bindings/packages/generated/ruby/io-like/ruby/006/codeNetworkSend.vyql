@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mee840174;
-
-binding networkSend6 {
-  requires {
-    dependency("io-like")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkSend at args[0]
-}

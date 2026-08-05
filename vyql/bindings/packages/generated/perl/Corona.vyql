@@ -1,0 +1,25 @@
+module bindings.perl.generated.m0b13d399;
+
+binding networkData0 {
+  requires {
+    dependency("Corona")
+  }
+  query pattern callExpr where callee.method == "Plack::Handler::Corona::run"
+  emit source code.NetworkData at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("Corona")
+  }
+  query pattern callExpr where callee.method == "Corona::Server::process_request"
+  emit source code.HttpInput at call.result
+}
+
+binding networkSend2 {
+  requires {
+    dependency("Corona")
+  }
+  query pattern callExpr where callee.method == "Corona::Server::_write_response"
+  emit sink code.NetworkSend at args[0]
+}

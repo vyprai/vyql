@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m727ae6bc;
-
-binding networkSend0 {
-  requires {
-    dependency("io.grpc:grpc-stub")
-  }
-  query pattern callExpr where callee.method == "blockingUnaryCall"
-  emit sink code.NetworkSend at args[0]
-}

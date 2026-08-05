@@ -1,9 +1,0 @@
-module bindings.scala.generated.m0779b6f2;
-
-binding networkSend3 {
-  requires {
-    dependency("com.sun.jersey:jersey-servlet")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkSend at args[0]
-}

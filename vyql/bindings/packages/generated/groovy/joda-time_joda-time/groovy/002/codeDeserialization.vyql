@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mdeea1403;
-
-binding deserialization2 {
-  requires {
-    dependency("joda-time:joda-time")
-  }
-  query pattern callExpr where callee.method == "parseHours"
-  emit sink code.Deserialization at args[0]
-}

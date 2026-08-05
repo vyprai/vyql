@@ -1,9 +1,0 @@
-module bindings.objc.generated.m8b0bbbbb;
-
-binding filePathAccess2 {
-  requires {
-    dependency("MMKV")
-  }
-  query pattern callExpr where callee.method == "writeActualSize"
-  emit sink code.FilePathAccess at args[0]
-}

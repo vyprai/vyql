@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m9e73db6f;
-
-binding filePathAccess0 {
-  requires {
-    dependency("exts")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.FilePathAccess at args[0]
-}

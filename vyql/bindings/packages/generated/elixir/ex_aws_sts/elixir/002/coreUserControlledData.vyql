@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m0c91c393;
-
-binding userControlledData2 {
-  requires {
-    dependency("ex_aws_sts")
-  }
-  query pattern callExpr where callee.method == "decode_authorization_message"
-  emit source core.UserControlledData at call.result
-}

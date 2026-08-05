@@ -1,9 +1,0 @@
-module bindings.php.generated.mfd224668;
-
-binding deserialization1 {
-  requires {
-    dependency("padraic/phar-updater")
-  }
-  query pattern callExpr where callee.method == "validatePhar"
-  emit sink code.Deserialization at args[0]
-}

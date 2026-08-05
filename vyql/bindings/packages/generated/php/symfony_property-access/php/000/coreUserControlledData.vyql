@@ -1,9 +1,0 @@
-module bindings.php.generated.m2ed8d90a;
-
-binding userControlledData0 {
-  requires {
-    dependency("symfony/property-access")
-  }
-  query pattern callExpr where callee.method == "getValue"
-  emit source core.UserControlledData at call.result
-}

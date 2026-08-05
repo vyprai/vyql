@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1a8a3829;
-
-binding filePathAccess0 {
-  requires {
-    dependency("io.netty:netty-handler")
-  }
-  query pattern callExpr where callee.method == "readCertificates"
-  emit sink code.FilePathAccess at args[0]
-}

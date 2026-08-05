@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m9a0b6a97;
-
-binding filePathAccess1 {
-  requires {
-    dependency("infer-owner")
-  }
-  query pattern callExpr where callee.method == "inferOwner"
-  emit sink code.FilePathAccess at args[0]
-}

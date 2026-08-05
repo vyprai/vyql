@@ -1,9 +1,0 @@
-module bindings.python.generated.m045e3ddb;
-
-binding userControlledData0 {
-  requires {
-    dependency("pytest-pythonpath")
-  }
-  query pattern callExpr where callee.method == "pytest_addoption"
-  emit source core.UserControlledData at call.result
-}

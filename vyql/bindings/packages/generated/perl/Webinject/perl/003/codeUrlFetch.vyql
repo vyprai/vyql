@@ -1,9 +1,0 @@
-module bindings.perl.generated.m214f1c8e;
-
-binding urlFetch3 {
-  requires {
-    dependency("Webinject")
-  }
-  query pattern callExpr where callee.method == "_httppost_form_urlencoded"
-  emit sink code.UrlFetch at args[0]
-}

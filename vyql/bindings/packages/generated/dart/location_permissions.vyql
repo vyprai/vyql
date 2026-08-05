@@ -1,0 +1,22 @@
+module bindings.dart.generated.ma4b5852d;
+
+binding redirectTarget0 {
+  requires {
+    dependency("location_permissions")
+  }
+  query pattern callExpr where callee.method == "openAppSettings"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding authorizationCheck1 {
+  requires {
+    dependency("location_permissions")
+  }
+  query pattern callExpr where callee.method == "requestPermissions"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

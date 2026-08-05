@@ -1,9 +1,0 @@
-module bindings.python.generated.m821ea8f3;
-
-binding storedDataRead1 {
-  requires {
-    dependency("django-tinymce")
-  }
-  query pattern callExpr where callee.method == "flatpages_link_list"
-  emit source code.StoredDataRead at call.result
-}

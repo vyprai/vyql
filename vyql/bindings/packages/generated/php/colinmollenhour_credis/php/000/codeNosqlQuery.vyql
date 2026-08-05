@@ -1,9 +1,0 @@
-module bindings.php.generated.mf2fe8b79;
-
-binding nosqlQuery0 {
-  requires {
-    dependency("colinmollenhour/credis")
-  }
-  query pattern callExpr where callee.method == "rawCommand"
-  emit sink code.NosqlQuery at args[0]
-}

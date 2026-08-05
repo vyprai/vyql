@@ -1,9 +1,0 @@
-module bindings.objc.generated.m8ed02bed;
-
-binding userControlledData19 {
-  requires {
-    dependency("Crashlytics")
-  }
-  query pattern callExpr where callee.method == "setUserName"
-  emit source core.UserControlledData at call.result
-}

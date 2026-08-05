@@ -1,9 +1,0 @@
-module bindings.rust.generated.m402d926e;
-
-binding templateRender2 {
-  requires {
-    dependency("tinytemplate")
-  }
-  query pattern callExpr where callee.method == "render"
-  emit sink code.TemplateRender at args[0]
-}

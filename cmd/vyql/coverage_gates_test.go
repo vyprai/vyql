@@ -14,9 +14,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/datadir"
-	"github.com/vyprai/vyql/extract/frontend"
-	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/internal/datadir"
+	"github.com/vyprai/vyql/internal/extract/frontend"
+	"github.com/vyprai/vyql/internal/parser"
 )
 
 // readDataFiles returns {relpath: content} for every *.vyql under vyql/<sub>.
@@ -581,8 +581,19 @@ func TestShippedDefinitionCorpusIsV2Only(t *testing.T) {
 	if err != nil {
 		t.Fatalf("shipped definition corpus must be v2-only: %v", err)
 	}
-	if checked < 30000 {
-		t.Fatalf("checked only %d v2 definition files; want the full shipped corpus", checked)
+	// Every file the walk collected must have been validated. This is the real
+	// invariant; a subset silently passing is what the gate exists to stop.
+	if checked != len(files) {
+		t.Fatalf("validated %d of %d collected definition files", checked, len(files))
+	}
+	// A presence check, not a coverage metric. It guards the failure where the
+	// walk matches nothing and a clean run reports over an empty set. The bound
+	// is deliberately far below the real corpus so it does not have to move
+	// whenever the data is reshaped -- how the definitions are laid out across
+	// files is not what this test is about. The count that does track coverage
+	// is the binding floor in data.yml, which is layout-independent.
+	if checked < 10000 {
+		t.Fatalf("only %d definition files found; the shipped corpus is missing or truncated", checked)
 	}
 	t.Logf("checked %d shipped v2 definition files", checked)
 }
@@ -992,7 +1003,7 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 			return err
 		}
 		src := string(data)
-		importsVyqlParser := strings.Contains(src, `"github.com/vyprai/vyql/parser"`)
+		importsVyqlParser := strings.Contains(src, `"github.com/vyprai/vyql/internal/parser"`)
 		usesLegacy := false
 		for _, snippet := range legacyCoverageClauses {
 			if strings.Contains(src, snippet) {

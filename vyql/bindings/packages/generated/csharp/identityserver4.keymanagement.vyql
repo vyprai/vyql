@@ -1,0 +1,33 @@
+module bindings.csharp.generated.m7bbf023a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("identityserver4.keymanagement")
+  }
+  query pattern callExpr where callee.method == "PersistKeysToFileSystem"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("identityserver4.keymanagement")
+  }
+  query pattern callExpr where callee.method == "StoreKeyAsync"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataRead2 {
+  requires {
+    dependency("identityserver4.keymanagement")
+  }
+  query pattern callExpr where callee.method == "LoadKeysAsync"
+  emit source code.StoredDataRead at call.result
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("identityserver4.keymanagement")
+  }
+  query pattern callExpr where callee.method == "DeleteKeyAsync"
+  emit sink code.FilePathAccess at args[0]
+}

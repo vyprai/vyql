@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m50eb1b2d;
-
-binding storedDataWrite4 {
-  requires {
-    dependency("cubdb")
-  }
-  query pattern callExpr where callee.method == "put_multi"
-  emit sink code.StoredDataWrite at args[0]
-}

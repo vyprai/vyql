@@ -1,9 +1,0 @@
-module bindings.go.generated.mffc629b8;
-
-binding filePathAccess2 {
-  requires {
-    dependency("github.com/containerd/zfs")
-  }
-  query pattern callExpr where callee.method == "NewSnapshotter"
-  emit sink code.FilePathAccess at args[0]
-}

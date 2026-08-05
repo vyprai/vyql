@@ -1,9 +1,0 @@
-module bindings.dart.generated.m90979562;
-
-binding weakCipher6 {
-  requires {
-    dependency("flutter_secure_storage_web")
-  }
-  query pattern callExpr where callee.method == "_getWrapKey"
-  emit issue code.WeakCipher at call
-}

@@ -1,9 +1,0 @@
-module bindings.javascript.generated.md2fd4000;
-
-binding deserialization6 {
-  requires {
-    dependency("cosmiconfig")
-  }
-  query pattern callExpr where callee.method == "loadTsSync"
-  emit sink code.Deserialization at args[0]
-}

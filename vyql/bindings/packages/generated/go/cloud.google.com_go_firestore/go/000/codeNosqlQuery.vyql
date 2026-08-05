@@ -1,9 +1,0 @@
-module bindings.go.generated.m9cb4de0c;
-
-binding nosqlQuery0 {
-  requires {
-    dependency("cloud.google.com/go/firestore")
-  }
-  query pattern callExpr where callee.method == "newQueryDocumentIterator"
-  emit sink code.NosqlQuery at args[0]
-}

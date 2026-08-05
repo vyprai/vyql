@@ -1,9 +1,0 @@
-module bindings.go.generated.m11300376;
-
-binding weakCipher5 {
-  requires {
-    dependency("github.com/containerd/imgcrypt")
-  }
-  query pattern callExpr where callee.method == "EncryptImage"
-  emit issue code.WeakCipher at call
-}

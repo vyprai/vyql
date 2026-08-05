@@ -1,0 +1,33 @@
+module bindings.cpp.generated.m426aedd2;
+
+binding deserialization0 {
+  requires {
+    dependency("tinyply")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("tinyply")
+  }
+  query pattern callExpr where callee.method == "parse_header"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("tinyply")
+  }
+  query pattern callExpr where callee.method == "parse_data"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("tinyply")
+  }
+  query pattern callExpr where callee.method == "parse_data_impl"
+  emit sink code.Deserialization at args[0]
+}

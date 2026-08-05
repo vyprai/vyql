@@ -1,9 +1,0 @@
-module bindings.rust.generated.m7a3dca84;
-
-binding storedDataRead1 {
-  requires {
-    dependency("dotenv")
-  }
-  query pattern callExpr where callee.method == "dotenv_iter"
-  emit source code.StoredDataRead at call.result
-}

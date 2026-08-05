@@ -1,0 +1,33 @@
+module bindings.python.generated.med8d6667;
+
+binding codeEval0 {
+  requires {
+    dependency("py")
+  }
+  query pattern callExpr where callee.method == "execfile"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("py")
+  }
+  query pattern callExpr where callee.method == "exec_"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval2 {
+  requires {
+    dependency("py")
+  }
+  query pattern callExpr where callee.method == "exec2"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval3 {
+  requires {
+    dependency("py")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}

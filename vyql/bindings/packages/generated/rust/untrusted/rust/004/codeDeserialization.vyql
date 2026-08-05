@@ -1,9 +1,0 @@
-module bindings.rust.generated.md4a5a880;
-
-binding deserialization4 {
-  requires {
-    dependency("untrusted")
-  }
-  query pattern callExpr where callee.method == "as_slice_less_safe"
-  emit sink code.Deserialization at args[0]
-}

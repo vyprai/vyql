@@ -1,0 +1,33 @@
+module bindings.ruby.generated.m48c87789;
+
+binding secretValue0 {
+  requires {
+    dependency("omniauth-google-oauth2")
+  }
+  query pattern callExpr where callee.method == "get_access_token"
+  emit source code.SecretValue at call.result
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("omniauth-google-oauth2")
+  }
+  query pattern callExpr where callee.method == "verify_token"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck2 {
+  requires {
+    dependency("omniauth-google-oauth2")
+  }
+  query pattern callExpr where callee.method == "verify_hd"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

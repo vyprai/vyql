@@ -1,9 +1,0 @@
-module bindings.dart.generated.m04542b4a;
-
-binding userControlledData0 {
-  requires {
-    dependency("file_selector_web")
-  }
-  query pattern callExpr where callee.method == "FileSelectorWeb.openFile"
-  emit source core.UserControlledData at call.result
-}

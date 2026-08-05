@@ -1,0 +1,17 @@
+module bindings.scala.generated.m1d6f42b7;
+
+binding httpInput0 {
+  requires {
+    dependency("org.apache.shiro:shiro-core")
+  }
+  query pattern callExpr where callee.method == "sessionId"
+  emit source code.HttpInput at call.result
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.apache.shiro:shiro-core")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

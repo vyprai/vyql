@@ -1,9 +1,0 @@
-module bindings.perl.generated.mbe535a15;
-
-binding httpInput1 {
-  requires {
-    dependency("Puncheur")
-  }
-  query pattern callExpr where callee.method == "query_parameters_raw"
-  emit source code.HttpInput at call.result
-}

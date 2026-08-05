@@ -1,0 +1,57 @@
+module bindings.scala.generated.m4a4ad117;
+
+binding networkBind0 {
+  requires {
+    dependency("com.squareup.okhttp:mockwebserver")
+  }
+  query pattern callExpr where callee.method == "MockWebServer.start"
+  emit sink code.NetworkBind at args[0]
+}
+
+binding htmlRender1 {
+  requires {
+    dependency("com.squareup.okhttp:mockwebserver")
+  }
+  query pattern callExpr where callee.method == "MockResponse.setBody"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("com.squareup.okhttp:mockwebserver")
+  }
+  query pattern callExpr where callee.method == "MockResponse.setHeader"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite3 {
+  requires {
+    dependency("com.squareup.okhttp:mockwebserver")
+  }
+  query pattern callExpr where callee.method == "MockResponse.addHeader"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("com.squareup.okhttp:mockwebserver")
+  }
+  query pattern callExpr where callee.method == "RecordedRequest.getPath"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("com.squareup.okhttp:mockwebserver")
+  }
+  query pattern callExpr where callee.method == "RecordedRequest.getMethod"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("com.squareup.okhttp:mockwebserver")
+  }
+  query pattern callExpr where callee.method == "RecordedRequest.getHeader"
+  emit source core.UserControlledData at call.result
+}

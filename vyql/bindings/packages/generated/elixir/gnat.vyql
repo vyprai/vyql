@@ -1,0 +1,33 @@
+module bindings.elixir.generated.mff89069b;
+
+binding networkSend0 {
+  requires {
+    dependency("gnat")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("gnat")
+  }
+  query pattern callExpr where callee.method == "request_multi"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("gnat")
+  }
+  query pattern callExpr where callee.method == "socket_write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("gnat")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

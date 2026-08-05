@@ -1,9 +1,0 @@
-module bindings.swift.generated.m8e721eac;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/ChimeHQ/SwiftTreeSitter")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

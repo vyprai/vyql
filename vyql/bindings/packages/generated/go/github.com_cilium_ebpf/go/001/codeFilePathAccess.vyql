@@ -1,9 +1,0 @@
-module bindings.go.generated.m5818ebce;
-
-binding filePathAccess1 {
-  requires {
-    dependency("github.com/cilium/ebpf")
-  }
-  query pattern callExpr where callee.method == "LoadPinnedProgram"
-  emit sink code.FilePathAccess at args[0]
-}

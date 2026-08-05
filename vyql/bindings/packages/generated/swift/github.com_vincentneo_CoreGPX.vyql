@@ -1,0 +1,17 @@
+module bindings.swift.generated.mb3813e60;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/vincentneo/CoreGPX")
+  }
+  query pattern callExpr where callee.method == "fallibleParsedData"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/vincentneo/CoreGPX")
+  }
+  query pattern callExpr where callee.method == "parsedData"
+  emit sink code.Deserialization at args[0]
+}

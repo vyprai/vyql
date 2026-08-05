@@ -1,9 +1,0 @@
-module bindings.go.generated.m5f6571f9;
-
-binding deserialization5 {
-  requires {
-    dependency("github.com/sourcegraph/go-diff")
-  }
-  query pattern callExpr where callee.method == "ParseHunksOptions"
-  emit sink code.Deserialization at args[0]
-}

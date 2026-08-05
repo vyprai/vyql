@@ -1,9 +1,0 @@
-module bindings.dart.generated.m16e0950c;
-
-binding userControlledData1 {
-  requires {
-    dependency("plugin")
-  }
-  query pattern callExpr where callee.method == "RegisterExtensionPoint"
-  emit source core.UserControlledData at call.result
-}

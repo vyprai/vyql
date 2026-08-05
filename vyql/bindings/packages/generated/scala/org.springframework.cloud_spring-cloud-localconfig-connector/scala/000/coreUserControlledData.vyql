@@ -1,9 +1,0 @@
-module bindings.scala.generated.m98139822;
-
-binding userControlledData0 {
-  requires {
-    dependency("org.springframework.cloud:spring-cloud-localconfig-connector")
-  }
-  query pattern callExpr where callee.method == "readServicesData"
-  emit source core.UserControlledData at call.result
-}

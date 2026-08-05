@@ -1,9 +1,0 @@
-module bindings.go.generated.mf4d208b3;
-
-binding networkSend1 {
-  requires {
-    dependency("github.com/hashicorp/yamux")
-  }
-  query pattern callExpr where callee.method == "Server"
-  emit sink code.NetworkSend at args[0]
-}

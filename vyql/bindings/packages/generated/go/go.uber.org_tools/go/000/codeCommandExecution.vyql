@@ -1,9 +1,0 @@
-module bindings.go.generated.m185ce702;
-
-binding commandExecution0 {
-  requires {
-    dependency("go.uber.org/tools")
-  }
-  query pattern callExpr where callee.method == "ExecCmd"
-  emit sink code.CommandExecution at args[0]
-}

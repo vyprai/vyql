@@ -1,0 +1,30 @@
+module bindings.ruby.generated.m641f9acf;
+
+binding networkConnect0 {
+  requires {
+    dependency("heroku-api")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding htmlEscape1 {
+  requires {
+    dependency("heroku-api")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding secretValue2 {
+  requires {
+    dependency("heroku-api")
+  }
+  query pattern callExpr where callee.method == "post_login"
+  emit source code.SecretValue at call.result
+}

@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mcb05be6e;
-
-binding deserialization1 {
-  requires {
-    dependency("postcss-svgo")
-  }
-  query pattern callExpr where callee.method == "minify"
-  emit sink code.Deserialization at args[0]
-}

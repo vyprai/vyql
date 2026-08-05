@@ -1,9 +1,0 @@
-module bindings.java.generated.mf27d1696;
-
-binding userControlledData2 {
-  requires {
-    dependency("io.springfox:springfox-boot-starter")
-  }
-  query pattern callExpr where callee.method == "filter"
-  emit source core.UserControlledData at call.result
-}

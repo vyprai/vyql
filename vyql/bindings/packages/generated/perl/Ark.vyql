@@ -1,0 +1,17 @@
+module bindings.perl.generated.m1a63e167;
+
+binding httpInput0 {
+  requires {
+    dependency("Ark")
+  }
+  query pattern callExpr where callee.method == "make_cookie"
+  emit source code.HttpInput at call.result
+}
+
+binding deserialization1 {
+  requires {
+    dependency("Ark")
+  }
+  query pattern callExpr where callee.method == "load_plugins"
+  emit sink code.Deserialization at args[0]
+}

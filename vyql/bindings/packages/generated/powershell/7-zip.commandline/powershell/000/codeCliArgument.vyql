@@ -1,9 +1,0 @@
-module bindings.powershell.generated.ma07e1cb9;
-
-binding cliArgument0 {
-  requires {
-    dependency("7-zip.commandline")
-  }
-  query pattern callExpr where callee.path ~= "7za.exe.argv"
-  emit source code.CliArgument at call.result
-}

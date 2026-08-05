@@ -1,9 +1,0 @@
-module bindings.dart.generated.m71c0189e;
-
-binding userControlledData1 {
-  requires {
-    dependency("flutter_svg")
-  }
-  query pattern callExpr where callee.method == "SvgBytesLoader"
-  emit source core.UserControlledData at call.result
-}

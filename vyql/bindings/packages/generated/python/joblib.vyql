@@ -1,0 +1,17 @@
+module bindings.python.generated.m0abb209c;
+
+binding deserialization0 {
+  requires {
+    dependency("joblib")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("joblib")
+  }
+  query pattern callExpr where callee.method == "dump"
+  emit sink code.StoredDataWrite at args[0]
+}

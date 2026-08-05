@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/vyprai/vyql/bindings"
-	"github.com/vyprai/vyql/datadir"
-	"github.com/vyprai/vyql/extract/frontend"
-	"github.com/vyprai/vyql/extract/lowering"
-	"github.com/vyprai/vyql/extract/parsecache"
-	"github.com/vyprai/vyql/usg"
+	"github.com/vyprai/vyql/internal/bindings"
+	"github.com/vyprai/vyql/internal/datadir"
+	"github.com/vyprai/vyql/internal/extract/frontend"
+	"github.com/vyprai/vyql/internal/extract/lowering"
+	"github.com/vyprai/vyql/internal/extract/parsecache"
+	"github.com/vyprai/vyql/internal/usg"
 )
 
 // encodeLabels/decodeLabels are a compact length-prefixed codec for one module's binding-label

@@ -1,0 +1,25 @@
+module bindings.go.generated.m51296237;
+
+binding deserialization0 {
+  requires {
+    dependency("modernc.org/cc")
+  }
+  query pattern callExpr where callee.method == "Parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("modernc.org/cc")
+  }
+  query pattern callExpr where callee.method == "ppParseString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("modernc.org/cc")
+  }
+  query pattern callExpr where callee.method == "ppParse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m8b020c1c;
-
-binding deserialization4 {
-  requires {
-    dependency("uboot_env")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.md871dd99;
-
-binding deserialization4 {
-  requires {
-    dependency("HackaMol")
-  }
-  query pattern callExpr where callee.method == "read_string_mol"
-  emit sink code.Deserialization at args[0]
-}

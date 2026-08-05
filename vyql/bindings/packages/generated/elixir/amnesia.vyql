@@ -1,0 +1,97 @@
+module bindings.elixir.generated.m5b2c6913;
+
+binding filePathAccess0 {
+  requires {
+    dependency("amnesia")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("amnesia")
+  }
+  query pattern callExpr where callee.method == "dump"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding databaseRead2 {
+  requires {
+    dependency("amnesia")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead3 {
+  requires {
+    dependency("amnesia")
+  }
+  query pattern callExpr where callee.method == "read!"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead4 {
+  requires {
+    dependency("amnesia")
+  }
+  query pattern callExpr where callee.method == "read_at"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead5 {
+  requires {
+    dependency("amnesia")
+  }
+  query pattern callExpr where callee.method == "read_at!"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding sqlExecution6 {
+  requires {
+    dependency("amnesia")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution7 {
+  requires {
+    dependency("amnesia")
+  }
+  query pattern callExpr where callee.method == "write!"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding databaseRead8 {
+  requires {
+    dependency("amnesia")
+  }
+  query pattern callExpr where callee.method == "match"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead9 {
+  requires {
+    dependency("amnesia")
+  }
+  query pattern callExpr where callee.method == "match!"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead10 {
+  requires {
+    dependency("amnesia")
+  }
+  query pattern callExpr where callee.method == "select"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding sqlExecution11 {
+  requires {
+    dependency("amnesia")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.SqlExecution at args[0]
+}

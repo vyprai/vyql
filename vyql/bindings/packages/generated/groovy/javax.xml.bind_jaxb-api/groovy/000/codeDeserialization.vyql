@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m6947ab47;
-
-binding deserialization0 {
-  requires {
-    dependency("javax.xml.bind:jaxb-api")
-  }
-  query pattern callExpr where callee.method == "unmarshal"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m49d8eae4;
-
-binding databaseRead1 {
-  requires {
-    dependency("DB_File")
-  }
-  query pattern callExpr where callee.method == "FETCH"
-  emit sink code.DatabaseReadSink at args[0]
-}

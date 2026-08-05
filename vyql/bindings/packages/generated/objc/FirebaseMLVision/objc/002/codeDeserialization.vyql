@@ -1,9 +1,0 @@
-module bindings.objc.generated.m39a5e11a;
-
-binding deserialization2 {
-  requires {
-    dependency("FirebaseMLVision")
-  }
-  query pattern callExpr where callee.method == "resultsInImage"
-  emit sink code.Deserialization at args[0]
-}

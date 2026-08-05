@@ -1,9 +1,0 @@
-module bindings.python.generated.m143c0518;
-
-binding codeEval2 {
-  requires {
-    dependency("graphene")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.CodeEval at args[0]
-}

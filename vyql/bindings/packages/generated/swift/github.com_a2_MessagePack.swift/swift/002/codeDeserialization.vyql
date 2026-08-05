@@ -1,9 +1,0 @@
-module bindings.swift.generated.m80cd7ac9;
-
-binding deserialization2 {
-  requires {
-    dependency("github.com/a2/MessagePack.swift")
-  }
-  query pattern callExpr where callee.method == "unpackFirst"
-  emit sink code.Deserialization at args[0]
-}

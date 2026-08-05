@@ -1,0 +1,33 @@
+module bindings.javascript.generated.md3ee2f79;
+
+binding networkConnect0 {
+  requires {
+    dependency("https-proxy-agent")
+  }
+  query pattern callExpr where callee.method == "HttpsProxyAgent.constructor"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("https-proxy-agent")
+  }
+  query pattern callExpr where callee.method == "HttpsProxyAgent.connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("https-proxy-agent")
+  }
+  query pattern callExpr where callee.method == "HttpsProxyAgent.connect"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("https-proxy-agent")
+  }
+  query pattern callExpr where callee.method == "HttpsProxyAgent._connectWithAuth"
+  emit sink code.NetworkSend at args[0]
+}

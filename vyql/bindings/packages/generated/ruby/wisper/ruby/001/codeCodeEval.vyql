@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mb2012c50;
-
-binding codeEval1 {
-  requires {
-    dependency("wisper")
-  }
-  query pattern callExpr where callee.method == "broadcast"
-  emit sink code.CodeEval at args[0]
-}

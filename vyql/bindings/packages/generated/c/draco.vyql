@@ -1,0 +1,57 @@
+module bindings.c.generated.mb4f2a5a4;
+
+binding filePathAccess0 {
+  requires {
+    dependency("draco")
+  }
+  query pattern callExpr where callee.method == "ReadFileToBuffer"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("draco")
+  }
+  query pattern callExpr where callee.method == "ReadFileToString"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse2 {
+  requires {
+    dependency("draco")
+  }
+  query pattern callExpr where callee.method == "WriteBufferToFile"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("draco")
+  }
+  query pattern callExpr where callee.method == "DecodeFromFile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("draco")
+  }
+  query pattern callExpr where callee.method == "DecodeFromBuffer"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("draco")
+  }
+  query pattern callExpr where callee.method == "DecodeFromFileToScene"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("draco")
+  }
+  query pattern callExpr where callee.method == "DecodeFromBufferToScene"
+  emit sink code.Deserialization at args[0]
+}

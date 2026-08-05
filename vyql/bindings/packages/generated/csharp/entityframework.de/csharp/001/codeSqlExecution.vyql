@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m8665dbb5;
-
-binding sqlExecution1 {
-  requires {
-    dependency("entityframework.de")
-  }
-  query pattern callExpr where callee.method == "ExecuteSqlCommandAsync"
-  emit sink code.SqlExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mb6e60529;
-
-binding weakRandomValue0 {
-  requires {
-    dependency("quickrand")
-  }
-  query pattern callExpr where callee.method == "lcg35x_32"
-  emit issue code.WeakRandomValue at call
-}

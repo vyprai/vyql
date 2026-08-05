@@ -1,9 +1,0 @@
-module bindings.objc.generated.mdb713232;
-
-binding filePathAccess2 {
-  requires {
-    dependency("Swifter")
-  }
-  query pattern callExpr where callee.method == "directoryBrowser"
-  emit sink code.FilePathAccess at args[0]
-}

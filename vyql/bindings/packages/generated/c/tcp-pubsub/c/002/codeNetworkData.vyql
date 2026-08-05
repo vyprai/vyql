@@ -1,9 +1,0 @@
-module bindings.c.generated.me6cbb240;
-
-binding networkData2 {
-  requires {
-    dependency("tcp-pubsub")
-  }
-  query pattern callExpr where callee.method == "Subscriber.Subscriber"
-  emit source code.NetworkData at call.result
-}

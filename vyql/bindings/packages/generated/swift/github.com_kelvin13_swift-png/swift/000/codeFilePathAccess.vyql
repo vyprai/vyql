@@ -1,9 +1,0 @@
-module bindings.swift.generated.mf3a75d05;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/kelvin13/swift-png")
-  }
-  query pattern callExpr where callee.method == "open"
-  emit sink code.FilePathAccess at args[0]
-}

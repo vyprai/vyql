@@ -1,9 +1,0 @@
-module bindings.swift.generated.meb48b266;
-
-binding userControlledData2 {
-  requires {
-    dependency("github.com/devxoul/URLNavigator")
-  }
-  query pattern callExpr where callee.method == "queryParameters"
-  emit source core.UserControlledData at call.result
-}

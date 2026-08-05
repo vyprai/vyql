@@ -1,9 +1,0 @@
-module bindings.cpp.generated.md85cdf0c;
-
-binding networkSend1 {
-  requires {
-    dependency("qtwebsockets")
-  }
-  query pattern callExpr where callee.method == "sendBinaryMessage"
-  emit sink code.NetworkSend at args[0]
-}

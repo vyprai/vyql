@@ -1,9 +1,0 @@
-module bindings.python.generated.m11fd24d1;
-
-binding htmlRender1 {
-  requires {
-    dependency("django-bootstrap3")
-  }
-  query pattern callExpr where callee.method == "render_link_tag"
-  emit sink code.HtmlRender at args[0]
-}

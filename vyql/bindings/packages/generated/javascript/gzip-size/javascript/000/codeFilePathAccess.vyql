@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m293e575b;
-
-binding filePathAccess0 {
-  requires {
-    dependency("gzip-size")
-  }
-  query pattern callExpr where callee.method == "gzipSizeFromFile"
-  emit sink code.FilePathAccess at args[0]
-}

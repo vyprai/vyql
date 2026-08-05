@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m21200970;
-
-binding deserialization1 {
-  requires {
-    dependency("cjson")
-  }
-  query pattern callExpr where callee.method == "cJSON_ParseWithLength"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m44d8665a;
-
-binding deserialization1 {
-  requires {
-    dependency("onnx")
-  }
-  query pattern callExpr where callee.method == "ParseProtoFromPyBytes"
-  emit sink code.Deserialization at args[0]
-}

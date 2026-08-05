@@ -1,0 +1,33 @@
+module bindings.swift.generated.m4f823696;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/patrick-zippenfenig/SwiftEccodes")
+  }
+  query pattern callExpr where callee.method == "getMessages"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/patrick-zippenfenig/SwiftEccodes")
+  }
+  query pattern callExpr where callee.method == "iterateMessages"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/patrick-zippenfenig/SwiftEccodes")
+  }
+  query pattern callExpr where callee.method == "seekGrib"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/patrick-zippenfenig/SwiftEccodes")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.ma54663b1;
-
-binding networkSend1 {
-  requires {
-    dependency("org.apache.httpcomponents:httpcore-nio")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkSend at args[0]
-}

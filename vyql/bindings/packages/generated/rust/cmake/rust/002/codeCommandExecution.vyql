@@ -1,9 +1,0 @@
-module bindings.rust.generated.ma2f92ddf;
-
-binding commandExecution2 {
-  requires {
-    dependency("cmake")
-  }
-  query pattern callExpr where callee.method == "cmake_build_command"
-  emit sink code.CommandExecution at args[0]
-}

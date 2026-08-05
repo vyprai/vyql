@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m944fc6bc;
-
-binding deserialization1 {
-  requires {
-    dependency("opusfile")
-  }
-  query pattern callExpr where callee.method == "opus_tags_parse"
-  emit sink code.Deserialization at args[0]
-}

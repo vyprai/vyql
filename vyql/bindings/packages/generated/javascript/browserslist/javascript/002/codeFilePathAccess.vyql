@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mac720eb8;
-
-binding filePathAccess2 {
-  requires {
-    dependency("browserslist")
-  }
-  query pattern callExpr where callee.method == "readConfig"
-  emit sink code.FilePathAccess at args[0]
-}

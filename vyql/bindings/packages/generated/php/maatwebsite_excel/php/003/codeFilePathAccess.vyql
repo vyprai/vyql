@@ -1,9 +1,0 @@
-module bindings.php.generated.m667d63fa;
-
-binding filePathAccess3 {
-  requires {
-    dependency("maatwebsite/excel")
-  }
-  query pattern callExpr where callee.method == "toCollection"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,0 +1,49 @@
+module bindings.cpp.generated.m7c4fc6af;
+
+binding deserialization0 {
+  requires {
+    dependency("jansson")
+  }
+  query pattern callExpr where callee.method == "json_loads"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("jansson")
+  }
+  query pattern callExpr where callee.method == "json_loadfd"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("jansson")
+  }
+  query pattern callExpr where callee.method == "json_loadf"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("jansson")
+  }
+  query pattern callExpr where callee.method == "json_load_file"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("jansson")
+  }
+  query pattern callExpr where callee.method == "json_unpack"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("jansson")
+  }
+  query pattern callExpr where callee.method == "json_unpack_ex"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m9f998ed7;
-
-binding filePathAccess1 {
-  requires {
-    dependency("picam")
-  }
-  query pattern callExpr where callee.method == "Picam.Camera.capture_still"
-  emit sink code.FilePathAccess at args[0]
-}

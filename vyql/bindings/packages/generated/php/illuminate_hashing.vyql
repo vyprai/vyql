@@ -1,0 +1,25 @@
+module bindings.php.generated.m6b833681;
+
+binding secretValue0 {
+  requires {
+    dependency("illuminate/hashing")
+  }
+  query pattern callExpr where callee.method == "make"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("illuminate/hashing")
+  }
+  query pattern callExpr where callee.method == "check"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("illuminate/hashing")
+  }
+  query pattern callExpr where callee.method == "isHashed"
+  emit source code.SecretValue at call.result
+}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.me17bb0c4;
-
-binding expressionEval1 {
-  requires {
-    dependency("org.openjfx:javafx-fxml")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.ExpressionEval at args[0]
-}

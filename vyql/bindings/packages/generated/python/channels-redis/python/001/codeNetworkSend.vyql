@@ -1,9 +1,0 @@
-module bindings.python.generated.m86ffa1d4;
-
-binding networkSend1 {
-  requires {
-    dependency("channels-redis")
-  }
-  query pattern callExpr where callee.method == "group_send"
-  emit sink code.NetworkSend at args[0]
-}

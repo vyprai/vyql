@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.me06634db;
-
-binding deserialization1 {
-  requires {
-    dependency("javax:javaee-api")
-  }
-  query pattern callExpr where callee.method == "createParser"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m6ebe8934;
-
-binding networkConnect1 {
-  requires {
-    dependency("fizz")
-  }
-  query pattern callExpr where callee.method == "FizzClient.connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

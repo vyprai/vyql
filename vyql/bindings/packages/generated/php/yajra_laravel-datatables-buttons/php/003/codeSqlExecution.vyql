@@ -1,9 +1,0 @@
-module bindings.php.generated.m7c3e16db;
-
-binding sqlExecution3 {
-  requires {
-    dependency("yajra/laravel-datatables-buttons")
-  }
-  query pattern callExpr where callee.method == "apply"
-  emit sink code.SqlExecution at args[0]
-}

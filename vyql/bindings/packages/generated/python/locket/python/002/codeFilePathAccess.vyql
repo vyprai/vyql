@@ -1,9 +1,0 @@
-module bindings.python.generated.mef0ee158;
-
-binding filePathAccess2 {
-  requires {
-    dependency("locket")
-  }
-  query pattern callExpr where callee.method == "release"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m3605bf81;
-
-binding deserialization3 {
-  requires {
-    dependency("sdl2-ttf")
-  }
-  query pattern callExpr where callee.method == "TTF_OpenFontIndexRW"
-  emit sink code.Deserialization at args[0]
-}

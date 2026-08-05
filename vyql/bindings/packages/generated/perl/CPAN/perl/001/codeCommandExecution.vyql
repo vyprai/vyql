@@ -1,9 +1,0 @@
-module bindings.perl.generated.mca17f939;
-
-binding commandExecution1 {
-  requires {
-    dependency("CPAN")
-  }
-  query pattern callExpr where callee.method == "system"
-  emit sink code.CommandExecution at args[0]
-}

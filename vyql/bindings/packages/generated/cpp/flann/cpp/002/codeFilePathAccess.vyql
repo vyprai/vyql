@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mc34f9126;
-
-binding filePathAccess2 {
-  requires {
-    dependency("flann")
-  }
-  query pattern callExpr where callee.method == "flann_load_index_double"
-  emit sink code.FilePathAccess at args[0]
-}

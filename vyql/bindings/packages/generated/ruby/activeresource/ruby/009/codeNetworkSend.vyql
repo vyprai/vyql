@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m4cd96b0a;
-
-binding networkSend9 {
-  requires {
-    dependency("activeresource")
-  }
-  query pattern callExpr where callee.method == "patch"
-  emit sink code.NetworkSend at args[0]
-}

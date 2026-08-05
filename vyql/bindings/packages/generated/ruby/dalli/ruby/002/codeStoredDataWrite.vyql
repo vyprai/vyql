@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mbe96c352;
-
-binding storedDataWrite2 {
-  requires {
-    dependency("dalli")
-  }
-  query pattern callExpr where callee.method == "replace"
-  emit sink code.StoredDataWrite at args[0]
-}

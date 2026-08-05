@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m3fd6ffcb;
-
-binding userControlledData0 {
-  requires {
-    dependency("arc_ecto")
-  }
-  query pattern callExpr where callee.method == "Arc.Ecto.Type.cast"
-  emit source core.UserControlledData at call.result
-}

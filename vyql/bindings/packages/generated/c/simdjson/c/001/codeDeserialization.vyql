@@ -1,9 +1,0 @@
-module bindings.c.generated.m24782dee;
-
-binding deserialization1 {
-  requires {
-    dependency("simdjson")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

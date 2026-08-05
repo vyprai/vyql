@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m8b8d5b9a;
-
-binding networkData1 {
-  requires {
-    dependency("tortoise")
-  }
-  query pattern callExpr where callee.method == "Tortoise.Transport.SSL.recv"
-  emit source code.NetworkData at call.result
-}

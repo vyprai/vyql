@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mbc89df60;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("com.aliyun.oss:aliyun-sdk-oss")
-  }
-  query pattern callExpr where callee.method == "copyObject"
-  emit sink code.StoredDataWrite at args[0]
-}

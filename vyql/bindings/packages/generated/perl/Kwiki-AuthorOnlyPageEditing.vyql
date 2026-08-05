@@ -1,0 +1,33 @@
+module bindings.perl.generated.ma2ec5935;
+
+binding userControlledData0 {
+  requires {
+    dependency("Kwiki-AuthorOnlyPageEditing")
+  }
+  query pattern callExpr where callee.method == "Kwiki::AuthorOnlyPageEditing::CGI::token"
+  emit source core.UserControlledData at call.result
+}
+
+binding fileUse1 {
+  requires {
+    dependency("Kwiki-AuthorOnlyPageEditing")
+  }
+  query pattern callExpr where callee.method == "Kwiki::AuthorOnlyPageEditing::associate"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("Kwiki-AuthorOnlyPageEditing")
+  }
+  query pattern callExpr where callee.method == "Kwiki::AuthorOnlyPageEditing::token_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding htmlRender3 {
+  requires {
+    dependency("Kwiki-AuthorOnlyPageEditing")
+  }
+  query pattern callExpr where callee.method == "Kwiki::AuthorOnlyPageEditing::modify_form"
+  emit sink code.HtmlRender at args[0]
+}

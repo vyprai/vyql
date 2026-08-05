@@ -1,0 +1,33 @@
+module bindings.perl.generated.m93336494;
+
+binding networkConnect0 {
+  requires {
+    dependency("File-FDpasser")
+  }
+  query pattern callExpr where callee.method == "endp_connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("File-FDpasser")
+  }
+  query pattern callExpr where callee.method == "send_file"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("File-FDpasser")
+  }
+  query pattern callExpr where callee.method == "recv_fd"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("File-FDpasser")
+  }
+  query pattern callExpr where callee.method == "recv_fh"
+  emit source code.NetworkData at call.result
+}

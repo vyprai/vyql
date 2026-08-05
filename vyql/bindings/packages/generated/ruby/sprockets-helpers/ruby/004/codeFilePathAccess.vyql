@@ -1,9 +1,0 @@
-module bindings.ruby.generated.me5a43a74;
-
-binding filePathAccess4 {
-  requires {
-    dependency("sprockets-helpers")
-  }
-  query pattern callExpr where callee.method == "javascript_path"
-  emit sink code.FilePathAccess at args[0]
-}

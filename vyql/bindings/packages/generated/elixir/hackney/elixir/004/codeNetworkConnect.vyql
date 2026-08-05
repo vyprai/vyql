@@ -1,9 +1,0 @@
-module bindings.elixir.generated.md39518e8;
-
-binding networkConnect4 {
-  requires {
-    dependency("hackney")
-  }
-  query pattern callExpr where callee.method == "connect_via_connect_proxy"
-  emit sink code.NetworkConnectSink at args[0]
-}

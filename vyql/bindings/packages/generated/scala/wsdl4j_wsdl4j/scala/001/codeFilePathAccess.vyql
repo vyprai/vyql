@@ -1,9 +1,0 @@
-module bindings.scala.generated.m26e821cb;
-
-binding filePathAccess1 {
-  requires {
-    dependency("wsdl4j:wsdl4j")
-  }
-  query pattern callExpr where callee.method == "writeWSDL"
-  emit sink code.FilePathAccess at args[0]
-}

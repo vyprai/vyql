@@ -1,0 +1,49 @@
+module bindings.perl.generated.maac68e8c;
+
+binding cliArgument0 {
+  requires {
+    dependency("App-Bin4TSV-6")
+  }
+  query pattern callExpr where callee.path ~= "colgrep"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("App-Bin4TSV-6")
+  }
+  query pattern callExpr where callee.path ~= "csel"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument2 {
+  requires {
+    dependency("App-Bin4TSV-6")
+  }
+  query pattern callExpr where callee.path ~= "freq"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument3 {
+  requires {
+    dependency("App-Bin4TSV-6")
+  }
+  query pattern callExpr where callee.path ~= "venn"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument4 {
+  requires {
+    dependency("App-Bin4TSV-6")
+  }
+  query pattern callExpr where callee.path ~= "colsummary"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument5 {
+  requires {
+    dependency("App-Bin4TSV-6")
+  }
+  query pattern callExpr where callee.path ~= "crosstable"
+  emit source code.CliArgument at call.result
+}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.mdefa03ba;
-
-binding networkData2 {
-  requires {
-    dependency("XCDYouTubeKit")
-  }
-  query pattern callExpr where callee.method == "queryVideo"
-  emit source code.NetworkData at call.result
-}

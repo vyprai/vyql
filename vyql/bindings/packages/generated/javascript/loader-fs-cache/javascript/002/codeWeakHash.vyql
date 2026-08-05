@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mbba09c33;
-
-binding weakHash2 {
-  requires {
-    dependency("loader-fs-cache")
-  }
-  query pattern callExpr where callee.method == "filename"
-  emit issue code.WeakHash at call
-}

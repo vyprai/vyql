@@ -1,9 +1,0 @@
-module bindings.python.generated.m2b1daddf;
-
-binding sqlExecution1 {
-  requires {
-    dependency("psycopg2")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.SqlExecution at args[0]
-}

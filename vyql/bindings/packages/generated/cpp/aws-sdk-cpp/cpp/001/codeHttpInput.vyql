@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m4107ab81;
-
-binding httpInput1 {
-  requires {
-    dependency("aws-sdk-cpp")
-  }
-  query pattern callExpr where callee.method == "AddQueryStringParameters"
-  emit source code.HttpInput at call.result
-}

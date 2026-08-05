@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m3235423b;
-
-binding deserialization0 {
-  requires {
-    dependency("xpp3:xpp3")
-  }
-  query pattern callExpr where callee.method == "setInput"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.go.generated.m9033bc0b;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/quasilyte/go-ruleguard")
-  }
-  query pattern callExpr where callee.method == "Read"
-  emit sink code.FilePathAccess at args[0]
-}

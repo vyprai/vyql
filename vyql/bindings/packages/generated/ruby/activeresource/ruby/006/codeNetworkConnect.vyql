@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m4cd96b0a;
-
-binding networkConnect6 {
-  requires {
-    dependency("activeresource")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit sink code.NetworkConnectSink at args[0]
-}

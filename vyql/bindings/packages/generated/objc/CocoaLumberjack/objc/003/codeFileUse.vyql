@@ -1,9 +1,0 @@
-module bindings.objc.generated.m637e118b;
-
-binding fileUse3 {
-  requires {
-    dependency("CocoaLumberjack")
-  }
-  query pattern callExpr where callee.method == "rollLogFileWithCompletionBlock:"
-  emit sink code.FileUseSink at args[0]
-}

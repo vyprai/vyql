@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m25d141a2;
-
-binding deserialization1 {
-  requires {
-    dependency("com.samskivert:jmustache")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

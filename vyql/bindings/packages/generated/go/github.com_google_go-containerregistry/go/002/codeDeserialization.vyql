@@ -1,9 +1,0 @@
-module bindings.go.generated.m6f7d8776;
-
-binding deserialization2 {
-  requires {
-    dependency("github.com/google/go-containerregistry")
-  }
-  query pattern callExpr where callee.method == "ParseConfigFile"
-  emit sink code.Deserialization at args[0]
-}

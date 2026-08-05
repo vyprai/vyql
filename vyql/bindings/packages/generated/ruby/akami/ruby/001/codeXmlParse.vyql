@@ -1,9 +1,0 @@
-module bindings.ruby.generated.me382d2eb;
-
-binding xmlParse1 {
-  requires {
-    dependency("akami")
-  }
-  query pattern callExpr where callee.method == "Akami::WSSE::VerifySignature.initialize"
-  emit sink code.XmlParse at args[0]
-}

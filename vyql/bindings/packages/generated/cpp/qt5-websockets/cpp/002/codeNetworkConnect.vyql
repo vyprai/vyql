@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m102c0472;
-
-binding networkConnect2 {
-  requires {
-    dependency("qt5-websockets")
-  }
-  query pattern callExpr where callee.method == "QWebSocket::open"
-  emit sink code.NetworkConnectSink at args[0]
-}

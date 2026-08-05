@@ -1,9 +1,0 @@
-module bindings.perl.generated.m92833b84;
-
-binding cookie3 {
-  requires {
-    dependency("Starch")
-  }
-  query pattern callExpr where callee.method == "cookie_set_args"
-  emit source code.Cookie at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mcd5f8955;
-
-binding networkSend0 {
-  requires {
-    dependency("fog-atmos")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit sink code.NetworkSend at args[0]
-}

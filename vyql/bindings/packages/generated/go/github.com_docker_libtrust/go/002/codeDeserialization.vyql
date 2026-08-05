@@ -1,9 +1,0 @@
-module bindings.go.generated.m802ba669;
-
-binding deserialization2 {
-  requires {
-    dependency("github.com/docker/libtrust")
-  }
-  query pattern callExpr where callee.method == "UnmarshalPrivateKeyPEM"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m0f4e57b9;
-
-binding weakHash1 {
-  requires {
-    dependency("node-forge")
-  }
-  query pattern presenceNode where node.path ~= "forge.sha1.create"
-  emit issue code.WeakHash at node
-}

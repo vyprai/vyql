@@ -1,9 +1,0 @@
-module bindings.csharp.generated.mf0a92a7e;
-
-binding codeEval0 {
-  requires {
-    dependency("jquery.jqgrid")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.rust.generated.mab271a08;
-
-binding networkBind5 {
-  requires {
-    dependency("wayland-sys")
-  }
-  query pattern callExpr where callee.method == "wl_display_add_socket"
-  emit sink code.NetworkBind at args[0]
-}

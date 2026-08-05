@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m615ca6e9;
-
-binding filePathAccess2 {
-  requires {
-    dependency("boost-sort")
-  }
-  query pattern callExpr where callee.method == "write_file_string"
-  emit sink code.FilePathAccess at args[0]
-}

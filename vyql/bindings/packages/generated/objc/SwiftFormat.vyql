@@ -1,0 +1,25 @@
+module bindings.objc.generated.m175808fe;
+
+binding cliArgument0 {
+  requires {
+    dependency("SwiftFormat")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source code.CliArgument at call.result
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("SwiftFormat")
+  }
+  query pattern callExpr where callee.method == "expandGlobs"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("SwiftFormat")
+  }
+  query pattern callExpr where callee.method == "matchGlobs"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m1a6bc03d;
-
-binding xmlParse1 {
-  requires {
-    dependency("org.springframework.security:spring-security-config")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.XmlParse at args[0]
-}

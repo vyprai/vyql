@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m5458f5bb;
-
-binding deserialization1 {
-  requires {
-    dependency("com.hazelcast:hazelcast")
-  }
-  query pattern callExpr where callee.method == "create"
-  emit sink code.Deserialization at args[0]
-}

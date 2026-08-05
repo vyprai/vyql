@@ -1,9 +1,0 @@
-module bindings.go.generated.m9933733e;
-
-binding httpInput0 {
-  requires {
-    dependency("github.com/tomasen/realip")
-  }
-  query pattern callExpr where callee.method == "FromRequest"
-  emit source code.HttpInput at call.result
-}

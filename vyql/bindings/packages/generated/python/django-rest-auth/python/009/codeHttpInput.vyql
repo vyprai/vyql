@@ -1,9 +1,0 @@
-module bindings.python.generated.m6e2eb0d1;
-
-binding httpInput9 {
-  requires {
-    dependency("django-rest-auth")
-  }
-  query pattern callExpr where callee.method == "post"
-  emit source code.HttpInput at call.result
-}

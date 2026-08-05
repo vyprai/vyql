@@ -1,9 +1,0 @@
-module bindings.go.generated.m839b577a;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/lyft/protoc-gen-star")
-  }
-  query pattern callExpr where callee.method == "ProcessDescriptors"
-  emit sink code.Deserialization at args[0]
-}

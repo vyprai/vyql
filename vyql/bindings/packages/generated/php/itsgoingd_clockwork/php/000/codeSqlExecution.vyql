@@ -1,9 +1,0 @@
-module bindings.php.generated.m13f7a0a2;
-
-binding sqlExecution0 {
-  requires {
-    dependency("itsgoingd/clockwork")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit sink code.SqlExecution at args[0]
-}

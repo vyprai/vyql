@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mc927b36e;
-
-binding networkSend2 {
-  requires {
-    dependency("neuron")
-  }
-  query pattern callExpr where callee.method == "post"
-  emit sink code.NetworkSend at args[0]
-}

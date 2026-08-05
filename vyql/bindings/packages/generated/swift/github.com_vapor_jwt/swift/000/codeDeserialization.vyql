@@ -1,9 +1,0 @@
-module bindings.swift.generated.mb0450704;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/vapor/jwt")
-  }
-  query pattern callExpr where callee.method == "verify"
-  emit sink code.Deserialization at args[0]
-}

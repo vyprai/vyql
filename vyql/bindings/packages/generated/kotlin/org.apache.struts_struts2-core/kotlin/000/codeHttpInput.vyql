@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m089379ee;
-
-binding httpInput0 {
-  requires {
-    dependency("org.apache.struts:struts2-core")
-  }
-  query pattern callExpr where callee.method == "withParameters"
-  emit source code.HttpInput at call.result
-}

@@ -1,0 +1,89 @@
+module bindings.dart.generated.meb2e0012;
+
+binding databaseRead0 {
+  requires {
+    dependency("firebase_database")
+  }
+  query pattern callExpr where callee.method == "Query.startAt"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead1 {
+  requires {
+    dependency("firebase_database")
+  }
+  query pattern callExpr where callee.method == "Query.startAfter"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead2 {
+  requires {
+    dependency("firebase_database")
+  }
+  query pattern callExpr where callee.method == "Query.endAt"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead3 {
+  requires {
+    dependency("firebase_database")
+  }
+  query pattern callExpr where callee.method == "Query.endBefore"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead4 {
+  requires {
+    dependency("firebase_database")
+  }
+  query pattern callExpr where callee.method == "Query.equalTo"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead5 {
+  requires {
+    dependency("firebase_database")
+  }
+  query pattern callExpr where callee.method == "Query.limitToFirst"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead6 {
+  requires {
+    dependency("firebase_database")
+  }
+  query pattern callExpr where callee.method == "Query.limitToLast"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead7 {
+  requires {
+    dependency("firebase_database")
+  }
+  query pattern callExpr where callee.method == "Query.orderByChild"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead8 {
+  requires {
+    dependency("firebase_database")
+  }
+  query pattern callExpr where callee.method == "Query.orderByKey"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead9 {
+  requires {
+    dependency("firebase_database")
+  }
+  query pattern callExpr where callee.method == "Query.orderByValue"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead10 {
+  requires {
+    dependency("firebase_database")
+  }
+  query pattern callExpr where callee.method == "Query.orderByPriority"
+  emit sink code.DatabaseReadSink at args[0]
+}

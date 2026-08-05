@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m389ac90a;
-
-binding cookie5 {
-  requires {
-    dependency("com.sparkjava:spark-core")
-  }
-  query pattern callExpr where callee.method == "Request.cookie"
-  emit source code.Cookie at call.result
-}

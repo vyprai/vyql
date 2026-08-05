@@ -1,9 +1,0 @@
-module bindings.cpp.generated.ma41d989b;
-
-binding expressionEval2 {
-  requires {
-    dependency("mcpp")
-  }
-  query pattern callExpr where callee.method == "mb_eval"
-  emit sink code.ExpressionEval at args[0]
-}

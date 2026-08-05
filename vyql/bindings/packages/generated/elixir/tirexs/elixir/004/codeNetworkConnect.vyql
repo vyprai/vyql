@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m59af96ee;
-
-binding networkConnect4 {
-  requires {
-    dependency("tirexs")
-  }
-  query pattern callExpr where callee.method == "delete"
-  emit sink code.NetworkConnectSink at args[0]
-}

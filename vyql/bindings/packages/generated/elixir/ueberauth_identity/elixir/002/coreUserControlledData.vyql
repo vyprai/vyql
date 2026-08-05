@@ -1,9 +1,0 @@
-module bindings.elixir.generated.md81f6f4f;
-
-binding userControlledData2 {
-  requires {
-    dependency("ueberauth_identity")
-  }
-  query pattern callExpr where callee.method == "credentials"
-  emit source core.UserControlledData at call.result
-}

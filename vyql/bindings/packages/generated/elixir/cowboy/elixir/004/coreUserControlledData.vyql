@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mc8cf5d9a;
-
-binding userControlledData4 {
-  requires {
-    dependency("cowboy")
-  }
-  query pattern callExpr where callee.method == "cowboy_router:match"
-  emit source core.UserControlledData at call.result
-}

@@ -1,0 +1,118 @@
+module bindings.elixir.generated.mbfdf81eb;
+
+binding secretValue0 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.Config.from_env"
+  emit source code.SecretValue at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.RequestValidator.validate"
+  emit source core.UserControlledData at call.result
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.API.request"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.API.request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.API.get"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.API.get"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect6 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.API.post"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend7 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.API.post"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect8 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.API.put"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend9 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.API.put"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect10 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.API.delete"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend11 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.API.delete"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding secretValue12 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.Capability.token"
+  emit source code.SecretValue at call.result
+}
+
+binding inputValidation13 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.RequestValidator.validate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

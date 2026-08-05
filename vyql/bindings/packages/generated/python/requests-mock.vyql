@@ -1,0 +1,33 @@
+module bindings.python.generated.mad97f1d3;
+
+binding networkConnect0 {
+  requires {
+    dependency("requests-mock")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding httpInput1 {
+  requires {
+    dependency("requests-mock")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("requests-mock")
+  }
+  query pattern callExpr where callee.method == "path"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("requests-mock")
+  }
+  query pattern callExpr where callee.method == "last_request"
+  emit source code.HttpInput at call.result
+}

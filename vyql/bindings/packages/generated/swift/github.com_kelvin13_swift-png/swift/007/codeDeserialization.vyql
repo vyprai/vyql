@@ -1,9 +1,0 @@
-module bindings.swift.generated.mf3a75d05;
-
-binding deserialization7 {
-  requires {
-    dependency("github.com/kelvin13/swift-png")
-  }
-  query pattern callExpr where callee.method == "unpack"
-  emit sink code.Deserialization at args[0]
-}

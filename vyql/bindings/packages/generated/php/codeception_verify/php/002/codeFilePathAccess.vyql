@@ -1,9 +1,0 @@
-module bindings.php.generated.m09af7c2f;
-
-binding filePathAccess2 {
-  requires {
-    dependency("codeception/verify")
-  }
-  query pattern callExpr where callee.method == "toEqualXmlFile"
-  emit sink code.FilePathAccess at args[0]
-}

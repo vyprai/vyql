@@ -1,9 +1,0 @@
-module bindings.swift.generated.mea7ae01c;
-
-binding deserialization8 {
-  requires {
-    dependency("github.com/CoreOffice/CoreXLSX")
-  }
-  query pattern callExpr where callee.method == "parseWorksheet"
-  emit sink code.Deserialization at args[0]
-}

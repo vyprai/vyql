@@ -1,9 +1,0 @@
-module bindings.perl.generated.m157054e9;
-
-binding logOutput3 {
-  requires {
-    dependency("Error")
-  }
-  query pattern callExpr where callee.method == "text"
-  emit sink code.LogOutput at args[0]
-}

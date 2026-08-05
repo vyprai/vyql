@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m61aeef55;
-
-binding deserialization0 {
-  requires {
-    dependency("libyaml")
-  }
-  query pattern callExpr where callee.method == "yaml_parser_parse"
-  emit sink code.Deserialization at args[0]
-}

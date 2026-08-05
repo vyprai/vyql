@@ -1,0 +1,33 @@
+module bindings.c.generated.m95b5b663;
+
+binding filePathAccess0 {
+  requires {
+    dependency("qtbase")
+  }
+  query pattern callExpr where callee.method == "installFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("qtbase")
+  }
+  query pattern callExpr where callee.method == "installFileOrDirectory"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("qtbase")
+  }
+  query pattern callExpr where callee.method == "doQInstall"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("qtbase")
+  }
+  query pattern callExpr where callee.method == "doInstall"
+  emit sink code.FilePathAccess at args[0]
+}

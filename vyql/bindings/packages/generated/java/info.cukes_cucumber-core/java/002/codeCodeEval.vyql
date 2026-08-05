@@ -1,9 +1,0 @@
-module bindings.java.generated.m490e28e4;
-
-binding codeEval2 {
-  requires {
-    dependency("info.cukes:cucumber-core")
-  }
-  query pattern callExpr where callee.method == "cucumber.runtime.Utils.invoke"
-  emit sink code.CodeEval at args[0]
-}

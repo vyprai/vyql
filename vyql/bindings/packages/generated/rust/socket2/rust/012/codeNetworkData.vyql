@@ -1,9 +1,0 @@
-module bindings.rust.generated.m86000b79;
-
-binding networkData12 {
-  requires {
-    dependency("socket2")
-  }
-  query pattern callExpr where callee.method == "recv_out_of_band"
-  emit source code.NetworkData at call.result
-}

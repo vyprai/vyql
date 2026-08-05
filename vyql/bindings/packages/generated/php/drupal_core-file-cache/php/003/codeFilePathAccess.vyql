@@ -1,9 +1,0 @@
-module bindings.php.generated.m6ff03c2c;
-
-binding filePathAccess3 {
-  requires {
-    dependency("drupal/core-file-cache")
-  }
-  query pattern callExpr where callee.method == "delete"
-  emit sink code.FilePathAccess at args[0]
-}

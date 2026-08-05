@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m8b13f787;
-
-binding networkSend2 {
-  requires {
-    dependency("com.badlogicgames.gdx:gdx-backend-android")
-  }
-  query pattern callExpr where callee.method == "sendHttpRequest"
-  emit sink code.NetworkSend at args[0]
-}

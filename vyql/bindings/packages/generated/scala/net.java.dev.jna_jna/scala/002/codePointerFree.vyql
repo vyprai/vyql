@@ -1,9 +1,0 @@
-module bindings.scala.generated.maf6a4921;
-
-binding pointerFree2 {
-  requires {
-    dependency("net.java.dev.jna:jna")
-  }
-  query pattern callExpr where callee.method == "free"
-  emit issue code.PointerFree at call
-}

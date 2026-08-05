@@ -1,0 +1,33 @@
+module bindings.javascript.generated.mae52a612;
+
+binding userControlledData0 {
+  requires {
+    dependency("caniuse-api")
+  }
+  query pattern callExpr where callee.method == "getSupport"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("caniuse-api")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("caniuse-api")
+  }
+  query pattern callExpr where callee.method == "isSupported"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("caniuse-api")
+  }
+  query pattern callExpr where callee.method == "setBrowserScope"
+  emit source core.UserControlledData at call.result
+}

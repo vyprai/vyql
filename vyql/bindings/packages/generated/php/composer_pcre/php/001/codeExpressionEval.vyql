@@ -1,9 +1,0 @@
-module bindings.php.generated.m881ff233;
-
-binding expressionEval1 {
-  requires {
-    dependency("composer/pcre")
-  }
-  query pattern callExpr where callee.method == "matchStrictGroups"
-  emit sink code.ExpressionEval at args[0]
-}

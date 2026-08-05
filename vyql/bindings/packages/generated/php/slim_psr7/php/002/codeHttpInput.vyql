@@ -1,9 +1,0 @@
-module bindings.php.generated.m9055bcf2;
-
-binding httpInput2 {
-  requires {
-    dependency("slim/psr7")
-  }
-  query pattern callExpr where callee.method == "getParsedBody"
-  emit source code.HttpInput at call.result
-}

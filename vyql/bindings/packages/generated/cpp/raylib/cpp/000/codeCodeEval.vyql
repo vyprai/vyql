@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mf4c6c556;
-
-binding codeEval0 {
-  requires {
-    dependency("raylib")
-  }
-  query pattern callExpr where callee.method == "LoadShader"
-  emit sink code.CodeEval at args[0]
-}

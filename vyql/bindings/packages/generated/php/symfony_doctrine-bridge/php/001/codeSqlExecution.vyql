@@ -1,9 +1,0 @@
-module bindings.php.generated.m3a9bc318;
-
-binding sqlExecution1 {
-  requires {
-    dependency("symfony/doctrine-bridge")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.SqlExecution at args[0]
-}

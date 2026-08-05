@@ -1,0 +1,56 @@
+module bindings.php.generated.m93b01918;
+
+binding commandExecution0 {
+  requires {
+    dependency("nette/utils")
+  }
+  query pattern callExpr where callee.method == "NetteUtilsProcess::exec"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("nette/utils")
+  }
+  query pattern callExpr where callee.method == "NetteUtilsJson::decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding htmlEscape2 {
+  requires {
+    dependency("nette/utils")
+  }
+  query pattern callExpr where callee.method == "NetteUtilsHtml::html_entity_decode"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("nette/utils")
+  }
+  query pattern callExpr where callee.method == "NetteUtilsStrings::replace"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation4 {
+  requires {
+    dependency("nette/utils")
+  }
+  query pattern callExpr where callee.method == "NetteUtilsStrings::split"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

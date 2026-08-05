@@ -1,9 +1,0 @@
-module bindings.dart.generated.me3dca079;
-
-binding userControlledData2 {
-  requires {
-    dependency("country_pickers")
-  }
-  query pattern callExpr where callee.method == "getCountryByName"
-  emit source core.UserControlledData at call.result
-}

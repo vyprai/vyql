@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m1b5e0d41;
-
-binding deserialization3 {
-  requires {
-    dependency("tinyobjloader")
-  }
-  query pattern callExpr where callee.method == "LoadMtl"
-  emit sink code.Deserialization at args[0]
-}

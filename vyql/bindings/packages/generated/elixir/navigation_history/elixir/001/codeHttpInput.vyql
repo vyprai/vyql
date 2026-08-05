@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m6a09b1f4;
-
-binding httpInput1 {
-  requires {
-    dependency("navigation_history")
-  }
-  query pattern callExpr where callee.method == "NavigationHistory.Tracker.track_history"
-  emit source code.HttpInput at call.result
-}

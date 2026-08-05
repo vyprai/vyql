@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mbb7981ca;
-
-binding networkData0 {
-  requires {
-    dependency("usockets")
-  }
-  query pattern callExpr where callee.method == "us_quic_socket_context_on_stream_data"
-  emit source code.NetworkData at call.result
-}

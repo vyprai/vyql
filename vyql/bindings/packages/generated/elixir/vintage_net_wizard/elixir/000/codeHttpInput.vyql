@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m7c1cd297;
-
-binding httpInput0 {
-  requires {
-    dependency("vintage_net_wizard")
-  }
-  query pattern callExpr where callee.method == "VintageNetWizard.Web.API.get_body"
-  emit source code.HttpInput at call.result
-}

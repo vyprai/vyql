@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m0a3caa70;
-
-binding sqlExecution0 {
-  requires {
-    dependency("esqlite")
-  }
-  query pattern callExpr where callee.method == "sqlite3_last_insert_rowid"
-  emit sink code.SqlExecution at args[0]
-}

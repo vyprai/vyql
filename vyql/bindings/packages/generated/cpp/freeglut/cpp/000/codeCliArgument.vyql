@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m867b4b3b;
-
-binding cliArgument0 {
-  requires {
-    dependency("freeglut")
-  }
-  query pattern callExpr where callee.method == "fghParseCommandLineArguments"
-  emit source code.CliArgument at call.result
-}

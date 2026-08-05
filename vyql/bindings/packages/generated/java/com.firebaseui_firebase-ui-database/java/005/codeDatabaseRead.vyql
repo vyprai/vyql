@@ -1,9 +1,0 @@
-module bindings.java.generated.me25e9eed;
-
-binding databaseRead5 {
-  requires {
-    dependency("com.firebaseui:firebase-ui-database")
-  }
-  query pattern callExpr where callee.method == "FirebaseIndexArray"
-  emit sink code.DatabaseReadSink at args[0]
-}

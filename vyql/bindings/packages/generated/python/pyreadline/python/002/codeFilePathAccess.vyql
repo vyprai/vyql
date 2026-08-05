@@ -1,9 +1,0 @@
-module bindings.python.generated.mb6c97805;
-
-binding filePathAccess2 {
-  requires {
-    dependency("pyreadline")
-  }
-  query pattern callExpr where callee.method == "read_history_file"
-  emit sink code.FilePathAccess at args[0]
-}

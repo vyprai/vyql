@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m3d689c4e;
-
-binding codeEval1 {
-  requires {
-    dependency("org.codehaus.groovy:groovy-jsr223")
-  }
-  query pattern callExpr where callee.method == "eval"
-  emit sink code.CodeEval at args[0]
-}

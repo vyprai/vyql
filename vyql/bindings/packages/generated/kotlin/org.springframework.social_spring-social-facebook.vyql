@@ -1,0 +1,49 @@
+module bindings.kotlin.generated.mc556037a;
+
+binding networkData0 {
+  requires {
+    dependency("org.springframework.social:spring-social-facebook")
+  }
+  query pattern callExpr where callee.method == "fetchObject"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("org.springframework.social:spring-social-facebook")
+  }
+  query pattern callExpr where callee.method == "fetchConnections"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData2 {
+  requires {
+    dependency("org.springframework.social:spring-social-facebook")
+  }
+  query pattern callExpr where callee.method == "fetchImage"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend3 {
+  requires {
+    dependency("org.springframework.social:spring-social-facebook")
+  }
+  query pattern callExpr where callee.method == "publish"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("org.springframework.social:spring-social-facebook")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("org.springframework.social:spring-social-facebook")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.rust.generated.m540f56d1;
-
-binding networkConnect6 {
-  requires {
-    dependency("libgit2-sys")
-  }
-  query pattern callExpr where callee.method == "git_remote_connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

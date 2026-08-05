@@ -1,9 +1,0 @@
-module bindings.java.generated.mdfe57a12;
-
-binding responseHeaderWrite3 {
-  requires {
-    dependency("com.sun.jersey:jersey-servlet")
-  }
-  query pattern callExpr where callee.method == "writeStatusAndHeaders"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

@@ -1,0 +1,214 @@
+module bindings.go.generated.m99a2d42a;
+
+binding regexCompile0 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "Matches"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding regexCompile1 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "StringMatches"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding pathCanonicalization2 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "SafeFileName"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "IsFilePath"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation4 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "IsWinFilePath"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation5 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "IsUnixFilePath"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation6 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "IsURL"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation7 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "IsRequestURL"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation8 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "IsRequestURI"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation9 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "NormalizeEmail"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation10 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "ByteLength"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation11 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "RuneLength"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation12 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "StringLength"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation13 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "MinStringLength"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation14 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "MaxStringLength"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation15 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "Range"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation16 {
+  requires {
+    dependency("github.com/asaskevich/govalidator")
+  }
+  query pattern callExpr where callee.method == "IsInRaw"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

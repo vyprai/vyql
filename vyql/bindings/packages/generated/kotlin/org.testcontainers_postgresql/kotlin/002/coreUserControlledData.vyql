@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m2b9069ba;
-
-binding userControlledData2 {
-  requires {
-    dependency("org.testcontainers:postgresql")
-  }
-  query pattern callExpr where callee.method == "withDatabaseName"
-  emit source core.UserControlledData at call.result
-}

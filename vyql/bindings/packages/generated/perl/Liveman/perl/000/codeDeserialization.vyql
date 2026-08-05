@@ -1,9 +1,0 @@
-module bindings.perl.generated.m45c14b21;
-
-binding deserialization0 {
-  requires {
-    dependency("Liveman")
-  }
-  query pattern callExpr where callee.method == "parse_from_file"
-  emit sink code.Deserialization at args[0]
-}

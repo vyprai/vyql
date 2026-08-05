@@ -1,9 +1,0 @@
-module bindings.objc.generated.m3ccc533c;
-
-binding deserialization2 {
-  requires {
-    dependency("JSONKit")
-  }
-  query pattern callExpr where callee.method == "objectFromJSONStringWithParseOptions"
-  emit sink code.Deserialization at args[0]
-}

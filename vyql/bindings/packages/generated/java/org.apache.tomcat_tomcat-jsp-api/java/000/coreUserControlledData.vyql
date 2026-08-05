@@ -1,9 +1,0 @@
-module bindings.java.generated.m97f81708;
-
-binding userControlledData0 {
-  requires {
-    dependency("org.apache.tomcat:tomcat-jsp-api")
-  }
-  query pattern callExpr where callee.method == "getRequestURI"
-  emit source core.UserControlledData at call.result
-}

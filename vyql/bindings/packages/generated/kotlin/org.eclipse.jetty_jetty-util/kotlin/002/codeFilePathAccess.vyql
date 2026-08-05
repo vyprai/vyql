@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m774bbc8c;
-
-binding filePathAccess2 {
-  requires {
-    dependency("org.eclipse.jetty:jetty-util")
-  }
-  query pattern callExpr where callee.method == "copyFile"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.m1054d26a;
-
-binding networkData3 {
-  requires {
-    dependency("FlurrySDK")
-  }
-  query pattern callExpr where callee.method == "logError:message:error:"
-  emit source code.NetworkData at call.result
-}

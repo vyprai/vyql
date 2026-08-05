@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m7ec5cd6a;
-
-binding filePathAccess6 {
-  requires {
-    dependency("com.aventstack:extentreports")
-  }
-  query pattern callExpr where callee.method == "tryResolveMediaPath"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m385728b6;
-
-binding networkData2 {
-  requires {
-    dependency("sensiolabs/security-checker")
-  }
-  query pattern callExpr where callee.method == "SensioLabsSecurityCrawler.addHeader"
-  emit source code.NetworkData at call.result
-}

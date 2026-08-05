@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/ontology"
+	"github.com/vyprai/vyql/internal/ontology"
 )
 
 func TestValidateDefinitionKindAcceptsEveryDocumentedKind(t *testing.T) {

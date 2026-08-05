@@ -1,9 +1,0 @@
-module bindings.python.generated.m94c8b013;
-
-binding networkSend1 {
-  requires {
-    dependency("lazr.restfulclient")
-  }
-  query pattern callExpr where callee.method == "post"
-  emit sink code.NetworkSend at args[0]
-}

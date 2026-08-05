@@ -1,9 +1,0 @@
-module bindings.scala.generated.m0779b6f2;
-
-binding httpInput2 {
-  requires {
-    dependency("com.sun.jersey:jersey-servlet")
-  }
-  query pattern callExpr where callee.method == "filterFormParameters"
-  emit source code.HttpInput at call.result
-}

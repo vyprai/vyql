@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.me12c5d0a;
-
-binding networkConnect1 {
-  requires {
-    dependency("org.jboss.arquillian.protocol:arquillian-protocol-servlet")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.NetworkConnectSink at args[0]
-}

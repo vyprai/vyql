@@ -1,0 +1,17 @@
+module bindings.python.generated.m441b537e;
+
+binding deserialization0 {
+  requires {
+    dependency("scikit-learn")
+  }
+  query pattern callExpr where callee.path ~= "sklearn.externals._arff.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("scikit-learn")
+  }
+  query pattern callExpr where callee.path ~= "sklearn.externals._arff.loads"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mca2e94cc;
-
-binding sqlExecution7 {
-  requires {
-    dependency("mariaex")
-  }
-  query pattern callExpr where callee.method == "execute!"
-  emit sink code.SqlExecution at args[0]
-}

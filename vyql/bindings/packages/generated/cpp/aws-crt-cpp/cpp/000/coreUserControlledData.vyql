@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m4fa6ca30;
-
-binding userControlledData0 {
-  requires {
-    dependency("aws-crt-cpp")
-  }
-  query pattern callExpr where callee.method == "Base64Decode"
-  emit source core.UserControlledData at call.result
-}

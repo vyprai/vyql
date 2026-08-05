@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m7f118b22;
-
-binding deserialization1 {
-  requires {
-    dependency("com.google.protobuf:protobuf-java-util")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

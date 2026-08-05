@@ -1,9 +1,0 @@
-module bindings.scala.generated.mcf13b90d;
-
-binding deserialization0 {
-  requires {
-    dependency("xpp3:xpp3")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

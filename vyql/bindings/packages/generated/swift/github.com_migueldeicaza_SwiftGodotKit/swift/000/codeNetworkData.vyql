@@ -1,9 +1,0 @@
-module bindings.swift.generated.m22074257;
-
-binding networkData0 {
-  requires {
-    dependency("github.com/migueldeicaza/SwiftGodotKit")
-  }
-  query pattern callExpr where callee.method == "emitMessageToHost"
-  emit source code.NetworkData at call.result
-}

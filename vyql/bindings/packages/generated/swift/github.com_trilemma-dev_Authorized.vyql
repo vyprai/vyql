@@ -1,0 +1,69 @@
+module bindings.swift.generated.m59574965;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("github.com/trilemma-dev/Authorized")
+  }
+  query pattern callExpr where callee.method == "requestRights"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck1 {
+  requires {
+    dependency("github.com/trilemma-dev/Authorized")
+  }
+  query pattern callExpr where callee.method == "checkRights"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding secretValue2 {
+  requires {
+    dependency("github.com/trilemma-dev/Authorized")
+  }
+  query pattern callExpr where callee.method == "retrieveInfo"
+  emit source code.SecretValue at call.result
+}
+
+binding authorizationCheck3 {
+  requires {
+    dependency("github.com/trilemma-dev/Authorized")
+  }
+  query pattern callExpr where callee.method == "destroyRights"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck4 {
+  requires {
+    dependency("github.com/trilemma-dev/Authorized")
+  }
+  query pattern callExpr where callee.method == "createOrUpdateDefinition"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck5 {
+  requires {
+    dependency("github.com/trilemma-dev/Authorized")
+  }
+  query pattern callExpr where callee.method == "removeDefinition"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

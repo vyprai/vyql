@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m9ed7f34f;
-
-binding httpInput2 {
-  requires {
-    dependency("org.zalando:problem-spring-web")
-  }
-  query pattern callExpr where callee.method == "commence"
-  emit source code.HttpInput at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.m268f8503;
-
-binding userControlledData5 {
-  requires {
-    dependency("Intercom")
-  }
-  query pattern callExpr where callee.method == "searchHelpCenter"
-  emit source core.UserControlledData at call.result
-}

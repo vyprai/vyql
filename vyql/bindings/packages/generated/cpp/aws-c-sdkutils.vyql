@@ -1,0 +1,41 @@
+module bindings.cpp.generated.m16f3f42c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("aws-c-sdkutils")
+  }
+  query pattern callExpr where callee.method == "aws_profile_collection_new_from_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("aws-c-sdkutils")
+  }
+  query pattern callExpr where callee.method == "aws_profile_collection_new_from_file"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("aws-c-sdkutils")
+  }
+  query pattern callExpr where callee.method == "aws_profile_collection_new_from_buffer"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("aws-c-sdkutils")
+  }
+  query pattern callExpr where callee.method == "aws_get_credentials_file_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("aws-c-sdkutils")
+  }
+  query pattern callExpr where callee.method == "aws_get_config_file_path"
+  emit sink code.FilePathAccess at args[0]
+}

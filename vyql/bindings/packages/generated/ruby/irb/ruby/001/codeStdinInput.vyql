@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m8b5d47fd;
-
-binding stdinInput1 {
-  requires {
-    dependency("irb")
-  }
-  query pattern callExpr where callee.method == "read_input_nomultiline"
-  emit source code.StdinInput at call.result
-}

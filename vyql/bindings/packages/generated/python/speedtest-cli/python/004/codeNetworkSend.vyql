@@ -1,9 +1,0 @@
-module bindings.python.generated.mc2fad8fe;
-
-binding networkSend4 {
-  requires {
-    dependency("speedtest-cli")
-  }
-  query pattern callExpr where callee.method == "upload"
-  emit sink code.NetworkSend at args[0]
-}

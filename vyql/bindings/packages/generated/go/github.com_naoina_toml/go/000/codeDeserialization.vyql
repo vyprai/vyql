@@ -1,9 +1,0 @@
-module bindings.go.generated.mb7a09f08;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/naoina/toml")
-  }
-  query pattern callExpr where callee.method == "Parse"
-  emit sink code.Deserialization at args[0]
-}

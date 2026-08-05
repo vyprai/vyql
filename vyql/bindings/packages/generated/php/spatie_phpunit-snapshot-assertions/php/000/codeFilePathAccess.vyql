@@ -1,9 +1,0 @@
-module bindings.php.generated.mdef2ed9c;
-
-binding filePathAccess0 {
-  requires {
-    dependency("spatie/phpunit-snapshot-assertions")
-  }
-  query pattern callExpr where callee.method == "SpatieSnapshotsFilesystem::read"
-  emit sink code.FilePathAccess at args[0]
-}

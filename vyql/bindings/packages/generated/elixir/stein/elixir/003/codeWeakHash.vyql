@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m06dd2b6a;
-
-binding weakHash3 {
-  requires {
-    dependency("stein")
-  }
-  query pattern callExpr where callee.method == "hash_password"
-  emit issue code.WeakHash at call
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma6195ec2;
-
-binding filePathAccess2 {
-  requires {
-    dependency("confex")
-  }
-  query pattern callExpr where callee.method == "Confex.Adapters.FileFromSystemEnvironment.read_value"
-  emit sink code.FilePathAccess at args[0]
-}

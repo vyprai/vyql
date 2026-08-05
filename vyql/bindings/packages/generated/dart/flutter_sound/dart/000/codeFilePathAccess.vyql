@@ -1,9 +1,0 @@
-module bindings.dart.generated.m684fede9;
-
-binding filePathAccess0 {
-  requires {
-    dependency("flutter_sound")
-  }
-  query pattern callExpr where callee.method == "startPlayer"
-  emit sink code.FilePathAccess at args[0]
-}

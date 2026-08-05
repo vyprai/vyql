@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma152eb54;
-
-binding networkConnect2 {
-  requires {
-    dependency("httpotion")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit sink code.NetworkConnectSink at args[0]
-}

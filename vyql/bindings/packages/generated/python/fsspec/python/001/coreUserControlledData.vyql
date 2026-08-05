@@ -1,9 +1,0 @@
-module bindings.python.generated.m2a0a8d4a;
-
-binding userControlledData1 {
-  requires {
-    dependency("fsspec")
-  }
-  query pattern callExpr where callee.method == "url_to_fs"
-  emit source core.UserControlledData at call.result
-}

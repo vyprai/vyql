@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mab35a78d;
-
-binding networkSend5 {
-  requires {
-    dependency("javax.websocket:javax.websocket-api")
-  }
-  query pattern callExpr where callee.method == "sendBinary"
-  emit sink code.NetworkSend at args[0]
-}

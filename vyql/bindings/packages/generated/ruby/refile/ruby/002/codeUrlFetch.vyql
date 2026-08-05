@@ -1,9 +1,0 @@
-module bindings.ruby.generated.me0f31a1d;
-
-binding urlFetch2 {
-  requires {
-    dependency("refile")
-  }
-  query pattern callExpr where callee.method == "download"
-  emit sink code.UrlFetch at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.mfcab7493;
-
-binding codeEval1 {
-  requires {
-    dependency("jcalderonzumba/gastonjs")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.CodeEval at args[0]
-}

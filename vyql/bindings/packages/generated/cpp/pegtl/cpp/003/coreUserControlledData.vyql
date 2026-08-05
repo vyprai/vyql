@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m21f5a70d;
-
-binding userControlledData3 {
-  requires {
-    dependency("pegtl")
-  }
-  query pattern callExpr where callee.method == "mmap_input"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m4ca94955;
-
-binding deserialization0 {
-  requires {
-    dependency("bson")
-  }
-  query pattern callExpr where callee.method == "Bson.decode"
-  emit sink code.Deserialization at args[0]
-}

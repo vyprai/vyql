@@ -1,9 +1,0 @@
-module bindings.swift.generated.mcc8da8a2;
-
-binding networkSend13 {
-  requires {
-    dependency("github.com/adamrushy/OpenAISwift")
-  }
-  query pattern callExpr where callee.method == "sendImages"
-  emit sink code.NetworkSend at args[0]
-}

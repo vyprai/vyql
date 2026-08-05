@@ -1,0 +1,27 @@
+module bindings.kotlin.generated.mf0957eb3;
+
+binding privilegedOp0 {
+  requires {
+    dependency("org.apache.curator:curator-framework")
+  }
+  query pattern callExpr where callee.method == "getACL"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp1 {
+  requires {
+    dependency("org.apache.curator:curator-framework")
+  }
+  query pattern callExpr where callee.method == "setACL"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding secretValue2 {
+  requires {
+    dependency("org.apache.curator:curator-framework")
+  }
+  query pattern callExpr where callee.method == "getAuth"
+  emit source code.SecretValue at call.result
+}

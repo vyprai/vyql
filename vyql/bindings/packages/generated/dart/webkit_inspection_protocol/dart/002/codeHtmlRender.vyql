@@ -1,9 +1,0 @@
-module bindings.dart.generated.ma6b87b6b;
-
-binding htmlRender2 {
-  requires {
-    dependency("webkit_inspection_protocol")
-  }
-  query pattern callExpr where callee.method == "setAttributeValue"
-  emit sink code.HtmlRender at args[0]
-}

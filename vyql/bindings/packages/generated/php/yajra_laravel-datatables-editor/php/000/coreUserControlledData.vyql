@@ -1,9 +1,0 @@
-module bindings.php.generated.m3a5e7773;
-
-binding userControlledData0 {
-  requires {
-    dependency("yajra/laravel-datatables-editor")
-  }
-  query pattern callExpr where callee.method == "dataFromRequest"
-  emit source core.UserControlledData at call.result
-}

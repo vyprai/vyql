@@ -1,9 +1,0 @@
-module bindings.rust.generated.m137cc19f;
-
-binding cleartextChannel3 {
-  requires {
-    dependency("security-framework-sys")
-  }
-  query pattern callExpr where callee.method == "SSLCreateContext"
-  emit issue code.CleartextChannel at call
-}

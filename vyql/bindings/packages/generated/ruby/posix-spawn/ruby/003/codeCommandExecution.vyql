@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m9e93d7f3;
-
-binding commandExecution3 {
-  requires {
-    dependency("posix-spawn")
-  }
-  query pattern callExpr where callee.method == "fspawn"
-  emit sink code.CommandExecution at args[0]
-}

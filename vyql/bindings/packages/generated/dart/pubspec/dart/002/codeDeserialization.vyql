@@ -1,9 +1,0 @@
-module bindings.dart.generated.mff42e49b;
-
-binding deserialization2 {
-  requires {
-    dependency("pubspec")
-  }
-  query pattern callExpr where callee.method == "parseJson"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.m8725dd6c;
-
-binding networkSend0 {
-  requires {
-    dependency("io.dropwizard.metrics:metrics-graphite")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

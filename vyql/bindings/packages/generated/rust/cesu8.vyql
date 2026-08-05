@@ -1,0 +1,17 @@
+module bindings.rust.generated.m4b220d0e;
+
+binding deserialization0 {
+  requires {
+    dependency("cesu8")
+  }
+  query pattern callExpr where callee.method == "from_cesu8"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("cesu8")
+  }
+  query pattern callExpr where callee.method == "from_java_cesu8"
+  emit sink code.Deserialization at args[0]
+}

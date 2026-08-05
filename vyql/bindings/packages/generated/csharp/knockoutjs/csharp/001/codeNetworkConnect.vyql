@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m93ede54e;
-
-binding networkConnect1 {
-  requires {
-    dependency("knockoutjs")
-  }
-  query pattern callExpr where callee.method == "postJson"
-  emit sink code.NetworkConnectSink at args[0]
-}

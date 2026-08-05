@@ -1,0 +1,49 @@
+module bindings.perl.generated.mc0510dbf;
+
+binding deserialization0 {
+  requires {
+    dependency("CracTools")
+  }
+  query pattern callExpr where callee.method == "parseBedLine"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("CracTools")
+  }
+  query pattern callExpr where callee.method == "parseGFFLine"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("CracTools")
+  }
+  query pattern callExpr where callee.method == "parseVCFLine"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("CracTools")
+  }
+  query pattern callExpr where callee.method == "parseChimCTLine"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("CracTools")
+  }
+  query pattern callExpr where callee.method == "parseSAMLineLite"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("CracTools")
+  }
+  query pattern callExpr where callee.method == "getReadingFileHandle"
+  emit sink code.FilePathAccess at args[0]
+}

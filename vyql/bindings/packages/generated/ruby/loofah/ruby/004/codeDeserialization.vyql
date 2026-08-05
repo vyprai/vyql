@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m441454db;
-
-binding deserialization4 {
-  requires {
-    dependency("loofah")
-  }
-  query pattern callExpr where callee.method == "html5_fragment"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.go.generated.mbcd2d56e;
-
-binding commandExecution0 {
-  requires {
-    dependency("github.com/joho/godotenv")
-  }
-  query pattern callExpr where callee.method == "Exec"
-  emit sink code.CommandExecution at args[0]
-}

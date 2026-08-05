@@ -1,0 +1,17 @@
+module bindings.groovy.generated.mcd4d754e;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework.security:spring-security-oauth2-jose")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding secretValue1 {
+  requires {
+    dependency("org.springframework.security:spring-security-oauth2-jose")
+  }
+  query pattern callExpr where callee.method == "encode"
+  emit source code.SecretValue at call.result
+}

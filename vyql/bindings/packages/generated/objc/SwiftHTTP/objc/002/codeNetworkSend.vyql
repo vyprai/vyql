@@ -1,9 +1,0 @@
-module bindings.objc.generated.m61035d9b;
-
-binding networkSend2 {
-  requires {
-    dependency("SwiftHTTP")
-  }
-  query pattern callExpr where callee.method == "New"
-  emit sink code.NetworkSend at args[0]
-}

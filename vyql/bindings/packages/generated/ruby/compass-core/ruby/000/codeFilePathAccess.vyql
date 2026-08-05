@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mfbf5d7c0;
-
-binding filePathAccess0 {
-  requires {
-    dependency("compass-core")
-  }
-  query pattern callExpr where callee.method == "manifest_file"
-  emit sink code.FilePathAccess at args[0]
-}

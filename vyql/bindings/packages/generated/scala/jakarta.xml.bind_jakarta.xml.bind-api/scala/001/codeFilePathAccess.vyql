@@ -1,9 +1,0 @@
-module bindings.scala.generated.m64142f68;
-
-binding filePathAccess1 {
-  requires {
-    dependency("jakarta.xml.bind:jakarta.xml.bind-api")
-  }
-  query pattern callExpr where callee.method == "marshal"
-  emit sink code.FilePathAccess at args[0]
-}

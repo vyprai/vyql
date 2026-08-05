@@ -1,9 +1,0 @@
-module bindings.scala.generated.mc93536dc;
-
-binding httpInput8 {
-  requires {
-    dependency("org.atmosphere:atmosphere-runtime")
-  }
-  query pattern callExpr where callee.method == "getIntHeader"
-  emit source code.HttpInput at call.result
-}

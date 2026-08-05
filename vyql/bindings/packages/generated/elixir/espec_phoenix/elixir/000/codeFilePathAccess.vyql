@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m651c5321;
-
-binding filePathAccess0 {
-  requires {
-    dependency("espec_phoenix")
-  }
-  query pattern callExpr where callee.method == "create_espec_phoenix_files"
-  emit sink code.FilePathAccess at args[0]
-}

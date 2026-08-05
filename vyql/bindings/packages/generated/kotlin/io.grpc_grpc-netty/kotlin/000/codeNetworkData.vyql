@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m2414ab83;
-
-binding networkData0 {
-  requires {
-    dependency("io.grpc:grpc-netty")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit source code.NetworkData at call.result
-}

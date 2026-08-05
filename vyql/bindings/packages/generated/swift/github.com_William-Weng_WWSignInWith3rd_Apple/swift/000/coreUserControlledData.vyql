@@ -1,9 +1,0 @@
-module bindings.swift.generated.mb9e45688;
-
-binding userControlledData0 {
-  requires {
-    dependency("github.com/William-Weng/WWSignInWith3rd_Apple")
-  }
-  query pattern callExpr where callee.method == "Apple.authorizationController(controller:didCompleteWithAuthorization:)"
-  emit source core.UserControlledData at call.result
-}

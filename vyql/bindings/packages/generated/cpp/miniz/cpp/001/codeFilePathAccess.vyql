@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mef03db68;
-
-binding filePathAccess1 {
-  requires {
-    dependency("miniz")
-  }
-  query pattern callExpr where callee.method == "mz_zip_extract_archive_file_to_heap"
-  emit sink code.FilePathAccess at args[0]
-}

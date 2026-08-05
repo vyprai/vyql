@@ -1,9 +1,0 @@
-module bindings.python.generated.mdd98ae45;
-
-binding commandExecution0 {
-  requires {
-    dependency("numba")
-  }
-  query pattern callExpr where callee.path ~= "subprocess.run"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.md0ee70ef;
-
-binding filePathAccess0 {
-  requires {
-    dependency("Plugins")
-  }
-  query pattern callExpr where callee.method == "readconfig"
-  emit sink code.FilePathAccess at args[0]
-}

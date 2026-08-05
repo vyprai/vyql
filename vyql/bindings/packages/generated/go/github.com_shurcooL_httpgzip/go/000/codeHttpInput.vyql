@@ -1,9 +1,0 @@
-module bindings.go.generated.maabc6139;
-
-binding httpInput0 {
-  requires {
-    dependency("github.com/shurcooL/httpgzip")
-  }
-  query pattern callExpr where callee.method == "FileServer"
-  emit source code.HttpInput at call.result
-}

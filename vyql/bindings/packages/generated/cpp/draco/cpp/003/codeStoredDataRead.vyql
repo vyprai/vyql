@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mca8a4cf4;
-
-binding storedDataRead3 {
-  requires {
-    dependency("draco")
-  }
-  query pattern callExpr where callee.method == "ReadFileToString"
-  emit source code.StoredDataRead at call.result
-}

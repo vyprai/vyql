@@ -1,0 +1,33 @@
+module bindings.cpp.generated.m6507593e;
+
+binding deserialization0 {
+  requires {
+    dependency("libtommath")
+  }
+  query pattern callExpr where callee.method == "mp_read_radix"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("libtommath")
+  }
+  query pattern callExpr where callee.method == "mp_fread"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("libtommath")
+  }
+  query pattern callExpr where callee.method == "mp_read_unsigned_bin"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("libtommath")
+  }
+  query pattern callExpr where callee.method == "mp_read_signed_bin"
+  emit sink code.Deserialization at args[0]
+}

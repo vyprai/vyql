@@ -1,9 +1,0 @@
-module bindings.python.generated.m99fe72c1;
-
-binding networkData1 {
-  requires {
-    dependency("google-cloud-pubsub")
-  }
-  query pattern callExpr where callee.method == "subscribe"
-  emit source code.NetworkData at call.result
-}

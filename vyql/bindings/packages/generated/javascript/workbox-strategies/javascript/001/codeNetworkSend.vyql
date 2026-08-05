@@ -1,9 +1,0 @@
-module bindings.javascript.generated.ma96665e3;
-
-binding networkSend1 {
-  requires {
-    dependency("workbox-strategies")
-  }
-  query pattern callExpr where callee.method == "StrategyHandler.prototype.fetch"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mfe2e1864;
-
-binding urlFetch1 {
-  requires {
-    dependency("net.sf.dozer:dozer")
-  }
-  query pattern callExpr where callee.method == "setMappingFiles"
-  emit sink code.UrlFetch at args[0]
-}

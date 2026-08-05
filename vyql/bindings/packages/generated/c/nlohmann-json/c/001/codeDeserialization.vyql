@@ -1,9 +1,0 @@
-module bindings.c.generated.m3baddb4d;
-
-binding deserialization1 {
-  requires {
-    dependency("nlohmann-json")
-  }
-  query pattern callExpr where callee.method == "from_json"
-  emit sink code.Deserialization at args[0]
-}

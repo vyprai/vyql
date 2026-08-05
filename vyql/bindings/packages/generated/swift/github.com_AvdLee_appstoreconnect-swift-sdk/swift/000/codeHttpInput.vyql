@@ -1,9 +1,0 @@
-module bindings.swift.generated.mb07686b1;
-
-binding httpInput0 {
-  requires {
-    dependency("github.com/AvdLee/appstoreconnect-swift-sdk")
-  }
-  query pattern callExpr where callee.method == "init"
-  emit source code.HttpInput at call.result
-}

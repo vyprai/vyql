@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m9a902388;
-
-binding deserialization1 {
-  requires {
-    dependency("kf5codecs")
-  }
-  query pattern callExpr where callee.method == "uudecode"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.go.generated.maa220b07;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/containerd/stargz-snapshotter/estargz")
-  }
-  query pattern callExpr where callee.method == "decompressTOCEStargz"
-  emit sink code.Deserialization at args[0]
-}

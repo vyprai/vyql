@@ -1,9 +1,0 @@
-module bindings.python.generated.mf4e57fd4;
-
-binding deserialization0 {
-  requires {
-    dependency("pelican")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

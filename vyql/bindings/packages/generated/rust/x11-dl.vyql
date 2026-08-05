@@ -1,0 +1,17 @@
+module bindings.rust.generated.m6a53b9a1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("x11-dl")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("x11-dl")
+  }
+  query pattern callExpr where callee.method == "open_multi"
+  emit sink code.FilePathAccess at args[0]
+}

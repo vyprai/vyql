@@ -1,9 +1,0 @@
-module bindings.go.generated.mc7cb396a;
-
-binding commandExecution1 {
-  requires {
-    dependency("github.com/gobuffalo/depgen")
-  }
-  query pattern callExpr where callee.method == "InstallDep"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.m73c6e28b;
-
-binding filePathAccess1 {
-  requires {
-    dependency("fmt")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.FilePathAccess at args[0]
-}

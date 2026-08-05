@@ -1,9 +1,0 @@
-module bindings.dart.generated.m9fbac062;
-
-binding storedDataWrite0 {
-  requires {
-    dependency("shared_preferences_web")
-  }
-  query pattern callExpr where callee.method == "SharedPreferencesPlugin.setValue"
-  emit sink code.StoredDataWrite at args[0]
-}

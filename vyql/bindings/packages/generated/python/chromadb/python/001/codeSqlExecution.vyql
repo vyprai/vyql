@@ -1,9 +1,0 @@
-module bindings.python.generated.m21853922;
-
-binding sqlExecution1 {
-  requires {
-    dependency("chromadb")
-  }
-  query pattern callExpr where callee.method == "executescript"
-  emit sink code.SqlExecution at args[0]
-}

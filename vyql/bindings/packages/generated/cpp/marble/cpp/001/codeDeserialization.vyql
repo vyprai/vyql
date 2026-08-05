@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m7c455364;
-
-binding deserialization1 {
-  requires {
-    dependency("marble")
-  }
-  query pattern callExpr where callee.method == "OsmParser.read"
-  emit sink code.Deserialization at args[0]
-}

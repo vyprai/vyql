@@ -1,9 +1,0 @@
-module bindings.objc.generated.mf608c243;
-
-binding deserialization2 {
-  requires {
-    dependency("libavif")
-  }
-  query pattern callExpr where callee.method == "avifDecoderReadFile"
-  emit sink code.Deserialization at args[0]
-}

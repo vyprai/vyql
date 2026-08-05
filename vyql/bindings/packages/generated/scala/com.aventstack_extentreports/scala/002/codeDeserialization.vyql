@@ -1,9 +1,0 @@
-module bindings.scala.generated.mea9a35c7;
-
-binding deserialization2 {
-  requires {
-    dependency("com.aventstack:extentreports")
-  }
-  query pattern callExpr where callee.method == "createDomainFromJsonArchive"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.m41829530;
-
-binding userControlledData1 {
-  requires {
-    dependency("org.apache.hadoop:hadoop-yarn-client")
-  }
-  query pattern callExpr where callee.method == "LogsCLI.run"
-  emit source core.UserControlledData at call.result
-}

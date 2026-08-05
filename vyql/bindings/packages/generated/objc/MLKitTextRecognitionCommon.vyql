@@ -1,0 +1,17 @@
+module bindings.objc.generated.m7c641188;
+
+binding userControlledData0 {
+  requires {
+    dependency("MLKitTextRecognitionCommon")
+  }
+  query pattern callExpr where callee.method == "resultsInImage:error:"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("MLKitTextRecognitionCommon")
+  }
+  query pattern callExpr where callee.method == "processImage:"
+  emit source core.UserControlledData at call.result
+}

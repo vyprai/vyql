@@ -1,9 +1,0 @@
-module bindings.php.generated.me17ccab1;
-
-binding userControlledData0 {
-  requires {
-    dependency("composer/package-versions-deprecated")
-  }
-  query pattern callExpr where callee.method == "getVersion"
-  emit source core.UserControlledData at call.result
-}

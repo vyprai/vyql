@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m23fe5458;
-
-binding deserialization10 {
-  requires {
-    dependency("ftgl")
-  }
-  query pattern callExpr where callee.method == "ftglCreatePixmapFont"
-  emit sink code.Deserialization at args[0]
-}

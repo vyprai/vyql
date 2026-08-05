@@ -1,9 +1,0 @@
-module bindings.dart.generated.mbd732551;
-
-binding filePathAccess2 {
-  requires {
-    dependency("barback")
-  }
-  query pattern callExpr where callee.method == "openRead"
-  emit sink code.FilePathAccess at args[0]
-}

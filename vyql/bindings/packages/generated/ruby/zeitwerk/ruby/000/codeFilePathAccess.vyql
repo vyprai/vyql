@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m9e6eb2e1;
-
-binding filePathAccess0 {
-  requires {
-    dependency("zeitwerk")
-  }
-  query pattern callExpr where callee.method == "Zeitwerk::Cref.autoload"
-  emit sink code.FilePathAccess at args[0]
-}

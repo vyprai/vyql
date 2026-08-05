@@ -1,9 +1,0 @@
-module bindings.python.generated.m2e706cc9;
-
-binding networkData0 {
-  requires {
-    dependency("gevent-websocket")
-  }
-  query pattern callExpr where callee.method == "read_message"
-  emit source code.NetworkData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.ma33e3a22;
-
-binding httpInput0 {
-  requires {
-    dependency("aws/aws-crt-php")
-  }
-  query pattern callExpr where callee.method == "AWSCRTHTTPMessage::query"
-  emit source code.HttpInput at call.result
-}

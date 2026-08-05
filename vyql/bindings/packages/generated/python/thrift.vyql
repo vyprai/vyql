@@ -1,0 +1,73 @@
+module bindings.python.generated.m7083342f;
+
+binding deserialization0 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "readMessageBegin"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "readI32"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "readByte"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "readBinary"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "readString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "readBool"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "readI16"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "readI64"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization8 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "readDouble"
+  emit sink code.Deserialization at args[0]
+}

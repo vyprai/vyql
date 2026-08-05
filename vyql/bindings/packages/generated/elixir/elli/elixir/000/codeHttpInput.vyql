@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m89b0616d;
-
-binding httpInput0 {
-  requires {
-    dependency("elli")
-  }
-  query pattern callExpr where callee.method == "get_request"
-  emit source code.HttpInput at call.result
-}

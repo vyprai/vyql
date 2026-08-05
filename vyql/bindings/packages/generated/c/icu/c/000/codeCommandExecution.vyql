@@ -1,9 +1,0 @@
-module bindings.c.generated.mb12bceb4;
-
-binding commandExecution0 {
-  requires {
-    dependency("icu")
-  }
-  query pattern callExpr where callee.method == "Qp0zSystem"
-  emit sink code.CommandExecution at args[0]
-}

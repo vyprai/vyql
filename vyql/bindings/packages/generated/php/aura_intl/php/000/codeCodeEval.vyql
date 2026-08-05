@@ -1,9 +1,0 @@
-module bindings.php.generated.m87f12c47;
-
-binding codeEval0 {
-  requires {
-    dependency("aura/intl")
-  }
-  query pattern callExpr where callee.method == "translate"
-  emit sink code.CodeEval at args[0]
-}

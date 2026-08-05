@@ -1,9 +1,0 @@
-module bindings.python.generated.m214a4bd7;
-
-binding networkConnect4 {
-  requires {
-    dependency("paho-mqtt")
-  }
-  query pattern callExpr where callee.method == "connect_async"
-  emit sink code.NetworkConnectSink at args[0]
-}

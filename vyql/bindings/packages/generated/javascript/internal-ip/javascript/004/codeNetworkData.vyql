@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mfd3bf356;
-
-binding networkData4 {
-  requires {
-    dependency("internal-ip")
-  }
-  query pattern callExpr where callee.method == "findIpViaUdp"
-  emit source code.NetworkData at call.result
-}

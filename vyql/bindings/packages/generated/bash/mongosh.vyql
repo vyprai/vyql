@@ -1,0 +1,17 @@
+module bindings.bash.generated.me3cf1c8f;
+
+binding cliArgument0 {
+  requires {
+    dependency("mongosh")
+  }
+  query pattern callExpr where callee.path ~= "mongosh.argv"
+  emit source code.CliArgument at call.result
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("mongosh")
+  }
+  query pattern callExpr where callee.path ~= "mongosh"
+  emit sink code.SqlExecution at args.any
+}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.m286d78bc;
-
-binding nosqlQuery0 {
-  requires {
-    dependency("org.mongodb:mongodb-driver-sync")
-  }
-  query pattern callExpr where callee.method == "runCommand"
-  emit sink code.NosqlQuery at args[0]
-}

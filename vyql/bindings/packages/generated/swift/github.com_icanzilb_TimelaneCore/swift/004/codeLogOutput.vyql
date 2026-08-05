@@ -1,9 +1,0 @@
-module bindings.swift.generated.m7c6e9677;
-
-binding logOutput4 {
-  requires {
-    dependency("github.com/icanzilb/TimelaneCore")
-  }
-  query pattern callExpr where callee.method == "defaultLogger"
-  emit sink code.LogOutput at args[0]
-}

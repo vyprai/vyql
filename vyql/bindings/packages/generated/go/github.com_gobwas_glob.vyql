@@ -1,0 +1,17 @@
+module bindings.go.generated.m5ffdea77;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/gobwas/glob")
+  }
+  query pattern callExpr where callee.method == "Compile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/gobwas/glob")
+  }
+  query pattern callExpr where callee.method == "MustCompile"
+  emit sink code.Deserialization at args[0]
+}

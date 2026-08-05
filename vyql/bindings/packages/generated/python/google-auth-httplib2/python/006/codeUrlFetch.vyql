@@ -1,9 +1,0 @@
-module bindings.python.generated.m81d1f3b6;
-
-binding urlFetch6 {
-  requires {
-    dependency("google-auth-httplib2")
-  }
-  query pattern callExpr where callee.method == "AuthorizedHttp.request"
-  emit sink code.UrlFetch at args[0]
-}

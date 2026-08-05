@@ -1,9 +1,0 @@
-module bindings.php.generated.mcfec5cd5;
-
-binding userControlledData0 {
-  requires {
-    dependency("prettus/laravel-validation")
-  }
-  query pattern callExpr where callee.method == "with"
-  emit source core.UserControlledData at call.result
-}

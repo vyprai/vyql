@@ -1,9 +1,0 @@
-module bindings.ruby.generated.me382d2eb;
-
-binding weakHash4 {
-  requires {
-    dependency("akami")
-  }
-  query pattern callExpr where callee.method == "Akami::WSSE.security_hash"
-  emit issue code.WeakHash at call
-}

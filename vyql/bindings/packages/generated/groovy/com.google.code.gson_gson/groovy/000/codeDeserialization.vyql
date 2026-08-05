@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m5f528b92;
-
-binding deserialization0 {
-  requires {
-    dependency("com.google.code.gson:gson")
-  }
-  query pattern callExpr where callee.method == "parseString"
-  emit sink code.Deserialization at args[0]
-}

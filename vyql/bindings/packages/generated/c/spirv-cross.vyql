@@ -1,0 +1,25 @@
+module bindings.c.generated.m3c846fbc;
+
+binding filePathAccess0 {
+  requires {
+    dependency("spirv-cross")
+  }
+  query pattern callExpr where callee.method == "read_spirv_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding stdinInput1 {
+  requires {
+    dependency("spirv-cross")
+  }
+  query pattern callExpr where callee.method == "read_spirv_file_stdin"
+  emit source code.StdinInput at call.result
+}
+
+binding fileUse2 {
+  requires {
+    dependency("spirv-cross")
+  }
+  query pattern callExpr where callee.method == "write_string_to_file"
+  emit sink code.FileUseSink at args[0]
+}

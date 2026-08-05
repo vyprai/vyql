@@ -1,0 +1,81 @@
+module bindings.swift.generated.mdb97838d;
+
+binding commandExecution0 {
+  requires {
+    dependency("github.com/kareman/SwiftShell")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("github.com/kareman/SwiftShell")
+  }
+  query pattern callExpr where callee.method == "runAsync"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution2 {
+  requires {
+    dependency("github.com/kareman/SwiftShell")
+  }
+  query pattern callExpr where callee.method == "runAsyncAndPrint"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution3 {
+  requires {
+    dependency("github.com/kareman/SwiftShell")
+  }
+  query pattern callExpr where callee.method == "runAndPrint"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("github.com/kareman/SwiftShell")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse5 {
+  requires {
+    dependency("github.com/kareman/SwiftShell")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse6 {
+  requires {
+    dependency("github.com/kareman/SwiftShell")
+  }
+  query pattern callExpr where callee.method == "readSome"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse7 {
+  requires {
+    dependency("github.com/kareman/SwiftShell")
+  }
+  query pattern callExpr where callee.method == "readData"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse8 {
+  requires {
+    dependency("github.com/kareman/SwiftShell")
+  }
+  query pattern callExpr where callee.method == "readSomeData"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse9 {
+  requires {
+    dependency("github.com/kareman/SwiftShell")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

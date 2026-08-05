@@ -1,9 +1,0 @@
-module bindings.dart.generated.m5ef00fbe;
-
-binding filePathAccess0 {
-  requires {
-    dependency("build_test")
-  }
-  query pattern callExpr where callee.method == "PackageAssetReader"
-  emit sink code.FilePathAccess at args[0]
-}

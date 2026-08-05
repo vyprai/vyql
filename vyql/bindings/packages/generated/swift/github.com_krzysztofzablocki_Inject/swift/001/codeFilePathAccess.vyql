@@ -1,9 +1,0 @@
-module bindings.swift.generated.mf185a2af;
-
-binding filePathAccess1 {
-  requires {
-    dependency("github.com/krzysztofzablocki/Inject")
-  }
-  query pattern callExpr where callee.path ~= "InjectConfiguration.bundlePath"
-  emit sink code.FilePathAccess at args[0]
-}

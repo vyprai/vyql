@@ -1,9 +1,0 @@
-module bindings.objc.generated.mfedb8893;
-
-binding userControlledData4 {
-  requires {
-    dependency("HLSCachingReverseProxyServer")
-  }
-  query pattern callExpr where callee.method == "absoluteURL"
-  emit source core.UserControlledData at call.result
-}

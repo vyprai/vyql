@@ -1,0 +1,86 @@
+module bindings.java.generated.m0d138574;
+
+binding secretValue0 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "Twilio.init"
+  emit source code.SecretValue at call.result
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "AccountCreator.create"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "AccountCreator.create"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect3 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "AccountReader.read"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "AccountReader.read"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect5 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "AccountUpdater.update"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend6 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "AccountUpdater.update"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect7 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "AccountDeleter.delete"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend8 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "AccountDeleter.delete"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding inputValidation9 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "RequestValidator.validate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

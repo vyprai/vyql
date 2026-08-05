@@ -1,9 +1,0 @@
-module bindings.perl.generated.m33814bd0;
-
-binding cookie4 {
-  requires {
-    dependency("Prancer")
-  }
-  query pattern callExpr where callee.method == "cookie"
-  emit source code.Cookie at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.m4314ea69;
-
-binding codeEval1 {
-  requires {
-    dependency("github.com/pvieito/PythonKit")
-  }
-  query pattern callExpr where callee.method == "useVersion"
-  emit sink code.CodeEval at args[0]
-}

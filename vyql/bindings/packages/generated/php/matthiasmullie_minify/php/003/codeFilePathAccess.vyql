@@ -1,9 +1,0 @@
-module bindings.php.generated.mfcc3a662;
-
-binding filePathAccess3 {
-  requires {
-    dependency("matthiasmullie/minify")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.FilePathAccess at args[0]
-}

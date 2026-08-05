@@ -1,9 +1,0 @@
-module bindings.java.generated.mcdede0a8;
-
-binding stdinInput1 {
-  requires {
-    dependency("com.github.stefanbirkner:system-rules")
-  }
-  query pattern callExpr where callee.method == "TextFromStandardInputStream.read"
-  emit source code.StdinInput at call.result
-}

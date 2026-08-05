@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m8b8d5b9a;
-
-binding networkConnect0 {
-  requires {
-    dependency("tortoise")
-  }
-  query pattern callExpr where callee.method == "Tortoise.Transport.SSL.connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

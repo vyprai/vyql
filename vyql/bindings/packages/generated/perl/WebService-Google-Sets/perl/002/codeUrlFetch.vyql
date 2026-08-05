@@ -1,9 +1,0 @@
-module bindings.perl.generated.m68a8959c;
-
-binding urlFetch2 {
-  requires {
-    dependency("WebService-Google-Sets")
-  }
-  query pattern callExpr where callee.method == "get_large_gset"
-  emit sink code.UrlFetch at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m6370600b;
-
-binding filePathAccess1 {
-  requires {
-    dependency("Dotenv")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.FilePathAccess at args[0]
-}

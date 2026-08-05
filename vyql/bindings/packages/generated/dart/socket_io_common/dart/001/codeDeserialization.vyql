@@ -1,9 +1,0 @@
-module bindings.dart.generated.md01b0b8b;
-
-binding deserialization1 {
-  requires {
-    dependency("socket_io_common")
-  }
-  query pattern callExpr where callee.method == "decodePayload"
-  emit sink code.Deserialization at args[0]
-}

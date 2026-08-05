@@ -1,9 +1,0 @@
-module bindings.swift.generated.m50c97e45;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/mattpolzin/VaporTypedRoutes")
-  }
-  query pattern callExpr where callee.method == "decodeBody"
-  emit sink code.Deserialization at args[0]
-}

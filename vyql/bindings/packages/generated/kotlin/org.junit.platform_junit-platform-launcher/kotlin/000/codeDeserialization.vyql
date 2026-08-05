@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m4e84504e;
-
-binding deserialization0 {
-  requires {
-    dependency("org.junit.platform:junit-platform-launcher")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

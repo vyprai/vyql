@@ -1,0 +1,17 @@
+module bindings.c.generated.m4c7bdcb9;
+
+binding fileUse0 {
+  requires {
+    dependency("qtlocation")
+  }
+  query pattern callExpr where callee.method == "dumpGeoJSON"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("qtlocation")
+  }
+  query pattern callExpr where callee.method == "writeDebug"
+  emit sink code.NetworkConnectSink at args[0]
+}

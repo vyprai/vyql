@@ -1,9 +1,0 @@
-module bindings.c.generated.m0ec13c4f;
-
-binding filePathAccess2 {
-  requires {
-    dependency("seacas")
-  }
-  query pattern callExpr where callee.method == "file"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,0 +1,49 @@
+module bindings.elixir.generated.mec43e959;
+
+binding deserialization0 {
+  requires {
+    dependency("tzdata")
+  }
+  query pattern callExpr where callee.method == "read_file"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("tzdata")
+  }
+  query pattern callExpr where callee.method == "process_file"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("tzdata")
+  }
+  query pattern callExpr where callee.method == "process_tz_list"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("tzdata")
+  }
+  query pattern callExpr where callee.method == "process_rule"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("tzdata")
+  }
+  query pattern callExpr where callee.method == "process_link"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("tzdata")
+  }
+  query pattern callExpr where callee.method == "process_zone"
+  emit sink code.Deserialization at args[0]
+}

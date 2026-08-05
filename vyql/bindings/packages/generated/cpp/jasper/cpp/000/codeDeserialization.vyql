@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mb21b01b4;
-
-binding deserialization0 {
-  requires {
-    dependency("jasper")
-  }
-  query pattern callExpr where callee.method == "jas_image_decode"
-  emit sink code.Deserialization at args[0]
-}

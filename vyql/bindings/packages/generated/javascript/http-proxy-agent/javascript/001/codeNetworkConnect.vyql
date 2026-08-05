@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mcd855a78;
-
-binding networkConnect1 {
-  requires {
-    dependency("http-proxy-agent")
-  }
-  query pattern callExpr where callee.method == "addRequest"
-  emit sink code.NetworkConnectSink at args[0]
-}

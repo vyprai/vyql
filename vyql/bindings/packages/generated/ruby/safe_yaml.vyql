@@ -1,0 +1,41 @@
+module bindings.ruby.generated.m16e42457;
+
+binding deserialization0 {
+  requires {
+    dependency("safe_yaml")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("safe_yaml")
+  }
+  query pattern callExpr where callee.method == "load_file"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("safe_yaml")
+  }
+  query pattern callExpr where callee.method == "safe_load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("safe_yaml")
+  }
+  query pattern callExpr where callee.method == "safe_load_file"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("safe_yaml")
+  }
+  query pattern callExpr where callee.method == "unsafe_load_file"
+  emit sink code.Deserialization at args[0]
+}

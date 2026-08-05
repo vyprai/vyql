@@ -1,9 +1,0 @@
-module bindings.python.generated.m189a9e7e;
-
-binding deserialization3 {
-  requires {
-    dependency("sip")
-  }
-  query pattern callExpr where callee.method == "toml_loads"
-  emit sink code.Deserialization at args[0]
-}

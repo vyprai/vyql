@@ -1,9 +1,0 @@
-module bindings.perl.generated.mb5913edd;
-
-binding filePathAccess2 {
-  requires {
-    dependency("GD-Map-Mercator")
-  }
-  query pattern callExpr where callee.method == "save"
-  emit sink code.FilePathAccess at args[0]
-}

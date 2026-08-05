@@ -1,9 +1,0 @@
-module bindings.swift.generated.md90858ad;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/maartene/InkSwift")
-  }
-  query pattern callExpr where callee.method == "InkStory.loadStory(json:)"
-  emit sink code.Deserialization at args[0]
-}

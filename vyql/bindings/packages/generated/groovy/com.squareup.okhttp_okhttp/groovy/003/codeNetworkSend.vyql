@@ -1,9 +1,0 @@
-module bindings.groovy.generated.me77b76be;
-
-binding networkSend3 {
-  requires {
-    dependency("com.squareup.okhttp:okhttp")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m38422b8f;
-
-binding networkSend1 {
-  requires {
-    dependency("nerves_uart")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkSend at args[0]
-}

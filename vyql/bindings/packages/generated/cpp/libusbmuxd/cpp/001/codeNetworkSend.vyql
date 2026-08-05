@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m81559570;
-
-binding networkSend1 {
-  requires {
-    dependency("libusbmuxd")
-  }
-  query pattern callExpr where callee.method == "usbmuxd_send"
-  emit sink code.NetworkSend at args[0]
-}

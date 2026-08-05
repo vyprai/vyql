@@ -1,9 +1,0 @@
-module bindings.php.generated.m7bcde4e5;
-
-binding filePathAccess5 {
-  requires {
-    dependency("hassankhan/config")
-  }
-  query pattern callExpr where callee.method == "loadFromFile"
-  emit sink code.FilePathAccess at args[0]
-}

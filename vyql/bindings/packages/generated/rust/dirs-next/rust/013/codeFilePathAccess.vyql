@@ -1,9 +1,0 @@
-module bindings.rust.generated.m3e745044;
-
-binding filePathAccess13 {
-  requires {
-    dependency("dirs-next")
-  }
-  query pattern callExpr where callee.method == "public_dir"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,0 +1,48 @@
+module bindings.perl.generated.m64082567;
+
+binding htmlEscape0 {
+  requires {
+    dependency("String-Util")
+  }
+  query pattern callExpr where callee.method == "htmlesc"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation1 {
+  requires {
+    dependency("String-Util")
+  }
+  query pattern callExpr where callee.method == "jsquote"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("String-Util")
+  }
+  query pattern callExpr where callee.method == "sanitize"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("String-Util")
+  }
+  query pattern callExpr where callee.method == "file_get_contents"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,67 @@
+module bindings.objc.generated.mb118e0aa;
+
+binding networkSend0 {
+  requires {
+    dependency("JitsiMeetSDK")
+  }
+  query pattern callExpr where callee.method == "sendEndpointTextMessage"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("JitsiMeetSDK")
+  }
+  query pattern callExpr where callee.method == "sendChatMessage"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding codeEval2 {
+  requires {
+    dependency("JitsiMeetSDK")
+  }
+  query pattern callExpr where callee.method == "overwriteConfig"
+  emit sink code.CodeEval at args[0]
+}
+
+binding secretValue3 {
+  requires {
+    dependency("JitsiMeetSDK")
+  }
+  query pattern callExpr where callee.method == "startRecording"
+  emit source code.SecretValue at call.result
+}
+
+binding networkSend4 {
+  requires {
+    dependency("JitsiMeetSDK")
+  }
+  query pattern callExpr where callee.method == "startRecording"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding privilegedOp5 {
+  requires {
+    dependency("JitsiMeetSDK")
+  }
+  query pattern callExpr where callee.method == "requestTransaction"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp6 {
+  requires {
+    dependency("JitsiMeetSDK")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("JitsiMeetSDK")
+  }
+  query pattern callExpr where callee.method == "fromBuilder"
+  emit source core.UserControlledData at call.result
+}

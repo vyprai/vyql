@@ -1,9 +1,0 @@
-module bindings.swift.generated.mdb125fb2;
-
-binding userControlledData4 {
-  requires {
-    dependency("github.com/pointfreeco/composable-core-location")
-  }
-  query pattern callExpr where callee.method == "startMonitoringForRegion"
-  emit source core.UserControlledData at call.result
-}

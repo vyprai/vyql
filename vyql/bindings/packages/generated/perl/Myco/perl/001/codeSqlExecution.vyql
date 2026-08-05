@@ -1,9 +1,0 @@
-module bindings.perl.generated.m8ab15add;
-
-binding sqlExecution1 {
-  requires {
-    dependency("Myco")
-  }
-  query pattern callExpr where callee.method == "unload"
-  emit sink code.SqlExecution at args[0]
-}

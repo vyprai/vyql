@@ -1,0 +1,33 @@
+module bindings.c.generated.m690a0f7e;
+
+binding fileUse0 {
+  requires {
+    dependency("imgui")
+  }
+  query pattern callExpr where callee.method == "WindowSettingsHandler_ReadLine"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("imgui")
+  }
+  query pattern callExpr where callee.method == "WindowSettingsHandler_WriteAll"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("imgui")
+  }
+  query pattern callExpr where callee.method == "Platform_GetClipboardTextFn_DefaultImpl"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("imgui")
+  }
+  query pattern callExpr where callee.method == "Platform_SetClipboardTextFn_DefaultImpl"
+  emit source core.UserControlledData at call.result
+}

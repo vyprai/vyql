@@ -1,9 +1,0 @@
-module bindings.php.generated.m5e085d6c;
-
-binding weakCipher8 {
-  requires {
-    dependency("symfony/http-client")
-  }
-  query pattern callExpr where callee.method == "setCiphers"
-  emit issue code.WeakCipher at call
-}

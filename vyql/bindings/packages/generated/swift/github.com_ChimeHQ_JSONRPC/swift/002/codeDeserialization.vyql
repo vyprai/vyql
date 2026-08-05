@@ -1,9 +1,0 @@
-module bindings.swift.generated.m620f29d3;
-
-binding deserialization2 {
-  requires {
-    dependency("github.com/ChimeHQ/JSONRPC")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

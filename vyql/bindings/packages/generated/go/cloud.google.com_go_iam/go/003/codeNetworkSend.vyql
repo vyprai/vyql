@@ -1,9 +1,0 @@
-module bindings.go.generated.m8b54f450;
-
-binding networkSend3 {
-  requires {
-    dependency("cloud.google.com/go/iam")
-  }
-  query pattern callExpr where callee.method == "executeHTTPRequest"
-  emit sink code.NetworkSend at args[0]
-}

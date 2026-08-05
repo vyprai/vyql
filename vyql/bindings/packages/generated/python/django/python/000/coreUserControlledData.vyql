@@ -1,9 +1,0 @@
-module bindings.python.generated.m291564d7;
-
-binding userControlledData0 {
-  requires {
-    dependency("django")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source core.UserControlledData at call.result
-}

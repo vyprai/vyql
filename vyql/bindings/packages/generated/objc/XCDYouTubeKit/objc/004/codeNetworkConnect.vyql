@@ -1,9 +1,0 @@
-module bindings.objc.generated.mdefa03ba;
-
-binding networkConnect4 {
-  requires {
-    dependency("XCDYouTubeKit")
-  }
-  query pattern callExpr where callee.method == "initWithURL"
-  emit sink code.NetworkConnectSink at args[0]
-}

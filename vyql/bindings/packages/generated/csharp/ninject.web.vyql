@@ -1,0 +1,17 @@
+module bindings.csharp.generated.mfcb55848;
+
+binding httpInput0 {
+  requires {
+    dependency("ninject.web")
+  }
+  query pattern callExpr where callee.method == "ProcessRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("ninject.web")
+  }
+  query pattern callExpr where callee.method == "DoProcessRequest"
+  emit source code.HttpInput at call.result
+}

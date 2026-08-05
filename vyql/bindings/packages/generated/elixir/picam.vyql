@@ -1,0 +1,41 @@
+module bindings.elixir.generated.m9f998ed7;
+
+binding networkSend0 {
+  requires {
+    dependency("picam")
+  }
+  query pattern callExpr where callee.method == "Picam.Camera.start_stream"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("picam")
+  }
+  query pattern callExpr where callee.method == "Picam.Camera.capture_still"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding cliArgument2 {
+  requires {
+    dependency("picam")
+  }
+  query pattern callExpr where callee.method == "parse_args"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument3 {
+  requires {
+    dependency("picam")
+  }
+  query pattern callExpr where callee.method == "parse_config_line"
+  emit source code.CliArgument at call.result
+}
+
+binding networkSend4 {
+  requires {
+    dependency("picam")
+  }
+  query pattern callExpr where callee.method == "output_jpeg"
+  emit sink code.NetworkSend at args[0]
+}

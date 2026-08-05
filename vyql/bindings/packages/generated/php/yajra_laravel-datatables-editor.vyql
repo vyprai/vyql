@@ -1,0 +1,42 @@
+module bindings.php.generated.m3a5e7773;
+
+binding userControlledData0 {
+  requires {
+    dependency("yajra/laravel-datatables-editor")
+  }
+  query pattern callExpr where callee.method == "dataFromRequest"
+  emit source core.UserControlledData at call.result
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("yajra/laravel-datatables-editor")
+  }
+  query pattern callExpr where callee.method == "create"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("yajra/laravel-datatables-editor")
+  }
+  query pattern callExpr where callee.method == "edit"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("yajra/laravel-datatables-editor")
+  }
+  query pattern callExpr where callee.method == "remove"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding fileUpload4 {
+  requires {
+    dependency("yajra/laravel-datatables-editor")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit issue code.FileUpload at call
+  emit source code.FileUploadSource at call
+}

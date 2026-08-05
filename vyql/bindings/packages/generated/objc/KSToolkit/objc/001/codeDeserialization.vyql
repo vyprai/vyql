@@ -1,9 +1,0 @@
-module bindings.objc.generated.mf363386e;
-
-binding deserialization1 {
-  requires {
-    dependency("KSToolkit")
-  }
-  query pattern callExpr where callee.method == "base64DecodedData"
-  emit sink code.Deserialization at args[0]
-}

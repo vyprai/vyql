@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m8b13f787;
-
-binding fileUse0 {
-  requires {
-    dependency("com.badlogicgames.gdx:gdx-backend-android")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.FileUseSink at args[0]
-}

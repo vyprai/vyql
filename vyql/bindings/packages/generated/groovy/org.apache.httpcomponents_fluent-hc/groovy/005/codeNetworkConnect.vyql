@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m909dd0fb;
-
-binding networkConnect5 {
-  requires {
-    dependency("org.apache.httpcomponents:fluent-hc")
-  }
-  query pattern callExpr where callee.method == "Trace"
-  emit sink code.NetworkConnectSink at args[0]
-}

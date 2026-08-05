@@ -1,9 +1,0 @@
-module bindings.php.generated.mf2b8b64f;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("illuminate/cache")
-  }
-  query pattern callExpr where callee.method == "set"
-  emit sink code.StoredDataWrite at args[0]
-}

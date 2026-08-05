@@ -1,9 +1,0 @@
-module bindings.swift.generated.m006c2da4;
-
-binding deserialization4 {
-  requires {
-    dependency("github.com/apple/swift-protobuf")
-  }
-  query pattern callExpr where callee.method == "decodeRepeated"
-  emit sink code.Deserialization at args[0]
-}

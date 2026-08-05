@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m723b197e;
-
-binding deserialization1 {
-  requires {
-    dependency("com.jayway.jsonpath:json-path")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

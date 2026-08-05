@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mfb0a552d;
-
-binding networkConnect1 {
-  requires {
-    dependency("com.mysql:mysql-connector-j")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

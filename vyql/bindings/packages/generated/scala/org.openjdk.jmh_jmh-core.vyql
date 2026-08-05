@@ -1,0 +1,25 @@
+module bindings.scala.generated.m5f67c63a;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.openjdk.jmh:jmh-core")
+  }
+  query pattern callExpr where callee.method == "doFork"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("org.openjdk.jmh:jmh-core")
+  }
+  query pattern callExpr where callee.method == "getForkedMainCommand"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution2 {
+  requires {
+    dependency("org.openjdk.jmh:jmh-core")
+  }
+  query pattern callExpr where callee.method == "getPrintPropertiesCommand"
+  emit sink code.CommandExecution at args[0]
+}

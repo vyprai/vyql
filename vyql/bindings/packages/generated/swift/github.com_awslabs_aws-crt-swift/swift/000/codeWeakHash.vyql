@@ -1,9 +1,0 @@
-module bindings.swift.generated.m27f9f375;
-
-binding weakHash0 {
-  requires {
-    dependency("github.com/awslabs/aws-crt-swift")
-  }
-  query pattern callExpr where callee.method == "computeMD5"
-  emit issue code.WeakHash at call
-}

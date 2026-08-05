@@ -1,9 +1,0 @@
-module bindings.php.generated.mea539daf;
-
-binding httpInput0 {
-  requires {
-    dependency("silex/silex")
-  }
-  query pattern callExpr where callee.method == "handle"
-  emit source code.HttpInput at call.result
-}

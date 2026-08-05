@@ -1,9 +1,0 @@
-module bindings.swift.generated.m26d4449f;
-
-binding networkSend1 {
-  requires {
-    dependency("github.com/emqx/CocoaMQTT")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkSend at args[0]
-}

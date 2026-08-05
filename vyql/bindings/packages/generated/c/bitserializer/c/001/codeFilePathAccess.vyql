@@ -1,9 +1,0 @@
-module bindings.c.generated.mac11b968;
-
-binding filePathAccess1 {
-  requires {
-    dependency("bitserializer")
-  }
-  query pattern callExpr where callee.method == "LoadObjectFromFile"
-  emit sink code.FilePathAccess at args[0]
-}

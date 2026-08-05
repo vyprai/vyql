@@ -1,9 +1,0 @@
-module bindings.java.generated.md924ce75;
-
-binding filePathAccess6 {
-  requires {
-    dependency("org.eclipse.jetty:jetty-util")
-  }
-  query pattern callExpr where callee.method == "isEmptyDir"
-  emit sink code.FilePathAccess at args[0]
-}

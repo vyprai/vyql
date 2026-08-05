@@ -1,9 +1,0 @@
-module bindings.perl.generated.m8122b530;
-
-binding deserialization0 {
-  requires {
-    dependency("YAML")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

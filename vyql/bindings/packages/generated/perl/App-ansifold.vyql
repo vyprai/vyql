@@ -1,0 +1,65 @@
+module bindings.perl.generated.mac97a6e3;
+
+binding userControlledData0 {
+  requires {
+    dependency("App-ansifold")
+  }
+  query pattern callExpr where callee.method == "ansifold"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("App-ansifold")
+  }
+  query pattern callExpr where callee.method == "ansiexpand"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("App-ansifold")
+  }
+  query pattern callExpr where callee.method == "ansicolrm"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("App-ansifold")
+  }
+  query pattern callExpr where callee.method == "ansicut"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("App-ansifold")
+  }
+  query pattern callExpr where callee.method == "options"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("App-ansifold")
+  }
+  query pattern callExpr where callee.method == "params"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("App-ansifold")
+  }
+  query pattern callExpr where callee.method == "perform"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("App-ansifold")
+  }
+  query pattern callExpr where callee.method == "doit"
+  emit source core.UserControlledData at call.result
+}

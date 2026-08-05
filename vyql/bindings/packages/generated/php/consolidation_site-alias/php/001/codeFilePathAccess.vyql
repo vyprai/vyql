@@ -1,9 +1,0 @@
-module bindings.php.generated.md404ea8f;
-
-binding filePathAccess1 {
-  requires {
-    dependency("consolidation/site-alias")
-  }
-  query pattern callExpr where callee.method == "DataFileLoaderInterface::load"
-  emit sink code.FilePathAccess at args[0]
-}

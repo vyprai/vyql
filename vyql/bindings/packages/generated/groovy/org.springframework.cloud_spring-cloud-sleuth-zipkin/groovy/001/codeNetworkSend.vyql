@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mded13c74;
-
-binding networkSend1 {
-  requires {
-    dependency("org.springframework.cloud:spring-cloud-sleuth-zipkin")
-  }
-  query pattern callExpr where callee.method == "post"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.dart.generated.m8dbe0c7b;
-
-binding filePathAccess1 {
-  requires {
-    dependency("analyzer_plugin")
-  }
-  query pattern callExpr where callee.method == "analyzeFile"
-  emit sink code.FilePathAccess at args[0]
-}

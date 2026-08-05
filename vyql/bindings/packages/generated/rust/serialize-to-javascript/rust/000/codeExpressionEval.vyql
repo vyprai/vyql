@@ -1,9 +1,0 @@
-module bindings.rust.generated.m4659c23e;
-
-binding expressionEval0 {
-  requires {
-    dependency("serialize-to-javascript")
-  }
-  query pattern callExpr where callee.method == "escape_json_parse"
-  emit sink code.ExpressionEval at args[0]
-}

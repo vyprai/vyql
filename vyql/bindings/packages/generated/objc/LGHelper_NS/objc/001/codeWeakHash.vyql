@@ -1,9 +1,0 @@
-module bindings.objc.generated.mc2f1d3c9;
-
-binding weakHash1 {
-  requires {
-    dependency("LGHelper+NS")
-  }
-  query pattern callExpr where callee.method == "sha1Hash"
-  emit issue code.WeakHash at call
-}

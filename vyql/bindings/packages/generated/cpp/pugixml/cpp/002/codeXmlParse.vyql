@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m5f17b485;
-
-binding xmlParse2 {
-  requires {
-    dependency("pugixml")
-  }
-  query pattern callExpr where callee.method == "load_string"
-  emit sink code.XmlParse at args[0]
-}

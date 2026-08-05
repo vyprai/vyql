@@ -1,0 +1,37 @@
+module bindings.elixir.generated.mcc5a44a6;
+
+binding networkConnect0 {
+  requires {
+    dependency("kafka_protocol")
+  }
+  query pattern callExpr where callee.method == "start"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("kafka_protocol")
+  }
+  query pattern callExpr where callee.method == "send_request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding authenticationCheck2 {
+  requires {
+    dependency("kafka_protocol")
+  }
+  query pattern callExpr where callee.method == "sasl_authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding deserialization3 {
+  requires {
+    dependency("kafka_protocol")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

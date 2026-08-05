@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m0b9a6cbc;
-
-binding deserialization1 {
-  requires {
-    dependency("unparser")
-  }
-  query pattern callExpr where callee.method == "parse_ast_either"
-  emit sink code.Deserialization at args[0]
-}

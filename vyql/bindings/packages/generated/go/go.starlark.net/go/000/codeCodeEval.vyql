@@ -1,9 +1,0 @@
-module bindings.go.generated.m4a74693d;
-
-binding codeEval0 {
-  requires {
-    dependency("go.starlark.net")
-  }
-  query pattern callExpr where callee.method == "Eval"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,0 +1,25 @@
+module bindings.kotlin.generated.m0c858cd1;
+
+binding networkSend0 {
+  requires {
+    dependency("io.searchbox:jest")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("io.searchbox:jest")
+  }
+  query pattern callExpr where callee.method == "constructHttpMethod"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("io.searchbox:jest")
+  }
+  query pattern callExpr where callee.method == "deserializeResponse"
+  emit sink code.Deserialization at args[0]
+}

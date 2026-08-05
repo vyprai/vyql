@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m3b47eb73;
-
-binding networkSend0 {
-  requires {
-    dependency("cocoapods-stats")
-  }
-  query pattern callExpr where callee.method == "CocoaPodsStats::Sender.send"
-  emit sink code.NetworkSend at args[0]
-}

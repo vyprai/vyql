@@ -1,9 +1,0 @@
-module bindings.php.generated.mecdba9b5;
-
-binding networkSend4 {
-  requires {
-    dependency("nexmo/client-core")
-  }
-  query pattern callExpr where callee.method == "delete"
-  emit sink code.NetworkSend at args[0]
-}

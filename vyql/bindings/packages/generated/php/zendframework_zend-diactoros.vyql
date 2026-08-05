@@ -1,0 +1,114 @@
+module bindings.php.generated.m4685cbb4;
+
+binding cookie0 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "ServerRequest::getCookieParams"
+  emit source code.Cookie at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "ServerRequest::getQueryParams"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "ServerRequest::getParsedBody"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "RequestTrait::getUri"
+  emit source code.HttpInput at call.result
+}
+
+binding cookie4 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "ServerRequest::withCookieParams"
+  emit source code.Cookie at call.result
+}
+
+binding urlFetch5 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "ServerRequest::withQueryParams"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch6 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "ServerRequest::withParsedBody"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding responseHeaderWrite7 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "MessageTrait::withHeader"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite8 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "MessageTrait::withAddedHeader"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite9 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "MessageTrait::withoutHeader"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding filePathAccess10 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "Stream::write"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess11 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "CallbackStream::write"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess12 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "RelativeStream::write"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding redirectTarget13 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "RequestTrait::withUri"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.ma6dc1814;
-
-binding networkConnect2 {
-  requires {
-    dependency("CNIOHTTPParser")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

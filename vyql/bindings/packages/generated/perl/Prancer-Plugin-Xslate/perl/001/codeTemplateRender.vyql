@@ -1,9 +1,0 @@
-module bindings.perl.generated.m36bd324a;
-
-binding templateRender1 {
-  requires {
-    dependency("Prancer-Plugin-Xslate")
-  }
-  query pattern callExpr where callee.method == "mark_raw"
-  emit sink code.TemplateRender at args[0]
-}

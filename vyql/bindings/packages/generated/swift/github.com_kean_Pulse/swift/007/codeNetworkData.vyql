@@ -1,9 +1,0 @@
-module bindings.swift.generated.mda5bfed3;
-
-binding networkData7 {
-  requires {
-    dependency("github.com/kean/Pulse")
-  }
-  query pattern callExpr where callee.method == "upload"
-  emit source code.NetworkData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.ma41afe90;
-
-binding deserialization2 {
-  requires {
-    dependency("javax.json:javax.json-api")
-  }
-  query pattern callExpr where callee.method == "readArray"
-  emit sink code.Deserialization at args[0]
-}

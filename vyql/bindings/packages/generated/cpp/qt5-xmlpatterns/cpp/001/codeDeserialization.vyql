@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m3ef25844;
-
-binding deserialization1 {
-  requires {
-    dependency("qt5-xmlpatterns")
-  }
-  query pattern callExpr where callee.method == "evaluateTo"
-  emit sink code.Deserialization at args[0]
-}

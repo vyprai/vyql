@@ -1,0 +1,58 @@
+module bindings.php.generated.m9b98bcea;
+
+binding urlFetch0 {
+  requires {
+    dependency("zendframework/zend-http")
+  }
+  query pattern callExpr where callee.method == "setUri"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch1 {
+  requires {
+    dependency("zendframework/zend-http")
+  }
+  query pattern callExpr where callee.method == "setRawBody"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch2 {
+  requires {
+    dependency("zendframework/zend-http")
+  }
+  query pattern callExpr where callee.method == "setParameterPost"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding cookie3 {
+  requires {
+    dependency("zendframework/zend-http")
+  }
+  query pattern callExpr where callee.method == "addCookie"
+  emit source code.Cookie at call.result
+}
+
+binding urlFetch4 {
+  requires {
+    dependency("zendframework/zend-http")
+  }
+  query pattern callExpr where callee.method == "setHeaders"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("zendframework/zend-http")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding fileUpload6 {
+  requires {
+    dependency("zendframework/zend-http")
+  }
+  query pattern callExpr where callee.method == "setFileUpload"
+  emit issue code.FileUpload at call
+  emit source code.FileUploadSource at call
+}

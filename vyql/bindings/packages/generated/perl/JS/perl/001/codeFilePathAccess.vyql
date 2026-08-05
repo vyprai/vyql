@@ -1,9 +1,0 @@
-module bindings.perl.generated.m3d563bcc;
-
-binding filePathAccess1 {
-  requires {
-    dependency("JS")
-  }
-  query pattern callExpr where callee.method == "find_js_path"
-  emit sink code.FilePathAccess at args[0]
-}

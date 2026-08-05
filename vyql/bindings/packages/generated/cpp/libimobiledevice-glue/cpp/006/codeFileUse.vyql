@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m9681b87d;
-
-binding fileUse6 {
-  requires {
-    dependency("libimobiledevice-glue")
-  }
-  query pattern callExpr where callee.method == "buffer_write_to_filename"
-  emit sink code.FileUseSink at args[0]
-}

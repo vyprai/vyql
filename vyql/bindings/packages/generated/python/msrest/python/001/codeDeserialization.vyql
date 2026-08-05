@@ -1,9 +1,0 @@
-module bindings.python.generated.m76ce40a4;
-
-binding deserialization1 {
-  requires {
-    dependency("msrest")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

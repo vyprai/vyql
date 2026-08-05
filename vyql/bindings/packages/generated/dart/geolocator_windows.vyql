@@ -1,0 +1,57 @@
+module bindings.dart.generated.m9cedd304;
+
+binding userControlledData0 {
+  requires {
+    dependency("geolocator_windows")
+  }
+  query pattern callExpr where callee.method == "GetLocationAccuracy"
+  emit source core.UserControlledData at call.result
+}
+
+binding authorizationCheck1 {
+  requires {
+    dependency("geolocator_windows")
+  }
+  query pattern callExpr where callee.method == "OnRequestPermission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck2 {
+  requires {
+    dependency("geolocator_windows")
+  }
+  query pattern callExpr where callee.method == "OnCheckPermission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck3 {
+  requires {
+    dependency("geolocator_windows")
+  }
+  query pattern callExpr where callee.method == "OnIsLocationServiceEnabled"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck4 {
+  requires {
+    dependency("geolocator_windows")
+  }
+  query pattern callExpr where callee.method == "OpenPrivacyLocationSettings"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

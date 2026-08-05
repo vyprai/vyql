@@ -1,9 +1,0 @@
-module bindings.perl.generated.m77118eb6;
-
-binding storedDataWrite4 {
-  requires {
-    dependency("Meerkat")
-  }
-  query pattern callExpr where callee.method == "remove"
-  emit sink code.StoredDataWrite at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m1b58423d;
-
-binding userControlledData3 {
-  requires {
-    dependency("inputsimulatorplus")
-  }
-  query pattern callExpr where callee.method == "ModifiedKeyStroke"
-  emit source core.UserControlledData at call.result
-}

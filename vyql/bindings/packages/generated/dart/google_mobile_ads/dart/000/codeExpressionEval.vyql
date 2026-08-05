@@ -1,9 +1,0 @@
-module bindings.dart.generated.m3a166e66;
-
-binding expressionEval0 {
-  requires {
-    dependency("google_mobile_ads")
-  }
-  query pattern callExpr where callee.method == "openDebugMenu"
-  emit sink code.ExpressionEval at args[0]
-}

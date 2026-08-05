@@ -1,9 +1,0 @@
-module bindings.swift.generated.mc7ef2db0;
-
-binding userControlledData0 {
-  requires {
-    dependency("github.com/JohnSundell/Splash")
-  }
-  query pattern callExpr where callee.method == "highlight"
-  emit source core.UserControlledData at call.result
-}

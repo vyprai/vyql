@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mf18737ed;
-
-binding deserialization1 {
-  requires {
-    dependency("org.apache.spark:spark-streaming_2.11")
-  }
-  query pattern callExpr where callee.method == "loads"
-  emit sink code.Deserialization at args[0]
-}

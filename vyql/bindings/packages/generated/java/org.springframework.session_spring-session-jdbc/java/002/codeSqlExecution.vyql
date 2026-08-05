@@ -1,9 +1,0 @@
-module bindings.java.generated.mfe97f080;
-
-binding sqlExecution2 {
-  requires {
-    dependency("org.springframework.session:spring-session-jdbc")
-  }
-  query pattern callExpr where callee.method == "setGetSessionQuery"
-  emit sink code.SqlExecution at args[0]
-}

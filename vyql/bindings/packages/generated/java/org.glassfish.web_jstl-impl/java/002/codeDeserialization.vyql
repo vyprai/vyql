@@ -1,9 +1,0 @@
-module bindings.java.generated.mddb29b43;
-
-binding deserialization2 {
-  requires {
-    dependency("org.glassfish.web:jstl-impl")
-  }
-  query pattern callExpr where callee.method == "compile"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,0 +1,49 @@
+module bindings.kotlin.generated.m7a1a2de0;
+
+binding deserialization0 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-http")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding httpInput1 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-http")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-http")
+  }
+  query pattern callExpr where callee.method == "getPath"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-http")
+  }
+  query pattern callExpr where callee.method == "getPathQuery"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-http")
+  }
+  query pattern callExpr where callee.method == "getQuery"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-http")
+  }
+  query pattern callExpr where callee.method == "getDecodedPath"
+  emit source code.HttpInput at call.result
+}

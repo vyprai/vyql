@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m2c533b20;
-
-binding deserialization1 {
-  requires {
-    dependency("org.xerial.snappy:snappy-java")
-  }
-  query pattern callExpr where callee.method == "unshuffle"
-  emit sink code.Deserialization at args[0]
-}

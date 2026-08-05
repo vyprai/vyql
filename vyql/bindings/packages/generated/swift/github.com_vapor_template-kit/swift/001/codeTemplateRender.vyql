@@ -1,9 +1,0 @@
-module bindings.swift.generated.m4cfc762c;
-
-binding templateRender1 {
-  requires {
-    dependency("github.com/vapor/template-kit")
-  }
-  query pattern callExpr where callee.method == "render"
-  emit sink code.TemplateRender at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.mad25947f;
-
-binding sqlExecution2 {
-  requires {
-    dependency("Tangram")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.SqlExecution at args[0]
-}

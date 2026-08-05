@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m10d3e7f2;
-
-binding deserialization2 {
-  requires {
-    dependency("snappy")
-  }
-  query pattern callExpr where callee.method == "RawUncompress"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m2ca3c897;
-
-binding filePathAccess8 {
-  requires {
-    dependency("spring.social.dropbox")
-  }
-  query pattern callExpr where callee.method == "GetShareableLink"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m6d1dbfdf;
-
-binding codeEval2 {
-  requires {
-    dependency("padrino-support")
-  }
-  query pattern callExpr where callee.method == "glob_require"
-  emit sink code.CodeEval at args[0]
-}

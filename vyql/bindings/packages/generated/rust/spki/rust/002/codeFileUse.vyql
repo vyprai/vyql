@@ -1,9 +1,0 @@
-module bindings.rust.generated.m397c49ff;
-
-binding fileUse2 {
-  requires {
-    dependency("spki")
-  }
-  query pattern callExpr where callee.method == "write_public_key_der_file"
-  emit sink code.FileUseSink at args[0]
-}

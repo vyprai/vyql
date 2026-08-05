@@ -1,9 +1,0 @@
-module bindings.scala.generated.m89fbb3be;
-
-binding filePathAccess6 {
-  requires {
-    dependency("org.osgi:org.osgi.core")
-  }
-  query pattern callExpr where callee.method == "getDataFile"
-  emit sink code.FilePathAccess at args[0]
-}

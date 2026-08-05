@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m60088840;
-
-binding sqlExecution2 {
-  requires {
-    dependency("org.apache.ibatis:ibatis-sqlmap")
-  }
-  query pattern callExpr where callee.method == "selectOne"
-  emit sink code.SqlExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.c.generated.m95208f1d;
-
-binding filePathAccess4 {
-  requires {
-    dependency("glpk")
-  }
-  query pattern callExpr where callee.method == "glp_read_prob"
-  emit sink code.FilePathAccess at args[0]
-}

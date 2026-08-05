@@ -1,9 +1,0 @@
-module bindings.objc.generated.m0f09610a;
-
-binding storedDataRead5 {
-  requires {
-    dependency("nanopb")
-  }
-  query pattern callExpr where callee.method == "pb_istream_from_buffer"
-  emit source code.StoredDataRead at call.result
-}

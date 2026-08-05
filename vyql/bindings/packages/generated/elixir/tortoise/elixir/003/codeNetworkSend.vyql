@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m8b8d5b9a;
-
-binding networkSend3 {
-  requires {
-    dependency("tortoise")
-  }
-  query pattern callExpr where callee.method == "Tortoise.publish"
-  emit sink code.NetworkSend at args[0]
-}

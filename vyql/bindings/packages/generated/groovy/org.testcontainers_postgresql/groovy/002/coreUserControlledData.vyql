@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m944f97af;
-
-binding userControlledData2 {
-  requires {
-    dependency("org.testcontainers:postgresql")
-  }
-  query pattern callExpr where callee.method == "withUsername"
-  emit source core.UserControlledData at call.result
-}

@@ -1,0 +1,33 @@
+module bindings.php.generated.meb96413c;
+
+binding networkConnect0 {
+  requires {
+    dependency("dama/doctrine-test-bundle")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding databaseRead1 {
+  requires {
+    dependency("dama/doctrine-test-bundle")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("dama/doctrine-test-bundle")
+  }
+  query pattern callExpr where callee.method == "beginTransaction"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("dama/doctrine-test-bundle")
+  }
+  query pattern callExpr where callee.method == "rollBack"
+  emit sink code.SqlExecution at args[0]
+}

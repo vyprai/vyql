@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m364e10a2;
-
-binding urlFetch0 {
-  requires {
-    dependency("javax:javaee-web-api")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit sink code.UrlFetch at args[0]
-}

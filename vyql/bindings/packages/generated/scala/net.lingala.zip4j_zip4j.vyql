@@ -1,0 +1,113 @@
+module bindings.scala.generated.m27782ca4;
+
+binding filePathAccess0 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "addFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "addFiles"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding archiveEntryWrite2 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "addStream"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "addStream"
+  emit source core.UserControlledData at call.result
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "extractAll"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse5 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "extractAll"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "extractFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse7 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "extractFile"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding archiveEntryWrite8 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "removeFile"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding archiveEntryWrite9 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "removeFiles"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding archiveEntryWrite10 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "renameFile"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding archiveEntryWrite11 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "renameFiles"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding filePathAccess12 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "mergeSplitFiles"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding archiveEntryWrite13 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "mergeSplitFiles"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

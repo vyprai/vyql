@@ -1,9 +1,0 @@
-module bindings.scala.generated.m852e8598;
-
-binding httpInput10 {
-  requires {
-    dependency("com.sparkjava:spark-core")
-  }
-  query pattern callExpr where callee.method == "after"
-  emit source code.HttpInput at call.result
-}

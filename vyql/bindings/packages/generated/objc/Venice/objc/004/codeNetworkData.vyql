@@ -1,9 +1,0 @@
-module bindings.objc.generated.m37c79026;
-
-binding networkData4 {
-  requires {
-    dependency("Venice")
-  }
-  query pattern callExpr where callee.method == "tcprecvlh"
-  emit source code.NetworkData at call.result
-}

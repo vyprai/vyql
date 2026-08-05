@@ -1,9 +1,0 @@
-module bindings.scala.generated.ma00db17c;
-
-binding httpInput5 {
-  requires {
-    dependency("io.quarkus:quarkus-resteasy")
-  }
-  query pattern callExpr where callee.method == "extractRequestHeaders"
-  emit source code.HttpInput at call.result
-}

@@ -1,0 +1,28 @@
+module bindings.objc.generated.m34e0c8cf;
+
+binding redirectTarget0 {
+  requires {
+    dependency("KakaoSDKNavi")
+  }
+  query pattern callExpr where callee.method == "shareUrl"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget1 {
+  requires {
+    dependency("KakaoSDKNavi")
+  }
+  query pattern callExpr where callee.method == "navigateUrl"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget2 {
+  requires {
+    dependency("KakaoSDKNavi")
+  }
+  query pattern callExpr where callee.method == "makeNaviUrl"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

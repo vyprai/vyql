@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mc9010118;
-
-binding weakHash2 {
-  requires {
-    dependency("ntlm-http")
-  }
-  query pattern callExpr where callee.method == "lm_hash"
-  emit issue code.WeakHash at call
-}

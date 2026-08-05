@@ -1,9 +1,0 @@
-module bindings.dart.generated.me672db61;
-
-binding networkConnect3 {
-  requires {
-    dependency("mailer")
-  }
-  query pattern callExpr where callee.method == "Connection.new"
-  emit sink code.NetworkConnectSink at args[0]
-}

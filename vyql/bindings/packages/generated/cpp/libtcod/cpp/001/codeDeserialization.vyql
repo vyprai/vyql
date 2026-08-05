@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mbe49191a;
-
-binding deserialization1 {
-  requires {
-    dependency("libtcod")
-  }
-  query pattern callExpr where callee.method == "loadApf"
-  emit sink code.Deserialization at args[0]
-}

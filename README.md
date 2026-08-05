@@ -4,7 +4,7 @@
 [![detection](https://github.com/vyprai/vyql/actions/workflows/detection.yml/badge.svg)](https://github.com/vyprai/vyql/actions/workflows/detection.yml)
 [![data](https://github.com/vyprai/vyql/actions/workflows/data.yml/badge.svg)](https://github.com/vyprai/vyql/actions/workflows/data.yml)
 [![security](https://github.com/vyprai/vyql/actions/workflows/security.yml/badge.svg)](https://github.com/vyprai/vyql/actions/workflows/security.yml)
-[![Go Reference](https://pkg.go.dev/badge/github.com/vyprai/vyql.svg)](https://pkg.go.dev/github.com/vyprai/vyql)
+[![Go Reference](https://pkg.go.dev/badge/github.com/vyprai/vyql/cmd/vyql.svg)](https://pkg.go.dev/github.com/vyprai/vyql/cmd/vyql)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 A multi-language security scanner that follows tainted data through your code and

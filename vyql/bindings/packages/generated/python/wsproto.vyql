@@ -1,0 +1,17 @@
+module bindings.python.generated.me9e751b6;
+
+binding networkData0 {
+  requires {
+    dependency("wsproto")
+  }
+  query pattern callExpr where callee.method == "receive_data"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("wsproto")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

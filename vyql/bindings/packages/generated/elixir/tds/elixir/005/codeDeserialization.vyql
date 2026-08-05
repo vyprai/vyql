@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m85a76522;
-
-binding deserialization5 {
-  requires {
-    dependency("tds")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

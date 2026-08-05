@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m38b72b89;
-
-binding sqlExecution1 {
-  requires {
-    dependency("com.amazonaws:aws-java-sdk-dynamodb")
-  }
-  query pattern callExpr where callee.method == "batchExecuteStatement"
-  emit sink code.SqlExecution at args[0]
-}

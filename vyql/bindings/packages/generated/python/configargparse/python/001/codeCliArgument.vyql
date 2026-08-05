@@ -1,9 +1,0 @@
-module bindings.python.generated.m04882151;
-
-binding cliArgument1 {
-  requires {
-    dependency("configargparse")
-  }
-  query pattern callExpr where callee.method == "parse_known_args"
-  emit source code.CliArgument at call.result
-}

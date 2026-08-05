@@ -1,9 +1,0 @@
-module bindings.bash.generated.m64dc9b90;
-
-binding commandExecution1 {
-  requires {
-    dependency("lastpass-cli")
-  }
-  query pattern callExpr where callee.path ~= "lastpass-cli"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m4623e3d5;
-
-binding deserialization2 {
-  requires {
-    dependency("org.eclipse.jetty:jetty-client")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

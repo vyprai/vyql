@@ -1,9 +1,0 @@
-module bindings.go.generated.m3c97ee4a;
-
-binding commandExecution1 {
-  requires {
-    dependency("k8s.io/component-base")
-  }
-  query pattern callExpr where callee.method == "RunNoErrOutput"
-  emit sink code.CommandExecution at args[0]
-}

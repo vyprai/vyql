@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.md02b8ab2;
-
-binding cookie2 {
-  requires {
-    dependency("org.seleniumhq.selenium:selenium-api")
-  }
-  query pattern callExpr where callee.method == "Cookie"
-  emit source code.Cookie at call.result
-}

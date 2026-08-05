@@ -1,9 +1,0 @@
-module bindings.objc.generated.mf97fd0db;
-
-binding weakHash1 {
-  requires {
-    dependency("WeexSDK")
-  }
-  query pattern presenceNode where node.path ~= "weexsdk.hash"
-  emit issue code.WeakHash at node
-}

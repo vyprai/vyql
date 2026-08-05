@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m390fd963;
-
-binding weakHash2 {
-  requires {
-    dependency("xxhash")
-  }
-  query pattern callExpr where callee.method == "XXH64"
-  emit issue code.WeakHash at call
-}

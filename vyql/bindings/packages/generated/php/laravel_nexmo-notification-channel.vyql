@@ -1,0 +1,33 @@
+module bindings.php.generated.mdb2a4161;
+
+binding networkSend0 {
+  requires {
+    dependency("laravel/nexmo-notification-channel")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("laravel/nexmo-notification-channel")
+  }
+  query pattern callExpr where callee.method == "content"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("laravel/nexmo-notification-channel")
+  }
+  query pattern callExpr where callee.method == "from"
+  emit source core.UserControlledData at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("laravel/nexmo-notification-channel")
+  }
+  query pattern callExpr where callee.method == "loadPrivateKey"
+  emit source code.SecretValue at call.result
+}

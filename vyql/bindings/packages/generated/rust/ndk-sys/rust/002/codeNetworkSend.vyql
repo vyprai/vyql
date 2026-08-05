@@ -1,9 +1,0 @@
-module bindings.rust.generated.m7c64ffc3;
-
-binding networkSend2 {
-  requires {
-    dependency("ndk-sys")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

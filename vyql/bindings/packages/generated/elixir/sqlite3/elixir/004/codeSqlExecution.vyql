@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m5a46a91e;
-
-binding sqlExecution4 {
-  requires {
-    dependency("sqlite3")
-  }
-  query pattern callExpr where callee.method == "prepared_bind"
-  emit sink code.SqlExecution at args[0]
-}

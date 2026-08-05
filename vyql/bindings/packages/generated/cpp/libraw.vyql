@@ -1,0 +1,73 @@
+module bindings.cpp.generated.m9ac101a6;
+
+binding fileUse0 {
+  requires {
+    dependency("libraw")
+  }
+  query pattern callExpr where callee.method == "libraw_open_file"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("libraw")
+  }
+  query pattern callExpr where callee.method == "libraw_open_file_ex"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse2 {
+  requires {
+    dependency("libraw")
+  }
+  query pattern callExpr where callee.method == "libraw_open_wfile"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse3 {
+  requires {
+    dependency("libraw")
+  }
+  query pattern callExpr where callee.method == "libraw_open_wfile_ex"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("libraw")
+  }
+  query pattern callExpr where callee.method == "libraw_open_buffer"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("libraw")
+  }
+  query pattern callExpr where callee.method == "libraw_unpack"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("libraw")
+  }
+  query pattern callExpr where callee.method == "libraw_unpack_thumb"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("libraw")
+  }
+  query pattern callExpr where callee.method == "libraw_unpack_thumb_ex"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization8 {
+  requires {
+    dependency("libraw")
+  }
+  query pattern callExpr where callee.method == "libraw_open_bayer"
+  emit sink code.Deserialization at args[0]
+}

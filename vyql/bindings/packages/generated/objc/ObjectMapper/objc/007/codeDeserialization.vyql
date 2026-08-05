@@ -1,9 +1,0 @@
-module bindings.objc.generated.m44a4d7ec;
-
-binding deserialization7 {
-  requires {
-    dependency("ObjectMapper")
-  }
-  query pattern callExpr where callee.method == "mapDictionaryOfArrays"
-  emit sink code.Deserialization at args[0]
-}

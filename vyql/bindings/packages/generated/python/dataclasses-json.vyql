@@ -1,0 +1,33 @@
+module bindings.python.generated.m6980d701;
+
+binding deserialization0 {
+  requires {
+    dependency("dataclasses-json")
+  }
+  query pattern callExpr where callee.method == "from_json"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("dataclasses-json")
+  }
+  query pattern callExpr where callee.method == "from_dict"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("dataclasses-json")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("dataclasses-json")
+  }
+  query pattern callExpr where callee.method == "loads"
+  emit sink code.Deserialization at args[0]
+}

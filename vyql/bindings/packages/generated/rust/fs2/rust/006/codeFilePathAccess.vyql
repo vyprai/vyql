@@ -1,9 +1,0 @@
-module bindings.rust.generated.m8d948af7;
-
-binding filePathAccess6 {
-  requires {
-    dependency("fs2")
-  }
-  query pattern callExpr where callee.method == "free_space"
-  emit sink code.FilePathAccess at args[0]
-}

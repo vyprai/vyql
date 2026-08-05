@@ -1,9 +1,0 @@
-module bindings.objc.generated.m2873fa1a;
-
-binding weakHash1 {
-  requires {
-    dependency("photo_manager")
-  }
-  query pattern callExpr where callee.method == "getmd5WithString"
-  emit issue code.WeakHash at call
-}

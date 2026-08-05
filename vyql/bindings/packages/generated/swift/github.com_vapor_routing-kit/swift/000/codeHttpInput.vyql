@@ -1,9 +1,0 @@
-module bindings.swift.generated.m017c4b2a;
-
-binding httpInput0 {
-  requires {
-    dependency("github.com/vapor/routing-kit")
-  }
-  query pattern callExpr where callee.method == "TrieRouter.route"
-  emit source code.HttpInput at call.result
-}

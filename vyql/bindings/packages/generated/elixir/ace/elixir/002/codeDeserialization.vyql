@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mfd2ebdec;
-
-binding deserialization2 {
-  requires {
-    dependency("ace")
-  }
-  query pattern callExpr where callee.method == "Ace.HPACK.decode"
-  emit sink code.Deserialization at args[0]
-}

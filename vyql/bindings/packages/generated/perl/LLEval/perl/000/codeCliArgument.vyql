@@ -1,9 +1,0 @@
-module bindings.perl.generated.me7a59fe3;
-
-binding cliArgument0 {
-  requires {
-    dependency("LLEval")
-  }
-  query pattern callExpr where callee.path ~= "LLEval.argv"
-  emit source code.CliArgument at call.result
-}

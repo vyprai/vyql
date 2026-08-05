@@ -1,9 +1,0 @@
-module bindings.php.generated.m40f493fa;
-
-binding userControlledData2 {
-  requires {
-    dependency("illuminate/console")
-  }
-  query pattern callExpr where callee.method == "parseCommand"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m796af5e8;
-
-binding codeEval1 {
-  requires {
-    dependency("jekyll-seo-tag")
-  }
-  query pattern callExpr where callee.method == "to_json"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mb84d38db;
-
-binding filePathAccess1 {
-  requires {
-    dependency("nerves_network")
-  }
-  query pattern callExpr where callee.path ~= "Nerves.Network.Resolvconf.write_resolvconf"
-  emit sink code.FilePathAccess at args[0]
-}

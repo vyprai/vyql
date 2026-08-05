@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m0005dd98;
-
-binding networkSend2 {
-  requires {
-    dependency("httparty")
-  }
-  query pattern callExpr where callee.method == "patch"
-  emit sink code.NetworkSend at args[0]
-}

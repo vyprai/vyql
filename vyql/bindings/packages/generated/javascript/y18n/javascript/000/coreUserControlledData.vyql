@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m6fdc023b;
-
-binding userControlledData0 {
-  requires {
-    dependency("y18n")
-  }
-  query pattern callExpr where callee.method == "y18n"
-  emit source core.UserControlledData at call.result
-}

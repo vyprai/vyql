@@ -1,9 +1,0 @@
-module bindings.java.generated.md9215274;
-
-binding deserialization2 {
-  requires {
-    dependency("com.alibaba:fastjson")
-  }
-  query pattern callExpr where callee.method == "readObject"
-  emit sink code.Deserialization at args[0]
-}

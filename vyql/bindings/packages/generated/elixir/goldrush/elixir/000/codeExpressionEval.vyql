@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mb12ac73f;
-
-binding expressionEval0 {
-  requires {
-    dependency("goldrush")
-  }
-  query pattern callExpr where callee.method == "compile"
-  emit sink code.ExpressionEval at args[0]
-}

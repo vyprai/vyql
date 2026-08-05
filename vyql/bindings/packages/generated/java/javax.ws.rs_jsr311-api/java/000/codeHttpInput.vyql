@@ -1,9 +1,0 @@
-module bindings.java.generated.m1512b883;
-
-binding httpInput0 {
-  requires {
-    dependency("javax.ws.rs:jsr311-api")
-  }
-  query pattern callExpr where callee.method == "javax.ws.rs.core.UriInfo.getQueryParameters"
-  emit source code.HttpInput at call.result
-}

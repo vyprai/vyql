@@ -1,9 +1,0 @@
-module bindings.dart.generated.md5322260;
-
-binding filePathAccess1 {
-  requires {
-    dependency("shelf_packages_handler")
-  }
-  query pattern callExpr where callee.method == "handleRequest"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.md34c4676;
-
-binding codeEval1 {
-  requires {
-    dependency("PAR")
-  }
-  query pattern callExpr where callee.method == "_run_member"
-  emit sink code.CodeEval at args[0]
-}

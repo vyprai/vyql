@@ -1,9 +1,0 @@
-module bindings.swift.generated.m3a1cbe6c;
-
-binding fileUse1 {
-  requires {
-    dependency("github.com/NordicSemiconductor/IOS-DFU-Library")
-  }
-  query pattern callExpr where callee.method == "extract"
-  emit sink code.FileUseSink at args[0]
-}

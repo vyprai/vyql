@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m8bd50664;
-
-binding htmlRender4 {
-  requires {
-    dependency("jekyll-commonmark-ghpages")
-  }
-  query pattern callExpr where callee.method == "render_rouge"
-  emit sink code.HtmlRender at args[0]
-}

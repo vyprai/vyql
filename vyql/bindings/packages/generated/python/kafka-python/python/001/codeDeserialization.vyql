@@ -1,9 +1,0 @@
-module bindings.python.generated.m38fd08c7;
-
-binding deserialization1 {
-  requires {
-    dependency("kafka-python")
-  }
-  query pattern callExpr where callee.method == "snappy_decode"
-  emit sink code.Deserialization at args[0]
-}

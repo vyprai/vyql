@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m7b31ca88;
-
-binding filePathAccess0 {
-  requires {
-    dependency("kf5iconthemes")
-  }
-  query pattern callExpr where callee.method == "KIconLoader::loadIcon"
-  emit sink code.FilePathAccess at args[0]
-}

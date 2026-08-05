@@ -1,0 +1,33 @@
+module bindings.objc.generated.macee218f;
+
+binding secretValue0 {
+  requires {
+    dependency("KeychainSwift")
+  }
+  query pattern callExpr where callee.method == "set"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("KeychainSwift")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("KeychainSwift")
+  }
+  query pattern callExpr where callee.method == "getData"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("KeychainSwift")
+  }
+  query pattern callExpr where callee.method == "getBool"
+  emit source code.SecretValue at call.result
+}

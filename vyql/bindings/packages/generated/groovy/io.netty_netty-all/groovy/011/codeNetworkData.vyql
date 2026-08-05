@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m1afc5a6b;
-
-binding networkData11 {
-  requires {
-    dependency("io.netty:netty-all")
-  }
-  query pattern callExpr where callee.method == "writeInt"
-  emit source code.NetworkData at call.result
-}

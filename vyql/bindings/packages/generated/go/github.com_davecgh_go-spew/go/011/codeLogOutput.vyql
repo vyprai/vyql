@@ -1,9 +1,0 @@
-module bindings.go.generated.m80404178;
-
-binding logOutput11 {
-  requires {
-    dependency("github.com/davecgh/go-spew")
-  }
-  query pattern callExpr where callee.method == "ConfigState.Dump"
-  emit sink code.LogOutput at args[0]
-}

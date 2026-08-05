@@ -1,9 +1,0 @@
-module bindings.ruby.generated.ma147353e;
-
-binding deserialization2 {
-  requires {
-    dependency("xml-simple")
-  }
-  query pattern callExpr where callee.method == "restore_storable"
-  emit sink code.Deserialization at args[0]
-}

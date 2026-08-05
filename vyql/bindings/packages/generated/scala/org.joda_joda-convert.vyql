@@ -1,0 +1,57 @@
+module bindings.scala.generated.mf8b523ed;
+
+binding deserialization0 {
+  requires {
+    dependency("org.joda:joda-convert")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.joda:joda-convert")
+  }
+  query pattern callExpr where callee.method == "parseRenameFile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("org.joda:joda-convert")
+  }
+  query pattern callExpr where callee.method == "parseBase64Binary"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("org.joda:joda-convert")
+  }
+  query pattern callExpr where callee.method == "parseCharacter"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("org.joda:joda-convert")
+  }
+  query pattern callExpr where callee.method == "parseBoolean"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("org.joda:joda-convert")
+  }
+  query pattern callExpr where callee.method == "parseAtomicBoolean"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("org.joda:joda-convert")
+  }
+  query pattern callExpr where callee.method == "parseLocale"
+  emit sink code.Deserialization at args[0]
+}

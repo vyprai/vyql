@@ -1,9 +1,0 @@
-module bindings.perl.generated.m35add0b4;
-
-binding userControlledData0 {
-  requires {
-    dependency("User")
-  }
-  query pattern callExpr where callee.method == "Home"
-  emit source core.UserControlledData at call.result
-}

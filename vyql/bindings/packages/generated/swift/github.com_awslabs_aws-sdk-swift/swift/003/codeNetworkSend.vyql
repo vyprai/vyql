@@ -1,9 +1,0 @@
-module bindings.swift.generated.mb3d11b14;
-
-binding networkSend3 {
-  requires {
-    dependency("github.com/awslabs/aws-sdk-swift")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

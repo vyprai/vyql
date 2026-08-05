@@ -1,9 +1,0 @@
-module bindings.go.generated.m5c729734;
-
-binding deserialization0 {
-  requires {
-    dependency("go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc")
-  }
-  query pattern callExpr where callee.method == "ParseFullMethod"
-  emit sink code.Deserialization at args[0]
-}

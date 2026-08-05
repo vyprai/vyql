@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m42d1a691;
-
-binding networkConnect0 {
-  requires {
-    dependency("excon")
-  }
-  query pattern callExpr where callee.method == "Excon.new"
-  emit sink code.NetworkConnectSink at args[0]
-}

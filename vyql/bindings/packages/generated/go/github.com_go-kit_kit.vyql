@@ -1,0 +1,21 @@
+module bindings.go.generated.m59d7be91;
+
+binding secretValue0 {
+  requires {
+    dependency("github.com/go-kit/kit")
+  }
+  query pattern callExpr where callee.method == "NewSigner"
+  emit source code.SecretValue at call.result
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("github.com/go-kit/kit")
+  }
+  query pattern callExpr where callee.method == "NewParser"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

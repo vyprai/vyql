@@ -1,9 +1,0 @@
-module bindings.go.generated.mb32cf6c5;
-
-binding userControlledData4 {
-  requires {
-    dependency("github.com/xeipuuv/gojsonschema")
-  }
-  query pattern callExpr where callee.method == "NewReaderLoader"
-  emit source core.UserControlledData at call.result
-}

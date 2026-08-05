@@ -1,9 +1,0 @@
-module bindings.swift.generated.m576d6c73;
-
-binding networkSend5 {
-  requires {
-    dependency("github.com/Nef10/WealthsimpleDownloader")
-  }
-  query pattern callExpr where callee.method == "getAccounts"
-  emit sink code.NetworkSend at args[0]
-}

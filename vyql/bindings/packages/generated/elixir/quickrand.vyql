@@ -1,0 +1,41 @@
+module bindings.elixir.generated.mb6e60529;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("quickrand")
+  }
+  query pattern callExpr where callee.method == "lcg35x_32"
+  emit issue code.WeakRandomValue at call
+}
+
+binding weakRandomValue1 {
+  requires {
+    dependency("quickrand")
+  }
+  query pattern callExpr where callee.method == "mwc256"
+  emit issue code.WeakRandomValue at call
+}
+
+binding weakRandomValue2 {
+  requires {
+    dependency("quickrand")
+  }
+  query pattern callExpr where callee.method == "mwc256_64"
+  emit issue code.WeakRandomValue at call
+}
+
+binding weakRandomValue3 {
+  requires {
+    dependency("quickrand")
+  }
+  query pattern callExpr where callee.method == "mwc256_128"
+  emit issue code.WeakRandomValue at call
+}
+
+binding weakRandomValue4 {
+  requires {
+    dependency("quickrand")
+  }
+  query pattern callExpr where callee.method == "seed_algorithms"
+  emit issue code.WeakRandomValue at call
+}

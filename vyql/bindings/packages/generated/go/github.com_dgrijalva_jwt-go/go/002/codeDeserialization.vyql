@@ -1,9 +1,0 @@
-module bindings.go.generated.m51933716;
-
-binding deserialization2 {
-  requires {
-    dependency("github.com/dgrijalva/jwt-go")
-  }
-  query pattern callExpr where callee.method == "DecodeSegment"
-  emit sink code.Deserialization at args[0]
-}

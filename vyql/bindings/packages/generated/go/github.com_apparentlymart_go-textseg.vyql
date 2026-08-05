@@ -1,0 +1,17 @@
+module bindings.go.generated.mf9732fa7;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/apparentlymart/go-textseg")
+  }
+  query pattern callExpr where callee.method == "AllTokens"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/apparentlymart/go-textseg")
+  }
+  query pattern callExpr where callee.method == "ScanUTF8Sequences"
+  emit sink code.Deserialization at args[0]
+}

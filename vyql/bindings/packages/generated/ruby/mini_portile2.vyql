@@ -1,0 +1,113 @@
+module bindings.ruby.generated.ma66d92b3;
+
+binding networkConnect0 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "download_file_http"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "download_file_ftp"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "download_file"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "edit_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "apply_patch"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "verify_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "log_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "which"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "tar_command"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess9 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "extract_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess10 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "native_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess11 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "posix_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess12 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "download_file_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess13 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "with_tempfile"
+  emit sink code.FilePathAccess at args[0]
+}

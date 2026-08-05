@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m07b39768;
-
-binding archiveEntryWrite3 {
-  requires {
-    dependency("org.zeroturnaround:zt-zip")
-  }
-  query pattern callExpr where callee.method == "addEntry"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

@@ -1,0 +1,25 @@
+module bindings.swift.generated.m3869f156;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/AliSoftware/OHHTTPStubs")
+  }
+  query pattern callExpr where callee.method == "hasJsonBody"
+  emit source core.UserControlledData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/AliSoftware/OHHTTPStubs")
+  }
+  query pattern callExpr where callee.method == "stub"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("github.com/AliSoftware/OHHTTPStubs")
+  }
+  query pattern callExpr where callee.method == "fixture"
+  emit sink code.NetworkSend at args[0]
+}

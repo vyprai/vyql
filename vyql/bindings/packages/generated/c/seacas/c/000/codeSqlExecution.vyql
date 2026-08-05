@@ -1,9 +1,0 @@
-module bindings.c.generated.m0ec13c4f;
-
-binding sqlExecution0 {
-  requires {
-    dependency("seacas")
-  }
-  query pattern callExpr where callee.method == "executePull"
-  emit sink code.SqlExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.rust.generated.m4014f6c5;
-
-binding filePathAccess1 {
-  requires {
-    dependency("android_glue")
-  }
-  query pattern callExpr where callee.method == "load_asset"
-  emit sink code.FilePathAccess at args[0]
-}

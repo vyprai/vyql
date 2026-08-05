@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m92ab0abc;
-
-binding filePathAccess1 {
-  requires {
-    dependency("rb-fsevent")
-  }
-  query pattern callExpr where callee.method == "FSEvent.watch"
-  emit sink code.FilePathAccess at args[0]
-}

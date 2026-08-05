@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m4d081a83;
-
-binding networkData0 {
-  requires {
-    dependency("qt5-connectivity")
-  }
-  query pattern callExpr where callee.method == "writeData"
-  emit source code.NetworkData at call.result
-}

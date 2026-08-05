@@ -1,9 +1,0 @@
-module bindings.php.generated.m009852a1;
-
-binding filePathAccess0 {
-  requires {
-    dependency("phpdocumentor/fileset")
-  }
-  query pattern callExpr where callee.method == "addDirectory"
-  emit sink code.FilePathAccess at args[0]
-}

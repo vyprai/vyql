@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m14698913;
-
-binding networkConnect2 {
-  requires {
-    dependency("fakeweb")
-  }
-  query pattern callExpr where callee.method == "request_with_fakeweb"
-  emit sink code.NetworkConnectSink at args[0]
-}

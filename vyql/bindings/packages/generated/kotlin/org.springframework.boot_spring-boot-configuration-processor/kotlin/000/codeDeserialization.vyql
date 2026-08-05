@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mb6fc7893;
-
-binding deserialization0 {
-  requires {
-    dependency("org.springframework.boot:spring-boot-configuration-processor")
-  }
-  query pattern callExpr where callee.method == "JsonMarshaller.read"
-  emit sink code.Deserialization at args[0]
-}

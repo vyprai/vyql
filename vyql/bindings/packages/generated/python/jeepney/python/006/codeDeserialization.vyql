@@ -1,9 +1,0 @@
-module bindings.python.generated.m0dc49fb6;
-
-binding deserialization6 {
-  requires {
-    dependency("jeepney")
-  }
-  query pattern callExpr where callee.method == "code_from_xml"
-  emit sink code.Deserialization at args[0]
-}

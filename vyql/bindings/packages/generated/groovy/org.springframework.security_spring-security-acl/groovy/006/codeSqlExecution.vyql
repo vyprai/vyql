@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m0294a815;
-
-binding sqlExecution6 {
-  requires {
-    dependency("org.springframework.security:spring-security-acl")
-  }
-  query pattern callExpr where callee.method == "setLookupObjectIdentitiesWhereClause"
-  emit sink code.SqlExecution at args[0]
-}

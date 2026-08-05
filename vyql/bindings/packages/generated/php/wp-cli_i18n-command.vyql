@@ -1,0 +1,65 @@
+module bindings.php.generated.m321695dd;
+
+binding filePathAccess0 {
+  requires {
+    dependency("wp-cli/i18n-command")
+  }
+  query pattern callExpr where callee.method == "FileDataExtractor::get_file_data"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("wp-cli/i18n-command")
+  }
+  query pattern callExpr where callee.method == "JsonSchemaExtractor::load_schema"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("wp-cli/i18n-command")
+  }
+  query pattern callExpr where callee.method == "JsonSchemaExtractor::load_schema"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("wp-cli/i18n-command")
+  }
+  query pattern callExpr where callee.method == "JsonSchemaExtractor::extract_strings_using_i18n_schema"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("wp-cli/i18n-command")
+  }
+  query pattern callExpr where callee.method == "MakeJsonCommand::build_map"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("wp-cli/i18n-command")
+  }
+  query pattern callExpr where callee.method == "MakeJsonCommand::make_json"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("wp-cli/i18n-command")
+  }
+  query pattern callExpr where callee.method == "MakeJsonCommand::make_json"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("wp-cli/i18n-command")
+  }
+  query pattern callExpr where callee.method == "UpdatePoCommand::restore_file_comments"
+  emit sink code.FilePathAccess at args[0]
+}

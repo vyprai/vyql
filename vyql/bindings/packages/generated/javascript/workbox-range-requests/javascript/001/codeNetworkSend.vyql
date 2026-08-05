@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mbdeabaaa;
-
-binding networkSend1 {
-  requires {
-    dependency("workbox-range-requests")
-  }
-  query pattern callExpr where callee.method == "createPartialResponse"
-  emit sink code.NetworkSend at args[0]
-}

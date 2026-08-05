@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mbfdf81eb;
-
-binding networkConnect4 {
-  requires {
-    dependency("ex_twilio")
-  }
-  query pattern callExpr where callee.method == "ExTwilio.API.get"
-  emit sink code.NetworkConnectSink at args[0]
-}

@@ -1,0 +1,17 @@
+module bindings.ruby.generated.mb97ee5a7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("i18n_data")
+  }
+  query pattern callExpr where callee.method == "read_from_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("i18n_data")
+  }
+  query pattern callExpr where callee.method == "write_to_file"
+  emit sink code.FilePathAccess at args[0]
+}

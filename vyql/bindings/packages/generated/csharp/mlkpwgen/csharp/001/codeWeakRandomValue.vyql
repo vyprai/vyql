@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m589bdb7a;
-
-binding weakRandomValue1 {
-  requires {
-    dependency("mlkpwgen")
-  }
-  query pattern callExpr where callee.method == "MlkPwgen.PasswordGenerator.GenerateComplex"
-  emit issue code.WeakRandomValue at call
-}

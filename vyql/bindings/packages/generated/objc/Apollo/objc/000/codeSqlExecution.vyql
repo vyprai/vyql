@@ -1,9 +1,0 @@
-module bindings.objc.generated.md9f09ab7;
-
-binding sqlExecution0 {
-  requires {
-    dependency("Apollo")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.SqlExecution at args[0]
-}

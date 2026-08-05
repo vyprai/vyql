@@ -1,9 +1,0 @@
-module bindings.php.generated.mc0603966;
-
-binding filePathAccess8 {
-  requires {
-    dependency("spatie/dropbox-api")
-  }
-  query pattern callExpr where callee.method == "getThumbnail"
-  emit sink code.FilePathAccess at args[0]
-}

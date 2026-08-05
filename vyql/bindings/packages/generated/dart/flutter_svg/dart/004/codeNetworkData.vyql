@@ -1,9 +1,0 @@
-module bindings.dart.generated.m71c0189e;
-
-binding networkData4 {
-  requires {
-    dependency("flutter_svg")
-  }
-  query pattern callExpr where callee.method == "SvgNetworkLoader"
-  emit source code.NetworkData at call.result
-}

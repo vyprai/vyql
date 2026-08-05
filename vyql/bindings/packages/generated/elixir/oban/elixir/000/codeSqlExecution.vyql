@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mefa410d1;
-
-binding sqlExecution0 {
-  requires {
-    dependency("oban")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit sink code.SqlExecution at args[0]
-}

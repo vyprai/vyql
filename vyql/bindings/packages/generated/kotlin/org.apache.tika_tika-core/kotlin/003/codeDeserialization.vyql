@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.md950cd2c;
-
-binding deserialization3 {
-  requires {
-    dependency("org.apache.tika:tika-core")
-  }
-  query pattern callExpr where callee.method == "detect"
-  emit sink code.Deserialization at args[0]
-}

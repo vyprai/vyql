@@ -1,0 +1,41 @@
+module bindings.ruby.generated.m850ba68e;
+
+binding deserialization0 {
+  requires {
+    dependency("mixlib-config")
+  }
+  query pattern callExpr where callee.method == "from_file"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("mixlib-config")
+  }
+  query pattern callExpr where callee.method == "from_yaml"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("mixlib-config")
+  }
+  query pattern callExpr where callee.method == "from_json"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("mixlib-config")
+  }
+  query pattern callExpr where callee.method == "from_toml"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("mixlib-config")
+  }
+  query pattern callExpr where callee.method == "from_hash"
+  emit sink code.Deserialization at args[0]
+}

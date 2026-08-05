@@ -1,0 +1,49 @@
+module bindings.rust.generated.md1392577;
+
+binding filePathAccess0 {
+  requires {
+    dependency("core-foundation")
+  }
+  query pattern callExpr where callee.method == "from_file_system_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("core-foundation")
+  }
+  query pattern callExpr where callee.method == "to_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("core-foundation")
+  }
+  query pattern callExpr where callee.method == "get_file_system_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("core-foundation")
+  }
+  query pattern callExpr where callee.method == "path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("core-foundation")
+  }
+  query pattern callExpr where callee.method == "resources_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("core-foundation")
+  }
+  query pattern callExpr where callee.method == "from_buffer"
+  emit sink code.Deserialization at args[0]
+}

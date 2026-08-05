@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mf4474e9d;
-
-binding sqlExecution1 {
-  requires {
-    dependency("org.testcontainers:mysql")
-  }
-  query pattern callExpr where callee.method == "constructUrlForConnection"
-  emit sink code.SqlExecution at args[0]
-}

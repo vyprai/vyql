@@ -1,0 +1,17 @@
+module bindings.elixir.generated.mde7df98d;
+
+binding deserialization0 {
+  requires {
+    dependency("slime")
+  }
+  query pattern callExpr where callee.method == "Slime.Parser.parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding templateRender1 {
+  requires {
+    dependency("slime")
+  }
+  query pattern callExpr where callee.method == "Slime.Renderer.render"
+  emit sink code.TemplateRender at args[0]
+}

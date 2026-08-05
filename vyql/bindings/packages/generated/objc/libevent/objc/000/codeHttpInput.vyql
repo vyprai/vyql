@@ -1,9 +1,0 @@
-module bindings.objc.generated.mf6e7b221;
-
-binding httpInput0 {
-  requires {
-    dependency("libevent")
-  }
-  query pattern callExpr where callee.method == "evhttp_parse_firstline_"
-  emit source code.HttpInput at call.result
-}

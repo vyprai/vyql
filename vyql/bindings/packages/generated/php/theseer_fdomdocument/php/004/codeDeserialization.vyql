@@ -1,9 +1,0 @@
-module bindings.php.generated.m382d8800;
-
-binding deserialization4 {
-  requires {
-    dependency("theseer/fdomdocument")
-  }
-  query pattern callExpr where callee.method == "appendXML"
-  emit sink code.Deserialization at args[0]
-}

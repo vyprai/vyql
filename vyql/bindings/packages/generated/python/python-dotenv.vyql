@@ -1,0 +1,41 @@
+module bindings.python.generated.mf16a0cc3;
+
+binding envVariable0 {
+  requires {
+    dependency("python-dotenv")
+  }
+  query pattern callExpr where callee.method == "load_dotenv"
+  emit source code.EnvVariable at call.result
+}
+
+binding envVariable1 {
+  requires {
+    dependency("python-dotenv")
+  }
+  query pattern callExpr where callee.method == "set_key"
+  emit source code.EnvVariable at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("python-dotenv")
+  }
+  query pattern callExpr where callee.method == "parse_stream"
+  emit source core.UserControlledData at call.result
+}
+
+binding cliArgument3 {
+  requires {
+    dependency("python-dotenv")
+  }
+  query pattern callExpr where callee.method == "cli"
+  emit source code.CliArgument at call.result
+}
+
+binding commandExecution4 {
+  requires {
+    dependency("python-dotenv")
+  }
+  query pattern callExpr where callee.method == "run_command"
+  emit sink code.CommandExecution at args[0]
+}

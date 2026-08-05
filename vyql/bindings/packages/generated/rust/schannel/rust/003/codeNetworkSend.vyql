@@ -1,9 +1,0 @@
-module bindings.rust.generated.maacb195e;
-
-binding networkSend3 {
-  requires {
-    dependency("schannel")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkSend at args[0]
-}

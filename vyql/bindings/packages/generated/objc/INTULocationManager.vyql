@@ -1,0 +1,49 @@
+module bindings.objc.generated.m438f99b0;
+
+binding networkData0 {
+  requires {
+    dependency("INTULocationManager")
+  }
+  query pattern callExpr where callee.method == "requestLocationWithDesiredAccuracy"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("INTULocationManager")
+  }
+  query pattern callExpr where callee.method == "subscribeToLocationUpdatesWithBlock"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData2 {
+  requires {
+    dependency("INTULocationManager")
+  }
+  query pattern callExpr where callee.method == "subscribeToLocationUpdatesWithDesiredAccuracy"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("INTULocationManager")
+  }
+  query pattern callExpr where callee.method == "subscribeToSignificantLocationChangesWithBlock"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData4 {
+  requires {
+    dependency("INTULocationManager")
+  }
+  query pattern callExpr where callee.method == "subscribeToHeadingUpdatesWithBlock"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData5 {
+  requires {
+    dependency("INTULocationManager")
+  }
+  query pattern callExpr where callee.method == "initWithType"
+  emit source code.NetworkData at call.result
+}

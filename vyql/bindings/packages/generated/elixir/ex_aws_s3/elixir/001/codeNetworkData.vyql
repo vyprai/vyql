@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m384b2ed3;
-
-binding networkData1 {
-  requires {
-    dependency("ex_aws_s3")
-  }
-  query pattern callExpr where callee.method == "ExAws.S3.get_object"
-  emit source code.NetworkData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.mae370669;
-
-binding deserialization1 {
-  requires {
-    dependency("nunomaduro/termwind")
-  }
-  query pattern callExpr where callee.method == "HtmlRenderer.parse"
-  emit sink code.Deserialization at args[0]
-}

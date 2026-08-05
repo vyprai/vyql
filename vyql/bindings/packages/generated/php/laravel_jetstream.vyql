@@ -1,0 +1,34 @@
+module bindings.php.generated.me7b7042d;
+
+binding fileUse0 {
+  requires {
+    dependency("laravel/jetstream")
+  }
+  query pattern callExpr where callee.method == "updateProfilePhoto"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("laravel/jetstream")
+  }
+  query pattern callExpr where callee.method == "deleteProfilePhoto"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("laravel/jetstream")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding redirectTarget3 {
+  requires {
+    dependency("laravel/jetstream")
+  }
+  query pattern callExpr where callee.method == "redirectPath"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

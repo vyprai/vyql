@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m3f2c2607;
-
-binding networkData2 {
-  requires {
-    dependency("facebook")
-  }
-  query pattern callExpr where callee.method == "get_object"
-  emit source code.NetworkData at call.result
-}

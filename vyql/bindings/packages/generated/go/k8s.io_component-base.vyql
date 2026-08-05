@@ -1,0 +1,33 @@
+module bindings.go.generated.m3c97ee4a;
+
+binding commandExecution0 {
+  requires {
+    dependency("k8s.io/component-base")
+  }
+  query pattern callExpr where callee.method == "Run"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("k8s.io/component-base")
+  }
+  query pattern callExpr where callee.method == "RunNoErrOutput"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding httpInput2 {
+  requires {
+    dependency("k8s.io/component-base")
+  }
+  query pattern callExpr where callee.method == "handle"
+  emit source code.HttpInput at call.result
+}
+
+binding responseHeaderWrite3 {
+  requires {
+    dependency("k8s.io/component-base")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

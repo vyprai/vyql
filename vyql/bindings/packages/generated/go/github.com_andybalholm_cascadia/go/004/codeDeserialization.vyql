@@ -1,9 +1,0 @@
-module bindings.go.generated.m9e2705dc;
-
-binding deserialization4 {
-  requires {
-    dependency("github.com/andybalholm/cascadia")
-  }
-  query pattern callExpr where callee.method == "Compile"
-  emit sink code.Deserialization at args[0]
-}

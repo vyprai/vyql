@@ -1,0 +1,17 @@
+module bindings.go.generated.me2bfc398;
+
+binding weakHash0 {
+  requires {
+    dependency("github.com/cespare/xxhash/v2")
+  }
+  query pattern callExpr where callee.method == "Sum64"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash1 {
+  requires {
+    dependency("github.com/cespare/xxhash/v2")
+  }
+  query pattern callExpr where callee.method == "Sum64String"
+  emit issue code.WeakHash at call
+}

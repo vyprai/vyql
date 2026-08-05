@@ -1,9 +1,0 @@
-module bindings.rust.generated.m1e6cbc76;
-
-binding deserialization0 {
-  requires {
-    dependency("humantime")
-  }
-  query pattern callExpr where callee.method == "parse_duration"
-  emit sink code.Deserialization at args[0]
-}

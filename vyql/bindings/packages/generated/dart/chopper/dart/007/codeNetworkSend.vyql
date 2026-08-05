@@ -1,9 +1,0 @@
-module bindings.dart.generated.md5715606;
-
-binding networkSend7 {
-  requires {
-    dependency("chopper")
-  }
-  query pattern callExpr where callee.method == "options"
-  emit sink code.NetworkSend at args[0]
-}

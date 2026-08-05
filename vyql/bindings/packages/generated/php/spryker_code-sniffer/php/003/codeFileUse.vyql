@@ -1,9 +1,0 @@
-module bindings.php.generated.m17304d30;
-
-binding fileUse3 {
-  requires {
-    dependency("spryker/code-sniffer")
-  }
-  query pattern callExpr where callee.method == "SprykerToolsTokenizer::getTokens"
-  emit sink code.FileUseSink at args[0]
-}

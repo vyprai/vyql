@@ -1,9 +1,0 @@
-module bindings.dart.generated.m42a72c4e;
-
-binding fileUse2 {
-  requires {
-    dependency("pasteboard")
-  }
-  query pattern callExpr where callee.method == "writeFiles"
-  emit sink code.FileUseSink at args[0]
-}

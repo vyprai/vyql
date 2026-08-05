@@ -1,0 +1,33 @@
+module bindings.javascript.generated.m293e575b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("gzip-size")
+  }
+  query pattern callExpr where callee.method == "gzipSizeFromFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("gzip-size")
+  }
+  query pattern callExpr where callee.method == "gzipSizeFromFileSync"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("gzip-size")
+  }
+  query pattern callExpr where callee.method == "gzipSize"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("gzip-size")
+  }
+  query pattern callExpr where callee.method == "gzipSizeSync"
+  emit source core.UserControlledData at call.result
+}

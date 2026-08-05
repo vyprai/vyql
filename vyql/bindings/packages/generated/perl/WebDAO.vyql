@@ -1,0 +1,41 @@
+module bindings.perl.generated.m5f6df47b;
+
+binding userControlledData0 {
+  requires {
+    dependency("WebDAO")
+  }
+  query pattern callExpr where callee.method == "param"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("WebDAO")
+  }
+  query pattern callExpr where callee.method == "_parse_body"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("WebDAO")
+  }
+  query pattern callExpr where callee.method == "get_body"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("WebDAO")
+  }
+  query pattern callExpr where callee.method == "get_cookie"
+  emit source core.UserControlledData at call.result
+}
+
+binding responseHeaderWrite4 {
+  requires {
+    dependency("WebDAO")
+  }
+  query pattern callExpr where callee.method == "print_headers"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

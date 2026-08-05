@@ -1,9 +1,0 @@
-module bindings.dart.generated.mdbd356fd;
-
-binding networkSend2 {
-  requires {
-    dependency("http2")
-  }
-  query pattern callExpr where callee.method == "sendHeaders"
-  emit sink code.NetworkSend at args[0]
-}

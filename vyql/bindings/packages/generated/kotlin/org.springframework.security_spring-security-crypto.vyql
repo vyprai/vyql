@@ -1,0 +1,17 @@
+module bindings.kotlin.generated.m4a710fb5;
+
+binding weakHash0 {
+  requires {
+    dependency("org.springframework.security:spring-security-crypto")
+  }
+  query pattern callExpr where callee.method == "Md4PasswordEncoder.encode"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash1 {
+  requires {
+    dependency("org.springframework.security:spring-security-crypto")
+  }
+  query pattern callExpr where callee.method == "Md4PasswordEncoder.matches"
+  emit issue code.WeakHash at call
+}

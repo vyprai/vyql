@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m41ec4d0a;
-
-binding databaseRead0 {
-  requires {
-    dependency("org.testcontainers:mysql")
-  }
-  query pattern callExpr where callee.method == "getJdbcUrl"
-  emit sink code.DatabaseReadSink at args[0]
-}

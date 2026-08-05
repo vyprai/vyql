@@ -1,0 +1,17 @@
+module bindings.perl.generated.m340e4174;
+
+binding sqlExecution0 {
+  requires {
+    dependency("Sedna")
+  }
+  query pattern callExpr where callee.method == "find_api"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding xmlParse1 {
+  requires {
+    dependency("Sedna")
+  }
+  query pattern callExpr where callee.method == "parse_version"
+  emit sink code.XmlParse at args[0]
+}

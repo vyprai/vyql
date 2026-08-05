@@ -1,0 +1,97 @@
+module bindings.ruby.generated.mbbe1ca32;
+
+binding networkData0 {
+  requires {
+    dependency("fog-dynect")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("fog-dynect")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("fog-dynect")
+  }
+  query pattern callExpr where callee.method == "post_record"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("fog-dynect")
+  }
+  query pattern callExpr where callee.method == "put_record"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("fog-dynect")
+  }
+  query pattern callExpr where callee.method == "delete_record"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("fog-dynect")
+  }
+  query pattern callExpr where callee.method == "post_zone"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend6 {
+  requires {
+    dependency("fog-dynect")
+  }
+  query pattern callExpr where callee.method == "put_zone"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend7 {
+  requires {
+    dependency("fog-dynect")
+  }
+  query pattern callExpr where callee.method == "delete_zone"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData8 {
+  requires {
+    dependency("fog-dynect")
+  }
+  query pattern callExpr where callee.method == "get_record"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData9 {
+  requires {
+    dependency("fog-dynect")
+  }
+  query pattern callExpr where callee.method == "get_all_records"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData10 {
+  requires {
+    dependency("fog-dynect")
+  }
+  query pattern callExpr where callee.method == "get_node_list"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData11 {
+  requires {
+    dependency("fog-dynect")
+  }
+  query pattern callExpr where callee.method == "get_zone"
+  emit source code.NetworkData at call.result
+}

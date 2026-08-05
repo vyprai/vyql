@@ -1,0 +1,65 @@
+module bindings.ruby.generated.m2f4e9035;
+
+binding httpInput0 {
+  requires {
+    dependency("http-accept")
+  }
+  query pattern callExpr where callee.method == "HTTP::Accept::Charsets.parse"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("http-accept")
+  }
+  query pattern callExpr where callee.method == "HTTP::Accept::Encodings.parse"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("http-accept")
+  }
+  query pattern callExpr where callee.method == "HTTP::Accept::Languages.parse"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("http-accept")
+  }
+  query pattern callExpr where callee.method == "HTTP::Accept::MediaTypes.parse"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("http-accept")
+  }
+  query pattern callExpr where callee.method == "HTTP::Accept::QuotedString.unquote"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  requires {
+    dependency("http-accept")
+  }
+  query pattern callExpr where callee.method == "HTTP::Accept::Charsets.browser_preferred_charsets"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput6 {
+  requires {
+    dependency("http-accept")
+  }
+  query pattern callExpr where callee.method == "HTTP::Accept::Encodings.browser_preferred_content_codings"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput7 {
+  requires {
+    dependency("http-accept")
+  }
+  query pattern callExpr where callee.method == "HTTP::Accept::MediaTypes.browser_preferred_media_types"
+  emit source code.HttpInput at call.result
+}

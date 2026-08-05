@@ -1,9 +1,0 @@
-module bindings.swift.generated.mc371d226;
-
-binding deserialization4 {
-  requires {
-    dependency("github.com/tsolomko/BitByteData")
-  }
-  query pattern callExpr where callee.method == "uint16"
-  emit sink code.Deserialization at args[0]
-}

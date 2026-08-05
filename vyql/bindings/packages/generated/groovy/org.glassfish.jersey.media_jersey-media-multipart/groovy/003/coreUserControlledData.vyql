@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mb6511e87;
-
-binding userControlledData3 {
-  requires {
-    dependency("org.glassfish.jersey.media:jersey-media-multipart")
-  }
-  query pattern callExpr where callee.method == "getFileName"
-  emit source core.UserControlledData at call.result
-}

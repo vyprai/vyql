@@ -1,9 +1,0 @@
-module bindings.python.generated.m406c28bc;
-
-binding deserialization2 {
-  requires {
-    dependency("qtpy")
-  }
-  query pattern callExpr where callee.method == "loadUiType"
-  emit sink code.Deserialization at args[0]
-}

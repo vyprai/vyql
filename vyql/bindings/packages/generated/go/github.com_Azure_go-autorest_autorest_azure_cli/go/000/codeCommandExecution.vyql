@@ -1,9 +1,0 @@
-module bindings.go.generated.m4da77d2a;
-
-binding commandExecution0 {
-  requires {
-    dependency("github.com/Azure/go-autorest/autorest/azure/cli")
-  }
-  query pattern callExpr where callee.method == "GetAzureCLICommand"
-  emit sink code.CommandExecution at args[0]
-}

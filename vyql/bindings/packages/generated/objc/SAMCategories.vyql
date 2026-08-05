@@ -1,0 +1,123 @@
+module bindings.objc.generated.m0cb6a173;
+
+binding userControlledData0 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_queryDictionary"
+  emit source core.UserControlledData at call.result
+}
+
+binding weakHash1 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_MD5Digest"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash2 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_SHA1Digest"
+  emit issue code.WeakHash at call
+}
+
+binding htmlEscape3 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_escapeHTML"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation4 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_stringByEscapingForURLQuery"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_stringByUnescapingFromURLQuery"
+  emit source core.UserControlledData at call.result
+}
+
+binding deserialization6 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_dictionaryWithFormEncodedString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_documentsDirectoryURL"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_cachesDirectoryURL"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess9 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_downloadsDirectoryURL"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess10 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_libraryDirectoryURL"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess11 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_applicationSupportDirectoryURL"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding secretValue12 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_setSignatureSalt"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue13 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_signatureSalt"
+  emit source code.SecretValue at call.result
+}

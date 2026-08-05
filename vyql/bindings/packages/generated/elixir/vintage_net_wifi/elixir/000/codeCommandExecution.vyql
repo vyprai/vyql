@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma5c41f61;
-
-binding commandExecution0 {
-  requires {
-    dependency("vintage_net_wifi")
-  }
-  query pattern callExpr where callee.method == "up_cmds"
-  emit sink code.CommandExecution at args[0]
-}

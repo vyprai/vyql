@@ -1,9 +1,0 @@
-module bindings.python.generated.m14764b31;
-
-binding nosqlQuery1 {
-  requires {
-    dependency("pymongo")
-  }
-  query pattern callExpr where callee.method == "collection"
-  emit sink code.NosqlQuery at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m5879e2a2;
-
-binding databaseRead2 {
-  requires {
-    dependency("django-haystack")
-  }
-  query pattern callExpr where callee.method == "raw_search"
-  emit sink code.DatabaseReadSink at args[0]
-}

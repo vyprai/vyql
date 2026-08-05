@@ -1,9 +1,0 @@
-module bindings.scala.generated.m6b590f49;
-
-binding deserialization1 {
-  requires {
-    dependency("jline:jline")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

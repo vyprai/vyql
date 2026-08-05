@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mdeee483b;
-
-binding userControlledData10 {
-  requires {
-    dependency("recaptcha")
-  }
-  query pattern callExpr where callee.method == "recaptcha_response_token"
-  emit source core.UserControlledData at call.result
-}

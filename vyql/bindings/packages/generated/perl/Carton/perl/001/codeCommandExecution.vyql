@@ -1,9 +1,0 @@
-module bindings.perl.generated.m27a90614;
-
-binding commandExecution1 {
-  requires {
-    dependency("Carton")
-  }
-  query pattern callExpr where callee.method == "cmd_exec"
-  emit sink code.CommandExecution at args[0]
-}

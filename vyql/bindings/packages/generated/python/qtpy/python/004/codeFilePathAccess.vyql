@@ -1,9 +1,0 @@
-module bindings.python.generated.m406c28bc;
-
-binding filePathAccess4 {
-  requires {
-    dependency("qtpy")
-  }
-  query pattern callExpr where callee.method == "getopenfilenames"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.m9916cfd1;
-
-binding deserialization2 {
-  requires {
-    dependency("org.apache.kafka:kafka-streams")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

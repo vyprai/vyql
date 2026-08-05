@@ -1,0 +1,57 @@
+module bindings.c.generated.mc5f1cd3a;
+
+binding networkData0 {
+  requires {
+    dependency("usockets")
+  }
+  query pattern callExpr where callee.method == "us_quic_socket_context_on_stream_data"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("usockets")
+  }
+  query pattern callExpr where callee.method == "us_quic_stream_write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("usockets")
+  }
+  query pattern callExpr where callee.method == "us_quic_socket_context_send_headers"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkBind3 {
+  requires {
+    dependency("usockets")
+  }
+  query pattern callExpr where callee.method == "us_socket_context_listen"
+  emit sink code.NetworkBind at args[0]
+}
+
+binding networkBind4 {
+  requires {
+    dependency("usockets")
+  }
+  query pattern callExpr where callee.method == "us_quic_socket_context_listen"
+  emit sink code.NetworkBind at args[0]
+}
+
+binding networkConnect5 {
+  requires {
+    dependency("usockets")
+  }
+  query pattern callExpr where callee.method == "us_socket_context_connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect6 {
+  requires {
+    dependency("usockets")
+  }
+  query pattern callExpr where callee.method == "us_quic_socket_context_connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mbeb9ff45;
-
-binding networkConnect2 {
-  requires {
-    dependency("reverse_proxy_plug")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit sink code.NetworkConnectSink at args[0]
-}

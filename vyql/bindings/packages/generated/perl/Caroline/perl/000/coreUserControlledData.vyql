@@ -1,9 +1,0 @@
-module bindings.perl.generated.m1a62625e;
-
-binding userControlledData0 {
-  requires {
-    dependency("Caroline")
-  }
-  query pattern callExpr where callee.method == "readline"
-  emit source core.UserControlledData at call.result
-}

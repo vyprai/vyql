@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m3fc09aaf;
-
-binding filePathAccess0 {
-  requires {
-    dependency("puma")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.FilePathAccess at args[0]
-}

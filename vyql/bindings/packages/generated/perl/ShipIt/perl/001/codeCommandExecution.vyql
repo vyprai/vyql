@@ -1,9 +1,0 @@
-module bindings.perl.generated.m9ba2618c;
-
-binding commandExecution1 {
-  requires {
-    dependency("ShipIt")
-  }
-  query pattern callExpr where callee.method == "system"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m005cda50;
-
-binding deserialization1 {
-  requires {
-    dependency("spacy-legacy")
-  }
-  query pattern callExpr where callee.method == "set_kb"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m7b5a4479;
-
-binding networkSend2 {
-  requires {
-    dependency("ZeroMQ")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

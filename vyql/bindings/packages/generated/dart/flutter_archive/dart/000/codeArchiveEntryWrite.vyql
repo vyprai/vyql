@@ -1,9 +1,0 @@
-module bindings.dart.generated.m664edbfe;
-
-binding archiveEntryWrite0 {
-  requires {
-    dependency("flutter_archive")
-  }
-  query pattern callExpr where callee.method == "createFromFiles"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

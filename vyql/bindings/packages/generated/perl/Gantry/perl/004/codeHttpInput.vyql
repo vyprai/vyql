@@ -1,9 +1,0 @@
-module bindings.perl.generated.m01685e94;
-
-binding httpInput4 {
-  requires {
-    dependency("Gantry")
-  }
-  query pattern callExpr where callee.method == "get_uf_param_hash"
-  emit source code.HttpInput at call.result
-}

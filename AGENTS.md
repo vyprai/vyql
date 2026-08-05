@@ -7,7 +7,10 @@ this covers the same ground plus the traps that cost real time here.
 
 A Go engine plus a large body of security knowledge stored as data.
 
-- `cmd/`, `engine/`, `extract/`, `parser/`, `solvers/`, `usg/` — the engine
+- `cmd/` — the binaries; `internal/` — the engine (`engine`, `extract`, `parser`,
+  `solvers`, `usg` and the rest). Everything outside `cmd/` is internal on
+  purpose: the CLI is the supported interface, so the Go packages stay free to
+  change.
 - `vyql/` — the knowledge: `ontology/` (concepts), `bindings/` (what each
   language means), `packs/` (rules), `tests/` (specs), `taxonomy/` (CWE/CAPEC)
 - `docs/` — the design series; `docs/README.md` indexes it

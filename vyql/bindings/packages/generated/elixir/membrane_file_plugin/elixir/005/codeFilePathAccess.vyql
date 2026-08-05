@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m3bf4d6c1;
-
-binding filePathAccess5 {
-  requires {
-    dependency("membrane_file_plugin")
-  }
-  query pattern callExpr where callee.method == "copy!"
-  emit sink code.FilePathAccess at args[0]
-}

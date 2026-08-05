@@ -1,9 +1,0 @@
-module bindings.java.generated.me3051de2;
-
-binding deserialization1 {
-  requires {
-    dependency("com.fasterxml.jackson.module:jackson-module-parameter-names")
-  }
-  query pattern callExpr where callee.method == "findImplicitPropertyName"
-  emit sink code.Deserialization at args[0]
-}

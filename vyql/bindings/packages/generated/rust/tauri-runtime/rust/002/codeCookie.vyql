@@ -1,9 +1,0 @@
-module bindings.rust.generated.m24cf5420;
-
-binding cookie2 {
-  requires {
-    dependency("tauri-runtime")
-  }
-  query pattern callExpr where callee.method == "set_cookie"
-  emit source code.Cookie at call.result
-}

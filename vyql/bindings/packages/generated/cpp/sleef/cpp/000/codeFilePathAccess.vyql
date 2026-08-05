@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m3242261e;
-
-binding filePathAccess0 {
-  requires {
-    dependency("sleef")
-  }
-  query pattern callExpr where callee.method == "SleefDFT_setPath"
-  emit sink code.FilePathAccess at args[0]
-}

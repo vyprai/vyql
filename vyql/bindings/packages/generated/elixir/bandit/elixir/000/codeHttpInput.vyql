@@ -1,9 +1,0 @@
-module bindings.elixir.generated.maccf35a5;
-
-binding httpInput0 {
-  requires {
-    dependency("bandit")
-  }
-  query pattern callExpr where callee.method == "run"
-  emit source code.HttpInput at call.result
-}

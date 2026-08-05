@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m4c2a21d8;
-
-binding xmlParse1 {
-  requires {
-    dependency("exmerl")
-  }
-  query pattern callExpr where callee.method == "from_file"
-  emit sink code.XmlParse at args[0]
-}

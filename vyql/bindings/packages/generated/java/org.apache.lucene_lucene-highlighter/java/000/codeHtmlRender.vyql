@@ -1,9 +1,0 @@
-module bindings.java.generated.mb0c06481;
-
-binding htmlRender0 {
-  requires {
-    dependency("org.apache.lucene:lucene-highlighter")
-  }
-  query pattern callExpr where callee.method == "highlightTerm"
-  emit sink code.HtmlRender at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m736e2978;
-
-binding networkData1 {
-  requires {
-    dependency("libusb-win32")
-  }
-  query pattern callExpr where callee.method == "usb_bulk_read"
-  emit source code.NetworkData at call.result
-}

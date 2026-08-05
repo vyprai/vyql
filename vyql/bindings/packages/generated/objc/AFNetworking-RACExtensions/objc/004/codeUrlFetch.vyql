@@ -1,9 +1,0 @@
-module bindings.objc.generated.m1cbeeec6;
-
-binding urlFetch4 {
-  requires {
-    dependency("AFNetworking-RACExtensions")
-  }
-  query pattern callExpr where callee.method == "rac_PATCH"
-  emit sink code.UrlFetch at args[0]
-}

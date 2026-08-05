@@ -1,0 +1,17 @@
+module bindings.ruby.generated.m46162442;
+
+binding commandExecution0 {
+  requires {
+    dependency("delayed_job")
+  }
+  query pattern callExpr where callee.method == "run_process"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("delayed_job")
+  }
+  query pattern callExpr where callee.method == "load_dj"
+  emit sink code.Deserialization at args[0]
+}

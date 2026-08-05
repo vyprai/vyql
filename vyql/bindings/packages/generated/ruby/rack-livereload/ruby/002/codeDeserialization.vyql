@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m6665dbcb;
-
-binding deserialization2 {
-  requires {
-    dependency("rack-livereload")
-  }
-  query pattern callExpr where callee.method == "decodeURIComponent"
-  emit sink code.Deserialization at args[0]
-}

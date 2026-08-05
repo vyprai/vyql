@@ -1,9 +1,0 @@
-module bindings.java.generated.m254c4c73;
-
-binding filePathAccess3 {
-  requires {
-    dependency("org.apache.curator:curator-client")
-  }
-  query pattern callExpr where callee.method == "mkdirs"
-  emit sink code.FilePathAccess at args[0]
-}

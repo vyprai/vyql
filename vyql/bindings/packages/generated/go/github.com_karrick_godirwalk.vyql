@@ -1,0 +1,33 @@
+module bindings.go.generated.m0a9603dd;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/karrick/godirwalk")
+  }
+  query pattern callExpr where callee.method == "Walk"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("github.com/karrick/godirwalk")
+  }
+  query pattern callExpr where callee.method == "NewDirent"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/karrick/godirwalk")
+  }
+  query pattern callExpr where callee.method == "ReadDirents"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("github.com/karrick/godirwalk")
+  }
+  query pattern callExpr where callee.method == "ReadDirnames"
+  emit sink code.FilePathAccess at args[0]
+}

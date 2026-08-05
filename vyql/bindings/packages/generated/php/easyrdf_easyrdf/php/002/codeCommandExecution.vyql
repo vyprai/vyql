@@ -1,9 +1,0 @@
-module bindings.php.generated.mebd9a39f;
-
-binding commandExecution2 {
-  requires {
-    dependency("easyrdf/easyrdf")
-  }
-  query pattern callExpr where callee.method == "EasyRdfUtils::execCommandPipe"
-  emit sink code.CommandExecution at args[0]
-}

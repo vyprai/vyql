@@ -1,9 +1,0 @@
-module bindings.rust.generated.m397c49ff;
-
-binding filePathAccess0 {
-  requires {
-    dependency("spki")
-  }
-  query pattern callExpr where callee.method == "read_public_key_der_file"
-  emit sink code.FilePathAccess at args[0]
-}

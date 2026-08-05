@@ -1,9 +1,0 @@
-module bindings.objc.generated.m632c1756;
-
-binding deserialization1 {
-  requires {
-    dependency("flutter_sound_core")
-  }
-  query pattern callExpr where callee.method == "startPlayerFromBuffer"
-  emit sink code.Deserialization at args[0]
-}

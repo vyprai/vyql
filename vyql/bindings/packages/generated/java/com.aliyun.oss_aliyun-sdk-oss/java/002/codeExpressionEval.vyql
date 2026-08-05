@@ -1,9 +1,0 @@
-module bindings.java.generated.m9457f182;
-
-binding expressionEval2 {
-  requires {
-    dependency("com.aliyun.oss:aliyun-sdk-oss")
-  }
-  query pattern callExpr where callee.method == "selectObject"
-  emit sink code.ExpressionEval at args[0]
-}

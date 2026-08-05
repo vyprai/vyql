@@ -1,0 +1,49 @@
+module bindings.php.generated.m7bcde4e5;
+
+binding deserialization0 {
+  requires {
+    dependency("hassankhan/config")
+  }
+  query pattern callExpr where callee.method == "parseFile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("hassankhan/config")
+  }
+  query pattern callExpr where callee.method == "parseString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("hassankhan/config")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("hassankhan/config")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("hassankhan/config")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("hassankhan/config")
+  }
+  query pattern callExpr where callee.method == "loadFromFile"
+  emit sink code.FilePathAccess at args[0]
+}

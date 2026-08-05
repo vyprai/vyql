@@ -1,0 +1,17 @@
+module bindings.elixir.generated.mb84d38db;
+
+binding commandExecution0 {
+  requires {
+    dependency("nerves_network")
+  }
+  query pattern callExpr where callee.path ~= "Nerves.Network.udhcpc_wrapper.execv"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("nerves_network")
+  }
+  query pattern callExpr where callee.path ~= "Nerves.Network.Resolvconf.write_resolvconf"
+  emit sink code.FilePathAccess at args[0]
+}

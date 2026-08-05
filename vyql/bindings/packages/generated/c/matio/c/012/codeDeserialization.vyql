@@ -1,9 +1,0 @@
-module bindings.c.generated.m1b9b358f;
-
-binding deserialization12 {
-  requires {
-    dependency("matio")
-  }
-  query pattern callExpr where callee.method == "Mat_VarReadDataLinear5"
-  emit sink code.Deserialization at args[0]
-}

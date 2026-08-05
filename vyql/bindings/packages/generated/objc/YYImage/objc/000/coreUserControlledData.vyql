@@ -1,9 +1,0 @@
-module bindings.objc.generated.m88b8997b;
-
-binding userControlledData0 {
-  requires {
-    dependency("YYImage")
-  }
-  query pattern callExpr where callee.method == "YYImageDetectType"
-  emit source core.UserControlledData at call.result
-}

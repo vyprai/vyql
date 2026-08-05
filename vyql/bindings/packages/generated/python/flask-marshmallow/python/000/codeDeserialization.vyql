@@ -1,9 +1,0 @@
-module bindings.python.generated.m3669c619;
-
-binding deserialization0 {
-  requires {
-    dependency("flask-marshmallow")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

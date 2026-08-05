@@ -1,9 +1,0 @@
-module bindings.elixir.generated.md6ea47c1;
-
-binding userControlledData0 {
-  requires {
-    dependency("fun_with_flags")
-  }
-  query pattern callExpr where callee.method == "enable"
-  emit source core.UserControlledData at call.result
-}

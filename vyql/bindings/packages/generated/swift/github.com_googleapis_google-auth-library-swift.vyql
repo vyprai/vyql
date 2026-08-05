@@ -1,0 +1,49 @@
+module bindings.swift.generated.m1d250a97;
+
+binding secretValue0 {
+  requires {
+    dependency("github.com/googleapis/google-auth-library-swift")
+  }
+  query pattern callExpr where callee.method == "oAuthToken"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("github.com/googleapis/google-auth-library-swift")
+  }
+  query pattern callExpr where callee.method == "oAuthTokenSecret"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("github.com/googleapis/google-auth-library-swift")
+  }
+  query pattern callExpr where callee.method == "AccessToken"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("github.com/googleapis/google-auth-library-swift")
+  }
+  query pattern callExpr where callee.method == "RefreshToken"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("github.com/googleapis/google-auth-library-swift")
+  }
+  query pattern callExpr where callee.method == "saveToken"
+  emit source code.SecretValue at call.result
+}
+
+binding networkSend5 {
+  requires {
+    dependency("github.com/googleapis/google-auth-library-swift")
+  }
+  query pattern callExpr where callee.method == "performRequest"
+  emit sink code.NetworkSend at args[0]
+}

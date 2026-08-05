@@ -1,0 +1,33 @@
+module bindings.ruby.generated.m7bc51ba1;
+
+binding networkData0 {
+  requires {
+    dependency("hawkins")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("hawkins")
+  }
+  query pattern callExpr where callee.method == "server_address"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("hawkins")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("hawkins")
+  }
+  query pattern callExpr where callee.method == "decodeURIComponent"
+  emit sink code.Deserialization at args[0]
+}

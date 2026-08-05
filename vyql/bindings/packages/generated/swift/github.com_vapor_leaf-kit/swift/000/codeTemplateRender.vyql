@@ -1,9 +1,0 @@
-module bindings.swift.generated.mef3132a6;
-
-binding templateRender0 {
-  requires {
-    dependency("github.com/vapor/leaf-kit")
-  }
-  query pattern callExpr where callee.method == "render"
-  emit sink code.TemplateRender at args[0]
-}

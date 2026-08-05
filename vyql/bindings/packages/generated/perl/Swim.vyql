@@ -1,0 +1,38 @@
+module bindings.perl.generated.m03e3243d;
+
+binding deserialization0 {
+  requires {
+    dependency("Swim")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("Swim")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution2 {
+  requires {
+    dependency("Swim")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding htmlEscape3 {
+  requires {
+    dependency("Swim")
+  }
+  query pattern callExpr where callee.method == "escape_html"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,9 +1,0 @@
-module bindings.dart.generated.m9a96523c;
-
-binding networkConnect8 {
-  requires {
-    dependency("http_client_helper")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkConnectSink at args[0]
-}

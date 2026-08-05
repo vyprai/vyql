@@ -1,0 +1,73 @@
+module bindings.groovy.generated.m909dd0fb;
+
+binding networkConnect0 {
+  requires {
+    dependency("org.apache.httpcomponents:fluent-hc")
+  }
+  query pattern callExpr where callee.method == "Get"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("org.apache.httpcomponents:fluent-hc")
+  }
+  query pattern callExpr where callee.method == "Head"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("org.apache.httpcomponents:fluent-hc")
+  }
+  query pattern callExpr where callee.method == "Post"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect3 {
+  requires {
+    dependency("org.apache.httpcomponents:fluent-hc")
+  }
+  query pattern callExpr where callee.method == "Patch"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("org.apache.httpcomponents:fluent-hc")
+  }
+  query pattern callExpr where callee.method == "Put"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect5 {
+  requires {
+    dependency("org.apache.httpcomponents:fluent-hc")
+  }
+  query pattern callExpr where callee.method == "Trace"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect6 {
+  requires {
+    dependency("org.apache.httpcomponents:fluent-hc")
+  }
+  query pattern callExpr where callee.method == "Delete"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect7 {
+  requires {
+    dependency("org.apache.httpcomponents:fluent-hc")
+  }
+  query pattern callExpr where callee.method == "Options"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend8 {
+  requires {
+    dependency("org.apache.httpcomponents:fluent-hc")
+  }
+  query pattern callExpr where callee.method == "Content"
+  emit sink code.NetworkSend at args[0]
+}

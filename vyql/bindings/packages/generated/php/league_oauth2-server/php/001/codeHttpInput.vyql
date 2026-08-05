@@ -1,9 +1,0 @@
-module bindings.php.generated.m970f0357;
-
-binding httpInput1 {
-  requires {
-    dependency("league/oauth2-server")
-  }
-  query pattern callExpr where callee.method == "validateAuthenticatedRequest"
-  emit source code.HttpInput at call.result
-}

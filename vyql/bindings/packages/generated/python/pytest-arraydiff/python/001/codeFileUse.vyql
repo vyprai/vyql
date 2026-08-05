@@ -1,9 +1,0 @@
-module bindings.python.generated.ma51a9702;
-
-binding fileUse1 {
-  requires {
-    dependency("pytest-arraydiff")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.FileUseSink at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.csharp.generated.md1519ec6;
-
-binding networkConnect0 {
-  requires {
-    dependency("system.net.ftpclient")
-  }
-  query pattern callExpr where callee.method == "Connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

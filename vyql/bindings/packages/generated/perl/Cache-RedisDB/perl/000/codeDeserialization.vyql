@@ -1,9 +1,0 @@
-module bindings.perl.generated.m923fa815;
-
-binding deserialization0 {
-  requires {
-    dependency("Cache-RedisDB")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit sink code.Deserialization at args[0]
-}

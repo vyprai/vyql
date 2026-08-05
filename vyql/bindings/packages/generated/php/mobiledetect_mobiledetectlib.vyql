@@ -1,0 +1,49 @@
+module bindings.php.generated.m4be3a9f8;
+
+binding httpInput0 {
+  requires {
+    dependency("mobiledetect/mobiledetectlib")
+  }
+  query pattern callExpr where callee.method == "getHttpHeader"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("mobiledetect/mobiledetectlib")
+  }
+  query pattern callExpr where callee.method == "setHttpHeaders"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("mobiledetect/mobiledetectlib")
+  }
+  query pattern callExpr where callee.method == "match"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("mobiledetect/mobiledetectlib")
+  }
+  query pattern callExpr where callee.method == "matchUserAgentWithFirstFoundMatchingRule"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("mobiledetect/mobiledetectlib")
+  }
+  query pattern callExpr where callee.method == "matchUserAgentWithRule"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  requires {
+    dependency("mobiledetect/mobiledetectlib")
+  }
+  query pattern callExpr where callee.method == "prepareUserAgent"
+  emit source code.HttpInput at call.result
+}

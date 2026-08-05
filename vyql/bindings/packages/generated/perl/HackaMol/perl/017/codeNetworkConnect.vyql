@@ -1,9 +1,0 @@
-module bindings.perl.generated.md871dd99;
-
-binding networkConnect17 {
-  requires {
-    dependency("HackaMol")
-  }
-  query pattern callExpr where callee.method == "rcsb_ftp_fetch"
-  emit sink code.NetworkConnectSink at args[0]
-}

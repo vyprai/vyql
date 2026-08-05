@@ -1,9 +1,0 @@
-module bindings.swift.generated.m8082fdb7;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/pointfreeco/swift-url-routing")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

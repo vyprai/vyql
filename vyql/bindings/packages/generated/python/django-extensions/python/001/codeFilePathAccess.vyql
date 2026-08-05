@@ -1,9 +1,0 @@
-module bindings.python.generated.m401c9fa6;
-
-binding filePathAccess1 {
-  requires {
-    dependency("django-extensions")
-  }
-  query pattern callExpr where callee.method == "parse_mysql_cnf"
-  emit sink code.FilePathAccess at args[0]
-}

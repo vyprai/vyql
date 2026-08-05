@@ -1,9 +1,0 @@
-module bindings.php.generated.mde571bb4;
-
-binding networkSend4 {
-  requires {
-    dependency("pusher/pusher-php-server")
-  }
-  query pattern callExpr where callee.method == "trigger"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m65d9ea34;
-
-binding weakRandomValue3 {
-  requires {
-    dependency("rsa")
-  }
-  query pattern callExpr where callee.method == "read_random_bits"
-  emit issue code.WeakRandomValue at call
-}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mbb7981ca;
-
-binding networkData8 {
-  requires {
-    dependency("usockets")
-  }
-  query pattern callExpr where callee.method == "us_socket_write2"
-  emit source code.NetworkData at call.result
-}

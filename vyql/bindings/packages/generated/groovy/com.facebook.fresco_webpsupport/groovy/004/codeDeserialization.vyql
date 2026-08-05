@@ -1,9 +1,0 @@
-module bindings.groovy.generated.md40e5fb5;
-
-binding deserialization4 {
-  requires {
-    dependency("com.facebook.fresco:webpsupport")
-  }
-  query pattern callExpr where callee.method == "decodeFile"
-  emit sink code.Deserialization at args[0]
-}

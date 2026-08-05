@@ -1,9 +1,0 @@
-module bindings.scala.generated.m4a4ad117;
-
-binding responseHeaderWrite3 {
-  requires {
-    dependency("com.squareup.okhttp:mockwebserver")
-  }
-  query pattern callExpr where callee.method == "MockResponse.addHeader"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

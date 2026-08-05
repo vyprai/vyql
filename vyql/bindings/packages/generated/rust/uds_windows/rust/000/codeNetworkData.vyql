@@ -1,9 +1,0 @@
-module bindings.rust.generated.m71105256;
-
-binding networkData0 {
-  requires {
-    dependency("uds_windows")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source code.NetworkData at call.result
-}

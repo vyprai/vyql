@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m23562f2c;
-
-binding storedDataWrite4 {
-  requires {
-    dependency("exleveldb")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.StoredDataWrite at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.m1e74582b;
-
-binding storedDataRead4 {
-  requires {
-    dependency("github.com/mergesort/Bodega")
-  }
-  query pattern callExpr where callee.method == "readAllData()"
-  emit source code.StoredDataRead at call.result
-}

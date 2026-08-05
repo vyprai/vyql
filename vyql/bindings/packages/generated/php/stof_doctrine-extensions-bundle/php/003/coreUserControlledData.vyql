@@ -1,9 +1,0 @@
-module bindings.php.generated.mf06f6e29;
-
-binding userControlledData3 {
-  requires {
-    dependency("stof/doctrine-extensions-bundle")
-  }
-  query pattern callExpr where callee.method == "getType"
-  emit source core.UserControlledData at call.result
-}

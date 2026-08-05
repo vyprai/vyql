@@ -1,9 +1,0 @@
-module bindings.elixir.generated.md3359d57;
-
-binding nosqlQuery0 {
-  requires {
-    dependency("mongodb")
-  }
-  query pattern callExpr where callee.method == "aggregate"
-  emit sink code.NosqlQuery at args[0]
-}

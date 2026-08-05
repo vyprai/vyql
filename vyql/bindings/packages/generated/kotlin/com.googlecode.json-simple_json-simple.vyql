@@ -1,0 +1,30 @@
+module bindings.kotlin.generated.mad84ffaf;
+
+binding deserialization0 {
+  requires {
+    dependency("com.googlecode.json-simple:json-simple")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.googlecode.json-simple:json-simple")
+  }
+  query pattern callExpr where callee.method == "parseWithException"
+  emit sink code.Deserialization at args[0]
+}
+
+binding htmlEscape2 {
+  requires {
+    dependency("com.googlecode.json-simple:json-simple")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

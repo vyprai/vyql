@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m373ebbc3;
-
-binding deserialization5 {
-  requires {
-    dependency("ancestry")
-  }
-  query pattern callExpr where callee.method == "parse_ancestry_column"
-  emit sink code.Deserialization at args[0]
-}

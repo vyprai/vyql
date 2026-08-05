@@ -1,9 +1,0 @@
-module bindings.c.generated.m3ee0926b;
-
-binding urlFetch0 {
-  requires {
-    dependency("qt5-webview")
-  }
-  query pattern callExpr where callee.method == "setUrl"
-  emit sink code.UrlFetch at args[0]
-}

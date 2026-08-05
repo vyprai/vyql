@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m47da9b45;
-
-binding nosqlQuery24 {
-  requires {
-    dependency("aws-sdk-dynamodb")
-  }
-  query pattern callExpr where callee.method == "enable_kinesis_streaming_destination"
-  emit sink code.NosqlQuery at args[0]
-}

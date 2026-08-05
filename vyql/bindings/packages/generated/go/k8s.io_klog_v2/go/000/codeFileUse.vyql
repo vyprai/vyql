@@ -1,9 +1,0 @@
-module bindings.go.generated.m56e5e20f;
-
-binding fileUse0 {
-  requires {
-    dependency("k8s.io/klog/v2")
-  }
-  query pattern callExpr where callee.method == "SetOutput"
-  emit sink code.FileUseSink at args[0]
-}

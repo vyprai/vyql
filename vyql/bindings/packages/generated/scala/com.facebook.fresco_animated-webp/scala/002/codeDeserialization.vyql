@@ -1,9 +1,0 @@
-module bindings.scala.generated.m2095cd9e;
-
-binding deserialization2 {
-  requires {
-    dependency("com.facebook.fresco:animated-webp")
-  }
-  query pattern callExpr where callee.method == "decodeFromNativeMemory"
-  emit sink code.Deserialization at args[0]
-}

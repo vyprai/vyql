@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m35718952;
-
-binding filePathAccess7 {
-  requires {
-    dependency("physfs")
-  }
-  query pattern callExpr where callee.method == "PHYSFS_addToSearchPath"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m005cda50;
-
-binding filePathAccess3 {
-  requires {
-    dependency("spacy-legacy")
-  }
-  query pattern callExpr where callee.method == "setup_logger"
-  emit sink code.FilePathAccess at args[0]
-}

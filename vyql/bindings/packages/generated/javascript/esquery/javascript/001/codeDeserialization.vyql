@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m2bc4859d;
-
-binding deserialization1 {
-  requires {
-    dependency("esquery")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit sink code.Deserialization at args[0]
-}

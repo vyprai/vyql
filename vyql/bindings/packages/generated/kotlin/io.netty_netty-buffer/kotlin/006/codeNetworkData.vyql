@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m19ec740d;
-
-binding networkData6 {
-  requires {
-    dependency("io.netty:netty-buffer")
-  }
-  query pattern callExpr where callee.method == "getBytes"
-  emit source code.NetworkData at call.result
-}

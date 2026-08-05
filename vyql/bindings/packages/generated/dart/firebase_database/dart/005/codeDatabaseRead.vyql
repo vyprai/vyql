@@ -1,9 +1,0 @@
-module bindings.dart.generated.meb2e0012;
-
-binding databaseRead5 {
-  requires {
-    dependency("firebase_database")
-  }
-  query pattern callExpr where callee.method == "Query.limitToFirst"
-  emit sink code.DatabaseReadSink at args[0]
-}

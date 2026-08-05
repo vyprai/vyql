@@ -1,9 +1,0 @@
-module bindings.objc.generated.me36f2000;
-
-binding httpInput10 {
-  requires {
-    dependency("RxAlamofire")
-  }
-  query pattern callExpr where callee.method == "upload"
-  emit source code.HttpInput at call.result
-}

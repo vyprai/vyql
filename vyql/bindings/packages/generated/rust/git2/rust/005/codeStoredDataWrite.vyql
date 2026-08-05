@@ -1,9 +1,0 @@
-module bindings.rust.generated.m886322e0;
-
-binding storedDataWrite5 {
-  requires {
-    dependency("git2")
-  }
-  query pattern callExpr where callee.method == "write_tree"
-  emit sink code.StoredDataWrite at args[0]
-}

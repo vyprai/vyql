@@ -1,0 +1,33 @@
+module bindings.perl.generated.mfddc86fe;
+
+binding filePathAccess0 {
+  requires {
+    dependency("KiokuDB")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding databaseRead1 {
+  requires {
+    dependency("KiokuDB")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("KiokuDB")
+  }
+  query pattern callExpr where callee.method == "STORABLE_freeze"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("KiokuDB")
+  }
+  query pattern callExpr where callee.method == "STORABLE_thaw"
+  emit sink code.Deserialization at args[0]
+}

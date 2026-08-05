@@ -1,9 +1,0 @@
-module bindings.swift.generated.m51072c5a;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/sindresorhus/Defaults")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

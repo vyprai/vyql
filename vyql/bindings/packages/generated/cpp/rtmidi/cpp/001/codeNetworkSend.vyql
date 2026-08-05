@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m3ee6ddc6;
-
-binding networkSend1 {
-  requires {
-    dependency("rtmidi")
-  }
-  query pattern callExpr where callee.method == "sendMessage"
-  emit sink code.NetworkSend at args[0]
-}

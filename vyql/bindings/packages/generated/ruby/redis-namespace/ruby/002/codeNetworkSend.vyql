@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mf86738b3;
-
-binding networkSend2 {
-  requires {
-    dependency("redis-namespace")
-  }
-  query pattern callExpr where callee.method == "method_missing"
-  emit sink code.NetworkSend at args[0]
-}

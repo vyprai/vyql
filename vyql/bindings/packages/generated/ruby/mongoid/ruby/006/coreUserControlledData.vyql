@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m942d4423;
-
-binding userControlledData6 {
-  requires {
-    dependency("mongoid")
-  }
-  query pattern callExpr where callee.method == "load!"
-  emit source core.UserControlledData at call.result
-}

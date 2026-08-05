@@ -1,9 +1,0 @@
-module bindings.c.generated.m48d31d47;
-
-binding deserialization3 {
-  requires {
-    dependency("libxmlpp")
-  }
-  query pattern callExpr where callee.method == "RelaxNGSchema::parse_memory"
-  emit sink code.Deserialization at args[0]
-}

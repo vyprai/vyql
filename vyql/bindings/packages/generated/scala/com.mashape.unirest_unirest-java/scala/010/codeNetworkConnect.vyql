@@ -1,9 +1,0 @@
-module bindings.scala.generated.m16284c04;
-
-binding networkConnect10 {
-  requires {
-    dependency("com.mashape.unirest:unirest-java")
-  }
-  query pattern callExpr where callee.method == "options"
-  emit sink code.NetworkConnectSink at args[0]
-}

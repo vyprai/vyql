@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m8b020c1c;
-
-binding filePathAccess2 {
-  requires {
-    dependency("uboot_env")
-  }
-  query pattern callExpr where callee.method == "from_file"
-  emit sink code.FilePathAccess at args[0]
-}

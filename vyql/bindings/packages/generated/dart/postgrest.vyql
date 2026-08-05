@@ -1,0 +1,25 @@
+module bindings.dart.generated.meb0a0cf0;
+
+binding networkConnect0 {
+  requires {
+    dependency("postgrest")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("postgrest")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding httpInput2 {
+  requires {
+    dependency("postgrest")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit source code.HttpInput at call.result
+}

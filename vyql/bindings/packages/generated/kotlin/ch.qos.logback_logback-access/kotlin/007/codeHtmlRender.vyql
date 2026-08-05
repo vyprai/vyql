@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m9669be91;
-
-binding htmlRender7 {
-  requires {
-    dependency("ch.qos.logback:logback-access")
-  }
-  query pattern callExpr where callee.method == "appendEventToBuffer"
-  emit sink code.HtmlRender at args[0]
-}

@@ -1,0 +1,17 @@
+module bindings.go.generated.mfa3aca3a;
+
+binding httpInput0 {
+  requires {
+    dependency("github.com/munnerz/goautoneg")
+  }
+  query pattern callExpr where callee.method == "ParseAccept"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("github.com/munnerz/goautoneg")
+  }
+  query pattern callExpr where callee.method == "Negotiate"
+  emit source code.HttpInput at call.result
+}

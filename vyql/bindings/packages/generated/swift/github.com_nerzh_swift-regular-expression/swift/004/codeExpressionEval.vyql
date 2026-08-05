@@ -1,9 +1,0 @@
-module bindings.swift.generated.m4e45b835;
-
-binding expressionEval4 {
-  requires {
-    dependency("github.com/nerzh/swift-regular-expression")
-  }
-  query pattern callExpr where callee.method == "replaceSelf"
-  emit sink code.ExpressionEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.me9aacd1e;
-
-binding expressionEval2 {
-  requires {
-    dependency("org.apache.felix:org.apache.felix.framework")
-  }
-  query pattern callExpr where callee.method == "matches"
-  emit sink code.ExpressionEval at args[0]
-}

@@ -1,0 +1,17 @@
+module bindings.objc.generated.m3872ad3f;
+
+binding deserialization0 {
+  requires {
+    dependency("JSONModel")
+  }
+  query pattern callExpr where callee.method == "initWithString:error:"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("JSONModel")
+  }
+  query pattern callExpr where callee.method == "initWithString:usingEncoding:error:"
+  emit sink code.Deserialization at args[0]
+}

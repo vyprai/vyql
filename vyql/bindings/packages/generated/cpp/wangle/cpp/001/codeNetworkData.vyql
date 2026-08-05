@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m64b6210f;
-
-binding networkData1 {
-  requires {
-    dependency("wangle")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit source code.NetworkData at call.result
-}

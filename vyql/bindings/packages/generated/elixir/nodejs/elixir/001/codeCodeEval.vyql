@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mfef0c42a;
-
-binding codeEval1 {
-  requires {
-    dependency("nodejs")
-  }
-  query pattern callExpr where callee.method == "call!"
-  emit sink code.CodeEval at args[0]
-}

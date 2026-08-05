@@ -1,9 +1,0 @@
-module bindings.python.generated.m81d1f3b6;
-
-binding userControlledData7 {
-  requires {
-    dependency("google-auth-httplib2")
-  }
-  query pattern callExpr where callee.method == "AuthorizedHttp.request"
-  emit source core.UserControlledData at call.result
-}

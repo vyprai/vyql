@@ -1,9 +1,0 @@
-module bindings.php.generated.mbd78a9e0;
-
-binding deserialization1 {
-  requires {
-    dependency("nette/schema")
-  }
-  query pattern callExpr where callee.method == "processMultiple"
-  emit sink code.Deserialization at args[0]
-}

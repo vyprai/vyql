@@ -1,9 +1,0 @@
-module bindings.perl.generated.m450c025f;
-
-binding filePathAccess1 {
-  requires {
-    dependency("Linux-Pidfile")
-  }
-  query pattern callExpr where callee.method == "_write"
-  emit sink code.FilePathAccess at args[0]
-}

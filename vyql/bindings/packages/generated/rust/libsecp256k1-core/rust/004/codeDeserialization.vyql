@@ -1,9 +1,0 @@
-module bindings.rust.generated.m1ab570bf;
-
-binding deserialization4 {
-  requires {
-    dependency("libsecp256k1-core")
-  }
-  query pattern callExpr where callee.method == "read_seq_len_lax"
-  emit sink code.Deserialization at args[0]
-}

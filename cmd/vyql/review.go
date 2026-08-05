@@ -8,11 +8,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/vyprai/vyql/datadir"
-	"github.com/vyprai/vyql/parser"
-	"github.com/vyprai/vyql/resultpolicy"
-	"github.com/vyprai/vyql/solvers"
-	"github.com/vyprai/vyql/usg"
+	"github.com/vyprai/vyql/internal/datadir"
+	"github.com/vyprai/vyql/internal/parser"
+	"github.com/vyprai/vyql/internal/resultpolicy"
+	"github.com/vyprai/vyql/internal/solvers"
+	"github.com/vyprai/vyql/internal/usg"
 )
 
 type reviewItem struct {

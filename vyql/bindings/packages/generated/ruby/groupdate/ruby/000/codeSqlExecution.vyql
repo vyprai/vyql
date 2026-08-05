@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m7f1577c5;
-
-binding sqlExecution0 {
-  requires {
-    dependency("groupdate")
-  }
-  query pattern callExpr where callee.method == "group_by_period"
-  emit sink code.SqlExecution at args[0]
-}

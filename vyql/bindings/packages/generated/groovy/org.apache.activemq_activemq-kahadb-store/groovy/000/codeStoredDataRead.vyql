@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mc43097c1;
-
-binding storedDataRead0 {
-  requires {
-    dependency("org.apache.activemq:activemq-kahadb-store")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source code.StoredDataRead at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.m3e54372e;
-
-binding deserialization0 {
-  requires {
-    dependency("GoogleDataTransport")
-  }
-  query pattern callExpr where callee.method == "GDTCORDecodeArchiveAtPath"
-  emit sink code.Deserialization at args[0]
-}

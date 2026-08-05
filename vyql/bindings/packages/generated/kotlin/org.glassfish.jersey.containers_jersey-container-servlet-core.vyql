@@ -1,0 +1,57 @@
+module bindings.kotlin.generated.m88f2378e;
+
+binding httpInput0 {
+  requires {
+    dependency("org.glassfish.jersey.containers:jersey-container-servlet-core")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("org.glassfish.jersey.containers:jersey-container-servlet-core")
+  }
+  query pattern callExpr where callee.method == "doFilter"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("org.glassfish.jersey.containers:jersey-container-servlet-core")
+  }
+  query pattern callExpr where callee.method == "getHttpServletRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding responseHeaderWrite3 {
+  requires {
+    dependency("org.glassfish.jersey.containers:jersey-container-servlet-core")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite4 {
+  requires {
+    dependency("org.glassfish.jersey.containers:jersey-container-servlet-core")
+  }
+  query pattern callExpr where callee.method == "doFilter"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite5 {
+  requires {
+    dependency("org.glassfish.jersey.containers:jersey-container-servlet-core")
+  }
+  query pattern callExpr where callee.method == "getHttpServletResponse"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite6 {
+  requires {
+    dependency("org.glassfish.jersey.containers:jersey-container-servlet-core")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

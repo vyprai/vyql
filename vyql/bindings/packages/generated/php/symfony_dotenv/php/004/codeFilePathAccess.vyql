@@ -1,9 +1,0 @@
-module bindings.php.generated.m338caa5a;
-
-binding filePathAccess4 {
-  requires {
-    dependency("symfony/dotenv")
-  }
-  query pattern callExpr where callee.method == "bootEnv"
-  emit sink code.FilePathAccess at args[0]
-}

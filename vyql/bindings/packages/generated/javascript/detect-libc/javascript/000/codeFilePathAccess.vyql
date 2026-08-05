@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m66e9778b;
-
-binding filePathAccess0 {
-  requires {
-    dependency("detect-libc")
-  }
-  query pattern callExpr where callee.method == "family"
-  emit sink code.FilePathAccess at args[0]
-}

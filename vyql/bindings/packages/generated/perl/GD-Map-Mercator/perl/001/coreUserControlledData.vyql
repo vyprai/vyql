@@ -1,9 +1,0 @@
-module bindings.perl.generated.mb5913edd;
-
-binding userControlledData1 {
-  requires {
-    dependency("GD-Map-Mercator")
-  }
-  query pattern callExpr where callee.method == "new"
-  emit source core.UserControlledData at call.result
-}

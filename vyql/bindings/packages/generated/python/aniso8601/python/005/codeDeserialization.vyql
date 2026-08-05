@@ -1,9 +1,0 @@
-module bindings.python.generated.md5162a41;
-
-binding deserialization5 {
-  requires {
-    dependency("aniso8601")
-  }
-  query pattern callExpr where callee.method == "parse_repeating_interval"
-  emit sink code.Deserialization at args[0]
-}

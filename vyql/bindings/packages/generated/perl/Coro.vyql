@@ -1,0 +1,25 @@
+module bindings.perl.generated.m8a1130b6;
+
+binding networkData0 {
+  requires {
+    dependency("Coro")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("Coro")
+  }
+  query pattern callExpr where callee.method == "close"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding httpInput2 {
+  requires {
+    dependency("Coro")
+  }
+  query pattern callExpr where callee.method == "session"
+  emit source code.HttpInput at call.result
+}

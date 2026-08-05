@@ -1,9 +1,0 @@
-module bindings.objc.generated.m0fbc1edc;
-
-binding networkConnect4 {
-  requires {
-    dependency("PusherSwift")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

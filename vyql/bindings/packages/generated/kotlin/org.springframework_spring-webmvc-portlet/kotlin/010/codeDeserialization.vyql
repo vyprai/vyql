@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m11f9a242;
-
-binding deserialization10 {
-  requires {
-    dependency("org.springframework:spring-webmvc-portlet")
-  }
-  query pattern callExpr where callee.method == "parseBooleans"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,0 +1,25 @@
+module bindings.ruby.generated.m45ad04de;
+
+binding filePathAccess0 {
+  requires {
+    dependency("polyglot")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("polyglot")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval2 {
+  requires {
+    dependency("polyglot")
+  }
+  query pattern callExpr where callee.method == "require"
+  emit sink code.CodeEval at args[0]
+}
