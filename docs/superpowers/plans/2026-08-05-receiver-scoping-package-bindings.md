@@ -226,7 +226,7 @@ func scanFixture(t *testing.T, dir string) []fixtureFinding {
 - [ ] **Step 3: Run the tests to verify the first fails and the second passes**
 
 ```bash
-cd /Users/khakiem/workspace/vypr/vyql2
+# from the repository root
 CGO_ENABLED=1 go test -count=1 -run 'TestBareMethod' ./cmd/vyql/ -v
 ```
 
@@ -296,7 +296,7 @@ func TestResolveReceiverPackage(t *testing.T) {
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-cd /Users/khakiem/workspace/vypr/vyql2
+# from the repository root
 CGO_ENABLED=1 go test -count=1 -run TestResolveReceiverPackage ./internal/extract/lowering/ -v
 ```
 
@@ -773,7 +773,7 @@ git commit -m "feat(bindings): scope package-gated bare-method specs to their pa
 - [ ] **Step 1: Build the binary**
 
 ```bash
-cd /Users/khakiem/workspace/vypr/vyql2
+# from the repository root
 CGO_ENABLED=1 go build -o /tmp/vyql-scoped ./cmd/vyql
 ```
 
@@ -863,7 +863,7 @@ insurance if some frontend does resolve a builtin receiver to a package.
 - [ ] **Step 1: Check whether the tests still pass without it**
 
 ```bash
-cd /Users/khakiem/workspace/vypr/vyql2
+# from the repository root
 git rm --cached vyql/bindings/javascript/deserialization.vyql >/dev/null
 git stash push vyql/bindings/javascript/deserialization.vyql
 CGO_ENABLED=1 go test -count=1 -run 'TestBareMethod' ./cmd/vyql/ -v
