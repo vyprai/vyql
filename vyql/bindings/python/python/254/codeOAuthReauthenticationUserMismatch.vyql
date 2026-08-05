@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding oAuthReauthenticationUserMismatch254 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.functionName, ["oauth_verify_response", "verify_response", "reauth"]) and node.context.callPath contains "_oauth_response_common" and node.context.callPath contains "session.__setitem__" and containsAny(node.context.callPath, ["redirect", "flask.redirect"]) and containsAny(node.context.literal, ["fs_paa", "REAUTHENTICATION_SUCCESSFUL", "POST_OAUTH_VERIFY_VIEW"]) and not (containsAny(node.context.binary, ["user.email==current_user.email", "current_user.email==user.email", "user.id==current_user.id", "current_user.id==user.id"]))
-  emit issue code.OAuthReauthenticationUserMismatch at node
-}

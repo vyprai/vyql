@@ -1,9 +1,0 @@
-module bindings.bash.generated.mb6f991a5;
-
-binding httpInput4 {
-  requires {
-    dependency("cgi")
-  }
-  query pattern callExpr where callee.path ~= "$QUERY_STRING"
-  emit source code.HttpInput at call.result
-}

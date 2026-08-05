@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding electronNodeIntegration208 {
-  query pattern presenceNode where node.context.language == "javascript" and node.context.callPath contains "BrowserWindow" and node.context.prop contains "contextIsolation=false"
-  emit issue code.ElectronNodeIntegration at node
-}

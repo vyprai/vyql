@@ -1,7 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding catastrophicRegex542 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.callPath contains "RegExp" and node.context.callPath contains "join" and node.context.literal contains "d]*(?:;" and not (node.context.literal contains "[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|")
-  emit issue code.CatastrophicRegex at node
-  emit sink code.CatastrophicRegexSink at node
-}

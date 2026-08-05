@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding weakHash66 {
-  query pattern presenceNode where node.path ~= "ngx.md5"
-  emit issue code.WeakHash at node
-}

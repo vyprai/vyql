@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding sqlExecution14 {
-  query pattern callExpr where callee.path ~= "sqlite3_exec"
-  emit sink code.SqlExecution at args[1]
-}

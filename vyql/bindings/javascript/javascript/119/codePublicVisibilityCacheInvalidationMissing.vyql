@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding publicVisibilityCacheInvalidationMissing119 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.selector contains "SandboxEvents.ARCHIVED" and node.context.callPath contains "redis.del" and node.context.literal contains "proxy:sandbox-runner-info:" and not (node.context.selector contains "SandboxEvents.PUBLIC_STATUS_UPDATED") and not (node.context.literal contains "proxy:sandbox-public:")
-  emit issue code.PublicVisibilityCacheInvalidationMissing at node
-}

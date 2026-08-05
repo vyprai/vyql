@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding trustBoundary52 {
-  query pattern callExpr where callee.method == "set"
-  emit sink code.TrustBoundary at args.any
-}

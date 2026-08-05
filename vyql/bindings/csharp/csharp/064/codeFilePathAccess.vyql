@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding filePathAccess64 {
-  query pattern callExpr where callee.path ~= "File.OpenText"
-  emit sink code.FilePathAccess at args[0]
-}

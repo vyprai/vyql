@@ -1,6 +1,0 @@
-module bindings.scala.generated.m06d0685b;
-
-binding objectLookupByUserInput12 {
-  query pattern callExpr where callee.method == "getUser"
-  emit sink code.ObjectLookupByUserInput at args[0]
-}

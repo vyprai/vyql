@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding massAssign380 {
-  query pattern callExpr where callee.analysis ~= "function.context.sink" and args.any.literal contains "class_bases=serializers.ModelSerializer" and args.any.literal contains "fields" and args.any.literal contains "is_superuser" and args.any.literal contains "validated_data" and args.any.literal contains "objects.create" and not args.any.literal contains "pop('is_superuser'" and not args.any.literal contains "pop(\"is_superuser\""
-  emit sink code.MassAssign at args[0]
-}

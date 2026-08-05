@@ -1,6 +1,0 @@
-module bindings.groovy.generated.m6eabb149;
-
-binding authenticationRequiredOp42 {
-  query pattern presenceNode where node.path ~= "transferFunds"
-  emit issue code.AuthenticationRequiredOp at node
-}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mbfd454d1;
-
-binding archiveEntryWrite19 {
-  requires {
-    dependency("commons-compress")
-  }
-  query pattern callExpr where callee.method == "extract"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

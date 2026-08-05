@@ -1,7 +1,0 @@
-module bindings.dart.generated.m1c398214;
-
-binding resourceHandle72 {
-  query pattern presenceNode where node.path ~= "File.openWrite"
-  emit issue code.ResourceHandle at node
-  emit sink code.ResourceHandleSink at node
-}

@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding urlFetch43 {
-  query pattern callExpr where callee.path ~= "http.request"
-  emit sink code.UrlFetch at args[0]
-}

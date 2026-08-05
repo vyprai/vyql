@@ -1,0 +1,90 @@
+module bindings.solidity.generated.m88e544d8;
+
+pattern bindingMetadata {
+  binding: {
+    name: "solidity"
+    meta: {
+      fidelity: "resolved"
+    }
+  }
+}
+
+binding httpInput0 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.functionVisibility contains "public"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.functionVisibility contains "external"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.functionVisibility contains "implicit_public"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  query pattern callExpr where callee.path ~= "msg.data"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  query pattern callExpr where callee.path ~= "msg.value"
+  emit source code.HttpInput at call.result
+}
+
+binding externalCall5 {
+  query pattern callExpr where callee.method == "call"
+  emit sink code.ExternalCall at args[0]
+}
+
+binding externalCall6 {
+  query pattern callExpr where callee.method == "delegatecall"
+  emit sink code.ExternalCall at args[0]
+}
+
+binding externalCall7 {
+  query pattern callExpr where callee.method == "callcode"
+  emit sink code.ExternalCall at args[0]
+}
+
+binding externalCall8 {
+  query pattern callExpr where callee.method == "send"
+  emit sink code.ExternalCall at args[0]
+}
+
+binding externalCall9 {
+  query pattern callExpr where callee.method == "transfer"
+  emit sink code.ExternalCall at args[0]
+}
+
+binding privilegedOp10 {
+  query pattern callExpr where callee.path ~= "selfdestruct"
+  emit sink code.PrivilegedOpSink at args[0]
+}
+
+binding privilegedOp11 {
+  query pattern callExpr where callee.path ~= "suicide"
+  emit sink code.PrivilegedOpSink at args[0]
+}
+
+binding txOriginAuth12 {
+  query pattern presenceNode where node.path ~= "tx.origin"
+  emit issue code.TxOriginAuth at node
+}
+
+binding stateWrite13 {
+  query pattern presenceNode where node.path ~= "state_write"
+  emit issue code.StateWrite at node
+}
+
+binding rsaPkcs1DigestSuffixOnlyVerification14 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "solidity" and node.context.rsaPkcs1 == "digest_suffix_sha256"
+  emit issue code.RsaPkcs1DigestSuffixOnlyVerification at node
+}
+
+binding rsaPkcs1DigestSuffixOnlyVerification15 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "solidity" and node.context.rsaPkcs1 == "digest_suffix_sha1"
+  emit issue code.RsaPkcs1DigestSuffixOnlyVerification at node
+}

@@ -1,9 +1,0 @@
-module bindings.rust.generated.m222602a5;
-
-binding codeEval17 {
-  requires {
-    dependency("rhai")
-  }
-  query pattern callExpr where callee.path ~= "rhai.Engine.eval"
-  emit sink code.CodeEval at args[0]
-}

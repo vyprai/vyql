@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding httpInput77 {
-  query pattern callExpr where callee.path ~= "request.json_body"
-  emit source code.HttpInput at call.result
-}

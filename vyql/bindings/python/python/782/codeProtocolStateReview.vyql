@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding protocolStateReview782 {
-  query pattern presenceNode where node.analysis == "function.context" and node.token contains "_original_transport" and node.token contains "_reader._transport" and node.token contains "_writer._transport" and not (node.token contains "_reader._buffer.clear")
-  emit issue code.ProtocolStateReview at node
-}

@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding sqlExecution31 {
-  query pattern callExpr where callee.path ~= "SQLiteCommand"
-  emit sink code.SqlExecution at args[0]
-}

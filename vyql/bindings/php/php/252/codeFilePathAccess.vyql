@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding filePathAccess252 {
-  query pattern callExpr where callee.path ~= "file"
-  emit sink code.FilePathAccess at args[0]
-}

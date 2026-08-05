@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding protocolCommandInjection119 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "protocol.oversized_body_not_discarded"
-  emit issue code.ProtocolCommandInjection at node
-}

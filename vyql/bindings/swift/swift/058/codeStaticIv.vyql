@@ -1,6 +1,0 @@
-module bindings.swift.generated.m388f23d0;
-
-binding staticIv58 {
-  query pattern callExpr where callee.path ~= "AES.GCM.Nonce" and args.any.literal contains "000000000000"
-  emit issue code.StaticIv at call
-}

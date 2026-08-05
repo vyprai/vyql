@@ -1,6 +1,0 @@
-module bindings.auditreview.generated.mbf0d19ec;
-
-binding sensitiveOperation20 {
-  query pattern callExpr where callee.method == "obtainLDAPServer"
-  emit issue code.SensitiveOperation at call
-}

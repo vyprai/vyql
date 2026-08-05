@@ -1,6 +1,0 @@
-module bindings.elixir.generated.m728b8a72;
-
-binding sqlExecution14 {
-  query pattern callExpr where callee.path ~= "Ecto.Adapters.SQL.query!"
-  emit sink code.SqlExecution at args[1]
-}

@@ -1,0 +1,348 @@
+module bindings.kotlin.generated.m1457a768;
+
+binding httpInput0 {
+  requires {
+    dependency("javax.servlet")
+  }
+  query pattern callExpr where callee.method == "getParameter" and callee.receiver.type == "HttpServletRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("javax.servlet")
+  }
+  query pattern callExpr where callee.method == "getHeader" and callee.receiver.type == "HttpServletRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("ktor-server-core")
+  }
+  query pattern callExpr where callee.method == "queryParameters" and callee.receiver.type == "ApplicationRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("ktor-server-core")
+  }
+  query pattern callExpr where callee.method == "receive" and callee.receiver.type == "ApplicationCall"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("spark-kotlin")
+  }
+  query pattern callExpr where callee.method == "param" and callee.receiver.type == "Request"
+  emit source code.HttpInput at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("kotlin-stdlib")
+  }
+  query pattern callExpr where callee.path ~= "System.getenv"
+  emit source code.SecretValue at call.result
+}
+
+binding regexCompile6 {
+  requires {
+    dependency("kotlin-stdlib")
+  }
+  query pattern callExpr where callee.path ~= "Regex"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding externalApiResponse7 {
+  requires {
+    dependency("okhttp")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source code.ExternalApiResponse at call.result
+}
+
+binding urlFetch8 {
+  requires {
+    dependency("okhttp")
+  }
+  query pattern callExpr where callee.method == "newCall"
+  emit sink code.UrlFetch at callee.receiver
+}
+
+binding sqlExecution9 {
+  requires {
+    dependency("java.sql")
+  }
+  query pattern callExpr where callee.method == "executeQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution10 {
+  requires {
+    dependency("android.database")
+  }
+  query pattern callExpr where callee.method == "execSQL"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution11 {
+  requires {
+    dependency("android.database")
+  }
+  query pattern callExpr where callee.method == "rawQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution12 {
+  requires {
+    dependency("hibernate-core")
+  }
+  query pattern callExpr where callee.method == "createQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding nosqlQuery13 {
+  requires {
+    dependency("mongodb-driver-kotlin")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding commandExecution14 {
+  requires {
+    dependency("java.lang")
+  }
+  query pattern callExpr where callee.path ~= "ProcessBuilder"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding codeEval15 {
+  requires {
+    dependency("kotlin-script-util")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}
+
+binding deserialization16 {
+  requires {
+    dependency("java.io")
+  }
+  query pattern callExpr where callee.method == "readObject"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess17 {
+  requires {
+    dependency("java.io")
+  }
+  query pattern callExpr where callee.path ~= "File"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization18 {
+  requires {
+    dependency("jackson-module-kotlin")
+  }
+  query pattern callExpr where callee.method == "readValue"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization19 {
+  requires {
+    dependency("snakeyaml")
+  }
+  query pattern callExpr where callee.path ~= "Yaml.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding safeDeserialization20 {
+  requires {
+    dependency("snakeyaml")
+  }
+  query pattern callExpr where callee.path ~= "Yaml.safeLoad"
+  emit check core.SafeDeserialization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding archiveEntryWrite21 {
+  requires {
+    dependency("commons-compress")
+  }
+  query pattern callExpr where callee.method == "extractEntry"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding urlFetch22 {
+  requires {
+    dependency("ktor-client-core")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding xmlParse23 {
+  requires {
+    dependency("dom4j")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xpathQuery24 {
+  requires {
+    dependency("javax.xml.xpath")
+  }
+  query pattern callExpr where callee.method == "evaluate"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding ldapQuery25 {
+  requires {
+    dependency("spring-ldap")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.LdapQuery at args[1]
+}
+
+binding ldapEscape26 {
+  requires {
+    dependency("spring-ldap")
+  }
+  query pattern callExpr where callee.path ~= "LdapEncoder.filterEncode"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding templateRender27 {
+  requires {
+    dependency("thymeleaf")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding htmlEscape28 {
+  requires {
+    dependency("commons-text")
+  }
+  query pattern callExpr where callee.path ~= "StringEscapeUtils.escapeHtml4"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape29 {
+  requires {
+    dependency("owasp-java-encoder")
+  }
+  query pattern callExpr where callee.path ~= "Encode.forHtml"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding xpathEscape30 {
+  requires {
+    dependency("owasp-java-encoder")
+  }
+  query pattern callExpr where callee.path ~= "Encode.forXPath"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding sqlParameterization31 {
+  requires {
+    dependency("jakarta.persistence")
+  }
+  query pattern callExpr where callee.method == "setParameter"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding pathCanonicalization32 {
+  requires {
+    dependency("commons-io")
+  }
+  query pattern callExpr where callee.path ~= "FilenameUtils.normalize"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding xmlHardening33 {
+  requires {
+    dependency("javax.xml.parsers")
+  }
+  query pattern callExpr where callee.path ~= "DocumentBuilderFactory.setFeature"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding authenticationCheck34 {
+  requires {
+    dependency("spring-security")
+  }
+  query pattern callExpr where callee.path ~= "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck35 {
+  requires {
+    dependency("spring-security")
+  }
+  query pattern callExpr where callee.path ~= "PreAuthorize"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding csrfProtection36 {
+  requires {
+    dependency("spring-security")
+  }
+  query pattern callExpr where callee.path ~= "CsrfToken"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

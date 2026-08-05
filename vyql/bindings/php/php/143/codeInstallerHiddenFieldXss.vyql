@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding installerHiddenFieldXss143 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "show_next_step" and node.context.phpReview == "installer_hidden_field_xss"
-  emit issue code.InstallerHiddenFieldXss at node
-}

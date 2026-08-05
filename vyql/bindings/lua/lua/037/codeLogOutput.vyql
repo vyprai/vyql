@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding logOutput37 {
-  query pattern callExpr where callee.path ~= "core.log.debug"
-  emit sink code.LogOutput at args.any
-}

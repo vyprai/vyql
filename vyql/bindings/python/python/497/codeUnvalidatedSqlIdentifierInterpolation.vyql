@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding unvalidatedSqlIdentifierInterpolation497 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unvalidated_sql_identifier_interpolation"
-  emit issue code.UnvalidatedSqlIdentifierInterpolation at node
-}

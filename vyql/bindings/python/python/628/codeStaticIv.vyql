@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding staticIv628 {
-  query pattern callExpr where callee.path ~= "DES3.new" and args.any.literal contains "00000000"
-  emit issue code.StaticIv at call
-}

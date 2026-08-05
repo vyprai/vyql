@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding httpInput9 {
-  query pattern callExpr where callee.path ~= "http_request_get_path_info"
-  emit source code.HttpInput at call.result
-}

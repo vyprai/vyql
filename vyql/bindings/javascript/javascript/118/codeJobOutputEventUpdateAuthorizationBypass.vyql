@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding jobOutputEventUpdateAuthorizationBypass118 {
-  query pattern presenceNode where node.scope == "function" and node.context.literal contains "Got job update from child" and node.context.literal contains "update_event" and node.context.assign contains "job[]=data[key]" and node.context.subscript contains "data[key]" and not (node.context.literal contains "allow_event_updates_from_jobs") and not (node.context.selector contains "data.update_event")
-  emit issue code.JobOutputEventUpdateAuthorizationBypass at node
-}

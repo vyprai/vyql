@@ -1,6 +1,0 @@
-module bindings.dart.generated.m1c398214;
-
-binding filePathAccess35 {
-  query pattern callExpr where callee.path ~= "Directory"
-  emit sink code.FilePathAccess at args[0]
-}

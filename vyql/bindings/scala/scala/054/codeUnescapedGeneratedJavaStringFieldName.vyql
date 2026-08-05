@@ -1,6 +1,0 @@
-module bindings.scala.generated.m06d0685b;
-
-binding unescapedGeneratedJavaStringFieldName54 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "scala" and node.context.functionName contains "generateRowConverter" and node.context.callPath contains "LogicalTypeChecks.getFieldNames" and node.context.callPath contains "fieldNames.zipWithIndex.map" and node.context.callPath contains "createNullableNodeTerm" and node.context.callPath contains "ctx.addReusableMember" and node.context.selector contains "?.stripMargin" and not (node.context.selector contains "EncodingUtils.escapeJava")
-  emit issue code.UnescapedGeneratedJavaStringFieldName at node
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.m942721f9;
-
-binding xmlParse10 {
-  requires {
-    dependency("Foundation")
-  }
-  query pattern callExpr where callee.path ~= "NSXMLDocument"
-  emit sink code.XmlParse at args[0]
-}

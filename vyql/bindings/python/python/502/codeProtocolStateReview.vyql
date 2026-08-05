@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding protocolStateReview502 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "asyncssh_pre_auth_packet_dispatch"
-  emit issue code.ProtocolStateReview at node
-}

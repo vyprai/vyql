@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding cloudStackBaremetalMacCommandInjection265 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cloudstack_baremetal_mac_command_injection"
-  emit issue code.CloudStackBaremetalMacCommandInjection at node
-}

@@ -1,6 +1,0 @@
-module bindings.config.generated.m2b6375a9;
-
-binding unboundedJupyterKernelDependency8 {
-  query pattern presenceNode where node.analysis ~= "config.python.jupyter_kernel_dependency_unbounded"
-  emit issue code.UnboundedJupyterKernelDependency at node
-}

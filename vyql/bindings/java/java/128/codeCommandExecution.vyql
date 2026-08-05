@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding commandExecution128 {
-  query pattern callExpr where callee.method == "command"
-  emit sink code.CommandExecution at args.any
-}

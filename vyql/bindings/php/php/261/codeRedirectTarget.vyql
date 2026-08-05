@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding redirectTarget261 {
-  query pattern callExpr where callee.path ~= "overlay_close_dialog"
-  emit sink code.RedirectTargetSink at args[0]
-}

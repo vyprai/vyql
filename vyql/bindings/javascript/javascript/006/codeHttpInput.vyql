@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding httpInput6 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "Put"
-  emit source code.HttpInput at call.result
-}

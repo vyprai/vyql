@@ -1,9 +1,0 @@
-module bindings.perl.generated.ma164dcec;
-
-binding httpInput4 {
-  requires {
-    dependency("Dancer2")
-  }
-  query pattern callExpr where callee.path ~= ".param"
-  emit source code.HttpInput at call.result
-}

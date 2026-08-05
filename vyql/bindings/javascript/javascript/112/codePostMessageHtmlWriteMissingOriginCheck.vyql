@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding postMessageHtmlWriteMissingOriginCheck112 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.selector contains "message.data" and containsAny(node.context.callPath, ["document.write", "parseFromString"]) and node.context.selector contains "innerHTML" and not (containsAny(node.context.selector, ["message.origin", "event.origin", ".origin"])) and not (containsAny(node.context.literal, ["origin", "Origin"]))
-  emit issue code.PostMessageHtmlWriteMissingOriginCheck at node
-}

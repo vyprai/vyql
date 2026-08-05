@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding userEnumSmell688 {
-  query pattern callExpr where callee.analysis ~= "smell.user_enum"
-  emit issue code.UserEnumSmell at call
-}

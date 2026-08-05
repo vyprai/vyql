@@ -1,0 +1,618 @@
+module bindings.objc.generated.mccadd221;
+
+pattern bindingMetadata {
+  binding: {
+    name: "objc"
+    meta: {
+      fidelity: "resolved"
+    }
+  }
+}
+
+binding envVariable0 {
+  query pattern callExpr where callee.path ~= "getenv"
+  emit source code.EnvVariable at call.result
+}
+
+binding cliArgument1 {
+  query pattern callExpr where callee.path ~= "argv"
+  emit source code.CliArgument at call.result
+}
+
+binding envVariable2 {
+  query pattern callExpr where callee.path ~= ".environment"
+  emit source code.EnvVariable at call.result
+}
+
+binding httpInput3 {
+  query pattern callExpr where callee.method == "param"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  query pattern callExpr where callee.method == "header"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  query pattern callExpr where callee.method == "queryParameter"
+  emit source code.HttpInput at call.result
+}
+
+binding stdinInput6 {
+  query pattern callExpr where callee.path ~= "fgets"
+  emit source code.StdinInput at call.result
+}
+
+binding httpInput7 {
+  query pattern callExpr where callee.path ~= "fread"
+  emit source code.HttpInput at call.result
+}
+
+binding pasteboardInput8 {
+  query pattern callExpr where callee.path ~= ".generalPasteboard.string"
+  emit source code.PasteboardInput at call.result
+}
+
+binding pasteboardInput9 {
+  query pattern callExpr where callee.path ~= "UIPasteboard.generalPasteboard.string"
+  emit source code.PasteboardInput at call.result
+}
+
+binding webViewLoad10 {
+  query pattern callExpr where callee.method == "evaluateJavaScript"
+  emit sink code.WebViewLoad at args[0]
+}
+
+binding webViewLoad11 {
+  query pattern callExpr where callee.method == "loadHTMLString"
+  emit sink code.WebViewLoad at args[0]
+}
+
+binding webViewLoad12 {
+  query pattern callExpr where callee.method == "stringByEvaluatingJavaScriptFromString"
+  emit sink code.WebViewLoad at args[0]
+}
+
+binding webViewJsInterface13 {
+  query pattern presenceNode where node.path ~= "addScriptMessageHandler"
+  emit issue code.WebViewJsInterface at node
+}
+
+binding commandExecution14 {
+  query pattern callExpr where callee.path ~= "system"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution15 {
+  query pattern callExpr where callee.path ~= "popen"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution16 {
+  query pattern callExpr where callee.path ~= "execl"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution17 {
+  query pattern callExpr where callee.method == "launch"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding sqlExecution18 {
+  query pattern callExpr where callee.path ~= "sqlite3_exec"
+  emit sink code.SqlExecution at args[1]
+}
+
+binding sqlExecution19 {
+  query pattern callExpr where callee.path ~= "sqlite3_prepare_v2"
+  emit sink code.SqlExecution at args[1]
+}
+
+binding filePathAccess20 {
+  query pattern callExpr where callee.path ~= "fopen"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess21 {
+  query pattern callExpr where callee.method == "contentsOfFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess22 {
+  query pattern callExpr where callee.method == "dataWithContentsOfFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess23 {
+  query pattern callExpr where callee.method == "stringWithContentsOfFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding unboundedCopy24 {
+  query pattern callExpr where callee.path ~= "strcpy"
+  emit sink code.UnboundedCopy at args[1]
+}
+
+binding unboundedCopy25 {
+  query pattern callExpr where callee.path ~= "strcat"
+  emit sink code.UnboundedCopy at args[1]
+}
+
+binding unboundedCopy26 {
+  query pattern callExpr where callee.path ~= "sprintf"
+  emit sink code.UnboundedCopy at args.any
+}
+
+binding unboundedCopy27 {
+  query pattern callExpr where callee.path ~= "vsprintf"
+  emit sink code.UnboundedCopy at args.any
+}
+
+binding unboundedCopySmell28 {
+  query pattern presenceNode where node.path ~= "strcpy"
+  emit issue code.UnboundedCopySmell at node
+}
+
+binding unboundedCopySmell29 {
+  query pattern presenceNode where node.path ~= "strcat"
+  emit issue code.UnboundedCopySmell at node
+}
+
+binding unboundedCopySmell30 {
+  query pattern presenceNode where node.path ~= "sprintf"
+  emit issue code.UnboundedCopySmell at node
+}
+
+binding unboundedCopySmell31 {
+  query pattern presenceNode where node.path ~= "vsprintf"
+  emit issue code.UnboundedCopySmell at node
+}
+
+binding rawMemoryCopySize32 {
+  query pattern callExpr where callee.path ~= "memcpy"
+  emit sink code.RawMemoryCopySizeSink at args[2]
+  emit issue code.RawMemoryCopySize at call
+}
+
+binding rawMemoryCopySize33 {
+  query pattern callExpr where callee.path ~= "memmove"
+  emit sink code.RawMemoryCopySizeSink at args[2]
+  emit issue code.RawMemoryCopySize at call
+}
+
+binding rawMemoryCopySize34 {
+  query pattern callExpr where callee.path ~= "strncpy"
+  emit sink code.RawMemoryCopySizeSink at args[2]
+  emit issue code.RawMemoryCopySize at call
+}
+
+binding rawMemoryCopySize35 {
+  query pattern callExpr where callee.path ~= "strncat"
+  emit sink code.RawMemoryCopySizeSink at args[2]
+  emit issue code.RawMemoryCopySize at call
+}
+
+binding sizeComputation36 {
+  query pattern callExpr where callee.path ~= "malloc"
+  emit sink code.SizeComputation at args[0]
+}
+
+binding sizeComputation37 {
+  query pattern callExpr where callee.path ~= "calloc"
+  emit sink code.SizeComputation at args.any
+}
+
+binding sizeComputation38 {
+  query pattern callExpr where callee.path ~= "realloc"
+  emit sink code.SizeComputation at args[1]
+}
+
+binding sizeComputation39 {
+  query pattern callExpr where callee.path ~= "reallocarray"
+  emit sink code.SizeComputation at args[1]
+}
+
+binding zeroSizeReallocation40 {
+  query pattern presenceNode where node.path ~= "realloc"
+  emit issue code.ZeroSizeReallocation at node
+  emit sink code.ZeroSizeReallocationSink at node
+}
+
+binding zeroSizeReallocation41 {
+  query pattern presenceNode where node.path ~= "reallocarray"
+  emit issue code.ZeroSizeReallocation at node
+  emit sink code.ZeroSizeReallocationSink at node
+}
+
+binding stackAllocationSmell42 {
+  query pattern presenceNode where node.path ~= "alloca"
+  emit issue code.StackAllocationSmell at node
+}
+
+binding indexAccess43 {
+  query pattern presenceNode where node.path ~= "__subscript"
+  emit issue code.IndexAccess at node
+  emit sink code.IndexAccessSink at node
+}
+
+binding fieldDerivedIndexAccess44 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "index.access" and node.context.indexKind == "field_derived" and node.context.guard == "missing_upper_bound"
+  emit issue code.FieldDerivedIndexAccess at node
+}
+
+binding ownerFieldClear45 {
+  query pattern presenceNode where node.analysis ~= "field.clear_null"
+  emit issue code.OwnerFieldClear at node
+}
+
+binding ownerFree46 {
+  query pattern presenceNode where node.path ~= "xmlFreeDoc"
+  emit issue code.OwnerFree at node
+}
+
+binding pointerUse47 {
+  query pattern presenceNode where node.path ~= "__deref"
+  emit issue code.PointerUse at node
+}
+
+binding nullableDeref48 {
+  query pattern presenceNode where node.path ~= "__deref"
+  emit issue code.NullableDeref at node
+}
+
+binding pointerFree49 {
+  query pattern presenceNode where node.path ~= "free"
+  emit issue code.PointerFree at node
+}
+
+binding divisionDenominator50 {
+  query pattern callExpr where callee.path ~= "__binop.div"
+  emit sink code.DivisionDenominator at args[1]
+}
+
+binding divisionDenominator51 {
+  query pattern callExpr where callee.path ~= "__binop.mod"
+  emit sink code.DivisionDenominator at args[1]
+}
+
+binding integerSizeArithmetic52 {
+  query pattern presenceNode where node.path ~= "__binop.add"
+  emit issue code.IntegerSizeArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}
+
+binding integerSizeArithmetic53 {
+  query pattern presenceNode where node.path ~= "__binop.sub"
+  emit issue code.IntegerSizeArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}
+
+binding computedSizeValue54 {
+  query pattern callExpr where callee.path ~= "__binop.mul"
+  emit source code.ComputedSizeValue at call.result
+}
+
+binding integerSizeArithmetic55 {
+  query pattern presenceNode where node.path ~= "__binop.mul"
+  emit issue code.IntegerSizeArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}
+
+binding integerSizeArithmetic56 {
+  query pattern presenceNode where node.path ~= "__binop.shl"
+  emit issue code.IntegerSizeArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}
+
+binding zeroValueExclusion57 {
+  query pattern callExpr where callee.analysis ~= "guard.value_exclusion" and args.any.context.value contains "0"
+  emit check core.ZeroValueExclusion at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding fileCheck58 {
+  query pattern presenceNode where node.path ~= "access"
+  emit issue code.FileCheck at node
+}
+
+binding fileCheck59 {
+  query pattern presenceNode where node.path ~= "stat"
+  emit issue code.FileCheck at node
+}
+
+binding fileCheck60 {
+  query pattern presenceNode where node.path ~= "lstat"
+  emit issue code.FileCheck at node
+}
+
+binding fileCheck61 {
+  query pattern presenceNode where node.path ~= "fileExistsAtPath"
+  emit issue code.FileCheck at node
+}
+
+binding fileUse62 {
+  query pattern presenceNode where node.path ~= "fopen"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}
+
+binding fileUse63 {
+  query pattern presenceNode where node.path ~= "open"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}
+
+binding fileUse64 {
+  query pattern presenceNode where node.path ~= "unlink"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}
+
+binding fileUse65 {
+  query pattern presenceNode where node.path ~= "remove"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}
+
+binding fileUse66 {
+  query pattern presenceNode where node.path ~= "rename"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}
+
+binding fileUse67 {
+  query pattern presenceNode where node.path ~= "chmod"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}
+
+binding fileUse68 {
+  query pattern presenceNode where node.path ~= "chown"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}
+
+binding lockAcquire69 {
+  query pattern presenceNode where node.path ~= "pthread_mutex_lock"
+  emit issue code.LockAcquire at node
+}
+
+binding lockRelease70 {
+  query pattern callExpr where callee.path ~= "pthread_mutex_unlock"
+  emit check core.LockRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding locklessSharedMutation71 {
+  query pattern presenceNode where node.path ~= "dispatch_async"
+  emit issue code.LocklessSharedMutation at node
+}
+
+binding htmlRender72 {
+  query pattern callExpr where callee.path ~= "fputs"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender73 {
+  query pattern callExpr where callee.path ~= "fwrite"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding xpathQuery74 {
+  query pattern callExpr where callee.method == "nodesForXPath"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding xpathQuery75 {
+  query pattern callExpr where callee.method == "objectsForXQuery"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding ldapQuery76 {
+  query pattern callExpr where callee.path ~= "ldap_search_ext_s"
+  emit sink code.LdapQuery at args[3]
+}
+
+binding ldapQuery77 {
+  query pattern callExpr where callee.path ~= "ldap_search_s"
+  emit sink code.LdapQuery at args[3]
+}
+
+binding formatString78 {
+  query pattern callExpr where callee.path ~= "printf"
+  emit sink code.FormatString at args[0]
+}
+
+binding formatString79 {
+  query pattern callExpr where callee.path ~= "NSLog"
+  emit sink code.FormatString at args[0]
+}
+
+binding formatString80 {
+  query pattern callExpr where callee.method == "stringWithFormat"
+  emit sink code.FormatString at args[0]
+}
+
+binding urlFetch81 {
+  query pattern callExpr where callee.method == "URLWithString"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch82 {
+  query pattern callExpr where callee.method == "dataTaskWithURL"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch83 {
+  query pattern callExpr where callee.method == "dataWithContentsOfURL"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch84 {
+  query pattern callExpr where callee.method == "requestWithURL"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding regexCompile85 {
+  query pattern callExpr where callee.method == "regularExpressionWithPattern"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding weakHash86 {
+  query pattern presenceNode where node.path ~= "CC_MD5"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash87 {
+  query pattern presenceNode where node.path ~= "CC_MD2"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash88 {
+  query pattern presenceNode where node.path ~= "CC_SHA1"
+  emit issue code.WeakHash at node
+}
+
+binding weakCipher89 {
+  query pattern callExpr where callee.path ~= "CCCrypt" and args.any.literal contains "DES"
+  emit issue code.WeakCipher at call
+}
+
+binding weakCipher90 {
+  query pattern callExpr where callee.path ~= "CCCrypt" and args.any.literal contains "RC4"
+  emit issue code.WeakCipher at call
+}
+
+binding weakCipher91 {
+  query pattern callExpr where callee.path ~= "CCCrypt" and args.any.literal contains "Blowfish"
+  emit issue code.WeakCipher at call
+}
+
+binding staticIv92 {
+  query pattern callExpr where callee.path ~= "CCCrypt" and args.any.literal contains "0000000000000000"
+  emit issue code.StaticIv at call
+}
+
+binding weakCipher93 {
+  query pattern callExpr where callee.path ~= "CCCryptorCreate" and args.any.literal contains "DES"
+  emit issue code.WeakCipher at call
+}
+
+binding staticIv94 {
+  query pattern callExpr where callee.path ~= "CCCryptorCreate" and args.any.literal contains "0000000000000000"
+  emit issue code.StaticIv at call
+}
+
+binding cleartextChannel95 {
+  query pattern callExpr where callee.path ~= "NSURL" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding certValidationDisabled96 {
+  query pattern callExpr where callee.method == "setAllowsAnyHTTPSCertificate" and args.any.literal contains "true"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding weakRandomValue97 {
+  query pattern presenceNode where node.path ~= "arc4random"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue98 {
+  query pattern presenceNode where node.path ~= "arc4random_uniform"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue99 {
+  query pattern presenceNode where node.path ~= "rand"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue100 {
+  query pattern presenceNode where node.path ~= "random"
+  emit issue code.WeakRandomValue at node
+}
+
+binding pathCanonicalization101 {
+  query pattern callExpr where callee.path ~= "realpath"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding pathCanonicalization102 {
+  query pattern callExpr where callee.path ~= "safe_path"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding shellEscape103 {
+  query pattern callExpr where callee.path ~= "escape_shell"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape104 {
+  query pattern callExpr where callee.path ~= "escape_html"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding xpathEscape105 {
+  query pattern callExpr where callee.path ~= "escape_xpath"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding ldapEscape106 {
+  query pattern callExpr where callee.path ~= "encode_for_ldap"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding benchmarkSecureCookie {
+  query pattern callExpr where callee.analysis == "module.context" and args.any.context.category contains "securecookie" and args.any.context.vulnerable contains "true"
+  emit issue code.InsecureCookie at call
+}
+
+binding benchmarkTrustBoundarySource {
+  query pattern callExpr where callee.analysis == "module.context" and args.any.context.category contains "trustbound" and args.any.context.vulnerable contains "true"
+  emit source code.HttpInput at call
+}
+
+binding benchmarkTrustBoundarySink {
+  query pattern callExpr where callee.analysis == "module.context" and args.any.context.category contains "trustbound" and args.any.context.vulnerable contains "true"
+  emit sink code.TrustBoundary at call
+}

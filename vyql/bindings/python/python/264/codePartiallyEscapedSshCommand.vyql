@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding partiallyEscapedSshCommand264 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "partially_escaped_ssh_command"
-  emit issue code.PartiallyEscapedSshCommand at node
-}

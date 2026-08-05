@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding objectLookupByUserInput48 {
-  query pattern callExpr where callee.method == "find_by!"
-  emit sink code.ObjectLookupByUserInput at args[0]
-}

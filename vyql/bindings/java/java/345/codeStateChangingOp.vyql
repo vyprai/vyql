@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding stateChangingOp345 {
-  query pattern callExpr where callee.method == "transferFunds"
-  emit sink code.StateChangingOpSink at args[0]
-}

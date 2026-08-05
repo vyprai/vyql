@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding templateRender380 {
-  query pattern callExpr where callee.path ~= "Velocity.evaluate"
-  emit sink code.TemplateRender at args[3]
-}

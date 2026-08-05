@@ -1,6 +1,0 @@
-module bindings.scala.generated.m06d0685b;
-
-binding weakCipher83 {
-  query pattern callExpr where callee.path ~= "Cipher.getInstance" and args.any.literal contains "DES"
-  emit issue code.WeakCipher at call
-}

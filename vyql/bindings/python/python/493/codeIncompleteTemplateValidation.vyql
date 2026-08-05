@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding incompleteTemplateValidation493 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "jinja_environment_without_sandbox"
-  emit issue code.IncompleteTemplateValidation at node
-}

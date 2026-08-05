@@ -1,9 +1,0 @@
-module bindings.go.generated.m39efcd29;
-
-binding userIdentityMappingReview40 {
-  requires {
-    dependency("github.com/ubuntu/authd")
-  }
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "userPreCheck" and node.context.callPath contains "json.Unmarshal" and node.context.callPath contains "s.userManager.GenerateUID" and node.context.callPath contains "s.userManager.GenerateGID" and not (node.context.callPath contains "s.userManager.RegisterUserPreAuth")
-  emit issue code.UserIdentityMappingReview at node
-}

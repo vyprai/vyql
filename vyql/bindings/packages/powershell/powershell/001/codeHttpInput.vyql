@@ -1,9 +1,0 @@
-module bindings.powershell.generated.m92132a18;
-
-binding httpInput1 {
-  requires {
-    dependency("Azure.Functions")
-  }
-  query pattern callExpr where callee.path ~= "$Request.Body"
-  emit source code.HttpInput at call.result
-}

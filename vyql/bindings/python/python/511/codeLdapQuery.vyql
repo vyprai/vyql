@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding ldapQuery511 {
-  query pattern callExpr where callee.path ~= "ldap.search_ext"
-  emit sink code.LdapQuery at args[0]
-}

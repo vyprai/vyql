@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding deserialization130 {
-  query pattern callExpr where callee.method == "readUnshared"
-  emit sink code.Deserialization at args[0]
-}

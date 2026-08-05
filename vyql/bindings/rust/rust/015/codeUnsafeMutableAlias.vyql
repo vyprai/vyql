@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding unsafeMutableAlias15 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "unsafe_mutable_alias"
-  emit issue code.UnsafeMutableAlias at node
-}

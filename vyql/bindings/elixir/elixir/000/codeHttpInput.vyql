@@ -1,6 +1,0 @@
-module bindings.elixir.generated.m728b8a72;
-
-binding httpInput0 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.firstParam contains "conn" and not args.any.context.paramIndex contains "0" and not args.any.context.paramName contains "_"
-  emit source code.HttpInput at call.result
-}

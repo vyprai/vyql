@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding ezPublishSearchNumericParamXss108 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.callPath contains "eZSearch.search" and node.context.callPath contains "$tpl.setVariable" and node.context.assignCall contains "$subTreeList:$http.variable" and node.context.assignLiteral contains "$subTreeList:SubTreeArray" and node.context.callArg contains "eZSearch.search:array" and node.context.callArg contains "$tpl.setVariable:$subTreeArray" and node.context.subscript contains "$subTreeArray[]" and not (node.context.callArg contains "is_numeric:$subTreeItem")
-  emit issue code.EzPublishSearchNumericParamXss at node
-}

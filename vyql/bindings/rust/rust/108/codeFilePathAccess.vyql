@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding filePathAccess108 {
-  query pattern callExpr where callee.path ~= "fs.read"
-  emit sink code.FilePathAccess at args[0]
-}

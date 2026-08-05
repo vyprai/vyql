@@ -1,0 +1,894 @@
+module bindings.cpp.generated.m4e783366;
+
+pattern bindingMetadata {
+  binding: {
+    name: "cpp"
+    meta: {
+      fidelity: "resolved"
+    }
+  }
+}
+
+binding envVariable0 {
+  query pattern callExpr where callee.path ~= "getenv"
+  emit source code.EnvVariable at call.result
+}
+
+binding cliArgument1 {
+  query pattern callExpr where callee.path ~= "argv"
+  emit source code.CliArgument at call.result
+}
+
+binding stdinInput2 {
+  query pattern callExpr where callee.path ~= "fgets"
+  emit source code.StdinInput at call.result
+}
+
+binding stdinInput3 {
+  query pattern callExpr where callee.path ~= "gets"
+  emit source code.StdinInput at call.result
+}
+
+binding httpInput4 {
+  query pattern callExpr where callee.path ~= "fread"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  query pattern callExpr where callee.path ~= "recv"
+  emit source code.HttpInput at call.result
+}
+
+binding commandExecution6 {
+  query pattern callExpr where callee.path ~= "system"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution7 {
+  query pattern callExpr where callee.path ~= "popen"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution8 {
+  query pattern callExpr where callee.path ~= "execl"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution9 {
+  query pattern callExpr where callee.path ~= "execlp"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution10 {
+  query pattern callExpr where callee.path ~= "execv"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution11 {
+  query pattern callExpr where callee.path ~= "execvp"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution12 {
+  query pattern callExpr where callee.path ~= "execve"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding sqlExecution13 {
+  query pattern callExpr where callee.path ~= "mysql_query"
+  emit sink code.SqlExecution at args[1]
+}
+
+binding sqlExecution14 {
+  query pattern callExpr where callee.path ~= "sqlite3_exec"
+  emit sink code.SqlExecution at args[1]
+}
+
+binding sqlExecution15 {
+  query pattern callExpr where callee.path ~= "sqlite3_prepare_v2"
+  emit sink code.SqlExecution at args[1]
+}
+
+binding sqlExecution16 {
+  query pattern callExpr where callee.path ~= "PQexec"
+  emit sink code.SqlExecution at args[1]
+}
+
+binding filePathAccess17 {
+  query pattern callExpr where callee.path ~= "fopen"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess18 {
+  query pattern callExpr where callee.path ~= "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess19 {
+  query pattern callExpr where callee.path ~= "ifstream"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess20 {
+  query pattern callExpr where callee.path ~= "ofstream"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess21 {
+  query pattern callExpr where callee.path ~= "fstream"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess22 {
+  query pattern callExpr where callee.path ~= "remove"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess23 {
+  query pattern callExpr where callee.path ~= "unlink"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding manualZipEntryFileWrite24 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.context.callPath contains "mapProperties.value" and node.context.identifier contains "XBinary::FPART_PROP_ORIGINALNAME" and node.context.callPath contains "QDir.separator" and node.context.callPath contains "file.setFileName" and node.context.callPath contains "file.open" and node.context.identifier contains "QIODevice::ReadWrite" and not (node.context.callPath contains "QDir.cleanPath") and not (node.context.callPath contains "startsWith")
+  emit issue code.ManualZipEntryFileWrite at node
+}
+
+binding dynamicCodeLoad25 {
+  query pattern callExpr where callee.path ~= "dlopen"
+  emit sink code.DynamicCodeLoad at args[0]
+}
+
+binding unboundedCopy26 {
+  query pattern callExpr where callee.path ~= "strcpy"
+  emit sink code.UnboundedCopy at args[1]
+}
+
+binding unboundedCopy27 {
+  query pattern callExpr where callee.path ~= "strcat"
+  emit sink code.UnboundedCopy at args[1]
+}
+
+binding unboundedCopy28 {
+  query pattern callExpr where callee.path ~= "sprintf"
+  emit sink code.UnboundedCopy at args.any
+}
+
+binding unboundedCopy29 {
+  query pattern callExpr where callee.path ~= "vsprintf"
+  emit sink code.UnboundedCopy at args.any
+}
+
+binding unboundedCopySmell30 {
+  query pattern presenceNode where node.path ~= "strcpy"
+  emit issue code.UnboundedCopySmell at node
+}
+
+binding unboundedCopySmell31 {
+  query pattern presenceNode where node.path ~= "strcat"
+  emit issue code.UnboundedCopySmell at node
+}
+
+binding unboundedCopySmell32 {
+  query pattern presenceNode where node.path ~= "sprintf"
+  emit issue code.UnboundedCopySmell at node
+}
+
+binding unboundedCopySmell33 {
+  query pattern presenceNode where node.path ~= "vsprintf"
+  emit issue code.UnboundedCopySmell at node
+}
+
+binding rawMemoryCopySize34 {
+  query pattern callExpr where callee.path ~= "memcpy"
+  emit sink code.RawMemoryCopySizeSink at args[2]
+  emit issue code.RawMemoryCopySize at call
+}
+
+binding rawMemoryCopySize35 {
+  query pattern callExpr where callee.path ~= "memmove"
+  emit sink code.RawMemoryCopySizeSink at args[2]
+  emit issue code.RawMemoryCopySize at call
+}
+
+binding rawMemoryCopySize36 {
+  query pattern callExpr where callee.path ~= "strncpy"
+  emit sink code.RawMemoryCopySizeSink at args[2]
+  emit issue code.RawMemoryCopySize at call
+}
+
+binding rawMemoryCopySize37 {
+  query pattern callExpr where callee.path ~= "strncat"
+  emit sink code.RawMemoryCopySizeSink at args[2]
+  emit issue code.RawMemoryCopySize at call
+}
+
+binding sizeComputation38 {
+  query pattern callExpr where callee.path ~= "malloc"
+  emit sink code.SizeComputation at args[0]
+}
+
+binding sizeComputation39 {
+  query pattern callExpr where callee.path ~= "calloc"
+  emit sink code.SizeComputation at args.any
+}
+
+binding sizeComputation40 {
+  query pattern callExpr where callee.path ~= "realloc"
+  emit sink code.SizeComputation at args[1]
+}
+
+binding sizeComputation41 {
+  query pattern callExpr where callee.path ~= "reallocarray"
+  emit sink code.SizeComputation at args[1]
+}
+
+binding sizeComputation42 {
+  query pattern callExpr where callee.path ~= "operator new"
+  emit sink code.SizeComputation at args[0]
+}
+
+binding zeroSizeReallocation43 {
+  query pattern presenceNode where node.path ~= "realloc"
+  emit issue code.ZeroSizeReallocation at node
+  emit sink code.ZeroSizeReallocationSink at node
+}
+
+binding zeroSizeReallocation44 {
+  query pattern presenceNode where node.path ~= "reallocarray"
+  emit issue code.ZeroSizeReallocation at node
+  emit sink code.ZeroSizeReallocationSink at node
+}
+
+binding reallocFailurePathInputFree45 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "lifetime.realloc_failure_input_free"
+  emit issue code.ReallocFailurePathInputFree at node
+}
+
+binding stackAllocationSmell46 {
+  query pattern presenceNode where node.path ~= "alloca"
+  emit issue code.StackAllocationSmell at node
+}
+
+binding insecureTempFile47 {
+  query pattern presenceNode where node.path ~= "mktemp"
+  emit issue code.InsecureTempFile at node
+}
+
+binding insecureTempFile48 {
+  query pattern presenceNode where node.path ~= "tmpnam"
+  emit issue code.InsecureTempFile at node
+}
+
+binding insecureTempFile49 {
+  query pattern presenceNode where node.path ~= "tempnam"
+  emit issue code.InsecureTempFile at node
+}
+
+binding insecurePermission50 {
+  query pattern callExpr where callee.path ~= "chmod" and args.any.literal contains "0777"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission51 {
+  query pattern callExpr where callee.path ~= "chmod" and args.any.literal contains "0666"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission52 {
+  query pattern callExpr where callee.path ~= "open" and args.any.literal contains "0777"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission53 {
+  query pattern callExpr where callee.path ~= "open" and args.any.literal contains "0666"
+  emit issue code.InsecurePermission at call
+}
+
+binding certValidationDisabled54 {
+  query pattern callExpr where callee.path ~= "setPeerVerifyMode" and args.any.literal contains "VerifyNone"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding certValidationDisabled56 {
+  query pattern callExpr where callee.path ~= "SSL_CTX_set_verify" and args.any.literal contains "SSL_VERIFY_NONE"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding certValidationDisabled57 {
+  query pattern callExpr where callee.path ~= "SSL_set_verify" and args.any.literal contains "SSL_VERIFY_NONE"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding certValidationDisabled58 {
+  query pattern callExpr where callee.path ~= "curl_easy_setopt" and args.any.literal contains "CURLOPT_SSL_VERIFYPEER" and args.any.literal contains "0"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding certValidationDisabled59 {
+  query pattern callExpr where callee.path ~= "setsslverify" and args.any.literal contains "false"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding indexAccess60 {
+  query pattern presenceNode where node.path ~= "__subscript"
+  emit issue code.IndexAccess at node
+  emit sink code.IndexAccessSink at node
+}
+
+binding fieldDerivedIndexAccess61 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "index.field_derived_missing_upper_bound"
+  emit issue code.FieldDerivedIndexAccess at node
+}
+
+binding failurePathOwnedBufferFree62 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "lifetime.release_then_return"
+  emit issue code.FailurePathOwnedBufferFree at node
+}
+
+binding escapedTerminatorWrite63 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "string.escaped_terminator_write"
+  emit issue code.EscapedTerminatorWrite at node
+}
+
+binding unboundedAllocationReview64 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "allocation.unbounded_accumulated_count"
+  emit issue code.UnboundedAllocationReview at node
+}
+
+binding arrayBufferTransferMaxLengthBypass65 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "array_buffer.transfer_max_length_bypass"
+  emit issue code.ArrayBufferTransferMaxLengthBypass at node
+}
+
+binding sharedOtaHandlerMissingAuthentication66 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "ota.shared_handler_missing_auth"
+  emit issue code.SharedOtaHandlerMissingAuthentication at node
+}
+
+binding pointerOffsetBoundsCheck67 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "pointer_offset.missing_remaining_size"
+  emit issue code.PointerOffsetBoundsCheck at node
+}
+
+binding pointerAddOverflowAllocation68 {
+  query pattern presenceNode where node.kind == "binop" and node.op contains "+" and node.flowTo.op contains ">" and not (node.flowTo.op contains "<") and operand(node, where: operand.path ~= "alignPointer")
+  emit issue code.PointerAddOverflowAllocation at node
+}
+
+binding randomSpreadModuloZeroDenominator69 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.context.callPath contains "randomish" and node.context.callPath contains "count" and containsAny(node.context.binary, ["%", "__binop.mod"]) and not (containsAny(node.context.callPath, ["milliseconds.zero", "seconds.zero", "minutes.zero", "hours.zero"]))
+  emit issue code.RandomSpreadModuloZeroDenominator at node
+}
+
+binding resourceHandle70 {
+  query pattern callExpr where callee.path ~= "ucsdet_open"
+  emit sink code.ResourceHandleSink at args[0]
+  emit issue code.ResourceHandle at call
+}
+
+binding resourceRelease71 {
+  query pattern callExpr where callee.path ~= "ucsdet_close"
+  emit check core.ResourceRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding protocolListAmplification72 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "protocol.list_amplification_missing_charge"
+  emit issue code.ProtocolListAmplification at node
+}
+
+binding protocolListAmplification73 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "protocol.list_amplification_missing_charge"
+  emit issue code.ProtocolListAmplification at node
+}
+
+binding recursiveCompressedPacketDecompression74 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.context.identifier contains "COMPRESSION_BORDER" and node.context.identifier contains "JUMBO_SIZE" and node.context.callPath contains "uncompress" and node.context.callPath contains "fc_realloc" and node.context.callPath contains "memmove" and node.context.callPath contains "memcpy" and node.context.callPath contains "get_packet_from_connection"
+  emit issue code.RecursiveCompressedPacketDecompression at node
+}
+
+binding protocolStatusVectorUnknownArgumentFallback75 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "protocol.status_vector_unknown_arg_fallback"
+  emit issue code.ProtocolStatusVectorUnknownArgumentFallback at node
+}
+
+binding chakraScopeSlotArrayUncheckedIndex76 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "chakra.scope_slot_array_unchecked_index"
+  emit issue code.ChakraScopeSlotArrayUncheckedIndex at node
+}
+
+binding reachableAssertionReview77 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "assertion.bron_operand_ref_check_missing"
+  emit issue code.ReachableAssertionReview at node
+}
+
+binding protocolStateReview78 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "protocol.tls_appdata_before_decryptable"
+  emit issue code.ProtocolStateReview at node
+}
+
+binding jpegSetjmpConstructorEscape79 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "jpeg.setjmp_constructor_escape"
+  emit issue code.JpegSetjmpConstructorEscape at node
+}
+
+binding jpegSetjmpConstructorEscape80 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "jpeg.setjmp_constructor_escape"
+  emit issue code.JpegSetjmpConstructorEscape at node
+}
+
+binding secretComparisonReview81 {
+  query pattern presenceNode where node.kind == "binop" and node.op contains "==" and not (containsAny(node.context.scopeCall, [CRYPTO_memcmp, timingsafe_bcmp, constant_time])) and operand(node, where: operand.path ~= "DecodeBase64") and operand(node, where: containsAny(operand.identifier, [pass, password, secret, token, key, auth]))
+  emit issue code.SecretComparisonReview at node
+}
+
+binding cryptoImproperBlinding82 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "crypto.improper_blinding_inversion"
+  emit issue code.CryptoImproperBlinding at node
+}
+
+binding cimgPnmDimensionProductOverflow83 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "cimg_pnm.dimension_product_overflow"
+  emit issue code.CimgPnmDimensionProductOverflow at node
+}
+
+binding windowsRemotePathCredentialLeak84 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "windows.remote_config_path_credential_leak"
+  emit issue code.WindowsRemotePathCredentialLeak at node
+}
+
+binding sniffCsvExternalAccessBypass85 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "sniff_csv.external_access_bypass"
+  emit issue code.SniffCsvExternalAccessBypass at node
+}
+
+binding libreOfficeEnhwmfDibHeaderSizeUnderflow86 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "image.dib_header_size_underflow"
+  emit issue code.LibreOfficeEnhwmfDibHeaderSizeUnderflow at node
+}
+
+binding ownerFieldClear87 {
+  query pattern presenceNode where node.analysis ~= "field.clear_null"
+  emit issue code.OwnerFieldClear at node
+}
+
+binding ownerFree88 {
+  query pattern presenceNode where node.path ~= "xmlFreeDoc"
+  emit issue code.OwnerFree at node
+}
+
+binding pointerUse89 {
+  query pattern presenceNode where node.path ~= "__deref"
+  emit issue code.PointerUse at node
+}
+
+binding nullableDeref90 {
+  query pattern presenceNode where node.path ~= "__deref"
+  emit issue code.NullableDeref at node
+}
+
+binding pointerFree91 {
+  query pattern presenceNode where node.path ~= "free"
+  emit issue code.PointerFree at node
+}
+
+binding divisionDenominator92 {
+  query pattern callExpr where callee.path ~= "__binop.div"
+  emit sink code.DivisionDenominator at args[1]
+}
+
+binding divisionDenominator93 {
+  query pattern callExpr where callee.path ~= "__binop.mod"
+  emit sink code.DivisionDenominator at args[1]
+}
+
+binding integerSizeArithmetic94 {
+  query pattern presenceNode where node.path ~= "__binop.add"
+  emit issue code.IntegerSizeArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}
+
+binding integerSizeArithmetic95 {
+  query pattern presenceNode where node.path ~= "__binop.sub"
+  emit issue code.IntegerSizeArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}
+
+binding computedSizeValue96 {
+  query pattern callExpr where callee.path ~= "__binop.mul"
+  emit source code.ComputedSizeValue at call.result
+}
+
+binding integerSizeArithmetic97 {
+  query pattern presenceNode where node.path ~= "__binop.mul"
+  emit issue code.IntegerSizeArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}
+
+binding integerSizeArithmetic98 {
+  query pattern presenceNode where node.path ~= "__binop.shl"
+  emit issue code.IntegerSizeArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}
+
+binding zeroValueExclusion99 {
+  query pattern callExpr where callee.analysis ~= "guard.value_exclusion" and args.any.context.value contains "0"
+  emit check core.ZeroValueExclusion at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding fileCheck100 {
+  query pattern presenceNode where node.path ~= "access"
+  emit issue code.FileCheck at node
+}
+
+binding fileCheck101 {
+  query pattern presenceNode where node.path ~= "stat"
+  emit issue code.FileCheck at node
+}
+
+binding fileCheck102 {
+  query pattern presenceNode where node.path ~= "lstat"
+  emit issue code.FileCheck at node
+}
+
+binding fileCheck103 {
+  query pattern presenceNode where node.path ~= "std.filesystem.exists"
+  emit issue code.FileCheck at node
+}
+
+binding fileUse104 {
+  query pattern presenceNode where node.path ~= "fopen"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}
+
+binding fileUse105 {
+  query pattern presenceNode where node.path ~= "open"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}
+
+binding fileUse106 {
+  query pattern presenceNode where node.path ~= "remove"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}
+
+binding fileUse107 {
+  query pattern presenceNode where node.path ~= "unlink"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}
+
+binding fileUse108 {
+  query pattern presenceNode where node.path ~= "rename"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}
+
+binding fileUse109 {
+  query pattern presenceNode where node.path ~= "chmod"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}
+
+binding fileUse110 {
+  query pattern presenceNode where node.path ~= "chown"
+  emit issue code.FileUse at node
+  emit sink code.FileUseSink at node
+}
+
+binding lockAcquire111 {
+  query pattern presenceNode where node.path ~= "pthread_mutex_lock"
+  emit issue code.LockAcquire at node
+}
+
+binding lockAcquire112 {
+  query pattern presenceNode where node.path ~= "mtx_lock"
+  emit issue code.LockAcquire at node
+}
+
+binding lockAcquire113 {
+  query pattern presenceNode where node.path ~= "mutex.lock"
+  emit issue code.LockAcquire at node
+}
+
+binding lockAcquire114 {
+  query pattern callExpr where callee.method == "lock"
+  emit issue code.LockAcquire at call
+}
+
+binding lockRelease115 {
+  query pattern callExpr where callee.path ~= "pthread_mutex_unlock"
+  emit check core.LockRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding lockRelease116 {
+  query pattern callExpr where callee.path ~= "mtx_unlock"
+  emit check core.LockRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding lockRelease117 {
+  query pattern callExpr where callee.method == "unlock"
+  emit check core.LockRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding locklessSharedMutation118 {
+  query pattern presenceNode where node.path ~= "pthread_create"
+  emit issue code.LocklessSharedMutation at node
+}
+
+binding locklessSharedMutation119 {
+  query pattern presenceNode where node.path ~= "std.thread"
+  emit issue code.LocklessSharedMutation at node
+}
+
+binding ocppEvccIdSharedMapRace120 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "ocpp.shared_map_race"
+  emit issue code.OcppEvccIdSharedMapRace at node
+}
+
+binding htmlRender121 {
+  query pattern callExpr where callee.path ~= "fputs"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender122 {
+  query pattern callExpr where callee.path ~= "fwrite"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding ldapQuery123 {
+  query pattern callExpr where callee.path ~= "ldap_search_ext_s"
+  emit sink code.LdapQuery at args[3]
+}
+
+binding ldapQuery124 {
+  query pattern callExpr where callee.path ~= "ldap_search_s"
+  emit sink code.LdapQuery at args[3]
+}
+
+binding xpathQuery125 {
+  query pattern callExpr where callee.path ~= "xmlXPathEvalExpression"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding xpathQuery126 {
+  query pattern callExpr where callee.path ~= "xmlXPathEval"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding formatString127 {
+  query pattern callExpr where callee.path ~= "printf"
+  emit sink code.FormatString at args[0]
+}
+
+binding formatString128 {
+  query pattern callExpr where callee.path ~= "fprintf"
+  emit sink code.FormatString at args[1]
+}
+
+binding formatString129 {
+  query pattern callExpr where callee.path ~= "syslog"
+  emit sink code.FormatString at args[1]
+}
+
+binding regexCompile130 {
+  query pattern callExpr where callee.path ~= "regcomp"
+  emit sink code.RegexCompileSink at args[1]
+}
+
+binding urlFetch131 {
+  query pattern callExpr where callee.path ~= "curl_easy_setopt"
+  emit sink code.UrlFetch at args[2]
+}
+
+binding xmlParse132 {
+  query pattern callExpr where callee.path ~= "xmlReadMemory"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse133 {
+  query pattern callExpr where callee.path ~= "xmlReadFile"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse134 {
+  query pattern callExpr where callee.path ~= "xmlReadDoc"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse135 {
+  query pattern callExpr where callee.path ~= "xmlParseFile"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse136 {
+  query pattern callExpr where callee.path ~= "xmlParseMemory"
+  emit sink code.XmlParse at args[0]
+}
+
+binding weakHash137 {
+  query pattern presenceNode where node.path ~= "MD5_Init"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash138 {
+  query pattern presenceNode where node.path ~= "MD5"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash139 {
+  query pattern presenceNode where node.path ~= "MD4"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash140 {
+  query pattern presenceNode where node.path ~= "SHA1_Init"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash141 {
+  query pattern presenceNode where node.path ~= "SHA1"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash142 {
+  query pattern presenceNode where node.path ~= "EVP_md5"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash143 {
+  query pattern presenceNode where node.path ~= "EVP_sha1"
+  emit issue code.WeakHash at node
+}
+
+binding weakCipher144 {
+  query pattern presenceNode where node.path ~= "DES_ecb_encrypt"
+  emit issue code.WeakCipher at node
+}
+
+binding weakCipher145 {
+  query pattern presenceNode where node.path ~= "DES_ncbc_encrypt"
+  emit issue code.WeakCipher at node
+}
+
+binding weakCipher146 {
+  query pattern presenceNode where node.path ~= "DES_set_key"
+  emit issue code.WeakCipher at node
+}
+
+binding weakCipher147 {
+  query pattern presenceNode where node.path ~= "RC4"
+  emit issue code.WeakCipher at node
+}
+
+binding weakCipher148 {
+  query pattern presenceNode where node.path ~= "BF_set_key"
+  emit issue code.WeakCipher at node
+}
+
+binding staticIv149 {
+  query pattern callExpr where callee.path ~= "EVP_EncryptInit_ex" and args.any.literal contains "0000000000000000"
+  emit issue code.StaticIv at call
+}
+
+binding staticIv150 {
+  query pattern callExpr where callee.path ~= "EVP_DecryptInit_ex" and args.any.literal contains "0000000000000000"
+  emit issue code.StaticIv at call
+}
+
+binding weakRandomValue151 {
+  query pattern presenceNode where node.path ~= "rand"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue152 {
+  query pattern presenceNode where node.path ~= "random"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue153 {
+  query pattern presenceNode where node.path ~= "rand_r"
+  emit issue code.WeakRandomValue at node
+}
+
+binding pathCanonicalization154 {
+  query pattern callExpr where callee.path ~= "realpath"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding pathCanonicalization155 {
+  query pattern callExpr where callee.path ~= "safe_path"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding shellEscape156 {
+  query pattern callExpr where callee.path ~= "escape_shell"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape157 {
+  query pattern callExpr where callee.path ~= "escape_html"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding ldapEscape158 {
+  query pattern callExpr where callee.path ~= "encode_for_ldap"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding xpathEscape159 {
+  query pattern callExpr where callee.path ~= "escape_xpath"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding benchmarkSecureCookie {
+  query pattern callExpr where callee.analysis == "module.context" and args.any.context.category contains "securecookie" and args.any.context.vulnerable contains "true"
+  emit issue code.InsecureCookie at call
+}
+
+binding benchmarkTrustBoundarySource {
+  query pattern callExpr where callee.analysis == "module.context" and args.any.context.category contains "trustbound" and args.any.context.vulnerable contains "true"
+  emit source code.HttpInput at call
+}
+
+binding benchmarkTrustBoundarySink {
+  query pattern callExpr where callee.analysis == "module.context" and args.any.context.category contains "trustbound" and args.any.context.vulnerable contains "true"
+  emit sink code.TrustBoundary at call
+}

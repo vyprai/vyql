@@ -1,9 +1,0 @@
-module bindings.python.generated.m3d9ccbad;
-
-binding databaseRead32 {
-  requires {
-    dependency("flask-sqlalchemy")
-  }
-  query pattern callExpr where callee.path ~= "query.get_or_404"
-  emit source code.DatabaseRead at call.result
-}

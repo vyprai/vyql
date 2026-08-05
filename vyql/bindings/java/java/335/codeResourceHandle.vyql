@@ -1,7 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding resourceHandle335 {
-  query pattern presenceNode where node.path ~= "Files.newInputStream"
-  emit issue code.ResourceHandle at node
-  emit sink code.ResourceHandleSink at node
-}

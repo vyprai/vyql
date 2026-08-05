@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding commandExecution240 {
-  query pattern callExpr where callee.path ~= "subprocess.getoutput"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.groovy.generated.m6eabb149;
-
-binding authenticationRequiredOp44 {
-  query pattern presenceNode where node.path ~= "grantRole"
-  emit issue code.AuthenticationRequiredOp at node
-}

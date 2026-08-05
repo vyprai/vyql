@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding containerdCriImageEnvAliasLeak230 {
-  query pattern presenceNode where node.analysis == "go.containerd_cri_image_env_alias"
-  emit issue code.ContainerdCriImageEnvAliasLeak at node
-}

@@ -1,6 +1,0 @@
-module bindings.dart.generated.m1c398214;
-
-binding sqlExecution22 {
-  query pattern callExpr where callee.method == "rawUpdate"
-  emit sink code.SqlExecution at args[0]
-}

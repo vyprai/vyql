@@ -1,6 +1,0 @@
-module bindings.kotlin.generated.m304d1620;
-
-binding regexCompile56 {
-  query pattern callExpr where callee.method == "toRegex"
-  emit sink code.RegexCompileSink at callee.receiver
-}

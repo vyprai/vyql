@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding encodedDotSegmentStaticPathBypass645 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.selector contains "req.isStaticFile" and node.context.selector contains "req.uri.pathname" and node.context.callPath contains "req.uri.pathname.indexOf" and node.context.literal contains "./" and node.context.callPath contains "req.$total_file" and not (node.context.literal contains "%2e") and not (node.context.literal contains "%2E") and not (node.context.callPath contains "decodeURIComponent") and not (node.context.callPath contains "decodeURI")
-  emit issue code.EncodedDotSegmentStaticPathBypass at node
-}

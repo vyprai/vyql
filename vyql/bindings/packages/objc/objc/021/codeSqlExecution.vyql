@@ -1,9 +1,0 @@
-module bindings.objc.generated.m942721f9;
-
-binding sqlExecution21 {
-  requires {
-    dependency("FMDB")
-  }
-  query pattern callExpr where callee.path ~= "FMDatabase.executeQuery"
-  emit sink code.SqlExecution at args[0]
-}

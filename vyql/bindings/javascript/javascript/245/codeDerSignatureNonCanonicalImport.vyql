@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding derSignatureNonCanonicalImport245 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "getLength" and node.context.callPath contains "data.slice" and node.context.callPath contains "BN" and node.context.expr contains "r[0]===0&&(r[1]&0x80)" and node.context.expr contains "s[0]===0&&(s[1]&0x80)" and not (node.context.expr contains "val>>>=0") and not (node.context.expr contains "val<=0x7f")
-  emit issue code.DerSignatureNonCanonicalImport at node
-}

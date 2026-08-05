@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding cliArgument1 {
-  query pattern callExpr where callee.path ~= "argv"
-  emit source code.CliArgument at call.result
-}

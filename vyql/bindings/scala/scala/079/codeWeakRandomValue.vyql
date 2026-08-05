@@ -1,6 +1,0 @@
-module bindings.scala.generated.m06d0685b;
-
-binding weakRandomValue79 {
-  query pattern presenceNode where node.path ~= "java.util.Random"
-  emit issue code.WeakRandomValue at node
-}

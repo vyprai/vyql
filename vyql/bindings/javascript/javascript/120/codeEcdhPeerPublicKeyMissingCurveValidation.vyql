@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding ecdhPeerPublicKeyMissingCurveValidation120 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "publicKey.Q.multiply" and node.context.callPath contains "zeroBuffer" and node.context.callPath contains "S.getX.toBigInteger.toString" and not (node.context.callPath contains "onCurve") and not (node.context.callPath contains "validatePublicKey") and not (node.context.callPath contains "isOnCurve")
-  emit issue code.EcdhPeerPublicKeyMissingCurveValidation at node
-}

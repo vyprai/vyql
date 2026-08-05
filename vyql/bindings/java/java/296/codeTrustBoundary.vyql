@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding trustBoundary296 {
-  query pattern callExpr where callee.method == "putValue"
-  emit sink code.TrustBoundary at args.any
-}

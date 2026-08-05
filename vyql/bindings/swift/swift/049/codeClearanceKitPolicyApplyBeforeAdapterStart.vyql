@@ -1,6 +1,0 @@
-module bindings.swift.generated.m388f23d0;
-
-binding clearanceKitPolicyApplyBeforeAdapterStart49 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "swift" and node.context.startupOrder == "clearance_policy_before_adapter_start"
-  emit issue code.ClearanceKitPolicyApplyBeforeAdapterStart at node
-}

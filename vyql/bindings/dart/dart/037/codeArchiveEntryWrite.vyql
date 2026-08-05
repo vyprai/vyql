@@ -1,6 +1,0 @@
-module bindings.dart.generated.m1c398214;
-
-binding archiveEntryWrite37 {
-  query pattern callExpr where callee.method == "extractFile"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

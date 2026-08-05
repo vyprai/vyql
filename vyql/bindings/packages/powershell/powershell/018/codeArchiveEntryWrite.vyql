@@ -1,9 +1,0 @@
-module bindings.powershell.generated.m92132a18;
-
-binding archiveEntryWrite18 {
-  requires {
-    dependency("Microsoft.PowerShell.Archive")
-  }
-  query pattern callExpr where callee.path ~= "Expand-Archive"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

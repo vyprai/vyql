@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding cipherWithoutIntegrityHash188 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "crypto.cipher_without_integrity_hash"
-  emit issue code.CipherWithoutIntegrityHash at node
-}

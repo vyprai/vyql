@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding samlFirstSignatureOnlyBypass157 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.functionName contains "VerifySignature" and node.context.callPath contains "signedDocument.GetElementsByTagName" and node.context.index contains "nodeList[]" and node.context.callPath contains "signedXml.LoadXml" and node.context.callPath contains "signedXml.CheckSignature" and not (node.context.callPath contains "VerifyAllSignatures") and not (node.context.identifier contains "signatureNodes")
-  emit issue code.SamlFirstSignatureOnlyBypass at node
-}

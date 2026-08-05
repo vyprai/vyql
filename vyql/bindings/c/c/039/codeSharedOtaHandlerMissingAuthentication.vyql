@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding sharedOtaHandlerMissingAuthentication39 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "ota.shared_handler_missing_auth"
-  emit issue code.SharedOtaHandlerMissingAuthentication at node
-}

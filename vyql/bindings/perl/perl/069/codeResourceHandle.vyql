@@ -1,7 +1,0 @@
-module bindings.perl.generated.mfca40a44;
-
-binding resourceHandle69 {
-  query pattern presenceNode where node.path ~= "open"
-  emit issue code.ResourceHandle at node
-  emit sink code.ResourceHandleSink at node
-}

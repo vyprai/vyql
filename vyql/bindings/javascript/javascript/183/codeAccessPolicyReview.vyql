@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding accessPolicyReview183 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "authorized_keys.includes" and node.context.subscript contains "private_keys[data.pubkey]" and node.context.identifier contains "noscraper" and not (node.context.identifier contains "pubkeyInConfig") and not (node.context.expr contains "authorized_keys?.length&&!pubkeyInConfig")
-  emit issue code.AccessPolicyReview at node
-}

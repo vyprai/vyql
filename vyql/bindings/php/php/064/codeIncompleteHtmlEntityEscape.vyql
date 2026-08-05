@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding incompleteHtmlEntityEscape64 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "incomplete_html_entity_escape"
-  emit issue code.IncompleteHtmlEntityEscape at node
-}

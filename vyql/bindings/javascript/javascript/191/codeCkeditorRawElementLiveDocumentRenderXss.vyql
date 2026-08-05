@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding ckeditorRawElementLiveDocumentRenderXss191 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "viewItem.is" and node.context.literal contains "rawElement" and node.context.callPath contains "document.createElement" and node.context.callPath contains "viewItem.render" and node.context.callPath contains "domElementToPlainText" and not (node.context.callPath contains "createHTMLDocument")
-  emit issue code.CkeditorRawElementLiveDocumentRenderXss at node
-}

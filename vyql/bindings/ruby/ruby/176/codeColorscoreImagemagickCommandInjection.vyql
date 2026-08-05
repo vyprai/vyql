@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding colorscoreImagemagickCommandInjection176 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.functionName == "initialize" and node.context.rubyReview == "imagemagick_convert_backtick_unescaped_interpolation"
-  emit issue code.ColorscoreImagemagickCommandInjection at node
-}

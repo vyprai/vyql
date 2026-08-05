@@ -1,9 +1,0 @@
-module bindings.python.generated.m3d9ccbad;
-
-binding httpInput16 {
-  requires {
-    dependency("djangorestframework")
-  }
-  query pattern callExpr where callee.path ~= "request.query_params"
-  emit source code.HttpInput at call.result
-}

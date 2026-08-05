@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding csvCell399 {
-  query pattern callExpr where callee.method == "writeAll"
-  emit sink code.CsvCell at args.any.collection
-}

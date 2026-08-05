@@ -1,9 +1,0 @@
-module bindings.dart.generated.m5342780c;
-
-binding commandExecution4 {
-  requires {
-    dependency("dart:io")
-  }
-  query pattern callExpr where callee.path ~= "Process.run"
-  emit sink code.CommandExecution at args[0]
-}

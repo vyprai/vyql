@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding weakHash770 {
-  query pattern presenceNode where node.path ~= "MD5.new"
-  emit issue code.WeakHash at node
-}

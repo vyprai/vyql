@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding filePathAccess340 {
-  query pattern callExpr where callee.path ~= "lstatSync"
-  emit sink code.FilePathAccess at args[0]
-}

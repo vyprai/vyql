@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding craftCommercePurchasablesSortSqlInjection194 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "actionPurchasablesTable" and node.context.phpReview == "craft_purchasables_sort_sql_injection"
-  emit issue code.CraftCommercePurchasablesSortSqlInjection at node
-}

@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding httpHeader34 {
-  query pattern callExpr where callee.path ~= "$request.headers.get"
-  emit source code.HttpHeader at call.result
-}

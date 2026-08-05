@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding urlFetch299 {
-  query pattern callExpr where callee.path ~= "request"
-  emit sink code.UrlFetch at args[0]
-}

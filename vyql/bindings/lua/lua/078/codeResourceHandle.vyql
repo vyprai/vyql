@@ -1,7 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding resourceHandle78 {
-  query pattern presenceNode where node.path ~= "io.open"
-  emit issue code.ResourceHandle at node
-  emit sink code.ResourceHandleSink at node
-}

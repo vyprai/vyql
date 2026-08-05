@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding kubernetesCurlAuthorizationHeaderLogLeak157 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "toCurl" and node.context.selector contains "r.RequestHeaders" and node.context.callPath contains "fmt.Sprintf" and node.context.literal contains "%s: %s" and not (node.context.scopeCall contains "maskValue")
-  emit issue code.KubernetesCurlAuthorizationHeaderLogLeak at node
-}

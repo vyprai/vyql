@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding domInputDataTransfer695 {
-  query pattern callExpr where callee.path ~= "dataTransfer.getData"
-  emit source code.DomInput at call.result
-}

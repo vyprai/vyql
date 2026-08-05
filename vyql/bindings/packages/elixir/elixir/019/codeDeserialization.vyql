@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mf98b3aca;
-
-binding deserialization19 {
-  requires {
-    dependency("plug_crypto")
-  }
-  query pattern callExpr where callee.path ~= "Plug.Crypto.non_executable_binary_to_term"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m5895bccf;
-
-binding commandExecution15 {
-  requires {
-    dependency("ruby")
-  }
-  query pattern callExpr where callee.path ~= "system"
-  emit sink code.CommandExecution at args[0]
-}

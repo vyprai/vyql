@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding regexLineCommentStripWithoutCharWhitelist40 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "regex_line_comment_strip_without_char_whitelist"
-  emit issue code.RegexLineCommentStripWithoutCharWhitelist at node
-}

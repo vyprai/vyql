@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding httpInput16 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.functionName contains "process" and args.any.context.paramName contains "target"
-  emit source code.HttpInput at call.result
-}

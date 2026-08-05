@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding httpInput29 {
-  query pattern callExpr where callee.path ~= "$request.query.all"
-  emit source code.HttpInput at call.result
-}

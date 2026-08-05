@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mf98b3aca;
-
-binding httpInput2 {
-  requires {
-    dependency("plug")
-  }
-  query pattern callExpr where callee.path ~= "Plug.Conn.get_req_header"
-  emit source code.HttpInput at call.result
-}

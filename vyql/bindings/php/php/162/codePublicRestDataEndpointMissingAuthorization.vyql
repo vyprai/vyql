@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding publicRestDataEndpointMissingAuthorization162 {
-  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.callPath contains "register_rest_route" and node.context.callArg contains "__return_true" and node.context.callArg contains "get_items" and node.context.callPath contains "Campaign.find" and node.context.callPath contains "CampaignDonationQuery" and node.context.callPath contains "joinDonationMeta" and not (containsAny(node.context.callPath, ["canViewPrivate", "isActive", "get_post_status", "authorizationStatusCode"])) and not (node.context.callArg contains "WP_Error:rest_forbidden")
-  emit issue code.PublicRestDataEndpointMissingAuthorization at node
-}

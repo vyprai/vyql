@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding stateChangingOp149 {
-  query pattern callExpr where callee.method == "changePassword"
-  emit sink code.StateChangingOpSink at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding ownedResourceDeleteMissingOwnershipCheck527 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "owned_resource_delete_missing_ownership_check"
-  emit issue code.OwnedResourceDeleteMissingOwnershipCheck at node
-}

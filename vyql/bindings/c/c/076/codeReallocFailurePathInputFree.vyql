@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding reallocFailurePathInputFree76 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "lifetime.realloc_failure_input_free"
-  emit issue code.ReallocFailurePathInputFree at node
-}

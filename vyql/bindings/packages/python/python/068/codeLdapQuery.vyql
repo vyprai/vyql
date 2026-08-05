@@ -1,9 +1,0 @@
-module bindings.python.generated.m3d9ccbad;
-
-binding ldapQuery68 {
-  requires {
-    dependency("ldap3")
-  }
-  query pattern callExpr where callee.method == "search"
-  emit sink code.LdapQuery at args[1]
-}

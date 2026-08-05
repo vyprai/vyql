@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding weakCipher366 {
-  query pattern presenceNode where node.path ~= "NullCipher"
-  emit issue code.WeakCipher at node
-}

@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding xpathQuery533 {
-  query pattern callExpr where callee.path ~= "elementpath.select"
-  emit sink code.XpathQuery at args[1]
-}

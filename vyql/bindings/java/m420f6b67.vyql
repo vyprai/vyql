@@ -1,0 +1,2569 @@
+module bindings.java.generated.m420f6b67;
+
+pattern bindingMetadata {
+  binding: {
+    name: "java"
+    meta: {
+      fidelity: "resolved"
+      match: "contains"
+    }
+  }
+}
+
+binding stdinInput0 {
+  query pattern callExpr where callee.path ~= "System.console.readLine"
+  emit source code.StdinInput at call.result
+}
+
+binding httpInput1 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "GetMapping"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "PostMapping"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "PutMapping"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "DeleteMapping"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "PatchMapping"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput6 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "RequestMapping"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput7 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "GET"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput8 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "POST"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput9 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "PUT"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput10 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "DELETE"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput11 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "HEAD"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput12 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "OPTIONS"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput13 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "Get"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput14 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "Post"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput15 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "Put"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput16 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "Delete"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput17 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.classAnnotation contains "RestController"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput18 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.classAnnotation contains "Controller"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput19 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.classAnnotation contains "RequestMapping"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput20 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.classAnnotation contains "Path"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput21 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.functionName contains "isValid" and args.any.context.hasParamType contains "ConstraintValidatorContext" and args.any.context.paramIndex contains "0"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput22 {
+  query pattern callExpr where callee.method == "getParameter"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput23 {
+  query pattern callExpr where callee.method == "getParameterValues"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput24 {
+  query pattern callExpr where callee.method == "getParameterMap"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput25 {
+  query pattern callExpr where callee.method == "getHeader"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput26 {
+  query pattern callExpr where callee.method == "getHeaders"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput27 {
+  query pattern callExpr where callee.method == "getQueryString"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput28 {
+  query pattern callExpr where callee.method == "getCookies"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput29 {
+  query pattern callExpr where callee.method == "getInputStream"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput30 {
+  query pattern callExpr where callee.method == "getReader"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput31 {
+  query pattern callExpr where callee.method == "getPathInfo"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput32 {
+  query pattern callExpr where callee.method == "getRequestURI"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput33 {
+  query pattern callExpr where callee.method == "getPart"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput34 {
+  query pattern callExpr where callee.method == "getArguments"
+  emit source code.HttpInput at call.result
+}
+
+binding archiveEntryName35 {
+  query pattern callExpr where callee.method == "getName" and callee.receiver.type == "ZipEntry"
+  emit source code.ArchiveEntryName at call.result
+}
+
+binding intentInput36 {
+  query pattern callExpr where callee.path ~= ".getStringExtra"
+  emit source code.IntentInput at call.result
+}
+
+binding intentInput37 {
+  query pattern callExpr where callee.path ~= ".getStringArrayExtra"
+  emit source code.IntentInput at call.result
+}
+
+binding intentInput38 {
+  query pattern callExpr where callee.path ~= ".getCharSequenceExtra"
+  emit source code.IntentInput at call.result
+}
+
+binding intentInput39 {
+  query pattern callExpr where callee.path ~= ".getBundleExtra"
+  emit source code.IntentInput at call.result
+}
+
+binding intentInput40 {
+  query pattern callExpr where callee.path ~= ".getDataString"
+  emit source code.IntentInput at call.result
+}
+
+binding intentInput41 {
+  query pattern callExpr where callee.path ~= ".getQueryParameter"
+  emit source code.IntentInput at call.result
+}
+
+binding intentInput42 {
+  query pattern callExpr where callee.path ~= ".getQueryParameters"
+  emit source code.IntentInput at call.result
+}
+
+binding intentInput43 {
+  query pattern callExpr where callee.path ~= ".getLastPathSegment"
+  emit source code.IntentInput at call.result
+}
+
+binding secretValue44 {
+  query pattern callExpr where callee.method == "getKeyMaterial"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue45 {
+  query pattern callExpr where callee.method == "getKeyPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue46 {
+  query pattern callExpr where callee.method == "getPrivateKey"
+  emit source code.SecretValue at call.result
+}
+
+binding fileWriter47 {
+  query pattern callExpr where callee.path ~= "FileWriter"
+  emit fact runtime.ReceiverType at call.result {
+    about: FileWriter
+  }
+}
+
+binding bufferedWriter48 {
+  query pattern callExpr where callee.path ~= "BufferedWriter"
+  emit fact runtime.ReceiverType at call.result {
+    about: BufferedWriter
+  }
+}
+
+binding fileOutputStream49 {
+  query pattern callExpr where callee.path ~= "FileOutputStream"
+  emit fact runtime.ReceiverType at call.result {
+    about: FileOutputStream
+  }
+}
+
+binding outputStreamWriter50 {
+  query pattern callExpr where callee.path ~= "OutputStreamWriter"
+  emit fact runtime.ReceiverType at call.result {
+    about: OutputStreamWriter
+  }
+}
+
+binding randomAccessFile51 {
+  query pattern callExpr where callee.path ~= "RandomAccessFile"
+  emit fact runtime.ReceiverType at call.result {
+    about: RandomAccessFile
+  }
+}
+
+binding stringWriter52 {
+  query pattern callExpr where callee.path ~= "StringWriter"
+  emit fact runtime.ReceiverType at call.result {
+    about: StringWriter
+  }
+}
+
+binding charArrayWriter53 {
+  query pattern callExpr where callee.path ~= "CharArrayWriter"
+  emit fact runtime.ReceiverType at call.result {
+    about: CharArrayWriter
+  }
+}
+
+binding byteArrayOutputStream54 {
+  query pattern callExpr where callee.path ~= "ByteArrayOutputStream"
+  emit fact runtime.ReceiverType at call.result {
+    about: ByteArrayOutputStream
+  }
+}
+
+binding cSVWriter55 {
+  query pattern callExpr where callee.path ~= "CSVWriter"
+  emit fact runtime.ReceiverType at call.result {
+    about: CSVWriter
+  }
+}
+
+binding integerSizeArithmetic56 {
+  query pattern presenceNode where node.scope == "function" and node.context.expr contains "offset+length>b.length" and node.context.callPath contains "write" and not (node.context.expr contains "offset>b.length-length")
+  emit issue code.IntegerSizeArithmetic at node
+  emit issue code.SizeSensitiveIntegerArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}
+
+binding integerSizeArithmetic57 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "crypt_raw" and node.context.binaryShape contains "INT<<ID" and not (node.context.binaryShape contains "LONG<<ID") and not (node.context.scopeCall contains "roundsForLogRounds")
+  emit issue code.IntegerSizeArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}
+
+binding unvalidatedRatingRange58 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "rateTopic" and node.context.callPath contains "registry.rateResource" and node.context.callPath contains "genericArtifact.getPath" and not (node.context.identifier contains "MAX_RATE") and not (node.context.identifier contains "MIN_RATE")
+  emit issue code.UnvalidatedRatingRange at node
+}
+
+binding worldCoordinateSafeRangeMissing59 {
+  query pattern presenceNode where node.scope == "function" and node.context.paramType contains "BlockVector3" and containsAny(node.context.call, ["getBlockAt", "setBlock", "getBlock", "getFullBlock", "getBiome", "setBiome", "generateTree", "canPlaceAt", "applySideEffects", "simulateItemUse", "checkLoadedChunk"]) and not (containsAny(node.context.scopeCall, [testCoords, checkCoords, validateCoords])) and not (node.context.literal contains "30000000")
+  emit issue code.WorldCoordinateSafeRangeMissing at node
+}
+
+binding frameworkRequestBeforeSessionValidation60 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doFilter" and node.context.callPath contains "Meteor.build" and node.context.callPath contains "httpReq.getParameter" and node.context.callPath contains "pushContext.getSessionManager.getPushSession" and node.context.callPath contains "httpResp.sendError" and node.context.call contains "RequestImpl" and node.context.callOrder contains "Meteor.build>Collections.emptyList" and node.context.callOrder contains "Collections.emptyList>httpReq.getParameter" and not (node.context.callOrder contains "httpResp.setContentType>Meteor.build")
+  emit issue code.FrameworkRequestBeforeSessionValidation at node
+}
+
+binding unvalidatedModelSelection61 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "addResults" and node.context.callPath contains "request.getParameter" and node.context.literal contains "classifier" and node.context.callPath contains "response.addHeader" and node.context.callPath contains "ners.get.classifyToString" and not (node.context.identifier contains "nerModel")
+  emit issue code.UnvalidatedModelSelection at node
+}
+
+binding integerSizeArithmetic62 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "integer_size.int_shift"
+  emit issue code.IntegerSizeArithmetic at node
+  emit sink code.IntegerSizeArithmeticSink at node
+}
+
+binding premasterSecretLengthReview63 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "safeDecryptPreMasterSecret" and node.context.call contains "doFinal" and node.context.call contains "createSecret" and node.context.indexShape contains "ID[INT]" and not (node.context.lengthCheck contains "length_==_48")
+  emit issue code.PremasterSecretLengthReview at node
+}
+
+binding ecdsaSignatureScalarBoundsMissing64 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "verify" and node.context.selector contains "signature.r" and node.context.selector contains "signature.s" and node.context.selector contains "publicKey.point" and node.context.callPath contains "Math.inv" and node.context.callPath contains "Math.multiply" and not (node.context.expr contains "r.compareTo(curve.N)>=0") and not (node.context.expr contains "s.compareTo(curve.N)>=0")
+  emit issue code.EcdsaSignatureScalarBoundsMissing at node
+}
+
+binding verboseHttpClientAuthorizationLog65 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "RestAdapter.Builder" and node.context.call contains "setLogLevel" and node.context.call contains "setLog" and node.context.selector contains "RestAdapter.LogLevel.FULL" and not (node.context.selector contains "RestAdapter.LogLevel.BASIC") and not (node.context.selector contains "RestAdapter.LogLevel.NONE")
+  emit issue code.VerboseHttpClientAuthorizationLog at node
+}
+
+binding requestHostUrlValidationBypass66 {
+  query pattern presenceNode where node.scope == "function" and node.context.call contains "getServerName" and node.context.call contains "getHost" and node.context.call contains "equals" and not (node.context.scopeCall contains "contains")
+  emit issue code.RequestHostUrlValidationBypass at node
+}
+
+binding multiOptionUrlValidationBypass67 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "isValidURL" and node.context.callPath contains "isURLRelative" and node.context.callPath contains "buildAbsoluteURL" and not (node.context.callPath contains "validateCallbackURL")
+  emit issue code.MultiOptionUrlValidationBypass at node
+}
+
+binding responseWriterScriptWindowIdXss68 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "encodeBegin" and node.context.callPath contains "writer.write" and node.context.literal contains "dswh.init" and node.context.identifier contains "windowId" and not (node.context.callPath contains "writer.writeText")
+  emit issue code.ResponseWriterScriptWindowIdXss at node
+}
+
+binding missingSessionRotationAfterAuthentication69 {
+  query pattern presenceNode where node.scope == "function" and node.context.call contains "setAuthentication" and node.context.call contains "getSession" and not (node.context.scopeCall contains "invalidate")
+  emit issue code.MissingSessionRotationAfterAuthentication at node
+}
+
+binding missingSessionRotationAfterAuthentication70 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["doFinishLogin", "finishLogin", "doLogin", "login"]) and node.context.call contains "setAuthentication" and not (node.context.scopeCall contains "invalidate")
+  emit issue code.MissingSessionRotationAfterAuthentication at node
+}
+
+binding expiredCachedAuthTokenReuse71 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "accessTokenCache.timeout.isBefore" and node.context.callPath contains "ZonedDateTime.now" and node.context.selector contains "accessTokenCache.resource" and node.context.callPath contains "accessToken.getExpiresAtAsInstant" and node.context.callPath contains "expiresAt.minus" and not (node.context.callPath contains "accessTokenCache.timeout.isAfter")
+  emit issue code.ExpiredCachedAuthTokenReuse at node
+}
+
+binding publicKeyHashBindingReview72 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "correctlySpends" and node.context.call contains "fromPublicOnly" and node.context.call contains "verify" and node.context.call contains "hashFor" and not (node.context.scopeCall contains "sha256hash160")
+  emit issue code.PublicKeyHashBindingReview at node
+}
+
+binding publicWeakChecksumUtility73 {
+  query pattern presenceNode where node.scope == "class" and node.context.className contains "Checksum" and node.context.classModifier contains "public" and node.context.literal contains "SHA-1" and node.context.literal contains "CRC32" and node.context.callPath contains "MessageDigest.getInstance" and node.context.callPath contains "res.setHash" and node.context.callPath contains "res.setCrc"
+  emit issue code.PublicWeakChecksumUtility at node
+}
+
+binding ldapCrlCredentialReuse74 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "prepareConnectionFactory" and node.context.callPath contains "ConnectionConfig.copy" and node.context.call contains "setLdapUrl" and node.context.call contains "DefaultConnectionFactory" and not (node.context.call contains "setConnectionInitializers")
+  emit issue code.LdapCrlCredentialReuse at node
+}
+
+binding sessionStoredRedirectTarget75 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "determineTargetUrl" and node.context.classBase contains "SimpleUrlAuthenticationSuccessHandler" and node.context.callPath contains "session.getAttribute" and node.context.identifier contains "targetUrlSessionAttribute" and node.context.callPath contains "targetUrl.substring" and not (node.context.callPath contains "Util.isSafeToRedirectTo")
+  emit issue code.SessionStoredRedirectTarget at node
+}
+
+binding protocolRelativeSavedRequestRedirect76 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["savedRequestURL", "savedRequestUrl", "getSavedRequestURL", "getSavedRequestUrl"]) and containsAny(node.context.callPath, ["saved.getRequestURI", "saved.getRequestURL", "saved.getQueryString"]) and node.context.callPath contains "StringBuilder" and containsAny(node.context.callPath, ["sb.append", "url.append", "redirect.append"]) and containsAny(node.context.returnCallPath, ["sb.toString", "url.toString", "redirect.toString"]) and not (containsAny(node.context.callPath, ["deleteCharAt", "stripLeading", "normalize", "isSafeToRedirectTo"])) and not (containsAny(node.context.expr, ["charAt(1)=='/'", "charAt(1)==\"/\""]))
+  emit issue code.ProtocolRelativeSavedRequestRedirect at node
+}
+
+binding jmxRmiRegistryExposure77 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "createJMXServer" and node.context.selector contains "RMIExporter.EXPORTER_ATTRIBUTE" and node.context.callPath contains "configureRMIRegistry" and node.context.callPath contains "JMXConnectorServerFactory.newJMXConnectorServer" and not (node.context.callPath contains "LocateRegistry.createRegistry") and not (node.context.callPath contains "RMIJRMPServerImpl")
+  emit issue code.JmxRmiRegistryExposure at node
+}
+
+binding nodetoolArchiveCommandPrivilegeEscalation78 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "enableFullQueryLogger" and node.context.identifier contains "archiveCommand" and node.context.selector contains "fqlOptions.archive_command" and node.context.callPath contains "FullQueryLogger.instance.enableWithoutClean" and not (node.context.identifier contains "allow_nodetool_archive_command")
+  emit issue code.NodetoolArchiveCommandPrivilegeEscalation at node
+}
+
+binding commandStringWrapperExecution79 {
+  query pattern presenceNode where node.scope == "function" and node.context.literal contains "/bin/sh" and node.context.literal contains "-c" and node.context.identifier contains "scriptPath" and node.context.expr contains "scriptPath+ALERT_TITLE_OPTION" and node.context.callPath contains "ProcessUtils.executeScript" and not (node.context.callPath contains "File") and not (node.context.scopeCall contains "exists") and not (node.context.scopeCall contains "isFile")
+  emit issue code.CommandStringWrapperExecution at node
+}
+
+binding commonsCompressBzip2FallbackSortMissing80 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "blockSort" and node.context.call contains "mainSort" and node.context.call contains "randomiseBlock" and node.context.expr contains "this.workDone>this.workLimit" and not (node.context.scopeCall contains "fallbackSort")
+  emit issue code.CommonsCompressBzip2FallbackSortMissing at node
+}
+
+binding cordysRequestParamXssFilterDisabled81 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "jackson2ObjectMapperBuilderCustomizer" and node.context.callPath contains "jacksonObjectMapperBuilder.deserializerByType" and node.context.callPath contains "StringUtils.trim" and node.context.callPath contains "jsonParser.getValueAsString" and node.context.callPath contains "HtmlUtils.htmlEscape" and node.context.identifier contains "escape" and not (node.context.scopeCall contains "shouldEscapeXss") and not (node.context.identifier contains "xssFilterUrlList")
+  emit issue code.CordysRequestParamXssFilterDisabled at node
+}
+
+binding dotcmsSqlUtilBlacklistBypass82 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "sanitizeParameter" and node.context.callPath contains "StringEscapeUtils.escapeSql" and node.context.identifier contains "EVIL_SQL_WORDS" and node.context.call contains "isValidSQLCharacter" and not (node.context.scopeCall contains "sanitizeSQL") and not (node.context.identifier contains "EVIL_SQL_CONDITION_WORDS")
+  emit issue code.DotcmsSqlUtilBlacklistBypass at node
+}
+
+binding dotcmsFormsOrderBySqlInjection83 {
+  query pattern presenceNode where node.scope == "function" and node.context.className contains "ViewFormHandlerAction" and node.context.functionName contains "_loadStructures" and node.context.callPath contains "req.getParameter" and node.context.callPath contains "StructureFactory.getStructuresByUser" and not (node.context.callPath contains "SQLUtil.sanitizeSortBy")
+  emit issue code.DotcmsFormsOrderBySqlInjection at node
+}
+
+binding unescapedExceptionMessageMarkup84 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "parseURL" and node.context.callPath contains "CssFouffa" and not (node.context.scopeCall contains "getMessage")
+  emit issue code.UnescapedExceptionMessageMarkup at node
+}
+
+binding unescapedDiagnosticHtml85 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "IOUtils.toString" and node.context.literal contains "text/html" and node.context.callPath contains "Fault" and not (node.context.callPath contains "MessageUtils.isRequestor") and not (node.context.callPath contains "StringEscapeUtils.escapeHtml") and not (node.context.callPath contains "HtmlUtils.htmlEscape")
+  emit issue code.UnescapedDiagnosticHtml at node
+}
+
+binding svgOnclickWindowOpenLinkXss86 {
+  query pattern presenceNode where node.scope == "function" and node.context.identifier contains "link" and node.context.literal contains "window.open" and node.context.literal contains "cursor: pointer" and node.context.call contains "escapeHtml" and node.context.call contains "replace" and node.context.call contains "getBytes" and not (node.context.scopeCall contains "getProtocol") and not (node.context.literal contains "&quot;")
+  emit issue code.SvgOnclickWindowOpenLinkXss at node
+}
+
+binding javaScriptTemplateHtmlEscapeMismatch87 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "renderContent" and node.context.callPath contains "request.getParameter" and node.context.callPath contains "vars.put" and node.context.callPath contains "Encode.forHtmlContent" and not (node.context.callPath contains "Encode.forJavaScript")
+  emit issue code.JavaScriptTemplateHtmlEscapeMismatch at node
+}
+
+binding repositorySourceMetadataExposure88 {
+  query pattern presenceNode where node.scope == "function" and node.context.metadataExportAfterSensitiveKey contains "repoSource" and node.context.metadataExportWriter contains "metadata"
+  emit issue code.RepositorySourceMetadataExposure at node
+}
+
+binding jenkinsProjectDisplayNameXss89 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "getName" and node.context.callPath contains "project.getFullDisplayName" and not (node.context.callPath contains "StringEscapeUtils.escapeHtml") and not (node.context.callPath contains "Util.escape")
+  emit issue code.JenkinsProjectDisplayNameXss at node
+}
+
+binding jenkinsTestResultNameXss90 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "getName" and node.context.classBase contains "TestResult" and node.context.returnIdentifier contains "name" and not (containsAny(node.context.returnCallPath, ["hudson.Util.escape", "Util.escape", "StringEscapeUtils.escapeHtml", "StringEscapeUtils.escapeHtml4"]))
+  emit issue code.JenkinsTestResultNameXss at node
+}
+
+binding jenkinsPluginForkedDirectoryBrowserWithoutCsp91 {
+  query pattern callExpr where callee.path == "DirectoryBrowserSupport" and args.any.literal contains "Compare Html Report" and args.any.literal contains "graph.gif"
+  emit issue code.JenkinsPluginForkedDirectoryBrowserWithoutCsp at call
+}
+
+binding redirectTarget92 {
+  query pattern callExpr where callee.analysis ~= "function.return" and args.any.context.functionName contains "determineTargetUrl" and args.any.literal contains "SimpleUrlAuthenticationSuccessHandler"
+  emit sink code.RedirectTargetSink at args[0]
+}
+
+binding redirectAllowlist93 {
+  query pattern callExpr where callee.path ~= "Util.isSafeToRedirectTo"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding sqlExecution94 {
+  query pattern callExpr where callee.method == "executeQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution95 {
+  query pattern callExpr where callee.method == "executeUpdate"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution96 {
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution97 {
+  query pattern callExpr where callee.method == "executeBatch"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution98 {
+  query pattern callExpr where callee.method == "addBatch"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution99 {
+  query pattern callExpr where callee.method == "rawQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution100 {
+  query pattern callExpr where callee.method == "execSQL"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding webViewLoad101 {
+  query pattern callExpr where callee.method == "loadUrl"
+  emit sink code.WebViewLoad at args[0]
+}
+
+binding webViewLoad102 {
+  query pattern callExpr where callee.method == "loadData"
+  emit sink code.WebViewLoad at args[0]
+}
+
+binding webViewLoad103 {
+  query pattern callExpr where callee.method == "loadDataWithBaseURL"
+  emit sink code.WebViewLoad at args[1]
+}
+
+binding webViewLoad104 {
+  query pattern callExpr where callee.method == "postUrl"
+  emit sink code.WebViewLoad at args[0]
+}
+
+binding webViewLoad105 {
+  query pattern callExpr where callee.method == "evaluateJavascript"
+  emit sink code.WebViewLoad at args[0]
+}
+
+binding redirectTarget106 {
+  query pattern callExpr where callee.method == "sendRedirect"
+  emit sink code.RedirectTargetSink at args[0]
+}
+
+binding webViewJsInterface107 {
+  query pattern presenceNode where node.path ~= "addJavascriptInterface"
+  emit issue code.WebViewJsInterface at node
+}
+
+binding sqlExecution108 {
+  query pattern callExpr where callee.method == "executeLargeUpdate"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution109 {
+  query pattern callExpr where callee.method == "prepareStatement"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution110 {
+  query pattern callExpr where callee.method == "prepareCall"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution111 {
+  query pattern callExpr where callee.method == "createQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution112 {
+  query pattern callExpr where callee.method == "createNativeQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution113 {
+  query pattern callExpr where callee.method == "queryForObject"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution114 {
+  query pattern callExpr where callee.method == "queryForList"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution115 {
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution116 {
+  query pattern callExpr where callee.method == "queryForRowSet"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution117 {
+  query pattern callExpr where callee.method == "queryForMap"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution118 {
+  query pattern callExpr where callee.method == "queryForInt"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution119 {
+  query pattern callExpr where callee.method == "queryForLong"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution120 {
+  query pattern callExpr where callee.method == "queryForStream"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution121 {
+  query pattern callExpr where callee.method == "batchUpdate"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding unparameterizedSqlQueryParser122 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "function.return" and node.context.functionName contains "toString" and node.context.expr contains "::uuid"
+  emit issue code.UnparameterizedSqlQueryParser at node
+}
+
+binding unparameterizedSqlQueryParser123 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "function.return" and node.context.functionName contains "toString" and node.context.expr contains "::point"
+  emit issue code.UnparameterizedSqlQueryParser at node
+}
+
+binding unparameterizedSqlQueryParser124 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "function.return" and node.context.functionName contains "toString" and node.context.expr contains "::box"
+  emit issue code.UnparameterizedSqlQueryParser at node
+}
+
+binding commandExecution125 {
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args.any
+}
+
+binding commandExecution126 {
+  query pattern callExpr where callee.path ~= "Runtime.getRuntime.exec"
+  emit sink code.CommandExecution at args.any
+}
+
+binding commandExecution127 {
+  query pattern callExpr where callee.path ~= "ProcessBuilder"
+  emit sink code.CommandExecution at args.any
+}
+
+binding commandExecution128 {
+  query pattern callExpr where callee.method == "command"
+  emit sink code.CommandExecution at args.any
+}
+
+binding deserialization129 {
+  query pattern callExpr where callee.method == "readObject"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization130 {
+  query pattern callExpr where callee.method == "readUnshared"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization131 {
+  query pattern callExpr where callee.path ~= "XMLDecoder"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization132 {
+  query pattern callExpr where callee.path ~= "XMLDecoder.readObject"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization133 {
+  query pattern callExpr where callee.method == "readValue"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization134 {
+  query pattern callExpr where callee.path ~= "yaml.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization135 {
+  query pattern callExpr where callee.path ~= "Yaml.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserializableInvocationHandler136 {
+  query pattern presenceNode where node.scope == "class" and node.context.classBase contains "InvocationHandler" and node.context.call contains "getMethod" and node.context.call contains "invokeMethod" and not (node.context.functionName contains "readResolve") and not (node.context.functionName contains "readObject") and not (node.context.scopeCall contains "NotSerializableException")
+  emit issue code.DeserializableInvocationHandler at node
+}
+
+binding gsonObjectTypeAdapterRecursiveRead137 {
+  query pattern presenceNode where node.scope == "function" and node.context.selector contains "ObjectTypeAdapter.FACTORY" and node.context.identifier contains "read" and node.context.call contains "read" and node.context.callPath contains "list.add" and node.context.callPath contains "map.put" and not (node.context.scopeCall contains "tryBeginNesting") and not (node.context.scopeCall contains "readTerminal")
+  emit issue code.GsonObjectTypeAdapterRecursiveRead at node
+}
+
+binding unrestrictedRequestParamDeserialization138 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "createXStream" and node.context.callPath contains "XStream" and node.context.call contains "registerConverter" and not (node.context.scopeCall contains "addDefaultPermissions") and not (node.context.scopeCall contains "addPermissions") and not (node.context.scopeCall contains "addPermission") and not (node.context.scopeCall contains "denyPermission")
+  emit issue code.UnrestrictedRequestParamDeserialization at node
+}
+
+binding unsafeYamlConstructor139 {
+  requires {
+    dependency("org.yaml.snakeyaml")
+  }
+  query pattern presenceNode where node.scope == "class" and node.context.classBase contains "Constructor"
+  emit issue code.UnsafeYamlConstructor at node
+}
+
+binding unsafeYamlConstructor140 {
+  requires {
+    dependency("org.yaml.snakeyaml")
+  }
+  query pattern presenceNode where node.path == "org.yaml.snakeyaml.constructor.Constructor"
+  emit issue code.UnsafeYamlConstructor at node
+}
+
+binding xmlParse141 {
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse142 {
+  query pattern callExpr where callee.method == "newDocumentBuilder"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParserCreate143 {
+  query pattern callExpr where callee.method == "newSAXParser"
+  emit issue code.XmlParserCreate at call
+}
+
+binding xmlParserCreate144 {
+  query pattern callExpr where callee.method == "newDocumentBuilder"
+  emit issue code.XmlParserCreate at call
+}
+
+binding xmlParserCreate145 {
+  query pattern callExpr where callee.method == "createXMLReader"
+  emit issue code.XmlParserCreate at call
+}
+
+binding xmlParserCreate146 {
+  query pattern callExpr where callee.method == "createXMLStreamReader"
+  emit issue code.XmlParserCreate at call
+}
+
+binding xmlParserCreate147 {
+  query pattern callExpr where callee.method == "createXMLEventReader"
+  emit issue code.XmlParserCreate at call
+}
+
+binding xmlParserCreate148 {
+  query pattern callExpr where callee.method == "newTransformer"
+  emit issue code.XmlParserCreate at call
+}
+
+binding xmlParserCreate149 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "SAXReader" and node.context.callPath contains "reader.read" and not (node.context.literal contains "http://apache.org/xml/features/nonvalidating/load-external-dtd") and not (node.context.literal contains "http://xml.org/sax/features/external-general-entities") and not (node.context.literal contains "http://xml.org/sax/features/external-parameter-entities")
+  emit issue code.XmlParserCreate at node
+}
+
+binding xmlParserCreate150 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "getTaskUnmarshaller.unmarshal" and not (node.context.callPath contains "getXMLStreamReader")
+  emit issue code.XmlParserCreate at node
+}
+
+binding checkstyleExternalParameterEntitiesXxe151 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "setFeaturesBySystemProperty" and node.context.className contains "LoadExternalDtdFeatureProvider" and node.context.callPath contains "factory.setFeature" and node.context.identifier contains "LOAD_EXTERNAL_DTD" and node.context.identifier contains "EXTERNAL_GENERAL_ENTITIES" and not (node.context.identifier contains "EXTERNAL_PARAMETER_ENTITIES")
+  emit issue code.CheckstyleExternalParameterEntitiesXxe at node
+}
+
+binding filePathAccess152 {
+  query pattern callExpr where callee.path ~= "File"
+  emit sink code.FilePathAccess at args.any
+}
+
+binding filePathAccess153 {
+  query pattern callExpr where callee.path ~= "Paths.get"
+  emit sink code.FilePathAccess at args.any
+}
+
+binding filePathAccess154 {
+  query pattern callExpr where callee.path ~= "FileInputStream"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess155 {
+  query pattern callExpr where callee.path ~= "FileOutputStream"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess156 {
+  query pattern callExpr where callee.path ~= "FileReader"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess157 {
+  query pattern callExpr where callee.path ~= "FileWriter"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess158 {
+  query pattern callExpr where callee.path ~= "RandomAccessFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess159 {
+  query pattern callExpr where callee.path ~= "Files.readAllBytes"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess160 {
+  query pattern callExpr where callee.path ~= "Files.readAllLines"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess161 {
+  query pattern callExpr where callee.path ~= "Files.newInputStream"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess162 {
+  query pattern callExpr where callee.path ~= "Files.newOutputStream"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess163 {
+  query pattern callExpr where callee.path ~= "Files.newBufferedReader"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess164 {
+  query pattern callExpr where callee.path ~= "Files.newBufferedWriter"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess165 {
+  query pattern callExpr where callee.path ~= "Files.write"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess166 {
+  query pattern callExpr where callee.path ~= "Files.lines"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess167 {
+  query pattern callExpr where callee.path ~= "Files.delete"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess168 {
+  query pattern callExpr where callee.path ~= "Files.copy"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess169 {
+  query pattern callExpr where callee.path ~= "Paths.get"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding archiveEntryWrite170 {
+  query pattern callExpr where callee.method == "extractEntry"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding unsafeUpload171 {
+  query pattern callExpr where callee.method == "transferTo"
+  emit sink code.UnsafeUpload at args[0]
+}
+
+binding urlFetch172 {
+  query pattern callExpr where callee.method == "openConnection"
+  emit sink code.UrlFetch at callee.receiver
+}
+
+binding urlFetch173 {
+  query pattern callExpr where callee.method == "getForObject"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch174 {
+  query pattern callExpr where callee.method == "getForEntity"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding objectLookupByUserInput175 {
+  query pattern callExpr where callee.method == "findById"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput176 {
+  query pattern callExpr where callee.method == "getReferenceById"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput177 {
+  query pattern callExpr where callee.method == "getAccount"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput178 {
+  query pattern callExpr where callee.method == "getOrder"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding authenticationRequiredOp179 {
+  query pattern presenceNode where node.path ~= "changePassword"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp180 {
+  query pattern presenceNode where node.path ~= "updatePassword"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp181 {
+  query pattern presenceNode where node.path ~= "resetPassword"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp182 {
+  query pattern presenceNode where node.path ~= "changeEmail"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp183 {
+  query pattern presenceNode where node.path ~= "transferFunds"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp184 {
+  query pattern presenceNode where node.path ~= "deleteAccount"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp185 {
+  query pattern presenceNode where node.path ~= "grantRole"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp186 {
+  query pattern presenceNode where node.path ~= "makeAdmin"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding codeEval187 {
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}
+
+binding xpathQuery188 {
+  query pattern callExpr where callee.method == "evaluate" and callee.receiver.type == "XPath"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding xpathQuery189 {
+  query pattern callExpr where callee.method == "compile" and callee.receiver.type == "XPath"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding xpathQuery190 {
+  query pattern callExpr where callee.path ~= "XPath.evaluate"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding xpathQuery191 {
+  query pattern callExpr where callee.path ~= "XPath.compile"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding ldapQuery192 {
+  query pattern callExpr where callee.method == "search" and callee.receiver.type in [DirContext, InitialDirContext, InitialLdapContext]
+  emit sink code.LdapQuery at args[1]
+}
+
+binding ldapQuery193 {
+  query pattern callExpr where callee.path ~= "InitialDirContext.search"
+  emit sink code.LdapQuery at args[1]
+}
+
+binding ldapQuery194 {
+  query pattern callExpr where callee.path ~= "InitialLdapContext.search"
+  emit sink code.LdapQuery at args[1]
+}
+
+binding authorizationCheck195 {
+  query pattern callExpr where callee.path ~= "hasPermission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck196 {
+  query pattern callExpr where callee.path ~= "hasAuthority"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck197 {
+  query pattern callExpr where callee.path ~= "hasRole"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck198 {
+  query pattern callExpr where callee.path ~= "checkPermission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck199 {
+  query pattern callExpr where callee.method == "hasPermission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck200 {
+  query pattern callExpr where callee.method == "hasAuthority"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck201 {
+  query pattern callExpr where callee.method == "hasRole"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck202 {
+  query pattern callExpr where callee.method == "checkPermission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck203 {
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.context.annotation contains "RequiresPermissions"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck204 {
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.context.annotation contains "PreAuthorize"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding sensitiveOperation205 {
+  query pattern presenceNode where node.path ~= "Login.accurevLoginFromGlobalConfig"
+  emit issue code.SensitiveOperation at node
+}
+
+binding ignoredAuthorizationResult206 {
+  query pattern presenceNode where node.scope == "function" and node.context.call contains "canFlush" and not (node.context.callPath contains "ThriftSecurityException")
+  emit issue code.IgnoredAuthorizationResult at node
+}
+
+binding ignoredAuthorizationResult207 {
+  query pattern presenceNode where node.scope == "function" and node.context.call contains "canPerformSystemActions" and not (node.context.callPath contains "ThriftSecurityException")
+  emit issue code.IgnoredAuthorizationResult at node
+}
+
+binding ignoredAuthorizationResult208 {
+  query pattern presenceNode where node.scope == "function" and node.context.call contains "canAlterNamespace" and not (node.context.callPath contains "ThriftSecurityException")
+  emit issue code.IgnoredAuthorizationResult at node
+}
+
+binding ignoredAuthorizationResult209 {
+  query pattern presenceNode where node.scope == "function" and node.context.call contains "canAlterTable" and not (node.context.callPath contains "ThriftSecurityException")
+  emit issue code.IgnoredAuthorizationResult at node
+}
+
+binding ignoredAuthorizationResult210 {
+  query pattern presenceNode where node.scope == "function" and node.context.call contains "canObtainDelegationToken" and not (node.context.callPath contains "ThriftSecurityException")
+  emit issue code.IgnoredAuthorizationResult at node
+}
+
+binding authorizationCheck211 {
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.context.call contains "canFlush" and args.any.context.call contains "ThriftSecurityException"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck212 {
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.context.call contains "canPerformSystemActions" and args.any.context.call contains "ThriftSecurityException"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck213 {
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.context.call contains "canAlterNamespace" and args.any.context.call contains "ThriftSecurityException"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck214 {
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.context.call contains "canAlterTable" and args.any.context.call contains "ThriftSecurityException"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck215 {
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.context.call contains "canObtainDelegationToken" and args.any.context.call contains "ThriftSecurityException"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding credentialedEndpointReview216 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doTest" and node.context.call contains "setCredentialsId" and node.context.call contains "accurevLoginFromGlobalConfig" and not (node.context.scopeCall contains "hasPermission") and not (node.context.scopeCall contains "checkPermission")
+  emit issue code.CredentialedEndpointReview at node
+}
+
+binding credentialedEndpointReview217 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doFill" and node.context.call contains "getBzmUtils" and not (node.context.scopeCall contains "checkPermission")
+  emit issue code.CredentialedEndpointReview at node
+}
+
+binding credentialedEndpointReview218 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doFillCredentialsIdItems" and node.context.call contains "lookupCredentials" and not (node.context.scopeCall contains "hasPermission") and not (node.context.scopeCall contains "checkPermission")
+  emit issue code.CredentialedEndpointReview at node
+}
+
+binding jenkinsDescriptorConfigEnumerationMissingPermission219 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doFillConnectionIdItems" and node.context.call contains "getHostConnections" and not (node.context.scopeCall contains "hasPermission") and not (node.context.scopeCall contains "checkPermission")
+  emit issue code.JenkinsDescriptorConfigEnumerationMissingPermission at node
+}
+
+binding jenkinsDescriptorConfigEnumerationMissingPermission220 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doFillCredentialsIdItems" and node.context.call contains "lookupCredentials" and not (node.context.scopeCall contains "hasPermission") and not (node.context.scopeCall contains "checkPermission")
+  emit issue code.JenkinsDescriptorConfigEnumerationMissingPermission at node
+}
+
+binding jenkinsCredentialEndpointMissingPostPermission221 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["doCreateApiToken", "doCheckRepoAccess", "doTestGithubAccess"]) and containsAny(node.context.callPath, ["createToken", "getRepository", "getMyself"]) and not (containsAny(node.context.callPath, ["checkPermission", "hasPermission"])) and not (containsAny(node.context.annotation, ["POST", "RequirePOST"]))
+  emit issue code.JenkinsCredentialEndpointMissingPostPermission at node
+}
+
+binding jenkinsBuildScheduleMissingPermission222 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doBuild" and node.context.callPath contains "Jenkins.get.getQueue.schedule" and node.context.identifier contains "project" and not (node.context.scopeCall contains "hasPermission") and not (node.context.scopeCall contains "checkPermission") and not (node.context.selector contains "Item.BUILD")
+  emit issue code.JenkinsBuildScheduleMissingPermission at node
+}
+
+binding codeDxJenkinsRemoteValidationMissingPostPermission223 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doCheckUrl" and node.context.call contains "buildClient" and node.context.call contains "getProjects" and not (node.context.annotation contains "POST") and not (node.context.scopeCall contains "checkPermissionForRemoteRequests")
+  emit issue code.CodeDxJenkinsRemoteValidationMissingPostPermission at node
+}
+
+binding codeDxJenkinsRemoteValidationMissingPostPermission224 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doCheckSelfSignedCertificateFingerprint" and node.context.call contains "buildClient" and node.context.call contains "getProjects" and not (node.context.annotation contains "POST") and not (node.context.scopeCall contains "checkPermissionForRemoteRequests")
+  emit issue code.CodeDxJenkinsRemoteValidationMissingPostPermission at node
+}
+
+binding codeDxJenkinsRemoteValidationMissingPostPermission225 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doFillProjectIdItems" and node.context.call contains "buildClient" and node.context.call contains "getProjects" and not (node.context.annotation contains "POST") and not (node.context.scopeCall contains "checkPermissionForRemoteRequests")
+  emit issue code.CodeDxJenkinsRemoteValidationMissingPostPermission at node
+}
+
+binding jenkinsRemoteValidationMissingPermission226 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doTestDynatraceConnection" and node.context.annotation contains "RequirePOST" and node.context.call contains "DynatraceClient" and node.context.call contains "getSystemProfiles" and not (node.context.scopeCall contains "checkPermission") and not (node.context.scopeCall contains "hasPermission")
+  emit issue code.JenkinsRemoteValidationMissingPermission at node
+}
+
+binding jenkinsRemoteValidationMissingPermission227 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doCheck" and node.context.annotation contains "RequirePOST" and node.context.call contains "DynatraceClient" and node.context.call contains "getSystemProfiles" and not (node.context.scopeCall contains "checkPermission") and not (node.context.scopeCall contains "hasPermission")
+  emit issue code.JenkinsRemoteValidationMissingPermission at node
+}
+
+binding jenkinsRemoteValidationMissingPermission228 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doTestConnection" and node.context.call contains "testConnection" and not (node.context.scopeCall contains "checkPermission") and not (node.context.scopeCall contains "hasPermission")
+  emit issue code.JenkinsRemoteValidationMissingPermission at node
+}
+
+binding jenkinsRemoteValidationMissingPermission229 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doTestConnection" and containsAny(node.context.callPath, ["getClient", "buildClient", "testConnection"]) and containsAny(node.context.callPath, ["getCurrentUser", "getProjects", "getSystemProfiles", "testConnection"]) and containsAny(node.context.identifier, ["url", "host", "endpoint", "apiTokenId", "credentialsId", "clientBuilderId", "ignoreCertificateErrors"]) and not (node.context.scopeCall contains "checkPermission") and not (node.context.scopeCall contains "hasPermission")
+  emit issue code.JenkinsRemoteValidationMissingPermission at node
+}
+
+binding jenkinsRemoteValidationMissingPostPermission230 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doTest" and node.context.call contains "testConnection" and node.context.call contains "CrowdConfigurationService" and not (node.context.annotation contains "POST") and not (node.context.scopeCall contains "checkPermission") and not (node.context.scopeCall contains "hasPermission")
+  emit issue code.JenkinsRemoteValidationMissingPostPermission at node
+}
+
+binding jenkinsRemoteValidationMissingPostPermission231 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doCheck" and node.context.call contains "testConnection" and node.context.call contains "CrowdConfigurationService" and not (node.context.annotation contains "POST") and not (node.context.scopeCall contains "checkPermission") and not (node.context.scopeCall contains "hasPermission")
+  emit issue code.JenkinsRemoteValidationMissingPostPermission at node
+}
+
+binding jenkinsDescriptorPropertyFileValidationMissingPost232 {
+  query pattern presenceNode where node.scope == "function" and node.context.classBase contains "ParameterDescriptor" and node.context.functionName contains "doCheckPropertyFile" and node.context.identifier contains "QueryParameter" and node.context.call contains "Property" and node.context.call contains "File" and node.context.call contains "URL" and node.context.call contains "execute" and not (node.context.annotation contains "POST") and not (node.context.annotation contains "RequirePOST")
+  emit issue code.JenkinsDescriptorPropertyFileValidationMissingPost at node
+}
+
+binding jenkinsDescriptorPropertyFileValidationMissingPost233 {
+  query pattern presenceNode where node.scope == "function" and node.context.classBase contains "ParameterDescriptor" and containsAny(node.context.functionName, ["doCheckPropertyKey", "doCheckDefaultPropertyFile", "doCheckDefaultPropertyKey"]) and node.context.identifier contains "QueryParameter" and node.context.callPath contains "doCheckPropertyFile" and not (node.context.annotation contains "POST") and not (node.context.annotation contains "RequirePOST")
+  emit issue code.JenkinsDescriptorPropertyFileValidationMissingPost at node
+}
+
+binding callerControlledFilenameComponentPathTraversal234 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["buildFilename", "buildFileName", "makeFilename", "makeFileName"]) and node.context.identifier contains "appName" and node.context.identifier contains "appVersion" and containsAny(node.context.identifier, ["filename", "fileName"]) and not (containsAny(node.context.callPath, ["Util.rawEncode", "URLEncoder.encode", "encodeURIComponent", "FilenameUtils.getName", "Paths.get"]))
+  emit issue code.CallerControlledFilenameComponentPathTraversal at node
+}
+
+binding unencodedUrlQueryParameter235 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["generateURL", "getRenderer"]) and node.context.callPath contains "StringBuilder" and node.context.callPath contains "append" and containsAny(node.context.literal, ["?jobFilter=", "&nodeFilter=", "&launcherFilter="]) and containsAny(node.context.callPath, ["getJobFilter", "getNodeFilter", "getLauncherFilter"]) and not (containsAny(node.context.callPath, ["URLEncoder.encode", "Util.rawEncode", "encodeURIComponent"]))
+  emit issue code.UnencodedUrlQueryParameter at node
+}
+
+binding embeddedDotSegmentFilenameWrite236 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.callPath, ["getFilename", "getOriginalFilename"]) and containsAny(node.context.callPath, ["Files.copy", "Files.write", "FileUtils.copyInputStreamToFile", "MultipartFile.transferTo"]) and containsAny(node.context.callPath, ["createTempFile", "resolve", "new File"]) and containsAny(node.context.callPath, ["getCanonicalPath", "normalize", "toRealPath"]) and containsAny(node.context.callArg, ["filename.equals:..", "fileName.equals:.."]) and not (containsAny(node.context.callArg, ["filename.contains:..", "fileName.contains:.."]))
+  emit issue code.EmbeddedDotSegmentFilenameWrite at node
+}
+
+binding clusterDeployFunctionMissingPermission237 {
+  query pattern presenceNode where node.scope == "class" and node.context.classBase contains "Function" and containsAny(node.context.className, ["DeployFunction", "InstallFunction", "UploadFunction"]) and containsAny(node.context.callPath, ["getJarDeployer.deploy", "ClassPathLoader.getLatest.getJarDeployer.deploy"]) and containsAny(node.context.callPath, ["stageJarContent", "RemoteInputStreamClient.wrap", "IOUtils.copyLarge"]) and not (node.context.functionName contains "getRequiredPermissions") and not (node.context.classBase contains "InternalFunction")
+  emit issue code.ClusterDeployFunctionMissingPermission at node
+}
+
+binding jenkinsStaplerStateChangeMissingPost238 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["doSave", "doSubmit", "doConfigure"]) and containsAny(node.context.call, ["bindJSON", "save", "configure"]) and node.context.call contains "checkPermission" and not (node.context.annotation contains "RequirePOST") and not (node.context.annotation contains "POST")
+  emit issue code.JenkinsStaplerStateChangeMissingPost at node
+}
+
+binding jenkinsStaplerStateChangeMissingPost239 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["doRemove", "doDelete"]) and containsAny(node.context.call, ["removeTemplateById", "delete", "remove"]) and node.context.call contains "checkPermission" and not (node.context.annotation contains "RequirePOST") and not (node.context.annotation contains "POST")
+  emit issue code.JenkinsStaplerStateChangeMissingPost at node
+}
+
+binding jenkinsRemotingCallableSystemPropertiesLeak240 {
+  query pattern presenceNode where node.scope == "class" and node.context.classBase contains "Callable" and node.context.functionName contains "call" and node.context.functionName contains "checkRoles" and node.context.callPath contains "System.getProperties" and not (node.context.classBase contains "MasterToSlaveCallable") and not (node.context.scopeCall contains "Roles.SLAVE")
+  emit issue code.JenkinsRemotingCallableSystemPropertiesLeak at node
+}
+
+binding secretDatabindingReview241 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "parameter.entry" and node.context.paramName contains "awsSecretKey" and node.context.paramType contains "Secret"
+  emit issue code.SecretDatabindingReview at node
+}
+
+binding secretDatabindingReview242 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "setAkid" and not (node.context.scopeCall contains "fromString")
+  emit issue code.SecretDatabindingReview at node
+}
+
+binding secretDatabindingReview243 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "setSkid" and not (node.context.scopeCall contains "fromString")
+  emit issue code.SecretDatabindingReview at node
+}
+
+binding jenkinsPlaintextDataboundCredential244 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "parameter.entry" and node.context.annotation contains "DataBoundConstructor" and node.context.paramName contains "apilogin" and node.context.paramType contains "String" and not (node.context.paramType contains "Secret")
+  emit issue code.JenkinsPlaintextDataboundCredential at node
+}
+
+binding jenkinsPlaintextDataboundCredential245 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "parameter.entry" and node.context.annotation contains "DataBoundConstructor" and node.context.paramName contains "apitoken" and node.context.paramType contains "String" and not (node.context.paramType contains "Secret")
+  emit issue code.JenkinsPlaintextDataboundCredential at node
+}
+
+binding jenkinsPlaintextDataboundCredential246 {
+  query pattern presenceNode where node.scope == "function" and node.context.annotation contains "DataBoundConstructor" and node.context.paramName contains "repoPassword" and node.context.paramType contains "String" and not (node.context.callPath contains "Secret.fromString") and not (node.context.paramType contains "Secret")
+  emit issue code.JenkinsPlaintextDataboundCredential at node
+}
+
+binding jenkinsPlaintextDataboundCredential247 {
+  query pattern presenceNode where node.scope == "function" and node.context.annotation contains "DataBoundConstructor" and node.context.paramName contains "password" and node.context.paramType contains "String" and not (node.context.callPath contains "Secret.fromString") and not (node.context.paramType contains "Secret")
+  emit issue code.JenkinsPlaintextDataboundCredential at node
+}
+
+binding jenkinsPlaintextDataboundCredential248 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "configure" and node.context.callPath contains "formData.getString" and node.context.callPath contains "save" and containsAny(node.context.identifier, ["privateToken", "apiToken", "accessToken", "secret", "password", "credential"]) and containsAny(node.context.literal, ["privateToken", "apiToken", "accessToken", "secret", "password", "credential"]) and not (node.context.callPath contains "Secret.fromString")
+  emit issue code.JenkinsPlaintextDataboundCredential at node
+}
+
+binding jenkinsCredentialsStartupLoadContextExposure249 {
+  query pattern presenceNode where node.scope == "class" and node.context.className contains "SystemCredentialsProvider" and node.context.functionName contains "SystemCredentialsProvider" and node.context.callPath contains "xml.unmarshal" and node.context.callPath contains "DomainCredentials.migrateListToMap" and node.context.functionName contains "getInstance" and not (node.context.annotation contains "Initializer") and not (node.context.functionName contains "forceLoadDuringStartup")
+  emit issue code.JenkinsCredentialsStartupLoadContextExposure at node
+}
+
+binding jdbcCredentialAttributeExposure250 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "connect" and node.context.call contains "tokenizeDatabase" and node.context.call contains "tokenizeURLProperties" and node.context.call contains "NetConnection" and not (node.context.scopeCall contains "appendDatabaseAttributes")
+  emit issue code.JdbcCredentialAttributeExposure at node
+}
+
+binding sensitiveOperation251 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doConfigure" and node.context.call contains "configure" and node.context.call contains "save" and not (node.context.scopeCall contains "checkPermission")
+  emit issue code.SensitiveOperation at node
+}
+
+binding sensitiveOperation252 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doAttachPublicIP" and node.context.call contains "getNode" and node.context.call contains "attachPublicIP" and not (node.context.scopeCall contains "checkPermission")
+  emit issue code.SensitiveOperation at node
+}
+
+binding pluginManagementMissingAuthorization253 {
+  query pattern presenceNode where node.scope == "function" and node.context.annotation contains "PostMapping" and node.context.callPath contains "pluginService.localInstall" and not (node.context.annotation contains "RequiresPermissions") and not (node.context.annotation contains "PreAuthorize") and not (node.context.scopeCall contains "checkPermission") and not (node.context.scopeCall contains "hasPermission")
+  emit issue code.PluginManagementMissingAuthorization at node
+}
+
+binding pluginManagementMissingAuthorization254 {
+  query pattern presenceNode where node.scope == "function" and node.context.annotation contains "PostMapping" and node.context.callPath contains "pluginService.uninstall" and not (node.context.annotation contains "RequiresPermissions") and not (node.context.annotation contains "PreAuthorize") and not (node.context.scopeCall contains "checkPermission") and not (node.context.scopeCall contains "hasPermission")
+  emit issue code.PluginManagementMissingAuthorization at node
+}
+
+binding stateChangingOp255 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doFill" and not (node.context.scopeCall contains "checkPermission") and not (node.context.annotation contains "POST") and not (node.context.annotation contains "RequirePOST")
+  emit issue code.StateChangingOp at node
+  emit sink code.StateChangingOpSink at node
+}
+
+binding absolutePathDisclosure256 {
+  query pattern presenceNode where node.scope == "function" and node.context.selector contains "Constants.MC_REALPATH" and node.context.selector contains "Constants.MC_RELATIVE_PATH" and node.context.call contains "FileReader" and not (node.context.call contains "FileNotFoundException")
+  emit issue code.AbsolutePathDisclosure at node
+}
+
+binding canonicalPathStringPrefixContainment257 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "getValidDirectoryPath" and node.context.call contains "getCanonicalPath" and node.context.call contains "startsWith" and not (node.context.scopeCall contains "toPath")
+  emit issue code.CanonicalPathStringPrefixContainment at node
+}
+
+binding urlDecodedTraversalCheckExceptionBypass258 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "URLDecoder.decode" and node.context.callPath contains "PARENT_DIRECTORY_REGEX.matcher" and node.context.callPath contains "PARENT_DIRECTORY_REGEX.matcher.find" and node.context.catchType contains "UnsupportedEncodingException" and not (node.context.catchType contains "IllegalArgumentException")
+  emit issue code.UrlDecodedTraversalCheckExceptionBypass at node
+}
+
+binding sensitiveOperation259 {
+  query pattern callExpr where callee.method == "getSomeWorkspace"
+  emit issue code.SensitiveOperation at call
+}
+
+binding authenticationCheck260 {
+  query pattern callExpr where callee.method == "requireAuth"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck261 {
+  query pattern callExpr where callee.method == "ensureAuthenticated"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck262 {
+  query pattern callExpr where callee.method == "isAuthenticated"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck263 {
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck264 {
+  query pattern callExpr where callee.method == "checkOwnership"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck265 {
+  query pattern callExpr where callee.method == "requireOwner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck266 {
+  query pattern callExpr where callee.method == "isOwner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding lockAcquire267 {
+  query pattern callExpr where callee.method == "lock"
+  emit issue code.LockAcquire at call
+}
+
+binding lockRelease268 {
+  query pattern callExpr where callee.method == "unlock"
+  emit check core.LockRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation269 {
+  query pattern callExpr where callee.path ~= "validateRole"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding xmlHardening270 {
+  query pattern callExpr where callee.path ~= "setFeature" and args.any.literal contains "disallow-doctype-decl"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening271 {
+  query pattern callExpr where callee.path ~= "setFeature" and args.any.literal contains "external-general-entities" and not args.any.literal contains "true"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening272 {
+  query pattern callExpr where callee.path ~= "setFeature" and args.any.literal contains "FEATURE_SECURE_PROCESSING" and args.any.literal contains "true"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening273 {
+  query pattern callExpr where callee.path ~= "setExpandEntityReferences" and args.any.literal contains "false"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening274 {
+  query pattern callExpr where callee.method == "getSecuredDocumentBuilder"
+  emit check core.XmlHardening at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding xmlHardening275 {
+  query pattern callExpr where callee.method == "getSecureDocumentBuilderFactory"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening276 {
+  query pattern callExpr where callee.method == "setFeaturesBySystemProperty"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening277 {
+  query pattern callExpr where callee.path ~= "setAttribute" and args.any.literal contains "ACCESS_EXTERNAL_DTD"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening278 {
+  query pattern callExpr where callee.path ~= "setAttribute" and args.any.literal contains "ACCESS_EXTERNAL_SCHEMA"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening279 {
+  query pattern callExpr where callee.path ~= "setAttribute" and args.any.literal contains "ACCESS_EXTERNAL_STYLESHEET"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening280 {
+  query pattern callExpr where callee.path ~= "setProperty" and args.any.literal contains "IS_SUPPORTING_EXTERNAL_ENTITIES" and not args.any.literal contains "true"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening281 {
+  query pattern callExpr where callee.path ~= "setProperty" and args.any.literal contains "SUPPORT_DTD" and not args.any.literal contains "true"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening282 {
+  query pattern callExpr where callee.path ~= "setFeature" and args.any.literal contains "disallow-doctype-decl"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening283 {
+  query pattern callExpr where callee.path ~= "setFeature" and args.any.literal contains "external-general-entities" and not args.any.literal contains "true"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening284 {
+  query pattern callExpr where callee.path ~= "setFeature" and args.any.literal contains "FEATURE_SECURE_PROCESSING" and args.any.literal contains "true"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening285 {
+  query pattern callExpr where callee.path ~= "setExpandEntityReferences" and args.any.literal contains "false"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening286 {
+  query pattern callExpr where callee.method == "getSecuredDocumentBuilder"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding xmlHardening287 {
+  query pattern callExpr where callee.method == "getSecureDocumentBuilderFactory"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening288 {
+  query pattern callExpr where callee.method == "setFeaturesBySystemProperty"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening289 {
+  query pattern callExpr where callee.path ~= "setAttribute" and args.any.literal contains "ACCESS_EXTERNAL_DTD"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening290 {
+  query pattern callExpr where callee.path ~= "setAttribute" and args.any.literal contains "ACCESS_EXTERNAL_SCHEMA"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening291 {
+  query pattern callExpr where callee.path ~= "setAttribute" and args.any.literal contains "ACCESS_EXTERNAL_STYLESHEET"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening292 {
+  query pattern callExpr where callee.path ~= "setProperty" and args.any.literal contains "IS_SUPPORTING_EXTERNAL_ENTITIES" and not args.any.literal contains "true"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening293 {
+  query pattern callExpr where callee.path ~= "setProperty" and args.any.literal contains "SUPPORT_DTD" and not args.any.literal contains "true"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening294 {
+  query pattern callExpr where callee.path ~= "setProperty" and args.any.literal contains "ACCESS_EXTERNAL_DTD"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening295 {
+  query pattern callExpr where callee.path ~= "setXIncludeAware" and args.any.literal contains "false"
+  emit check core.XmlHardening at call {
+    advisory: true
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding trustBoundary296 {
+  query pattern callExpr where callee.method == "putValue"
+  emit sink code.TrustBoundary at args.any
+}
+
+binding trustBoundary297 {
+  query pattern callExpr where callee.path ~= "getSession.setAttribute"
+  emit sink code.TrustBoundary at args.any
+}
+
+binding trustBoundary298 {
+  query pattern callExpr where callee.path ~= "session.setAttribute"
+  emit sink code.TrustBoundary at args.any
+}
+
+binding htmlRender299 {
+  query pattern callExpr where callee.method == "println"
+  emit sink code.HtmlRender at args.any
+}
+
+binding htmlRender300 {
+  query pattern callExpr where callee.method == "print"
+  emit sink code.HtmlRender at args.any
+}
+
+binding htmlRender301 {
+  query pattern callExpr where callee.method == "printf"
+  emit sink code.HtmlRender at args.any
+}
+
+binding htmlRender302 {
+  query pattern callExpr where callee.method == "write" and callee.receiver.type in [PrintWriter, ServletOutputStream, JspWriter]
+  emit sink code.HtmlRender at args.any
+}
+
+binding htmlRender303 {
+  query pattern callExpr where callee.method == "format"
+  emit sink code.HtmlRender at args.any
+}
+
+binding htmlEscape304 {
+  query pattern callExpr where callee.method == "encodeForHTML"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape305 {
+  query pattern callExpr where callee.method == "encodeForHTMLAttribute"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape306 {
+  query pattern callExpr where callee.method == "forHtml"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape307 {
+  query pattern callExpr where callee.method == "forHtmlContent"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape308 {
+  query pattern callExpr where callee.method == "forHtmlAttribute"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape309 {
+  query pattern callExpr where callee.method == "escapeHtml"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape310 {
+  query pattern callExpr where callee.method == "escapeHtml4"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape311 {
+  query pattern callExpr where callee.method == "escapeHtml3"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape312 {
+  query pattern callExpr where callee.method == "htmlEscape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape313 {
+  query pattern callExpr where callee.path ~= "hudson.Util.escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape314 {
+  query pattern callExpr where callee.path ~= "Util.escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding formatString315 {
+  query pattern callExpr where callee.path ~= "String.format"
+  emit sink code.FormatString at args[0]
+}
+
+binding formatString316 {
+  query pattern callExpr where callee.method == "printf"
+  emit sink code.FormatString at args[0]
+}
+
+binding regexCompile317 {
+  query pattern callExpr where callee.path ~= "Pattern.compile"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding csrfDisabled318 {
+  query pattern presenceNode where node.path ~= "csrf.disable"
+  emit issue code.CsrfDisabled at node
+}
+
+binding certValidationDisabled319 {
+  query pattern callExpr where callee.path ~= "setHostnameVerifier" and args.any.literal contains "true"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding certValidationDisabled320 {
+  query pattern callExpr where callee.path ~= "setDefaultHostnameVerifier" and args.any.literal contains "true"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding certValidationDisabled321 {
+  query pattern presenceNode where node.path ~= "NoopHostnameVerifier"
+  emit issue code.CertValidationDisabled at node
+}
+
+binding javaMailSmtpSslIdentityVerificationMissing322 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "createSession" and node.context.callPath contains "props.put" and node.context.literal contains "mail.smtp.socketFactory.class" and node.context.literal contains "javax.net.ssl.SSLSocketFactory" and node.context.literal contains "mail.smtp.socketFactory.fallback" and not (node.context.literal contains "mail.smtp.ssl.checkserveridentity")
+  emit issue code.JavaMailSmtpSslIdentityVerificationMissing at node
+}
+
+binding jwtUnverified323 {
+  query pattern presenceNode where node.path ~= "Algorithm.none"
+  emit issue code.JwtUnverified at node
+}
+
+binding insecurePermission324 {
+  query pattern callExpr where callee.path ~= "setWritable" and args.any.literal contains "true" and args.any.literal contains "false"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission325 {
+  query pattern callExpr where callee.path ~= "Files.setPosixFilePermissions" and args.any.literal contains "OTHERS_WRITE"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission326 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "createTempFile" and node.context.callPath contains "File.createTempFile" and not (node.context.callPath contains "setReadable") and not (node.context.callPath contains "Files.setPosixFilePermissions")
+  emit issue code.InsecurePermission at node
+}
+
+binding insecurePermission327 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "createTempFile" and node.context.callPath contains "File.createTempFile" and not (node.context.callPath contains "setWritable") and not (node.context.callPath contains "Files.setPosixFilePermissions")
+  emit issue code.InsecurePermission at node
+}
+
+binding sensitiveTempFileDefaultPermission328 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "File.createTempFile" and containsAny(node.context.callPath, ["java.io.PrintWriter", "PrintWriter"]) and containsAny(node.context.callPath, ["Secret.toString", "getPrivateKeys"]) and not (containsAny(node.context.callPath, ["Files.createTempFile", "setReadable", "setWritable", "Files.setPosixFilePermissions", "PosixFilePermissions.asFileAttribute"]))
+  emit issue code.SensitiveTempFileDefaultPermission at node
+}
+
+binding tempFileDirectoryCreationRace329 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "File.createTempFile" and node.context.callPath contains "delete" and containsAny(node.context.callPath, ["mkdir", "mkdirs"]) and not (node.context.callPath contains "Files.createTempDirectory")
+  emit issue code.TempFileDirectoryCreationRace at node
+}
+
+binding insecureTempFile330 {
+  query pattern callExpr where callee.path ~= "Files.createFile" and args.any.literal contains "/tmp/"
+  emit issue code.InsecureTempFile at call
+}
+
+binding threadLocalScopeOverwriteWithoutCleanup331 {
+  query pattern presenceNode where node.scope == "function" and node.context.className contains "RequestScopedCache" and node.context.functionName contains "beginRequest" and node.context.callPath contains "CACHE.set" and not (node.context.scopeCall contains "endRequest") and not (node.context.callPath contains "CACHE.remove")
+  emit issue code.ThreadLocalScopeOverwriteWithoutCleanup at node
+}
+
+binding internalContentExposureReview332 {
+  query pattern presenceNode where node.scope == "function" and node.context.call contains "setContent" and node.context.call contains "toJson" and node.context.call contains "saveDocument" and not (node.context.scopeCall contains "setHidden")
+  emit issue code.InternalContentExposureReview at node
+}
+
+binding protocolStateReview333 {
+  query pattern presenceNode where node.scope == "function" and node.context.call contains "getType" and node.context.selector contains "FEDERATION_DOWNSTREAM_CONNECT" and node.context.call contains "deploy" and not (node.context.scopeCall contains "getSubject")
+  emit issue code.ProtocolStateReview at node
+}
+
+binding resourceHandle334 {
+  query pattern presenceNode where node.path ~= "Socket"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}
+
+binding resourceHandle335 {
+  query pattern presenceNode where node.path ~= "Files.newInputStream"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}
+
+binding resourceHandle336 {
+  query pattern presenceNode where node.path ~= "Files.newOutputStream"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}
+
+binding resourceHandle337 {
+  query pattern presenceNode where node.path ~= "Files.newBufferedReader"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}
+
+binding resourceHandle338 {
+  query pattern presenceNode where node.path ~= "Files.newBufferedWriter"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}
+
+binding resourceRelease339 {
+  query pattern callExpr where callee.method == "close"
+  emit check core.ResourceRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding expressionEval340 {
+  query pattern callExpr where callee.method == "parseExpression"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding stateChangingOp341 {
+  query pattern callExpr where callee.method == "changePassword"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp342 {
+  query pattern callExpr where callee.method == "updatePassword"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp343 {
+  query pattern callExpr where callee.method == "resetPassword"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp344 {
+  query pattern callExpr where callee.method == "changeEmail"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp345 {
+  query pattern callExpr where callee.method == "transferFunds"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp346 {
+  query pattern callExpr where callee.method == "deleteAccount"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp347 {
+  query pattern callExpr where callee.method == "grantRole"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp348 {
+  query pattern callExpr where callee.method == "makeAdmin"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding csrfProtection349 {
+  query pattern callExpr where callee.path ~= "validateCsrfToken"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding csrfProtection350 {
+  query pattern callExpr where callee.path ~= "verifyCsrfToken"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding expressionEval351 {
+  query pattern callExpr where callee.path ~= "Ognl.getValue"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval352 {
+  query pattern callExpr where callee.path ~= "Ognl.setValue"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval353 {
+  query pattern callExpr where callee.path ~= "MVEL.eval"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval354 {
+  query pattern callExpr where callee.path ~= "MVEL.evalToBoolean"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval355 {
+  query pattern callExpr where callee.method == "createExpression"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval356 {
+  query pattern callExpr where callee.path ~= "parseExpression.getValue"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval357 {
+  query pattern callExpr where callee.method == "buildConstraintViolationWithTemplate"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding weakCipher358 {
+  query pattern callExpr where callee.path ~= "Cipher.getInstance" and args.any.literal contains "DES"
+  emit issue code.WeakCipher at call
+}
+
+binding weakCipher359 {
+  query pattern callExpr where callee.path ~= "Cipher.getInstance" and args.any.literal contains "RC4"
+  emit issue code.WeakCipher at call
+}
+
+binding weakCipher360 {
+  query pattern callExpr where callee.path ~= "Cipher.getInstance" and args.any.literal contains "ARCFOUR"
+  emit issue code.WeakCipher at call
+}
+
+binding weakCipher361 {
+  query pattern callExpr where callee.path ~= "Cipher.getInstance" and args.any.literal contains "RC2"
+  emit issue code.WeakCipher at call
+}
+
+binding weakCipher362 {
+  query pattern callExpr where callee.path ~= "Cipher.getInstance" and args.any.literal contains "Blowfish"
+  emit issue code.WeakCipher at call
+}
+
+binding weakCipher363 {
+  query pattern callExpr where callee.path ~= "Cipher.getInstance" and args.any.literal contains "ECB"
+  emit issue code.WeakCipher at call
+}
+
+binding staticIv364 {
+  query pattern callExpr where callee.path ~= "IvParameterSpec" and args.any.literal contains "0000000000000000"
+  emit issue code.StaticIv at call
+}
+
+binding staticIv365 {
+  query pattern callExpr where callee.path ~= "GCMParameterSpec" and args.any.literal contains "000000000000"
+  emit issue code.StaticIv at call
+}
+
+binding weakCipher366 {
+  query pattern presenceNode where node.path ~= "NullCipher"
+  emit issue code.WeakCipher at node
+}
+
+binding weakRandomValue367 {
+  query pattern presenceNode where node.path ~= "java.util.Random"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue368 {
+  query pattern presenceNode where node.kind == "any" and node.path ~= "Random" and not (node.context.scopeCall contains "SecureRandom.getInstance")
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue369 {
+  query pattern presenceNode where node.path ~= "Math.random"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue370 {
+  query pattern presenceNode where node.path ~= "ThreadLocalRandom.current"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakHash371 {
+  query pattern callExpr where callee.path ~= "MessageDigest.getInstance" and args.any.literal contains "MD2"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash372 {
+  query pattern callExpr where callee.path ~= "MessageDigest.getInstance" and args.any.literal contains "MD5"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash373 {
+  query pattern callExpr where callee.path ~= "MessageDigest.getInstance" and args.any.literal contains "SHA-1"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash374 {
+  query pattern callExpr where callee.path ~= "MessageDigest.getInstance" and args.any.literal contains "SHA1"
+  emit issue code.WeakHash at call
+}
+
+binding secretComparisonReview375 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doIndex" and node.context.call contains "getReloadTokenProperty" and node.context.call contains "getRequestToken" and node.context.callPath contains "token.equals" and not (node.context.callPath contains "MessageDigest.isEqual")
+  emit issue code.SecretComparisonReview at node
+}
+
+binding secretComparisonReview376 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["validate", "verify", "check", "authenticate"]) and node.context.callPath contains "computeSignature" and node.context.callPath contains "signature.equals" and not (node.context.callPath contains "constantTimeEquals") and not (node.context.callPath contains "MessageDigest.isEqual")
+  emit issue code.SecretComparisonReview at node
+}
+
+binding secretComparisonReview377 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["matches", "validate", "verify", "check", "authenticate"]) and containsAny(node.context.callPath, ["StringUtils.equals", "Objects.equals"]) and containsAny(node.context.callPath, ["sha1", "sha256", "computeSignature", "computeDigest", "digest"]) and containsAny(node.context.callArg, ["StringUtils.equals:computed", "StringUtils.equals:digest", "StringUtils.equals:signature", "Objects.equals:computed", "Objects.equals:digest", "Objects.equals:signature"]) and not (containsAny(node.context.callPath, ["MessageDigest.isEqual", "constantTimeEquals", "isEqual"]))
+  emit issue code.SecretComparisonReview at node
+}
+
+binding optionalClientSignatureVerification378 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["authenticate", "verify", "validate", "check"]) and node.context.call contains "getSignature" and node.context.callPath contains "Signature.getInstance" and node.context.call contains "initVerify" and node.context.call contains "verify" and containsAny(node.context.expr, ["signature!=null", "sigBytes!=null", "clientSignature!=null"]) and not (containsAny(node.context.expr, ["signature==null", "sigBytes==null", "clientSignature==null"])) and not (node.context.literal contains "Client signature required") and not (node.context.literal contains "signature required") and not (node.context.literal contains "missing signature")
+  emit issue code.OptionalClientSignatureVerification at node
+}
+
+binding unsafeJXPathContextEvaluation379 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.callPath, ["JXPathContext.newContext", "JXPathContextFactory.newInstance.newContext"]) and containsAny(node.context.callPath, ["getValue", "selectNodes", "iterate"]) and not (node.context.callPath contains "JXPathUtils.newSafeContext") and not (node.context.callPath contains "setFunctions")
+  emit issue code.UnsafeJXPathContextEvaluation at node
+}
+
+binding templateRender380 {
+  query pattern callExpr where callee.path ~= "Velocity.evaluate"
+  emit sink code.TemplateRender at args[3]
+}
+
+binding templateRender381 {
+  query pattern callExpr where callee.method == "getLiteralTemplate"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding permissiveCors382 {
+  query pattern callExpr where callee.path ~= "setHeader" and args.any.literal contains "Access-Control-Allow-Origin" and args.any.literal contains "*"
+  emit issue code.PermissiveCors at call
+}
+
+binding permissiveCors383 {
+  query pattern callExpr where callee.path ~= "addHeader" and args.any.literal contains "Access-Control-Allow-Origin" and args.any.literal contains "*"
+  emit issue code.PermissiveCors at call
+}
+
+binding missingFrameProtection384 {
+  query pattern callExpr where callee.path ~= "setHeader" and args.any.literal contains "X-Frame-Options" and args.any.literal contains "ALLOWALL"
+  emit issue code.MissingFrameProtection at call
+}
+
+binding missingFrameProtection385 {
+  query pattern callExpr where callee.path ~= "addHeader" and args.any.literal contains "X-Frame-Options" and args.any.literal contains "ALLOWALL"
+  emit issue code.MissingFrameProtection at call
+}
+
+binding insecureCookie386 {
+  query pattern callExpr where callee.path ~= "setHttpOnly" and args.any.literal contains "false"
+  emit issue code.InsecureCookie at call
+}
+
+binding insecureCookie387 {
+  query pattern callExpr where callee.path ~= "setSecure" and args.any.literal contains "false"
+  emit issue code.InsecureCookie at call
+}
+
+binding cleartextChannel388 {
+  query pattern callExpr where callee.path ~= "URL" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding cleartextChannel389 {
+  query pattern callExpr where callee.path ~= "HttpGet" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding cleartextChannel390 {
+  query pattern callExpr where callee.path ~= "getForObject" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding reflectionInvoke391 {
+  query pattern callExpr where callee.path ~= "Class.forName"
+  emit sink code.ReflectionInvoke at args[0]
+}
+
+binding dynamicCodeLoad392 {
+  query pattern callExpr where callee.path ~= "Class.forName"
+  emit sink code.DynamicCodeLoad at args[0]
+}
+
+binding reflectionInvoke393 {
+  query pattern callExpr where callee.method == "newInstance"
+  emit sink code.ReflectionInvoke at args[0]
+}
+
+binding reflectionInvoke394 {
+  query pattern callExpr where callee.method == "getDeclaredMethod"
+  emit sink code.ReflectionInvoke at args[0]
+}
+
+binding reflectionInvoke395 {
+  query pattern callExpr where callee.method == "getMethod"
+  emit sink code.ReflectionInvoke at args[0]
+}
+
+binding responseHeaderWrite396 {
+  query pattern callExpr where callee.method == "setHeader"
+  emit sink code.ResponseHeaderWrite at args[1]
+}
+
+binding responseHeaderWrite397 {
+  query pattern callExpr where callee.method == "addHeader"
+  emit sink code.ResponseHeaderWrite at args[1]
+}
+
+binding csvCell398 {
+  query pattern callExpr where callee.method == "writeNext"
+  emit sink code.CsvCell at args.any.collection
+}
+
+binding csvCell399 {
+  query pattern callExpr where callee.method == "writeAll"
+  emit sink code.CsvCell at args.any.collection
+}
+
+binding massAssign400 {
+  query pattern callExpr where callee.path ~= "BeanUtils.copyProperties"
+  emit sink code.MassAssign at args.any
+}
+
+binding massAssign401 {
+  query pattern callExpr where callee.method == "bind"
+  emit sink code.MassAssign at args.any
+}
+
+binding logOutput402 {
+  query pattern callExpr where callee.path ~= "logger.info"
+  emit sink code.LogOutput at args.any
+}
+
+binding logOutput403 {
+  query pattern callExpr where callee.path ~= "logger.warn"
+  emit sink code.LogOutput at args.any
+}
+
+binding logOutput404 {
+  query pattern callExpr where callee.path ~= "logger.error"
+  emit sink code.LogOutput at args.any
+}
+
+binding logOutput405 {
+  query pattern callExpr where callee.path ~= "logger.debug"
+  emit sink code.LogOutput at args.any
+}
+
+binding logOutput406 {
+  query pattern callExpr where callee.path ~= "log.info"
+  emit sink code.LogOutput at args.any
+}
+
+binding logOutput407 {
+  query pattern callExpr where callee.path ~= "log.warn"
+  emit sink code.LogOutput at args.any
+}
+
+binding logOutput408 {
+  query pattern callExpr where callee.path ~= "log.error"
+  emit sink code.LogOutput at args.any
+}
+
+binding logOutput409 {
+  query pattern callExpr where callee.path ~= "log.debug"
+  emit sink code.LogOutput at args.any
+}
+
+binding logOutput410 {
+  query pattern callExpr where callee.path ~= "LOG.info"
+  emit sink code.LogOutput at args.any
+}
+
+binding logOutput411 {
+  query pattern callExpr where callee.path ~= "LOGGER.info"
+  emit sink code.LogOutput at args.any
+}
+
+binding logOutput412 {
+  query pattern callExpr where callee.path ~= "LOG.error"
+  emit sink code.LogOutput at args.any
+}
+
+binding logOutput413 {
+  query pattern callExpr where callee.path ~= "System.out.println"
+  emit sink code.LogOutput at args.any
+}
+
+binding logOutput414 {
+  query pattern callExpr where callee.method == "logInfo"
+  emit sink code.LogOutput at args.any
+}
+
+binding logOutput415 {
+  query pattern callExpr where callee.method == "logWarning"
+  emit sink code.LogOutput at args.any
+}
+
+binding logOutput416 {
+  query pattern callExpr where callee.method == "logException"
+  emit sink code.LogOutput at args.any
+}
+
+binding logWrite417 {
+  query pattern callExpr where callee.path ~= "logger.info"
+  emit sink code.LogWriteSink at args.any
+}
+
+binding logWrite418 {
+  query pattern callExpr where callee.path ~= "logger.warn"
+  emit sink code.LogWriteSink at args.any
+}
+
+binding logWrite419 {
+  query pattern callExpr where callee.path ~= "logger.error"
+  emit sink code.LogWriteSink at args.any
+}
+
+binding logWrite420 {
+  query pattern callExpr where callee.path ~= "logger.debug"
+  emit sink code.LogWriteSink at args.any
+}
+
+binding logWrite421 {
+  query pattern callExpr where callee.path ~= "log.info"
+  emit sink code.LogWriteSink at args.any
+}
+
+binding logWrite422 {
+  query pattern callExpr where callee.path ~= "log.warn"
+  emit sink code.LogWriteSink at args.any
+}
+
+binding logWrite423 {
+  query pattern callExpr where callee.path ~= "log.error"
+  emit sink code.LogWriteSink at args.any
+}
+
+binding logWrite424 {
+  query pattern callExpr where callee.path ~= "log.debug"
+  emit sink code.LogWriteSink at args.any
+}
+
+binding logWrite425 {
+  query pattern callExpr where callee.path ~= "LOG.info"
+  emit sink code.LogWriteSink at args.any
+}
+
+binding logWrite426 {
+  query pattern callExpr where callee.path ~= "LOGGER.info"
+  emit sink code.LogWriteSink at args.any
+}
+
+binding logWrite427 {
+  query pattern callExpr where callee.path ~= "LOG.error"
+  emit sink code.LogWriteSink at args.any
+}
+
+binding logWrite428 {
+  query pattern callExpr where callee.path ~= "System.out.println"
+  emit sink code.LogWriteSink at args.any
+}
+
+binding logWrite429 {
+  query pattern callExpr where callee.method == "logInfo"
+  emit sink code.LogWriteSink at args.any
+}
+
+binding logWrite430 {
+  query pattern callExpr where callee.method == "logWarning"
+  emit sink code.LogWriteSink at args.any
+}
+
+binding logWrite431 {
+  query pattern callExpr where callee.method == "logException"
+  emit sink code.LogWriteSink at args.any
+}
+
+binding logWrite432 {
+  query pattern presenceNode where node.path ~= "logger.info"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite433 {
+  query pattern presenceNode where node.path ~= "logger.warn"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite434 {
+  query pattern presenceNode where node.path ~= "logger.error"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite435 {
+  query pattern presenceNode where node.path ~= "logger.debug"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite436 {
+  query pattern presenceNode where node.path ~= "log.info"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite437 {
+  query pattern presenceNode where node.path ~= "log.error"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite438 {
+  query pattern presenceNode where node.path ~= "LOG.info"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite439 {
+  query pattern presenceNode where node.path ~= "System.out.println"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite440 {
+  query pattern presenceNode where node.path ~= "logInfo"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite441 {
+  query pattern presenceNode where node.path ~= "logWarning"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite442 {
+  query pattern presenceNode where node.path ~= "logException"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding htmlRender455 {
+  query pattern callExpr where callee.path ~= "getWriter.write"
+  emit sink code.HtmlRender at args.any
+}
+
+binding httpInput456 {
+  query pattern callExpr where callee.method == "getParameterNames"
+  emit source code.HttpInput at call.result
+}

@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding tpmDiskKeyWeakPcrSealing54 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "go.tpm_weak_pcr_sealing"
-  emit issue code.TpmDiskKeyWeakPcrSealing at node
-}

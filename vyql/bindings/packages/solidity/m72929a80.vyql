@@ -1,0 +1,194 @@
+module bindings.solidity.generated.m72929a80;
+
+binding httpInput0 {
+  requires {
+    dependency("solidity")
+  }
+  query pattern callExpr where callee.path ~= "msg.data"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("solidity")
+  }
+  query pattern callExpr where callee.path ~= "msg.value"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("solidity")
+  }
+  query pattern callExpr where callee.path ~= "tx.origin"
+  emit source code.HttpInput at call.result
+}
+
+binding externalCall3 {
+  requires {
+    dependency("solidity")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.ExternalCall at args[0]
+}
+
+binding externalCall4 {
+  requires {
+    dependency("solidity")
+  }
+  query pattern callExpr where callee.method == "delegatecall"
+  emit sink code.ExternalCall at args[0]
+}
+
+binding externalCall5 {
+  requires {
+    dependency("solidity")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.ExternalCall at args[0]
+}
+
+binding externalCall6 {
+  requires {
+    dependency("solidity")
+  }
+  query pattern callExpr where callee.method == "transfer"
+  emit sink code.ExternalCall at args[0]
+}
+
+binding privilegedOp7 {
+  requires {
+    dependency("solidity")
+  }
+  query pattern callExpr where callee.path ~= "selfdestruct"
+  emit sink code.PrivilegedOpSink at args[0]
+}
+
+binding stateWrite8 {
+  requires {
+    dependency("solidity")
+  }
+  query pattern presenceNode where node.path ~= "state_write"
+  emit issue code.StateWrite at node
+}
+
+binding txOriginAuth9 {
+  requires {
+    dependency("solidity")
+  }
+  query pattern presenceNode where node.path ~= "tx.origin"
+  emit issue code.TxOriginAuth at node
+}
+
+binding authenticationCheck10 {
+  requires {
+    dependency("solidity")
+  }
+  query pattern callExpr where callee.path ~= "msg.sender"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding secretValue11 {
+  requires {
+    dependency("@chainlink/contracts")
+  }
+  query pattern callExpr where callee.path ~= "AggregatorV3Interface.latestRoundData"
+  emit source code.SecretValue at call.result
+}
+
+binding urlFetch12 {
+  requires {
+    dependency("@chainlink/contracts")
+  }
+  query pattern callExpr where callee.method == "requestRandomWords"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding externalCall13 {
+  requires {
+    dependency("@openzeppelin/contracts")
+  }
+  query pattern callExpr where callee.method == "safeTransferFrom"
+  emit sink code.ExternalCall at args[0]
+}
+
+binding externalCall14 {
+  requires {
+    dependency("@openzeppelin/contracts")
+  }
+  query pattern callExpr where callee.method == "functionCall"
+  emit sink code.ExternalCall at args[0]
+}
+
+binding externalCall15 {
+  requires {
+    dependency("@openzeppelin/contracts")
+  }
+  query pattern callExpr where callee.method == "verifyCallResult"
+  emit sink code.ExternalCall at args[0]
+}
+
+binding ownershipCheck16 {
+  requires {
+    dependency("@openzeppelin/contracts")
+  }
+  query pattern callExpr where callee.path ~= "onlyOwner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck17 {
+  requires {
+    dependency("@openzeppelin/contracts")
+  }
+  query pattern callExpr where callee.path ~= "Ownable._checkOwner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck18 {
+  requires {
+    dependency("@openzeppelin/contracts")
+  }
+  query pattern callExpr where callee.path ~= "AccessControl.hasRole"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding rateLimit19 {
+  requires {
+    dependency("@openzeppelin/contracts")
+  }
+  query pattern callExpr where callee.path ~= "nonReentrant"
+  emit check core.RateLimit at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding authorizationCheck20 {
+  requires {
+    dependency("@openzeppelin/contracts")
+  }
+  query pattern callExpr where callee.path ~= "Pausable.whenNotPaused"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

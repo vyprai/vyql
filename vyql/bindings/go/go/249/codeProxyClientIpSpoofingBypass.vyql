@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding proxyClientIpSpoofingBypass249 {
-  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "g.management.GetProxy" and node.context.callPath contains "proxy.ServeHTTP" and not (node.context.callPath contains "rewriteRequestSourceIP")
-  emit issue code.ProxyClientIpSpoofingBypass at node
-}

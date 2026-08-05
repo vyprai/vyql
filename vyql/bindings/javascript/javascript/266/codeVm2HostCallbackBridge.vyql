@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding vm2HostCallbackBridge266 {
-  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "VM" and node.context.selector contains "sandbox.templateFilters" and node.context.selector contains "sandbox.templateGlobals" and node.context.callPath contains "vm.run" and not (node.context.identifier contains "isolated-vm") and not (node.context.identifier contains "Isolate")
-  emit issue code.Vm2HostCallbackBridge at node
-}

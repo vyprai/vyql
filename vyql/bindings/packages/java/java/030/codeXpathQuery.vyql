@@ -1,9 +1,0 @@
-module bindings.java.generated.m9ef49b0f;
-
-binding xpathQuery30 {
-  requires {
-    dependency("javax.xml.xpath")
-  }
-  query pattern callExpr where callee.method == "evaluate"
-  emit sink code.XpathQuery at args[0]
-}

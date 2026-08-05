@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding insecurePermission325 {
-  query pattern callExpr where callee.path ~= "Files.setPosixFilePermissions" and args.any.literal contains "OTHERS_WRITE"
-  emit issue code.InsecurePermission at call
-}

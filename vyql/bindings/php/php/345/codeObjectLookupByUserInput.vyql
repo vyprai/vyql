@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding objectLookupByUserInput345 {
-  query pattern callExpr where callee.method == "findById"
-  emit sink code.ObjectLookupByUserInput at args[0]
-}

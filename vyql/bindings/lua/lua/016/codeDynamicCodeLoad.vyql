@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding dynamicCodeLoad16 {
-  query pattern callExpr where callee.path ~= "dofile"
-  emit sink code.DynamicCodeLoad at args[0]
-}

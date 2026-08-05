@@ -1,0 +1,4287 @@
+module bindings.python.generated.m21017d75;
+
+pattern bindingMetadata {
+  binding: {
+    name: "python"
+    meta: {
+      fidelity: "resolved"
+    }
+  }
+}
+
+binding httpInput0 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "get" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "post" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "put" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "delete" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "patch" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "head" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput6 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "options" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput7 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "route" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput8 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "websocket" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput9 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "api_route" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput10 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "filter" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput11 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.functionName contains "resolve_" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls" and not args.any.context.paramName contains "info" and not args.any.context.paramName contains "root" and not args.any.context.paramName contains "parent" and not args.any.context.paramName contains "_"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput12 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.literal contains "mutate" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls" and not args.any.context.paramName contains "info" and not args.any.context.paramName contains "root" and not args.any.context.paramName contains "parent" and not args.any.context.paramName contains "_"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput13 {
+  query pattern callExpr where callee.path ~= "request.form"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput14 {
+  query pattern callExpr where callee.path ~= "request.query_string"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput15 {
+  query pattern callExpr where callee.path ~= "request.full_path"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput16 {
+  query pattern callExpr where callee.path ~= "request.url"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput17 {
+  query pattern callExpr where callee.path ~= "self.request.form"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput18 {
+  query pattern callExpr where callee.path ~= "self.request.args"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput19 {
+  query pattern callExpr where callee.path ~= "self.request.values"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput20 {
+  query pattern callExpr where callee.path ~= "self.request.cookies"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput21 {
+  query pattern callExpr where callee.path ~= "self.request.headers"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput22 {
+  query pattern callExpr where callee.path ~= "self.request.get_json"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput23 {
+  query pattern callExpr where callee.path ~= "self.request.json"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput24 {
+  query pattern callExpr where callee.path ~= "self.request.data"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput25 {
+  query pattern callExpr where callee.path ~= "self.request.files"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput26 {
+  query pattern callExpr where callee.path ~= "self.request.get_data"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput27 {
+  query pattern callExpr where callee.path ~= "request.args"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput28 {
+  query pattern callExpr where callee.path ~= "request.values"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput29 {
+  query pattern callExpr where callee.path ~= "request.cookies"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput30 {
+  query pattern callExpr where callee.path ~= "request.get_json"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput31 {
+  query pattern callExpr where callee.path ~= "request.json"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput32 {
+  query pattern callExpr where callee.path ~= "request.data"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput33 {
+  query pattern callExpr where callee.path ~= "request.headers"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput34 {
+  query pattern callExpr where callee.path ~= "request.files"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput35 {
+  query pattern callExpr where callee.path ~= "request.stream"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput36 {
+  query pattern callExpr where callee.path ~= "request.get_data"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput37 {
+  query pattern callExpr where callee.path ~= "request.view_args"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput38 {
+  query pattern callExpr where callee.path ~= "request.GET"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput39 {
+  query pattern callExpr where callee.path ~= "request.POST"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput40 {
+  query pattern callExpr where callee.path ~= "request.body"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput41 {
+  query pattern callExpr where callee.path ~= "request.COOKIES"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput42 {
+  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.literal contains "python_review:traceback_format_exc_pre_unescaped"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput43 {
+  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.literal contains "python_review:traceback_format_exc_html_unescaped"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput44 {
+  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.context.name contains "get_filename_for_event_id" and args.any.literal contains "event_id" and args.any.literal contains "os.path.join" and args.any.literal contains "INGEST_STORE_BASE_DIR" and not args.any.literal contains "uuid.UUID(event_id).hex"
+  emit source code.HttpInput at call.result
+}
+
+binding archiveEntryName45 {
+  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.context.name contains "get_text" and args.any.literal contains "toc_item.name.decode('utf-8')" and args.any.literal contains "os.path.join(output_dir,toc_item.name.decode('utf-8'))" and not args.any.literal contains "get_safe_path"
+  emit source code.ArchiveEntryName at call.result
+}
+
+binding archiveEntryName46 {
+  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.context.name contains "get_image" and args.any.literal contains "toc_item.name.decode('utf-8')" and args.any.literal contains "os.path.join(output_dir,toc_item.name.decode('utf-8'))" and not args.any.literal contains "get_safe_path"
+  emit source code.ArchiveEntryName at call.result
+}
+
+binding archiveSymlinkFilterBypass47 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "archive_symlink_filter_bypass"
+  emit issue code.ArchiveSymlinkFilterBypass at node
+}
+
+binding lockFileCreateMissingNoFollow48 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.functionName, ["acquire", "lock"]) and node.context.callPath contains "os.open" and node.context.selector contains "os.O_CREAT" and node.context.selector contains "os.O_EXCL" and not (node.context.literal contains "O_NOFOLLOW")
+  emit issue code.LockFileCreateMissingNoFollow at node
+}
+
+binding httpInput49 {
+  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.context.name contains "generate_auth_token" and args.any.literal contains "RemoteAuthToken.user_id==user_id" and args.any.literal contains "auth_token.user_id=user_id" and not args.any.literal contains "current_user.id!=user_id"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput50 {
+  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.context.name contains "delete_auth_token" and args.any.literal contains "RemoteAuthToken.user_id==user_id" and args.any.literal contains "delete()" and not args.any.literal contains "current_user.id!=user_id"
+  emit source code.HttpInput at call.result
+}
+
+binding emmettUnhandledCookieParseException51 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "emmett_unhandled_cookie_parse_exception"
+  emit issue code.EmmettUnhandledCookieParseException at node
+}
+
+binding dnsUdpResponseValidationAfterLoop52 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "dns_udp_response_validation_after_loop"
+  emit issue code.DnsUdpResponseValidationAfterLoop at node
+}
+
+binding httpInput53 {
+  query pattern callExpr where callee.path ~= "request.META"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput54 {
+  query pattern callExpr where callee.path ~= "request.FILES"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput55 {
+  query pattern callExpr where callee.path ~= "request.path_info"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput56 {
+  query pattern callExpr where callee.path ~= "request.query_params"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput57 {
+  query pattern callExpr where callee.path ~= "request.path_params"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput58 {
+  query pattern callExpr where callee.path ~= "request.data"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput59 {
+  query pattern callExpr where callee.path ~= "request.query"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput60 {
+  query pattern callExpr where callee.path ~= "request.post"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput61 {
+  query pattern callExpr where callee.path ~= "request.match_info"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput62 {
+  query pattern callExpr where callee.path ~= "request.rel_url"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput63 {
+  query pattern callExpr where callee.path ~= "request.read"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput64 {
+  query pattern callExpr where callee.path ~= "request.text"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput65 {
+  query pattern callExpr where callee.path ~= "request.multipart"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput66 {
+  query pattern callExpr where callee.path ~= "self.get_argument"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput67 {
+  query pattern callExpr where callee.path ~= "self.get_query_argument"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput68 {
+  query pattern callExpr where callee.path ~= "self.get_body_argument"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput69 {
+  query pattern callExpr where callee.path ~= "self.get_arguments"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput70 {
+  query pattern callExpr where callee.path ~= "self.request.arguments"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput71 {
+  query pattern callExpr where callee.path ~= "self.request.body"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput72 {
+  query pattern callExpr where callee.path ~= "self.get_cookie"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput73 {
+  query pattern callExpr where callee.path ~= "self.request.query_arguments"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput74 {
+  query pattern callExpr where callee.path ~= "request.forms"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput75 {
+  query pattern callExpr where callee.path ~= "request.params"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput76 {
+  query pattern callExpr where callee.path ~= "request.matchdict"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput77 {
+  query pattern callExpr where callee.path ~= "request.json_body"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput78 {
+  query pattern callExpr where callee.path ~= "request.query_parameters"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput79 {
+  query pattern callExpr where callee.path ~= "request.urlargs"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput80 {
+  query pattern callExpr where callee.path ~= "ctx.request.json"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput81 {
+  query pattern callExpr where callee.path ~= "req.params"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput82 {
+  query pattern callExpr where callee.path ~= "req.media"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput83 {
+  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.literal contains "class_bases=serializers.ModelSerializer" and args.any.literal contains "fields" and args.any.literal contains "is_superuser" and args.any.literal contains "validated_data" and args.any.literal contains "objects.create" and not args.any.literal contains "pop('is_superuser'" and not args.any.literal contains "pop(\"is_superuser\""
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput84 {
+  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.literal contains "class_bases=serializers.ModelSerializer" and args.any.literal contains "fields" and args.any.literal contains "is_superuser" and args.any.literal contains "validated_data" and args.any.literal contains "super().update" and not args.any.literal contains "pop('is_superuser'" and not args.any.literal contains "pop(\"is_superuser\""
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput85 {
+  query pattern callExpr where callee.path ~= "req.get_param"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput86 {
+  query pattern callExpr where callee.path ~= "req.stream"
+  emit source code.HttpInput at call.result
+}
+
+binding cliArgument87 {
+  query pattern callExpr where callee.path ~= "sys.argv"
+  emit source code.CliArgument at call.result
+}
+
+binding absolutePathDisclosure88 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "absolute_path_disclosure"
+  emit issue code.AbsolutePathDisclosure at node
+}
+
+binding sensitiveConfigInfoLog89 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "sensitive_config_info_log"
+  emit issue code.SensitiveConfigInfoLog at node
+}
+
+binding typerPrettyExceptionLocalsSecretExposure90 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "python" and node.context.callPath contains "typer.Typer" and containsAny(node.context.literal, ["GH_TOKEN", "GITHUB_TOKEN", "TOKEN"]) and not (node.context.callArg contains "typer.Typer:pretty_exceptions_show_locals=False")
+  emit issue code.TyperPrettyExceptionLocalsSecretExposure at node
+}
+
+binding ckanSolrConnectionErrorDisclosure91 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "ckan_solr_connection_error_disclosure"
+  emit issue code.CkanSolrConnectionErrorDisclosure at node
+}
+
+binding cloakserveFingerprintSeedPathTraversal92 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cloakserve_fingerprint_seed_path_traversal"
+  emit issue code.CloakserveFingerprintSeedPathTraversal at node
+}
+
+binding emailAttachmentFilenamePathTraversal93 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "email_attachment_filename_path_traversal"
+  emit issue code.EmailAttachmentFilenamePathTraversal at node
+}
+
+binding internalAssetRoutePathTraversal94 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "internal_asset_route_path_traversal"
+  emit issue code.InternalAssetRoutePathTraversal at node
+}
+
+binding ansibleSnmpFactsCredentialsNoLogMissing95 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "ansible_snmp_facts_credentials_no_log_missing"
+  emit issue code.AnsibleSnmpFactsCredentialsNoLogMissing at node
+}
+
+binding stdinInput96 {
+  query pattern callExpr where callee.path ~= "input"
+  emit source code.StdinInput at call.result
+}
+
+binding stdinInput97 {
+  query pattern callExpr where callee.path ~= "sys.stdin"
+  emit source code.StdinInput at call.result
+}
+
+binding stdinInput98 {
+  query pattern callExpr where callee.path ~= "fileinput.input"
+  emit source code.StdinInput at call.result
+}
+
+binding shortSecurityIdentifier99 {
+  query pattern callExpr where callee.method == "[]" and args.any.literal contains "-8:"
+  emit source code.ShortSecurityIdentifier at call.result
+}
+
+binding werkzeugDebugConsoleExposure100 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "werkzeug_debug_console_exposure"
+  emit issue code.WerkzeugDebugConsoleExposure at node
+}
+
+binding httpInput101 {
+  query pattern callExpr where callee.path ~= "os.environ.get" and args.any.literal contains "HTTP_PROXY"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput102 {
+  query pattern callExpr where callee.path ~= "os.getenv" and args.any.literal contains "HTTP_PROXY"
+  emit source code.HttpInput at call.result
+}
+
+binding secretValue103 {
+  query pattern callExpr where callee.path ~= "os.environ"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue104 {
+  query pattern callExpr where callee.path ~= "os.getenv"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue105 {
+  query pattern callExpr where callee.path ~= "config.get"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue106 {
+  query pattern callExpr where callee.path ~= "settings.SECRET_KEY"
+  emit source code.SecretValue at call.result
+}
+
+binding hardcodedSecret107 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "flask_hardcoded_secret_key"
+  emit issue code.HardcodedSecret at node
+}
+
+binding hardcodedSecret108 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "flask_hardcoded_secret_key"
+  emit issue code.HardcodedSecret at node
+}
+
+binding hardcodedSecret109 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "flask_hardcoded_secret_key"
+  emit issue code.HardcodedSecret at node
+}
+
+binding hardcodedSecret110 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "flask_hardcoded_secret_key"
+  emit issue code.HardcodedSecret at node
+}
+
+binding autoActiveSignupAccount111 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "auto_active_signup_account"
+  emit issue code.AutoActiveSignupAccount at node
+}
+
+binding databaseRead112 {
+  query pattern callExpr where callee.method == "fetchall"
+  emit source code.DatabaseRead at call.result
+}
+
+binding databaseRead113 {
+  query pattern callExpr where callee.method == "fetchone"
+  emit source code.DatabaseRead at call.result
+}
+
+binding databaseRead114 {
+  query pattern callExpr where callee.method == "fetchmany"
+  emit source code.DatabaseRead at call.result
+}
+
+binding sqlExecution115 {
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution116 {
+  query pattern callExpr where callee.method == "executemany"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution117 {
+  query pattern callExpr where callee.method == "executescript"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution118 {
+  query pattern callExpr where callee.method == "executescript"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution119 {
+  query pattern callExpr where callee.method == "raw"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution120 {
+  query pattern callExpr where callee.method == "extra"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution121 {
+  query pattern callExpr where callee.path ~= "sqlalchemy.text"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution122 {
+  query pattern callExpr where callee.path ~= "session.execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution123 {
+  query pattern callExpr where callee.path ~= "connection.execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution124 {
+  query pattern callExpr where callee.path ~= "db.execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution125 {
+  query pattern callExpr where callee.path ~= "cursor.execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution126 {
+  query pattern callExpr where callee.path ~= "RawSQL"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution127 {
+  query pattern callExpr where callee.path ~= "django.db.connection.cursor"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding mcpSqlExecutionMissingValidation128 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "mcp_sql_execution_missing_validation"
+  emit issue code.McpSqlExecutionMissingValidation at node
+}
+
+binding sqlExecution129 {
+  query pattern callExpr where callee.method == "fetch"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution130 {
+  query pattern callExpr where callee.method == "fetchrow"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution131 {
+  query pattern callExpr where callee.method == "fetchval"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding stateChangingOp132 {
+  query pattern callExpr where callee.method == "change_password"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp133 {
+  query pattern callExpr where callee.method == "changePassword"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp134 {
+  query pattern callExpr where callee.method == "update_password"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp135 {
+  query pattern callExpr where callee.method == "reset_password"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp136 {
+  query pattern callExpr where callee.method == "change_email"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp137 {
+  query pattern callExpr where callee.method == "transfer_funds"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp138 {
+  query pattern callExpr where callee.method == "transferFunds"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp139 {
+  query pattern callExpr where callee.method == "delete_account"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp140 {
+  query pattern callExpr where callee.method == "grant_role"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding stateChangingOp141 {
+  query pattern callExpr where callee.method == "make_admin"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding authenticationRequiredOp142 {
+  query pattern presenceNode where node.path ~= "change_password"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp143 {
+  query pattern presenceNode where node.path ~= "changePassword"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp144 {
+  query pattern presenceNode where node.path ~= "update_password"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp145 {
+  query pattern presenceNode where node.path ~= "reset_password"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp146 {
+  query pattern presenceNode where node.path ~= "change_email"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp147 {
+  query pattern presenceNode where node.path ~= "transfer_funds"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp148 {
+  query pattern presenceNode where node.path ~= "transferFunds"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp149 {
+  query pattern presenceNode where node.path ~= "delete_account"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp150 {
+  query pattern presenceNode where node.path ~= "grant_role"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp151 {
+  query pattern presenceNode where node.path ~= "make_admin"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding csrfProtection152 {
+  query pattern callExpr where callee.path ~= "validate_csrf_token"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding csrfProtection153 {
+  query pattern callExpr where callee.path ~= "verify_authenticity_token"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck154 {
+  query pattern callExpr where callee.method == "login_required"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck155 {
+  query pattern callExpr where callee.method == "require_auth"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck156 {
+  query pattern callExpr where callee.method == "ensure_authenticated"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck157 {
+  query pattern callExpr where callee.method == "is_authenticated"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck158 {
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck159 {
+  query pattern callExpr where callee.path ~= "has_perm"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck160 {
+  query pattern callExpr where callee.path ~= "has_permission"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck161 {
+  query pattern callExpr where callee.path ~= "permission_required"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck162 {
+  query pattern callExpr where callee.path ~= "user_passes_test"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding effectiveUidRootCheckBypass163 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "effective_uid_root_check_bypass"
+  emit issue code.EffectiveUidRootCheckBypass at node
+}
+
+binding accessPolicyReview164 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "access_policy_public_shelf_without_role_check"
+  emit issue code.AccessPolicyReview at node
+}
+
+binding codeCheckerGuidelineRulesMissingViewCheck165 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "codechecker_guideline_rules_missing_view_check"
+  emit issue code.CodeCheckerGuidelineRulesMissingViewCheck at node
+}
+
+binding tokenCacheAuthorizationBypass166 {
+  query pattern presenceNode where node.path ~= "DIRAC.FrameworkSystem.Utilities.TokenManagementUtilities.getCachedToken"
+  emit issue code.TokenCacheAuthorizationBypass at node
+}
+
+binding flaskEntityDetailMissingAuthorization167 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "flask_entity_detail_missing_authorization"
+  emit issue code.FlaskEntityDetailMissingAuthorization at node
+}
+
+binding overbroadRolePermissionGrant168 {
+  query pattern presenceNode where node.scope == "module" and node.context.pythonReview == "overbroad_role_permission_grant"
+  emit issue code.OverbroadRolePermissionGrant at node
+}
+
+binding ownershipCheck169 {
+  query pattern callExpr where callee.method == "check_ownership"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck170 {
+  query pattern callExpr where callee.method == "require_owner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck171 {
+  query pattern callExpr where callee.method == "is_owner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding redirectAllowlist172 {
+  query pattern callExpr where callee.path ~= "url_has_allowed_host_and_scheme"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding redirectAllowlist173 {
+  query pattern callExpr where callee.path ~= "is_safe_url"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding redirectAllowlist174 {
+  query pattern callExpr where callee.path ~= "is_safe_redirect_url"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding allowlistValidation175 {
+  query pattern callExpr where callee.path ~= "is_allowed_url"
+  emit check core.AllowlistValidation at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding allowlistValidation176 {
+  query pattern callExpr where callee.path ~= "is_allowed_host"
+  emit check core.AllowlistValidation at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding inputValidation177 {
+  query pattern callExpr where callee.method == "login"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation178 {
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation179 {
+  query pattern callExpr where callee.method == "authenticate_user"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation180 {
+  query pattern callExpr where callee.method == "sign_in"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation181 {
+  query pattern callExpr where callee.method == "log_in"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation182 {
+  query pattern callExpr where callee.method == "check_credentials"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation183 {
+  query pattern callExpr where callee.method == "verify_credentials"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation184 {
+  query pattern callExpr where callee.method == "validate_credentials"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation185 {
+  query pattern callExpr where callee.method == "check_password"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation186 {
+  query pattern callExpr where callee.method == "verify_password"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation187 {
+  query pattern callExpr where callee.analysis ~= "function.result" and args.any.literal contains "marker:validator"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding allowlistValidation188 {
+  query pattern callExpr where callee.path ~= "validate_url"
+  emit check core.AllowlistValidation at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding allowlistValidation189 {
+  query pattern callExpr where callee.path ~= "_validate_url"
+  emit check core.AllowlistValidation at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding allowlistValidation190 {
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.literal contains "socket.getaddrinfo" and args.any.literal contains "ipaddress.ip_address" and args.any.literal contains "is_private" and args.any.literal contains "is_loopback" and args.any.literal contains "is_link_local"
+  emit check core.AllowlistValidation at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding codeExecutionValidation191 {
+  query pattern callExpr where callee.path ~= "validate_python_code"
+  emit check core.CodeExecutionValidation at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding xmlHardening192 {
+  query pattern callExpr where callee.path ~= "etree.XMLParser" and args.any.context.resolveEntities contains "False"
+  emit check core.XmlHardening at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding xmlHardening193 {
+  query pattern callExpr where callee.path ~= "etree.XMLParser" and args.any.context.noNetwork contains "True"
+  emit check core.XmlHardening at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding xmlHardening194 {
+  query pattern callExpr where callee.path ~= "lxml.etree.XMLParser" and args.any.context.resolveEntities contains "False"
+  emit check core.XmlHardening at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding xmlHardening195 {
+  query pattern callExpr where callee.path ~= "XMLParser" and args.any.context.resolveEntities contains "False"
+  emit check core.XmlHardening at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding xmlHardening196 {
+  query pattern callExpr where callee.path ~= "objectify.makeparser" and args.any.context.resolveEntities contains "False"
+  emit check core.XmlHardening at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding xmlHardening197 {
+  query pattern callExpr where callee.path ~= "lxml.objectify.makeparser" and args.any.context.resolveEntities contains "False"
+  emit check core.XmlHardening at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding logOutput198 {
+  query pattern callExpr where callee.path ~= "logging.info"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput199 {
+  query pattern callExpr where callee.path ~= "logging.warning"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput200 {
+  query pattern callExpr where callee.path ~= "logging.error"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput201 {
+  query pattern callExpr where callee.path ~= "logging.debug"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput202 {
+  query pattern callExpr where callee.path ~= "logger.info"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput203 {
+  query pattern callExpr where callee.path ~= "logger.warning"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput204 {
+  query pattern callExpr where callee.path ~= "logger.error"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput205 {
+  query pattern callExpr where callee.path ~= "logger.debug"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput206 {
+  query pattern callExpr where callee.path ~= "log.info"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput207 {
+  query pattern callExpr where callee.path ~= "log.error"
+  emit sink code.LogOutput at args[0]
+}
+
+binding unneutralizedDiagnosticValue208 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unneutralized_diagnostic_value"
+  emit issue code.UnneutralizedDiagnosticValue at node
+}
+
+binding requestPathPercentSLogInjection209 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "request_path_percent_s_log_injection"
+  emit issue code.RequestPathPercentSLogInjection at node
+}
+
+binding logWrite210 {
+  query pattern presenceNode where node.path ~= "logging.info"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite211 {
+  query pattern presenceNode where node.path ~= "logging.warning"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite212 {
+  query pattern presenceNode where node.path ~= "logging.error"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite213 {
+  query pattern presenceNode where node.path ~= "logging.debug"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite214 {
+  query pattern presenceNode where node.path ~= "logger.info"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite215 {
+  query pattern presenceNode where node.path ~= "logger.error"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite216 {
+  query pattern presenceNode where node.path ~= "log.info"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite217 {
+  query pattern presenceNode where node.path ~= "LOG.debug"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite218 {
+  query pattern presenceNode where node.path ~= "LOG.info"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite219 {
+  query pattern presenceNode where node.path ~= "LOG.warning"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding logWrite220 {
+  query pattern presenceNode where node.path ~= "LOG.error"
+  emit issue code.LogWrite at node
+  emit sink code.LogWriteSink at node
+}
+
+binding credentialAttributeLogExposure221 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "credential_attribute_log_exposure"
+  emit issue code.CredentialAttributeLogExposure at node
+}
+
+binding untrustedSupportUrlNotification222 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "untrusted_support_url_notification"
+  emit issue code.UntrustedSupportUrlNotification at node
+}
+
+binding commandExecution223 {
+  query pattern callExpr where callee.path ~= "os.system"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution224 {
+  query pattern callExpr where callee.path ~= "os.popen"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution225 {
+  query pattern callExpr where callee.path ~= "os.popen2"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution226 {
+  query pattern callExpr where callee.path ~= "os.popen3"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution227 {
+  query pattern callExpr where callee.path ~= "os.popen4"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution228 {
+  query pattern callExpr where callee.path ~= "subprocess.call"
+  emit sink code.CommandExecution at args[0].collection[0]
+}
+
+binding commandExecution229 {
+  query pattern callExpr where callee.path ~= "subprocess.run"
+  emit sink code.CommandExecution at args[0].collection[0]
+}
+
+binding commandExecution230 {
+  query pattern callExpr where callee.path ~= "subprocess.Popen"
+  emit sink code.CommandExecution at args[0].collection[0]
+}
+
+binding commandExecution231 {
+  query pattern callExpr where callee.path ~= "subprocess.call" and args.any.literal contains "-c"
+  emit sink code.CommandExecution at args[0].collection[2]
+}
+
+binding commandExecution232 {
+  query pattern callExpr where callee.path ~= "subprocess.run" and args.any.literal contains "-c"
+  emit sink code.CommandExecution at args[0].collection[2]
+}
+
+binding commandExecution233 {
+  query pattern callExpr where callee.path ~= "subprocess.Popen" and args.any.literal contains "-c"
+  emit sink code.CommandExecution at args[0].collection[2]
+}
+
+binding commandOptionInjection234 {
+  query pattern callExpr where callee.path ~= "subprocess.Popen" and args.any.literal contains "self.args" and args.any.literal contains "tag.filename" and not args.any.literal contains "--"
+  emit sink code.CommandOptionInjectionSink at args[0]
+  emit issue code.CommandOptionInjection at call
+}
+
+binding commandOptionInjection235 {
+  query pattern callExpr where callee.path ~= "subprocess.Popen" and args.any.literal contains "self.args" and args.any.literal contains "filename" and not args.any.literal contains "--"
+  emit sink code.CommandOptionInjectionSink at args[0]
+  emit issue code.CommandOptionInjection at call
+}
+
+binding commandExecution236 {
+  query pattern callExpr where callee.path ~= "subprocess.check_output"
+  emit sink code.CommandExecution at args[0].collection[0]
+}
+
+binding commandExecution237 {
+  query pattern callExpr where callee.path ~= "subprocess.check_call"
+  emit sink code.CommandExecution at args[0].collection[0]
+}
+
+binding commandExecution238 {
+  query pattern callExpr where callee.path ~= "subprocess.check_output" and args.any.literal contains "-c"
+  emit sink code.CommandExecution at args[0].collection[2]
+}
+
+binding commandExecution239 {
+  query pattern callExpr where callee.path ~= "subprocess.check_call" and args.any.literal contains "-c"
+  emit sink code.CommandExecution at args[0].collection[2]
+}
+
+binding commandExecution240 {
+  query pattern callExpr where callee.path ~= "subprocess.getoutput"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution241 {
+  query pattern callExpr where callee.path ~= "subprocess.getstatusoutput"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution242 {
+  query pattern callExpr where callee.path ~= "commands.getoutput"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution243 {
+  query pattern callExpr where callee.path ~= "commands.getstatusoutput"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandStringWrapperExecution244 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "command_string_wrapper_execution"
+  emit issue code.CommandStringWrapperExecution at node
+}
+
+binding shellTruePackageManagerProbe245 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "shell_true_package_manager_probe"
+  emit issue code.ShellTruePackageManagerProbe at node
+}
+
+binding shellTruePackageManagerProbe246 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "shell_true_package_manager_probe"
+  emit issue code.ShellTruePackageManagerProbe at node
+}
+
+binding securityKeyTrustOperation247 {
+  query pattern callExpr where callee.path ~= "module.run_command" and args.any.literal contains "apt-key" and args.any.literal contains "--recv"
+  emit sink code.SecurityKeyTrustOperation at args[0]
+}
+
+binding commandLineAssemblyReview248 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "command_line_assembly_review"
+  emit issue code.CommandLineAssemblyReview at node
+}
+
+binding msgfmtPathShellCommandInterpolation249 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "msgfmt_path_shell_command_interpolation"
+  emit issue code.MsgfmtPathShellCommandInterpolation at node
+}
+
+binding samlRelayStateOpenRedirect250 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "saml_relay_state_open_redirect"
+  emit issue code.SamlRelayStateOpenRedirect at node
+}
+
+binding unsignedOidcStateDestinationRedirect251 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "python" and node.context.callPath contains "json.dumps" and node.context.callPath contains "json.loads" and containsAny(node.context.callPath, ["redirect", "flask.redirect"]) and node.context.attrPath contains "request.args" and node.context.subscript contains "state" and node.context.subscript contains "destination" and not (containsAny(node.context.callPath, ["destination_serializer.dumps", "destination_serializer.loads"])) and not (containsAny(node.identifier, [BadSignature, RedirectAllowlist]))
+  emit issue code.UnsignedOidcStateDestinationRedirect at node
+}
+
+binding weakRedirectUrlValidation252 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.functionName, ["validate_redirect", "is_safe_url", "safe_redirect"]) and node.context.callPath contains "urlsplit" and node.context.attrPath contains "request.host_url" and node.context.callPath contains "current_app.config.get" and containsAny(node.context.binary, ["__binop.not in"]) and containsAny(node.context.binary, ["__binop.ne"]) and not (containsAny(node.context.callPath, ["ord", "url.startswith", "url.replace", "quote", "urlquote"])) and not (containsAny(node.context.binary, ["__binop.le"]))
+  emit issue code.WeakRedirectUrlValidation at node
+}
+
+binding oAuthStateCookieValidationMissing253 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["verify_and_process", "oauth_callback", "auth_callback", "callback"]) and node.context.literal contains "state" and node.context.callPath contains "request.query_params.get" and containsAny(node.context.call, ["process_login", "exchange_code", "fetch_token"]) and not (node.context.literal contains "sso_state")
+  emit issue code.OAuthStateCookieValidationMissing at node
+}
+
+binding oAuthReauthenticationUserMismatch254 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.functionName, ["oauth_verify_response", "verify_response", "reauth"]) and node.context.callPath contains "_oauth_response_common" and node.context.callPath contains "session.__setitem__" and containsAny(node.context.callPath, ["redirect", "flask.redirect"]) and containsAny(node.context.literal, ["fs_paa", "REAUTHENTICATION_SUCCESSFUL", "POST_OAUTH_VERIFY_VIEW"]) and not (containsAny(node.context.binary, ["user.email==current_user.email", "current_user.email==user.email", "user.id==current_user.id", "current_user.id==user.id"]))
+  emit issue code.OAuthReauthenticationUserMismatch at node
+}
+
+binding unanchoredOAuthEmailRegexAuthBypass255 {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "re.match" and operand(node, where: operand.path ~= "self.application.options.auth") and operand(node, where: containsAny(operand.key, [email, mail]))
+  emit issue code.UnanchoredOAuthEmailRegexAuthBypass at node
+}
+
+binding snsCertificateUrlTrustBypass256 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "sns_certificate_url_trust_bypass"
+  emit issue code.SnsCertificateUrlTrustBypass at node
+}
+
+binding secretComparisonReview257 {
+  query pattern presenceNode where node.kind == "binop" and node.op contains "not in" and not (containsAny(node.context.scopeCall, [constant_time_compare, hmac.compare_digest, secrets.compare_digest, compare_digest])) and operand(node, where: operand.path ~= "get_request_basic_auth") and operand(node, where: operand.path ~= "basic_auth")
+  emit issue code.SecretComparisonReview at node
+}
+
+binding passwordHashMissingUserBalance258 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["auth_user_db", "authenticate", "login"]) and node.context.callPath contains "find_user" and node.context.attrPath contains "user.is_active" and node.context.callPath contains "check_password_hash" and node.context.callPath contains "update_user_auth_stat" and node.context.callPath contains "LOGMSG_WAR_SEC_LOGIN_FAILED.format" and not (containsAny(node.context.literal, ["pbkdf2:", "argon2", "bcrypt", "scrypt"])) and not (containsAny(node.identifier, [dummy, DUMMY, fake, FAKE, balance, BALANCE]))
+  emit issue code.PasswordHashMissingUserBalance at node
+}
+
+binding captchaValidationTruthyReturnBypass259 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.functionName, ["validate", "verify", "check"]) and node.context.callPath contains "session.get" and node.context.callPath contains "session.__setitem__" and containsAny(node.context.callPath, ["request.form[].strip", "request.form.get"]) and node.context.callArg contains "session.get:captcha_answer" and containsAny(node.context.binary, ["__binop.and"]) and containsAny(node.context.binary, ["__binop.eq"]) and not (containsAny(node.context.binary, ["__binop.is not", "value != None", "answer != None"]))
+  emit issue code.CaptchaValidationTruthyReturnBypass at node
+}
+
+binding djangoAttachmentSaveWithoutModelValidation260 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "django_attachment_save_without_model_validation"
+  emit issue code.DjangoAttachmentSaveWithoutModelValidation at node
+}
+
+binding pythonDunderPathClassPollution261 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "python_dunder_path_class_pollution"
+  emit issue code.PythonDunderPathClassPollution at node
+}
+
+binding docutilsRestUnsafeDirectiveRendering262 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "docutils_rest_unsafe_directive_rendering"
+  emit issue code.DocutilsRestUnsafeDirectiveRendering at node
+}
+
+binding fidoRegistrationChallengeReplay263 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "fido_registration_challenge_replay"
+  emit issue code.FidoRegistrationChallengeReplay at node
+}
+
+binding partiallyEscapedSshCommand264 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "partially_escaped_ssh_command"
+  emit issue code.PartiallyEscapedSshCommand at node
+}
+
+binding cloudStackBaremetalMacCommandInjection265 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cloudstack_baremetal_mac_command_injection"
+  emit issue code.CloudStackBaremetalMacCommandInjection at node
+}
+
+binding commandExecution266 {
+  query pattern callExpr where callee.path ~= "pty.spawn"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution267 {
+  query pattern callExpr where callee.path ~= "os.execv"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution268 {
+  query pattern callExpr where callee.path ~= "os.execve"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution269 {
+  query pattern callExpr where callee.path ~= "os.execvp"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution270 {
+  query pattern callExpr where callee.path ~= "os.execvpe"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution271 {
+  query pattern callExpr where callee.path ~= "os.spawnv"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution272 {
+  query pattern callExpr where callee.path ~= "os.spawnl"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution273 {
+  query pattern callExpr where callee.path ~= "asyncio.create_subprocess_shell"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution274 {
+  query pattern callExpr where callee.path ~= "asyncio.create_subprocess_exec"
+  emit sink code.CommandExecution at args.any.collection
+}
+
+binding commandExecution275 {
+  query pattern callExpr where callee.path ~= "popen2.popen2"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution276 {
+  query pattern callExpr where callee.path ~= "popen2.popen3"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding codeEval277 {
+  query pattern callExpr where callee.path ~= "eval"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval278 {
+  query pattern callExpr where callee.path ~= "exec"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval279 {
+  query pattern callExpr where callee.path ~= "execfile"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval280 {
+  query pattern callExpr where callee.path ~= "compile"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval281 {
+  query pattern callExpr where callee.path ~= "code.interact"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval282 {
+  query pattern callExpr where callee.path ~= "code.InteractiveInterpreter"
+  emit sink code.CodeEval at args[0]
+}
+
+binding deserialization283 {
+  query pattern callExpr where callee.path ~= "yaml.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization284 {
+  query pattern callExpr where callee.path ~= "yaml.full_load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization285 {
+  query pattern callExpr where callee.path ~= "yaml.unsafe_load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization286 {
+  query pattern callExpr where callee.path ~= "yaml.load_all"
+  emit sink code.Deserialization at args[0]
+}
+
+binding unsafeYamlLoad287 {
+  query pattern presenceNode where node.kind == "call" and node.path == "yaml.unsafe_load"
+  emit issue code.UnsafeYamlLoad at node
+}
+
+binding unsafeYamlLoad288 {
+  query pattern presenceNode where node.kind == "call" and node.path == "yaml.unsafe_load_all"
+  emit issue code.UnsafeYamlLoad at node
+}
+
+binding unsafeYamlLoad289 {
+  query pattern presenceNode where node.kind == "call" and node.path == "yaml.load" and operand(node, where: operand.path == "yaml.Loader")
+  emit issue code.UnsafeYamlLoad at node
+}
+
+binding unsafeYamlLoad290 {
+  query pattern presenceNode where node.kind == "call" and node.path == "yaml.load_all" and operand(node, where: operand.path == "yaml.Loader")
+  emit issue code.UnsafeYamlLoad at node
+}
+
+binding unsafeYamlLoad291 {
+  query pattern presenceNode where node.kind == "call" and node.path == "yaml.load" and operand(node, where: operand.path == "yaml.UnsafeLoader")
+  emit issue code.UnsafeYamlLoad at node
+}
+
+binding unsafeYamlLoad292 {
+  query pattern presenceNode where node.kind == "call" and node.path == "yaml.load_all" and operand(node, where: operand.path == "yaml.UnsafeLoader")
+  emit issue code.UnsafeYamlLoad at node
+}
+
+binding deserialization293 {
+  query pattern callExpr where callee.path ~= "pickle.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization294 {
+  query pattern callExpr where callee.path ~= "pickle.loads"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization295 {
+  query pattern callExpr where callee.path ~= "cPickle.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization296 {
+  query pattern callExpr where callee.path ~= "cPickle.loads"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization297 {
+  query pattern callExpr where callee.path ~= "_pickle.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization298 {
+  query pattern callExpr where callee.path ~= "_pickle.loads"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization299 {
+  query pattern callExpr where callee.path ~= "marshal.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization300 {
+  query pattern callExpr where callee.path ~= "marshal.loads"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization301 {
+  query pattern callExpr where callee.path ~= "dill.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization302 {
+  query pattern callExpr where callee.path ~= "dill.loads"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization303 {
+  query pattern callExpr where callee.path ~= "cloudpickle.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization304 {
+  query pattern callExpr where callee.path ~= "cloudpickle.loads"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization305 {
+  query pattern callExpr where callee.path == "jsonpickle.decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization306 {
+  query pattern callExpr where callee.path ~= "shelve.open"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization307 {
+  query pattern callExpr where callee.path ~= "joblib.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization308 {
+  query pattern callExpr where callee.path ~= "numpy.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization309 {
+  query pattern callExpr where callee.path ~= "pandas.read_pickle"
+  emit sink code.Deserialization at args[0]
+}
+
+binding pickleLoadsJoblibModelLoader310 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "pickle_loads_joblib_model_loader"
+  emit issue code.PickleLoadsJoblibModelLoader at node
+}
+
+binding requestSelectedDeserializationFormat311 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "request_selected_deserialization_format"
+  emit issue code.RequestSelectedDeserializationFormat at node
+}
+
+binding pickleUnsafeImportBlocklistGap312 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "unsafe_imports" and containsAny(node.context.literal, ["runpy", "cProfile", "marshal", "types", "subprocess", "os"]) and not (node.context.literal contains "ctypes")
+  emit issue code.PickleUnsafeImportBlocklistGap at node
+}
+
+binding pickleUnsafeImportBlocklistGap313 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "unsafe_imports" and containsAny(node.context.literal, ["runpy", "cProfile", "marshal", "types", "subprocess", "os"]) and not (node.context.literal contains "pydoc")
+  emit issue code.PickleUnsafeImportBlocklistGap at node
+}
+
+binding serverSideBrowserActiveHtmlRendering314 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "server_side_browser_active_html_js_enabled"
+  emit issue code.ServerSideBrowserActiveHtmlRendering at node
+}
+
+binding serverSideBrowserActiveHtmlRendering315 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "server_side_browser_active_html_fetch_enabled"
+  emit issue code.ServerSideBrowserActiveHtmlRendering at node
+}
+
+binding cinderUnsafeMinidomXmlDeserializer316 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cinder_unsafe_minidom_xml_deserializer"
+  emit issue code.CinderUnsafeMinidomXmlDeserializer at node
+}
+
+binding xmlParse317 {
+  query pattern callExpr where callee.path ~= "etree.parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse318 {
+  query pattern callExpr where callee.path ~= "etree.fromstring"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse319 {
+  query pattern callExpr where callee.path ~= "etree.XML"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse320 {
+  query pattern callExpr where callee.path ~= "lxml.etree.parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse321 {
+  query pattern callExpr where callee.path ~= "lxml.etree.fromstring"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse322 {
+  query pattern callExpr where callee.path ~= "objectify.parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse323 {
+  query pattern callExpr where callee.path ~= "lxml.objectify.parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParserCreate324 {
+  query pattern presenceNode where node.kind == "any" and node.path ~= "etree.XMLParser" and not (containsAny(node.context.callArg, ["etree.XMLParser:resolve_entities=False", "etree.XMLParser:no_network=True"]))
+  emit issue code.XmlParserCreate at node
+}
+
+binding xmlParserCreate325 {
+  query pattern presenceNode where node.kind == "any" and node.path ~= "lxml.etree.XMLParser" and not (containsAny(node.context.callArg, ["lxml.etree.XMLParser:resolve_entities=False", "lxml.etree.XMLParser:no_network=True"]))
+  emit issue code.XmlParserCreate at node
+}
+
+binding xmlParserCreate326 {
+  query pattern presenceNode where node.path ~= "objectify.parse"
+  emit issue code.XmlParserCreate at node
+}
+
+binding xmlParserCreate327 {
+  query pattern presenceNode where node.path ~= "lxml.objectify.parse"
+  emit issue code.XmlParserCreate at node
+}
+
+binding xmlParse328 {
+  query pattern callExpr where callee.path ~= "xml.dom.minidom.parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse329 {
+  query pattern callExpr where callee.path ~= "xml.dom.minidom.parseString"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse330 {
+  query pattern callExpr where callee.path ~= "xml.sax.parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse331 {
+  query pattern callExpr where callee.path ~= "xml.sax.parseString"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse332 {
+  query pattern callExpr where callee.path ~= "ElementTree.parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse333 {
+  query pattern callExpr where callee.path ~= "ElementTree.fromstring"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse334 {
+  query pattern callExpr where callee.path ~= "xmlrpc.client.loads"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse335 {
+  query pattern callExpr where callee.path ~= "xmltodict.parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding urlFetch336 {
+  query pattern callExpr where callee.path ~= "requests.get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch337 {
+  query pattern callExpr where callee.path ~= "requests.post"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch338 {
+  query pattern callExpr where callee.path ~= "requests.put"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch339 {
+  query pattern callExpr where callee.path ~= "requests.delete"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch340 {
+  query pattern callExpr where callee.path ~= "requests.head"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch341 {
+  query pattern callExpr where callee.path ~= "requests.patch"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch342 {
+  query pattern callExpr where callee.path ~= "requests.options"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch343 {
+  query pattern callExpr where callee.path ~= "requests.request"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch344 {
+  query pattern callExpr where callee.path ~= "session.get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch345 {
+  query pattern callExpr where callee.path ~= "session.post"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch346 {
+  query pattern callExpr where callee.path ~= "session.request"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch347 {
+  query pattern callExpr where callee.path ~= "urllib.request.urlopen"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch348 {
+  query pattern callExpr where callee.path ~= "urllib.request.Request"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch349 {
+  query pattern callExpr where callee.path ~= "urllib.urlopen"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch350 {
+  query pattern callExpr where callee.path ~= "urllib2.urlopen"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch351 {
+  query pattern callExpr where callee.path ~= "urllib2.Request"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch352 {
+  query pattern callExpr where callee.path ~= "urllib3.request"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch353 {
+  query pattern callExpr where callee.path ~= "urllib3.ProxyManager"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch354 {
+  query pattern callExpr where callee.path ~= "urllib3.PoolManager"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch355 {
+  query pattern callExpr where callee.path ~= "httpx.get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch356 {
+  query pattern callExpr where callee.path ~= "httpx.post"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch357 {
+  query pattern callExpr where callee.path ~= "httpx.request"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch358 {
+  query pattern callExpr where callee.path ~= "httpx.Client"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch359 {
+  query pattern callExpr where callee.path ~= "httpx.AsyncClient"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch360 {
+  query pattern callExpr where callee.path ~= "httpx.stream"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch361 {
+  query pattern callExpr where callee.path ~= "aiohttp.request"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch362 {
+  query pattern callExpr where callee.path ~= "aiohttp.ClientSession.get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch363 {
+  query pattern callExpr where callee.path ~= "aiohttp.ClientSession.post"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch364 {
+  query pattern callExpr where callee.path ~= "aiohttp.ClientSession"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch365 {
+  query pattern callExpr where callee.path ~= "session.request"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch366 {
+  query pattern callExpr where callee.path ~= "pycurl.Curl"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch367 {
+  query pattern callExpr where callee.path ~= "treq.get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch368 {
+  query pattern callExpr where callee.path ~= "treq.post"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding httpInput369 {
+  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.literal contains "python_review:loop_requests_get_url_without_validation"
+  emit source code.HttpInput at call.result
+}
+
+binding urlFetch370 {
+  query pattern callExpr where callee.analysis ~= "function.context.sink" and args.any.literal contains "python_review:loop_requests_get_url_without_validation"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding trustBoundary371 {
+  query pattern callExpr where callee.path ~= "session.__setitem__"
+  emit sink code.TrustBoundary at args.any
+}
+
+binding responseHeaderWrite372 {
+  query pattern callExpr where callee.path ~= "headers.add"
+  emit sink code.ResponseHeaderWrite at args[1]
+}
+
+binding responseHeaderWrite373 {
+  query pattern callExpr where callee.path ~= "headers.setdefault"
+  emit sink code.ResponseHeaderWrite at args[1]
+}
+
+binding responseHeaderWrite374 {
+  query pattern callExpr where callee.path ~= "set_header"
+  emit sink code.ResponseHeaderWrite at args[1]
+}
+
+binding responseHeaderWrite375 {
+  query pattern callExpr where callee.path ~= "response.set_header"
+  emit sink code.ResponseHeaderWrite at args[1]
+}
+
+binding massAssign376 {
+  query pattern callExpr where callee.path ~= "User.update"
+  emit sink code.MassAssign at args[0]
+}
+
+binding massAssign377 {
+  query pattern callExpr where callee.path ~= "User.objects.create"
+  emit sink code.MassAssign at args.any
+}
+
+binding massAssign378 {
+  query pattern callExpr where callee.path ~= "Model.objects.create"
+  emit sink code.MassAssign at args.any
+}
+
+binding massAssign379 {
+  query pattern callExpr where callee.path ~= "serializer.save"
+  emit sink code.MassAssign at args.any
+}
+
+binding massAssign380 {
+  query pattern callExpr where callee.analysis ~= "function.context.sink" and args.any.literal contains "class_bases=serializers.ModelSerializer" and args.any.literal contains "fields" and args.any.literal contains "is_superuser" and args.any.literal contains "validated_data" and args.any.literal contains "objects.create" and not args.any.literal contains "pop('is_superuser'" and not args.any.literal contains "pop(\"is_superuser\""
+  emit sink code.MassAssign at args[0]
+}
+
+binding massAssign381 {
+  query pattern callExpr where callee.analysis ~= "function.context.sink" and args.any.literal contains "class_bases=serializers.ModelSerializer" and args.any.literal contains "fields" and args.any.literal contains "is_superuser" and args.any.literal contains "validated_data" and args.any.literal contains "super().update" and not args.any.literal contains "pop('is_superuser'" and not args.any.literal contains "pop(\"is_superuser\""
+  emit sink code.MassAssign at args[0]
+}
+
+binding filePathAccess382 {
+  query pattern callExpr where callee.path ~= "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess383 {
+  query pattern callExpr where callee.path ~= "io.open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess384 {
+  query pattern callExpr where callee.path ~= "os.open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess385 {
+  query pattern callExpr where callee.path ~= "codecs.open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess386 {
+  query pattern callExpr where callee.analysis ~= "function.context.sink" and args.any.context.name contains "get_filename_for_event_id" and args.any.literal contains "event_id" and args.any.literal contains "os.path.join" and args.any.literal contains "INGEST_STORE_BASE_DIR" and not args.any.literal contains "uuid.UUID(event_id).hex"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess387 {
+  query pattern callExpr where callee.analysis ~= "function.context.sink" and args.any.context.name contains "get_text" and args.any.literal contains "toc_item.name.decode('utf-8')" and args.any.literal contains "open(os.path.join(output_dir,toc_item.name.decode('utf-8')),'wb')" and not args.any.literal contains "get_safe_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess388 {
+  query pattern callExpr where callee.analysis ~= "function.context.sink" and args.any.context.name contains "get_image" and args.any.literal contains "toc_item.name.decode('utf-8')" and args.any.literal contains "open(os.path.join(output_dir,toc_item.name.decode('utf-8')),'wb')" and not args.any.literal contains "get_safe_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding dynamicCodeLoad389 {
+  query pattern callExpr where callee.path ~= "__import__"
+  emit sink code.DynamicCodeLoad at args[0]
+}
+
+binding dynamicCodeLoad390 {
+  query pattern callExpr where callee.path ~= "importlib.import_module"
+  emit sink code.DynamicCodeLoad at args[0]
+}
+
+binding dynamicCodeLoad391 {
+  query pattern callExpr where callee.path ~= "imp.load_source"
+  emit sink code.DynamicCodeLoad at args[0]
+}
+
+binding dynamicCodeLoad392 {
+  query pattern callExpr where callee.path ~= "SourceFileLoader"
+  emit sink code.DynamicCodeLoad at args[0]
+}
+
+binding filePathAccess393 {
+  query pattern callExpr where callee.path ~= "os.remove"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess394 {
+  query pattern callExpr where callee.path ~= "os.unlink"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess395 {
+  query pattern callExpr where callee.path ~= "os.rename"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess396 {
+  query pattern callExpr where callee.path ~= "os.replace"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess397 {
+  query pattern callExpr where callee.path ~= "os.makedirs"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess398 {
+  query pattern callExpr where callee.path ~= "os.mkdir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess399 {
+  query pattern callExpr where callee.path ~= "os.rmdir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess400 {
+  query pattern callExpr where callee.path ~= "shutil.copy"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess401 {
+  query pattern callExpr where callee.path ~= "shutil.copyfile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess402 {
+  query pattern callExpr where callee.path ~= "shutil.move"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess403 {
+  query pattern callExpr where callee.path ~= "shutil.rmtree"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess404 {
+  query pattern callExpr where callee.path ~= "send_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess405 {
+  query pattern callExpr where callee.path ~= "send_from_directory"
+  emit sink code.FilePathAccess at args[1]
+}
+
+binding filePathAccess406 {
+  query pattern callExpr where callee.path ~= "FileResponse"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess407 {
+  query pattern callExpr where callee.path ~= "StaticFileResponse"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess408 {
+  query pattern callExpr where callee.path ~= "django.views.static.serve"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess409 {
+  query pattern callExpr where callee.path ~= "aiofiles.open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess410 {
+  query pattern callExpr where callee.path ~= "flask.send_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess411 {
+  query pattern callExpr where callee.path ~= "zipfile.ZipFile.extractall"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess412 {
+  query pattern callExpr where callee.path ~= "tarfile.open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding archiveEntryWrite413 {
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding archiveEntryWrite414 {
+  query pattern callExpr where callee.method == "extractall"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding filePathAccess415 {
+  query pattern callExpr where callee.path ~= "os.path.exists"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess416 {
+  query pattern callExpr where callee.path ~= "os.path.isfile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess417 {
+  query pattern callExpr where callee.path ~= "os.path.isdir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess418 {
+  query pattern callExpr where callee.path ~= "os.path.islink"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess419 {
+  query pattern callExpr where callee.path ~= "os.path.getsize"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess420 {
+  query pattern callExpr where callee.path ~= "os.stat"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess421 {
+  query pattern callExpr where callee.path ~= "os.lstat"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess422 {
+  query pattern callExpr where callee.path ~= "os.scandir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess423 {
+  query pattern callExpr where callee.path ~= "os.listdir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess424 {
+  query pattern callExpr where callee.path ~= "fileinput.FileInput"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding unsafeUpload425 {
+  query pattern callExpr where callee.path ~= "uploaded_file.save"
+  emit sink code.UnsafeUpload at args[0]
+}
+
+binding unsafeUpload426 {
+  query pattern callExpr where callee.path ~= "file.save"
+  emit sink code.UnsafeUpload at args[0]
+}
+
+binding unsafeUpload427 {
+  query pattern callExpr where callee.path ~= "werkzeug.datastructures.FileStorage.save"
+  emit sink code.UnsafeUpload at args[0]
+}
+
+binding filePathAccess428 {
+  query pattern callExpr where callee.method == "exists"
+  emit sink code.FilePathAccess at callee.receiver
+}
+
+binding filePathAccess429 {
+  query pattern callExpr where callee.method == "is_file"
+  emit sink code.FilePathAccess at callee.receiver
+}
+
+binding filePathAccess430 {
+  query pattern callExpr where callee.method == "is_dir"
+  emit sink code.FilePathAccess at callee.receiver
+}
+
+binding filePathAccess431 {
+  query pattern callExpr where callee.method == "read_text"
+  emit sink code.FilePathAccess at callee.receiver
+}
+
+binding filePathAccess432 {
+  query pattern callExpr where callee.method == "read_bytes"
+  emit sink code.FilePathAccess at callee.receiver
+}
+
+binding filePathAccess433 {
+  query pattern callExpr where callee.method == "write_text"
+  emit sink code.FilePathAccess at callee.receiver
+}
+
+binding filePathAccess434 {
+  query pattern callExpr where callee.method == "write_bytes"
+  emit sink code.FilePathAccess at callee.receiver
+}
+
+binding filePathAccess435 {
+  query pattern callExpr where callee.method == "iterdir"
+  emit sink code.FilePathAccess at callee.receiver
+}
+
+binding filePathAccess436 {
+  query pattern callExpr where callee.method == "unlink"
+  emit sink code.FilePathAccess at callee.receiver
+}
+
+binding htmlRender437 {
+  query pattern callExpr where callee.path ~= "render_template_string"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender438 {
+  query pattern callExpr where callee.path ~= "flask.render_template_string"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender439 {
+  query pattern callExpr where callee.analysis ~= "function.context.sink" and args.any.literal contains "python_review:traceback_format_exc_pre_unescaped"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender440 {
+  query pattern callExpr where callee.analysis ~= "function.context.sink" and args.any.literal contains "python_review:traceback_format_exc_html_unescaped"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlSanitizerLogicReview441 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "html_sanitizer_missing_rcdata_escape"
+  emit issue code.HtmlSanitizerLogicReview at node
+}
+
+binding unescapedHtmlOptionRenderer442 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unescaped_html_option_renderer"
+  emit issue code.UnescapedHtmlOptionRenderer at node
+}
+
+binding unescapedDocsOpenapiUrl443 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unescaped_docs_openapi_url"
+  emit issue code.UnescapedDocsOpenapiUrl at node
+}
+
+binding unescapedDocsOpenapiUrl444 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unescaped_docs_openapi_url"
+  emit issue code.UnescapedDocsOpenapiUrl at node
+}
+
+binding unsafeWatchUrlProtocol445 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unsafe_watch_url_protocol"
+  emit issue code.UnsafeWatchUrlProtocol at node
+}
+
+binding cowAgentMemoryFilenameTraversal446 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cowagent_memory_filename_traversal"
+  emit issue code.CowAgentMemoryFilenameTraversal at node
+}
+
+binding cherryPySessionIdFilePathTraversal447 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cherrypy_session_id_file_path_traversal"
+  emit issue code.CherryPySessionIdFilePathTraversal at node
+}
+
+binding codeRedProtectedMediaPathTraversal448 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "codered_protected_media_path_traversal"
+  emit issue code.CodeRedProtectedMediaPathTraversal at node
+}
+
+binding relativeOnlyFilenameValidation449 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "relative_only_filename_validation"
+  emit issue code.RelativeOnlyFilenameValidation at node
+}
+
+binding mimeSubtypeFileExtensionPathTraversal450 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "mime_subtype_file_extension_path_traversal"
+  emit issue code.MimeSubtypeFileExtensionPathTraversal at node
+}
+
+binding copypartyCprStaticPathTraversal451 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "copyparty_cpr_static_path_traversal"
+  emit issue code.CopypartyCprStaticPathTraversal at node
+}
+
+binding publicUploadChunkPathTraversal452 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.name, ["Chunk", "chunk"]) and containsAny(node.context.literal, ["/api/uploadChunked/public", "/uploadChunked/public"]) and node.context.callPath contains "request.form.get" and node.context.literal contains "checkSum" and node.context.callPath contains "os.path.join" and node.context.callPath contains "open" and not (node.context.callPath contains "re.sub") and not (node.context.callPath contains "os.path.realpath.startswith")
+  emit issue code.PublicUploadChunkPathTraversal at node
+}
+
+binding internalServiceUrlPathTraversal453 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "internal_service_url_path_traversal"
+  emit issue code.InternalServiceUrlPathTraversal at node
+}
+
+binding chatterBotSqlalchemySessionPoolExhaustion454 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "chatterbot_sqlalchemy_session_pool_exhaustion_init"
+  emit issue code.ChatterBotSqlalchemySessionPoolExhaustion at node
+}
+
+binding chatterBotSqlalchemySessionPoolExhaustion455 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "chatterbot_sqlalchemy_session_pool_exhaustion_filter"
+  emit issue code.ChatterBotSqlalchemySessionPoolExhaustion at node
+}
+
+binding unboundedRouteFilenameCacheAccess456 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.decoratorMethod contains "route" and containsAny(node.context.paramName, ["file_name", "filename", "camera_name", "path"]) and containsAny(node.context.callPath, ["secure_filename", "werkzeug.utils.secure_filename"]) and node.context.callPath contains "os.path.join" and containsAny(node.context.identifier, ["CACHE_DIR", "cache_dir", "preview_dir"]) and not (containsAny(node.context.expr, ["len(file_name)>1000", "len(file_name)>=1000", "1000<len(file_name)", "1000<=len(file_name)", "len(filename)>1000", "len(filename)>=1000", "1000<len(filename)", "1000<=len(filename)"]))
+  emit issue code.UnboundedRouteFilenameCacheAccess at node
+}
+
+binding checkmkPendingChangeTextUnescapeXss457 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "checkmk_pending_change_text_unescape_xss"
+  emit issue code.CheckmkPendingChangeTextUnescapeXss at node
+}
+
+binding collectiveContactWidgetTitleXss458 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "collective_contact_widget_title_xss"
+  emit issue code.CollectiveContactWidgetTitleXss at node
+}
+
+binding htmlRender459 {
+  query pattern callExpr where callee.analysis ~= "function.return" and args.any.context.decoratorMethod contains "get" and args.any.literal contains "<" and not args.any.literal contains "abort" and not args.any.literal contains "jsonify" and not args.any.literal contains "redirect" and not args.any.literal contains "render_template" and not args.any.literal contains "render_template_string" and not args.any.literal contains "send_file" and not args.any.literal contains "send_from_directory" and not args.any.literal contains "url_for" and not args.any.literal contains "FileResponse" and not args.any.literal contains "Response" and not args.any.literal contains "HttpResponse" and not args.any.literal contains "make_response"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender460 {
+  query pattern callExpr where callee.analysis ~= "function.return" and args.any.context.decoratorMethod contains "post" and args.any.literal contains "<" and not args.any.literal contains "abort" and not args.any.literal contains "jsonify" and not args.any.literal contains "redirect" and not args.any.literal contains "render_template" and not args.any.literal contains "render_template_string" and not args.any.literal contains "send_file" and not args.any.literal contains "send_from_directory" and not args.any.literal contains "url_for" and not args.any.literal contains "FileResponse" and not args.any.literal contains "Response" and not args.any.literal contains "HttpResponse" and not args.any.literal contains "make_response"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender461 {
+  query pattern callExpr where callee.analysis ~= "function.return" and args.any.context.decoratorMethod contains "put" and args.any.literal contains "<" and not args.any.literal contains "abort" and not args.any.literal contains "jsonify" and not args.any.literal contains "redirect" and not args.any.literal contains "render_template" and not args.any.literal contains "render_template_string" and not args.any.literal contains "send_file" and not args.any.literal contains "send_from_directory" and not args.any.literal contains "url_for" and not args.any.literal contains "FileResponse" and not args.any.literal contains "Response" and not args.any.literal contains "HttpResponse" and not args.any.literal contains "make_response"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender462 {
+  query pattern callExpr where callee.analysis ~= "function.return" and args.any.context.decoratorMethod contains "delete" and args.any.literal contains "<" and not args.any.literal contains "abort" and not args.any.literal contains "jsonify" and not args.any.literal contains "redirect" and not args.any.literal contains "render_template" and not args.any.literal contains "render_template_string" and not args.any.literal contains "send_file" and not args.any.literal contains "send_from_directory" and not args.any.literal contains "url_for" and not args.any.literal contains "FileResponse" and not args.any.literal contains "Response" and not args.any.literal contains "HttpResponse" and not args.any.literal contains "make_response"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender463 {
+  query pattern callExpr where callee.analysis ~= "function.return" and args.any.context.decoratorMethod contains "patch" and args.any.literal contains "<" and not args.any.literal contains "abort" and not args.any.literal contains "jsonify" and not args.any.literal contains "redirect" and not args.any.literal contains "render_template" and not args.any.literal contains "render_template_string" and not args.any.literal contains "send_file" and not args.any.literal contains "send_from_directory" and not args.any.literal contains "url_for" and not args.any.literal contains "FileResponse" and not args.any.literal contains "Response" and not args.any.literal contains "HttpResponse" and not args.any.literal contains "make_response"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender464 {
+  query pattern callExpr where callee.analysis ~= "function.return" and args.any.context.decoratorMethod contains "head" and args.any.literal contains "<" and not args.any.literal contains "abort" and not args.any.literal contains "jsonify" and not args.any.literal contains "redirect" and not args.any.literal contains "render_template" and not args.any.literal contains "render_template_string" and not args.any.literal contains "send_file" and not args.any.literal contains "send_from_directory" and not args.any.literal contains "url_for" and not args.any.literal contains "FileResponse" and not args.any.literal contains "Response" and not args.any.literal contains "HttpResponse" and not args.any.literal contains "make_response"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender465 {
+  query pattern callExpr where callee.analysis ~= "function.return" and args.any.context.decoratorMethod contains "options" and args.any.literal contains "<" and not args.any.literal contains "abort" and not args.any.literal contains "jsonify" and not args.any.literal contains "redirect" and not args.any.literal contains "render_template" and not args.any.literal contains "render_template_string" and not args.any.literal contains "send_file" and not args.any.literal contains "send_from_directory" and not args.any.literal contains "url_for" and not args.any.literal contains "FileResponse" and not args.any.literal contains "Response" and not args.any.literal contains "HttpResponse" and not args.any.literal contains "make_response"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender466 {
+  query pattern callExpr where callee.analysis ~= "function.return" and args.any.context.decoratorMethod contains "route" and not args.any.literal contains "abort" and not args.any.literal contains "jsonify" and not args.any.literal contains "redirect" and not args.any.literal contains "render_template" and not args.any.literal contains "render_template_string" and not args.any.literal contains "send_file" and not args.any.literal contains "send_from_directory" and not args.any.literal contains "url_for" and not args.any.literal contains "FileResponse" and not args.any.literal contains "Response" and not args.any.literal contains "HttpResponse" and not args.any.literal contains "make_response"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender467 {
+  query pattern callExpr where callee.analysis ~= "function.return" and args.any.context.decoratorMethod contains "websocket" and not args.any.literal contains "abort" and not args.any.literal contains "jsonify" and not args.any.literal contains "redirect" and not args.any.literal contains "render_template" and not args.any.literal contains "render_template_string" and not args.any.literal contains "send_file" and not args.any.literal contains "send_from_directory" and not args.any.literal contains "url_for" and not args.any.literal contains "FileResponse" and not args.any.literal contains "Response" and not args.any.literal contains "HttpResponse" and not args.any.literal contains "make_response"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender468 {
+  query pattern callExpr where callee.analysis ~= "function.return" and args.any.context.decoratorMethod contains "api_route" and args.any.literal contains "<" and not args.any.literal contains "abort" and not args.any.literal contains "jsonify" and not args.any.literal contains "redirect" and not args.any.literal contains "render_template" and not args.any.literal contains "render_template_string" and not args.any.literal contains "send_file" and not args.any.literal contains "send_from_directory" and not args.any.literal contains "url_for" and not args.any.literal contains "FileResponse" and not args.any.literal contains "Response" and not args.any.literal contains "HttpResponse" and not args.any.literal contains "make_response"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender469 {
+  query pattern callExpr where callee.path ~= "make_response"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender470 {
+  query pattern callExpr where callee.path ~= "Response" and not args.any.literal contains "text/plain" and not args.any.literal contains "application/json"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender471 {
+  query pattern callExpr where callee.path ~= "HttpResponse"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender472 {
+  query pattern callExpr where callee.path ~= "HttpResponseBadRequest"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender473 {
+  query pattern callExpr where callee.path ~= "Markup"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender474 {
+  query pattern callExpr where callee.path ~= "markupsafe.Markup"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender475 {
+  query pattern callExpr where callee.path ~= "mark_safe"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender476 {
+  query pattern callExpr where callee.path ~= "django.utils.safestring.mark_safe"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender477 {
+  query pattern callExpr where callee.path ~= "format_html"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender478 {
+  query pattern callExpr where callee.path ~= "jinja2.Template"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender479 {
+  query pattern callExpr where callee.path ~= "Template.render"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender480 {
+  query pattern callExpr where callee.path ~= "mako.template.Template"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender481 {
+  query pattern callExpr where callee.path ~= "Environment.from_string"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding templateRender482 {
+  query pattern callExpr where callee.path ~= "Template"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender483 {
+  query pattern callExpr where callee.path ~= "jinja2.Template"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender484 {
+  query pattern callExpr where callee.path ~= "jinja2.Environment.from_string"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender485 {
+  query pattern callExpr where callee.path ~= "mako.template.Template"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender486 {
+  query pattern callExpr where callee.path ~= "Environment.from_string"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender487 {
+  query pattern callExpr where callee.path ~= "render_template_string"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender488 {
+  query pattern callExpr where callee.path ~= "flask.render_template_string"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding incompleteTemplateValidation489 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "incomplete_template_validation"
+  emit issue code.IncompleteTemplateValidation at node
+}
+
+binding incompleteTemplateValidation490 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "incomplete_template_validation"
+  emit issue code.IncompleteTemplateValidation at node
+}
+
+binding incompleteTemplateValidation491 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "incomplete_template_validation"
+  emit issue code.IncompleteTemplateValidation at node
+}
+
+binding incompleteTemplateValidation492 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "incomplete_template_validation"
+  emit issue code.IncompleteTemplateValidation at node
+}
+
+binding incompleteTemplateValidation493 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "jinja_environment_without_sandbox"
+  emit issue code.IncompleteTemplateValidation at node
+}
+
+binding unparameterizedSqlQueryParser494 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unparameterized_sql_query_parser"
+  emit issue code.UnparameterizedSqlQueryParser at node
+}
+
+binding unparameterizedSqlQueryParser495 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unparameterized_sql_query_parser"
+  emit issue code.UnparameterizedSqlQueryParser at node
+}
+
+binding unparameterizedSqlQueryParser496 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unparameterized_sql_query_parser"
+  emit issue code.UnparameterizedSqlQueryParser at node
+}
+
+binding unvalidatedSqlIdentifierInterpolation497 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unvalidated_sql_identifier_interpolation"
+  emit issue code.UnvalidatedSqlIdentifierInterpolation at node
+}
+
+binding unparameterizedSqlExportStringBuilder498 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.callPath contains "cur.execute" and containsAny(node.context.identifier, ["creation_list", "values_list", "insert_list", "insert_query"]) and containsAny(node.context.identifier, ["plugin", "table", "col_names", "columns"]) and not (containsAny(node.context.callPath, ["sql.Identifier", "sql.Literal", "sql.Placeholder"])) and not (containsAny(node.context.callPath, ["cur.executemany", "execute_values", "execute_batch"]))
+  emit issue code.UnparameterizedSqlExportStringBuilder at node
+}
+
+binding ambiguousQueryParameterSeparator499 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "ambiguous_query_parameter_separator"
+  emit issue code.AmbiguousQueryParameterSeparator at node
+}
+
+binding unvalidatedChoiceControlField500 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unvalidated_choice_control_field"
+  emit issue code.UnvalidatedChoiceControlField at node
+}
+
+binding protocolStateReview501 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "starttls_transport_buffer_handoff"
+  emit issue code.ProtocolStateReview at node
+}
+
+binding protocolStateReview502 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "asyncssh_pre_auth_packet_dispatch"
+  emit issue code.ProtocolStateReview at node
+}
+
+binding redirectTarget503 {
+  query pattern callExpr where callee.path ~= "redirect"
+  emit sink code.RedirectTargetSink at args[0]
+}
+
+binding redirectTarget504 {
+  query pattern callExpr where callee.path ~= "flask.redirect"
+  emit sink code.RedirectTargetSink at args[0]
+}
+
+binding redirectTarget505 {
+  query pattern callExpr where callee.path ~= "HttpResponseRedirect"
+  emit sink code.RedirectTargetSink at args[0]
+}
+
+binding redirectTarget506 {
+  query pattern callExpr where callee.path ~= "django.shortcuts.redirect"
+  emit sink code.RedirectTargetSink at args[0]
+}
+
+binding redirectTarget507 {
+  query pattern callExpr where callee.path ~= "starlette.responses.RedirectResponse"
+  emit sink code.RedirectTargetSink at args[0]
+}
+
+binding redirectTarget508 {
+  query pattern callExpr where callee.path ~= "RedirectResponse"
+  emit sink code.RedirectTargetSink at args[0]
+}
+
+binding ldapQuery509 {
+  query pattern callExpr where callee.path ~= "ldap.search"
+  emit sink code.LdapQuery at args[0]
+}
+
+binding ldapQuery510 {
+  query pattern callExpr where callee.path ~= "ldap.search_s"
+  emit sink code.LdapQuery at args[0]
+}
+
+binding ldapQuery511 {
+  query pattern callExpr where callee.path ~= "ldap.search_ext"
+  emit sink code.LdapQuery at args[0]
+}
+
+binding ldapQuery512 {
+  query pattern callExpr where callee.path ~= "ldap3.Connection.search"
+  emit sink code.LdapQuery at args[1]
+}
+
+binding ldapQuery513 {
+  query pattern callExpr where callee.path ~= "connection.search"
+  emit sink code.LdapQuery at args[1]
+}
+
+binding ldapQuery514 {
+  query pattern callExpr where callee.path ~= "conn.search"
+  emit sink code.LdapQuery at args[1]
+}
+
+binding nosqlQuery515 {
+  query pattern callExpr where callee.path ~= "collection.find"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery516 {
+  query pattern callExpr where callee.path ~= "collection.find_one"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery517 {
+  query pattern callExpr where callee.path ~= "db.eval"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery518 {
+  query pattern callExpr where callee.path ~= "collection.where"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery519 {
+  query pattern callExpr where callee.path ~= "find"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery520 {
+  query pattern callExpr where callee.path ~= "aggregate"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding objectLookupByUserInput521 {
+  query pattern callExpr where callee.method == "get_user"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput522 {
+  query pattern callExpr where callee.method == "get_account"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput523 {
+  query pattern callExpr where callee.method == "get_order"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput524 {
+  query pattern callExpr where callee.method == "find_by_id"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput525 {
+  query pattern callExpr where callee.method == "get_by_id"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding frappeLinkExpansionMissingReadPermission526 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "frappe_link_expansion_missing_read_permission"
+  emit issue code.FrappeLinkExpansionMissingReadPermission at node
+}
+
+binding ownedResourceDeleteMissingOwnershipCheck527 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "owned_resource_delete_missing_ownership_check"
+  emit issue code.OwnedResourceDeleteMissingOwnershipCheck at node
+}
+
+binding objectLookupByUserInput528 {
+  query pattern callExpr where callee.analysis ~= "function.context.sink" and args.any.context.name contains "generate_auth_token" and args.any.literal contains "RemoteAuthToken.user_id==user_id" and args.any.literal contains "auth_token.user_id=user_id" and not args.any.literal contains "current_user.id!=user_id"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput529 {
+  query pattern callExpr where callee.analysis ~= "function.context.sink" and args.any.context.name contains "delete_auth_token" and args.any.literal contains "RemoteAuthToken.user_id==user_id" and args.any.literal contains "delete()" and not args.any.literal contains "current_user.id!=user_id"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding xpathQuery530 {
+  query pattern callExpr where callee.method == "xpath"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding xpathQuery531 {
+  query pattern callExpr where callee.path ~= "etree.XPath"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding xpathQuery532 {
+  query pattern callExpr where callee.path ~= "XPath"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding xpathQuery533 {
+  query pattern callExpr where callee.path ~= "elementpath.select"
+  emit sink code.XpathQuery at args[1]
+}
+
+binding xpathQuery534 {
+  query pattern callExpr where callee.path ~= "elementpath.iter_select"
+  emit sink code.XpathQuery at args[1]
+}
+
+binding shellEscape535 {
+  query pattern callExpr where callee.path ~= "shlex.quote"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding pathCanonicalization536 {
+  query pattern callExpr where callee.path ~= "os.path.basename"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding xpathEscape537 {
+  query pattern callExpr where callee.path ~= "xpath_literal"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding shellEscape538 {
+  query pattern callExpr where callee.path ~= "pipes.quote"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape539 {
+  query pattern callExpr where callee.path ~= "html.escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape540 {
+  query pattern callExpr where callee.path ~= "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape541 {
+  query pattern callExpr where callee.path ~= "cgi.escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape542 {
+  query pattern callExpr where callee.path ~= "escape_for_html"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape543 {
+  query pattern callExpr where callee.path ~= "markupsafe.escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape544 {
+  query pattern callExpr where callee.path ~= "bleach.clean"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape545 {
+  query pattern callExpr where callee.path ~= "django.utils.html.escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding safeDeserialization546 {
+  query pattern callExpr where callee.path ~= "yaml.safe_load"
+  emit check core.SafeDeserialization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding ldapEscape547 {
+  query pattern callExpr where callee.path ~= "ldap.filter.escape_filter_chars"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding ldapEscape548 {
+  query pattern callExpr where callee.path ~= "ldap3.utils.conv.escape_filter_chars"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding pathAccessCheck549 {
+  query pattern callExpr where callee.method == "startswith" and args.any.literal contains "os.sep"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding pathAccessCheck550 {
+  query pattern callExpr where callee.analysis ~= "path.access_check" and args.any.literal contains "path.resolve.parents"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding pathAccessCheck551 {
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.context.name contains "get_or_launch" and args.any.literal contains "SAFE_SEED_RE.match(seed)" and args.any.literal contains "os.path.join(self._data_dir,seed_key)"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding pathCanonicalization552 {
+  query pattern callExpr where callee.method == "relative_to"
+  emit check core.PathCanonicalization at callee.receiver {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding pathAccessCheck553 {
+  query pattern callExpr where callee.method == "relative_to"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding pathAccessCheck554 {
+  query pattern callExpr where callee.path ~= "SAFE_SEED_RE.match"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding pathAccessCheck555 {
+  query pattern presenceNode where node.kind == "binop" and node.path == "__binop.in" and operand(node, where: operand.path == "__object_literal")
+  emit check core.PathAccessCheck at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}
+
+binding packageVersionSpecifierValidationReview562 {
+  query pattern presenceNode where node.scope == "module" and node.context.pythonReview == "package_version_specifier_validation_review"
+  emit issue code.PackageVersionSpecifierValidationReview at node
+}
+
+binding regexCompile563 {
+  query pattern callExpr where callee.path ~= "re.compile"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding regexCompile564 {
+  query pattern callExpr where callee.path ~= "re.match"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding regexCompile565 {
+  query pattern callExpr where callee.path ~= "re.search"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding regexCompile566 {
+  query pattern callExpr where callee.path ~= "re.sub"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding regexCompile567 {
+  query pattern callExpr where callee.path ~= "re.findall"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding catastrophicRegex568 {
+  query pattern callExpr where callee.path ~= "re.match" and args.any.literal contains "+/?)+"
+  emit sink code.CatastrophicRegexSink at args[0]
+  emit issue code.CatastrophicRegex at call
+}
+
+binding catastrophicRegex569 {
+  query pattern callExpr where callee.path ~= "re.match" and args.any.literal contains "(\\w+=[\\w,]+;?)*" and args.any.literal contains "(\\w+=\\w+;?)*"
+  emit sink code.CatastrophicRegexSink at args[0]
+  emit issue code.CatastrophicRegex at call
+}
+
+binding catastrophicRegex570 {
+  query pattern callExpr where callee.path ~= "re.compile" and args.any.literal contains "[ \\n\\r\\t]*(.+?)[ \\n\\r\\t]*"
+  emit sink code.CatastrophicRegexSink at args[0]
+  emit issue code.CatastrophicRegex at call
+}
+
+binding catastrophicRegex571 {
+  query pattern callExpr where callee.path ~= "re.compile" and args.any.literal contains "[^@]+(?:\\.[^@]+)*"
+  emit sink code.CatastrophicRegexSink at args[0]
+  emit issue code.CatastrophicRegex at call
+}
+
+binding weakHash572 {
+  query pattern presenceNode where node.path ~= "hashlib.md5"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash573 {
+  query pattern presenceNode where node.path ~= "hashlib.sha1"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash574 {
+  query pattern presenceNode where node.path ~= "hashlib.md4"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash575 {
+  query pattern presenceNode where node.path ~= "hashlib.md2"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash576 {
+  query pattern callExpr where callee.path ~= "hashlib.new" and args.any.literal contains "md5"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash577 {
+  query pattern callExpr where callee.path ~= "hashlib.new" and args.any.literal contains "md4"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash578 {
+  query pattern callExpr where callee.path ~= "hashlib.new" and args.any.literal contains "md2"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash579 {
+  query pattern callExpr where callee.path ~= "hashlib.new" and args.any.literal contains "sha1"
+  emit issue code.WeakHash at call
+}
+
+binding insecurePermission580 {
+  query pattern callExpr where callee.path ~= "os.chmod" and args.any.literal contains "0o777"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission581 {
+  query pattern callExpr where callee.path ~= "os.chmod" and args.any.literal contains "0o666"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission582 {
+  query pattern callExpr where callee.path ~= "os.fchmod" and args.any.literal contains "0o777"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission583 {
+  query pattern callExpr where callee.path ~= "os.fchmod" and args.any.literal contains "0o666"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission584 {
+  query pattern callExpr where callee.path ~= "os.open" and args.any.literal contains "0o777"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission585 {
+  query pattern callExpr where callee.path ~= "os.open" and args.any.literal contains "0o666"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission586 {
+  query pattern callExpr where callee.path ~= "Path.chmod" and args.any.literal contains "0o777"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission587 {
+  query pattern callExpr where callee.method == "mkdir" and args.any.literal contains "parents=True" and args.any.literal contains "exist_ok=True" and not (args.any.literal contains "mode=")
+  emit issue code.InsecurePermission at call
+}
+
+binding resourceHandle588 {
+  query pattern presenceNode where node.path ~= "socket.socket"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}
+
+binding resourceRelease589 {
+  query pattern callExpr where callee.method == "close"
+  emit check core.ResourceRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding weakRandomValue590 {
+  query pattern presenceNode where node.path ~= "random.random"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue591 {
+  query pattern presenceNode where node.path ~= "random.randint"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue592 {
+  query pattern presenceNode where node.path ~= "random.randrange"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue593 {
+  query pattern presenceNode where node.path ~= "random.getrandbits"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue594 {
+  query pattern presenceNode where node.path ~= "random.randbytes"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue595 {
+  query pattern presenceNode where node.path ~= "random.choice"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue596 {
+  query pattern presenceNode where node.path ~= "random.choices"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue597 {
+  query pattern presenceNode where node.path ~= "random.sample"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue598 {
+  query pattern presenceNode where node.path ~= "random.uniform"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue599 {
+  query pattern presenceNode where node.path ~= "random.normalvariate"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue600 {
+  query pattern presenceNode where node.path ~= "random.gauss"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue601 {
+  query pattern presenceNode where node.path ~= "random.betavariate"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue602 {
+  query pattern presenceNode where node.path ~= "random.gammavariate"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue603 {
+  query pattern presenceNode where node.path ~= "random.expovariate"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue604 {
+  query pattern presenceNode where node.path ~= "random.lognormvariate"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue605 {
+  query pattern presenceNode where node.path ~= "random.paretovariate"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue606 {
+  query pattern presenceNode where node.path ~= "random.weibullvariate"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue607 {
+  query pattern presenceNode where node.path ~= "random.vonmisesvariate"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue608 {
+  query pattern presenceNode where node.path ~= "random.triangular"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue609 {
+  query pattern presenceNode where node.path ~= "random.shuffle"
+  emit issue code.WeakRandomValue at node
+}
+
+binding csrfDisabled610 {
+  query pattern presenceNode where node.path ~= "csrf_exempt"
+  emit issue code.CsrfDisabled at node
+}
+
+binding cobblerDjangoStateChangeGetCsrf611 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cobbler_get_state_change_without_post" and not (node.context.decoratorPath contains "require_POST")
+  emit issue code.CobblerDjangoStateChangeGetCsrf at node
+}
+
+binding cobblerDjangoStateChangeGetCsrf612 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cobbler_get_state_change_without_post" and not (node.context.decoratorPath contains "require_POST")
+  emit issue code.CobblerDjangoStateChangeGetCsrf at node
+}
+
+binding cobblerDjangoStateChangeGetCsrf613 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cobbler_get_state_change_without_post" and not (node.context.decoratorPath contains "require_POST")
+  emit issue code.CobblerDjangoStateChangeGetCsrf at node
+}
+
+binding cobblerDjangoStateChangeGetCsrf614 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cobbler_get_state_change_without_post" and not (node.context.decoratorPath contains "require_POST")
+  emit issue code.CobblerDjangoStateChangeGetCsrf at node
+}
+
+binding cobblerDjangoStateChangeGetCsrf615 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cobbler_get_state_change_without_post" and not (node.context.decoratorPath contains "require_POST")
+  emit issue code.CobblerDjangoStateChangeGetCsrf at node
+}
+
+binding csvCell616 {
+  query pattern callExpr where callee.method == "writerow"
+  emit sink code.CsvCell at args[0]
+  emit sink code.CsvCell at args[0].collection
+}
+
+binding csvCell617 {
+  query pattern callExpr where callee.method == "writerows"
+  emit sink code.CsvCell at args[0].collection
+}
+
+binding commandExecution618 {
+  query pattern callExpr where callee.path ~= "subprocess.Popen" and args.any.literal contains "shell=True"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding weakCipher618 {
+  query pattern presenceNode where node.path ~= "DES.new"
+  emit issue code.WeakCipher at node
+}
+
+binding weakCipher619 {
+  query pattern presenceNode where node.path ~= "ARC4.new"
+  emit issue code.WeakCipher at node
+}
+
+binding weakCipher620 {
+  query pattern presenceNode where node.path ~= "Blowfish.new"
+  emit issue code.WeakCipher at node
+}
+
+binding weakCipher621 {
+  query pattern presenceNode where node.path ~= "DES3.new"
+  emit issue code.WeakCipher at node
+}
+
+binding weakCipher622 {
+  query pattern callExpr where callee.path == "AES.new" and not args.any.literal contains "MODE_"
+  emit issue code.WeakCipher at call
+}
+
+binding weakCipher623 {
+  query pattern presenceNode where node.path ~= "AES.MODE_ECB"
+  emit issue code.WeakCipher at node
+}
+
+binding weakCipher624 {
+  query pattern presenceNode where node.path ~= "DES.MODE_ECB"
+  emit issue code.WeakCipher at node
+}
+
+binding weakCipher625 {
+  query pattern presenceNode where node.path ~= "DES3.MODE_ECB"
+  emit issue code.WeakCipher at node
+}
+
+binding weakCipher626 {
+  query pattern presenceNode where node.path ~= "modes.ECB"
+  emit issue code.WeakCipher at node
+}
+
+binding staticIv627 {
+  query pattern callExpr where callee.path ~= "AES.new" and args.any.literal contains "0000000000000000"
+  emit issue code.StaticIv at call
+}
+
+binding staticIv628 {
+  query pattern callExpr where callee.path ~= "DES3.new" and args.any.literal contains "00000000"
+  emit issue code.StaticIv at call
+}
+
+binding staticIv629 {
+  query pattern callExpr where callee.path ~= "Cipher" and args.any.literal contains "0000000000000000"
+  emit issue code.StaticIv at call
+}
+
+binding staticIv630 {
+  query pattern callExpr where callee.path ~= "IvParameterSpec" and args.any.literal contains "0000000000000000"
+  emit issue code.StaticIv at call
+}
+
+binding insecureTempFile631 {
+  query pattern presenceNode where node.path ~= "tempfile.mktemp"
+  emit issue code.InsecureTempFile at node
+}
+
+binding insecureTempFile632 {
+  query pattern callExpr where callee.path ~= "os.path.join" and args.any.literal contains "/var/tmp/"
+  emit issue code.InsecureTempFile at call
+}
+
+binding insecureTempFile633 {
+  query pattern callExpr where callee.path ~= "open" and args.any.literal contains "/tmp/" and args.any.literal contains "w"
+  emit issue code.InsecureTempFile at call
+}
+
+binding insecureTempFile634 {
+  query pattern callExpr where callee.path ~= "open" and args.any.literal contains "/var/tmp/" and args.any.literal contains "w"
+  emit issue code.InsecureTempFile at call
+}
+
+binding insecureTempFile635 {
+  query pattern callExpr where callee.path ~= "open" and args.any.literal contains ".lxc-attach-script" and args.any.literal contains "w"
+  emit issue code.InsecureTempFile at call
+}
+
+binding insecureTempFile636 {
+  query pattern callExpr where callee.path ~= "open" and args.any.literal contains "lxc-attach-script.log" and args.any.literal contains "a"
+  emit issue code.InsecureTempFile at call
+}
+
+binding insecureTempFile637 {
+  query pattern callExpr where callee.path ~= "open" and args.any.literal contains "lxc-attach-script.err" and args.any.literal contains "a"
+  emit issue code.InsecureTempFile at call
+}
+
+binding certValidationDisabled638 {
+  query pattern callExpr where callee.path ~= "requests" and args.any.literal contains "verify=False"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding certValidationDisabled639 {
+  query pattern callExpr where callee.path ~= "httpx" and args.any.literal contains "verify=False"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding certValidationDisabled640 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cert_validation_disabled_tls_fallback"
+  emit issue code.CertValidationDisabled at node
+}
+
+binding jwtUnverified641 {
+  query pattern callExpr where callee.path ~= "jwt.decode" and args.any.literal contains "algorithms=none"
+  emit issue code.JwtUnverified at call
+}
+
+binding jwtUnverified642 {
+  query pattern callExpr where callee.path ~= "jwt.decode" and args.any.literal contains "verify_signature=False"
+  emit issue code.JwtUnverified at call
+}
+
+binding jwtUnverified643 {
+  query pattern callExpr where callee.path ~= "jwt.decode" and args.any.literal contains "verify=False"
+  emit issue code.JwtUnverified at call
+}
+
+binding jwtUnverified644 {
+  query pattern callExpr where callee.path ~= "jwt.encode" and args.any.literal contains "algorithm=none"
+  emit issue code.JwtUnverified at call
+}
+
+binding weakJwtSecret645 {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "jwt.encode" and containsAny(node.context.callArg, ["secret", "jwt-secret", "change-me", "changeme", "password"])
+  emit issue code.WeakJwtSecret at node
+}
+
+binding weakJwtSecret646 {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "jwt.decode" and containsAny(node.context.callArg, ["secret", "jwt-secret", "change-me", "changeme", "password"])
+  emit issue code.WeakJwtSecret at node
+}
+
+binding headerControlledJwkReview647 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "header_controlled_jwk"
+  emit issue code.HeaderControlledJwkReview at node
+}
+
+binding headerControlledJwkReview648 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "header_controlled_jwk"
+  emit issue code.HeaderControlledJwkReview at node
+}
+
+binding configExposureReview649 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "config_exposure_without_api_redaction"
+  emit issue code.ConfigExposureReview at node
+}
+
+binding cleartextChannel650 {
+  query pattern callExpr where callee.path ~= "requests" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding cleartextChannel651 {
+  query pattern callExpr where callee.path ~= "httpx" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding cleartextChannel652 {
+  query pattern callExpr where callee.path ~= "urllib.request.urlopen" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding insecureCookie653 {
+  query pattern callExpr where callee.path ~= "set_cookie" and args.any.literal contains "httponly=False"
+  emit issue code.InsecureCookie at call
+}
+
+binding insecureCookie654 {
+  query pattern callExpr where callee.path ~= "set_cookie" and args.any.literal contains "secure=False"
+  emit issue code.InsecureCookie at call
+}
+
+binding permissiveCors655 {
+  query pattern callExpr where callee.path ~= "headers.add" and args.any.literal contains "Access-Control-Allow-Origin" and args.any.literal contains "*"
+  emit issue code.PermissiveCors at call
+}
+
+binding permissiveCors656 {
+  query pattern callExpr where callee.path ~= "CORS" and args.any.literal contains "origins=*"
+  emit issue code.PermissiveCors at call
+}
+
+binding permissiveCors657 {
+  query pattern callExpr where callee.path ~= "cross_origin" and args.any.literal contains "origins=*"
+  emit issue code.PermissiveCors at call
+}
+
+binding missingFrameProtection658 {
+  query pattern callExpr where callee.path ~= "headers.add" and args.any.literal contains "X-Frame-Options" and args.any.literal contains "ALLOWALL"
+  emit issue code.MissingFrameProtection at call
+}
+
+binding missingFrameProtection659 {
+  query pattern callExpr where callee.path ~= "headers.setdefault" and args.any.literal contains "X-Frame-Options" and args.any.literal contains "ALLOWALL"
+  emit issue code.MissingFrameProtection at call
+}
+
+binding pathAccessCheck662 {
+  query pattern callExpr where callee.path ~= "SHA256_REGEX.match"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding archiveEntryRawPrefixContainment663 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "archive_entry_raw_prefix_containment"
+  emit issue code.ArchiveEntryRawPrefixContainment at node
+}
+
+binding rsaPkcs1v15DecryptErrorOracle664 {
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "rsa_pkcs1v15_decrypt_error_oracle"
+  emit issue code.RsaPkcs1v15DecryptErrorOracle at node
+}
+
+binding hardcodedBase64Secret665 {
+  query pattern callExpr where callee.path ~= "base64.b64decode" and args.any.literal contains "=="
+  emit issue code.HardcodedSecret at call
+}
+
+binding terminalCharacterRejection674 {
+  query pattern callExpr where callee.path ~= "analysis.validation.character_rejection"
+    and call.filter.global == true
+  emit check threat.CharFilter at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding hardcodedSecretLiteral675 {
+  query pattern callExpr where callee.analysis ~= "secret.hardcoded"
+  emit issue code.HardcodedSecretLiteral at call
+}
+
+binding debugEnabled676 {
+  query pattern callExpr where callee.analysis ~= "config.debug_on"
+  emit issue code.DebugEnabled at call
+}
+
+binding insecureHeaderConfig677 {
+  query pattern callExpr where callee.analysis ~= "config.insecure_header"
+  emit issue code.InsecureHeaderConfig at call
+}
+
+binding catastrophicRegex678 {
+  query pattern callExpr where callee.analysis ~= "dos.catastrophic_regex"
+  emit issue code.CatastrophicRegex at call
+}
+
+binding plaintextPasswordStorage679 {
+  query pattern callExpr where callee.analysis ~= "storage.plaintext_password"
+  emit issue code.PlaintextPasswordStorage at call
+}
+
+binding dynamicSqlQuery680 {
+  query pattern callExpr where callee.analysis ~= "injection.dynamic_sql"
+  emit issue code.DynamicSqlQuery at call
+}
+
+binding sensitiveDataInLog681 {
+  query pattern callExpr where callee.analysis ~= "disclosure.sensitive_log"
+  emit issue code.SensitiveDataInLog at call
+}
+
+binding sensitiveDataInResponse682 {
+  query pattern callExpr where callee.analysis ~= "disclosure.sensitive_response"
+  emit issue code.SensitiveDataInResponse at call
+}
+
+binding errorDetailDisclosure683 {
+  query pattern callExpr where callee.analysis ~= "disclosure.error_detail"
+  emit issue code.ErrorDetailDisclosure at call
+}
+
+binding debugInfoExposure684 {
+  query pattern callExpr where callee.analysis ~= "disclosure.debug_info"
+  emit issue code.DebugInfoExposure at call
+}
+
+binding rawHtmlResponse685 {
+  query pattern callExpr where callee.analysis ~= "xss.raw_html_response"
+  emit issue code.RawHtmlResponse at call
+}
+
+binding dataExposureSmell686 {
+  query pattern callExpr where callee.analysis ~= "smell.data_exposure"
+  emit issue code.DataExposureSmell at call
+}
+
+binding weakAuthzSmell687 {
+  query pattern callExpr where callee.analysis ~= "smell.weak_authz"
+  emit issue code.WeakAuthzSmell at call
+}
+
+binding userEnumSmell688 {
+  query pattern callExpr where callee.analysis ~= "smell.user_enum"
+  emit issue code.UserEnumSmell at call
+}
+
+binding businessLogicSmell689 {
+  query pattern callExpr where callee.analysis ~= "smell.business_logic"
+  emit issue code.BusinessLogicSmell at call
+}
+
+binding debugMediaExposure690 {
+  query pattern callExpr where callee.analysis ~= "debug.media_exposure"
+  emit issue code.DebugMediaExposure at call
+}
+
+binding dynamicCommandExec691 {
+  query pattern callExpr where callee.analysis ~= "injection.dynamic_command"
+  emit issue code.DynamicCommandExec at call
+}
+
+binding stateChangeSmell692 {
+  query pattern callExpr where callee.analysis ~= "smell.state_change"
+  emit sink code.StateChangeSmell at args[0]
+}
+
+binding massAssignmentSink693 {
+  query pattern callExpr where callee.analysis ~= "access.mass_assign"
+  emit sink code.MassAssignmentSink at args[0]
+}
+
+binding clientControlledSecurityDecision694 {
+  query pattern callExpr where callee.analysis ~= "access.role_marker_compare"
+  emit sink code.ClientControlledSecurityDecision at args[0]
+}
+
+binding ownershipCheck695 {
+  query pattern callExpr where callee.analysis ~= "ownership.check"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding httpInput696 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "field" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls" and not args.any.context.paramName contains "info" and not args.any.context.paramName contains "_info" and not args.any.context.paramName contains "root" and not args.any.context.paramName contains "parent" and not args.any.context.paramName contains "_"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput697 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "mutation" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls" and not args.any.context.paramName contains "info" and not args.any.context.paramName contains "_info" and not args.any.context.paramName contains "root" and not args.any.context.paramName contains "parent" and not args.any.context.paramName contains "_"
+  emit source code.HttpInput at call.result
+}
+
+binding objectAccessSmell698 {
+  query pattern callExpr where callee.path ~= "session.get"
+  emit sink code.ObjectAccessSmell at args[0]
+}
+
+binding objectAccessSmell699 {
+  query pattern callExpr where callee.path ~= "query.one"
+  emit sink code.ObjectAccessSmell at args[0]
+}
+
+binding objectAccessSmell700 {
+  query pattern callExpr where callee.path ~= "objects.get"
+  emit sink code.ObjectAccessSmell at args[0]
+}
+
+binding objectAccessSmell701 {
+  query pattern callExpr where callee.path ~= "query.filter_by"
+  emit sink code.ObjectAccessSmell at args[0]
+}
+
+binding massAssignmentSink702 {
+  query pattern callExpr where callee.path ~= "objects.create"
+  emit sink code.MassAssignmentSink at args[0]
+}
+
+binding massAssignmentSink703 {
+  query pattern callExpr where callee.path ~= "objects.update"
+  emit sink code.MassAssignmentSink at args[0]
+}
+
+binding urlFetch704 {
+  query pattern callExpr where callee.path ~= "urllib.request.urlretrieve"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding objectLookupByUserInput705 {
+  query pattern callExpr where callee.path ~= "objects.get"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput706 {
+  query pattern callExpr where callee.path ~= "objects.filter"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput707 {
+  query pattern callExpr where callee.path ~= "objects.get_or_create"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput708 {
+  query pattern callExpr where callee.path ~= "query.get"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput709 {
+  query pattern callExpr where callee.path ~= "query.filter_by"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput710 {
+  query pattern callExpr where callee.path ~= "query.get_or_404"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectAccessSmell711 {
+  query pattern callExpr where callee.method == "get_object_or_404"
+  emit sink code.ObjectAccessSmell at args[0]
+}
+
+binding massAssignmentSink712 {
+  query pattern callExpr where callee.method == "setattr"
+  emit sink code.MassAssignmentSink at args[0]
+}
+
+binding nosqlQuery713 {
+  query pattern callExpr where callee.method == "count_documents"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding objectLookupByUserInput714 {
+  query pattern callExpr where callee.method == "get_object_or_404"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput715 {
+  query pattern callExpr where callee.method == "get_list_or_404"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding ownershipCheck716 {
+  query pattern callExpr where callee.method == "can_access"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck717 {
+  query pattern callExpr where callee.method == "can_view"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck718 {
+  query pattern callExpr where callee.method == "can_edit"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck719 {
+  query pattern callExpr where callee.method == "can_delete"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck720 {
+  query pattern callExpr where callee.method == "can_access_document"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck721 {
+  query pattern callExpr where callee.method == "has_object_permission"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck722 {
+  query pattern callExpr where callee.method == "get_object_or_403"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck723 {
+  query pattern callExpr where callee.method == "check_object_permissions"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck724 {
+  query pattern callExpr where callee.method == "verify_owner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck725 {
+  query pattern callExpr where callee.method == "ensure_owner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck726 {
+  query pattern callExpr where callee.method == "is_accessible_by"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck727 {
+  query pattern callExpr where callee.path ~= "_can_view"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck728 {
+  query pattern callExpr where callee.path ~= "_is_owner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck729 {
+  query pattern callExpr where callee.path ~= "_visible_to"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck730 {
+  query pattern callExpr where callee.path ~= "_belongs_to"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding rateLimitCheck731 {
+  query pattern callExpr where callee.method == "ratelimit"
+  emit check code.RateLimitCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding rateLimitCheck732 {
+  query pattern callExpr where callee.method == "throttle"
+  emit check code.RateLimitCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding rateLimitCheck733 {
+  query pattern callExpr where callee.method == "limiter"
+  emit check code.RateLimitCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding rateLimitCheck734 {
+  query pattern callExpr where callee.path ~= "throttle_classes"
+  emit check code.RateLimitCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding rateLimitCheck735 {
+  query pattern callExpr where callee.path ~= "RateLimiter"
+  emit check code.RateLimitCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding rateLimitCheck736 {
+  query pattern callExpr where callee.path ~= "@limits"
+  emit check code.RateLimitCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding rateLimitRequiredOp737 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "name=login"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp738 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "name=do_login"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp739 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "name=signin"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp740 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "name=register"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp741 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "name=signup"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp742 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "name=password_reset"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp743 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "name=password_reset_request"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp744 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "name=reset_password"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp745 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "name=forgot_password"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp746 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "name=authenticate"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp747 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "route_path:/login"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp748 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "route_path:/signin"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp749 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "route_path:/register"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp750 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "route_path:/signup"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp751 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "route_path:password-reset"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp752 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "route_path:password_reset"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp753 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "route_path:reset-password"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp754 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "route_path:forgot-password"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp755 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "route_path:/token"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp756 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "route_path:/otp"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp757 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "route_path:/mfa"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp758 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "route_path:/2fa"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding rateLimitRequiredOp759 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "route_path:verify-email"
+  emit issue code.RateLimitRequiredOp at node
+}
+
+binding csrfDisabledSink760 {
+  query pattern presenceNode where node.analysis ~= "parameter.entry" and node.token contains "decorator_method:csrf_exempt"
+  emit issue code.CsrfDisabledSink at node
+}
+
+binding csrfDisabledSink761 {
+  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "csrf_exempt"
+  emit issue code.CsrfDisabledSink at node
+}
+
+binding insecureCookieFlag762 {
+  query pattern presenceNode where node.method == "set_cookie" and not (node.token contains "secure=True") and not (node.token contains "secure = True") and not (node.token contains "secure':True") and not (node.token contains "secure': True")
+  emit issue code.InsecureCookieFlag at node
+}
+
+binding unverifiedJwt763 {
+  query pattern presenceNode where node.path ~= "jwt.decode" and node.token contains "verify_signature"
+  emit issue code.UnverifiedJwt at node
+}
+
+binding unverifiedJwt764 {
+  query pattern presenceNode where node.path ~= "jwt.decode" and node.token contains "none"
+  emit issue code.UnverifiedJwt at node
+}
+
+binding weakHash765 {
+  query pattern presenceNode where node.path ~= "Crypto.Hash.MD5.new"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash766 {
+  query pattern presenceNode where node.path ~= "Crypto.Hash.SHA1.new"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash767 {
+  query pattern presenceNode where node.path ~= "Crypto.Hash.SHA.new"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash768 {
+  query pattern presenceNode where node.path ~= "Crypto.Hash.MD4.new"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash769 {
+  query pattern presenceNode where node.path ~= "Crypto.Hash.MD2.new"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash770 {
+  query pattern presenceNode where node.path ~= "MD5.new"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash771 {
+  query pattern presenceNode where node.path ~= "SHA1.new"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash772 {
+  query pattern presenceNode where node.path ~= "SHA.new"
+  emit issue code.WeakHash at node
+}
+
+binding hardcodedSecret773 {
+  query pattern presenceNode where node.method == "connect" and node.token contains "password"
+  emit issue code.HardcodedSecret at node
+}
+
+binding incompleteTemplateValidation774 {
+  query pattern presenceNode where node.analysis == "function.context" and node.token contains "Formatter().parse" and node.token contains "." and not (node.token contains "format_spec")
+  emit issue code.IncompleteTemplateValidation at node
+}
+
+binding incompleteTemplateValidation775 {
+  query pattern presenceNode where node.analysis == "function.context" and node.token contains "Formatter().parse" and node.token contains "[" and not (node.token contains "format_spec")
+  emit issue code.IncompleteTemplateValidation at node
+}
+
+binding incompleteTemplateValidation776 {
+  query pattern presenceNode where node.analysis == "function.context" and node.token contains "Formatter().parse" and node.token contains "." and node.token contains "format_spec" and not (node.token contains "{") and not (node.token contains "}")
+  emit issue code.IncompleteTemplateValidation at node
+}
+
+binding incompleteTemplateValidation777 {
+  query pattern presenceNode where node.analysis == "function.context" and node.token contains "Formatter().parse" and node.token contains "[" and node.token contains "format_spec" and not (node.token contains "{") and not (node.token contains "}")
+  emit issue code.IncompleteTemplateValidation at node
+}
+
+binding unparameterizedSqlQueryParser778 {
+  query pattern presenceNode where node.analysis == "function.context" and node.token contains "name=parse" and node.token contains "query_expr.parseString" and node.token contains "repr(" and node.token contains ".replace(" and node.token contains "__default_field__" and node.token contains "ILIKE"
+  emit issue code.UnparameterizedSqlQueryParser at node
+}
+
+binding unparameterizedSqlQueryParser779 {
+  query pattern presenceNode where node.analysis == "function.context" and node.token contains "name=parse" and node.token contains "query_expr.parseString" and node.token contains "repr(" and node.token contains ".replace(" and node.token contains "__default_field__" and node.token contains "::jsonb"
+  emit issue code.UnparameterizedSqlQueryParser at node
+}
+
+binding unparameterizedSqlQueryParser780 {
+  query pattern presenceNode where node.analysis == "function.context" and node.token contains "name=parse" and node.token contains "query_expr.parseString" and node.token contains "repr(" and node.token contains ".replace(" and node.token contains "__default_field__" and node.token contains "=ANY("
+  emit issue code.UnparameterizedSqlQueryParser at node
+}
+
+binding ambiguousQueryParameterSeparator781 {
+  query pattern presenceNode where node.analysis == "function.context" and node.token contains "name=_parse_qsl" and node.token contains "qs.replace(';','&').split('&')"
+  emit issue code.AmbiguousQueryParameterSeparator at node
+}
+
+binding protocolStateReview782 {
+  query pattern presenceNode where node.analysis == "function.context" and node.token contains "_original_transport" and node.token contains "_reader._transport" and node.token contains "_writer._transport" and not (node.token contains "_reader._buffer.clear")
+  emit issue code.ProtocolStateReview at node
+}
+
+binding protocolStateReview783 {
+  query pattern presenceNode where node.analysis == "function.context" and node.token contains "name=_recv_packet" and node.token contains "MSG_USERAUTH_LAST" and node.token contains "process_packet(pkttype,seq,packet" and not (node.token contains "Invalid request received before")
+  emit issue code.ProtocolStateReview at node
+}
+
+binding htmlRender784 {
+  query pattern callExpr where callee.path ~= "HTMLResponse"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding unsafeUpload784 {
+  query pattern callExpr where callee.method == "save"
+  emit sink code.UnsafeUpload at args.any
+}
+
+// Python stdlib XML parsers (xml.sax / xml.dom.minidom) do NOT resolve external
+// entities by default — expat only does so once feature_external_ges is enabled
+// via setFeature(...). So a make_parser() with no setFeature call anywhere in the
+// enclosing scope is a *hardened* (safe) parser. This mirrors the lxml hardening
+// (resolve_entities=False) but for the inverted stdlib default. Without it every
+// stdlib parse is a false-positive XXE. lxml/objectify are unaffected (no make_parser).
+binding xmlHardeningPySaxSafeDefault900 {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "make_parser" and not (containsAny(node.context.scopeCall, ["setFeature"]))
+  emit check core.XmlHardening at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}
+
+// OWASP "plain string literal" guard:
+//   if not bar.startswith("'") or not bar.endswith("'") or "'" in bar[1:-1]: return
+// Anything that is not a bare single-quoted literal is rejected before eval/exec/compile,
+// so only a quoted string literal is ever evaluated (it returns a string, runs no code).
+// Anchor CodeExecutionValidation at the startswith() call, which dominates the sink via the
+// early return; the paired endswith() in scope distinguishes this from an unrelated prefix
+// check. No codeinj true-positive in the corpus uses startswith/endswith -> adds no FNs.
+binding codeExecValidationPyQuotedLiteral901 {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "startswith" and containsAny(node.context.scopeCall, ["endswith"])
+  emit check core.CodeExecutionValidation at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}

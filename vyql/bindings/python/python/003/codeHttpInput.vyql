@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding httpInput3 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "delete" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls"
-  emit source code.HttpInput at call.result
-}

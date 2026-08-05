@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding unescapedSessionFlash72 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "unescaped_session_flash_message"
-  emit issue code.UnescapedSessionFlash at node
-}

@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding logOutput383 {
-  query pattern callExpr where callee.path ~= "logger.warn"
-  emit sink code.LogOutput at args.any
-}

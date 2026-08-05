@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding unboundedCopy29 {
-  query pattern callExpr where callee.path ~= "vsprintf"
-  emit sink code.UnboundedCopy at args.any
-}

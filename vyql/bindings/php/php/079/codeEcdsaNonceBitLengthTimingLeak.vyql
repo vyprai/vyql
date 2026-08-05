@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding ecdsaNonceBitLengthTimingLeak79 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "sign" and node.context.phpReview == "ecdsa_nonce_bit_length_timing_leak"
-  emit issue code.EcdsaNonceBitLengthTimingLeak at node
-}

@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding htmlRender406 {
-  query pattern callExpr where callee.path ~= "dangerouslySetInnerHTML"
-  emit sink code.HtmlRender at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding urlFetch82 {
-  query pattern callExpr where callee.method == "dataTaskWithURL"
-  emit sink code.UrlFetch at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.bash.generated.mb6f991a5;
-
-binding filePathAccess15 {
-  requires {
-    dependency("coreutils")
-  }
-  query pattern callExpr where callee.path ~= "cat"
-  emit sink code.FilePathAccess at args.any
-}

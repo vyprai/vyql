@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1457a768;
-
-binding httpInput4 {
-  requires {
-    dependency("spark-kotlin")
-  }
-  query pattern callExpr where callee.method == "param" and callee.receiver.type == "Request"
-  emit source code.HttpInput at call.result
-}

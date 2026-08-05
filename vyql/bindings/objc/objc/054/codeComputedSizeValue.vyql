@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding computedSizeValue54 {
-  query pattern callExpr where callee.path ~= "__binop.mul"
-  emit source code.ComputedSizeValue at call.result
-}

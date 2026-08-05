@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding insecurePermission133 {
-  query pattern callExpr where callee.path ~= "Permissions.from_mode" and args.any.literal contains "0o666"
-  emit issue code.InsecurePermission at call
-}

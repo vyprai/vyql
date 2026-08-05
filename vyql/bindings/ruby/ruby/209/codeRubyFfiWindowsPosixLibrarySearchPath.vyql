@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding rubyFfiWindowsPosixLibrarySearchPath209 {
-  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "FFI.DynamicLibrary.open" and node.context.language == "ruby" and node.context.functionName contains "ffi_lib" and node.context.callPath contains "File.exist?" and node.context.literal contains "/usr/lib/" and node.context.literal contains "/usr/local/lib/" and not (node.context.callPath contains "FFI.Platform.windows?")
-  emit issue code.RubyFfiWindowsPosixLibrarySearchPath at node
-}

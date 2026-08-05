@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding templateRender436 {
-  query pattern callExpr where callee.path ~= "Handlebars.compile"
-  emit sink code.TemplateRender at args[0]
-}

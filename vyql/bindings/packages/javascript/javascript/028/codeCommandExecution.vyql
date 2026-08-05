@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m5c270092;
-
-binding commandExecution28 {
-  requires {
-    dependency("execa")
-  }
-  query pattern callExpr where callee.path ~= "execa.command"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding xmlParse171 {
-  query pattern callExpr where callee.path ~= "xmlReadDoc"
-  emit sink code.XmlParse at args[0]
-}

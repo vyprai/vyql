@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding stdinInput0 {
-  query pattern callExpr where callee.path ~= "System.console.readLine"
-  emit source code.StdinInput at call.result
-}

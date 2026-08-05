@@ -1,0 +1,357 @@
+module bindings.ruby.generated.m5895bccf;
+
+binding httpInput0 {
+  requires {
+    dependency("rails")
+  }
+  query pattern callExpr where callee.path ~= "params"
+  emit source code.HttpInput at call.result
+}
+
+binding templateRender1 {
+  requires {
+    dependency("rails")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding redirectAllowlist2 {
+  requires {
+    dependency("rails")
+  }
+  query pattern callExpr where callee.path ~= "redirect_back_or_to"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding csrfProtection3 {
+  requires {
+    dependency("rails")
+  }
+  query pattern callExpr where callee.path ~= "protect_from_forgery"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding httpInput4 {
+  requires {
+    dependency("rack")
+  }
+  query pattern callExpr where callee.path ~= "request.params"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  requires {
+    dependency("rack")
+  }
+  query pattern callExpr where callee.path ~= "env"
+  emit source code.HttpInput at call.result
+}
+
+binding secretValue6 {
+  requires {
+    dependency("dotenv")
+  }
+  query pattern callExpr where callee.path ~= "ENV"
+  emit source code.SecretValue at call.result
+}
+
+binding externalApiResponse7 {
+  requires {
+    dependency("faraday")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source code.ExternalApiResponse at call.result
+}
+
+binding urlFetch8 {
+  requires {
+    dependency("faraday")
+  }
+  query pattern callExpr where callee.path ~= "Faraday.get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding sqlExecution9 {
+  requires {
+    dependency("activerecord")
+  }
+  query pattern callExpr where callee.method == "find_by_sql"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution10 {
+  requires {
+    dependency("activerecord")
+  }
+  query pattern callExpr where callee.method == "where"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlParameterization11 {
+  requires {
+    dependency("activerecord")
+  }
+  query pattern callExpr where callee.path ~= "sanitize_sql_array"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding sqlExecution12 {
+  requires {
+    dependency("pg")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution13 {
+  requires {
+    dependency("mysql2")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding nosqlQuery14 {
+  requires {
+    dependency("mongo")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding commandExecution15 {
+  requires {
+    dependency("ruby")
+  }
+  query pattern callExpr where callee.path ~= "system"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding codeEval16 {
+  requires {
+    dependency("ruby")
+  }
+  query pattern callExpr where callee.path ~= "eval"
+  emit sink code.CodeEval at args[0]
+}
+
+binding deserialization17 {
+  requires {
+    dependency("ruby")
+  }
+  query pattern callExpr where callee.path ~= "Marshal.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess18 {
+  requires {
+    dependency("ruby")
+  }
+  query pattern callExpr where callee.path ~= "File.read"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding regexCompile19 {
+  requires {
+    dependency("ruby")
+  }
+  query pattern callExpr where callee.path ~= "Regexp.new"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding pathCanonicalization20 {
+  requires {
+    dependency("ruby")
+  }
+  query pattern callExpr where callee.path ~= "File.expand_path"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding commandExecution21 {
+  requires {
+    dependency("open3")
+  }
+  query pattern callExpr where callee.path ~= "Open3.capture3"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding deserialization22 {
+  requires {
+    dependency("psych")
+  }
+  query pattern callExpr where callee.path ~= "YAML.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding safeDeserialization23 {
+  requires {
+    dependency("psych")
+  }
+  query pattern callExpr where callee.path ~= "YAML.safe_load"
+  emit check core.SafeDeserialization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding archiveEntryWrite24 {
+  requires {
+    dependency("rubyzip")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding urlFetch25 {
+  requires {
+    dependency("httparty")
+  }
+  query pattern callExpr where callee.path ~= "HTTParty.get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding xmlParse26 {
+  requires {
+    dependency("nokogiri")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xpathQuery27 {
+  requires {
+    dependency("nokogiri")
+  }
+  query pattern callExpr where callee.method == "xpath"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding xmlHardening28 {
+  requires {
+    dependency("nokogiri")
+  }
+  query pattern callExpr where callee.path ~= "Nokogiri.XML" and args.any.literal contains "NONET"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding ldapQuery29 {
+  requires {
+    dependency("net-ldap")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.LdapQuery at args[1]
+}
+
+binding ldapEscape30 {
+  requires {
+    dependency("net-ldap")
+  }
+  query pattern callExpr where callee.path ~= "ldap_escape"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape31 {
+  requires {
+    dependency("erb")
+  }
+  query pattern callExpr where callee.path ~= "ERB.Util.html_escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape32 {
+  requires {
+    dependency("cgi")
+  }
+  query pattern callExpr where callee.path ~= "CGI.escapeHTML"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape33 {
+  requires {
+    dependency("rails-html-sanitizer")
+  }
+  query pattern callExpr where callee.method == "sanitize"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding shellEscape34 {
+  requires {
+    dependency("shellwords")
+  }
+  query pattern callExpr where callee.path ~= "Shellwords.escape"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding authenticationCheck35 {
+  requires {
+    dependency("devise")
+  }
+  query pattern callExpr where callee.method == "authenticate_user!"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck36 {
+  requires {
+    dependency("pundit")
+  }
+  query pattern callExpr where callee.method == "authorize"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

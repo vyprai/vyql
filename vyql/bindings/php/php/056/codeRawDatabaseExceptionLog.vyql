@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding rawDatabaseExceptionLog56 {
-  query pattern presenceNode where node.kind == "call" and node.path == "$error.getMessage" and node.flowTo.path ~= "fwrite" and not (node.flowTo.path ~= "str_replace")
-  emit issue code.RawDatabaseExceptionLog at node
-}

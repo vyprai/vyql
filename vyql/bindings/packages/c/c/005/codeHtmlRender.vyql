@@ -1,9 +1,0 @@
-module bindings.c.generated.m2816daee;
-
-binding htmlRender5 {
-  requires {
-    dependency("libc")
-  }
-  query pattern callExpr where callee.path ~= "fwrite"
-  emit sink code.HtmlRender at args[0]
-}

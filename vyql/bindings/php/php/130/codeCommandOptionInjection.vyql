@@ -1,7 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding commandOptionInjection130 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "gpg_option_arg_missing_delimiter_list_keys"
-  emit issue code.CommandOptionInjection at node
-  emit sink code.CommandOptionInjectionSink at node
-}

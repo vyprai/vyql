@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding jenkinsRemoteValidationMissingPermission226 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doTestDynatraceConnection" and node.context.annotation contains "RequirePOST" and node.context.call contains "DynatraceClient" and node.context.call contains "getSystemProfiles" and not (node.context.scopeCall contains "checkPermission") and not (node.context.scopeCall contains "hasPermission")
-  emit issue code.JenkinsRemoteValidationMissingPermission at node
-}

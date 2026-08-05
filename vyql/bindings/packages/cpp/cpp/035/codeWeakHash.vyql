@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m1c1357ee;
-
-binding weakHash35 {
-  requires {
-    dependency("openssl")
-  }
-  query pattern presenceNode where node.path ~= "EVP_sha1"
-  emit issue code.WeakHash at node
-}

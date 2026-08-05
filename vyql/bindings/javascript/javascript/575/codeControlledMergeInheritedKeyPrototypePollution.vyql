@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding controlledMergeInheritedKeyPrototypePollution575 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.forIn == "true" and node.context.dynamicPropertyWriteFromSubscript == "true" and node.context.dynamicPropertyWriteFromCall == "true" and node.context.callPath contains "clone" and not (node.context.callPath contains "Object.getOwnPropertyNames") and not (node.context.ownPropertyKeyGuard == "true")
-  emit issue code.ControlledMergeInheritedKeyPrototypePollution at node
-}

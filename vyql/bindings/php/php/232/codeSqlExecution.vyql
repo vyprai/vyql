@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding sqlExecution232 {
-  query pattern callExpr where callee.path ~= "DB.raw"
-  emit sink code.SqlExecution at args[0]
-}

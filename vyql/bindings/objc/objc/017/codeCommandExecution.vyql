@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding commandExecution17 {
-  query pattern callExpr where callee.method == "launch"
-  emit sink code.CommandExecution at args[0]
-}

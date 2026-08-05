@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding httpInput2 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.methodAttribute contains "HttpGet"
-  emit source code.HttpInput at call.result
-}

@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding weakHash143 {
-  query pattern presenceNode where node.path ~= "EVP_sha1"
-  emit issue code.WeakHash at node
-}

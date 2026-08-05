@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding logOutput198 {
-  query pattern callExpr where callee.path ~= "logging.info"
-  emit sink code.LogOutput at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.swift.generated.m388f23d0;
-
-binding cliArgument0 {
-  query pattern callExpr where callee.path ~= "CommandLine.arguments"
-  emit source code.CliArgument at call.result
-}

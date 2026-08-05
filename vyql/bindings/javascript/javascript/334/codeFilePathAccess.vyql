@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding filePathAccess334 {
-  query pattern callExpr where callee.path ~= "fs.readdir"
-  emit sink code.FilePathAccess at args[0]
-}

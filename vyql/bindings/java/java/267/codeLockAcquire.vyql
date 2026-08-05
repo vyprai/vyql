@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding lockAcquire267 {
-  query pattern callExpr where callee.method == "lock"
-  emit issue code.LockAcquire at call
-}

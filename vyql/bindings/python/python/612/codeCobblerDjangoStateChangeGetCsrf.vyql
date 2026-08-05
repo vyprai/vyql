@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding cobblerDjangoStateChangeGetCsrf612 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cobbler_get_state_change_without_post" and not (node.context.decoratorPath contains "require_POST")
-  emit issue code.CobblerDjangoStateChangeGetCsrf at node
-}

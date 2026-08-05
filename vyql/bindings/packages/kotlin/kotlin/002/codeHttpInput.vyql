@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1457a768;
-
-binding httpInput2 {
-  requires {
-    dependency("ktor-server-core")
-  }
-  query pattern callExpr where callee.method == "queryParameters" and callee.receiver.type == "ApplicationRequest"
-  emit source code.HttpInput at call.result
-}

@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding sessionStoredRedirectTarget75 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "determineTargetUrl" and node.context.classBase contains "SimpleUrlAuthenticationSuccessHandler" and node.context.callPath contains "session.getAttribute" and node.context.identifier contains "targetUrlSessionAttribute" and node.context.callPath contains "targetUrl.substring" and not (node.context.callPath contains "Util.isSafeToRedirectTo")
-  emit issue code.SessionStoredRedirectTarget at node
-}

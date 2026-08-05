@@ -1,6 +1,0 @@
-module bindings.kotlin.generated.m304d1620;
-
-binding httpInput0 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "GetMapping"
-  emit source code.HttpInput at call.result
-}

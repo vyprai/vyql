@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding basicAuthStreamAuthBypass248 {
-  query pattern callExpr where callee.path == "Options" and args.any.literal contains "BasicAuthEnabled" and args.any.literal contains "Creds" and not args.any.literal contains "AuthRequired"
-  emit issue code.BasicAuthStreamAuthBypass at node
-}

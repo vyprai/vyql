@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding insecureCookieFlag762 {
-  query pattern presenceNode where node.method == "set_cookie" and not (node.token contains "secure=True") and not (node.token contains "secure = True") and not (node.token contains "secure':True") and not (node.token contains "secure': True")
-  emit issue code.InsecureCookieFlag at node
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.mc6005d88;
-
-binding urlFetch12 {
-  requires {
-    dependency("Foundation")
-  }
-  query pattern callExpr where callee.path ~= "URLSession.shared.dataTask"
-  emit sink code.UrlFetch at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding httpInput11 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.functionName contains "resolve_" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls" and not args.any.context.paramName contains "info" and not args.any.context.paramName contains "root" and not args.any.context.paramName contains "parent" and not args.any.context.paramName contains "_"
-  emit source code.HttpInput at call.result
-}

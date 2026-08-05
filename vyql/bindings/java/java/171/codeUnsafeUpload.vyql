@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding unsafeUpload171 {
-  query pattern callExpr where callee.method == "transferTo"
-  emit sink code.UnsafeUpload at args[0]
-}

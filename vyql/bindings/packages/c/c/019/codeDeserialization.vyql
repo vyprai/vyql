@@ -1,9 +1,0 @@
-module bindings.c.generated.m2816daee;
-
-binding deserialization19 {
-  requires {
-    dependency("json-c")
-  }
-  query pattern callExpr where callee.path ~= "json_tokener_parse"
-  emit sink code.Deserialization at args[0]
-}

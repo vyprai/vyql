@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding filePathAccess411 {
-  query pattern callExpr where callee.path ~= "zipfile.ZipFile.extractall"
-  emit sink code.FilePathAccess at args[0]
-}

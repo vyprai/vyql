@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding codeEval281 {
-  query pattern callExpr where callee.path ~= "code.interact"
-  emit sink code.CodeEval at args[0]
-}

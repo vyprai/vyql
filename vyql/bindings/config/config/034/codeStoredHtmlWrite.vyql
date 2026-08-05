@@ -1,6 +1,0 @@
-module bindings.config.generated.m2b6375a9;
-
-binding storedHtmlWrite34 {
-  query pattern presenceNode where node.analysis ~= "template.django.autoescape_off"
-  emit issue code.StoredHtmlWrite at node
-}

@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding commentUpdateMissingOwnershipConstraint155 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "updateComment" and node.context.phpReview == "comment_update_missing_ownership_constraint"
-  emit issue code.CommentUpdateMissingOwnershipConstraint at node
-}

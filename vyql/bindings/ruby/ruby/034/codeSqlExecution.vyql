@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding sqlExecution34 {
-  query pattern callExpr where callee.method == "delete_all"
-  emit sink code.SqlExecution at args[0]
-}

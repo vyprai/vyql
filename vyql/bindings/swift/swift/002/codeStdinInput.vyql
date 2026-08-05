@@ -1,6 +1,0 @@
-module bindings.swift.generated.m388f23d0;
-
-binding stdinInput2 {
-  query pattern callExpr where callee.path ~= "readLine"
-  emit source code.StdinInput at call.result
-}

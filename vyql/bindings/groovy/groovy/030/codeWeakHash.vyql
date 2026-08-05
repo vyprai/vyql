@@ -1,6 +1,0 @@
-module bindings.groovy.generated.m6eabb149;
-
-binding weakHash30 {
-  query pattern presenceNode where node.path ~= "DigestUtils.sha1Hex"
-  emit issue code.WeakHash at node
-}

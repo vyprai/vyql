@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding commandExecution99 {
-  query pattern callExpr where callee.path ~= "syscall"
-  emit sink code.CommandExecution at args[0]
-}

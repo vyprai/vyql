@@ -1,6 +1,0 @@
-module bindings.perl.generated.mfca40a44;
-
-binding commandExecution9 {
-  query pattern callExpr where callee.path ~= "qx"
-  emit sink code.CommandExecution at args[0]
-}

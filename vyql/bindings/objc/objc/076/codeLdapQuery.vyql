@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding ldapQuery76 {
-  query pattern callExpr where callee.path ~= "ldap_search_ext_s"
-  emit sink code.LdapQuery at args[3]
-}

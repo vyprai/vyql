@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding urlFetch354 {
-  query pattern callExpr where callee.path ~= "urllib3.PoolManager"
-  emit sink code.UrlFetch at args[0]
-}

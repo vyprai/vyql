@@ -1,9 +1,0 @@
-module bindings.php.generated.mc5601031;
-
-binding httpInput14 {
-  requires {
-    dependency("laravel/framework")
-  }
-  query pattern callExpr where callee.method == "input" and callee.receiver.type == "Request"
-  emit source code.HttpInput at call.result
-}

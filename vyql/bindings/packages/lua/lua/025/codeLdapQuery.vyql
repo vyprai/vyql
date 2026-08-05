@@ -1,9 +1,0 @@
-module bindings.lua.generated.m49b0a04f;
-
-binding ldapQuery25 {
-  requires {
-    dependency("lua-ldap")
-  }
-  query pattern callExpr where callee.method == "search"
-  emit sink code.LdapQuery at args[1]
-}

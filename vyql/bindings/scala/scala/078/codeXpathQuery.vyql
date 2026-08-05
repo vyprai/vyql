@@ -1,6 +1,0 @@
-module bindings.scala.generated.m06d0685b;
-
-binding xpathQuery78 {
-  query pattern callExpr where callee.method == "evaluate"
-  emit sink code.XpathQuery at args[0]
-}

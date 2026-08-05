@@ -1,6 +1,0 @@
-module bindings.elixir.generated.m728b8a72;
-
-binding ldapQuery77 {
-  query pattern callExpr where callee.method == "search"
-  emit sink code.LdapQuery at args[1]
-}

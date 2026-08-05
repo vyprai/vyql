@@ -1,6 +1,0 @@
-module bindings.solidity.generated.m88e544d8;
-
-binding externalCall6 {
-  query pattern callExpr where callee.method == "delegatecall"
-  emit sink code.ExternalCall at args[0]
-}

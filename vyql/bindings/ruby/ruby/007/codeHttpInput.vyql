@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding httpInput7 {
-  query pattern callExpr where callee.path ~= "request.body"
-  emit source code.HttpInput at call.result
-}

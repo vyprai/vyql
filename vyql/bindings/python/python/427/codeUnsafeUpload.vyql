@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding unsafeUpload427 {
-  query pattern callExpr where callee.path ~= "werkzeug.datastructures.FileStorage.save"
-  emit sink code.UnsafeUpload at args[0]
-}

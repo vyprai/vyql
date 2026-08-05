@@ -1,6 +1,0 @@
-module bindings.auditreview.generated.mbf0d19ec;
-
-binding resourceReview24 {
-  query pattern callExpr where callee.method == "read_to_end"
-  emit issue code.ResourceReview at call
-}

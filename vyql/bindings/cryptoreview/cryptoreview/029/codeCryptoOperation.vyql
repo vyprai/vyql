@@ -1,6 +1,0 @@
-module bindings.cryptoreview.generated.m4f475b34;
-
-binding cryptoOperation29 {
-  query pattern callExpr where callee.method == "CreateDecryptor"
-  emit issue code.CryptoOperation at call
-}

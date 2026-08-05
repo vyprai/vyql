@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding htmlRender31 {
-  query pattern callExpr where callee.path ~= "ngx.say"
-  emit sink code.HtmlRender at args.any
-}

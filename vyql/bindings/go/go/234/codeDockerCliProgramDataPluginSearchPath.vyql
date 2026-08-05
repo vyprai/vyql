@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding dockerCliProgramDataPluginSearchPath234 {
-  query pattern callExpr where callee.path == "filepath.Join" and args.any.literal contains "ProgramData" and args.any.literal contains "Docker" and args.any.literal contains "cli-plugins" and not args.any.literal contains "ProgramFiles"
-  emit issue code.DockerCliProgramDataPluginSearchPath at node
-}

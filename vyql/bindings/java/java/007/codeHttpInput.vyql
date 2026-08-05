@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding httpInput7 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "GET"
-  emit source code.HttpInput at call.result
-}

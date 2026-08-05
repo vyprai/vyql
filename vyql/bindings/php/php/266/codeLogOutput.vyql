@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding logOutput266 {
-  query pattern callExpr where callee.path ~= "error_log"
-  emit sink code.LogOutput at args.any
-}

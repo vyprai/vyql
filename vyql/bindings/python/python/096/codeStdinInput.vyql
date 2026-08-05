@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding stdinInput96 {
-  query pattern callExpr where callee.path ~= "input"
-  emit source code.StdinInput at call.result
-}

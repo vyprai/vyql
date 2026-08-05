@@ -1,6 +1,0 @@
-module bindings.cryptoreview.generated.m4f475b34;
-
-binding cryptoOperation27 {
-  query pattern presenceNode where node.path ~= "HashAlgorithm.Create"
-  emit issue code.CryptoOperation at node
-}

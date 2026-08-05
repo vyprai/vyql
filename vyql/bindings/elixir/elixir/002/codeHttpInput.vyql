@@ -1,6 +1,0 @@
-module bindings.elixir.generated.m728b8a72;
-
-binding httpInput2 {
-  query pattern callExpr where callee.path ~= "conn.params"
-  emit source code.HttpInput at call.result
-}

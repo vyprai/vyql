@@ -1,7 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding integerSizeArithmetic57 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "crypt_raw" and node.context.binaryShape contains "INT<<ID" and not (node.context.binaryShape contains "LONG<<ID") and not (node.context.scopeCall contains "roundsForLogRounds")
-  emit issue code.IntegerSizeArithmetic at node
-  emit sink code.IntegerSizeArithmeticSink at node
-}

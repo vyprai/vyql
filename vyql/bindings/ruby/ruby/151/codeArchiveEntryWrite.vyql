@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding archiveEntryWrite151 {
-  query pattern callExpr where callee.path ~= "Zip.File.extract"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

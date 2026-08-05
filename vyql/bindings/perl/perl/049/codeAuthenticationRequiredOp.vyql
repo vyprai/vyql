@@ -1,6 +1,0 @@
-module bindings.perl.generated.mfca40a44;
-
-binding authenticationRequiredOp49 {
-  query pattern presenceNode where node.path ~= "delete_account"
-  emit issue code.AuthenticationRequiredOp at node
-}

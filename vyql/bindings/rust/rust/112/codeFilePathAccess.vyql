@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding filePathAccess112 {
-  query pattern callExpr where callee.method == "read_to_string"
-  emit sink code.FilePathAccess at args[0]
-}

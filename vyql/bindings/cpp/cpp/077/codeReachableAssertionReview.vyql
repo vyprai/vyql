@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding reachableAssertionReview77 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "assertion.bron_operand_ref_check_missing"
-  emit issue code.ReachableAssertionReview at node
-}

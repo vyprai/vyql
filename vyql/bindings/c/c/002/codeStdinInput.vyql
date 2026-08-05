@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding stdinInput2 {
-  query pattern callExpr where callee.path ~= "fgets"
-  emit source code.StdinInput at call.result
-}

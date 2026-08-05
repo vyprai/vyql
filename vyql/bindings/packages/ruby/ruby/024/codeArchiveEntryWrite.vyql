@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m5895bccf;
-
-binding archiveEntryWrite24 {
-  requires {
-    dependency("rubyzip")
-  }
-  query pattern callExpr where callee.method == "extract"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

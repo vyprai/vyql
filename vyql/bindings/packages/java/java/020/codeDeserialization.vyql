@@ -1,9 +1,0 @@
-module bindings.java.generated.m9ef49b0f;
-
-binding deserialization20 {
-  requires {
-    dependency("java.io")
-  }
-  query pattern callExpr where callee.method == "readObject"
-  emit sink code.Deserialization at args[0]
-}

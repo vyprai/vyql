@@ -1,7 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding commandOptionInjection235 {
-  query pattern callExpr where callee.path ~= "subprocess.Popen" and args.any.literal contains "self.args" and args.any.literal contains "filename" and not args.any.literal contains "--"
-  emit sink code.CommandOptionInjectionSink at args[0]
-  emit issue code.CommandOptionInjection at call
-}

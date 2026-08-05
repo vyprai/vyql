@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding deserialization113 {
-  query pattern callExpr where callee.path ~= "JSON.load"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.scala.generated.m06d0685b;
-
-binding deserialization29 {
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

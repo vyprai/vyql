@@ -1,9 +1,0 @@
-module bindings.c.generated.m2816daee;
-
-binding sqlExecution12 {
-  requires {
-    dependency("mysqlclient")
-  }
-  query pattern callExpr where callee.path ~= "mysql_query"
-  emit sink code.SqlExecution at args[1]
-}

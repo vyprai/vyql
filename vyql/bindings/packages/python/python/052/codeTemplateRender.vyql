@@ -1,9 +1,0 @@
-module bindings.python.generated.m3d9ccbad;
-
-binding templateRender52 {
-  requires {
-    dependency("jinja2")
-  }
-  query pattern callExpr where callee.path ~= "jinja2.Template"
-  emit sink code.TemplateRender at args[0]
-}

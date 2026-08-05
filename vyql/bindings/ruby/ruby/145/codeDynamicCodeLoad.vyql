@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding dynamicCodeLoad145 {
-  query pattern callExpr where callee.path ~= "require"
-  emit sink code.DynamicCodeLoad at args[0]
-}

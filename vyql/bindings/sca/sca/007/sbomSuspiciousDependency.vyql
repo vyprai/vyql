@@ -1,6 +1,0 @@
-module bindings.sca.generated.mc40a837e;
-
-binding suspiciousDependency7 {
-  query pattern presenceNode where node.kind == "any" and node.analysis == "sca.package" and node.context.status == "suspicious"
-  emit issue sbom.SuspiciousDependency at node
-}

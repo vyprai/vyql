@@ -1,6 +1,0 @@
-module bindings.config.generated.m2b6375a9;
-
-binding publicNetworkExposure12 {
-  query pattern presenceNode where node.analysis ~= "config.terraform.open_cidr"
-  emit issue code.PublicNetworkExposure at node
-}

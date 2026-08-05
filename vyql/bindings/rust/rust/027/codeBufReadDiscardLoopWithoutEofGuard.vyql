@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding bufReadDiscardLoopWithoutEofGuard27 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "bufread_discard_loop_without_eof_guard"
-  emit issue code.BufReadDiscardLoopWithoutEofGuard at node
-}

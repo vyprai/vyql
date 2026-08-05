@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding xmlParse125 {
-  query pattern callExpr where callee.path ~= "XmlDocument.Load"
-  emit sink code.XmlParse at args[0]
-}

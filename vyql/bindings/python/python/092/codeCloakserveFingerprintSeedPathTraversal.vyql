@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding cloakserveFingerprintSeedPathTraversal92 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cloakserve_fingerprint_seed_path_traversal"
-  emit issue code.CloakserveFingerprintSeedPathTraversal at node
-}

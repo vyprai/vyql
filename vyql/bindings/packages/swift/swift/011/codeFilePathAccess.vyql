@@ -1,9 +1,0 @@
-module bindings.swift.generated.mc6005d88;
-
-binding filePathAccess11 {
-  requires {
-    dependency("Foundation")
-  }
-  query pattern callExpr where callee.path ~= "FileManager.default.contents"
-  emit sink code.FilePathAccess at args[0]
-}

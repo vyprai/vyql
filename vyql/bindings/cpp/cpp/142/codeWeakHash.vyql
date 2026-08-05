@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding weakHash142 {
-  query pattern presenceNode where node.path ~= "EVP_md5"
-  emit issue code.WeakHash at node
-}

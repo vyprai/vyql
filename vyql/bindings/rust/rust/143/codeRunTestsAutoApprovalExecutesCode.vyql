@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding runTestsAutoApprovalExecutesCode143 {
-  query pattern presenceNode where node.kind == "any" and node.analysis == "rust.run_tests_auto_approval_executes_code"
-  emit issue code.RunTestsAutoApprovalExecutesCode at node
-}

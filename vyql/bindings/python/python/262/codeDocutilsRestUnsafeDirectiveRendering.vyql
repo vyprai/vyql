@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding docutilsRestUnsafeDirectiveRendering262 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "docutils_rest_unsafe_directive_rendering"
-  emit issue code.DocutilsRestUnsafeDirectiveRendering at node
-}

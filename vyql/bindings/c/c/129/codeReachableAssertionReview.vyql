@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding reachableAssertionReview129 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "assertion.avahi_publish_flag_pair_reachable"
-  emit issue code.ReachableAssertionReview at node
-}

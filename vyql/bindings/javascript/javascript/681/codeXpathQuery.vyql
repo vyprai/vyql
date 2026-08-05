@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding xpathQuery681 {
-  query pattern callExpr where callee.path ~= "xpath.select"
-  emit sink code.XpathQuery at args[0]
-}

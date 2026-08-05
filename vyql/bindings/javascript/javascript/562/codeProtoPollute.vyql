@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding protoPollute562 {
-  query pattern callExpr where callee.path ~= "deepmerge"
-  emit sink code.ProtoPollute at args[1]
-}

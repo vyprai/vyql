@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding logWrite424 {
-  query pattern callExpr where callee.path ~= "log.debug"
-  emit sink code.LogWriteSink at args.any
-}

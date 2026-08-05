@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding urlFetch320 {
-  query pattern callExpr where callee.path ~= "fetch.default"
-  emit sink code.UrlFetch at args[0]
-}

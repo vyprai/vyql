@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding clientControlledSecurityDecision694 {
-  query pattern callExpr where callee.analysis ~= "access.role_marker_compare"
-  emit sink code.ClientControlledSecurityDecision at args[0]
-}

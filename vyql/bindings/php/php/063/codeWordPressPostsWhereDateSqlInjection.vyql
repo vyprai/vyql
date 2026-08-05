@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding wordPressPostsWhereDateSqlInjection63 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "wordpress_posts_where_date_sql_injection"
-  emit issue code.WordPressPostsWhereDateSqlInjection at node
-}

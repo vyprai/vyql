@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding userControlledData2 {
-  query pattern callExpr where callee.path ~= "options.timezone"
-  emit source core.UserControlledData at call.result
-}

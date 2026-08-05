@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding weakCipher599 {
-  query pattern callExpr where callee.path ~= "createCipheriv" and not args.any.literal contains "gcm" and not args.any.literal contains "chacha" and not args.any.literal contains "poly1305"
-  emit issue code.WeakCipher at call
-}

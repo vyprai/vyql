@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding jwtUnverified156 {
-  query pattern presenceNode where node.kind == "any" and node.analysis == "csharp.jwt_validate_issuer_signing_key_false"
-  emit issue code.JwtUnverified at node
-}

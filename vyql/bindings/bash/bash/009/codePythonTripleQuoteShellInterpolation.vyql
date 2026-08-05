@@ -1,6 +1,0 @@
-module bindings.bash.generated.m59952d5d;
-
-binding pythonTripleQuoteShellInterpolation9 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "bash" and node.context.shellBridge == "python_triple_quote_stdin_interpolation"
-  emit issue code.PythonTripleQuoteShellInterpolation at node
-}

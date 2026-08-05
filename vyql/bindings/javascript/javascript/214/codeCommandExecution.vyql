@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding commandExecution214 {
-  query pattern callExpr where callee.path ~= "child_process.spawn"
-  emit sink code.CommandExecution at args[0]
-}

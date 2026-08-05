@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding foldedHeaderContinuationCrash632 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "split" and node.context.identifier contains "RE_CRLF" and node.context.callPath contains "RE_HDR.exec" and node.context.subscript contains "lines[i][0]" and node.context.subscript contains "this.header[h]" and not (node.context.foldedHeaderCurrentGuard == "true")
-  emit issue code.FoldedHeaderContinuationCrash at node
-}

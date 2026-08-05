@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding logWrite430 {
-  query pattern callExpr where callee.method == "logWarning"
-  emit sink code.LogWriteSink at args.any
-}

@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding deserialization132 {
-  query pattern callExpr where callee.path ~= "XMLDecoder.readObject"
-  emit sink code.Deserialization at args[0]
-}

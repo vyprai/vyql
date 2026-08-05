@@ -1,6 +1,0 @@
-module bindings.cryptoreview.generated.m4f475b34;
-
-binding cryptoOperation40 {
-  query pattern presenceNode where node.path ~= "Rfc2898DeriveBytes"
-  emit issue code.CryptoOperation at node
-}

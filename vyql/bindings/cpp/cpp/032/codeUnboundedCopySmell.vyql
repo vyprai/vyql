@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding unboundedCopySmell32 {
-  query pattern presenceNode where node.path ~= "sprintf"
-  emit issue code.UnboundedCopySmell at node
-}

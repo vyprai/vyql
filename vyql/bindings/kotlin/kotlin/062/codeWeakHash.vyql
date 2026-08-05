@@ -1,6 +1,0 @@
-module bindings.kotlin.generated.m304d1620;
-
-binding weakHash62 {
-  query pattern callExpr where callee.path ~= "MessageDigest.getInstance" and args.any.literal contains "SHA1"
-  emit issue code.WeakHash at call
-}

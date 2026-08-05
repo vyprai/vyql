@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding requestScopePolicyReview241 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "ServeHTTP" and node.context.call contains "RequestInfoFrom" and node.context.call contains "Get" and node.context.call contains "serveResource" and not (node.context.selector contains "apiextensions.NamespaceScoped")
-  emit issue code.RequestScopePolicyReview at node
-}

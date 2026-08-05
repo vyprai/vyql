@@ -1,6 +1,0 @@
-module bindings.swift.generated.m388f23d0;
-
-binding commandExecution23 {
-  query pattern callExpr where callee.path ~= "popen"
-  emit sink code.CommandExecution at args[0]
-}

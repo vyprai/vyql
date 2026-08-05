@@ -1,0 +1,276 @@
+module bindings.config.generated.m2b6375a9;
+
+pattern bindingMetadata {
+  binding: {
+    name: "config"
+    meta: {
+      config_directive_value_events: ["dockerfile|USER|root|exact|analysis.config.container.root_user", "dockerfile|USER|0|exact|analysis.config.container.root_user", "dockerfile|USER|root:|prefix|analysis.config.container.root_user", "dockerfile|USER|0:|prefix|analysis.config.container.root_user"]
+      config_dot_template_rules: ["_limit.jst|must be number|maximum;exclusiveMaximum;$schemaExcl|$schemaExcl|analysis.template.dot.schema_codegen_unvalidated", "_limititems.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated", "_limitlength.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated", "_limitproperties.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated", "definitions.def|def.numberKeyword|def.$dataNotType|def.$dataNotType|analysis.template.dot.schema_codegen_unvalidated", "index.html|Thelpers.encode(item.message)|common.notifications.template;item.message;refresh_notifications|msg = t.format('@(Navigation has been saved)', item.message)|analysis.config.totaljs_admin_notification_message_xss"]
+      config_file_contains_all_events: ["yaml|analysis.config.github_actions.privileged_pr_framework_execution|pull_request_target;;git show \"$PR_SHA:$file\" > \"$file\";;python manage.py makemigrations", "schematron|analysis.config.schematron_link_href_case_sensitive_script_denylist|xlink:href;;contains(@*[name()='xlink:href'];;javascript:;;vbscript:"]
+      config_line_contains_events: ["dockerfile|--privileged|analysis.config.container.privileged_mode", "dockerfile|pip install --upgrade ipykernel|analysis.config.python.jupyter_kernel_dependency_unbounded", "dockerfile|pip install --upgrade future pycryptodomex ipykernel|analysis.config.python.jupyter_kernel_dependency_unbounded", "terraform|0.0.0.0/0|analysis.config.terraform.open_cidr", "jelly|permission=\"${it.ADMINISTRATOR}\"|analysis.config.jenkins_advisor_weak_layout_permission", "jelly|tooltip=\"${item.why}${h.escape(item.params)}|analysis.config.jenkins_computer_queue_unescaped_tooltip", "jsp|label: item.displayedValue +|analysis.config.dspace_jspui_autocomplete_label_xss", "pest|dangerous_url = { \"data:\" ~ !(\"image/\"|analysis.config.comrak_dangerous_url_case_sensitive"]
+      config_line_exact_compact_events: ["yaml|- ipykernel|analysis.config.python.jupyter_kernel_dependency_unbounded", "yaml|privileged: true|analysis.config.k8s.privileged_container", "yaml|allowprivilegeescalation: true|analysis.config.k8s.privileged_container", "yaml|hostnetwork: true|analysis.config.k8s.host_namespace", "yaml|hostpid: true|analysis.config.k8s.host_namespace", "yaml|hostipc: true|analysis.config.k8s.host_namespace"]
+      config_line_prefix_compact_events: ["yaml|hostpath:|analysis.config.k8s.host_path"]
+      config_plist_true_keys: ["NSAllowsArbitraryLoads|analysis.config.plist.ats_arbitrary_loads", "NSAllowsArbitraryLoadsInWebContent|analysis.config.plist.ats_arbitrary_loads", "NSAllowsArbitraryLoadsForMedia|analysis.config.plist.ats_arbitrary_loads"]
+      config_quoted_star_field_events: ["terraform|action|analysis.config.terraform.wildcard_iam", "terraform|resource|analysis.config.terraform.wildcard_iam"]
+      config_template_escape_active_contains_jelly: ["escapeEntryTitleAndDescription\" value=\"true"]
+      config_template_escape_active_contains_jsp_scriptlet: ["leftPropertyValue = Encode.forHtml(leftPropertyValue)"]
+      config_template_escape_event_jelly: "analysis.template.jelly.escape"
+      config_template_escape_event_jsp_scriptlet: "analysis.template.jsp.escape"
+      config_template_escape_line_contains_jelly: ["title=", "description="]
+      config_template_escape_line_contains_jsp_scriptlet: ["<%=leftPropertyValue%>", "<%=rightPropertyValue%>", "<%=mediaType%>", "<%=filterMediaType%>", "<%=leftOp%>", "<%=rightOp%>"]
+      config_template_escape_prefix_jelly: "h.escape("
+      config_template_escape_prefix_jsp_scriptlet: "Utils.addEntities("
+      config_template_expr_end: "}"
+      config_template_expr_end_jsp_scriptlet: "%>"
+      config_template_expr_start: "${"
+      config_template_expr_start_jsp_scriptlet: "<%="
+      config_template_input_event_jelly: "analysis.template.jelly.input"
+      config_template_input_event_jsp: "analysis.template.jsp.input"
+      config_template_input_event_jsp_scriptlet: "analysis.template.jsp.input"
+      config_template_input_pattern_jelly: "\\b(it\\.(name|description|value|defaultValue|getDescription|getToolTip)|parameter\\.(name|description)|cause\\.description)\\b"
+      config_template_input_pattern_jsp: "\\b(requestContext|request|param|row|queues|value|text|name|defaultValue|JMSDestination)\\b"
+      config_template_input_pattern_jsp_scriptlet: "\\b(leftPropertyValue|rightPropertyValue|mediaType|leftOp|rightOp|spellCheckQuery)\\b"
+      config_template_render_event_jelly: "analysis.template.jelly.render"
+      config_template_render_event_jsp: "analysis.template.jsp.render"
+      config_template_render_event_jsp_scriptlet: "analysis.template.jsp.render"
+      config_template_scopes: ["jelly", "jsp", "jsp_scriptlet"]
+      config_template_skip_contains_jelly: ["<j:set", "<j:when", "<j:if", " test=", "markupFormatter.translate", "<f:password", "<f:checkbox", "<f:textarea", "<f:textbox", "<select"]
+      config_template_skip_contains_jsp: ["<%@", "<c:out", "<c:forEach", "<c:if", " items=", " test="]
+      config_template_skip_contains_jsp_scriptlet: ["<%@", "<%--", "Encode.forHtml"]
+      config_text_template_assign_events_xwiki_velocity: ["#set\\s*\\(\\s*\\$([A-Za-z_][A-Za-z0-9_]*)\\s*=.*\\$!?request\\.[A-Za-z0-9_]+\\b|\\$!?request\\.[A-Za-z0-9_]+\\b|analysis.template.xwiki_velocity.input"]
+      config_text_template_extensions_django: [".html"]
+      config_text_template_extensions_django_safe: [".html"]
+      config_text_template_extensions_django_session_key_exposure: [".html"]
+      config_text_template_extensions_erb: [".erb"]
+      config_text_template_extensions_svelte: [".svelte"]
+      config_text_template_extensions_xwiki_velocity: [".xml"]
+      config_text_template_flow_events_xwiki_velocity: ["#ckeditor_convert|\\$!?request\\.[A-Za-z0-9_]+\\b|analysis.template.xwiki_velocity.input|analysis.template.xwiki_velocity.state_change", "#ckeditor_convert|\\$text\\b|analysis.template.xwiki_velocity.input|analysis.template.xwiki_velocity.state_change"]
+      config_text_template_line_events_django: ["{% autoescape off %}|analysis.template.django.autoescape_off"]
+      config_text_template_line_events_django_safe: ["safe|analysis.template.django.safe_filter_raw_html", "object.pk|analysis.template.django.session_key_action_exposure"]
+      config_text_template_line_events_django_session_key_exposure: ["object.pk|analysis.template.django.session_key_action_exposure"]
+      config_text_template_line_events_erb: ["raw comment.content|analysis.template.erb.raw_comment_html", "vect[\"note\"]%>|analysis.template.erb.unescaped_tooltip_html", "value[:description] %>|analysis.template.erb.unescaped_tooltip_html", "\"_last_status_message\").to_s if|analysis.template.erb.unescaped_tooltip_html"]
+      config_text_template_line_events_svelte: ["{@html|analysis.template.svelte.raw_html"]
+      config_text_template_line_events_xwiki_velocity: ["$services.csrf.isTokenValid|analysis.template.xwiki_velocity.csrf_check"]
+      config_text_template_required_contains_django: ["{% autoescape off %}"]
+      config_text_template_required_contains_django_safe: ["{{", "|safe"]
+      config_text_template_required_contains_django_session_key_exposure: ["session_key", "{% url", "object.pk"]
+      config_text_template_required_contains_erb: ["<%="]
+      config_text_template_required_contains_svelte: ["{@html"]
+      config_text_template_required_contains_xwiki_velocity: ["<content", "$request.", "#"]
+      config_text_template_scopes: ["xwiki_velocity", "svelte", "django", "django_session_key_exposure", "django_safe", "erb"]
+      config_xml_attr_not_value_events: ["application|allowBackup|false|analysis.config.android.backup_allowed"]
+      config_xml_true_attrs: ["activity|exported|analysis.config.android.exported_component", "activity-alias|exported|analysis.config.android.exported_component", "service|exported|analysis.config.android.exported_component", "receiver|exported|analysis.config.android.exported_component", "provider|exported|analysis.config.android.exported_component", "application|usesCleartextTraffic|analysis.config.android.cleartext_enabled", "application|debuggable|analysis.config.android.debuggable_enabled"]
+      cross_language: "true"
+      fidelity: "resolved"
+    }
+  }
+}
+
+binding exportedComponent0 {
+  query pattern presenceNode where node.analysis ~= "config.android.exported_component"
+  emit issue code.ExportedComponent at node
+}
+
+binding cleartextConfig1 {
+  query pattern presenceNode where node.analysis ~= "config.android.cleartext_enabled"
+  emit issue code.CleartextConfig at node
+}
+
+binding debuggableApp2 {
+  query pattern presenceNode where node.analysis ~= "config.android.debuggable_enabled"
+  emit issue code.DebuggableApp at node
+}
+
+binding backupAllowedConfig3 {
+  query pattern presenceNode where node.analysis ~= "config.android.backup_allowed"
+  emit issue code.BackupAllowedConfig at node
+}
+
+binding cleartextConfig4 {
+  query pattern presenceNode where node.analysis ~= "config.plist.ats_arbitrary_loads"
+  emit issue code.CleartextConfig at node
+}
+
+binding privilegedContainer5 {
+  query pattern presenceNode where node.analysis ~= "config.k8s.privileged_container"
+  emit issue code.PrivilegedContainer at node
+}
+
+binding privilegedContainer6 {
+  query pattern presenceNode where node.analysis ~= "config.container.root_user"
+  emit issue code.PrivilegedContainer at node
+}
+
+binding privilegedContainer7 {
+  query pattern presenceNode where node.analysis ~= "config.container.privileged_mode"
+  emit issue code.PrivilegedContainer at node
+}
+
+binding unboundedJupyterKernelDependency8 {
+  query pattern presenceNode where node.analysis ~= "config.python.jupyter_kernel_dependency_unbounded"
+  emit issue code.UnboundedJupyterKernelDependency at node
+}
+
+binding nodePreGypRemoteBinaryInstall9 {
+  query pattern presenceNode where node.analysis ~= "config.npm.node_pre_gyp_remote_binary_install"
+  emit issue code.NodePreGypRemoteBinaryInstall at node
+}
+
+binding hostNamespaceShare10 {
+  query pattern presenceNode where node.analysis ~= "config.k8s.host_namespace"
+  emit issue code.HostNamespaceShare at node
+}
+
+binding hostNamespaceShare11 {
+  query pattern presenceNode where node.analysis ~= "config.k8s.host_path"
+  emit issue code.HostNamespaceShare at node
+}
+
+binding publicNetworkExposure12 {
+  query pattern presenceNode where node.analysis ~= "config.terraform.open_cidr"
+  emit issue code.PublicNetworkExposure at node
+}
+
+binding wildcardIamPolicy13 {
+  query pattern presenceNode where node.analysis ~= "config.terraform.wildcard_iam"
+  emit issue code.WildcardIamPolicy at node
+}
+
+binding privilegedWorkflowUntrustedCodeExecution14 {
+  query pattern presenceNode where node.analysis ~= "config.github_actions.privileged_pr_framework_execution"
+  emit issue code.PrivilegedWorkflowUntrustedCodeExecution at node
+}
+
+binding jenkinsAdvisorWeakLayoutPermission15 {
+  query pattern presenceNode where node.analysis ~= "config.jenkins_advisor_weak_layout_permission"
+  emit issue code.JenkinsAdvisorWeakLayoutPermission at node
+}
+
+binding jenkinsComputerQueueUnescapedTooltipXss16 {
+  query pattern presenceNode where node.analysis ~= "config.jenkins_computer_queue_unescaped_tooltip"
+  emit issue code.JenkinsComputerQueueUnescapedTooltipXss at node
+}
+
+binding dspaceJspuiAutocompleteLabelXss17 {
+  query pattern presenceNode where node.analysis ~= "config.dspace_jspui_autocomplete_label_xss"
+  emit issue code.DspaceJspuiAutocompleteLabelXss at node
+}
+
+binding comrakDangerousUrlCaseSensitiveGrammar18 {
+  query pattern presenceNode where node.analysis ~= "config.comrak_dangerous_url_case_sensitive"
+  emit issue code.ComrakDangerousUrlCaseSensitiveGrammar at node
+}
+
+binding schematronLinkHrefUnsafeSchemeDenylist19 {
+  query pattern presenceNode where node.analysis ~= "config.schematron_link_href_case_sensitive_script_denylist"
+  emit issue code.SchematronLinkHrefUnsafeSchemeDenylist at node
+}
+
+binding externalLinkReferrerLeak20 {
+  query pattern presenceNode where node.analysis ~= "config.html.external_link_missing_noreferrer"
+  emit issue code.ExternalLinkReferrerLeak at node
+}
+
+binding jenkinsJellySecretTextboxExposure21 {
+  query pattern presenceNode where node.analysis ~= "config.jenkins_jelly_secret_textbox"
+  emit issue code.JenkinsJellySecretTextboxExposure at node
+}
+
+binding userControlledData22 {
+  query pattern callExpr where callee.analysis ~= "template.jelly.input"
+  emit source core.UserControlledData at call.result
+}
+
+binding htmlRender23 {
+  query pattern callExpr where callee.analysis ~= "template.jelly.render"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlEscape24 {
+  query pattern callExpr where callee.analysis ~= "template.jelly.escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding userControlledData25 {
+  query pattern callExpr where callee.analysis ~= "template.jsp.input"
+  emit source core.UserControlledData at call.result
+}
+
+binding htmlRender26 {
+  query pattern callExpr where callee.analysis ~= "template.jsp.render"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlEscape27 {
+  query pattern callExpr where callee.analysis ~= "template.jsp.escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding schemaCodegenValidationBypass28 {
+  query pattern presenceNode where node.analysis ~= "template.dot.schema_codegen_unvalidated"
+  emit issue code.SchemaCodegenValidationBypass at node
+}
+
+binding totalJsAdminThemeXss29 {
+  query pattern presenceNode where node.analysis ~= "config.totaljs_admin_notification_message_xss"
+  emit issue code.TotalJsAdminThemeXss at node
+}
+
+binding userControlledData30 {
+  query pattern callExpr where callee.analysis ~= "template.xwiki_velocity.input"
+  emit source core.UserControlledData at call.result
+}
+
+binding stateChangingOp31 {
+  query pattern callExpr where callee.analysis ~= "template.xwiki_velocity.state_change"
+  emit sink code.StateChangingOpSink at args[0]
+}
+
+binding csrfProtection32 {
+  query pattern callExpr where callee.analysis ~= "template.xwiki_velocity.csrf_check"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding storedHtmlWrite33 {
+  query pattern presenceNode where node.analysis ~= "template.svelte.raw_html"
+  emit issue code.StoredHtmlWrite at node
+}
+
+binding storedHtmlWrite34 {
+  query pattern presenceNode where node.analysis ~= "template.django.autoescape_off"
+  emit issue code.StoredHtmlWrite at node
+}
+
+binding storedHtmlWrite35 {
+  query pattern presenceNode where node.analysis ~= "template.django.safe_filter_raw_html"
+  emit issue code.StoredHtmlWrite at node
+}
+
+binding sessionKeyTemplateExposure36 {
+  query pattern presenceNode where node.analysis ~= "template.django.session_key_action_exposure"
+  emit issue code.SessionKeyTemplateExposure at node
+}
+
+binding storedHtmlWrite37 {
+  query pattern presenceNode where node.analysis ~= "template.erb.raw_comment_html"
+  emit issue code.StoredHtmlWrite at node
+}
+
+binding storedHtmlWrite38 {
+  query pattern presenceNode where node.analysis ~= "template.erb.unescaped_tooltip_html"
+  emit issue code.StoredHtmlWrite at node
+}

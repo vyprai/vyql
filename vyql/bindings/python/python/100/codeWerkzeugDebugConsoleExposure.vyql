@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding werkzeugDebugConsoleExposure100 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "werkzeug_debug_console_exposure"
-  emit issue code.WerkzeugDebugConsoleExposure at node
-}

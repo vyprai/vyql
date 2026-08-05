@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding weakHash772 {
-  query pattern presenceNode where node.path ~= "SHA.new"
-  emit issue code.WeakHash at node
-}

@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding stdinInput2 {
-  query pattern callExpr where callee.path ~= "fgets"
-  emit source code.StdinInput at call.result
-}

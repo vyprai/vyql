@@ -1,9 +1,0 @@
-module bindings.java.generated.m9ef49b0f;
-
-binding externalApiResponse10 {
-  requires {
-    dependency("okhttp3")
-  }
-  query pattern callExpr where callee.method == "body"
-  emit source code.ExternalApiResponse at call.result
-}

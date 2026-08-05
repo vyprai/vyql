@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding deserialization55 {
-  query pattern callExpr where callee.path ~= "NetDataContractSerializer"
-  emit sink code.Deserialization at args[0]
-}

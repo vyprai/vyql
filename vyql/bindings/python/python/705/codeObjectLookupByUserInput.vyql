@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding objectLookupByUserInput705 {
-  query pattern callExpr where callee.path ~= "objects.get"
-  emit sink code.ObjectLookupByUserInput at args[0]
-}

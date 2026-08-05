@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding pickleLoadsJoblibModelLoader310 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "pickle_loads_joblib_model_loader"
-  emit issue code.PickleLoadsJoblibModelLoader at node
-}

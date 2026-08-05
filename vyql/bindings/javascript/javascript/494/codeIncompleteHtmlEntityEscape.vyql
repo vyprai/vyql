@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding incompleteHtmlEntityEscape494 {
-  query pattern callExpr where callee.path ~= "string.replace" and args.any.literal contains "&amp;" and args.any.literal contains "\\w+;" and not args.any.literal contains "#\\d" and not args.any.literal contains "#x"
-  emit issue code.IncompleteHtmlEntityEscape at node
-}

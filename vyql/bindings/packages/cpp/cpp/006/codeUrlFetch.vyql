@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m1c1357ee;
-
-binding urlFetch6 {
-  requires {
-    dependency("cpr")
-  }
-  query pattern callExpr where callee.method == "Get"
-  emit sink code.UrlFetch at args[0]
-}

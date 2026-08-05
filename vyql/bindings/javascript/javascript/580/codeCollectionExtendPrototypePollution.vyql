@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding collectionExtendPrototypePollution580 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.callPath contains "forEach" and node.context.callPath contains "byLink" and node.context.callPath contains "setVal" and not (node.context.prototypeKeyGuard == "true")
-  emit issue code.CollectionExtendPrototypePollution at node
-}

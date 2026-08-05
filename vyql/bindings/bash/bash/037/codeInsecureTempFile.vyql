@@ -1,6 +1,0 @@
-module bindings.bash.generated.m59952d5d;
-
-binding insecureTempFile37 {
-  query pattern callExpr where callee.path ~= "mktemp" and args.any.literal contains "-u"
-  emit issue code.InsecureTempFile at call
-}

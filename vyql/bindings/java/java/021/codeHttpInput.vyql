@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding httpInput21 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.functionName contains "isValid" and args.any.context.hasParamType contains "ConstraintValidatorContext" and args.any.context.paramIndex contains "0"
-  emit source code.HttpInput at call.result
-}

@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding stateChangingOp136 {
-  query pattern callExpr where callee.method == "change_email"
-  emit sink code.StateChangingOpSink at args[0]
-}

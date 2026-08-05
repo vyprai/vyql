@@ -1,9 +1,0 @@
-module bindings.scala.generated.m3608f193;
-
-binding httpInput5 {
-  requires {
-    dependency("akka-http")
-  }
-  query pattern callExpr where callee.path ~= ".param"
-  emit source code.HttpInput at call.result
-}

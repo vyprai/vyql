@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding weakHash180 {
-  query pattern presenceNode where node.path ~= "SHA1Managed"
-  emit issue code.WeakHash at node
-}

@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding httpInput369 {
-  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.literal contains "python_review:loop_requests_get_url_without_validation"
-  emit source code.HttpInput at call.result
-}

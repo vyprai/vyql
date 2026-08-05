@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding formatString164 {
-  query pattern callExpr where callee.path ~= "fprintf"
-  emit sink code.FormatString at args[1]
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m5895bccf;
-
-binding httpInput4 {
-  requires {
-    dependency("rack")
-  }
-  query pattern callExpr where callee.path ~= "request.params"
-  emit source code.HttpInput at call.result
-}

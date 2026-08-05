@@ -1,9 +1,0 @@
-module bindings.perl.generated.ma164dcec;
-
-binding templateRender26 {
-  requires {
-    dependency("Template")
-  }
-  query pattern callExpr where callee.method == "process"
-  emit sink code.TemplateRender at args[0]
-}

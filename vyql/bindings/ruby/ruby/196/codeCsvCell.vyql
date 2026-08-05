@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding csvCell196 {
-  query pattern callExpr where callee.path ~= "CSV.open"
-  emit sink code.CsvCell at args.any
-}

@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding weakCipher147 {
-  query pattern presenceNode where node.path ~= "RC4"
-  emit issue code.WeakCipher at node
-}

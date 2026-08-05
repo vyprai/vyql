@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding csvCell402 {
-  query pattern callExpr where callee.method == "writeRecords"
-  emit sink code.CsvCell at args.any
-}

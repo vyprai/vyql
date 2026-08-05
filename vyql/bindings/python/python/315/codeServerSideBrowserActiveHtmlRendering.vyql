@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding serverSideBrowserActiveHtmlRendering315 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "server_side_browser_active_html_fetch_enabled"
-  emit issue code.ServerSideBrowserActiveHtmlRendering at node
-}

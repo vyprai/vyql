@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding opnSenseRrdRestoreFilenameCommandInjection135 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "rrd_import" and node.context.phpReview == "opnsense_rrd_restore_filename_command_injection"
-  emit issue code.OpnSenseRrdRestoreFilenameCommandInjection at node
-}

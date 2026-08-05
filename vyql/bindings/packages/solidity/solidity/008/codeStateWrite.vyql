@@ -1,9 +1,0 @@
-module bindings.solidity.generated.m72929a80;
-
-binding stateWrite8 {
-  requires {
-    dependency("solidity")
-  }
-  query pattern presenceNode where node.path ~= "state_write"
-  emit issue code.StateWrite at node
-}

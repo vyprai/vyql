@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding unfilteredAgentCommandTag269 {
-  query pattern presenceNode where node.scope == "function" and node.context.identifier contains "customTagNames" and node.context.literal contains "dyad-execute-sql" and node.context.literal contains "dyad-codebase-context" and node.context.identifier contains "tagPattern" and not (node.context.literal contains "dyad-command")
-  emit issue code.UnfilteredAgentCommandTag at node
-}

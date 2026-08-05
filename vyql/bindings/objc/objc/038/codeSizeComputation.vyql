@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding sizeComputation38 {
-  query pattern callExpr where callee.path ~= "realloc"
-  emit sink code.SizeComputation at args[1]
-}

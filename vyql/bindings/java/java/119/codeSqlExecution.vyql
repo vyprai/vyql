@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding sqlExecution119 {
-  query pattern callExpr where callee.method == "queryForLong"
-  emit sink code.SqlExecution at args[0]
-}

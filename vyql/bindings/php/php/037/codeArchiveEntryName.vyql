@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding archiveEntryName37 {
-  query pattern callExpr where callee.method == "getNameIndex"
-  emit source code.ArchiveEntryName at call.result
-}

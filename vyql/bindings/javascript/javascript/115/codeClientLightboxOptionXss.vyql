@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding clientLightboxOptionXss115 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.literal contains "<video>" and node.context.identifier contains "videoParams" and node.context.selector contains "options.videoParams" and not (node.context.callPath contains "startsWith") and not (node.context.subscript contains "videoParams[key]")
-  emit issue code.ClientLightboxOptionXss at node
-}

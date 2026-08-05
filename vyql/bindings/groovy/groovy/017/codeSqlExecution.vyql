@@ -1,6 +1,0 @@
-module bindings.groovy.generated.m6eabb149;
-
-binding sqlExecution17 {
-  query pattern callExpr where callee.method == "eachRow"
-  emit sink code.SqlExecution at args[0]
-}

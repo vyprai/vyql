@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding commandExecution225 {
-  query pattern callExpr where callee.path ~= "os.popen2"
-  emit sink code.CommandExecution at args[0]
-}

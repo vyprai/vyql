@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding nosqlQuery515 {
-  query pattern callExpr where callee.path ~= "collection.find"
-  emit sink code.NosqlQuery at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding sessionId400 {
-  query pattern callExpr where callee.path ~= "session_id"
-  emit sink code.SessionIdSink at args[0]
-}

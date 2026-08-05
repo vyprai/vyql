@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding fieldDerivedIndexAccess61 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "index.field_derived_missing_upper_bound"
-  emit issue code.FieldDerivedIndexAccess at node
-}

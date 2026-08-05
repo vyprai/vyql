@@ -1,6 +1,0 @@
-module bindings.cryptoreview.generated.m4f475b34;
-
-binding cryptoOperation10 {
-  query pattern presenceNode where node.path ~= "Cipher.getInstance"
-  emit issue code.CryptoOperation at node
-}

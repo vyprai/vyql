@@ -1,7 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding catastrophicRegex541 {
-  query pattern callExpr where callee.path ~= "RegExp" and args.any.literal contains "d]*(?:;"
-  emit issue code.CatastrophicRegex at node
-  emit sink code.CatastrophicRegexSink at node
-}

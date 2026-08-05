@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mbfd454d1;
-
-binding ldapQuery23 {
-  requires {
-    dependency("spring-ldap")
-  }
-  query pattern callExpr where callee.method == "search"
-  emit sink code.LdapQuery at args[1]
-}

@@ -1,0 +1,479 @@
+module bindings.swift.generated.m388f23d0;
+
+pattern bindingMetadata {
+  binding: {
+    name: "swift"
+    meta: {
+      fidelity: "resolved"
+      match: "contains"
+    }
+  }
+}
+
+binding cliArgument0 {
+  query pattern callExpr where callee.path ~= "CommandLine.arguments"
+  emit source code.CliArgument at call.result
+}
+
+binding envVariable1 {
+  query pattern callExpr where callee.path ~= ".environment"
+  emit source code.EnvVariable at call.result
+}
+
+binding stdinInput2 {
+  query pattern callExpr where callee.path ~= "readLine"
+  emit source code.StdinInput at call.result
+}
+
+binding httpInput3 {
+  query pattern callExpr where callee.path ~= ".query"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  query pattern callExpr where callee.path ~= ".parameters"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  query pattern callExpr where callee.path ~= ".queryParameters"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput6 {
+  query pattern callExpr where callee.path ~= ".headers"
+  emit source code.HttpInput at call.result
+}
+
+binding uRLSchemeInput7 {
+  query pattern callExpr where callee.path ~= "url_scheme_input"
+  emit source code.URLSchemeInput at call.result
+}
+
+binding pasteboardInput8 {
+  query pattern callExpr where callee.path ~= "UIPasteboard.general.string"
+  emit source code.PasteboardInput at call.result
+}
+
+binding pasteboardInput9 {
+  query pattern callExpr where callee.path ~= "UIPasteboard.general.strings"
+  emit source code.PasteboardInput at call.result
+}
+
+binding pasteboardInput10 {
+  query pattern callExpr where callee.path ~= ".generalPasteboard.string"
+  emit source code.PasteboardInput at call.result
+}
+
+binding webViewLoad11 {
+  query pattern callExpr where callee.method == "evaluateJavaScript"
+  emit sink code.WebViewLoad at args[0]
+}
+
+binding webViewLoad12 {
+  query pattern callExpr where callee.method == "loadHTMLString"
+  emit sink code.WebViewLoad at args[0]
+}
+
+binding webViewLoad13 {
+  query pattern callExpr where callee.method == "stringByEvaluatingJavaScriptFromString"
+  emit sink code.WebViewLoad at args[0]
+}
+
+binding webViewJsInterface14 {
+  query pattern presenceNode where node.path ~= "add.name"
+  emit issue code.WebViewJsInterface at node
+}
+
+binding sqlExecution15 {
+  query pattern callExpr where callee.path ~= "sqlite3_exec"
+  emit sink code.SqlExecution at args[1]
+}
+
+binding sqlExecution16 {
+  query pattern callExpr where callee.path ~= "sqlite3_prepare_v2"
+  emit sink code.SqlExecution at args[1]
+}
+
+binding sqlExecution17 {
+  query pattern callExpr where callee.path ~= "sqlite3_prepare"
+  emit sink code.SqlExecution at args[1]
+}
+
+binding sqlExecution18 {
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution19 {
+  query pattern callExpr where callee.method == "run"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding commandExecution20 {
+  query pattern callExpr where callee.path ~= "Process"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution21 {
+  query pattern callExpr where callee.method == "launch"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution22 {
+  query pattern callExpr where callee.path ~= "system"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution23 {
+  query pattern callExpr where callee.path ~= "popen"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding filePathAccess24 {
+  query pattern callExpr where callee.method == "contentsOfFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess25 {
+  query pattern callExpr where callee.method == "contents"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess26 {
+  query pattern callExpr where callee.path ~= "FileHandle"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding archiveEntryWrite27 {
+  query pattern callExpr where callee.method == "extractEntry"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding urlFetch28 {
+  query pattern callExpr where callee.path ~= "URL"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch29 {
+  query pattern callExpr where callee.path ~= "URLRequest"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding webViewServerRedirectUrlValidationBypass30 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "swift" and node.context.callPath contains "RequestHandler.handle" and node.context.callPath contains "decisionHandler" and node.context.selector contains "navigationAction.request" and not (node.context.paramLabel contains "didReceiveServerRedirectForProvisionalNavigation")
+  emit issue code.WebViewServerRedirectUrlValidationBypass at node
+}
+
+binding regexCompile31 {
+  query pattern callExpr where callee.path ~= "NSRegularExpression"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding htmlRender32 {
+  query pattern callExpr where callee.method == "write"
+  emit sink code.HtmlRender at args.any
+}
+
+binding htmlRender33 {
+  query pattern callExpr where callee.method == "send"
+  emit sink code.HtmlRender at args.any
+}
+
+binding ldapQuery34 {
+  query pattern callExpr where callee.method == "search"
+  emit sink code.LdapQuery at args[1]
+}
+
+binding xpathQuery35 {
+  query pattern callExpr where callee.method == "evaluate"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding trustBoundary36 {
+  query pattern callExpr where callee.method == "setAttribute"
+  emit sink code.TrustBoundary at args.any
+}
+
+binding trustBoundary37 {
+  query pattern callExpr where callee.method == "putValue"
+  emit sink code.TrustBoundary at args.any
+}
+
+binding objectLookupByUserInput38 {
+  query pattern callExpr where callee.method == "findById"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput39 {
+  query pattern callExpr where callee.method == "getUser"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput40 {
+  query pattern callExpr where callee.method == "getAccount"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding authenticationRequiredOp41 {
+  query pattern presenceNode where node.path ~= "changePassword"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp42 {
+  query pattern presenceNode where node.path ~= "updatePassword"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp43 {
+  query pattern presenceNode where node.path ~= "resetPassword"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp44 {
+  query pattern presenceNode where node.path ~= "changeEmail"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp45 {
+  query pattern presenceNode where node.path ~= "transferFunds"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp46 {
+  query pattern presenceNode where node.path ~= "deleteAccount"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp47 {
+  query pattern presenceNode where node.path ~= "grantRole"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp48 {
+  query pattern presenceNode where node.path ~= "makeAdmin"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding clearanceKitPolicyApplyBeforeAdapterStart49 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "swift" and node.context.startupOrder == "clearance_policy_before_adapter_start"
+  emit issue code.ClearanceKitPolicyApplyBeforeAdapterStart at node
+}
+
+binding weakHash50 {
+  query pattern presenceNode where node.path ~= "Insecure.MD5"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash51 {
+  query pattern presenceNode where node.path ~= "Insecure.SHA1"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash52 {
+  query pattern presenceNode where node.path ~= "CC_MD5"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash53 {
+  query pattern presenceNode where node.path ~= "CC_SHA1"
+  emit issue code.WeakHash at node
+}
+
+binding weakCipher54 {
+  query pattern callExpr where callee.path ~= "Cipher" and args.any.literal contains "DES"
+  emit issue code.WeakCipher at call
+}
+
+binding weakCipher55 {
+  query pattern callExpr where callee.path ~= "Cipher" and args.any.literal contains "RC4"
+  emit issue code.WeakCipher at call
+}
+
+binding weakCipher56 {
+  query pattern callExpr where callee.path ~= "Cipher" and args.any.literal contains "Blowfish"
+  emit issue code.WeakCipher at call
+}
+
+binding staticIv57 {
+  query pattern callExpr where callee.path ~= "Cipher" and args.any.literal contains "0000000000000000"
+  emit issue code.StaticIv at call
+}
+
+binding staticIv58 {
+  query pattern callExpr where callee.path ~= "AES.GCM.Nonce" and args.any.literal contains "000000000000"
+  emit issue code.StaticIv at call
+}
+
+binding weakRandomValue59 {
+  query pattern presenceNode where node.path ~= "arc4random"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue60 {
+  query pattern presenceNode where node.path ~= "arc4random_uniform"
+  emit issue code.WeakRandomValue at node
+}
+
+binding insecureCookie61 {
+  query pattern callExpr where callee.path ~= "setSecure" and args.any.literal contains "false"
+  emit issue code.InsecureCookie at call
+}
+
+binding insecureCookie62 {
+  query pattern callExpr where callee.path ~= "setHttpOnly" and args.any.literal contains "false"
+  emit issue code.InsecureCookie at call
+}
+
+binding certValidationDisabled63 {
+  query pattern callExpr where callee.path ~= "allowsAnyHTTPSCertificate" and args.any.literal contains "true"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding certValidationDisabled64 {
+  query pattern callExpr where callee.path ~= "serverTrustPolicy" and args.any.literal contains "disableEvaluation"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding cleartextChannel65 {
+  query pattern callExpr where callee.path ~= "URL" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding cleartextChannel66 {
+  query pattern callExpr where callee.path ~= "URLRequest" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding permissiveCors67 {
+  query pattern callExpr where callee.path ~= "setHeader" and args.any.literal contains "Access-Control-Allow-Origin" and args.any.literal contains "*"
+  emit issue code.PermissiveCors at call
+}
+
+binding missingFrameProtection68 {
+  query pattern callExpr where callee.path ~= "setHeader" and args.any.literal contains "X-Frame-Options" and args.any.literal contains "ALLOWALL"
+  emit issue code.MissingFrameProtection at call
+}
+
+binding resourceHandle69 {
+  query pattern presenceNode where node.path ~= "FileHandle.forReadingAtPath"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}
+
+binding resourceHandle70 {
+  query pattern presenceNode where node.path ~= "FileHandle.forWritingAtPath"
+  emit issue code.ResourceHandle at node
+  emit sink code.ResourceHandleSink at node
+}
+
+binding resourceRelease71 {
+  query pattern callExpr where callee.method == "closeFile"
+  emit check core.ResourceRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding unboundedCopySmell72 {
+  query pattern presenceNode where node.path ~= "BIO_puts"
+  emit issue code.UnboundedCopySmell at node
+}
+
+binding htmlEscape73 {
+  query pattern callExpr where callee.path ~= "escapeHtml"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding xpathEscape74 {
+  query pattern callExpr where callee.path ~= "escapeXPath"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding ldapEscape75 {
+  query pattern callExpr where callee.path ~= "encodeForLDAP"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding shellEscape76 {
+  query pattern callExpr where callee.path ~= "escapeShell"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding pathCanonicalization77 {
+  query pattern callExpr where callee.path ~= "safePath"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation78 {
+  query pattern callExpr where callee.path ~= "validateRole"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding authenticationCheck79 {
+  query pattern callExpr where callee.path ~= "requireAuth"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck80 {
+  query pattern callExpr where callee.path ~= "ensureAuthenticated"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck81 {
+  query pattern callExpr where callee.path ~= "checkOwnership"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck82 {
+  query pattern callExpr where callee.path ~= "requireOwner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m5c270092;
-
-binding xmlParse39 {
-  requires {
-    dependency("xmldom")
-  }
-  query pattern callExpr where callee.path ~= "DOMParser.parseFromString"
-  emit sink code.XmlParse at args[0]
-}

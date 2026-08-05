@@ -1,6 +1,0 @@
-module bindings.perl.generated.mfca40a44;
-
-binding insecureTempFile67 {
-  query pattern presenceNode where node.path ~= "tmpnam"
-  emit issue code.InsecureTempFile at node
-}

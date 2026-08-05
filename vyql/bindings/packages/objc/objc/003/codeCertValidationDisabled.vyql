@@ -1,9 +1,0 @@
-module bindings.objc.generated.m942721f9;
-
-binding certValidationDisabled3 {
-  requires {
-    dependency("AFNetworking")
-  }
-  query pattern callExpr where callee.method == "setAllowsAnyHTTPSCertificate" and args.any.literal contains "true"
-  emit issue code.CertValidationDisabled at call
-}

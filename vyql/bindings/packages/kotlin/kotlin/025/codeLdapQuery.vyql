@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1457a768;
-
-binding ldapQuery25 {
-  requires {
-    dependency("spring-ldap")
-  }
-  query pattern callExpr where callee.method == "search"
-  emit sink code.LdapQuery at args[1]
-}

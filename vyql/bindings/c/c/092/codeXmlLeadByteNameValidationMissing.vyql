@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding xmlLeadByteNameValidationMissing92 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "c" and node.context.macroName contains "CHECK_NAME_CASE" and node.context.macroName contains "CHECK_NMSTRT_CASE" and node.context.macroBody contains "CHECK_NAME_CASE:" and node.context.macroBody contains "if(!IS_NAME_CHAR(enc,ptr,n))" and node.context.macroBody contains "CHECK_NMSTRT_CASE:" and node.context.macroBody contains "if(!IS_NMSTRT_CHAR(enc,ptr,n))" and not (node.context.macroBody contains "IS_INVALID_CHAR(enc,ptr,n)||!IS_NAME_CHAR(enc,ptr,n)") and not (node.context.macroBody contains "IS_INVALID_CHAR(enc,ptr,n)||!IS_NMSTRT_CHAR(enc,ptr,n)")
-  emit issue code.XmlLeadByteNameValidationMissing at node
-}

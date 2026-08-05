@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m5c270092;
-
-binding sqlExecution23 {
-  requires {
-    dependency("sqlite3")
-  }
-  query pattern callExpr where callee.method == "all"
-  emit sink code.SqlExecution at args[0]
-}

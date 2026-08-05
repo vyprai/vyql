@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding locklessSharedMutation71 {
-  query pattern presenceNode where node.path ~= "dispatch_async"
-  emit issue code.LocklessSharedMutation at node
-}

@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding textAccessLogDefaultFormatInjection160 {
-  query pattern presenceNode where node.kind == "call" and node.path ~= "cfgcore.DataSource_InlineString" and operand(node, where: operand.identifier contains "EnvoyTextLogFormat")
-  emit issue code.TextAccessLogDefaultFormatInjection at node
-}

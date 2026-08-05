@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding unencodedUrlQueryParameter235 {
-  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["generateURL", "getRenderer"]) and node.context.callPath contains "StringBuilder" and node.context.callPath contains "append" and containsAny(node.context.literal, ["?jobFilter=", "&nodeFilter=", "&launcherFilter="]) and containsAny(node.context.callPath, ["getJobFilter", "getNodeFilter", "getLauncherFilter"]) and not (containsAny(node.context.callPath, ["URLEncoder.encode", "Util.rawEncode", "encodeURIComponent"]))
-  emit issue code.UnencodedUrlQueryParameter at node
-}

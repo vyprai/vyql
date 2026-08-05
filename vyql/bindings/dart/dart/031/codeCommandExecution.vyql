@@ -1,7 +1,0 @@
-module bindings.dart.generated.m1c398214;
-
-binding commandExecution31 {
-  query pattern callExpr where callee.path ~= "Process.run"
-  emit sink code.CommandExecution at args.any
-  emit sink code.CommandExecution at args.any.collection
-}

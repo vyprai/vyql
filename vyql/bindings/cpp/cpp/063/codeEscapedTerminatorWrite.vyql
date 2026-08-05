@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding escapedTerminatorWrite63 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "string.escaped_terminator_write"
-  emit issue code.EscapedTerminatorWrite at node
-}

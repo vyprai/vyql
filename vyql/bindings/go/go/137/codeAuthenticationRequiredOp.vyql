@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding authenticationRequiredOp137 {
-  query pattern presenceNode where node.path ~= "ChangePassword"
-  emit issue code.AuthenticationRequiredOp at node
-}

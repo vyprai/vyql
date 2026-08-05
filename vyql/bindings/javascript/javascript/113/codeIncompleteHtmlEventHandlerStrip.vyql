@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding incompleteHtmlEventHandlerStrip113 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.identifier contains "ViewSource" and node.context.prop contains "stripScripts=true" and node.context.prop contains "stripIFrames=true" and node.context.prop contains "stripComments=true" and node.context.call contains "_stripScripts" and node.context.call contains "_stripIFrames" and not (node.context.prop contains "stripEventHandlers=true") and not (node.context.call contains "_stripEventHandlers")
-  emit issue code.IncompleteHtmlEventHandlerStrip at node
-}

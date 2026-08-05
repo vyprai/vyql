@@ -1,6 +1,0 @@
-module bindings.swift.generated.m388f23d0;
-
-binding envVariable1 {
-  query pattern callExpr where callee.path ~= ".environment"
-  emit source code.EnvVariable at call.result
-}

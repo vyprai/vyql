@@ -1,7 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding fileUse152 {
-  query pattern presenceNode where node.path ~= "open64"
-  emit issue code.FileUse at node
-  emit sink code.FileUseSink at node
-}

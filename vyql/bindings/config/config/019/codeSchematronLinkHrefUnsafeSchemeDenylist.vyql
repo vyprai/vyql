@@ -1,6 +1,0 @@
-module bindings.config.generated.m2b6375a9;
-
-binding schematronLinkHrefUnsafeSchemeDenylist19 {
-  query pattern presenceNode where node.analysis ~= "config.schematron_link_href_case_sensitive_script_denylist"
-  emit issue code.SchematronLinkHrefUnsafeSchemeDenylist at node
-}

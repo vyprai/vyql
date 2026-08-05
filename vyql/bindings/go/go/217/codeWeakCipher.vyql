@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding weakCipher217 {
-  query pattern presenceNode where node.path ~= "des.NewCipher"
-  emit issue code.WeakCipher at node
-}

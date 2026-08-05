@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding repositorySourceMetadataExposure88 {
-  query pattern presenceNode where node.scope == "function" and node.context.metadataExportAfterSensitiveKey contains "repoSource" and node.context.metadataExportWriter contains "metadata"
-  emit issue code.RepositorySourceMetadataExposure at node
-}

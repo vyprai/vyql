@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding claxonResidualPartitionBufferExposure24 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "claxon_residual_partition_buffer_exposure"
-  emit issue code.ClaxonResidualPartitionBufferExposure at node
-}

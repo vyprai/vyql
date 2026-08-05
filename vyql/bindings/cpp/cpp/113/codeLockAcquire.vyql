@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding lockAcquire113 {
-  query pattern presenceNode where node.path ~= "mutex.lock"
-  emit issue code.LockAcquire at node
-}

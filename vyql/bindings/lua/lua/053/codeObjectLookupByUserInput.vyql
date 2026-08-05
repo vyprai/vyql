@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding objectLookupByUserInput53 {
-  query pattern callExpr where callee.method == "find_by_id"
-  emit sink code.ObjectLookupByUserInput at args[0]
-}

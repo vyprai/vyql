@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding fileInclude248 {
-  query pattern callExpr where callee.path ~= "include"
-  emit sink code.FileInclude at args[0]
-}

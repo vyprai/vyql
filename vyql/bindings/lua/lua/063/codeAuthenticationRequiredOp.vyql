@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding authenticationRequiredOp63 {
-  query pattern presenceNode where node.path ~= "make_admin"
-  emit issue code.AuthenticationRequiredOp at node
-}

@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding sensitiveOperation251 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doConfigure" and node.context.call contains "configure" and node.context.call contains "save" and not (node.context.scopeCall contains "checkPermission")
-  emit issue code.SensitiveOperation at node
-}

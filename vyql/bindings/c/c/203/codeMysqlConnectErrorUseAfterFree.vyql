@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding mysqlConnectErrorUseAfterFree203 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "lifetime.mysql_connect_error_use_after_free"
-  emit issue code.MysqlConnectErrorUseAfterFree at node
-}

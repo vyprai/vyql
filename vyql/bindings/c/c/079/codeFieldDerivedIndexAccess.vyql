@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding fieldDerivedIndexAccess79 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "index.field_derived_missing_upper_bound"
-  emit issue code.FieldDerivedIndexAccess at node
-}

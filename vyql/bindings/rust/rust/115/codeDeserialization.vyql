@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding deserialization115 {
-  query pattern callExpr where callee.path ~= "serde_json.from_str"
-  emit sink code.Deserialization at args[0]
-}

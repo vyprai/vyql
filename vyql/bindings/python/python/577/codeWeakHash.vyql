@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding weakHash577 {
-  query pattern callExpr where callee.path ~= "hashlib.new" and args.any.literal contains "md4"
-  emit issue code.WeakHash at call
-}

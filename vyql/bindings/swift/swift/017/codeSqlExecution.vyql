@@ -1,6 +1,0 @@
-module bindings.swift.generated.m388f23d0;
-
-binding sqlExecution17 {
-  query pattern callExpr where callee.path ~= "sqlite3_prepare"
-  emit sink code.SqlExecution at args[1]
-}

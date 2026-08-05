@@ -1,7 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding logWrite212 {
-  query pattern presenceNode where node.path ~= "logging.error"
-  emit issue code.LogWrite at node
-  emit sink code.LogWriteSink at node
-}

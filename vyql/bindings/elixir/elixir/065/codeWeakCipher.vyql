@@ -1,6 +1,0 @@
-module bindings.elixir.generated.m728b8a72;
-
-binding weakCipher65 {
-  query pattern callExpr where callee.path ~= ":crypto.block_encrypt" and args.any.literal contains ":blowfish"
-  emit issue code.WeakCipher at call
-}

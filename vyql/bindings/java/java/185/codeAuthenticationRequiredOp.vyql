@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding authenticationRequiredOp185 {
-  query pattern presenceNode where node.path ~= "grantRole"
-  emit issue code.AuthenticationRequiredOp at node
-}

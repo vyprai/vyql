@@ -1,7 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding logWrite191 {
-  query pattern presenceNode where node.path ~= "logger.info"
-  emit issue code.LogWrite at node
-  emit sink code.LogWriteSink at node
-}

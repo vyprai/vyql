@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding httpInput16 {
-  query pattern callExpr where callee.path ~= "$HTTP_SERVER_VARS" and args.any.literal contains "PATH_INFO"
-  emit source code.HttpInput at call.result
-}

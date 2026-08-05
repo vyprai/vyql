@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding codeEval11 {
-  query pattern callExpr where callee.path ~= "load"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding lengthDerivedAllocation100 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "allocation.length_derived_before_file_bound"
-  emit issue code.LengthDerivedAllocation at node
-}

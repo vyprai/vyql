@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding wordPressAddQueryArgHrefXss103 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "wordpress_add_query_arg_href_xss"
-  emit issue code.WordPressAddQueryArgHrefXss at node
-}

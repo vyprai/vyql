@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding commandExecution222 {
-  query pattern callExpr where callee.path ~= "cp.execSync"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding deserialization308 {
-  query pattern callExpr where callee.path ~= "numpy.load"
-  emit sink code.Deserialization at args[0]
-}

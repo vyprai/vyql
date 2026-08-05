@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding fidoRegistrationChallengeReplay263 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "fido_registration_challenge_replay"
-  emit issue code.FidoRegistrationChallengeReplay at node
-}

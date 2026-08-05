@@ -1,7 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding catastrophicRegex570 {
-  query pattern callExpr where callee.path ~= "re.compile" and args.any.literal contains "[ \\n\\r\\t]*(.+?)[ \\n\\r\\t]*"
-  emit sink code.CatastrophicRegexSink at args[0]
-  emit issue code.CatastrophicRegex at call
-}

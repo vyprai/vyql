@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding insecureCookie654 {
-  query pattern callExpr where callee.path ~= "set_cookie" and args.any.literal contains "secure=False"
-  emit issue code.InsecureCookie at call
-}

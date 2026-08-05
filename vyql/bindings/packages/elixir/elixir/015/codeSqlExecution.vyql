@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mf98b3aca;
-
-binding sqlExecution15 {
-  requires {
-    dependency("ecto_sql")
-  }
-  query pattern callExpr where callee.path ~= "Ecto.Adapters.SQL.query"
-  emit sink code.SqlExecution at args[0]
-}

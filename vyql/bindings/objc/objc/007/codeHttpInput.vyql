@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding httpInput7 {
-  query pattern callExpr where callee.path ~= "fread"
-  emit source code.HttpInput at call.result
-}

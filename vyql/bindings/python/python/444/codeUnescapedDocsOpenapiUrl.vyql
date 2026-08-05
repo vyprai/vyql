@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding unescapedDocsOpenapiUrl444 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unescaped_docs_openapi_url"
-  emit issue code.UnescapedDocsOpenapiUrl at node
-}

@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding weakRandomValue72 {
-  query pattern presenceNode where node.path ~= "math.random"
-  emit issue code.WeakRandomValue at node
-}

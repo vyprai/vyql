@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding jenkinsPluginForkedDirectoryBrowserWithoutCsp91 {
-  query pattern callExpr where callee.path == "DirectoryBrowserSupport" and args.any.literal contains "Compare Html Report" and args.any.literal contains "graph.gif"
-  emit issue code.JenkinsPluginForkedDirectoryBrowserWithoutCsp at call
-}

@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding patternOptionInput1 {
-  query pattern callExpr where callee.path ~= "options.pattern"
-  emit source code.PatternOptionInput at call.result
-}

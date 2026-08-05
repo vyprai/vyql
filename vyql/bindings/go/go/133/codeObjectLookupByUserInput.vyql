@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding objectLookupByUserInput133 {
-  query pattern callExpr where callee.method == "FindById"
-  emit sink code.ObjectLookupByUserInput at args[0]
-}

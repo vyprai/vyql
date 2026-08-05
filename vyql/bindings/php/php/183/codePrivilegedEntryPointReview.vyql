@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding privilegedEntryPointReview183 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "privileged_entry_point_review"
-  emit issue code.PrivilegedEntryPointReview at node
-}

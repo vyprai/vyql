@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding csrfDisabled655 {
-  query pattern callExpr where callee.path ~= "csrfProtection" and args.any.literal contains "false"
-  emit issue code.CsrfDisabled at call
-}

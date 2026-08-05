@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding locklessSharedMutation162 {
-  query pattern presenceNode where node.path ~= "pthread_create"
-  emit issue code.LocklessSharedMutation at node
-}

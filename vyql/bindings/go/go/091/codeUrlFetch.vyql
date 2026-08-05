@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding urlFetch91 {
-  query pattern callExpr where callee.path ~= "client.Head"
-  emit sink code.UrlFetch at args[0]
-}

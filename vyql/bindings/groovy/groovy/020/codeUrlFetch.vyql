@@ -1,6 +1,0 @@
-module bindings.groovy.generated.m6eabb149;
-
-binding urlFetch20 {
-  query pattern callExpr where callee.path ~= "URL"
-  emit sink code.UrlFetch at args[0]
-}

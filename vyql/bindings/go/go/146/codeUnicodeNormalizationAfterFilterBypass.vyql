@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding unicodeNormalizationAfterFilterBypass146 {
-  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["Preprocess", "preprocess", "Normalize", "normalize", "Canonical", "canonical", "Lookup", "lookup"]) and node.context.callPath contains "regexp.MustCompile.ReplaceAllString" and node.context.callPath contains "norm.NFKD.String" and node.context.callOrder contains "norm.NFKD.String>regexp.MustCompile.ReplaceAllString" and not (node.context.callOrder contains "regexp.MustCompile.ReplaceAllString>norm.NFKD.String") and containsAny(node.context.literal, ["-_ .", "[-_ .]", "-_."])
-  emit issue code.UnicodeNormalizationAfterFilterBypass at node
-}

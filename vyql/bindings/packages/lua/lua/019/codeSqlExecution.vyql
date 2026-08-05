@@ -1,9 +1,0 @@
-module bindings.lua.generated.m49b0a04f;
-
-binding sqlExecution19 {
-  requires {
-    dependency("pgmoon")
-  }
-  query pattern callExpr where callee.path ~= "pg.query"
-  emit sink code.SqlExecution at args[0]
-}

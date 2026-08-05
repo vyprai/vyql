@@ -1,6 +1,0 @@
-module bindings.perl.generated.mfca40a44;
-
-binding urlFetch26 {
-  query pattern callExpr where callee.path ~= "getprint"
-  emit sink code.UrlFetch at args[0]
-}

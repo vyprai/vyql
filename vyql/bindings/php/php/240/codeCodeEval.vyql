@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding codeEval240 {
-  query pattern callExpr where callee.path ~= "eval"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.lua.generated.m49b0a04f;
-
-binding xmlParse23 {
-  requires {
-    dependency("luaexpat")
-  }
-  query pattern callExpr where callee.path ~= "xml.parse"
-  emit sink code.XmlParse at args[0]
-}

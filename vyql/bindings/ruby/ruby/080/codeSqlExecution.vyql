@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding sqlExecution80 {
-  query pattern callExpr where callee.path ~= "DB.execute"
-  emit sink code.SqlExecution at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding stateChangingOp364 {
-  query pattern callExpr where callee.method == "setFromPost"
-  emit sink code.StateChangingOpSink at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding htmlRender479 {
-  query pattern callExpr where callee.path ~= "Template.render"
-  emit sink code.HtmlRender at args[0]
-}

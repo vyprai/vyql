@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding dhcpOptionLengthUncheckedRead110 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "dhcp_option.unchecked_read"
-  emit issue code.DhcpOptionLengthUncheckedRead at node
-}

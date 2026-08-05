@@ -1,6 +1,0 @@
-module bindings.scala.generated.m06d0685b;
-
-binding certValidationDisabled42 {
-  query pattern presenceNode where node.path ~= "NoopHostnameVerifier"
-  emit issue code.CertValidationDisabled at node
-}

@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding bufferedErrorPageRequestMetadataXss274 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "buffered_error_page_request_metadata_xss"
-  emit issue code.BufferedErrorPageRequestMetadataXss at node
-}

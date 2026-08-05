@@ -1,9 +1,0 @@
-module bindings.java.generated.m9ef49b0f;
-
-binding filePathAccess24 {
-  requires {
-    dependency("java.nio.file")
-  }
-  query pattern callExpr where callee.path ~= "Files.readAllBytes"
-  emit sink code.FilePathAccess at args[0]
-}

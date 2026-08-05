@@ -1,0 +1,392 @@
+module bindings.go.generated.m39efcd29;
+
+binding httpInput0 {
+  requires {
+    dependency("net/http")
+  }
+  query pattern callExpr where callee.method == "Query" and callee.receiver.type == "http.Request"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("net/http")
+  }
+  query pattern callExpr where callee.method == "FormValue" and callee.receiver.type == "http.Request"
+  emit source code.HttpInput at call.result
+}
+
+binding urlFetch2 {
+  requires {
+    dependency("net/http")
+  }
+  query pattern callExpr where callee.path ~= "http.Get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding httpInput3 {
+  requires {
+    dependency("github.com/gin-gonic/gin")
+  }
+  query pattern callExpr where callee.method == "Param" and callee.receiver.type == "gin.Context"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("github.com/gin-gonic/gin")
+  }
+  query pattern callExpr where callee.method == "Query" and callee.receiver.type == "gin.Context"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  requires {
+    dependency("github.com/gofiber/fiber")
+  }
+  query pattern callExpr where callee.method == "Params" and callee.receiver.type == "fiber.Ctx"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput6 {
+  requires {
+    dependency("github.com/labstack/echo")
+  }
+  query pattern callExpr where callee.method == "QueryParam" and callee.receiver.type == "echo.Context"
+  emit source code.HttpInput at call.result
+}
+
+binding secretValue7 {
+  requires {
+    dependency("os")
+  }
+  query pattern callExpr where callee.path ~= "os.Getenv"
+  emit source code.SecretValue at call.result
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("os")
+  }
+  query pattern callExpr where callee.path ~= "os.Open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding externalApiResponse9 {
+  requires {
+    dependency("github.com/go-resty/resty")
+  }
+  query pattern callExpr where callee.method == "Body"
+  emit source code.ExternalApiResponse at call.result
+}
+
+binding urlFetch10 {
+  requires {
+    dependency("github.com/go-resty/resty")
+  }
+  query pattern callExpr where callee.method == "R"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding sqlExecution11 {
+  requires {
+    dependency("database/sql")
+  }
+  query pattern callExpr where callee.method == "Query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution12 {
+  requires {
+    dependency("database/sql")
+  }
+  query pattern callExpr where callee.method == "Exec"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlParameterization13 {
+  requires {
+    dependency("database/sql")
+  }
+  query pattern callExpr where callee.method == "Prepare"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding sqlExecution14 {
+  requires {
+    dependency("gorm.io/gorm")
+  }
+  query pattern callExpr where callee.method == "Raw"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution15 {
+  requires {
+    dependency("gorm.io/gorm")
+  }
+  query pattern callExpr where callee.method == "Where"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution16 {
+  requires {
+    dependency("github.com/jmoiron/sqlx")
+  }
+  query pattern callExpr where callee.method == "Select"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding nosqlQuery17 {
+  requires {
+    dependency("go.mongodb.org/mongo-driver")
+  }
+  query pattern callExpr where callee.method == "Find"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding commandExecution18 {
+  requires {
+    dependency("os/exec")
+  }
+  query pattern callExpr where callee.path ~= "exec.Command"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding codeEval19 {
+  requires {
+    dependency("text/template")
+  }
+  query pattern callExpr where callee.path ~= "template.New"
+  emit sink code.CodeEval at args[0]
+}
+
+binding deserialization20 {
+  requires {
+    dependency("gopkg.in/yaml.v3")
+  }
+  query pattern callExpr where callee.path ~= "yaml.Unmarshal"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization21 {
+  requires {
+    dependency("encoding/json")
+  }
+  query pattern callExpr where callee.path ~= "json.Unmarshal"
+  emit sink code.Deserialization at args[0]
+}
+
+binding archiveEntryWrite22 {
+  requires {
+    dependency("archive/zip")
+  }
+  query pattern callExpr where callee.path ~= "zip.File.Open"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding xmlParse23 {
+  requires {
+    dependency("encoding/xml")
+  }
+  query pattern callExpr where callee.path ~= "xml.Unmarshal"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlHardening24 {
+  requires {
+    dependency("encoding/xml")
+  }
+  query pattern callExpr where callee.path ~= "xml.NewDecoder"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xpathQuery25 {
+  requires {
+    dependency("github.com/antchfx/xpath")
+  }
+  query pattern callExpr where callee.path ~= "xpath.Compile"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding ldapQuery26 {
+  requires {
+    dependency("github.com/go-ldap/ldap")
+  }
+  query pattern callExpr where callee.method == "Search"
+  emit sink code.LdapQuery at args[1]
+}
+
+binding ldapEscape27 {
+  requires {
+    dependency("github.com/go-ldap/ldap")
+  }
+  query pattern callExpr where callee.path ~= "ldap.EscapeFilter"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlRender28 {
+  requires {
+    dependency("html/template")
+  }
+  query pattern callExpr where callee.method == "Execute"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlEscape29 {
+  requires {
+    dependency("html/template")
+  }
+  query pattern callExpr where callee.path ~= "template.HTMLEscapeString"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding regexCompile30 {
+  requires {
+    dependency("regexp")
+  }
+  query pattern callExpr where callee.path ~= "regexp.Compile"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding htmlEscape31 {
+  requires {
+    dependency("html")
+  }
+  query pattern callExpr where callee.path ~= "html.EscapeString"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding shellEscape32 {
+  requires {
+    dependency("github.com/alessio/shellescape")
+  }
+  query pattern callExpr where callee.path ~= "shellescape.Quote"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding pathCanonicalization33 {
+  requires {
+    dependency("path/filepath")
+  }
+  query pattern callExpr where callee.path ~= "filepath.Clean"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape34 {
+  requires {
+    dependency("github.com/microcosm-cc/bluemonday")
+  }
+  query pattern callExpr where callee.path ~= "bluemonday.UGCPolicy"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding redirectAllowlist35 {
+  requires {
+    dependency("net/url")
+  }
+  query pattern callExpr where callee.path ~= "url.ParseRequestURI"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck36 {
+  requires {
+    dependency("github.com/golang-jwt/jwt")
+  }
+  query pattern callExpr where callee.method == "RequireAuth"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding csrfProtection37 {
+  requires {
+    dependency("github.com/gorilla/csrf")
+  }
+  query pattern callExpr where callee.path ~= "csrf.Protect"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck38 {
+  requires {
+    dependency("github.com/casbin/casbin")
+  }
+  query pattern callExpr where callee.method == "Can"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding nullableDeref39 {
+  requires {
+    dependency("github.com/free5gc/ausf/internal/context")
+  }
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "UeAuthPostRequestProcedure" and node.context.selector contains "updateAuthenticationInfo.ResynchronizationInfo" and node.context.call contains "GetSupiFromSuciSupiMap" and node.context.call contains "GetAusfUeContext" and node.context.selector contains "ausfCurrentContext.Rand" and not (node.context.scopeCall contains "CheckIfSuciSupiPairExists") and not (node.context.scopeCall contains "CheckIfAusfUeContextExists")
+  emit issue code.NullableDeref at node
+}
+
+binding userIdentityMappingReview40 {
+  requires {
+    dependency("github.com/ubuntu/authd")
+  }
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "userPreCheck" and node.context.callPath contains "json.Unmarshal" and node.context.callPath contains "s.userManager.GenerateUID" and node.context.callPath contains "s.userManager.GenerateGID" and not (node.context.callPath contains "s.userManager.RegisterUserPreAuth")
+  emit issue code.UserIdentityMappingReview at node
+}
+
+binding authFailureResponseReview41 {
+  requires {
+    dependency("github.com/authelia/authelia")
+  }
+  query pattern callExpr where callee.path ~= "ctx.Error" and args.any.literal contains "Unable to parse target URL"
+  emit issue code.AuthFailureResponseReview at call
+}

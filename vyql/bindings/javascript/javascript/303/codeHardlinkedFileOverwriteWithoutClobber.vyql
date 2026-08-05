@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding hardlinkedFileOverwriteWithoutClobber303 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "get-type" and node.context.callPath contains "rimraf" and node.context.callPath contains "create" and node.context.attrPath contains "self._path" and node.context.attrPath contains "self.type" and not (node.context.binary contains "current.nlink>1")
-  emit issue code.HardlinkedFileOverwriteWithoutClobber at node
-}

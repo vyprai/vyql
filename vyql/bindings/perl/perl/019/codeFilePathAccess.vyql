@@ -1,6 +1,0 @@
-module bindings.perl.generated.mfca40a44;
-
-binding filePathAccess19 {
-  query pattern callExpr where callee.path ~= "open"
-  emit sink code.FilePathAccess at args.any
-}

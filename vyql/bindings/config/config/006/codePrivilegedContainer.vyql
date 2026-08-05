@@ -1,6 +1,0 @@
-module bindings.config.generated.m2b6375a9;
-
-binding privilegedContainer6 {
-  query pattern presenceNode where node.analysis ~= "config.container.root_user"
-  emit issue code.PrivilegedContainer at node
-}

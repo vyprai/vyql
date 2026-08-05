@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding unsanitizedSvgUpload472 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.subscript contains "$_FILES" and node.context.callPath contains "Filesystem.extension" and node.context.callPath contains "Filesystem.mimeType" and node.context.callPath contains "Filesystem.mv" and node.context.callPath contains "in_array" and not (containsAny(node.context.scopeCall, [sanitizeSvg, svgSanitize, Sanitizer]))
-  emit issue code.UnsanitizedSvgUpload at node
-}

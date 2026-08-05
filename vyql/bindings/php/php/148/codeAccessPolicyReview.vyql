@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding accessPolicyReview148 {
-  query pattern presenceNode where node.analysis == "module.context" and node.context.language == "php" and node.context.phpReview == "access_policy_locale_site_groups_admin"
-  emit issue code.AccessPolicyReview at node
-}

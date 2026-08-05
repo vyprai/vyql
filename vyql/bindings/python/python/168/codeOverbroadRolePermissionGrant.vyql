@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding overbroadRolePermissionGrant168 {
-  query pattern presenceNode where node.scope == "module" and node.context.pythonReview == "overbroad_role_permission_grant"
-  emit issue code.OverbroadRolePermissionGrant at node
-}

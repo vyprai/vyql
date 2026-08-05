@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding mcpToolCommandTemplateExecution248 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.callPath contains "server.tool" and containsAny(node.context.literal, ["lsof -t -i tcp:${port}", "ps -p ${pid} -o comm="]) and not (node.context.callPath contains "execFile")
-  emit issue code.McpToolCommandTemplateExecution at node
-}

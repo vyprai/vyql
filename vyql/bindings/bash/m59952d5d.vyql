@@ -1,0 +1,228 @@
+module bindings.bash.generated.m59952d5d;
+
+pattern bindingMetadata {
+  binding: {
+    name: "bash"
+    meta: {
+      fidelity: "resolved"
+      source_var_event: "shell_input"
+      source_var_exact: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "@", "*", "QUERY_STRING", "REQUEST_URI", "REQUEST_METHOD"]
+      source_var_prefix: ["HTTP_", "REQUEST_", "CONTENT_", "PATH_INFO", "REMOTE_"]
+    }
+  }
+}
+
+binding httpInput0 {
+  query pattern callExpr where callee.path ~= "shell_input"
+  emit source code.HttpInput at call.result
+}
+
+binding codeEval1 {
+  query pattern callExpr where callee.path ~= "eval"
+  emit sink code.CodeEval at args[0]
+}
+
+binding commandExecution2 {
+  query pattern callExpr where callee.path ~= "eval"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution3 {
+  query pattern callExpr where callee.path ~= "bash"
+  emit sink code.CommandExecution at args[1]
+}
+
+binding commandExecution4 {
+  query pattern callExpr where callee.path ~= "sh"
+  emit sink code.CommandExecution at args[1]
+}
+
+binding commandExecution5 {
+  query pattern callExpr where callee.path ~= "zsh"
+  emit sink code.CommandExecution at args[1]
+}
+
+binding commandExecution6 {
+  query pattern callExpr where callee.path ~= "ksh"
+  emit sink code.CommandExecution at args[1]
+}
+
+binding codeEval7 {
+  query pattern callExpr where callee.path ~= "python"
+  emit sink code.CodeEval at args[1]
+}
+
+binding codeEval8 {
+  query pattern callExpr where callee.path ~= "python3"
+  emit sink code.CodeEval at args[1]
+}
+
+binding pythonTripleQuoteShellInterpolation9 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "bash" and node.context.shellBridge == "python_triple_quote_stdin_interpolation"
+  emit issue code.PythonTripleQuoteShellInterpolation at node
+}
+
+binding codeEval10 {
+  query pattern callExpr where callee.path ~= "perl"
+  emit sink code.CodeEval at args[1]
+}
+
+binding codeEval11 {
+  query pattern callExpr where callee.path ~= "php"
+  emit sink code.CodeEval at args[1]
+}
+
+binding codeEval12 {
+  query pattern callExpr where callee.path ~= "node"
+  emit sink code.CodeEval at args[1]
+}
+
+binding urlFetch13 {
+  query pattern callExpr where callee.path ~= "curl"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch14 {
+  query pattern callExpr where callee.path ~= "wget"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding regexCompile15 {
+  query pattern callExpr where callee.path ~= "grep"
+  emit sink code.RegexCompileSink at args.any
+}
+
+binding regexCompile16 {
+  query pattern callExpr where callee.path ~= "egrep"
+  emit sink code.RegexCompileSink at args.any
+}
+
+binding cleartextChannel17 {
+  query pattern callExpr where callee.path ~= "curl" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding cleartextChannel18 {
+  query pattern callExpr where callee.path ~= "wget" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding fileInclude19 {
+  query pattern callExpr where callee.path ~= "source"
+  emit sink code.FileInclude at args[0]
+}
+
+binding fileInclude20 {
+  query pattern callExpr where callee.path ~= "."
+  emit sink code.FileInclude at args[0]
+}
+
+binding filePathAccess21 {
+  query pattern callExpr where callee.path ~= "cat"
+  emit sink code.FilePathAccess at args.any
+}
+
+binding filePathAccess22 {
+  query pattern callExpr where callee.path ~= "less"
+  emit sink code.FilePathAccess at args.any
+}
+
+binding filePathAccess23 {
+  query pattern callExpr where callee.path ~= "head"
+  emit sink code.FilePathAccess at args.any
+}
+
+binding filePathAccess24 {
+  query pattern callExpr where callee.path ~= "tail"
+  emit sink code.FilePathAccess at args.any
+}
+
+binding filePathAccess25 {
+  query pattern callExpr where callee.path ~= "rm"
+  emit sink code.FilePathAccess at args.any
+}
+
+binding filePathAccess26 {
+  query pattern callExpr where callee.path ~= "cp"
+  emit sink code.FilePathAccess at args.any
+}
+
+binding filePathAccess27 {
+  query pattern callExpr where callee.path ~= "mv"
+  emit sink code.FilePathAccess at args.any
+}
+
+binding filePathAccess28 {
+  query pattern callExpr where callee.path ~= "chmod"
+  emit sink code.FilePathAccess at args.any
+}
+
+binding filePathAccess29 {
+  query pattern callExpr where callee.path ~= "chown"
+  emit sink code.FilePathAccess at args.any
+}
+
+binding filePathAccess30 {
+  query pattern callExpr where callee.path ~= "tar"
+  emit sink code.FilePathAccess at args.any
+}
+
+binding pathCanonicalization31 {
+  query pattern callExpr where callee.path ~= "basename"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding weakHash32 {
+  query pattern presenceNode where node.path ~= "md5sum"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash33 {
+  query pattern presenceNode where node.path ~= "sha1sum"
+  emit issue code.WeakHash at node
+}
+
+binding insecurePermission34 {
+  query pattern callExpr where callee.path ~= "chmod" and args.any.literal contains "777"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission35 {
+  query pattern callExpr where callee.path ~= "chmod" and args.any.literal contains "666"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission36 {
+  query pattern callExpr where callee.path ~= "chmod" and args.any.literal contains "a+w"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecureTempFile37 {
+  query pattern callExpr where callee.path ~= "mktemp" and args.any.literal contains "-u"
+  emit issue code.InsecureTempFile at call
+}
+
+binding weakRandomValue38 {
+  query pattern presenceNode where node.path ~= "RANDOM"
+  emit issue code.WeakRandomValue at node
+}
+
+binding sqlExecution39 {
+  query pattern callExpr where callee.path ~= "mysql"
+  emit sink code.SqlExecution at args.any
+}
+
+binding sqlExecution40 {
+  query pattern callExpr where callee.path ~= "psql"
+  emit sink code.SqlExecution at args.any
+}
+
+binding sqlExecution41 {
+  query pattern callExpr where callee.path ~= "sqlite3"
+  emit sink code.SqlExecution at args.any
+}

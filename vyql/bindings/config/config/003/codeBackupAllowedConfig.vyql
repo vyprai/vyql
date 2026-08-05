@@ -1,6 +1,0 @@
-module bindings.config.generated.m2b6375a9;
-
-binding backupAllowedConfig3 {
-  query pattern presenceNode where node.analysis ~= "config.android.backup_allowed"
-  emit issue code.BackupAllowedConfig at node
-}

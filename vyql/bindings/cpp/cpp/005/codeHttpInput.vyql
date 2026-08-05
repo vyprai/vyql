@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding httpInput5 {
-  query pattern callExpr where callee.path ~= "recv"
-  emit source code.HttpInput at call.result
-}

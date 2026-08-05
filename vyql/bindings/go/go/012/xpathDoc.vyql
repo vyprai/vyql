@@ -1,8 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding doc12 {
-  query pattern callExpr where callee.path ~= "support.NewXMLDoc"
-  emit fact runtime.ReceiverType at call.result {
-    about: xpath.Doc
-  }
-}

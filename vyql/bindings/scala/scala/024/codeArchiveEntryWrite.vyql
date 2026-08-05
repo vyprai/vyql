@@ -1,6 +1,0 @@
-module bindings.scala.generated.m06d0685b;
-
-binding archiveEntryWrite24 {
-  query pattern callExpr where callee.method == "extractEntry"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

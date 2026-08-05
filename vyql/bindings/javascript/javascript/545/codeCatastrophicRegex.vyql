@@ -1,7 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding catastrophicRegex545 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.literal contains "[\\{\\[].*[\\/]*.*[\\}\\]]$" and node.context.callPath contains "enclosure.test" and not (node.context.literal contains "[\\{\\[].*[\\}\\]]$")
-  emit issue code.CatastrophicRegex at node
-  emit sink code.CatastrophicRegexSink at node
-}

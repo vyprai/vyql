@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding staticIv151 {
-  query pattern callExpr where callee.path ~= "CreateEncryptor" and args.any.literal contains "0000000000000000"
-  emit issue code.StaticIv at call
-}

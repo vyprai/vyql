@@ -1,9 +1,0 @@
-module bindings.java.generated.m9ef49b0f;
-
-binding unescapedExceptionMessageMarkup49 {
-  requires {
-    dependency("org.kohsuke.stapler")
-  }
-  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "Pattern.compile" and node.context.callPath contains "FormValidation.errorWithMarkup" and node.context.call contains "getMessage" and not (node.context.callPath contains "Util.escape")
-  emit issue code.UnescapedExceptionMessageMarkup at node
-}

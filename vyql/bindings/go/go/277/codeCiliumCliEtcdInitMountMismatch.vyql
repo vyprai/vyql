@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding ciliumCliEtcdInitMountMismatch277 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "generateDeployment" and node.context.literal contains "etcd-init" and node.context.field contains "MountPath=etcd-data-dir" and node.context.field contains "Args"
-  emit issue code.CiliumCliEtcdInitMountMismatch at node
-}

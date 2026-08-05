@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding httpInput22 {
-  query pattern callExpr where callee.method == "getParameter"
-  emit source code.HttpInput at call.result
-}

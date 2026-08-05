@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding ffiEnumLayoutRisk16 {
-  query pattern presenceNode where node.kind == "any" and node.analysis == "rust.ffi_enum_layout_risk"
-  emit issue code.FfiEnumLayoutRisk at node
-}

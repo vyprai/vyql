@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding commandExecution11 {
-  query pattern callExpr where callee.path ~= "Command.new"
-  emit sink code.CommandExecution at args[0]
-}

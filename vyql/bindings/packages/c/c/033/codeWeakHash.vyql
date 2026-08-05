@@ -1,9 +1,0 @@
-module bindings.c.generated.m2816daee;
-
-binding weakHash33 {
-  requires {
-    dependency("openssl")
-  }
-  query pattern presenceNode where node.path ~= "SHA1_Init"
-  emit issue code.WeakHash at node
-}

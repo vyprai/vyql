@@ -1,9 +1,0 @@
-module bindings.python.generated.m3d9ccbad;
-
-binding databaseRead40 {
-  requires {
-    dependency("sqlalchemy")
-  }
-  query pattern callExpr where callee.path ~= "query.one"
-  emit source code.DatabaseRead at call.result
-}

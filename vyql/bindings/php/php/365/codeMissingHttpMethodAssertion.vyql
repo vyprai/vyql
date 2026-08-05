@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding missingHttpMethodAssertion365 {
-  query pattern presenceNode where node.scope == "class" and node.context.phpReview == "state_changing_action_missing_method_assertion_delete_by"
-  emit issue code.MissingHttpMethodAssertion at node
-}

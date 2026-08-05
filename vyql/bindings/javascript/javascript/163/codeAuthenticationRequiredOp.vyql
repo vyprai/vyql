@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding authenticationRequiredOp163 {
-  query pattern presenceNode where node.path ~= "grantRole"
-  emit issue code.AuthenticationRequiredOp at node
-}

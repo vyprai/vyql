@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding filePathAccess342 {
-  query pattern callExpr where callee.path ~= "unlinkSync"
-  emit sink code.FilePathAccess at args[0]
-}

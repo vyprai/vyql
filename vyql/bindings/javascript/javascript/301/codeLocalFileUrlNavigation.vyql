@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding localFileUrlNavigation301 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "page.goto" and node.context.selector contains "request.url" and not (node.context.expr contains "request.url.trim().toLowerCase().substring(0,4)==='file'")
-  emit issue code.LocalFileUrlNavigation at node
-}

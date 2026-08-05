@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding regexCompile195 {
-  query pattern callExpr where callee.path ~= "regexp.MustCompile"
-  emit sink code.RegexCompileSink at args[0]
-}

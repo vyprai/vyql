@@ -1,9 +1,0 @@
-module bindings.scala.generated.m3608f193;
-
-binding deserialization18 {
-  requires {
-    dependency("snakeyaml")
-  }
-  query pattern callExpr where callee.path ~= "Yaml.load"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding sqlExecution34 {
-  query pattern callExpr where callee.method == "ExecuteSqlRaw"
-  emit sink code.SqlExecution at args[0]
-}

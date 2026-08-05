@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding httpInput4 {
-  query pattern callExpr where callee.method == "header"
-  emit source code.HttpInput at call.result
-}

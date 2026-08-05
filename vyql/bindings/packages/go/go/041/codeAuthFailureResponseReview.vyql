@@ -1,9 +1,0 @@
-module bindings.go.generated.m39efcd29;
-
-binding authFailureResponseReview41 {
-  requires {
-    dependency("github.com/authelia/authelia")
-  }
-  query pattern callExpr where callee.path ~= "ctx.Error" and args.any.literal contains "Unable to parse target URL"
-  emit issue code.AuthFailureResponseReview at call
-}

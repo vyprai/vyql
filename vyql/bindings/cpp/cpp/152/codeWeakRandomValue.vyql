@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding weakRandomValue152 {
-  query pattern presenceNode where node.path ~= "random"
-  emit issue code.WeakRandomValue at node
-}

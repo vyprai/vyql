@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding filePathAccess30 {
-  query pattern callExpr where callee.path ~= "open"
-  emit sink code.FilePathAccess at args[0]
-}

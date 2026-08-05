@@ -1,6 +1,0 @@
-module bindings.dart.generated.m1c398214;
-
-binding weakRandomValue77 {
-  query pattern presenceNode where node.kind == "call" and node.path == "Random"
-  emit issue code.WeakRandomValue at node
-}

@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding sqlExecution64 {
-  query pattern callExpr where callee.method == "ExecContext" and callee.receiver.type in [sql.DB, sqlx.DB, gorm.DB]
-  emit sink code.SqlExecution at args[0]
-}

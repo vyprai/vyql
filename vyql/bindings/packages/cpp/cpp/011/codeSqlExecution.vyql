@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m1c1357ee;
-
-binding sqlExecution11 {
-  requires {
-    dependency("libpq")
-  }
-  query pattern callExpr where callee.path ~= "PQexec"
-  emit sink code.SqlExecution at args[1]
-}

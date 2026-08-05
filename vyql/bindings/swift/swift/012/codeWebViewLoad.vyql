@@ -1,6 +1,0 @@
-module bindings.swift.generated.m388f23d0;
-
-binding webViewLoad12 {
-  query pattern callExpr where callee.method == "loadHTMLString"
-  emit sink code.WebViewLoad at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding authenticationRequiredOp150 {
-  query pattern presenceNode where node.path ~= "grant_role"
-  emit issue code.AuthenticationRequiredOp at node
-}

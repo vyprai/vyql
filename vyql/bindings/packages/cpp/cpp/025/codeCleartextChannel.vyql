@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m1c1357ee;
-
-binding cleartextChannel25 {
-  requires {
-    dependency("libcurl")
-  }
-  query pattern callExpr where callee.path ~= "curl_easy_setopt" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
-  emit issue code.CleartextChannel at call
-}

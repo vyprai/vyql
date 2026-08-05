@@ -1,6 +1,0 @@
-module bindings.swift.generated.m388f23d0;
-
-binding xpathQuery35 {
-  query pattern callExpr where callee.method == "evaluate"
-  emit sink code.XpathQuery at args[0]
-}

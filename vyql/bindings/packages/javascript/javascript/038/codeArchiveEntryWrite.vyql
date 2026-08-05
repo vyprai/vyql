@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m5c270092;
-
-binding archiveEntryWrite38 {
-  requires {
-    dependency("adm-zip")
-  }
-  query pattern callExpr where callee.path ~= "admZip.extractAllTo"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

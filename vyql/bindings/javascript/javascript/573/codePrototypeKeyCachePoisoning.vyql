@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding prototypeKeyCachePoisoning573 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.dynamicPropertyPlainObjectFallback == "true" and node.context.dynamicPropertyWrite == "true" and node.context.callPath contains ".call" and not (node.context.callPath contains "Object.create")
-  emit issue code.PrototypeKeyCachePoisoning at node
-}

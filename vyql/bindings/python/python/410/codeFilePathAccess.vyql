@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding filePathAccess410 {
-  query pattern callExpr where callee.path ~= "flask.send_file"
-  emit sink code.FilePathAccess at args[0]
-}

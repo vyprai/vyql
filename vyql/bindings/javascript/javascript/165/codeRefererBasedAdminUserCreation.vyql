@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding refererBasedAdminUserCreation165 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "req.header" and node.context.callPath contains "url.parse" and node.context.literal contains "Referer" and node.context.literal contains "/admin/setup" and node.context.selector contains "urlParts.path" and node.context.assign contains "isAdmin=true" and node.context.callPath contains "db.users.insert" and not (node.context.callPath contains "db.users.count")
-  emit issue code.RefererBasedAdminUserCreation at node
-}

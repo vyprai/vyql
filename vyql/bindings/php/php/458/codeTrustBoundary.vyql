@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding trustBoundary458 {
-  query pattern callExpr where callee.method == "__set"
-  emit sink code.TrustBoundary at args.any
-}

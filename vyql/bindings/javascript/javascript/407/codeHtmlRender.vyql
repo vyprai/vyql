@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding htmlRender407 {
-  query pattern callExpr where callee.path ~= "innerHTML"
-  emit sink code.HtmlRender at args[0]
-}

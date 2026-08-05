@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m2a0e231a;
-
-binding sqlExecution7 {
-  requires {
-    dependency("Microsoft.EntityFrameworkCore")
-  }
-  query pattern callExpr where callee.method == "FromSqlRaw"
-  emit sink code.SqlExecution at args[0]
-}

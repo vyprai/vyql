@@ -1,6 +1,0 @@
-module bindings.groovy.generated.m6eabb149;
-
-binding filePathAccess19 {
-  query pattern callExpr where callee.path ~= "File"
-  emit sink code.FilePathAccess at args[0]
-}

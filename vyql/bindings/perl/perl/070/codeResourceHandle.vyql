@@ -1,7 +1,0 @@
-module bindings.perl.generated.mfca40a44;
-
-binding resourceHandle70 {
-  query pattern presenceNode where node.path ~= "IO.Socket.INET.new"
-  emit issue code.ResourceHandle at node
-  emit sink code.ResourceHandleSink at node
-}

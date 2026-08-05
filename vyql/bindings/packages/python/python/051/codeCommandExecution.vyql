@@ -1,9 +1,0 @@
-module bindings.python.generated.m3d9ccbad;
-
-binding commandExecution51 {
-  requires {
-    dependency("subprocess")
-  }
-  query pattern callExpr where callee.path ~= "subprocess.run"
-  emit sink code.CommandExecution at args[0]
-}

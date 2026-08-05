@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding storedHtmlWrite161 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.rubyReview == "stored_html_interpolation_missing_sanitize"
-  emit issue code.StoredHtmlWrite at node
-}

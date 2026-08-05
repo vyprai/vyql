@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m5895bccf;
-
-binding deserialization22 {
-  requires {
-    dependency("psych")
-  }
-  query pattern callExpr where callee.path ~= "YAML.load"
-  emit sink code.Deserialization at args[0]
-}

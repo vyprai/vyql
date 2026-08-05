@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding weakHash461 {
-  query pattern presenceNode where node.path ~= "md5"
-  emit issue code.WeakHash at node
-}

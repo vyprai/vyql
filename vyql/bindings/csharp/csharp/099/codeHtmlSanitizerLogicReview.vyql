@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding htmlSanitizerLogicReview99 {
-  query pattern callExpr where callee.method == "LoadHtml"
-  emit issue code.HtmlSanitizerLogicReview at call
-}

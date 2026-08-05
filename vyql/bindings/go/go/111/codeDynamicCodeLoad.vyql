@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding dynamicCodeLoad111 {
-  query pattern callExpr where callee.path ~= "plugin.Open"
-  emit sink code.DynamicCodeLoad at args[0]
-}

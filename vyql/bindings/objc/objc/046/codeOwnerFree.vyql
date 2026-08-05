@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding ownerFree46 {
-  query pattern presenceNode where node.path ~= "xmlFreeDoc"
-  emit issue code.OwnerFree at node
-}

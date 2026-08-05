@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding xpathQuery182 {
-  query pattern callExpr where callee.method == "SelectSingleNode"
-  emit sink code.XpathQuery at args[0]
-}

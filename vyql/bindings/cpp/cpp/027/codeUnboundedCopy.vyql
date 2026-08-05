@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding unboundedCopy27 {
-  query pattern callExpr where callee.path ~= "strcat"
-  emit sink code.UnboundedCopy at args[1]
-}

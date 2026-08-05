@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding deserialization300 {
-  query pattern callExpr where callee.path ~= "marshal.loads"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.config.generated.m2b6375a9;
-
-binding storedHtmlWrite38 {
-  query pattern presenceNode where node.analysis ~= "template.erb.unescaped_tooltip_html"
-  emit issue code.StoredHtmlWrite at node
-}

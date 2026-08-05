@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding filePathAccess22 {
-  query pattern callExpr where callee.path ~= "lfs.chdir"
-  emit sink code.FilePathAccess at args[0]
-}

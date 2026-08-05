@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding domInput96 {
-  query pattern callExpr where callee.method == "originalTitle"
-  emit source code.DomInput at call.result
-}

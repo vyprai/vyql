@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding htmlRender473 {
-  query pattern callExpr where callee.path ~= "Markup"
-  emit sink code.HtmlRender at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding templateRender167 {
-  query pattern callExpr where callee.path ~= "ERB.new"
-  emit sink code.TemplateRender at args[0]
-}

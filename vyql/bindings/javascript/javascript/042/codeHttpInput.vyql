@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding httpInput42 {
-  query pattern callExpr where callee.path ~= "err.message"
-  emit source code.HttpInput at call.result
-}

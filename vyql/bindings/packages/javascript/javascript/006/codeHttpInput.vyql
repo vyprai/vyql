@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m5c270092;
-
-binding httpInput6 {
-  requires {
-    dependency("@hapi/hapi")
-  }
-  query pattern callExpr where callee.path ~= "request.payload"
-  emit source code.HttpInput at call.result
-}

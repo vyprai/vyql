@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding weakRandomValue459 {
-  query pattern presenceNode where node.path ~= "rand"
-  emit issue code.WeakRandomValue at node
-}

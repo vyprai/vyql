@@ -1,6 +1,0 @@
-module bindings.dart.generated.m1c398214;
-
-binding envVariable0 {
-  query pattern callExpr where callee.path ~= "Platform.environment"
-  emit source code.EnvVariable at call.result
-}

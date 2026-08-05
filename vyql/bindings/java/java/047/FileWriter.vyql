@@ -1,8 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding fileWriter47 {
-  query pattern callExpr where callee.path ~= "FileWriter"
-  emit fact runtime.ReceiverType at call.result {
-    about: FileWriter
-  }
-}

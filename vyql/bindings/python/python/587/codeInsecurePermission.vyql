@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding insecurePermission587 {
-  query pattern callExpr where callee.method == "mkdir" and args.any.literal contains "parents=True" and args.any.literal contains "exist_ok=True" and not (args.any.literal contains "mode=")
-  emit issue code.InsecurePermission at call
-}

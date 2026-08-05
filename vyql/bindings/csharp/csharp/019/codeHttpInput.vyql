@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding httpInput19 {
-  query pattern callExpr where callee.path ~= ".Params"
-  emit source code.HttpInput at call.result
-}

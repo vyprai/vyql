@@ -1,6 +1,0 @@
-module bindings.perl.generated.mfca40a44;
-
-binding authenticationRequiredOp47 {
-  query pattern presenceNode where node.path ~= "change_email"
-  emit issue code.AuthenticationRequiredOp at node
-}

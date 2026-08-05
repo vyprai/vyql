@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding xmlParse319 {
-  query pattern callExpr where callee.path ~= "etree.XML"
-  emit sink code.XmlParse at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding ajaxBackslashProtocolRelativeUrlXss117 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.ajaxBackslashProtocolRelativeUrlXss == "true"
-  emit issue code.AjaxBackslashProtocolRelativeUrlXss at node
-}

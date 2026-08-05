@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding csrfDisabled228 {
-  query pattern callExpr where callee.path ~= "skip_before_action" and args.any.literal contains "verify_authenticity_token"
-  emit issue code.CsrfDisabled at call
-}

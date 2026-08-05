@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding commandExecution13 {
-  query pattern callExpr where callee.path ~= "execlp"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding urlFetch172 {
-  query pattern callExpr where callee.method == "openConnection"
-  emit sink code.UrlFetch at callee.receiver
-}

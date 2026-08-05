@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding incompleteServerPortValidation50 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "server_port_validation_incomplete_privileged_range"
-  emit issue code.IncompleteServerPortValidation at node
-}

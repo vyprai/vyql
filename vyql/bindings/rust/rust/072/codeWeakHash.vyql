@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding weakHash72 {
-  query pattern presenceNode where node.path ~= "md5.compute"
-  emit issue code.WeakHash at node
-}

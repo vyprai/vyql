@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding sqlExecution37 {
-  query pattern callExpr where callee.method == "QueryAsync"
-  emit sink code.SqlExecution at args[0]
-}

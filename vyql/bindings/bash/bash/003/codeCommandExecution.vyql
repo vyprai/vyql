@@ -1,6 +1,0 @@
-module bindings.bash.generated.m59952d5d;
-
-binding commandExecution3 {
-  query pattern callExpr where callee.path ~= "bash"
-  emit sink code.CommandExecution at args[1]
-}

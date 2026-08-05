@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding cleartextChannel246 {
-  query pattern callExpr where callee.path ~= "open" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
-  emit issue code.CleartextChannel at call
-}

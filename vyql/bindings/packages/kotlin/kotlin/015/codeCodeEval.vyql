@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1457a768;
-
-binding codeEval15 {
-  requires {
-    dependency("kotlin-script-util")
-  }
-  query pattern callExpr where callee.method == "eval"
-  emit sink code.CodeEval at args[0]
-}

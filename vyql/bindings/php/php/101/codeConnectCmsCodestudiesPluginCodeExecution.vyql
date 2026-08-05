@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding connectCmsCodestudiesPluginCodeExecution101 {
-  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.className contains "CodestudiesPlugin" and node.context.phpReview == "connectcms_codestudies_code_execution"
-  emit issue code.ConnectCmsCodestudiesPluginCodeExecution at node
-}

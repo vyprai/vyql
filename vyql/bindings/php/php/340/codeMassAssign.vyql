@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding massAssign340 {
-  query pattern callExpr where callee.method == "forceFill"
-  emit sink code.MassAssign at args[0]
-}

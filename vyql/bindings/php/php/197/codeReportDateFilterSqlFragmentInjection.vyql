@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding reportDateFilterSqlFragmentInjection197 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and containsAny(node.context.subscript, ["$_POST['dropdown_calendar']", "$_POST[\"dropdown_calendar\"]", "$_GET['dropdown_calendar']", "$_GET[\"dropdown_calendar\"]"]) and containsAny(node.context.subscript, ["$_POST['dropdown_sup_inf']", "$_POST[\"dropdown_sup_inf\"]", "$_GET['dropdown_sup_inf']", "$_GET[\"dropdown_sup_inf\"]"]) and containsAny(node.context.literal, [" LIKE '", "date_mod", " ORDER BY "]) and node.context.callPath contains "$DB.doQuery" and not (containsAny(node.context.callPath, ["DateTime.createFromFormat", "createFromFormat", "filter_var", "QueryParam", "$DB.request", "$DB.prepare", "prepare"]))
-  emit issue code.ReportDateFilterSqlFragmentInjection at node
-}

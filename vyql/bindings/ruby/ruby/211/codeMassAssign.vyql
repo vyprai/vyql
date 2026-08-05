@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding massAssign211 {
-  query pattern callExpr where callee.method == "assign_attributes"
-  emit sink code.MassAssign at args[0]
-}

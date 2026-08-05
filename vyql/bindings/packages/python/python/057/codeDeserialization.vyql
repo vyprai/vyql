@@ -1,9 +1,0 @@
-module bindings.python.generated.m3d9ccbad;
-
-binding deserialization57 {
-  requires {
-    dependency("pickle")
-  }
-  query pattern callExpr where callee.path ~= "pickle.loads"
-  emit sink code.Deserialization at args[0]
-}

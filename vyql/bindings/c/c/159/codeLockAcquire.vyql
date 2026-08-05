@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding lockAcquire159 {
-  query pattern presenceNode where node.path ~= "mtx_lock"
-  emit issue code.LockAcquire at node
-}
