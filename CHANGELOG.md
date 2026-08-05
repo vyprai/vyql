@@ -75,3 +75,5 @@ First public release.
 ### Retracted
 - **0.1.0** produced a binary that could not locate its data directory when
   installed with `go install`. It is retracted in `go.mod`; use 0.2.0.
+
+<!-- probe: verifying that required checks still report when the expensive jobs are skipped -->
