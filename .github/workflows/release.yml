@@ -204,14 +204,42 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
       - run: ls -la artifacts
+
+      # A release page is where someone arrives from a search result or the
+      # Marketplace listing, and generate_release_notes alone gives them a list
+      # of our pull request titles. The CHANGELOG entry is what was written for
+      # a reader, so it leads; the commit log follows underneath.
+      - name: Lead with the changelog entry for this version
+        run: |
+          set -euo pipefail
+          VER="${VERSION#v}"
+          # Everything between this version's heading and the next one.
+          # A literal prefix match, not a regex: awk -v processes backslashes,
+          # so "## \\[$VER\\]" reaches the program as a character class and
+          # silently matches nothing.
+          awk -v tag="## [$VER]" '
+            index($0, tag) == 1 {found=1; next}
+            found && /^## \[/ {exit}
+            found {print}
+          ' CHANGELOG.md > /tmp/notes.md
+          if [ ! -s /tmp/notes.md ]; then
+            echo "::warning::no CHANGELOG entry for $VER; falling back to the generated notes alone"
+            : > /tmp/notes.md
+          fi
+          echo "Full detail in [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)." >> /tmp/notes.md
+          cat /tmp/notes.md
+
       - uses: softprops/action-gh-release@v3
         with:
           files: |
             artifacts/*.tar.gz
             artifacts/*.tar.gz.sha256
+          body_path: /tmp/notes.md
+          append_body: true
           generate_release_notes: true
