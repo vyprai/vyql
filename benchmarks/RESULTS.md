@@ -150,8 +150,8 @@ has._
 
 ### 6.1 RealVuln — `kolega-ai/Real-Vuln-Benchmark`
 
-Real-world Python applications rather than generated test cases. 66 repos, 1,896 real
-findings plus **280 false-positive traps**, Apache-2.0, ground truth as JSON per repo with
+Real-world applications rather than generated test cases. 66 repos, 1,896 real findings
+plus **280 false-positive traps**, Apache-2.0, ground truth as JSON per repo with
 file / line-range / CWE. Matching is `file` + `cwe ∈ acceptable_cwes` + line within ±10.
 
 Measured 2026-08-03 over **62 of 66 repos** — four (`owasp-web-playground`, `pygoat`,
