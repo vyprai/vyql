@@ -72,7 +72,10 @@ jobs:
       # seconds and covers the code we actually write.
       - name: Scan this repository
         run: |
-          VYQL_HOME=./vyql ./bin/vyql scan --format sarif \
+          # -fail-on none: this step produces SARIF for the upload below and the
+          # assertion that follows it. Gating here would fail the job on a
+          # finding instead of reporting it, and the report is the point.
+          VYQL_HOME=./vyql ./bin/vyql scan -fail-on none --format sarif \
             --exclude grammars,vyql,bin,docs,benchmarks . > vyql-self.sarif
           # A scan that produces no SARIF, or SARIF with no runs, has not
           # scanned anything -- and the upload below would happily accept it.

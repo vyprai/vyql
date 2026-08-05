@@ -1,5 +1,12 @@
 # VyQL
 
+[![ci](https://github.com/vyprai/vyql/actions/workflows/ci.yml/badge.svg)](https://github.com/vyprai/vyql/actions/workflows/ci.yml)
+[![detection](https://github.com/vyprai/vyql/actions/workflows/detection.yml/badge.svg)](https://github.com/vyprai/vyql/actions/workflows/detection.yml)
+[![data](https://github.com/vyprai/vyql/actions/workflows/data.yml/badge.svg)](https://github.com/vyprai/vyql/actions/workflows/data.yml)
+[![security](https://github.com/vyprai/vyql/actions/workflows/security.yml/badge.svg)](https://github.com/vyprai/vyql/actions/workflows/security.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/vyprai/vyql.svg)](https://pkg.go.dev/github.com/vyprai/vyql)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 A multi-language security scanner that follows tainted data through your code and
 tells you why each finding is a finding.
 
@@ -56,10 +63,28 @@ cd vyql
 make build          # -> bin/vyql
 ```
 
+### Check what you have
+
+```sh
+vyql version
+```
+
+```
+vyql v0.2.0
+commit: 222e6c64a8745977dec6635eb70bdcbca9280f37
+built:  2026-08-04T15:16:59Z
+go:     go1.26.4
+platform: darwin/arm64
+```
+
+Worth quoting in a bug report: findings depend on the version of the security
+knowledge as much as on the engine.
+
 ## Scan something
 
 ```sh
 vyql scan ./my-project
+vyql scan                  # no path: scans the working directory, and says so
 ```
 
 ```
@@ -81,9 +106,63 @@ something is vulnerable, it should be able to tell you what would have made it
 safe.
 
 ```sh
-vyql scan --format sarif ./my-project > results.sarif   # for CI
+vyql scan --format sarif ./my-project > results.sarif
 vyql scan --format json  ./my-project | jq '.[].rule'
 ```
+
+### Failing a build
+
+**`scan` exits 1 when it finds anything HIGH or CRITICAL.** Dropping it into a
+pipeline gates that pipeline, with no extra configuration.
+
+```sh
+vyql scan .                        # exit 1 on HIGH or CRITICAL  (the default)
+vyql scan -fail-on critical .      # exit 1 only on CRITICAL
+vyql scan -fail-on none .          # report everything, always exit 0
+```
+
+Severities, lowest to highest: `info low medium high critical`. `-fail-on`
+takes any of them, or `none`.
+
+A failed scan also exits 1, so if your pipeline needs to tell "found something"
+apart from "could not run", give `-exit-code` a distinct value:
+
+```sh
+vyql scan -exit-code 3 .   # 3 = findings, 1 = VyQL failed, 2 = bad usage
+```
+
+### What was actually read
+
+"No findings" is only as good as what the scan looked at, so anything left
+unanalysed is reported whether you ask or not:
+
+```
+scanned python:1 textpattern:1 — 9 finding(s)
+warning: 15 file(s) matched no frontend and were not analysed (.zig 12, .cob 3)
+         run with -coverage for the breakdown
+```
+
+`-coverage` gives the full account:
+
+```sh
+vyql scan -coverage .
+```
+
+```
+coverage
+  parsed    python 1 · textpattern 1
+  excluded  5 file(s) dropped by -exclude
+  unread    15 file(s) matched no frontend: .zig 12, .cob 3
+  depth     java, python, javascript are the reference frontends;
+            other languages range down to call-and-concat coverage
+  note      a parse that partially fails still counts as parsed;
+            this does not yet report that
+```
+
+A clean report over a tree that was mostly skipped reads exactly like a clean
+report over a tree that was fully read. The warning is the difference, which is
+why it is not optional. The `note` is there because the gap is real: tree-sitter
+recovers from syntax errors, so a file that parsed badly still counts as parsed.
 
 ## Understand a finding
 
@@ -152,6 +231,40 @@ vyql definitions explain code.SqlExecution   # which binding produced a label
 vyql bindings -lang python                   # one language's source/sink/check vocabulary
 ```
 
+A filter that matches no known concept is an error rather than an empty result,
+because "0 sources reach a sink" and "you typed the name wrong" should not look
+the same:
+
+```
+$ vyql trace -from HttpInpt .
+vyql: -from "HttpInpt" matches no concept
+  did you mean: code.HttpInput, code.HttpHeader, code.HttpPersistentAuthReuse?
+  list them with: vyql definitions -kind concepts
+```
+
+### Comparing two scans
+
+**`diff`** compares two `--format json` runs by finding fingerprint. Fingerprints
+are anchored to rule and location rather than line number, so the comparison
+survives edits elsewhere in the file:
+
+```sh
+vyql scan --format json . > before.json
+# ... change something ...
+vyql scan --format json . > after.json
+vyql diff before.json after.json
+```
+
+```
+before: 9 findings   after: 7 findings
+- removed: 2   + added: 0   (= 7 unchanged)
+  - [VYQL-INJ-004] app.py:18 → app.py:19
+  - [VYQL-INJ-202]  → app.py:19
+```
+
+This is how to ask "did this branch introduce anything new" without failing on a
+backlog that was already there.
+
 A missed finding is nearly always one of three things, and `match`, `resolve` and
 `explain` distinguish them in that order: nothing was labelled, the call did not
 resolve, or an `unless` clause was satisfied.
@@ -197,6 +310,30 @@ binding requestJson {
 Write it, add a spec in `vyql/tests/`, run `go test -count=1 ./...`. See
 [docs/07-adapters-and-patterns.md](docs/07-adapters-and-patterns.md) for the
 binding language.
+
+Check a binding file parses, and what it emits, without running a scan. Bindings
+live under `vyql/bindings/<language>/`, one module per file:
+
+```sh
+vyql validate-binding -file vyql/bindings/python/python/558.vyql
+```
+
+```json
+{
+  "ok": true,
+  "bindings": [
+    { "name": "python", "mapping_count": 1, "mappings": [ ... ] }
+  ]
+}
+```
+
+Then confirm it attaches what you expect on real code — `match` lists what was
+labelled, and `definitions explain` names the binding responsible:
+
+```sh
+vyql match ./some-project
+vyql definitions explain code.HttpInput
+```
 
 ## Documentation
 
