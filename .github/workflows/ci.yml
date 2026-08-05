@@ -9,7 +9,49 @@ permissions:
   contents: read
 
 jobs:
+  # Docs-only pull requests still have to satisfy the required checks, so the
+  # workflow always runs and the expensive jobs decide for themselves. Path
+  # filtering at the `on:` level would leave those checks Pending forever --
+  # GitHub is explicit that a workflow skipped by a path filter never reports.
+  #
+  # A job skipped by a conditional does report, as success.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.detect.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: detect
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          # Anything that is not a pull request -- a push to main, a schedule, a
+          # manual run -- gets the full suite. Only a pull request has a base to
+          # compare against, and only there is the saving worth the machinery.
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "not a pull request: running everything"
+            exit 0
+          fi
+          changed="$(git diff --name-only "$BASE"...HEAD)"
+          echo "changed files:"; echo "$changed" | sed 's/^/  /'
+          # Deliberately inverted: anything NOT matching the docs patterns means
+          # run everything. A new kind of file defaults to being treated as code,
+          # which is the safe direction to be wrong in.
+          if printf '%s\n' "$changed" | grep -qvE '^(docs/|CHANGELOG\.md|README\.md|.*\.md|LICENSE|NOTICE)$'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "-> code changed; running everything"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "-> documentation only; the expensive jobs will report success without running"
+          fi
   build-test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -41,6 +83,8 @@ jobs:
         run: go test -count=1 ./...
 
   lint:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: "1"
@@ -87,7 +131,8 @@ jobs:
   # build needs a cross C toolchain, and the point here is to exercise the same
   # path a user's machine would.
   matrix-build:
-    if: github.event_name == 'push'
+    needs: changes
+    if: github.event_name == 'push' && needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
