@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding insecureCookie329 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "go.insecure_cookie_setcookie_secure_false"
-  emit issue code.InsecureCookie at node
-}

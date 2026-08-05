@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding weakCipher185 {
-  query pattern presenceNode where node.path ~= "BF_set_key"
-  emit issue code.WeakCipher at node
-}

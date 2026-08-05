@@ -1,9 +1,0 @@
-module bindings.bash.generated.mb6f991a5;
-
-binding xmlParse23 {
-  requires {
-    dependency("libxml2")
-  }
-  query pattern callExpr where callee.path ~= "xmllint"
-  emit sink code.XmlParse at args[0]
-}

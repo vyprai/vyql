@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding massAssign557 {
-  query pattern callExpr where callee.method == "bulkCreate"
-  emit sink code.MassAssign at args[0]
-}

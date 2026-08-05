@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding deserializableInvocationHandler136 {
-  query pattern presenceNode where node.scope == "class" and node.context.classBase contains "InvocationHandler" and node.context.call contains "getMethod" and node.context.call contains "invokeMethod" and not (node.context.functionName contains "readResolve") and not (node.context.functionName contains "readObject") and not (node.context.scopeCall contains "NotSerializableException")
-  emit issue code.DeserializableInvocationHandler at node
-}

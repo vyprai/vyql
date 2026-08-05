@@ -1,6 +1,0 @@
-module bindings.dart.generated.m1c398214;
-
-binding storedDataWrite14 {
-  query pattern callExpr where callee.method == "setBool"
-  emit sink code.StoredDataWrite at args[0]
-}

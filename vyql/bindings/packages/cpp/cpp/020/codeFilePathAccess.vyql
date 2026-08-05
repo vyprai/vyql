@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m1c1357ee;
-
-binding filePathAccess20 {
-  requires {
-    dependency("std")
-  }
-  query pattern callExpr where callee.path ~= "std.ifstream"
-  emit sink code.FilePathAccess at args[0]
-}

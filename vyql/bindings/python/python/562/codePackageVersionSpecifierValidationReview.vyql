@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding packageVersionSpecifierValidationReview562 {
-  query pattern presenceNode where node.scope == "module" and node.context.pythonReview == "package_version_specifier_validation_review"
-  emit issue code.PackageVersionSpecifierValidationReview at node
-}

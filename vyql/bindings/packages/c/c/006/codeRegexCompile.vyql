@@ -1,9 +1,0 @@
-module bindings.c.generated.m2816daee;
-
-binding regexCompile6 {
-  requires {
-    dependency("libc")
-  }
-  query pattern callExpr where callee.path ~= "regcomp"
-  emit sink code.RegexCompileSink at args[1]
-}

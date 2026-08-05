@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding sqlExecution231 {
-  query pattern callExpr where callee.path ~= "DB.select"
-  emit sink code.SqlExecution at args[0]
-}

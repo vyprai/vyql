@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding clientLightboxOptionXss116 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.callPath contains "options.slides.forEach" and node.context.literal contains "data-elementor-slideshow-video" and node.context.selector contains "slide.image" and not (node.context.callPath contains "isValidUrl") and not (node.context.callPath contains "startsWith")
-  emit issue code.ClientLightboxOptionXss at node
-}

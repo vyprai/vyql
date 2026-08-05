@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding fileCheck58 {
-  query pattern presenceNode where node.path ~= "access"
-  emit issue code.FileCheck at node
-}

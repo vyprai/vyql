@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding unescapedJsonTreeLabelXss141 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "unescaped_json_tree_label_xss"
-  emit issue code.UnescapedJsonTreeLabelXss at node
-}

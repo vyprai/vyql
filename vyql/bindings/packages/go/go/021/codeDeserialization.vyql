@@ -1,9 +1,0 @@
-module bindings.go.generated.m39efcd29;
-
-binding deserialization21 {
-  requires {
-    dependency("encoding/json")
-  }
-  query pattern callExpr where callee.path ~= "json.Unmarshal"
-  emit sink code.Deserialization at args[0]
-}

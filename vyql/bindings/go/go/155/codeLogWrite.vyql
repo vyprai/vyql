@@ -1,7 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding logWrite155 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "NewClient" and node.context.callPath contains "log.Infof" and node.context.literal contains "Loaded client config: %#v" and node.context.selector contains "cfg.Spec"
-  emit issue code.LogWrite at node
-  emit sink code.LogWriteSink at node
-}

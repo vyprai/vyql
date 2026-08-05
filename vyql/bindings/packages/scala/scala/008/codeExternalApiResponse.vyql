@@ -1,9 +1,0 @@
-module bindings.scala.generated.m3608f193;
-
-binding externalApiResponse8 {
-  requires {
-    dependency("sttp")
-  }
-  query pattern callExpr where callee.method == "body"
-  emit source code.ExternalApiResponse at call.result
-}

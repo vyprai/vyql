@@ -1,6 +1,0 @@
-module bindings.scala.generated.m06d0685b;
-
-binding filePathAccess75 {
-  query pattern callExpr where callee.method == "readText"
-  emit sink code.FilePathAccess at args[0]
-}

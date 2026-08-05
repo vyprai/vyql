@@ -1,6 +1,0 @@
-module bindings.swift.generated.m388f23d0;
-
-binding trustBoundary37 {
-  query pattern callExpr where callee.method == "putValue"
-  emit sink code.TrustBoundary at args.any
-}

@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding fileCheck344 {
-  query pattern presenceNode where node.path ~= "fs.lstat"
-  emit issue code.FileCheck at node
-}

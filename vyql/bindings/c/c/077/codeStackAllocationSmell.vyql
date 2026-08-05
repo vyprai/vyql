@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding stackAllocationSmell77 {
-  query pattern presenceNode where node.path ~= "alloca"
-  emit issue code.StackAllocationSmell at node
-}

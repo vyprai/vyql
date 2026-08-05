@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding expressionEval355 {
-  query pattern callExpr where callee.method == "createExpression"
-  emit sink code.ExpressionEval at args[0]
-}

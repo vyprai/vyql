@@ -1,6 +1,0 @@
-module bindings.elixir.generated.m728b8a72;
-
-binding portRequestResponseCorrelationMissing30 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "elixir" and node.context.portProtocol == "request_response_missing_correlation"
-  emit issue code.PortRequestResponseCorrelationMissing at node
-}

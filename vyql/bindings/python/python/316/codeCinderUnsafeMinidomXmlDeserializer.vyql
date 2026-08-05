@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding cinderUnsafeMinidomXmlDeserializer316 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cinder_unsafe_minidom_xml_deserializer"
-  emit issue code.CinderUnsafeMinidomXmlDeserializer at node
-}

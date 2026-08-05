@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mbfd454d1;
-
-binding commandExecution5 {
-  requires {
-    dependency("groovy")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.CommandExecution at args[0]
-}

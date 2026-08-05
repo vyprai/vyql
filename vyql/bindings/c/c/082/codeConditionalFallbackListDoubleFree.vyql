@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding conditionalFallbackListDoubleFree82 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "list.conditional_fallback_double_free"
-  emit issue code.ConditionalFallbackListDoubleFree at node
-}

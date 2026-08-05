@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding lengthDerivedAllocation266 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "readNBytes" and node.context.call contains "make" and node.context.call contains "ReadByte" and not (node.context.selector contains "reader.data") and not (node.context.selector contains "reader.pos")
-  emit issue code.LengthDerivedAllocation at node
-}

@@ -1,6 +1,0 @@
-module bindings.bash.generated.m59952d5d;
-
-binding codeEval12 {
-  query pattern callExpr where callee.path ~= "node"
-  emit sink code.CodeEval at args[1]
-}

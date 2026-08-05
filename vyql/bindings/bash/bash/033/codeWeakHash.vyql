@@ -1,6 +1,0 @@
-module bindings.bash.generated.m59952d5d;
-
-binding weakHash33 {
-  query pattern presenceNode where node.path ~= "sha1sum"
-  emit issue code.WeakHash at node
-}

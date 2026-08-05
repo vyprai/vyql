@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding weakHash177 {
-  query pattern presenceNode where node.path ~= "SHA1_Init"
-  emit issue code.WeakHash at node
-}

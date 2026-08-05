@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding filePathAccess162 {
-  query pattern callExpr where callee.path ~= "Files.newOutputStream"
-  emit sink code.FilePathAccess at args[0]
-}

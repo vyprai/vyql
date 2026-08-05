@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding insecureTempFile52 {
-  query pattern presenceNode where node.path ~= "tmpnam"
-  emit issue code.InsecureTempFile at node
-}

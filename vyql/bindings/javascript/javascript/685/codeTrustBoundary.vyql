@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding trustBoundary685 {
-  query pattern callExpr where callee.path ~= "session"
-  emit sink code.TrustBoundary at args[0]
-}

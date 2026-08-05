@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding weakCipher212 {
-  query pattern presenceNode where node.path ~= "OpenSSL.Cipher.DES"
-  emit issue code.WeakCipher at node
-}

@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding accessPolicyReview159 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "catch_page_load" and node.context.phpReview == "bp_docs_save_missing_access_policy"
-  emit issue code.AccessPolicyReview at node
-}

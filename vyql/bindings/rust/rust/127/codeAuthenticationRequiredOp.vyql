@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding authenticationRequiredOp127 {
-  query pattern presenceNode where node.path ~= "grant_role"
-  emit issue code.AuthenticationRequiredOp at node
-}

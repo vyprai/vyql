@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding sqlExecution101 {
-  query pattern callExpr where callee.path ~= "sqlx.query"
-  emit sink code.SqlExecution at args[0]
-}

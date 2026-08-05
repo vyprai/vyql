@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding unparameterizedSqlQueryParser779 {
-  query pattern presenceNode where node.analysis == "function.context" and node.token contains "name=parse" and node.token contains "query_expr.parseString" and node.token contains "repr(" and node.token contains ".replace(" and node.token contains "__default_field__" and node.token contains "::jsonb"
-  emit issue code.UnparameterizedSqlQueryParser at node
-}

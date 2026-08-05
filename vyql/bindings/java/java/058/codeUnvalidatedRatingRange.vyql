@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding unvalidatedRatingRange58 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "rateTopic" and node.context.callPath contains "registry.rateResource" and node.context.callPath contains "genericArtifact.getPath" and not (node.context.identifier contains "MAX_RATE") and not (node.context.identifier contains "MIN_RATE")
-  emit issue code.UnvalidatedRatingRange at node
-}

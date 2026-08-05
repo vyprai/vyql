@@ -1,6 +1,0 @@
-module bindings.elixir.generated.m728b8a72;
-
-binding weakHash58 {
-  query pattern callExpr where callee.path ~= ":crypto.hash" and args.any.literal contains ":sha" and not args.any.literal contains ":sha2" and not args.any.literal contains ":sha3" and not args.any.literal contains ":sha5"
-  emit issue code.WeakHash at call
-}

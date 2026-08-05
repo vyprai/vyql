@@ -1,9 +1,0 @@
-module bindings.swift.generated.mc6005d88;
-
-binding httpInput6 {
-  requires {
-    dependency("kitura")
-  }
-  query pattern callExpr where callee.method == "parameters"
-  emit source code.HttpInput at call.result
-}

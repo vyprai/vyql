@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding mailHeaderWrite403 {
-  query pattern callExpr where callee.path ~= "mail"
-  emit sink code.MailHeaderWrite at args[3]
-}

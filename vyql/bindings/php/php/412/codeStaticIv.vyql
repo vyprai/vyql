@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding staticIv412 {
-  query pattern callExpr where callee.path ~= "openssl_encrypt" and args.any.literal contains "0000000000000000"
-  emit issue code.StaticIv at call
-}

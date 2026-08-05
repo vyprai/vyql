@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding unescapedTableExportHtml103 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.prop contains "onCellHtmlData" and node.context.identifier contains "htmlData" and node.context.callPath contains "tableExport" and node.context.prop contains "escape=false" and not (node.context.prop contains "escape=true") and not (node.context.callPath contains "cell.text")
-  emit issue code.UnescapedTableExportHtml at node
-}

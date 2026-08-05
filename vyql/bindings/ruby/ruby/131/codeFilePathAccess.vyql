@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding filePathAccess131 {
-  query pattern callExpr where callee.path ~= "File.read"
-  emit sink code.FilePathAccess at args[0]
-}

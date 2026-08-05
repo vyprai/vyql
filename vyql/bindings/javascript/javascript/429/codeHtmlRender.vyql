@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding htmlRender429 {
-  query pattern callExpr where callee.method == "insertOne" and args.any.literal contains "html"
-  emit sink code.HtmlRender at args[0].collection
-}

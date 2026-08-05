@@ -1,6 +1,0 @@
-module bindings.solidity.generated.m88e544d8;
-
-binding stateWrite13 {
-  query pattern presenceNode where node.path ~= "state_write"
-  emit issue code.StateWrite at node
-}

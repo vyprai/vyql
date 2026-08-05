@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding hopByHopHeaderAuthBypass247 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "impersonateHandler" and node.context.callPath contains "hr.GetUserAndGroups" and node.context.callPath contains "request.Header.Set" and node.context.callPath contains "request.Header.Add" and node.context.literal contains "Authorization" and node.context.literal contains "Impersonate-User" and node.context.literal contains "Impersonate-Group" and not (node.context.callPath contains "n.removingHopByHopHeaders") and not (node.context.callPath contains "httpguts.HeaderValuesContainsToken")
-  emit issue code.HopByHopHeaderAuthBypass at node
-}

@@ -1,9 +1,0 @@
-module bindings.rust.generated.m222602a5;
-
-binding externalApiResponse7 {
-  requires {
-    dependency("reqwest")
-  }
-  query pattern callExpr where callee.method == "json"
-  emit source code.ExternalApiResponse at call.result
-}

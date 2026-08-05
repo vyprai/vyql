@@ -1,9 +1,0 @@
-module bindings.objc.generated.m942721f9;
-
-binding weakCipher31 {
-  requires {
-    dependency("CommonCrypto")
-  }
-  query pattern callExpr where callee.path ~= "CCCrypt" and args.any.literal contains "DES"
-  emit issue code.WeakCipher at call
-}

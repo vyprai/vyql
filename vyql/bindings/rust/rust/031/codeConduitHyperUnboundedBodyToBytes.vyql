@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding conduitHyperUnboundedBodyToBytes31 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "conduit_hyper_unbounded_body_to_bytes"
-  emit issue code.ConduitHyperUnboundedBodyToBytes at node
-}

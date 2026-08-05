@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding uninitializedBufferExposure23 {
-  query pattern presenceNode where node.analysis == "rust.uninitialized"
-  emit issue code.UninitializedBufferExposure at node
-}

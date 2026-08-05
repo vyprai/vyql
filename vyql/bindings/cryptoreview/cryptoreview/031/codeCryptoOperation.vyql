@@ -1,6 +1,0 @@
-module bindings.cryptoreview.generated.m4f475b34;
-
-binding cryptoOperation31 {
-  query pattern callExpr where callee.method == "GenerateKey"
-  emit issue code.CryptoOperation at call
-}

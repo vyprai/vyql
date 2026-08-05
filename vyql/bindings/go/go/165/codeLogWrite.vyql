@@ -1,7 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding logWrite165 {
-  query pattern presenceNode where node.path ~= "log.Println"
-  emit issue code.LogWrite at node
-  emit sink code.LogWriteSink at node
-}

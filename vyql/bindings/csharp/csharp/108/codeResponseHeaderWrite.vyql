@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding responseHeaderWrite108 {
-  query pattern callExpr where callee.path ~= "Response.Headers.Add"
-  emit sink code.ResponseHeaderWrite at args[1]
-}

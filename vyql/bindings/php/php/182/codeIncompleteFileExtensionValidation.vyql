@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding incompleteFileExtensionValidation182 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "fileExt" and node.context.phpReview == "incomplete_file_extension_validation"
-  emit issue code.IncompleteFileExtensionValidation at node
-}

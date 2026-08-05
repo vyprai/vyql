@@ -1,9 +1,0 @@
-module bindings.dart.generated.m5342780c;
-
-binding storedDataRead38 {
-  requires {
-    dependency("shared_preferences")
-  }
-  query pattern callExpr where callee.method == "getDouble"
-  emit source code.StoredDataRead at call.result
-}

@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding protocolStateReview638 {
-  query pattern presenceNode where node.scope == "function" and node.context.selector contains "protocolMsg.type" and node.context.selector contains "HISTORY_SYNC_NOTIFICATION" and node.context.selector contains "APP_STATE_SYNC_KEY_SHARE" and node.context.selector contains "PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE" and not (node.context.callPath contains "SELF_ONLY_TYPES.has")
-  emit issue code.ProtocolStateReview at node
-}

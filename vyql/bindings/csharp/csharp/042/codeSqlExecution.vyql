@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding sqlExecution42 {
-  query pattern callExpr where callee.method == "QueryFirstOrDefault"
-  emit sink code.SqlExecution at args[0]
-}

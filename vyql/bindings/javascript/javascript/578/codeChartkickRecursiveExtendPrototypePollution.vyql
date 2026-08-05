@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding chartkickRecursiveExtendPrototypePollution578 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.forIn == "true" and node.context.dynamicPropertyWriteFromSubscript == "true" and node.context.dynamicPropertyWriteObjectLiteral == "true" and node.context.callPath contains "isPlainObject" and node.context.callPath contains "isArray" and not (node.context.prototypeKeyGuard == "true")
-  emit issue code.ChartkickRecursiveExtendPrototypePollution at node
-}

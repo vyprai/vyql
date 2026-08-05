@@ -1,9 +1,0 @@
-module bindings.scala.generated.m3608f193;
-
-binding commandExecution15 {
-  requires {
-    dependency("scala.sys.process")
-  }
-  query pattern callExpr where callee.path ~= "Process"
-  emit sink code.CommandExecution at args[0]
-}

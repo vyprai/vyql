@@ -1,0 +1,803 @@
+module bindings.rust.generated.mdc4f74cd;
+
+pattern bindingMetadata {
+  binding: {
+    name: "rust"
+    meta: {
+      fidelity: "resolved"
+      match: "contains"
+    }
+  }
+}
+
+binding envVariable0 {
+  query pattern callExpr where callee.path ~= "env.var"
+  emit source code.EnvVariable at call.result
+}
+
+binding envVariable1 {
+  query pattern callExpr where callee.path ~= "env.vars"
+  emit source code.EnvVariable at call.result
+}
+
+binding cliArgument2 {
+  query pattern callExpr where callee.path ~= "env.args"
+  emit source code.CliArgument at call.result
+}
+
+binding httpInput3 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.attrName contains "get"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.attrName contains "post"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.attrName contains "put"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput6 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.attrName contains "delete"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput7 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.attrName contains "patch"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput8 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.attrName contains "head"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput9 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.attrName contains "route"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput10 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.attrName contains "handler"
+  emit source code.HttpInput at call.result
+}
+
+binding commandExecution11 {
+  query pattern callExpr where callee.path ~= "Command.new"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution12 {
+  query pattern callExpr where callee.method == "arg"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution13 {
+  query pattern callExpr where callee.method == "args"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding templateInstallScriptHostExecution14 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "template_install_script_host_execution"
+  emit issue code.TemplateInstallScriptHostExecution at node
+}
+
+binding unsafeMutableAlias15 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "unsafe_mutable_alias"
+  emit issue code.UnsafeMutableAlias at node
+}
+
+binding ffiEnumLayoutRisk16 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "rust.ffi_enum_layout_risk"
+  emit issue code.FfiEnumLayoutRisk at node
+}
+
+binding unsafeAutoTraitImpl17 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "rust.unsafe_send_impl_missing_bound"
+  emit issue code.UnsafeAutoTraitImpl at node
+}
+
+binding unsafeAutoTraitImpl18 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "rust.unsafe_sync_impl_missing_bound"
+  emit issue code.UnsafeAutoTraitImpl at node
+}
+
+binding uncheckedFfiLengthNarrowing19 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "unchecked_ffi_length_narrowing"
+  emit issue code.UncheckedFfiLengthNarrowing at node
+}
+
+binding uninitializedBufferExposure20 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "uninitialized_buffer_exposure"
+  emit issue code.UninitializedBufferExposure at node
+}
+
+binding uninitializedBufferExposure21 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "uninitialized_buffer_exposure"
+  emit issue code.UninitializedBufferExposure at node
+}
+
+binding uninitializedBufferExposure22 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "uninitialized_buffer_exposure"
+  emit issue code.UninitializedBufferExposure at node
+}
+
+binding uninitializedBufferExposure23 {
+  query pattern presenceNode where node.analysis == "rust.uninitialized"
+  emit issue code.UninitializedBufferExposure at node
+}
+
+binding claxonResidualPartitionBufferExposure24 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "claxon_residual_partition_buffer_exposure"
+  emit issue code.ClaxonResidualPartitionBufferExposure at node
+}
+
+binding unboundedResourceOperation25 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "unbounded_next_await"
+  emit issue code.UnboundedResourceOperation at node
+}
+
+binding emptySourceSliceMemoryExpansion26 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "empty_source_slice_memory_expansion"
+  emit issue code.EmptySourceSliceMemoryExpansion at node
+}
+
+binding bufReadDiscardLoopWithoutEofGuard27 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "bufread_discard_loop_without_eof_guard"
+  emit issue code.BufReadDiscardLoopWithoutEofGuard at node
+}
+
+binding deviceStatusStateMachineBypass28 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and containsAny(node.context.name, ["write_common_config", "write_device_status", "write_config_byte"]) and node.context.matchArm contains "DEVICE_STATUS" and node.context.assign contains "self.driver_status=value" and not (node.context.callPath contains "self.set_device_status")
+  emit issue code.DeviceStatusStateMachineBypass at node
+}
+
+binding unvalidatedDependencyMapKeyDeserialization29 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "rust.unvalidated_dependency_map_key_deserialization"
+  emit issue code.UnvalidatedDependencyMapKeyDeserialization at node
+}
+
+binding modexpZeroExponentIterationUnderflow30 {
+  query pattern presenceNode where node.kind == "binop" and node.op contains "-" and operand(node, where: operand.path ~= "?.bits")
+  emit issue code.ModexpZeroExponentIterationUnderflow at node
+}
+
+binding conduitHyperUnboundedBodyToBytes31 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "conduit_hyper_unbounded_body_to_bytes"
+  emit issue code.ConduitHyperUnboundedBodyToBytes at node
+}
+
+binding cookieMaxAgeDurationSecondsPanic32 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "cookie_max_age_duration_seconds_panic"
+  emit issue code.CookieMaxAgeDurationSecondsPanic at node
+}
+
+binding callFutureRawWeakStateRef33 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "call_future_raw_weak_state_ref"
+  emit issue code.CallFutureRawWeakStateRef at node
+}
+
+binding windowsReservedDeviceNameBypass34 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "windows_reserved_device_name_bypass_com"
+  emit issue code.WindowsReservedDeviceNameBypass at node
+}
+
+binding windowsReservedDeviceNameBypass35 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "windows_reserved_device_name_bypass_lpt"
+  emit issue code.WindowsReservedDeviceNameBypass at node
+}
+
+binding archiveMarkerSymlinkOverwrite36 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "archive_marker_symlink_overwrite"
+  emit issue code.ArchiveMarkerSymlinkOverwrite at node
+}
+
+binding stateMutationBeforeOperationPreconditions37 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "state_mutation_before_operation_preconditions"
+  emit issue code.StateMutationBeforeOperationPreconditions at node
+}
+
+binding stateCommitBeforeExternalWriteAccounting38 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "state_commit_before_external_write_accounting"
+  emit issue code.StateCommitBeforeExternalWriteAccounting at node
+}
+
+binding peerLimitUnderflow39 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "peer_limit_underflow"
+  emit issue code.PeerLimitUnderflow at node
+}
+
+binding regexLineCommentStripWithoutCharWhitelist40 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "regex_line_comment_strip_without_char_whitelist"
+  emit issue code.RegexLineCommentStripWithoutCharWhitelist at node
+}
+
+binding cryptoMissingOptimizationBarrier41 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "crypto_missing_optimization_barrier"
+  emit issue code.CryptoMissingOptimizationBarrier at node
+}
+
+binding cryptoScalarRandomBitsByteLengthConfusion42 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "crypto_scalar_random_bits_byte_length_confusion"
+  emit issue code.CryptoScalarRandomBitsByteLengthConfusion at node
+}
+
+binding cryptoScalarRandomBitsByteLengthConfusion43 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "crypto_scalar_random_bits_byte_length_confusion"
+  emit issue code.CryptoScalarRandomBitsByteLengthConfusion at node
+}
+
+binding luks2AttachedHeaderActivation44 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "luks2_attached_header_activation"
+  emit issue code.Luks2AttachedHeaderActivation at node
+}
+
+binding urlFetch45 {
+  query pattern callExpr where callee.path ~= "reqwest.get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch46 {
+  query pattern callExpr where callee.path ~= "reqwest.post"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch47 {
+  query pattern callExpr where callee.path ~= "reqwest.Client.get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch48 {
+  query pattern callExpr where callee.path ~= "reqwest.Client.post"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch49 {
+  query pattern callExpr where callee.path ~= "ureq.get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch50 {
+  query pattern callExpr where callee.path ~= "ureq.post"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch51 {
+  query pattern callExpr where callee.path ~= "ureq.request"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch52 {
+  query pattern callExpr where callee.path ~= "surf.get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch53 {
+  query pattern callExpr where callee.path ~= "surf.post"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding incompleteIpDenylist54 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call contains "is_private" and node.context.call contains "is_loopback" and node.context.call contains "is_link_local" and node.context.call contains "is_multicast" and node.context.call contains "is_documentation" and not (node.context.call contains "is_unspecified")
+  emit issue code.IncompleteIpDenylist at node
+}
+
+binding incompleteIpDenylist55 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call contains "is_private" and node.context.call contains "is_loopback" and node.context.call contains "is_link_local" and node.context.call contains "is_multicast" and node.context.call contains "is_documentation" and not (node.context.call contains "is_broadcast")
+  emit issue code.IncompleteIpDenylist at node
+}
+
+binding cleartextChannel56 {
+  query pattern callExpr where callee.path ~= "reqwest.get" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding cleartextChannel57 {
+  query pattern callExpr where callee.path ~= "reqwest.post" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding cleartextChannel58 {
+  query pattern callExpr where callee.path ~= "reqwest.Client.get" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding cleartextChannel59 {
+  query pattern callExpr where callee.path ~= "reqwest.Client.post" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding cleartextChannel60 {
+  query pattern callExpr where callee.path ~= "ureq.get" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding cleartextChannel61 {
+  query pattern callExpr where callee.path ~= "ureq.post" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding cleartextChannel62 {
+  query pattern callExpr where callee.path ~= "ureq.request" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding cleartextChannel63 {
+  query pattern callExpr where callee.path ~= "surf.get" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding cleartextChannel64 {
+  query pattern callExpr where callee.path ~= "surf.post" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding regexCompile65 {
+  query pattern callExpr where callee.path ~= "Regex.new"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding regexCompile66 {
+  query pattern callExpr where callee.path ~= "RegexBuilder.new"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding htmlRender67 {
+  query pattern callExpr where callee.path ~= "maud.PreEscaped"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender68 {
+  query pattern callExpr where callee.path ~= "PreEscaped"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender69 {
+  query pattern callExpr where callee.method == "render_html"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender70 {
+  query pattern callExpr where callee.method == "body"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender71 {
+  query pattern callExpr where callee.method == "html"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding weakHash72 {
+  query pattern presenceNode where node.path ~= "md5.compute"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash73 {
+  query pattern presenceNode where node.path ~= "Md5.new"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash74 {
+  query pattern presenceNode where node.path ~= "Sha1.new"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash75 {
+  query pattern presenceNode where node.path ~= "sha1.Sha1"
+  emit issue code.WeakHash at node
+}
+
+binding weakCipher76 {
+  query pattern presenceNode where node.path ~= "Des.new"
+  emit issue code.WeakCipher at node
+}
+
+binding weakCipher77 {
+  query pattern presenceNode where node.path ~= "Rc4.new"
+  emit issue code.WeakCipher at node
+}
+
+binding staticIv78 {
+  query pattern callExpr where callee.path ~= "new_from_slices" and args.any.literal contains "0000000000000000"
+  emit issue code.StaticIv at call
+}
+
+binding ldapQuery79 {
+  query pattern callExpr where callee.method == "search"
+  emit sink code.LdapQuery at args[1]
+}
+
+binding xpathQuery80 {
+  query pattern callExpr where callee.method == "evaluate"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding trustBoundary81 {
+  query pattern callExpr where callee.method == "insert"
+  emit sink code.TrustBoundary at args.any
+}
+
+binding trustBoundary82 {
+  query pattern callExpr where callee.method == "set_attribute"
+  emit sink code.TrustBoundary at args.any
+}
+
+binding insecureCookie83 {
+  query pattern callExpr where callee.path ~= "set_secure" and args.any.literal contains "false"
+  emit issue code.InsecureCookie at call
+}
+
+binding insecureCookie84 {
+  query pattern callExpr where callee.path ~= "set_http_only" and args.any.literal contains "false"
+  emit issue code.InsecureCookie at call
+}
+
+binding permissiveCors85 {
+  query pattern callExpr where callee.path == "CorsLayer.new.allow_origin.allow_methods.allow_headers" and args.any.literal contains "Any"
+  emit issue code.PermissiveCors at call
+}
+
+binding weakRandomValue86 {
+  query pattern presenceNode where node.path ~= "rand.random"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue87 {
+  query pattern presenceNode where node.path ~= "rand.thread_rng"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue88 {
+  query pattern presenceNode where node.path ~= "thread_rng"
+  emit issue code.WeakRandomValue at node
+}
+
+binding weakRandomValue89 {
+  query pattern presenceNode where node.path ~= "StdRng.seed_from_u64"
+  emit issue code.WeakRandomValue at node
+}
+
+binding shellEscape90 {
+  query pattern callExpr where callee.path ~= "shell_escape.escape"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape91 {
+  query pattern callExpr where callee.path ~= "html_escape.encode_text"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape92 {
+  query pattern callExpr where callee.path ~= "html_escape.encode_safe"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape93 {
+  query pattern callExpr where callee.path ~= "htmlescape.encode_minimal"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape94 {
+  query pattern callExpr where callee.path ~= "ammonia.clean"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape95 {
+  query pattern callExpr where callee.path ~= "escape_html"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding xpathEscape96 {
+  query pattern callExpr where callee.path ~= "escape_xpath"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding ldapEscape97 {
+  query pattern callExpr where callee.path ~= "encode_for_ldap"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding shellEscape98 {
+  query pattern callExpr where callee.path ~= "escape_shell"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding pathCanonicalization99 {
+  query pattern callExpr where callee.path ~= "safe_path"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation100 {
+  query pattern callExpr where callee.path ~= "validate_role"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding sqlExecution101 {
+  query pattern callExpr where callee.path ~= "sqlx.query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution102 {
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution103 {
+  query pattern callExpr where callee.method == "query_as"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution104 {
+  query pattern callExpr where callee.method == "sql_query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution105 {
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding filePathAccess106 {
+  query pattern callExpr where callee.path ~= "File.open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess107 {
+  query pattern callExpr where callee.path ~= "File.create"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess108 {
+  query pattern callExpr where callee.path ~= "fs.read"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess109 {
+  query pattern callExpr where callee.path ~= "fs.read_to_string"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess110 {
+  query pattern callExpr where callee.path ~= "fs.write"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess111 {
+  query pattern callExpr where callee.path ~= "fs.remove_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess112 {
+  query pattern callExpr where callee.method == "read_to_string"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding archiveEntryWrite113 {
+  query pattern callExpr where callee.method == "extract_entry"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding archiveEntryWrite114 {
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding deserialization115 {
+  query pattern callExpr where callee.path ~= "serde_json.from_str"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization116 {
+  query pattern callExpr where callee.path ~= "serde_yaml.from_str"
+  emit sink code.Deserialization at args[0]
+}
+
+binding uncheckedDecodeResult117 {
+  query pattern presenceNode where node.path == "b62_decode.expect"
+  emit issue code.UncheckedDecodeResult at node
+}
+
+binding objectLookupByUserInput118 {
+  query pattern callExpr where callee.method == "find_by_id"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput119 {
+  query pattern callExpr where callee.method == "get_user"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput120 {
+  query pattern callExpr where callee.method == "get_account"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding authenticationRequiredOp121 {
+  query pattern presenceNode where node.path ~= "change_password"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp122 {
+  query pattern presenceNode where node.path ~= "update_password"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp123 {
+  query pattern presenceNode where node.path ~= "reset_password"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp124 {
+  query pattern presenceNode where node.path ~= "change_email"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp125 {
+  query pattern presenceNode where node.path ~= "transfer_funds"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp126 {
+  query pattern presenceNode where node.path ~= "delete_account"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp127 {
+  query pattern presenceNode where node.path ~= "grant_role"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationRequiredOp128 {
+  query pattern presenceNode where node.path ~= "make_admin"
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding certValidationDisabled129 {
+  query pattern callExpr where callee.path ~= "danger_accept_invalid_certs" and args.any.literal contains "true"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding insecurePermission130 {
+  query pattern callExpr where callee.method == "mode" and args.any.literal contains "0o777"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission131 {
+  query pattern callExpr where callee.method == "mode" and args.any.literal contains "0o666"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission132 {
+  query pattern callExpr where callee.path ~= "Permissions.from_mode" and args.any.literal contains "0o777"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission133 {
+  query pattern callExpr where callee.path ~= "Permissions.from_mode" and args.any.literal contains "0o666"
+  emit issue code.InsecurePermission at call
+}
+
+binding insecurePermission134 {
+  query pattern callExpr where callee.path ~= "platform_lib.mode_t.from" and args.any.literal contains "S_IRWXO"
+  emit issue code.InsecurePermission at call
+}
+
+binding secretConfigFilePermissionMissing135 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "secret_config_file_permission_missing"
+  emit issue code.SecretConfigFilePermissionMissing at node
+}
+
+binding insecureTempFile136 {
+  query pattern callExpr where callee.path ~= "File.create" and args.any.literal contains "/tmp/"
+  emit issue code.InsecureTempFile at call
+}
+
+binding indexAccess137 {
+  query pattern presenceNode where node.path ~= "__subscript"
+  emit issue code.IndexAccess at node
+  emit sink code.IndexAccessSink at node
+}
+
+binding nullableDeref138 {
+  query pattern presenceNode where node.path ~= "__unary.deref"
+  emit issue code.NullableDeref at node
+}
+
+binding authenticationCheck139 {
+  query pattern callExpr where callee.path ~= "require_auth"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck140 {
+  query pattern callExpr where callee.path ~= "ensure_authenticated"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck141 {
+  query pattern callExpr where callee.path ~= "check_ownership"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding ownershipCheck142 {
+  query pattern callExpr where callee.path ~= "require_owner"
+  emit check core.OwnershipCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding runTestsAutoApprovalExecutesCode143 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "rust.run_tests_auto_approval_executes_code"
+  emit issue code.RunTestsAutoApprovalExecutesCode at node
+}

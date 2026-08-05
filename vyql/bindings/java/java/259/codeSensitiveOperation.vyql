@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding sensitiveOperation259 {
-  query pattern callExpr where callee.method == "getSomeWorkspace"
-  emit issue code.SensitiveOperation at call
-}

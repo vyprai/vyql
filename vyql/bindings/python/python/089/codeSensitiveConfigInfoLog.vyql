@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding sensitiveConfigInfoLog89 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "sensitive_config_info_log"
-  emit issue code.SensitiveConfigInfoLog at node
-}

@@ -1,6 +1,0 @@
-module bindings.elixir.generated.m728b8a72;
-
-binding htmlRender81 {
-  query pattern callExpr where callee.path ~= "Phoenix.HTML.raw"
-  emit sink code.HtmlRender at args[0]
-}

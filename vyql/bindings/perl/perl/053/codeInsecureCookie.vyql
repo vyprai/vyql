@@ -1,6 +1,0 @@
-module bindings.perl.generated.mfca40a44;
-
-binding insecureCookie53 {
-  query pattern callExpr where callee.path ~= "httponly" and args.any.literal contains "false"
-  emit issue code.InsecureCookie at call
-}

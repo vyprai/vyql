@@ -1,7 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding integerSizeArithmetic260 {
-  query pattern presenceNode where node.scope == "function" and node.context.call contains "ReadBlockHeader" and node.context.call contains "int" and node.context.call contains "getMaxMapAllocSize"
-  emit issue code.IntegerSizeArithmetic at node
-  emit sink code.IntegerSizeArithmeticSink at node
-}

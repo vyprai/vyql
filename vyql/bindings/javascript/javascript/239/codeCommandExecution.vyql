@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding commandExecution239 {
-  query pattern callExpr where callee.path ~= "shelljs.exec"
-  emit sink code.CommandExecution at args[0]
-}

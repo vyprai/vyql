@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding commonMarkPreserveEntitiesUrlAttributeXss115 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "render" and node.context.phpReview == "commonmark_preserve_entities_url_attribute_xss"
-  emit issue code.CommonMarkPreserveEntitiesUrlAttributeXss at node
-}

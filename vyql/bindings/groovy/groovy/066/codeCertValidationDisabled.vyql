@@ -1,6 +1,0 @@
-module bindings.groovy.generated.m6eabb149;
-
-binding certValidationDisabled66 {
-  query pattern presenceNode where node.path ~= "NoopHostnameVerifier"
-  emit issue code.CertValidationDisabled at node
-}

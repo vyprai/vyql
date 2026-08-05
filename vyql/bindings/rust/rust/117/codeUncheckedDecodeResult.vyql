@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding uncheckedDecodeResult117 {
-  query pattern presenceNode where node.path == "b62_decode.expect"
-  emit issue code.UncheckedDecodeResult at node
-}

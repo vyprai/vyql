@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding logWrite431 {
-  query pattern callExpr where callee.method == "logException"
-  emit sink code.LogWriteSink at args.any
-}

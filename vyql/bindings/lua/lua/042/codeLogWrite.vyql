@@ -1,7 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding logWrite42 {
-  query pattern presenceNode where node.path ~= "core.log.debug"
-  emit issue code.LogWrite at node
-  emit sink code.LogWriteSink at node
-}

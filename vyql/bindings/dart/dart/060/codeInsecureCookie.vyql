@@ -1,6 +1,0 @@
-module bindings.dart.generated.m1c398214;
-
-binding insecureCookie60 {
-  query pattern callExpr where callee.path ~= "setSecure" and args.any.literal contains "false"
-  emit issue code.InsecureCookie at call
-}

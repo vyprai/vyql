@@ -1,9 +1,0 @@
-module bindings.php.generated.mc5601031;
-
-binding deserialization25 {
-  requires {
-    dependency("yaml")
-  }
-  query pattern callExpr where callee.path ~= "yaml_parse"
-  emit sink code.Deserialization at args[0]
-}

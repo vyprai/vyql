@@ -1,6 +1,0 @@
-module bindings.cryptoreview.generated.m4f475b34;
-
-binding cryptoOperation22 {
-  query pattern presenceNode where node.path ~= "ecdsa.Sign"
-  emit issue code.CryptoOperation at node
-}

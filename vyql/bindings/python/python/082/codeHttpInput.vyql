@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding httpInput82 {
-  query pattern callExpr where callee.path ~= "req.media"
-  emit source code.HttpInput at call.result
-}

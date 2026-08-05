@@ -1,6 +1,0 @@
-module bindings.swift.generated.m388f23d0;
-
-binding weakRandomValue60 {
-  query pattern presenceNode where node.path ~= "arc4random_uniform"
-  emit issue code.WeakRandomValue at node
-}

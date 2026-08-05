@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding unsafeYamlLoad291 {
-  query pattern presenceNode where node.kind == "call" and node.path == "yaml.load" and operand(node, where: operand.path == "yaml.UnsafeLoader")
-  emit issue code.UnsafeYamlLoad at node
-}

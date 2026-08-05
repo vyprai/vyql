@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding filePathAccess395 {
-  query pattern callExpr where callee.path ~= "os.rename"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding bladeRawMarkdownRenderWithoutSanitizer118 {
-  query pattern presenceNode where node.analysis == "module.context" and node.context.language == "php" and node.context.phpReview == "blade_raw_markdown_without_sanitizer"
-  emit issue code.BladeRawMarkdownRenderWithoutSanitizer at node
-}

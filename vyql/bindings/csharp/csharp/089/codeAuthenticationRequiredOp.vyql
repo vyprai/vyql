@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding authenticationRequiredOp89 {
-  query pattern presenceNode where node.path ~= "UpdatePassword"
-  emit issue code.AuthenticationRequiredOp at node
-}

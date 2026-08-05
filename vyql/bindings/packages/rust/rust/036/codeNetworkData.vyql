@@ -1,9 +1,0 @@
-module bindings.rust.generated.m222602a5;
-
-binding networkData36 {
-  requires {
-    dependency("mio")
-  }
-  query pattern callExpr where callee.method == "recv_from"
-  emit source code.NetworkData at call.result
-}

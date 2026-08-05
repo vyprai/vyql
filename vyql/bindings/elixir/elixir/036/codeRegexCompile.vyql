@@ -1,6 +1,0 @@
-module bindings.elixir.generated.m728b8a72;
-
-binding regexCompile36 {
-  query pattern callExpr where callee.path ~= "Regex.compile"
-  emit sink code.RegexCompileSink at args[0]
-}

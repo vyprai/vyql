@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1457a768;
-
-binding urlFetch8 {
-  requires {
-    dependency("okhttp")
-  }
-  query pattern callExpr where callee.method == "newCall"
-  emit sink code.UrlFetch at callee.receiver
-}

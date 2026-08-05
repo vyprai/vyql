@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding businessLogicSmell689 {
-  query pattern callExpr where callee.analysis ~= "smell.business_logic"
-  emit issue code.BusinessLogicSmell at call
-}

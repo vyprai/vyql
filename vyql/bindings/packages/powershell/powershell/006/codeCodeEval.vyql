@@ -1,9 +1,0 @@
-module bindings.powershell.generated.m92132a18;
-
-binding codeEval6 {
-  requires {
-    dependency("Microsoft.PowerShell.Utility")
-  }
-  query pattern callExpr where callee.path ~= "Add-Type"
-  emit sink code.CodeEval at args[0]
-}

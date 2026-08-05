@@ -1,0 +1,72 @@
+module bindings.sca.generated.mc40a837e;
+
+pattern bindingMetadata {
+  binding: {
+    name: "sca"
+    meta: {
+      auto_apply: "graph"
+      cross_language: "true"
+      fidelity: "resolved"
+    }
+  }
+}
+
+binding vulnerableDependency0 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "sca.package" and node.context.status == "vulnerable"
+  emit issue sbom.VulnerableDependency at node
+}
+
+binding httpRequestSmugglingDependency1 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "sca.package" and node.context.advisoryCwe contains "CWE-444"
+  emit issue sbom.HttpRequestSmugglingDependency at node
+}
+
+binding httpRequestSmugglingDependency2 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "sca.package" and node.context.advisoryCwe contains "CWE_444"
+  emit issue sbom.HttpRequestSmugglingDependency at node
+}
+
+binding certValidationDependency3 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "sca.package" and node.context.advisoryCwe contains "CWE-295"
+  emit issue sbom.CertValidationDependency at node
+}
+
+binding certValidationDependency4 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "sca.package" and node.context.advisoryCwe contains "CWE_295"
+  emit issue sbom.CertValidationDependency at node
+}
+
+binding ssrfDependency5 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "sca.package" and node.context.advisoryCwe contains "CWE-918"
+  emit issue sbom.SsrfDependency at node
+}
+
+binding ssrfDependency6 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "sca.package" and node.context.advisoryCwe contains "CWE_918"
+  emit issue sbom.SsrfDependency at node
+}
+
+binding suspiciousDependency7 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "sca.package" and node.context.status == "suspicious"
+  emit issue sbom.SuspiciousDependency at node
+}
+
+binding maliciousDependency8 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "sca.package" and node.context.status == "malicious"
+  emit issue sbom.MaliciousDependency at node
+}
+
+binding maliciousDependency9 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "sca.package" and node.context.advisoryCwe contains "CWE-506"
+  emit issue sbom.MaliciousDependency at node
+}
+
+binding maliciousDependency10 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "sca.package" and node.context.advisoryCwe contains "CWE_506"
+  emit issue sbom.MaliciousDependency at node
+}
+
+binding reachableSymbol11 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "sca.package" and node.context.reachable == "true"
+  emit issue sbom.ReachableSymbol at node
+}

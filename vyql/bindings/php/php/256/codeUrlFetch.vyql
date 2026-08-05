@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding urlFetch256 {
-  query pattern callExpr where callee.path ~= "wp_remote_get"
-  emit sink code.UrlFetch at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.mc5601031;
-
-binding ldapQuery30 {
-  requires {
-    dependency("ldap")
-  }
-  query pattern callExpr where callee.path ~= "ldap_search"
-  emit sink code.LdapQuery at args[2]
-}

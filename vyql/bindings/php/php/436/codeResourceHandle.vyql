@@ -1,7 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding resourceHandle436 {
-  query pattern presenceNode where node.path ~= "fopen"
-  emit issue code.ResourceHandle at node
-  emit sink code.ResourceHandleSink at node
-}

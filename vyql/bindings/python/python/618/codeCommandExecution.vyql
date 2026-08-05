@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding commandExecution618 {
-  query pattern callExpr where callee.path ~= "subprocess.Popen" and args.any.literal contains "shell=True"
-  emit sink code.CommandExecution at args[0]
-}

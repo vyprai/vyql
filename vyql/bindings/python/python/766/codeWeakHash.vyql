@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding weakHash766 {
-  query pattern presenceNode where node.path ~= "Crypto.Hash.SHA1.new"
-  emit issue code.WeakHash at node
-}

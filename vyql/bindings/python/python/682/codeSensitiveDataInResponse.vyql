@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding sensitiveDataInResponse682 {
-  query pattern callExpr where callee.analysis ~= "disclosure.sensitive_response"
-  emit issue code.SensitiveDataInResponse at call
-}

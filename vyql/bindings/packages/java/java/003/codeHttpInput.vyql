@@ -1,9 +1,0 @@
-module bindings.java.generated.m9ef49b0f;
-
-binding httpInput3 {
-  requires {
-    dependency("jakarta.servlet")
-  }
-  query pattern callExpr where callee.method == "getHeader" and callee.receiver.type == "HttpServletRequest"
-  emit source code.HttpInput at call.result
-}

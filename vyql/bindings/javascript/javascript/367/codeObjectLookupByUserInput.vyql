@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding objectLookupByUserInput367 {
-  query pattern callExpr where callee.path ~= "findUserById"
-  emit sink code.ObjectLookupByUserInput at args[0]
-}

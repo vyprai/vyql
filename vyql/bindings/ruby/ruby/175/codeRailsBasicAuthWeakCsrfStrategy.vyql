@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding railsBasicAuthWeakCsrfStrategy175 {
-  query pattern presenceNode where node.scope == "class" and node.context.language == "ruby" and node.context.classBase contains "ActionController.Base" and node.context.callPath contains "protect_from_forgery" and node.context.callPath contains "http_basic_authenticate_with" and not (node.context.callArg contains "protect_from_forgery:with=exception")
-  emit issue code.RailsBasicAuthWeakCsrfStrategy at node
-}

@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding commandExecution204 {
-  query pattern callExpr where callee.path ~= "shell.openExternal"
-  emit sink code.CommandExecution at args[0]
-}

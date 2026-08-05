@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding httpInput102 {
-  query pattern callExpr where callee.path ~= "os.getenv" and args.any.literal contains "HTTP_PROXY"
-  emit source code.HttpInput at call.result
-}

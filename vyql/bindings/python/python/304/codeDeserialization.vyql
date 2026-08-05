@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding deserialization304 {
-  query pattern callExpr where callee.path ~= "cloudpickle.loads"
-  emit sink code.Deserialization at args[0]
-}

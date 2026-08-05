@@ -1,9 +1,0 @@
-module bindings.solidity.generated.m72929a80;
-
-binding privilegedOp7 {
-  requires {
-    dependency("solidity")
-  }
-  query pattern callExpr where callee.path ~= "selfdestruct"
-  emit sink code.PrivilegedOpSink at args[0]
-}

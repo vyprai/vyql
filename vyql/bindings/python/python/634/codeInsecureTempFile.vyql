@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding insecureTempFile634 {
-  query pattern callExpr where callee.path ~= "open" and args.any.literal contains "/var/tmp/" and args.any.literal contains "w"
-  emit issue code.InsecureTempFile at call
-}

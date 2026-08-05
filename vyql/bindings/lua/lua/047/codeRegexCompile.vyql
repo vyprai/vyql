@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding regexCompile47 {
-  query pattern callExpr where callee.path ~= "ngx.re.gsub"
-  emit sink code.RegexCompileSink at args[1]
-}

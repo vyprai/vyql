@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding clientAuthFailureResponseReview648 {
-  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "callbackData.hasOwnProperty" and node.context.literal contains "status" and node.context.expr contains "data.status==-1" and node.context.callPath contains "callbackFun" and not (node.context.expr contains "callbackData.status==-1")
-  emit issue code.ClientAuthFailureResponseReview at node
-}

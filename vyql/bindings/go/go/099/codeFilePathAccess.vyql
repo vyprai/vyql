@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding filePathAccess99 {
-  query pattern callExpr where callee.path ~= "os.Create"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding cWebRequestFilePathTraversal38 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "web_request.path_traversal"
-  emit issue code.CWebRequestFilePathTraversal at node
-}

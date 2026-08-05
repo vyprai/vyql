@@ -1,9 +1,0 @@
-module bindings.python.generated.m3d9ccbad;
-
-binding unboundedResourceOperation71 {
-  requires {
-    dependency("zlib")
-  }
-  query pattern presenceNode where node.path ~= "zlib.decompress"
-  emit issue code.UnboundedResourceOperation at node
-}

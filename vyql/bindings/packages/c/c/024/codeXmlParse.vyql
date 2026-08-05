@@ -1,9 +1,0 @@
-module bindings.c.generated.m2816daee;
-
-binding xmlParse24 {
-  requires {
-    dependency("libxml2")
-  }
-  query pattern callExpr where callee.path ~= "xmlReadMemory"
-  emit sink code.XmlParse at args[0]
-}

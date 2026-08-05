@@ -1,6 +1,0 @@
-module bindings.perl.generated.mfca40a44;
-
-binding deserialization74 {
-  query pattern callExpr where callee.path ~= "retrieve"
-  emit sink code.Deserialization at args[0]
-}

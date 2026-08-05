@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding cockpitAuthArrayNosqlInjection121 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "check" and node.context.phpReview == "cockpit_auth_array_nosql_injection"
-  emit issue code.CockpitAuthArrayNosqlInjection at node
-}

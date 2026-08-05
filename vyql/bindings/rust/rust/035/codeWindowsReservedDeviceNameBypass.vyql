@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding windowsReservedDeviceNameBypass35 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "windows_reserved_device_name_bypass_lpt"
-  emit issue code.WindowsReservedDeviceNameBypass at node
-}

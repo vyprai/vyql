@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding weakCipher184 {
-  query pattern presenceNode where node.path ~= "RC4"
-  emit issue code.WeakCipher at node
-}

@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding webViewJsInterface13 {
-  query pattern presenceNode where node.path ~= "addScriptMessageHandler"
-  emit issue code.WebViewJsInterface at node
-}

@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding bbcodeUrlTagProtocolXss78 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "bbcode_url_tag_protocol_xss"
-  emit issue code.BbcodeUrlTagProtocolXss at node
-}

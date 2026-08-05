@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding unvalidatedDependencyMapKeyDeserialization29 {
-  query pattern presenceNode where node.kind == "any" and node.analysis == "rust.unvalidated_dependency_map_key_deserialization"
-  emit issue code.UnvalidatedDependencyMapKeyDeserialization at node
-}

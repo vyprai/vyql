@@ -1,6 +1,0 @@
-module bindings.elixir.generated.m728b8a72;
-
-binding sqlExecution15 {
-  query pattern callExpr where callee.method == "query"
-  emit sink code.SqlExecution at args[1]
-}

@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding stateMutationBeforeOperationPreconditions37 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "state_mutation_before_operation_preconditions"
-  emit issue code.StateMutationBeforeOperationPreconditions at node
-}

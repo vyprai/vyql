@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding incompleteTemplateValidation776 {
-  query pattern presenceNode where node.analysis == "function.context" and node.token contains "Formatter().parse" and node.token contains "." and node.token contains "format_spec" and not (node.token contains "{") and not (node.token contains "}")
-  emit issue code.IncompleteTemplateValidation at node
-}

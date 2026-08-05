@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding cliArgument2 {
-  query pattern callExpr where callee.path ~= "env.args"
-  emit source code.CliArgument at call.result
-}

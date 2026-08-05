@@ -1,9 +1,0 @@
-module bindings.c.generated.m2816daee;
-
-binding commandExecution3 {
-  requires {
-    dependency("libc")
-  }
-  query pattern callExpr where callee.path ~= "popen"
-  emit sink code.CommandExecution at args[0]
-}

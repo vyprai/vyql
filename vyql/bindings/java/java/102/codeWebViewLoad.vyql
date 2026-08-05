@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding webViewLoad102 {
-  query pattern callExpr where callee.method == "loadData"
-  emit sink code.WebViewLoad at args[0]
-}

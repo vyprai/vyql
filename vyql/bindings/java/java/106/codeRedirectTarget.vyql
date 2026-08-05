@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding redirectTarget106 {
-  query pattern callExpr where callee.method == "sendRedirect"
-  emit sink code.RedirectTargetSink at args[0]
-}

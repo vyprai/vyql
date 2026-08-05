@@ -1,7 +1,0 @@
-module bindings.groovy.generated.m6eabb149;
-
-binding resourceHandle73 {
-  query pattern presenceNode where node.path ~= "FileInputStream"
-  emit issue code.ResourceHandle at node
-  emit sink code.ResourceHandleSink at node
-}

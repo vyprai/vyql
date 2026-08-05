@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding nilMapMergeWritePanic272 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.selector contains "options.Helm.Values" and node.context.selector contains "options.Helm.ValuesFrom" and node.context.assign contains "values=options.Helm.Values.Data" and node.context.callPath contains "mergeValues" and not (node.context.binary contains "values==nil") and not (node.context.assign contains "values=map[string]interface{}{}") and not (node.context.callPath contains "make")
-  emit issue code.NilMapMergeWritePanic at node
-}

@@ -1,6 +1,0 @@
-module bindings.kotlin.generated.m304d1620;
-
-binding sqlExecution31 {
-  query pattern callExpr where callee.method == "rawQuery"
-  emit sink code.SqlExecution at args[0]
-}

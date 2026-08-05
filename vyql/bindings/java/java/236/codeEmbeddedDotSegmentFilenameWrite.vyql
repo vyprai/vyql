@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding embeddedDotSegmentFilenameWrite236 {
-  query pattern presenceNode where node.scope == "function" and containsAny(node.context.callPath, ["getFilename", "getOriginalFilename"]) and containsAny(node.context.callPath, ["Files.copy", "Files.write", "FileUtils.copyInputStreamToFile", "MultipartFile.transferTo"]) and containsAny(node.context.callPath, ["createTempFile", "resolve", "new File"]) and containsAny(node.context.callPath, ["getCanonicalPath", "normalize", "toRealPath"]) and containsAny(node.context.callArg, ["filename.equals:..", "fileName.equals:.."]) and not (containsAny(node.context.callArg, ["filename.contains:..", "fileName.contains:.."]))
-  emit issue code.EmbeddedDotSegmentFilenameWrite at node
-}

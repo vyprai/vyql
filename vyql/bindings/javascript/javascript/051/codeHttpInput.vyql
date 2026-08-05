@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding httpInput51 {
-  query pattern callExpr where callee.path ~= "ctx.headers"
-  emit source code.HttpInput at call.result
-}

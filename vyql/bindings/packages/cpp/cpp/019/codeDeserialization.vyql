@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m1c1357ee;
-
-binding deserialization19 {
-  requires {
-    dependency("nlohmann-json")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

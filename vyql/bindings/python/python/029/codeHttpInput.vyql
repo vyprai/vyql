@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding httpInput29 {
-  query pattern callExpr where callee.path ~= "request.cookies"
-  emit source code.HttpInput at call.result
-}

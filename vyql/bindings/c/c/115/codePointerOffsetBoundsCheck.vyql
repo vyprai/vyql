@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding pointerOffsetBoundsCheck115 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "pointer_offset.missing_remaining_size"
-  emit issue code.PointerOffsetBoundsCheck at node
-}

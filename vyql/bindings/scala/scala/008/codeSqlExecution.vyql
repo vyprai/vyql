@@ -1,6 +1,0 @@
-module bindings.scala.generated.m06d0685b;
-
-binding sqlExecution8 {
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.SqlExecution at args[0]
-}

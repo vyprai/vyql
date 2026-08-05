@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1457a768;
-
-binding nosqlQuery13 {
-  requires {
-    dependency("mongodb-driver-kotlin")
-  }
-  query pattern callExpr where callee.method == "find"
-  emit sink code.NosqlQuery at args[0]
-}

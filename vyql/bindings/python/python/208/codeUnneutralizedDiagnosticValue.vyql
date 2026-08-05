@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding unneutralizedDiagnosticValue208 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unneutralized_diagnostic_value"
-  emit issue code.UnneutralizedDiagnosticValue at node
-}

@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding commandExecution9 {
-  query pattern callExpr where callee.path ~= "execlp"
-  emit sink code.CommandExecution at args[0]
-}

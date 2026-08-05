@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding filePathAccess18 {
-  query pattern callExpr where callee.path ~= "io.lines"
-  emit sink code.FilePathAccess at args[0]
-}

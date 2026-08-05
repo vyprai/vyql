@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding massAssignmentSink693 {
-  query pattern callExpr where callee.analysis ~= "access.mass_assign"
-  emit sink code.MassAssignmentSink at args[0]
-}

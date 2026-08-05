@@ -1,9 +1,0 @@
-module bindings.scala.generated.m3608f193;
-
-binding templateRender26 {
-  requires {
-    dependency("twirl")
-  }
-  query pattern callExpr where callee.method == "render"
-  emit sink code.TemplateRender at args[0]
-}

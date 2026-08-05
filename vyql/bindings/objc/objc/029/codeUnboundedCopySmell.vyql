@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding unboundedCopySmell29 {
-  query pattern presenceNode where node.path ~= "strcat"
-  emit issue code.UnboundedCopySmell at node
-}

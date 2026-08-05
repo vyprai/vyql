@@ -1,6 +1,0 @@
-module bindings.elixir.generated.m728b8a72;
-
-binding authenticationRequiredOp28 {
-  query pattern presenceNode where node.path ~= "grant_role"
-  emit issue code.AuthenticationRequiredOp at node
-}

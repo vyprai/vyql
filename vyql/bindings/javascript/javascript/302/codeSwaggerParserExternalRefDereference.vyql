@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding swaggerParserExternalRefDereference302 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "yaml.safeLoad" and node.context.callPath contains "swaggerParser.validate" and node.context.identifier contains "loaded" and not (node.context.prop contains "external=false")
-  emit issue code.SwaggerParserExternalRefDereference at node
-}

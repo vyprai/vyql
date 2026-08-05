@@ -1,9 +1,0 @@
-module bindings.dart.generated.m5342780c;
-
-binding httpInput1 {
-  requires {
-    dependency("shelf")
-  }
-  query pattern callExpr where callee.path ~= ".readAsString"
-  emit source code.HttpInput at call.result
-}

@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding dynamicCommandExec691 {
-  query pattern callExpr where callee.analysis ~= "injection.dynamic_command"
-  emit issue code.DynamicCommandExec at call
-}

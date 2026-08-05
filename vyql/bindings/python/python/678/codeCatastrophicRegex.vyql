@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding catastrophicRegex678 {
-  query pattern callExpr where callee.analysis ~= "dos.catastrophic_regex"
-  emit issue code.CatastrophicRegex at call
-}

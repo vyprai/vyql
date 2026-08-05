@@ -1,9 +1,0 @@
-module bindings.python.generated.m3d9ccbad;
-
-binding httpInput19 {
-  requires {
-    dependency("tornado")
-  }
-  query pattern callExpr where callee.path ~= "self.get_argument"
-  emit source code.HttpInput at call.result
-}

@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding unboundedCopySmell63 {
-  query pattern presenceNode where node.path ~= "strcat"
-  emit issue code.UnboundedCopySmell at node
-}

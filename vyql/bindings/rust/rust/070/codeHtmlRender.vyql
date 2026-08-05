@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding htmlRender70 {
-  query pattern callExpr where callee.method == "body"
-  emit sink code.HtmlRender at args[0]
-}

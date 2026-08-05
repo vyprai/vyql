@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding defaultPermissiveCorsConfig110 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.prop contains "CORS_ENABLED=true" and node.context.prop contains "CORS_ORIGIN=true" and not (node.context.prop contains "CORS_ENABLED=false") and not (node.context.prop contains "CORS_ORIGIN=false")
-  emit issue code.DefaultPermissiveCorsConfig at node
-}

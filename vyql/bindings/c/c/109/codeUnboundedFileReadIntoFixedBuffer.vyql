@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding unboundedFileReadIntoFixedBuffer109 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "file_read.unbounded_fgetc_fixed_buffer"
-  emit issue code.UnboundedFileReadIntoFixedBuffer at node
-}

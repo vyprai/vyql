@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding insecureExecutableDownload660 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.literal contains "OpenJDK-JRE" and node.context.literal contains "http://bundled-openjdk-jre" and node.context.identifier contains "jreUrl" and node.context.identifier contains "jreTempFile" and node.context.callPath contains "download" and node.context.callPath contains "http.request" and not (node.context.literal contains "https://storage.googleapis.com")
-  emit issue code.InsecureExecutableDownload at node
-}

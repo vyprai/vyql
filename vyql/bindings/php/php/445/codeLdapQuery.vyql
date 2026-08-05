@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding ldapQuery445 {
-  query pattern callExpr where callee.path ~= "ldap_search"
-  emit sink code.LdapQuery at args[2]
-}

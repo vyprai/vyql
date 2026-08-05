@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m5c270092;
-
-binding codeEval30 {
-  requires {
-    dependency("lodash")
-  }
-  query pattern callExpr where callee.path ~= "lodash.template"
-  emit sink code.CodeEval at args[0]
-}

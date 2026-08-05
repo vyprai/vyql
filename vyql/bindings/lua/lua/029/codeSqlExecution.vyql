@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding sqlExecution29 {
-  query pattern callExpr where callee.method == "query"
-  emit sink code.SqlExecution at args[0]
-}

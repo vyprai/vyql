@@ -1,6 +1,0 @@
-module bindings.groovy.generated.m6eabb149;
-
-binding ldapQuery57 {
-  query pattern callExpr where callee.method == "search"
-  emit sink code.LdapQuery at args[1]
-}

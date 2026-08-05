@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding logOutput183 {
-  query pattern callExpr where callee.path ~= "Rails.logger.warn"
-  emit sink code.LogOutput at args.any
-}

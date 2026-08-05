@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding objectLookupByUserInput85 {
-  query pattern callExpr where callee.method == "GetUser"
-  emit sink code.ObjectLookupByUserInput at args[0]
-}

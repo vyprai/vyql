@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding weakHash64 {
-  query pattern presenceNode where node.path ~= "md5.sum"
-  emit issue code.WeakHash at node
-}

@@ -1,6 +1,0 @@
-module bindings.config.generated.m2b6375a9;
-
-binding userControlledData25 {
-  query pattern callExpr where callee.analysis ~= "template.jsp.input"
-  emit source core.UserControlledData at call.result
-}

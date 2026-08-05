@@ -1,6 +1,0 @@
-module bindings.scala.generated.m06d0685b;
-
-binding httpInput3 {
-  query pattern callExpr where callee.path ~= "http_input"
-  emit source code.HttpInput at call.result
-}

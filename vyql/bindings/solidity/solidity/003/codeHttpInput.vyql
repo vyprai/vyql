@@ -1,6 +1,0 @@
-module bindings.solidity.generated.m88e544d8;
-
-binding httpInput3 {
-  query pattern callExpr where callee.path ~= "msg.data"
-  emit source code.HttpInput at call.result
-}

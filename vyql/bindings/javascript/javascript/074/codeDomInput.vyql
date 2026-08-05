@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding domInput74 {
-  query pattern callExpr where callee.path ~= "getPageQuery"
-  emit source code.DomInput at call.result
-}

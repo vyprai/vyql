@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding nextcloudCircleMemberAddMissingCircleCheck166 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "membersAdd" and node.context.phpReview == "nextcloud_circle_members_add_missing_circle_check"
-  emit issue code.NextcloudCircleMemberAddMissingCircleCheck at node
-}

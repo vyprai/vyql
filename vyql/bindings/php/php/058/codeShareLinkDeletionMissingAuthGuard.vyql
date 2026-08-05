@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding shareLinkDeletionMissingAuthGuard58 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "deleteShareLink" and node.context.subscript contains "$_POST" and node.context.callPath contains "FileModel.deleteShareLink" and not (node.context.callPath contains "$this.checkCsrf") and not (node.context.callPath contains "$this.requireAuth")
-  emit issue code.ShareLinkDeletionMissingAuthGuard at node
-}

@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding unstoppedLimitedStream637 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "Buffer.concat" and node.context.selector contains "config.maxContentLength" and node.context.callPath contains "reject" and node.context.callPath contains "createError" and not (node.context.callPath contains "stream.destroy")
-  emit issue code.UnstoppedLimitedStream at node
-}

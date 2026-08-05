@@ -1,6 +1,0 @@
-module bindings.auditreview.generated.mbf0d19ec;
-
-binding sensitiveOperation9 {
-  query pattern callExpr where callee.method == "setPermission"
-  emit issue code.SensitiveOperation at call
-}

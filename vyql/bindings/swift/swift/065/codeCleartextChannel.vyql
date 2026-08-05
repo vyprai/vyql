@@ -1,6 +1,0 @@
-module bindings.swift.generated.m388f23d0;
-
-binding cleartextChannel65 {
-  query pattern callExpr where callee.path ~= "URL" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
-  emit issue code.CleartextChannel at call
-}

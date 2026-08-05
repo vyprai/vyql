@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m2a0e231a;
-
-binding nosqlQuery12 {
-  requires {
-    dependency("MongoDB.Driver")
-  }
-  query pattern callExpr where callee.method == "Find"
-  emit sink code.NosqlQuery at args[0]
-}

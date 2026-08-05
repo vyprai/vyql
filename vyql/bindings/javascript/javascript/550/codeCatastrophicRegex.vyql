@@ -1,7 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding catastrophicRegex550 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.literal contains "^hwb\\(" and node.context.callPath contains "string.match" and not (node.context.literal contains "\\d{0,3}") and not (node.context.literal contains "(?:\\.\\d+)?")
-  emit issue code.CatastrophicRegex at node
-  emit sink code.CatastrophicRegexSink at node
-}

@@ -1,8 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding charArrayWriter53 {
-  query pattern callExpr where callee.path ~= "CharArrayWriter"
-  emit fact runtime.ReceiverType at call.result {
-    about: CharArrayWriter
-  }
-}

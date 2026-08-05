@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding ldapQuery79 {
-  query pattern callExpr where callee.method == "search"
-  emit sink code.LdapQuery at args[1]
-}

@@ -1,6 +1,0 @@
-module bindings.scala.generated.m06d0685b;
-
-binding expressionEval55 {
-  query pattern callExpr where callee.method == "parseExpression"
-  emit sink code.ExpressionEval at args[0]
-}

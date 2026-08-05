@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding unsafeEmbeddableAllowlist615 {
-  query pattern callExpr where callee.path ~= "Set" and args.any.literal contains "dddice.com"
-  emit issue code.UnsafeEmbeddableAllowlist at call
-}

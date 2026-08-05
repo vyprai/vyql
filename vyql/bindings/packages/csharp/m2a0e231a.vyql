@@ -1,0 +1,336 @@
+module bindings.csharp.generated.m2a0e231a;
+
+binding httpInput0 {
+  requires {
+    dependency("Microsoft.AspNetCore.Http")
+  }
+  query pattern callExpr where callee.method == "Query" and callee.receiver.type == "HttpRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("Microsoft.AspNetCore.Http")
+  }
+  query pattern callExpr where callee.method == "Form" and callee.receiver.type == "HttpRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("Microsoft.AspNetCore.Http")
+  }
+  query pattern callExpr where callee.method == "Headers" and callee.receiver.type == "HttpRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("Microsoft.Extensions.Configuration")
+  }
+  query pattern callExpr where callee.path ~= "Configuration.GetValue"
+  emit source code.SecretValue at call.result
+}
+
+binding externalApiResponse4 {
+  requires {
+    dependency("System.Net.Http")
+  }
+  query pattern callExpr where callee.method == "ReadAsStringAsync"
+  emit source code.ExternalApiResponse at call.result
+}
+
+binding urlFetch5 {
+  requires {
+    dependency("System.Net.Http")
+  }
+  query pattern callExpr where callee.method == "GetAsync"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding sqlExecution6 {
+  requires {
+    dependency("Microsoft.EntityFrameworkCore")
+  }
+  query pattern callExpr where callee.method == "ExecuteSqlRaw"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution7 {
+  requires {
+    dependency("Microsoft.EntityFrameworkCore")
+  }
+  query pattern callExpr where callee.method == "FromSqlRaw"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution8 {
+  requires {
+    dependency("Dapper")
+  }
+  query pattern callExpr where callee.method == "Query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution9 {
+  requires {
+    dependency("Dapper")
+  }
+  query pattern callExpr where callee.method == "Execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution10 {
+  requires {
+    dependency("System.Data.SqlClient")
+  }
+  query pattern callExpr where callee.path ~= "SqlCommand"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlParameterization11 {
+  requires {
+    dependency("System.Data.SqlClient")
+  }
+  query pattern callExpr where callee.method == "Parameters.Add"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding nosqlQuery12 {
+  requires {
+    dependency("MongoDB.Driver")
+  }
+  query pattern callExpr where callee.method == "Find"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding commandExecution13 {
+  requires {
+    dependency("System.Diagnostics.Process")
+  }
+  query pattern callExpr where callee.path ~= "Process.Start"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding codeEval14 {
+  requires {
+    dependency("Microsoft.CodeAnalysis.CSharp.Scripting")
+  }
+  query pattern callExpr where callee.path ~= "CSharpScript.EvaluateAsync"
+  emit sink code.CodeEval at args[0]
+}
+
+binding deserialization15 {
+  requires {
+    dependency("Newtonsoft.Json")
+  }
+  query pattern callExpr where callee.method == "DeserializeObject"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization16 {
+  requires {
+    dependency("System.Text.Json")
+  }
+  query pattern callExpr where callee.method == "Deserialize"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess17 {
+  requires {
+    dependency("System.IO")
+  }
+  query pattern callExpr where callee.path ~= "File.ReadAllText"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding pathCanonicalization18 {
+  requires {
+    dependency("System.IO")
+  }
+  query pattern callExpr where callee.path ~= "Path.GetFullPath"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding archiveEntryWrite19 {
+  requires {
+    dependency("System.IO.Compression")
+  }
+  query pattern callExpr where callee.method == "ExtractToDirectory"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding xmlParse20 {
+  requires {
+    dependency("System.Xml")
+  }
+  query pattern callExpr where callee.path ~= "XmlDocument.LoadXml"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlHardening21 {
+  requires {
+    dependency("System.Xml")
+  }
+  query pattern callExpr where callee.path ~= "XmlReaderSettings" and args.any.literal contains "DtdProcessing=Prohibit"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xpathQuery22 {
+  requires {
+    dependency("System.Xml.XPath")
+  }
+  query pattern callExpr where callee.method == "SelectNodes"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding ldapQuery23 {
+  requires {
+    dependency("System.DirectoryServices")
+  }
+  query pattern callExpr where callee.path ~= "DirectorySearcher"
+  emit sink code.LdapQuery at args[0]
+}
+
+binding ldapEscape24 {
+  requires {
+    dependency("System.DirectoryServices")
+  }
+  query pattern callExpr where callee.path ~= "LdapFilterEscape"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlRender25 {
+  requires {
+    dependency("Microsoft.AspNetCore.Html")
+  }
+  query pattern callExpr where callee.method == "Raw"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding regexCompile26 {
+  requires {
+    dependency("System.Text.RegularExpressions")
+  }
+  query pattern callExpr where callee.path ~= "Regex"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding htmlEscape27 {
+  requires {
+    dependency("System.Text.Encodings.Web")
+  }
+  query pattern callExpr where callee.path ~= "HtmlEncoder.Encode"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape28 {
+  requires {
+    dependency("System.Web")
+  }
+  query pattern callExpr where callee.path ~= "HttpUtility.HtmlEncode"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape29 {
+  requires {
+    dependency("Microsoft.Security.Application")
+  }
+  query pattern callExpr where callee.path ~= "AntiXssEncoder.HtmlEncode"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape30 {
+  requires {
+    dependency("System.Security")
+  }
+  query pattern callExpr where callee.path ~= "SecurityElement.Escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding redirectAllowlist31 {
+  requires {
+    dependency("Microsoft.AspNetCore.Mvc")
+  }
+  query pattern callExpr where callee.path ~= "Url.IsLocalUrl"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding csrfProtection32 {
+  requires {
+    dependency("Microsoft.AspNetCore.Mvc")
+  }
+  query pattern callExpr where callee.path ~= "ValidateAntiForgeryToken"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck33 {
+  requires {
+    dependency("Microsoft.AspNetCore.Authorization")
+  }
+  query pattern callExpr where callee.path ~= "AuthorizeAttribute"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck34 {
+  requires {
+    dependency("System.Security.Claims")
+  }
+  query pattern callExpr where callee.method == "IsAuthenticated"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

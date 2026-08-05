@@ -1,9 +1,0 @@
-module bindings.powershell.generated.m92132a18;
-
-binding xpathQuery11 {
-  requires {
-    dependency("Microsoft.PowerShell.Utility")
-  }
-  query pattern callExpr where callee.path ~= "Select-Xml"
-  emit sink code.XpathQuery at args[1]
-}

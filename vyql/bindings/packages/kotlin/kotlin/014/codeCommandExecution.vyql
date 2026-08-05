@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1457a768;
-
-binding commandExecution14 {
-  requires {
-    dependency("java.lang")
-  }
-  query pattern callExpr where callee.path ~= "ProcessBuilder"
-  emit sink code.CommandExecution at args[0]
-}

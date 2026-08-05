@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding requestReferenceEval265 {
-  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "eval" and node.context.literal contains "value=ref." and node.context.selector contains "parts[].value"
-  emit issue code.RequestReferenceEval at node
-}

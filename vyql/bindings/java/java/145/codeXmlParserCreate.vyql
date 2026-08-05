@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding xmlParserCreate145 {
-  query pattern callExpr where callee.method == "createXMLReader"
-  emit issue code.XmlParserCreate at call
-}

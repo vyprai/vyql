@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding stackAllocationSmell42 {
-  query pattern presenceNode where node.path ~= "alloca"
-  emit issue code.StackAllocationSmell at node
-}

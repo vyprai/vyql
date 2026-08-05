@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding trustBoundary186 {
-  query pattern callExpr where callee.method == "SetAttribute"
-  emit sink code.TrustBoundary at args.any
-}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1457a768;
-
-binding xmlParse23 {
-  requires {
-    dependency("dom4j")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.XmlParse at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.perl.generated.mfca40a44;
-
-binding cliArgument5 {
-  query pattern callExpr where callee.path ~= "ARGV"
-  emit source code.CliArgument at call.result
-}

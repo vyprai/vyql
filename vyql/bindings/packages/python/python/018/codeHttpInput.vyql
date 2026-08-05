@@ -1,9 +1,0 @@
-module bindings.python.generated.m3d9ccbad;
-
-binding httpInput18 {
-  requires {
-    dependency("starlette")
-  }
-  query pattern callExpr where callee.path ~= "http_input"
-  emit source code.HttpInput at call.result
-}

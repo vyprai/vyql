@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding manualZipEntryFileWrite273 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "Decode" and node.context.callPath contains "zip.NewReader" and node.context.callPath contains "filepath.Join" and node.context.selector contains "f.Name" and node.context.callPath contains "copy" and not (node.context.callPath contains "sanitizeArchivePath") and not (node.context.callPath contains "strings.HasPrefix")
-  emit issue code.ManualZipEntryFileWrite at node
-}

@@ -1,7 +1,0 @@
-module bindings.scala.generated.m06d0685b;
-
-binding resourceHandle49 {
-  query pattern presenceNode where node.path ~= "Files.newOutputStream"
-  emit issue code.ResourceHandle at node
-  emit sink code.ResourceHandleSink at node
-}

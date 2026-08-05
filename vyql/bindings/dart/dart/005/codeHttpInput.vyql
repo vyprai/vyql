@@ -1,6 +1,0 @@
-module bindings.dart.generated.m1c398214;
-
-binding httpInput5 {
-  query pattern callExpr where callee.path ~= ".requestedUri"
-  emit source code.HttpInput at call.result
-}

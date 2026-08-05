@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding chefUserManagementWithoutAdminGuard163 {
-  query pattern presenceNode where node.scope == "class" and node.context.language == "ruby" and node.context.className == "Users" and node.context.rubyReview == "chef_user_management_missing_admin_guard"
-  emit issue code.ChefUserManagementWithoutAdminGuard at node
-}

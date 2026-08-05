@@ -1,6 +1,0 @@
-module bindings.bash.generated.m59952d5d;
-
-binding codeEval8 {
-  query pattern callExpr where callee.path ~= "python3"
-  emit sink code.CodeEval at args[1]
-}

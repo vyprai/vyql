@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding urlFetch351 {
-  query pattern callExpr where callee.path ~= "urllib2.Request"
-  emit sink code.UrlFetch at args[0]
-}

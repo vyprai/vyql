@@ -1,6 +1,0 @@
-module bindings.bash.generated.m59952d5d;
-
-binding fileInclude20 {
-  query pattern callExpr where callee.path ~= "."
-  emit sink code.FileInclude at args[0]
-}

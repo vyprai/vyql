@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding insecureTempFile48 {
-  query pattern presenceNode where node.path ~= "tmpnam"
-  emit issue code.InsecureTempFile at node
-}

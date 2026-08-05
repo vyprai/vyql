@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding xmlParse329 {
-  query pattern callExpr where callee.path ~= "xml.dom.minidom.parseString"
-  emit sink code.XmlParse at args[0]
-}

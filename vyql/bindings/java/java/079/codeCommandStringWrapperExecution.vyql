@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding commandStringWrapperExecution79 {
-  query pattern presenceNode where node.scope == "function" and node.context.literal contains "/bin/sh" and node.context.literal contains "-c" and node.context.identifier contains "scriptPath" and node.context.expr contains "scriptPath+ALERT_TITLE_OPTION" and node.context.callPath contains "ProcessUtils.executeScript" and not (node.context.callPath contains "File") and not (node.context.scopeCall contains "exists") and not (node.context.scopeCall contains "isFile")
-  emit issue code.CommandStringWrapperExecution at node
-}

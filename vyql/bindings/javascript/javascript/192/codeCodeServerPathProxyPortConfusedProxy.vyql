@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding codeServerPathProxyPortConfusedProxy192 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.selector contains "req.params.port" and node.context.literal contains "0.0.0.0:" and node.context.callPath contains "req.originalUrl.slice" and not (node.context.callPath contains "parseInt")
-  emit issue code.CodeServerPathProxyPortConfusedProxy at node
-}

@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding incompleteDangerousUploadExtensionBlocklist85 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "process" and node.context.phpReview == "dangerous_upload_extension_blocklist_missing_phar"
-  emit issue code.IncompleteDangerousUploadExtensionBlocklist at node
-}

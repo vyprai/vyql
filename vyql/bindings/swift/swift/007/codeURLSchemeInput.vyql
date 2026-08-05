@@ -1,6 +1,0 @@
-module bindings.swift.generated.m388f23d0;
-
-binding uRLSchemeInput7 {
-  query pattern callExpr where callee.path ~= "url_scheme_input"
-  emit source code.URLSchemeInput at call.result
-}

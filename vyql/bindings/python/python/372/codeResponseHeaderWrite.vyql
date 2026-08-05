@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding responseHeaderWrite372 {
-  query pattern callExpr where callee.path ~= "headers.add"
-  emit sink code.ResponseHeaderWrite at args[1]
-}

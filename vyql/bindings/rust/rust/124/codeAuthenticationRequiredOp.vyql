@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding authenticationRequiredOp124 {
-  query pattern presenceNode where node.path ~= "change_email"
-  emit issue code.AuthenticationRequiredOp at node
-}

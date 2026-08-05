@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding codeEval13 {
-  query pattern callExpr where callee.path ~= "dofile"
-  emit sink code.CodeEval at args[0]
-}

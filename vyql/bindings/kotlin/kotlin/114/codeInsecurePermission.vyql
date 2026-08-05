@@ -1,6 +1,0 @@
-module bindings.kotlin.generated.m304d1620;
-
-binding insecurePermission114 {
-  query pattern callExpr where callee.path ~= "setWritable" and args.any.literal contains "true" and args.any.literal contains "false"
-  emit issue code.InsecurePermission at call
-}

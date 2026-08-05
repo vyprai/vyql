@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding httpInput10 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.attrName contains "handler"
-  emit source code.HttpInput at call.result
-}

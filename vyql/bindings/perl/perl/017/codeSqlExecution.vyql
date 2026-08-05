@@ -1,6 +1,0 @@
-module bindings.perl.generated.mfca40a44;
-
-binding sqlExecution17 {
-  query pattern callExpr where callee.method == "selectrow_arrayref"
-  emit sink code.SqlExecution at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.perl.generated.mfca40a44;
-
-binding authenticationRequiredOp50 {
-  query pattern presenceNode where node.path ~= "grant_role"
-  emit issue code.AuthenticationRequiredOp at node
-}

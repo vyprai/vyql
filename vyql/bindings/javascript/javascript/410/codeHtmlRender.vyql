@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding htmlRender410 {
-  query pattern callExpr where callee.path ~= "insertAdjacentHTML"
-  emit sink code.HtmlRender at args[1]
-}

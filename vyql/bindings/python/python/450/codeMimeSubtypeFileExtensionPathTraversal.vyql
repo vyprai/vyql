@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding mimeSubtypeFileExtensionPathTraversal450 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "mime_subtype_file_extension_path_traversal"
-  emit issue code.MimeSubtypeFileExtensionPathTraversal at node
-}

@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding cliArgument1 {
-  query pattern callExpr where callee.path ~= "argv"
-  emit source code.CliArgument at call.result
-}

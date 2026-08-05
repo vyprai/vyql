@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding logOutput407 {
-  query pattern callExpr where callee.path ~= "log.warn"
-  emit sink code.LogOutput at args.any
-}

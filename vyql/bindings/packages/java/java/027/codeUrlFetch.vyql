@@ -1,9 +1,0 @@
-module bindings.java.generated.m9ef49b0f;
-
-binding urlFetch27 {
-  requires {
-    dependency("okhttp")
-  }
-  query pattern callExpr where callee.path ~= "OkHttpClient.newCall"
-  emit sink code.UrlFetch at args[0]
-}

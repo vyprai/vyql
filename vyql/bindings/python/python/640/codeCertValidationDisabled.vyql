@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding certValidationDisabled640 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cert_validation_disabled_tls_fallback"
-  emit issue code.CertValidationDisabled at node
-}

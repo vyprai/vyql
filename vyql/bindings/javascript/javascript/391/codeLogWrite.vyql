@@ -1,7 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding logWrite391 {
-  query pattern presenceNode where node.path ~= "logger.info"
-  emit issue code.LogWrite at node
-  emit sink code.LogWriteSink at node
-}

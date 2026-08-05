@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding zikulaThemeNameReflectedXss112 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "setasdefault" and node.context.phpReview == "zikula_theme_name_reflected_xss"
-  emit issue code.ZikulaThemeNameReflectedXss at node
-}

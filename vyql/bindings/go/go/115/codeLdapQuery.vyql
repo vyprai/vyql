@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding ldapQuery115 {
-  query pattern callExpr where callee.method == "SearchWithPaging" and callee.receiver.type == "ldap.Conn"
-  emit sink code.LdapQuery at args[0]
-}

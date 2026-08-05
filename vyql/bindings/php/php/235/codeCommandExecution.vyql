@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding commandExecution235 {
-  query pattern callExpr where callee.path ~= "shell_exec"
-  emit sink code.CommandExecution at args[0]
-}

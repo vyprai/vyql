@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding redirectTarget505 {
-  query pattern callExpr where callee.path ~= "HttpResponseRedirect"
-  emit sink code.RedirectTargetSink at args[0]
-}

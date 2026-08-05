@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding rateLimitRequiredOp756 {
-  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "route_path:/otp"
-  emit issue code.RateLimitRequiredOp at node
-}

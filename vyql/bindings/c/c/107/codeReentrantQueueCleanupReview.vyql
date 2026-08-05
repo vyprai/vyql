@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding reentrantQueueCleanupReview107 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "queue.reentrant_cleanup_without_disconnect_guard"
-  emit issue code.ReentrantQueueCleanupReview at node
-}

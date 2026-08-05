@@ -1,7 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding logWrite440 {
-  query pattern presenceNode where node.path ~= "logInfo"
-  emit issue code.LogWrite at node
-  emit sink code.LogWriteSink at node
-}

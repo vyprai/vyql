@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding htmlRender122 {
-  query pattern callExpr where callee.analysis ~= "function.return" and args.any.literal contains "<html"
-  emit sink code.HtmlRender at args[0]
-}

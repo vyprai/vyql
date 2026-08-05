@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding filePathAccess352 {
-  query pattern callExpr where callee.path ~= "fs.promises.readFile"
-  emit sink code.FilePathAccess at args[0]
-}

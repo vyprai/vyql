@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding weakHash372 {
-  query pattern callExpr where callee.path ~= "MessageDigest.getInstance" and args.any.literal contains "MD5"
-  emit issue code.WeakHash at call
-}

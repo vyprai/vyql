@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding clamavWwpackStructsPointerOobWrite113 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "struct_pointer.oob_write"
-  emit issue code.ClamavWwpackStructsPointerOobWrite at node
-}

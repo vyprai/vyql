@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding sqlExecution672 {
-  query pattern callExpr where callee.method == "all"
-  emit sink code.SqlExecution at args[0]
-}

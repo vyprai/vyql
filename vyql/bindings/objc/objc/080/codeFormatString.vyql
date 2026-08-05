@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding formatString80 {
-  query pattern callExpr where callee.method == "stringWithFormat"
-  emit sink code.FormatString at args[0]
-}

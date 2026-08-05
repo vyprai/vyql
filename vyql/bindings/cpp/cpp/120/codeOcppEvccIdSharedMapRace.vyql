@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding ocppEvccIdSharedMapRace120 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "ocpp.shared_map_race"
-  emit issue code.OcppEvccIdSharedMapRace at node
-}

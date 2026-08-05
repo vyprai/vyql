@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding htmlRender67 {
-  query pattern callExpr where callee.path ~= "maud.PreEscaped"
-  emit sink code.HtmlRender at args[0]
-}

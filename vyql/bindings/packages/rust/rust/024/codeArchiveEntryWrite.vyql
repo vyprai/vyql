@@ -1,9 +1,0 @@
-module bindings.rust.generated.m222602a5;
-
-binding archiveEntryWrite24 {
-  requires {
-    dependency("tar")
-  }
-  query pattern callExpr where callee.method == "unpack"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

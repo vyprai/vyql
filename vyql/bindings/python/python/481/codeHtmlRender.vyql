@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding htmlRender481 {
-  query pattern callExpr where callee.path ~= "Environment.from_string"
-  emit sink code.HtmlRender at args[0]
-}

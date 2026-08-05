@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding remoteListingDownloadPath640 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "_downloadFromWorkingDir" and node.context.callPath contains "join" and node.context.callPath contains "downloadTo" and node.context.selector contains "file.name" and not (node.context.callPath contains "basename")
-  emit issue code.RemoteListingDownloadPath at node
-}

@@ -1,6 +1,0 @@
-module bindings.dart.generated.m1c398214;
-
-binding objectLookupByUserInput50 {
-  query pattern callExpr where callee.method == "getAccount"
-  emit sink code.ObjectLookupByUserInput at args[0]
-}

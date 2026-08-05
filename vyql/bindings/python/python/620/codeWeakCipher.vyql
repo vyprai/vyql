@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding weakCipher620 {
-  query pattern presenceNode where node.path ~= "Blowfish.new"
-  emit issue code.WeakCipher at node
-}

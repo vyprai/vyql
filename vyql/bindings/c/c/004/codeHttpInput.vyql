@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding httpInput4 {
-  query pattern callExpr where callee.path ~= "fread"
-  emit source code.HttpInput at call.result
-}

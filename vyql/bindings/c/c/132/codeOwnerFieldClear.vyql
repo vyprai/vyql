@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding ownerFieldClear132 {
-  query pattern presenceNode where node.analysis ~= "field.clear_null"
-  emit issue code.OwnerFieldClear at node
-}

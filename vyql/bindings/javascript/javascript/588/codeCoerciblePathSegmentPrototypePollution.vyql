@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding coerciblePathSegmentPrototypePollution588 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.selector contains ".length" and node.context.dynamicPropertyWriteObjectLiteral == "true" and node.context.dynamicPropertyWrite == "true" and node.context.prototypeKeyGuard == "true" and not (node.context.pathSegmentTypeGuard == "true")
-  emit issue code.CoerciblePathSegmentPrototypePollution at node
-}

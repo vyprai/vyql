@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding filePathAccess337 {
-  query pattern callExpr where callee.path ~= "fs.rename"
-  emit sink code.FilePathAccess at args[0]
-}

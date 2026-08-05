@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding httpInput10 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "Head"
-  emit source code.HttpInput at call.result
-}

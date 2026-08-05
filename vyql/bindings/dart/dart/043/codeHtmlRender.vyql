@@ -1,6 +1,0 @@
-module bindings.dart.generated.m1c398214;
-
-binding htmlRender43 {
-  query pattern callExpr where callee.method == "writeln"
-  emit sink code.HtmlRender at args.any
-}

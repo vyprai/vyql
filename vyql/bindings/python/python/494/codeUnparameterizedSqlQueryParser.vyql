@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding unparameterizedSqlQueryParser494 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unparameterized_sql_query_parser"
-  emit issue code.UnparameterizedSqlQueryParser at node
-}

@@ -1,7 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding catastrophicRegex207 {
-  query pattern presenceNode where node.scope == "class" and node.context.language == "ruby" and containsAny(node.context.literal, ["\\A/([^/]+)/?([^/]+)?\\z", "^/([^/]+)/?([^/]+)?$"]) and containsAny(node.context.callPath, ["path.match", "path.match.to_a"]) and not (node.context.callPath contains "path.split") and not (containsAny(node.context.callPath, ["model_id.include", "model_id.include?"]))
-  emit issue code.CatastrophicRegex at node
-  emit sink code.CatastrophicRegexSink at node
-}

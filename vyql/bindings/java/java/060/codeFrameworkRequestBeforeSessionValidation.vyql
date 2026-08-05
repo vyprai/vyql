@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding frameworkRequestBeforeSessionValidation60 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doFilter" and node.context.callPath contains "Meteor.build" and node.context.callPath contains "httpReq.getParameter" and node.context.callPath contains "pushContext.getSessionManager.getPushSession" and node.context.callPath contains "httpResp.sendError" and node.context.call contains "RequestImpl" and node.context.callOrder contains "Meteor.build>Collections.emptyList" and node.context.callOrder contains "Collections.emptyList>httpReq.getParameter" and not (node.context.callOrder contains "httpResp.setContentType>Meteor.build")
-  emit issue code.FrameworkRequestBeforeSessionValidation at node
-}

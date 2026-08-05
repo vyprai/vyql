@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding insecureTempFile77 {
-  query pattern presenceNode where node.path ~= "os.tmpname"
-  emit issue code.InsecureTempFile at node
-}

@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding missingFrameProtection402 {
-  query pattern presenceNode where node.context.language == "php" and node.context.phpReview == "missing_frame_protection_allowall"
-  emit issue code.MissingFrameProtection at node
-}

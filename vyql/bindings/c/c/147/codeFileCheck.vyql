@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding fileCheck147 {
-  query pattern presenceNode where node.path ~= "access"
-  emit issue code.FileCheck at node
-}

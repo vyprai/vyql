@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding logOutput113 {
-  query pattern callExpr where callee.method == "LogError"
-  emit sink code.LogOutput at args.any
-}

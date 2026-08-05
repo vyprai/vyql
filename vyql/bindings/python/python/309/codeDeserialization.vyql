@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding deserialization309 {
-  query pattern callExpr where callee.path ~= "pandas.read_pickle"
-  emit sink code.Deserialization at args[0]
-}

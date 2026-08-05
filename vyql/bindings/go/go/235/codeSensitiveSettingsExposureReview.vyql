@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding sensitiveSettingsExposureReview235 {
-  query pattern callExpr where callee.path ~= "settingspkg.Settings" and args.any.literal contains "PasswordPattern"
-  emit issue code.SensitiveSettingsExposureReview at node
-}

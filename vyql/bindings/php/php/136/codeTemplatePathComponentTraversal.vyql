@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding templatePathComponentTraversal136 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "template_path_component_traversal_type"
-  emit issue code.TemplatePathComponentTraversal at node
-}

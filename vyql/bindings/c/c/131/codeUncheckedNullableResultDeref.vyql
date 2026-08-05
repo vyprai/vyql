@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding uncheckedNullableResultDeref131 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "nullable_result.unchecked_deref"
-  emit issue code.UncheckedNullableResultDeref at node
-}

@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding arrayBufferTransferMaxLengthBypass65 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "array_buffer.transfer_max_length_bypass"
-  emit issue code.ArrayBufferTransferMaxLengthBypass at node
-}

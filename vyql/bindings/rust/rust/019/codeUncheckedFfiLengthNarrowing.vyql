@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding uncheckedFfiLengthNarrowing19 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "unchecked_ffi_length_narrowing"
-  emit issue code.UncheckedFfiLengthNarrowing at node
-}

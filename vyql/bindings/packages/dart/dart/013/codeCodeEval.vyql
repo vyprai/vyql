@@ -1,9 +1,0 @@
-module bindings.dart.generated.m5342780c;
-
-binding codeEval13 {
-  requires {
-    dependency("dart:isolate")
-  }
-  query pattern callExpr where callee.path ~= "Isolate.spawnUri"
-  emit sink code.CodeEval at args[0]
-}

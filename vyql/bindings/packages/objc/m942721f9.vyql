@@ -1,0 +1,301 @@
+module bindings.objc.generated.m942721f9;
+
+binding httpInput0 {
+  requires {
+    dependency("AFNetworking")
+  }
+  query pattern callExpr where callee.method == "param"
+  emit source code.HttpInput at call.result
+}
+
+binding externalApiResponse1 {
+  requires {
+    dependency("AFNetworking")
+  }
+  query pattern callExpr where callee.method == "responseObject"
+  emit source code.ExternalApiResponse at call.result
+}
+
+binding urlFetch2 {
+  requires {
+    dependency("AFNetworking")
+  }
+  query pattern callExpr where callee.method == "GET"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding certValidationDisabled3 {
+  requires {
+    dependency("AFNetworking")
+  }
+  query pattern callExpr where callee.method == "setAllowsAnyHTTPSCertificate" and args.any.literal contains "true"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding httpInput4 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.method == "header"
+  emit source code.HttpInput at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= ".environment"
+  emit source code.SecretValue at call.result
+}
+
+binding commandExecution6 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.method == "launch"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "NSKeyedUnarchiver.unarchiveObject"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.method == "contentsOfFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding urlFetch9 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.method == "dataTaskWithURL"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding xmlParse10 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "NSXMLDocument"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xpathQuery11 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.method == "nodesForXPath"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding regexCompile12 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.method == "regularExpressionWithPattern"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding cleartextChannel13 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "NSURL" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
+  emit issue code.CleartextChannel at call
+}
+
+binding redirectAllowlist14 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "stringByAddingPercentEncodingWithAllowedCharacters"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding pathCanonicalization15 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "stringByStandardizingPath"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding xmlHardening16 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "NSXMLDocument" and args.any.literal contains "NSXMLNodeLoadExternalEntitiesNever"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding authenticationCheck17 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "requireAuth"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck18 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "authorize"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding sqlExecution19 {
+  requires {
+    dependency("sqlite")
+  }
+  query pattern callExpr where callee.path ~= "sqlite3_exec"
+  emit sink code.SqlExecution at args[1]
+}
+
+binding sqlParameterization20 {
+  requires {
+    dependency("sqlite")
+  }
+  query pattern callExpr where callee.path ~= "sqlite3_prepare_v2"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding sqlExecution21 {
+  requires {
+    dependency("FMDB")
+  }
+  query pattern callExpr where callee.path ~= "FMDatabase.executeQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding commandExecution22 {
+  requires {
+    dependency("libc")
+  }
+  query pattern callExpr where callee.path ~= "system"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding codeEval23 {
+  requires {
+    dependency("WebKit")
+  }
+  query pattern callExpr where callee.method == "evaluateJavaScript"
+  emit sink code.CodeEval at args[0]
+}
+
+binding htmlRender24 {
+  requires {
+    dependency("WebKit")
+  }
+  query pattern callExpr where callee.method == "loadHTMLString"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding archiveEntryWrite25 {
+  requires {
+    dependency("SSZipArchive")
+  }
+  query pattern callExpr where callee.method == "unzipFileAtPath"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding ldapQuery26 {
+  requires {
+    dependency("openldap")
+  }
+  query pattern callExpr where callee.path ~= "ldap_search_ext_s"
+  emit sink code.LdapQuery at args[3]
+}
+
+binding ldapEscape27 {
+  requires {
+    dependency("openldap")
+  }
+  query pattern callExpr where callee.path ~= "ldap_escape"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding templateRender28 {
+  requires {
+    dependency("GRMustache")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding weakHash29 {
+  requires {
+    dependency("CommonCrypto")
+  }
+  query pattern presenceNode where node.path ~= "CC_MD5"
+  emit issue code.WeakHash at node
+}
+
+binding weakHash30 {
+  requires {
+    dependency("CommonCrypto")
+  }
+  query pattern presenceNode where node.path ~= "CC_SHA1"
+  emit issue code.WeakHash at node
+}
+
+binding weakCipher31 {
+  requires {
+    dependency("CommonCrypto")
+  }
+  query pattern callExpr where callee.path ~= "CCCrypt" and args.any.literal contains "DES"
+  emit issue code.WeakCipher at call
+}
+
+binding htmlEscape32 {
+  requires {
+    dependency("hpple")
+  }
+  query pattern callExpr where callee.path ~= "NSString.stringByEscapingHTML"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

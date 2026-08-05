@@ -1,6 +1,0 @@
-module bindings.groovy.generated.m6eabb149;
-
-binding envVariable1 {
-  query pattern callExpr where callee.path ~= "env"
-  emit source code.EnvVariable at call.result
-}

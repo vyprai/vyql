@@ -1,7 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding resourceHandle588 {
-  query pattern presenceNode where node.path ~= "socket.socket"
-  emit issue code.ResourceHandle at node
-  emit sink code.ResourceHandleSink at node
-}

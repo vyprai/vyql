@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding trustBoundary371 {
-  query pattern callExpr where callee.path ~= "session.__setitem__"
-  emit sink code.TrustBoundary at args.any
-}

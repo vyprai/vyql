@@ -1,9 +1,0 @@
-module bindings.swift.generated.mc6005d88;
-
-binding ldapQuery27 {
-  requires {
-    dependency("swift-ldap")
-  }
-  query pattern callExpr where callee.method == "search"
-  emit sink code.LdapQuery at args[1]
-}

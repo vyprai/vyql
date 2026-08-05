@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding libreOfficeEnhwmfDibHeaderSizeUnderflow86 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "image.dib_header_size_underflow"
-  emit issue code.LibreOfficeEnhwmfDibHeaderSizeUnderflow at node
-}

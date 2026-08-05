@@ -1,6 +1,0 @@
-module bindings.groovy.generated.m6eabb149;
-
-binding codeEval12 {
-  query pattern callExpr where callee.method == "evaluate"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding authenticationRequiredOp143 {
-  query pattern presenceNode where node.path ~= "changePassword"
-  emit issue code.AuthenticationRequiredOp at node
-}

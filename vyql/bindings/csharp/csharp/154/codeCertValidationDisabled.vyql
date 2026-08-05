@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding certValidationDisabled154 {
-  query pattern callExpr where callee.path ~= "ServerCertificateCustomValidationCallback" and args.any.literal contains "true"
-  emit issue code.CertValidationDisabled at call
-}

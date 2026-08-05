@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding xmlParserCreate326 {
-  query pattern presenceNode where node.path ~= "objectify.parse"
-  emit issue code.XmlParserCreate at node
-}

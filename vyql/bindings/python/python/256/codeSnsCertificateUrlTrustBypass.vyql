@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding snsCertificateUrlTrustBypass256 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "sns_certificate_url_trust_bypass"
-  emit issue code.SnsCertificateUrlTrustBypass at node
-}

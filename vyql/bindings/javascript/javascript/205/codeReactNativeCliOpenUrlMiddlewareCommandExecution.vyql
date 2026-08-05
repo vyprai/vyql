@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding reactNativeCliOpenUrlMiddlewareCommandExecution205 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.selector contains "req.body" and node.context.callPath contains "open" and not (node.context.callPath contains "URL") and not (node.context.selector contains ".protocol")
-  emit issue code.ReactNativeCliOpenUrlMiddlewareCommandExecution at node
-}

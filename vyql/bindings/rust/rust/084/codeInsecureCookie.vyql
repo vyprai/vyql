@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding insecureCookie84 {
-  query pattern callExpr where callee.path ~= "set_http_only" and args.any.literal contains "false"
-  emit issue code.InsecureCookie at call
-}

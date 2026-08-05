@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding unescapedExceptionMessageMarkup84 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "parseURL" and node.context.callPath contains "CssFouffa" and not (node.context.scopeCall contains "getMessage")
-  emit issue code.UnescapedExceptionMessageMarkup at node
-}

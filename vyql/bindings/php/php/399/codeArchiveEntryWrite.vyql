@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding archiveEntryWrite399 {
-  query pattern callExpr where callee.path ~= "ZipArchive.extractTo"
-  emit sink code.ArchiveEntryWrite at args.any
-}

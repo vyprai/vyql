@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding htmlRender299 {
-  query pattern callExpr where callee.method == "println"
-  emit sink code.HtmlRender at args.any
-}

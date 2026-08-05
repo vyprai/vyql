@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding codeEval271 {
-  query pattern callExpr where callee.path ~= "globalEval"
-  emit sink code.CodeEval at args[0]
-}

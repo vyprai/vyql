@@ -1,6 +1,0 @@
-module bindings.powershell.generated.m390f1180;
-
-binding codeEval2 {
-  query pattern callExpr where callee.path ~= "Invoke-Expression"
-  emit sink code.CodeEval at args[0]
-}

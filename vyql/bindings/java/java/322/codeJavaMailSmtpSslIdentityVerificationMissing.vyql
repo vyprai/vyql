@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding javaMailSmtpSslIdentityVerificationMissing322 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "createSession" and node.context.callPath contains "props.put" and node.context.literal contains "mail.smtp.socketFactory.class" and node.context.literal contains "javax.net.ssl.SSLSocketFactory" and node.context.literal contains "mail.smtp.socketFactory.fallback" and not (node.context.literal contains "mail.smtp.ssl.checkserveridentity")
-  emit issue code.JavaMailSmtpSslIdentityVerificationMissing at node
-}

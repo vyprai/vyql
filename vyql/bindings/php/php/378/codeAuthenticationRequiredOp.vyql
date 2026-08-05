@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding authenticationRequiredOp378 {
-  query pattern presenceNode where node.path ~= "updatePassword"
-  emit issue code.AuthenticationRequiredOp at node
-}

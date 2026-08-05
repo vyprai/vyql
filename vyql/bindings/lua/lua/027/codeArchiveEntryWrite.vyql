@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding archiveEntryWrite27 {
-  query pattern callExpr where callee.method == "extractEntry"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

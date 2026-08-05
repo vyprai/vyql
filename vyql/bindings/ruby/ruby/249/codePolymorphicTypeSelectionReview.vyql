@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding polymorphicTypeSelectionReview249 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.rubyReview == "polymorphic_type_selected_from_params"
-  emit issue code.PolymorphicTypeSelectionReview at node
-}

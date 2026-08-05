@@ -1,7 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding fileUse64 {
-  query pattern presenceNode where node.path ~= "unlink"
-  emit issue code.FileUse at node
-  emit sink code.FileUseSink at node
-}

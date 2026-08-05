@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding htmlRender157 {
-  query pattern callExpr where callee.path ~= "safe_concat"
-  emit sink code.HtmlRender at args[0]
-}

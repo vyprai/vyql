@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding stdinInput6 {
-  query pattern callExpr where callee.path ~= "fgets"
-  emit source code.StdinInput at call.result
-}

@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding databaseRead221 {
-  query pattern callExpr where callee.method == "get_row"
-  emit source code.DatabaseRead at call.result
-}

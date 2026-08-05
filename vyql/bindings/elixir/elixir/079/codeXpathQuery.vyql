@@ -1,6 +1,0 @@
-module bindings.elixir.generated.m728b8a72;
-
-binding xpathQuery79 {
-  query pattern callExpr where callee.method == "xpath"
-  emit sink code.XpathQuery at args[1]
-}

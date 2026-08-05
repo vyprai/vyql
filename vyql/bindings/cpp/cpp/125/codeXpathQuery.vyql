@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding xpathQuery125 {
-  query pattern callExpr where callee.path ~= "xmlXPathEvalExpression"
-  emit sink code.XpathQuery at args[0]
-}

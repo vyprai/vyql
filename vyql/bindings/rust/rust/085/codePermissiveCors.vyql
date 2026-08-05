@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding permissiveCors85 {
-  query pattern callExpr where callee.path == "CorsLayer.new.allow_origin.allow_methods.allow_headers" and args.any.literal contains "Any"
-  emit issue code.PermissiveCors at call
-}

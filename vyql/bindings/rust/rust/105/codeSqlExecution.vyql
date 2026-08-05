@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding sqlExecution105 {
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.SqlExecution at args[0]
-}

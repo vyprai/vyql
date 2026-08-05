@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m5c270092;
-
-binding ldapQuery42 {
-  requires {
-    dependency("ldapjs")
-  }
-  query pattern callExpr where callee.method == "search"
-  emit sink code.LdapQuery at args[1].collection
-}

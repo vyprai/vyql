@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding claspRemoteFilePathTraversal643 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "script.projects.getContent" and node.context.selector contains "response.data.files" and node.context.selector contains "f.name" and node.context.callPath contains "path.resolve" and node.context.identifier contains "contentDir" and not (node.context.callPath contains "isInside")
-  emit issue code.ClaspRemoteFilePathTraversal at node
-}

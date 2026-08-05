@@ -1,6 +1,0 @@
-module bindings.config.generated.m2b6375a9;
-
-binding storedHtmlWrite33 {
-  query pattern presenceNode where node.analysis ~= "template.svelte.raw_html"
-  emit issue code.StoredHtmlWrite at node
-}

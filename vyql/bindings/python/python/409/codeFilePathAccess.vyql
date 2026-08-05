@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding filePathAccess409 {
-  query pattern callExpr where callee.path ~= "aiofiles.open"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding publicWeakChecksumUtility73 {
-  query pattern presenceNode where node.scope == "class" and node.context.className contains "Checksum" and node.context.classModifier contains "public" and node.context.literal contains "SHA-1" and node.context.literal contains "CRC32" and node.context.callPath contains "MessageDigest.getInstance" and node.context.callPath contains "res.setHash" and node.context.callPath contains "res.setCrc"
-  emit issue code.PublicWeakChecksumUtility at node
-}

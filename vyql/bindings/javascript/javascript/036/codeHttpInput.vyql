@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding httpInput36 {
-  query pattern callExpr where callee.path ~= "req.originalUrl"
-  emit source code.HttpInput at call.result
-}

@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding mediaWikiParserHookHttpInput468 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and containsAny(args.any.context.functionName, ["parse", "Parser", "ImageBeforeProduceHTML"]) and containsAny(args.any.context.paramName, ["$input", "$args", "$handlerParams", "$frameParams"])
-  emit source code.HttpInput at call.result
-}

@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding responseHeaderWrite374 {
-  query pattern callExpr where callee.path ~= "res.setHeader"
-  emit sink code.ResponseHeaderWrite at args[1]
-}

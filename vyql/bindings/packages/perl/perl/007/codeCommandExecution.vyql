@@ -1,9 +1,0 @@
-module bindings.perl.generated.ma164dcec;
-
-binding commandExecution7 {
-  requires {
-    dependency("perl")
-  }
-  query pattern callExpr where callee.path ~= "system"
-  emit sink code.CommandExecution at args[0]
-}

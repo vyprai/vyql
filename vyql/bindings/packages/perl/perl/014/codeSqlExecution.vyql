@@ -1,9 +1,0 @@
-module bindings.perl.generated.ma164dcec;
-
-binding sqlExecution14 {
-  requires {
-    dependency("DBI")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.SqlExecution at args[0]
-}

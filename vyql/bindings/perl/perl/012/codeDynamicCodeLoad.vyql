@@ -1,6 +1,0 @@
-module bindings.perl.generated.mfca40a44;
-
-binding dynamicCodeLoad12 {
-  query pattern callExpr where callee.path ~= "require"
-  emit sink code.DynamicCodeLoad at args.any
-}

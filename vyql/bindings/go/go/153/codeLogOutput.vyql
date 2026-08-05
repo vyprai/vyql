@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding logOutput153 {
-  query pattern callExpr where callee.path ~= "log.Printf"
-  emit sink code.LogOutput at args.any
-}

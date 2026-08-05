@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding commandStringWrapperExecution244 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "command_string_wrapper_execution"
-  emit issue code.CommandStringWrapperExecution at node
-}

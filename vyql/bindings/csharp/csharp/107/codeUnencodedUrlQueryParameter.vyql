@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding unencodedUrlQueryParameter107 {
-  query pattern presenceNode where node.analysis == "csharp.cas_unencoded_ticket_query_parameter"
-  emit issue code.UnencodedUrlQueryParameter at node
-}

@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding filePathAccess398 {
-  query pattern callExpr where callee.path ~= "os.mkdir"
-  emit sink code.FilePathAccess at args[0]
-}

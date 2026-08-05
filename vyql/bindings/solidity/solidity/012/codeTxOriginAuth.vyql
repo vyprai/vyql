@@ -1,6 +1,0 @@
-module bindings.solidity.generated.m88e544d8;
-
-binding txOriginAuth12 {
-  query pattern presenceNode where node.path ~= "tx.origin"
-  emit issue code.TxOriginAuth at node
-}

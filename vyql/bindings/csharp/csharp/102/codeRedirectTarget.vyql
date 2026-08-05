@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding redirectTarget102 {
-  query pattern callExpr where callee.method == "Redirect"
-  emit sink code.RedirectTargetSink at args[0]
-}

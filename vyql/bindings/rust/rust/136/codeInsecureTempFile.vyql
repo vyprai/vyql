@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding insecureTempFile136 {
-  query pattern callExpr where callee.path ~= "File.create" and args.any.literal contains "/tmp/"
-  emit issue code.InsecureTempFile at call
-}

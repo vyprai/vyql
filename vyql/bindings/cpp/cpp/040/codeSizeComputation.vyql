@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding sizeComputation40 {
-  query pattern callExpr where callee.path ~= "realloc"
-  emit sink code.SizeComputation at args[1]
-}

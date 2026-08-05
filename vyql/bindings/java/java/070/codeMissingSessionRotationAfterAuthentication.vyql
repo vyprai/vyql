@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding missingSessionRotationAfterAuthentication70 {
-  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["doFinishLogin", "finishLogin", "doLogin", "login"]) and node.context.call contains "setAuthentication" and not (node.context.scopeCall contains "invalidate")
-  emit issue code.MissingSessionRotationAfterAuthentication at node
-}

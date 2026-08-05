@@ -1,9 +1,0 @@
-module bindings.java.generated.m9ef49b0f;
-
-binding unparameterizedSqlQueryParser14 {
-  requires {
-    dependency("neo.dbaccess")
-  }
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "execute" and node.context.callPath contains "t.getConnection.prepareStatement" and node.context.callPath contains "st.executeQuery" and not (node.context.scopeCall contains "setString")
-  emit issue code.UnparameterizedSqlQueryParser at node
-}

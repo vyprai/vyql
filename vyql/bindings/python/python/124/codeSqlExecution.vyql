@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding sqlExecution124 {
-  query pattern callExpr where callee.path ~= "db.execute"
-  emit sink code.SqlExecution at args[0]
-}

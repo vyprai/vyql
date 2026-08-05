@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding unsafeJXPathContextEvaluation379 {
-  query pattern presenceNode where node.scope == "function" and containsAny(node.context.callPath, ["JXPathContext.newContext", "JXPathContextFactory.newInstance.newContext"]) and containsAny(node.context.callPath, ["getValue", "selectNodes", "iterate"]) and not (node.context.callPath contains "JXPathUtils.newSafeContext") and not (node.context.callPath contains "setFunctions")
-  emit issue code.UnsafeJXPathContextEvaluation at node
-}

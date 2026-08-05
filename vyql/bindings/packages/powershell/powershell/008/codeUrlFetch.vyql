@@ -1,9 +1,0 @@
-module bindings.powershell.generated.m92132a18;
-
-binding urlFetch8 {
-  requires {
-    dependency("Microsoft.PowerShell.Utility")
-  }
-  query pattern callExpr where callee.path ~= "Invoke-WebRequest"
-  emit sink code.UrlFetch at args[0]
-}

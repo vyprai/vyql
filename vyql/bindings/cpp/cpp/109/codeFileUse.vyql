@@ -1,7 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding fileUse109 {
-  query pattern presenceNode where node.path ~= "chmod"
-  emit issue code.FileUse at node
-  emit sink code.FileUseSink at node
-}

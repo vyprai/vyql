@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding headerControlledJwkReview648 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "header_controlled_jwk"
-  emit issue code.HeaderControlledJwkReview at node
-}

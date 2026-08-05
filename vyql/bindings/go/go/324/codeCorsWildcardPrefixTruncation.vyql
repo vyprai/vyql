@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding corsWildcardPrefixTruncation324 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "parseWildcardRules" and node.context.selector contains "c.AllowOrigins" and node.context.selector contains "c.AllowWildcard" and node.context.callPath contains "strings.Index" and node.context.callPath contains "append" and node.context.slice contains "o::i-1"
-  emit issue code.CorsWildcardPrefixTruncation at node
-}

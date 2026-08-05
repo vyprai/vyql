@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding authenticationRequiredOp151 {
-  query pattern presenceNode where node.path ~= "make_admin"
-  emit issue code.AuthenticationRequiredOp at node
-}

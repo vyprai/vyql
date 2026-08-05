@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding unrestrictedRequestParamDeserialization65 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "unrestricted_request_param_deserialization"
-  emit issue code.UnrestrictedRequestParamDeserialization at node
-}

@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding emmettUnhandledCookieParseException51 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "emmett_unhandled_cookie_parse_exception"
-  emit issue code.EmmettUnhandledCookieParseException at node
-}

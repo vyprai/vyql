@@ -1,6 +1,0 @@
-module bindings.kotlin.generated.m304d1620;
-
-binding weakRandomValue71 {
-  query pattern presenceNode where node.path == "Random"
-  emit issue code.WeakRandomValue at node
-}

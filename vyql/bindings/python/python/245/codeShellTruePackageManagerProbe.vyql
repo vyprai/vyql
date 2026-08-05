@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding shellTruePackageManagerProbe245 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "shell_true_package_manager_probe"
-  emit issue code.ShellTruePackageManagerProbe at node
-}

@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding stateChangingOp54 {
-  query pattern callExpr where callee.method == "delete_account"
-  emit sink code.StateChangingOpSink at args[0]
-}

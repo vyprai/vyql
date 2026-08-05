@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding permissiveCors666 {
-  query pattern callExpr where callee.path ~= "res.setHeader" and args.any.literal contains "Access-Control-Allow-Origin" and args.any.literal contains "*"
-  emit issue code.PermissiveCors at call
-}

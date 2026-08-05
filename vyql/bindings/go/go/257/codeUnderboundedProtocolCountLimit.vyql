@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding underboundedProtocolCountLimit257 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "BtcDecode" and node.context.call contains "ReadVarInt" and node.context.selector contains "txin.Witness" and node.context.const contains "maxWitnessItemsPerInput=500000"
-  emit issue code.UnderboundedProtocolCountLimit at node
-}

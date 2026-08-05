@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding rawDatatablesAttributeXss145 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "raw_datatables_attribute_xss"
-  emit issue code.RawDatatablesAttributeXss at node
-}

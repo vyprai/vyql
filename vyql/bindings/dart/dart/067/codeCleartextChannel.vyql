@@ -1,6 +1,0 @@
-module bindings.dart.generated.m1c398214;
-
-binding cleartextChannel67 {
-  query pattern callExpr where callee.path ~= "http.delete" and args.any.literal contains "http://" and not args.any.literal contains "127.0"
-  emit issue code.CleartextChannel at call
-}

@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding cloudBaseOpenUrlSsrf206 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.literal contains "/api/open-url" and node.context.selector contains "req.body" and node.context.callPath contains "openUrl" and not (node.context.callPath contains "isUrlSafeToOpen") and not (node.context.selector contains "validation.safe")
-  emit issue code.CloudBaseOpenUrlSsrf at node
-}

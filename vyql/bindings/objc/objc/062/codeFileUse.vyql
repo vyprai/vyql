@@ -1,7 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding fileUse62 {
-  query pattern presenceNode where node.path ~= "fopen"
-  emit issue code.FileUse at node
-  emit sink code.FileUseSink at node
-}

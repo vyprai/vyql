@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding nosqlQuery463 {
-  query pattern callExpr where callee.path ~= "db.eval"
-  emit sink code.NosqlQuery at args[0]
-}

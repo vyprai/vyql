@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding databaseRead218 {
-  query pattern callExpr where callee.path ~= "wp.list_table.row"
-  emit source code.DatabaseRead at call.result
-}

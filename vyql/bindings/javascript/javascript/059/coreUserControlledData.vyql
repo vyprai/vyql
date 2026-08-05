@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding userControlledData59 {
-  query pattern callExpr where callee.path ~= "process.env.NODE_ENV"
-  emit source core.UserControlledData at call.result
-}

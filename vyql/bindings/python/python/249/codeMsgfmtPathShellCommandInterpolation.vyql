@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding msgfmtPathShellCommandInterpolation249 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "msgfmt_path_shell_command_interpolation"
-  emit issue code.MsgfmtPathShellCommandInterpolation at node
-}

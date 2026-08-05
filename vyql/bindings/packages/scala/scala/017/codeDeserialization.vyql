@@ -1,9 +1,0 @@
-module bindings.scala.generated.m3608f193;
-
-binding deserialization17 {
-  requires {
-    dependency("java.io")
-  }
-  query pattern callExpr where callee.method == "readObject"
-  emit sink code.Deserialization at args[0]
-}

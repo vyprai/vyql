@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding weakCipher144 {
-  query pattern presenceNode where node.path ~= "DES_ecb_encrypt"
-  emit issue code.WeakCipher at node
-}

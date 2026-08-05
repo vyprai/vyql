@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding jenkinsProjectDisplayNameXss89 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "getName" and node.context.callPath contains "project.getFullDisplayName" and not (node.context.callPath contains "StringEscapeUtils.escapeHtml") and not (node.context.callPath contains "Util.escape")
-  emit issue code.JenkinsProjectDisplayNameXss at node
-}

@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding commandExecution93 {
-  query pattern callExpr where callee.path ~= "Open3.capture3"
-  emit sink code.CommandExecution at args[0]
-}

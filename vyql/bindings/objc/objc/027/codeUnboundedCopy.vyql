@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding unboundedCopy27 {
-  query pattern callExpr where callee.path ~= "vsprintf"
-  emit sink code.UnboundedCopy at args.any
-}

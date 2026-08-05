@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding staticIv365 {
-  query pattern callExpr where callee.path ~= "GCMParameterSpec" and args.any.literal contains "000000000000"
-  emit issue code.StaticIv at call
-}

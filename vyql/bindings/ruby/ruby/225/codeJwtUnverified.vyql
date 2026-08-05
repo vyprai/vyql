@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding jwtUnverified225 {
-  query pattern callExpr where callee.path ~= "JWT.decode" and args.any.literal contains "false"
-  emit issue code.JwtUnverified at call
-}

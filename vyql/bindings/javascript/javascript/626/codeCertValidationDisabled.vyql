@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding certValidationDisabled626 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.tlsRejectUnauthorizedDisabledDefault == "true" and node.context.tlsRejectUnauthorizedPropagated == "true"
-  emit issue code.CertValidationDisabled at node
-}

@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding weakCipher69 {
-  query pattern callExpr where callee.path ~= "crypto.cipher" and args.any.literal contains "RC4"
-  emit issue code.WeakCipher at call
-}

@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding deflateDecompressionMaxSafeIntegerLimit631 {
-  query pattern presenceNode where node.kind == "call" and node.path ~= "decompressDeflateRawWithLimit" and operand(node, where: operand.path ~= "Number.MAX_SAFE_INTEGER")
-  emit issue code.DeflateDecompressionMaxSafeIntegerLimit at node
-}

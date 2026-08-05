@@ -1,9 +1,0 @@
-module bindings.rust.generated.m222602a5;
-
-binding networkConnect33 {
-  requires {
-    dependency("mio")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

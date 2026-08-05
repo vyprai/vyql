@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding concreteCmsIncompleteUploadExtensionBlacklist86 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "concrete_upload_extension_blacklist_missing_phar"
-  emit issue code.ConcreteCmsIncompleteUploadExtensionBlacklist at node
-}

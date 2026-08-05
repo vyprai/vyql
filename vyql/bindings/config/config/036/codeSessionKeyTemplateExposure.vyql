@@ -1,6 +1,0 @@
-module bindings.config.generated.m2b6375a9;
-
-binding sessionKeyTemplateExposure36 {
-  query pattern presenceNode where node.analysis ~= "template.django.session_key_action_exposure"
-  emit issue code.SessionKeyTemplateExposure at node
-}

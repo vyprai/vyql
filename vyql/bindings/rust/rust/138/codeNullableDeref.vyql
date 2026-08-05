@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding nullableDeref138 {
-  query pattern presenceNode where node.path ~= "__unary.deref"
-  emit issue code.NullableDeref at node
-}

@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding electronPrivilegedUrlNodeIntegration211 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.expr contains "window.location.protocol==='chrome-devtools:'" and node.context.assign contains "nodeIntegration=true"
-  emit issue code.ElectronPrivilegedUrlNodeIntegration at node
-}

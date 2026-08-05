@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding urlFetch289 {
-  query pattern callExpr where callee.path ~= "axios.delete"
-  emit sink code.UrlFetch at args[0]
-}

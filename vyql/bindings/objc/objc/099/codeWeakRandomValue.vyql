@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding weakRandomValue99 {
-  query pattern presenceNode where node.path ~= "rand"
-  emit issue code.WeakRandomValue at node
-}

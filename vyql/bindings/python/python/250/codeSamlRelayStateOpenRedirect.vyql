@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding samlRelayStateOpenRedirect250 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "saml_relay_state_open_redirect"
-  emit issue code.SamlRelayStateOpenRedirect at node
-}

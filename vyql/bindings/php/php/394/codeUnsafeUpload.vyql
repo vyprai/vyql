@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding unsafeUpload394 {
-  query pattern callExpr where callee.path ~= "move_uploaded_file"
-  emit sink code.UnsafeUpload at args[1]
-}

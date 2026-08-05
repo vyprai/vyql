@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding protocolFrameLengthUint16Wrap204 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "protocol.frame_length_uint16_wrap"
-  emit issue code.ProtocolFrameLengthUint16Wrap at node
-}

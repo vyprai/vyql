@@ -1,9 +1,0 @@
-module bindings.dart.generated.m5342780c;
-
-binding sqlExecution9 {
-  requires {
-    dependency("postgres")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.SqlExecution at args[0]
-}

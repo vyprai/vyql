@@ -1,6 +1,0 @@
-module bindings.cryptoreview.generated.m4f475b34;
-
-binding cryptoOperation16 {
-  query pattern callExpr where callee.method == "EncryptValue"
-  emit issue code.CryptoOperation at call
-}

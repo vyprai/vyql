@@ -1,6 +1,0 @@
-module bindings.swift.generated.m388f23d0;
-
-binding webViewJsInterface14 {
-  query pattern presenceNode where node.path ~= "add.name"
-  emit issue code.WebViewJsInterface at node
-}

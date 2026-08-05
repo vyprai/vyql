@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding expressSpaAssetFallbackReflectedXss646 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.callPath contains "express.static" and node.context.literal contains "/*" and containsAny(node.context.literal, ["./build/index.html", "./src/client/index.html"]) and not (node.context.literal contains "/js/*") and not (node.context.literal contains "/images/*") and not (node.context.literal contains "/styles/*")
-  emit issue code.ExpressSpaAssetFallbackReflectedXss at node
-}

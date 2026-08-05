@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1457a768;
-
-binding templateRender27 {
-  requires {
-    dependency("thymeleaf")
-  }
-  query pattern callExpr where callee.method == "render"
-  emit sink code.TemplateRender at args[0]
-}

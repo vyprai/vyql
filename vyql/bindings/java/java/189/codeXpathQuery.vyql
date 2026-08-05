@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding xpathQuery189 {
-  query pattern callExpr where callee.method == "compile" and callee.receiver.type == "XPath"
-  emit sink code.XpathQuery at args[0]
-}

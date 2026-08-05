@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding httpInput15 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.entryKind contains "call_lambda_param" and args.any.context.callPath contains "ipcRenderer" and args.any.context.callMethod contains "on" and not args.any.context.paramIndex contains "0"
-  emit source code.HttpInput at call.result
-}

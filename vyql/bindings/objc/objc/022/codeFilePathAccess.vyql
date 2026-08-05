@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding filePathAccess22 {
-  query pattern callExpr where callee.method == "dataWithContentsOfFile"
-  emit sink code.FilePathAccess at args[0]
-}

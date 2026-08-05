@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding goStaticPosixCleanWindowsTraversal344 {
-  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "url.PathUnescape" and node.context.callPath contains "filepath.Join" and node.context.callPath contains "path.Clean" and containsAny(node.context.callPath, ["os.Stat", "File"]) and not (node.context.callPath contains "filepath.Clean")
-  emit issue code.GoStaticPosixCleanWindowsTraversal at node
-}

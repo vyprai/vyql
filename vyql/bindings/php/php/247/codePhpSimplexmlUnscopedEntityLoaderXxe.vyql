@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding phpSimplexmlUnscopedEntityLoaderXxe247 {
-  query pattern presenceNode where node.analysis == "php.simplexml_unscoped_entity_loader"
-  emit issue code.PhpSimplexmlUnscopedEntityLoaderXxe at node
-}

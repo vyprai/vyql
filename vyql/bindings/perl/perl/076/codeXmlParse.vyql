@@ -1,6 +1,0 @@
-module bindings.perl.generated.mfca40a44;
-
-binding xmlParse76 {
-  query pattern callExpr where callee.method == "parse_file"
-  emit sink code.XmlParse at args[0]
-}

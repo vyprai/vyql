@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding csvCell400 {
-  query pattern callExpr where callee.path ~= "stringifier.write"
-  emit sink code.CsvCell at args.any
-}

@@ -1,6 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding pointerUse47 {
-  query pattern presenceNode where node.path ~= "__deref"
-  emit issue code.PointerUse at node
-}

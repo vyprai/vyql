@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m5c270092;
-
-binding deserialization36 {
-  requires {
-    dependency("js-yaml")
-  }
-  query pattern callExpr where callee.path ~= "js-yaml.load"
-  emit sink code.Deserialization at args[0]
-}

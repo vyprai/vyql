@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding regexCompile167 {
-  query pattern callExpr where callee.path ~= "regcomp"
-  emit sink code.RegexCompileSink at args[1]
-}

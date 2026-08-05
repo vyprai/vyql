@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding csrfDisabledSink761 {
-  query pattern presenceNode where node.analysis ~= "function.context" and node.token contains "csrf_exempt"
-  emit issue code.CsrfDisabledSink at node
-}

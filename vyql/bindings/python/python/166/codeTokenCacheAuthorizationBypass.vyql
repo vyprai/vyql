@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding tokenCacheAuthorizationBypass166 {
-  query pattern presenceNode where node.path ~= "DIRAC.FrameworkSystem.Utilities.TokenManagementUtilities.getCachedToken"
-  emit issue code.TokenCacheAuthorizationBypass at node
-}

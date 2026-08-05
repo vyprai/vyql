@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding sqlExecution216 {
-  query pattern callExpr where callee.method == "get_row"
-  emit sink code.SqlExecution at args[0]
-}

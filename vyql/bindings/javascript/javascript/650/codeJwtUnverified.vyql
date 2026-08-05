@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding jwtUnverified650 {
-  query pattern presenceNode where node.context.language == "javascript" and node.context.callPath contains "jwt.verify" and node.context.prop contains "algorithms" and node.context.literal contains "none"
-  emit issue code.JwtUnverified at node
-}

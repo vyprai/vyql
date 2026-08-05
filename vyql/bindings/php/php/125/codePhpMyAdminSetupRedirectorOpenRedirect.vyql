@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding phpMyAdminSetupRedirectorOpenRedirect125 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "PMA_linkURL" and node.context.phpReview == "phpmyadmin_setup_redirector_open_redirect"
-  emit issue code.PhpMyAdminSetupRedirectorOpenRedirect at node
-}

@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding weakRandomValue88 {
-  query pattern presenceNode where node.path ~= "thread_rng"
-  emit issue code.WeakRandomValue at node
-}

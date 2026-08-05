@@ -1,6 +1,0 @@
-module bindings.rust.generated.mdc4f74cd;
-
-binding weakCipher77 {
-  query pattern presenceNode where node.path ~= "Rc4.new"
-  emit issue code.WeakCipher at node
-}

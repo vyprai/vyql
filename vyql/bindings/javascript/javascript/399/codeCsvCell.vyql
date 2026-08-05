@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding csvCell399 {
-  query pattern callExpr where callee.path ~= "csvStream.write"
-  emit sink code.CsvCell at args.any
-}

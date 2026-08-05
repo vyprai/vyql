@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1457a768;
-
-binding deserialization19 {
-  requires {
-    dependency("snakeyaml")
-  }
-  query pattern callExpr where callee.path ~= "Yaml.load"
-  emit sink code.Deserialization at args[0]
-}

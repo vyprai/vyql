@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1457a768;
-
-binding httpInput1 {
-  requires {
-    dependency("javax.servlet")
-  }
-  query pattern callExpr where callee.method == "getHeader" and callee.receiver.type == "HttpServletRequest"
-  emit source code.HttpInput at call.result
-}

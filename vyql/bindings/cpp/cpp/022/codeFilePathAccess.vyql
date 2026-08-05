@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding filePathAccess22 {
-  query pattern callExpr where callee.path ~= "remove"
-  emit sink code.FilePathAccess at args[0]
-}

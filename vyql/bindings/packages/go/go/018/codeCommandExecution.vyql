@@ -1,9 +1,0 @@
-module bindings.go.generated.m39efcd29;
-
-binding commandExecution18 {
-  requires {
-    dependency("os/exec")
-  }
-  query pattern callExpr where callee.path ~= "exec.Command"
-  emit sink code.CommandExecution at args[0]
-}

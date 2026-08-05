@@ -1,6 +1,0 @@
-module bindings.groovy.generated.m6eabb149;
-
-binding objectLookupByUserInput36 {
-  query pattern callExpr where callee.method == "getUser"
-  emit sink code.ObjectLookupByUserInput at args[0]
-}

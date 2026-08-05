@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding csvCell119 {
-  query pattern callExpr where callee.method == "WriteField"
-  emit sink code.CsvCell at args.any
-}

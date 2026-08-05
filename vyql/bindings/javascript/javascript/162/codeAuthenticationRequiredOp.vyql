@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding authenticationRequiredOp162 {
-  query pattern presenceNode where node.path ~= "deleteAccount"
-  emit issue code.AuthenticationRequiredOp at node
-}

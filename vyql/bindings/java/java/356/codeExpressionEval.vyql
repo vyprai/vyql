@@ -1,6 +1,0 @@
-module bindings.java.generated.m420f6b67;
-
-binding expressionEval356 {
-  query pattern callExpr where callee.path ~= "parseExpression.getValue"
-  emit sink code.ExpressionEval at args[0]
-}

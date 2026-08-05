@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding weakRandomValue621 {
-  query pattern presenceNode where node.path ~= "Math.random"
-  emit issue code.WeakRandomValue at node
-}

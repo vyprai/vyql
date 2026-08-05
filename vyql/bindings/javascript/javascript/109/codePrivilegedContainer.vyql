@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding privilegedContainer109 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.literal, ["docker run -dt", "dockerrun-dt"]) and containsAny(node.context.literal, ["--privileged=true", "--cap-add SYS_ADMIN", "--cap-addSYS_ADMIN", "--device /dev/fuse", "--device/dev/fuse"]) and node.context.callPath contains "exec" and not (node.context.selector contains "appConfig.capabilities") and not (node.context.literal contains "--privileged=false")
-  emit issue code.PrivilegedContainer at node
-}

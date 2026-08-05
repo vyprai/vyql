@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding namespacedSubjectKeyCollision246 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "OwnerRoleBindingsIndexFunc" and node.context.selector contains "rb.Subjects" and node.context.selector contains "subject.Kind" and node.context.selector contains "subject.Name" and node.context.callPath contains "fmt.Sprintf" and not (node.context.selector contains "subject.Namespace") and not (node.context.callPath contains "strings.Join")
-  emit issue code.NamespacedSubjectKeyCollision at node
-}

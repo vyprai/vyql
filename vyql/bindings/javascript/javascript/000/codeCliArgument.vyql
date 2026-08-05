@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding cliArgument0 {
-  query pattern callExpr where callee.path ~= "process.argv"
-  emit source code.CliArgument at call.result
-}

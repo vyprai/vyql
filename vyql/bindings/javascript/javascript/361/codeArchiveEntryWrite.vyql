@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding archiveEntryWrite361 {
-  query pattern callExpr where callee.path ~= "entry.pipe"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

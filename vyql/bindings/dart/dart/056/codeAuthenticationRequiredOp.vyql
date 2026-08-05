@@ -1,6 +1,0 @@
-module bindings.dart.generated.m1c398214;
-
-binding authenticationRequiredOp56 {
-  query pattern presenceNode where node.path ~= "deleteAccount"
-  emit issue code.AuthenticationRequiredOp at node
-}

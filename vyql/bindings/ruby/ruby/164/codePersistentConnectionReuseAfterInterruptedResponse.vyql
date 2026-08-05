@@ -1,6 +1,0 @@
-module bindings.ruby.generated.m5a48bf47;
-
-binding persistentConnectionReuseAfterInterruptedResponse164 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.functionName == "request" and node.context.rubyReview == "persistent_response_reuse_missing_guard"
-  emit issue code.PersistentConnectionReuseAfterInterruptedResponse at node
-}

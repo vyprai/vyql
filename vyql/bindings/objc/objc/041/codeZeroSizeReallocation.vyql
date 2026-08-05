@@ -1,7 +1,0 @@
-module bindings.objc.generated.mccadd221;
-
-binding zeroSizeReallocation41 {
-  query pattern presenceNode where node.path ~= "reallocarray"
-  emit issue code.ZeroSizeReallocation at node
-  emit sink code.ZeroSizeReallocationSink at node
-}

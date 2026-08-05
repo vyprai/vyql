@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding fileCheck345 {
-  query pattern presenceNode where node.path ~= "fs.lstatSync"
-  emit issue code.FileCheck at node
-}

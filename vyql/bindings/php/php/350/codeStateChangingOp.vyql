@@ -1,7 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding stateChangingOp350 {
-  query pattern callExpr where callee.method == "resetPassword"
-  emit issue code.StateChangingOp at call
-  emit sink code.StateChangingOpSink at call
-}

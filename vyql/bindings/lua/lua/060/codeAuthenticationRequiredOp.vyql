@@ -1,6 +1,0 @@
-module bindings.lua.generated.ma99d12f7;
-
-binding authenticationRequiredOp60 {
-  query pattern presenceNode where node.path ~= "transfer_funds"
-  emit issue code.AuthenticationRequiredOp at node
-}

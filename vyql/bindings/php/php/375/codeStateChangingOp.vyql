@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding stateChangingOp375 {
-  query pattern callExpr where callee.path ~= "queryDB" and args.any.literal contains "update " and args.any.literal contains " set "
-  emit sink code.StateChangingOpSink at args[0]
-}

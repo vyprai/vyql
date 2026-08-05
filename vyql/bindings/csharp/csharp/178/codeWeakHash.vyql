@@ -1,6 +1,0 @@
-module bindings.csharp.generated.m1caa8bf2;
-
-binding weakHash178 {
-  query pattern presenceNode where node.path ~= "MD5CryptoServiceProvider"
-  emit issue code.WeakHash at node
-}

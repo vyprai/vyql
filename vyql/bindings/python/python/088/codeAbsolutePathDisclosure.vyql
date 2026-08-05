@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding absolutePathDisclosure88 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "absolute_path_disclosure"
-  emit issue code.AbsolutePathDisclosure at node
-}

@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding httpInput40 {
-  query pattern callExpr where callee.method == "getPathInfo"
-  emit source code.HttpInput at call.result
-}

@@ -1,6 +1,0 @@
-module bindings.javascript.generated.mfb63017a;
-
-binding urlFetch288 {
-  query pattern callExpr where callee.path ~= "axios.put"
-  emit sink code.UrlFetch at args[0]
-}

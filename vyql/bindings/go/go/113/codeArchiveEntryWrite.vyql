@@ -1,6 +1,0 @@
-module bindings.go.generated.m48a985c1;
-
-binding archiveEntryWrite113 {
-  query pattern callExpr where callee.path ~= "writeArchiveEntry"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

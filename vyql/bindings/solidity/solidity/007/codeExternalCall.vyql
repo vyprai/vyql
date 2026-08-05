@@ -1,6 +1,0 @@
-module bindings.solidity.generated.m88e544d8;
-
-binding externalCall7 {
-  query pattern callExpr where callee.method == "callcode"
-  emit sink code.ExternalCall at args[0]
-}

@@ -1,6 +1,0 @@
-module bindings.python.generated.m21017d75;
-
-binding checkmkPendingChangeTextUnescapeXss457 {
-  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "checkmk_pending_change_text_unescape_xss"
-  emit issue code.CheckmkPendingChangeTextUnescapeXss at node
-}

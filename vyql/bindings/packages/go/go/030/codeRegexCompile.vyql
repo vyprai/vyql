@@ -1,9 +1,0 @@
-module bindings.go.generated.m39efcd29;
-
-binding regexCompile30 {
-  requires {
-    dependency("regexp")
-  }
-  query pattern callExpr where callee.path ~= "regexp.Compile"
-  emit sink code.RegexCompileSink at args[0]
-}

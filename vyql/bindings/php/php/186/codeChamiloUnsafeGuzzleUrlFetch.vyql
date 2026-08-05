@@ -1,6 +1,0 @@
-module bindings.php.generated.mfbe84119;
-
-binding chamiloUnsafeGuzzleUrlFetch186 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "verifyUrl" and node.context.phpReview == "chamilo_unsafe_guzzle_url_fetch"
-  emit issue code.ChamiloUnsafeGuzzleUrlFetch at node
-}

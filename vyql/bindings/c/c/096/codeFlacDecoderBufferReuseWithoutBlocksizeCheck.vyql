@@ -1,6 +1,0 @@
-module bindings.c.generated.mce54b166;
-
-binding flacDecoderBufferReuseWithoutBlocksizeCheck96 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "flac.buffer_reuse_without_blocksize_check"
-  emit issue code.FlacDecoderBufferReuseWithoutBlocksizeCheck at node
-}
