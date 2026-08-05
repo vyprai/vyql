@@ -94,11 +94,11 @@ Youden (`TPR − FPR`) macro-averaged. `benchmarks/RESULTS.md` has the method.
 - **`vyql/` is both a directory and the binary's name.** Binaries build to
   `bin/`; they cannot sit at the repository root.
 
-## Three repositories ship this, and only one is here
+## Four repositories ship this, and only one is here
 
-Two satellite repositories document and package the CLI, and neither is exercised
-by this repository's CI. Nothing tells you when they fall out of step, so check
-them whenever you change what they describe:
+Three satellite repositories document and package the CLI, and none is exercised
+by this repository's CI. Nothing here tells you when they fall out of step, so
+check them whenever you change what they describe:
 
 - **[vyprai/vyql-action](https://github.com/vyprai/vyql-action)** — `action.yml`
   invokes the CLI. It passes `-fail-on`, `-exit-code`, `-format`, `-profile` and
@@ -108,18 +108,28 @@ them whenever you change what they describe:
 - **[vyprai/homebrew-tap](https://github.com/vyprai/homebrew-tap)** —
   `Formula/vyql.rb` is generated from `packaging/homebrew/vyql.rb.tmpl` here.
   Edit the template, never the tap directly, or the next release overwrites it.
+- **[vyprai/claude-plugins](https://github.com/vyprai/claude-plugins)** — the
+  agent skill, which is instructions naming this CLI's flags. It carries its own
+  copy of `check-skills.py` and a CI job that installs the current release and
+  validates the skill against it, so a renamed flag turns that repository red
+  rather than this one. That check runs weekly as well as on change, because the
+  CLI moves without anything happening there.
 
 What actually drifts, in order of how often it has:
 
-1. **Version examples.** Both READMEs show a pinned version in copy-paste
+1. **Version examples.** Each README shows a pinned version in copy-paste
    snippets. A snippet pinning a release with a known defect is worse than one
    showing `latest`, because it is what people paste.
-2. **Install instructions**, which exist in three places: this README, the action's,
-   and the tap's. The install URL, the container image name and the `go install`
-   path appear in all of them.
+2. **Install instructions**, which exist in four places: this README, the
+   action's, the tap's, and the skill's `references/install.md`. The install URL,
+   the container image name and the `go install` path appear in all of them.
 3. **Flags and severity vocabulary.** `-fail-on` takes
    `none info low medium high critical`; the action's input description repeats
    that list, and a change here does not update it there.
+
+The skill also carries a version that is **not** the CLI's. Claude Code uses it
+as an update cache key, so a skill edit that does not bump it reaches nobody;
+that repository's CI fails a pull request which changes the skill without one.
 
 After a release, confirm the tap resolves to the new version — `brew install
 vyprai/tap/vyql` then `vyql version` — rather than assuming the release job's
