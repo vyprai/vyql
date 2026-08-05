@@ -10,6 +10,46 @@ behaviour change even when no code changed.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-05
+
+### Added
+- **An install script.** `curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh`
+  detects the platform, verifies the published SHA-256, unpacks under
+  `~/.local/share/vyql` and puts `vyql` in `~/.local/bin`. POSIX `sh`, because it
+  runs before VyQL exists on the machine. `VYQL_INSTALL_BASE_URL` points the
+  download at a mirror serving the same `<base>/<version>/<asset>` layout.
+- **A container image.** `docker run --rm -v "$PWD:/work" ghcr.io/vyprai/vyql scan .`
+  Runs as a non-root user, so it leaves no root-owned files in a mounted tree.
+  `debian:stable-slim` rather than Alpine: the parsers are C linked against glibc.
+
+### Fixed
+- **A binary reached through a symlink could not find its data.**
+  `os.Executable` reports the symlink's own path on macOS, so a linked `vyql`
+  searched the wrong directory and panicked with "could not locate the data
+  directory". It now follows the link, preferring data beside the link itself
+  where someone put it there deliberately. This blocked every packaged install,
+  Homebrew included.
+- **`JSON.parse` was reported as critical CWE-502.** Package bindings for
+  libraries whose API exposes `parse` matched any `.parse()` call once the
+  dependency gate opened, so a project with a parser package anywhere in
+  `devDependencies` had `JSON.parse(req.body)` reported as deserialization of
+  untrusted data. `JSON`, `Date`, `url` and `querystring` parse are now
+  recognised as safe; `node-serialize.unserialize` and friends still report, at
+  higher confidence than before.
+- **Checkouts are byte-identical across platforms.** Git converts line endings
+  on Windows by default, and the NIR golden files are compared as bytes, so all
+  ten golden tests failed there and nowhere else.
+
+### Changed
+- **Sink concepts that exported a null operation are now mapped**: 58 mappings
+  in `vyql/exports/sink_operations.tsv`, up from 32, matched against the
+  consuming vocabulary on the CWE both sides record. The six with no honest
+  counterpart stay unmapped and say why — a wrong operation is
+  indistinguishable from a right one, where a null is visibly absent. A test
+  requires every sink concept to be either mapped or listed.
+- The generated binding tree no longer nests files under numeric shard
+  directories.
+
 ## [0.2.0] - 2026-08-05
 
 First public release.
@@ -45,7 +85,7 @@ First public release.
   because a clean result over a tree that was mostly skipped reads exactly like
   a clean result over one that was fully read. `-coverage` gives the full
   account of what was parsed, excluded and left unanalysed.
-- **An [Agent Skill](skills/vyql-security-scan/)** for scanning and triage,
+- **An [Agent Skill](https://github.com/vyprai/claude-plugins)** for scanning and triage,
   written to the open SKILL.md format so it works across agent tools rather than
   one vendor's.
 - **A [GitHub Action](https://github.com/vyprai/vyql-action)**:

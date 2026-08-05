@@ -27,7 +27,27 @@ is usually a new binding, not new Go.
 
 ## Install
 
-### Download a release
+```sh
+curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh
+```
+
+Picks the right build for your platform, verifies its published SHA-256, unpacks
+it under `~/.local/share/vyql`, and puts `vyql` in `~/.local/bin`. Set
+`VYQL_VERSION`, `VYQL_INSTALL_DIR` or `VYQL_BIN_DIR` to change any of that.
+
+Release assets come from the GitHub release, which is where the checksums and
+build provenance live. `VYQL_INSTALL_BASE_URL` points the download at a mirror
+serving the same `<base>/<version>/<asset>` layout.
+
+The checksum is served from the same host as the archive, so it catches a
+corrupted download rather than a compromised release. Pin `VYQL_VERSION` and
+check the sum against a second source if you need more than that.
+
+Linux and macOS, amd64 and arm64. On Windows it says so rather than failing
+obscurely — use WSL, or the [GitHub
+Action](https://github.com/marketplace/actions/vyql-security-scan).
+
+### Download a release manually
 
 The scanner loads its security knowledge from a `vyql/` directory at startup. The
 release archive carries both halves, so it works on a machine that has never seen
@@ -55,6 +75,16 @@ go install github.com/vyprai/vyql/cmd/vyql@latest
 
 The binary finds its data in the module cache, so no further setup is needed.
 
+### Container
+
+```sh
+docker run --rm -v "$PWD:/work" ghcr.io/vyprai/vyql scan .
+```
+
+About 270 MB, most of it the security knowledge base. Runs as a non-root user,
+so it will not leave root-owned files in a mounted tree. `debian:stable-slim`
+rather than Alpine: the parsers are C linked against glibc.
+
 ### From source
 
 ```sh
@@ -62,6 +92,28 @@ git clone https://github.com/vyprai/vyql
 cd vyql
 make build          # -> bin/vyql
 ```
+
+### As an agent skill
+
+For Claude Code, VyQL ships as a plugin that teaches the agent to run a scan and
+triage what comes back:
+
+```
+/plugin marketplace add vyprai/claude-plugins
+/plugin install vyql@vypr
+```
+
+Then ask for a security scan in the ordinary way. The skill installs the `vyql`
+binary if it is missing, after asking — a security tool that downloads and runs
+binaries unprompted has the wrong instincts.
+
+It lives in [vyprai/claude-plugins](https://github.com/vyprai/claude-plugins)
+rather than here, so installing it copies 32 KB instead of cloning a repository
+whose knowledge base is several hundred megabytes.
+
+`skills/vyql-security-scan/` there follows the [Agent
+Skills](https://agentskills.io) format, which is not Claude-specific: any tool
+that reads a `SKILL.md` can use it directly, without the plugin manifests.
 
 ### Check what you have
 

@@ -6,8 +6,9 @@
 //  2. the nearest ancestor of the current working directory that contains a
 //     valid `vyql/` data directory (covers `go test ./...` from any package and
 //     running the binary from within the repo).
-//  3. the nearest such ancestor of the executable's directory (covers an
-//     installed binary shipped alongside its `vyql/` data dir).
+//  3. the nearest such ancestor of the executable's directory, following the
+//     symlink if there is one (covers an installed binary shipped alongside its
+//     `vyql/` data dir, and one linked onto PATH from a package prefix).
 //  4. the module cache entry this binary was built from (covers `go install`,
 //     where the binary lands in GOBIN with nothing beside it -- but the module,
 //     data included, is already on disk).
@@ -181,7 +182,7 @@ func resolve() string {
 		}
 	}
 	if exe, err := os.Executable(); err == nil {
-		if d := searchUp(filepath.Dir(exe)); d != "" {
+		if d := rootFromExecutable(exe); d != "" {
 			return d
 		}
 	}
@@ -251,6 +252,28 @@ func escapeModulePath(p string) string {
 
 // searchUp walks from start toward the filesystem root, returning the first
 // `<ancestor>/vyql` directory that has a recognized data-root layout.
+// rootFromExecutable looks for the data directory beside the binary, following
+// the symlink if there is one.
+//
+// A packaged install keeps the binary and its data together and links the
+// binary onto PATH: Homebrew links out of the Cellar, and an installer links
+// out of its own prefix. os.Executable reports the link's own path on macOS,
+// so searching from there finds nothing and the scanner panics at startup with
+// its data one resolved hop away.
+//
+// The link's own directory is searched first: data placed there is the more
+// specific answer, and someone put it there on purpose.
+func rootFromExecutable(exe string) string {
+	if d := searchUp(filepath.Dir(exe)); d != "" {
+		return d
+	}
+	resolved, err := filepath.EvalSymlinks(exe)
+	if err != nil || resolved == exe {
+		return ""
+	}
+	return searchUp(filepath.Dir(resolved))
+}
+
 func searchUp(start string) string {
 	dir := start
 	for {
