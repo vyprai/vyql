@@ -94,6 +94,37 @@ Youden (`TPR − FPR`) macro-averaged. `benchmarks/RESULTS.md` has the method.
 - **`vyql/` is both a directory and the binary's name.** Binaries build to
   `bin/`; they cannot sit at the repository root.
 
+## Three repositories ship this, and only one is here
+
+Two satellite repositories document and package the CLI, and neither is exercised
+by this repository's CI. Nothing tells you when they fall out of step, so check
+them whenever you change what they describe:
+
+- **[vyprai/vyql-action](https://github.com/vyprai/vyql-action)** — `action.yml`
+  invokes the CLI. It passes `-fail-on`, `-exit-code`, `-format`, `-profile` and
+  `-exclude`, so renaming or removing any of those breaks every workflow using
+  the action while everything here stays green. Its README states a minimum VyQL
+  version for the flags it passes; that claim has to stay true.
+- **[vyprai/homebrew-tap](https://github.com/vyprai/homebrew-tap)** —
+  `Formula/vyql.rb` is generated from `packaging/homebrew/vyql.rb.tmpl` here.
+  Edit the template, never the tap directly, or the next release overwrites it.
+
+What actually drifts, in order of how often it has:
+
+1. **Version examples.** Both READMEs show a pinned version in copy-paste
+   snippets. A snippet pinning a release with a known defect is worse than one
+   showing `latest`, because it is what people paste.
+2. **Install instructions**, which exist in three places: this README, the action's,
+   and the tap's. The install URL, the container image name and the `go install`
+   path appear in all of them.
+3. **Flags and severity vocabulary.** `-fail-on` takes
+   `none info low medium high critical`; the action's input description repeats
+   that list, and a change here does not update it there.
+
+After a release, confirm the tap resolves to the new version — `brew install
+vyprai/tap/vyql` then `vyql version` — rather than assuming the release job's
+pull request was merged.
+
 ## Before you say it works
 
 Run the command and read the output. In this repository specifically:
