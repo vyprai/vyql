@@ -84,6 +84,7 @@ knowledge as much as on the engine.
 
 ```sh
 vyql scan ./my-project
+vyql scan                  # no path: scans the working directory, and says so
 ```
 
 ```
@@ -129,6 +130,39 @@ apart from "could not run", give `-exit-code` a distinct value:
 ```sh
 vyql scan -exit-code 3 .   # 3 = findings, 1 = VyQL failed, 2 = bad usage
 ```
+
+### What was actually read
+
+"No findings" is only as good as what the scan looked at, so anything left
+unanalysed is reported whether you ask or not:
+
+```
+scanned python:1 textpattern:1 — 9 finding(s)
+warning: 15 file(s) matched no frontend and were not analysed (.zig 12, .cob 3)
+         run with -coverage for the breakdown
+```
+
+`-coverage` gives the full account:
+
+```sh
+vyql scan -coverage .
+```
+
+```
+coverage
+  parsed    python 1 · textpattern 1
+  excluded  5 file(s) dropped by -exclude
+  unread    15 file(s) matched no frontend: .zig 12, .cob 3
+  depth     java, python, javascript are the reference frontends;
+            other languages range down to call-and-concat coverage
+  note      a parse that partially fails still counts as parsed;
+            this does not yet report that
+```
+
+A clean report over a tree that was mostly skipped reads exactly like a clean
+report over a tree that was fully read. The warning is the difference, which is
+why it is not optional. The `note` is there because the gap is real: tree-sitter
+recovers from syntax errors, so a file that parsed badly still counts as parsed.
 
 ## Understand a finding
 

@@ -56,10 +56,27 @@ var languages = []language{
 	{"textpattern", textpattern.Extensions(), textpattern.Extract, frontend.TextPatternBindings},
 }
 
-// scanStats reports per-language file counts for the run summary.
+// scanStats reports per-language file counts for the run summary, and what the
+// scan did NOT look at.
+//
+// The counts of untouched files are the point. "scanned python:1 — 0 findings"
+// is a clean bill of health for one file and says nothing about the other forty
+// in the tree; without the second number a reader cannot tell the difference
+// between code that is clean and code that was never read.
 type scanStats struct {
 	files     map[string]int // language -> files parsed
 	languages []string       // languages actually present
+	excluded  int            // files dropped by -exclude
+	unmatched map[string]int // extension -> count, claimed by no frontend
+}
+
+// unmatchedTotal is the number of files present that no frontend analysed.
+func (s scanStats) unmatchedTotal() int {
+	n := 0
+	for _, c := range s.unmatched {
+		n += c
+	}
+	return n
 }
 
 // extractAll routes every path to the right frontend(s), merges into one NIR
@@ -68,7 +85,11 @@ type scanStats struct {
 func extractAll(paths []string) (nir.Program, []bindings.Applicator, map[string]string, scanStats, error) {
 	var prog nir.Program
 	present := map[string]bool{}
-	stats := scanStats{files: map[string]int{}}
+	stats := scanStats{files: map[string]int{}, unmatched: map[string]int{}}
+	// Every path a frontend claimed, so what is left over can be counted rather
+	// than assumed to be nothing.
+	claimed := map[string]bool{}
+	kinds := map[string]string{} // path -> extension or basename, for the report
 
 	for _, p := range paths {
 		info, err := os.Stat(p)
@@ -92,7 +113,15 @@ func extractAll(paths []string) (nir.Program, []bindings.Applicator, map[string]
 					kept = append(kept, e)
 				}
 			}
+			stats.excluded += len(entries) - len(kept)
 			entries = kept
+		}
+		for _, e := range entries {
+			kind := e.Ext
+			if kind == "" {
+				kind = e.Base
+			}
+			kinds[e.Path] = kind
 		}
 		if props := propertiesFromEntries(entries); len(props) > 0 {
 			if prog.Properties == nil {
@@ -117,6 +146,14 @@ func extractAll(paths []string) (nir.Program, []bindings.Applicator, map[string]
 			prog.Modules = append(prog.Modules, sub.Modules...)
 			present[lg.name] = true
 			stats.files[lg.name] += len(files)
+			for _, f := range files {
+				claimed[f] = true
+			}
+		}
+	}
+	for path, kind := range kinds {
+		if !claimed[path] {
+			stats.unmatched[kind]++
 		}
 	}
 

@@ -26,6 +26,11 @@ type cachedScan struct {
 	Findings  []*findings.Finding
 	Files     map[string]int
 	Languages []string
+	// Coverage travels with the findings. A replayed scan that omitted it would
+	// drop the "not analysed" warning on exactly the second run of a tree, so
+	// the same command would report the same findings with less honesty.
+	Excluded  int
+	Unmatched map[string]int
 }
 
 // scanFingerprint hashes everything a scan's output depends on: the binary (cache salt — a
@@ -184,7 +189,7 @@ func loadCachedScan(c *parsecache.Cache, key string) (cachedScan, bool) {
 // storeCachedScan persists a scan result under key.
 func storeCachedScan(c *parsecache.Cache, key string, all []*findings.Finding, stats scanStats) {
 	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(cachedScan{Findings: all, Files: stats.files, Languages: stats.languages}); err != nil {
+	if err := gob.NewEncoder(&buf).Encode(cachedScan{Findings: all, Files: stats.files, Languages: stats.languages, Excluded: stats.excluded, Unmatched: stats.unmatched}); err != nil {
 		return
 	}
 	c.PutRaw("scan\x00"+key, buf.Bytes())

@@ -176,11 +176,15 @@ func cmdScan(args []string) error {
 	incrementalCache := fs.Bool("incremental-cache", false, "also populate per-file parse/lower/binding caches for edit-loop scans")
 	failOn := fs.String("fail-on", defaultFailOn, "exit non-zero when a finding is at or above this severity: none | "+strings.Join(severityOrder, " | "))
 	exitCode := fs.Int("exit-code", 1, "exit status to use when -fail-on is met")
+	coverage := fs.Bool("coverage", false, "report what was parsed, excluded and left unanalysed")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
-		usage()
-		os.Exit(2)
+		// Scanning the working directory is what a bare `vyql scan` almost always
+		// means. Announced rather than assumed, so the report is never read as
+		// covering somewhere else.
+		fmt.Fprintln(os.Stderr, "path not specified, default to CWD")
+		paths = []string{"."}
 	}
 	// Resolved before the scan runs. A typo here should cost nothing; finding
 	// out after a multi-minute scan that the gate was never armed is the kind of
@@ -210,6 +214,7 @@ func cmdScan(args []string) error {
 		FailOnRank:   failOnRank,
 		FailOnName:   strings.ToLower(strings.TrimSpace(*failOn)),
 		ExitCode:     *exitCode,
+		ShowCoverage: *coverage,
 	})
 }
 
@@ -610,6 +615,10 @@ type scanRunOptions struct {
 	FailOnRank int
 	FailOnName string
 	ExitCode   int
+	// ShowCoverage prints the full parsed/excluded/unanalysed breakdown. The
+	// warning about unanalysed files prints either way -- that one is not
+	// something a reader should have to ask for.
+	ShowCoverage bool
 }
 
 func (o scanRunOptions) wantsFlags() bool {
@@ -650,7 +659,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	if cache != nil && syncCollector == nil && !needsGraph {
 		rkey = scanFingerprint(cache.Salt(), paths, ruleSources, prof.Name)
 		if cs, ok := loadCachedScan(cache, rkey); ok {
-			all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
+			all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages, excluded: cs.Excluded, unmatched: cs.Unmatched}, true
 		}
 	}
 	tk.mark("fingerprint")
@@ -730,6 +739,9 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 			printScanFlags(flags)
 		}
 		printSummaryWithFlags(stats, len(all), len(flags), wantsFlags)
+	}
+	if opts.ShowCoverage {
+		printCoverage(stats)
 	}
 	if opts.ShowStats {
 		fmt.Printf("[stats] profile %s (%s)\n", prof.Name, prof.Title)
@@ -924,9 +936,77 @@ func printSummaryWithFlags(stats scanStats, findingsN, flagsN int, includeFlags 
 	}
 	if includeFlags {
 		fmt.Printf("scanned %s — %d finding(s), %d flag(s)\n", scanned, findingsN, flagsN)
+	} else {
+		fmt.Printf("scanned %s — %d finding(s)\n", scanned, findingsN)
+	}
+	printCoverageWarning(stats)
+}
+
+// printCoverageWarning reports files no frontend read. It is unconditional: a
+// report of zero findings over a tree that was mostly skipped reads as a clean
+// bill of health, and the reader has no way to tell without this line.
+func printCoverageWarning(stats scanStats) {
+	n := stats.unmatchedTotal()
+	if n == 0 {
 		return
 	}
-	fmt.Printf("scanned %s — %d finding(s)\n", scanned, findingsN)
+	fmt.Fprintf(os.Stderr, "warning: %d file(s) matched no frontend and were not analysed (%s)\n",
+		n, topKinds(stats.unmatched, 4))
+	fmt.Fprintln(os.Stderr, "         run with -coverage for the breakdown")
+}
+
+// topKinds renders the most common file kinds, largest first, so the summary
+// names what was missed rather than only how much.
+func topKinds(m map[string]int, limit int) string {
+	type kv struct {
+		kind string
+		n    int
+	}
+	var all []kv
+	for k, v := range m {
+		all = append(all, kv{k, v})
+	}
+	sort.Slice(all, func(i, j int) bool {
+		if all[i].n != all[j].n {
+			return all[i].n > all[j].n
+		}
+		return all[i].kind < all[j].kind
+	})
+	var parts []string
+	for i, e := range all {
+		if i == limit {
+			parts = append(parts, fmt.Sprintf("+%d more", len(all)-limit))
+			break
+		}
+		parts = append(parts, fmt.Sprintf("%s %d", e.kind, e.n))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// printCoverage is the full account: what was read, what -exclude dropped, and
+// what nothing claimed.
+func printCoverage(stats scanStats) {
+	fmt.Println("\ncoverage")
+	if len(stats.languages) == 0 {
+		fmt.Println("  parsed    nothing")
+	} else {
+		var parts []string
+		for _, lg := range stats.languages {
+			parts = append(parts, fmt.Sprintf("%s %d", lg, stats.files[lg]))
+		}
+		fmt.Printf("  parsed    %s\n", strings.Join(parts, " · "))
+	}
+	if stats.excluded > 0 {
+		fmt.Printf("  excluded  %d file(s) dropped by -exclude\n", stats.excluded)
+	}
+	if n := stats.unmatchedTotal(); n > 0 {
+		fmt.Printf("  unread    %d file(s) matched no frontend: %s\n", n, topKinds(stats.unmatched, 12))
+	}
+	// Depth is not uniform, and a clean result means different things across it.
+	fmt.Println("  depth     java, python, javascript are the reference frontends;")
+	fmt.Println("            other languages range down to call-and-concat coverage")
+	fmt.Println("  note      a parse that partially fails still counts as parsed;")
+	fmt.Println("            this does not yet report that")
 }
 
 // cmdVersion reports the version and everything needed to identify the exact
