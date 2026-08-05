@@ -27,7 +27,23 @@ is usually a new binding, not new Go.
 
 ## Install
 
-### Download a release
+```sh
+curl -fsSL https://raw.githubusercontent.com/vyprai/vyql/main/scripts/install.sh | sh
+```
+
+Picks the right build for your platform, verifies its published SHA-256, unpacks
+it under `~/.local/share/vyql`, and puts `vyql` in `~/.local/bin`. Set
+`VYQL_VERSION`, `VYQL_INSTALL_DIR` or `VYQL_BIN_DIR` to change any of that.
+
+The checksum is served from the same host as the archive, so it catches a
+corrupted download rather than a compromised release. Pin `VYQL_VERSION` and
+check the sum against a second source if you need more than that.
+
+Linux and macOS, amd64 and arm64. On Windows it says so rather than failing
+obscurely — use WSL, or the [GitHub
+Action](https://github.com/marketplace/actions/vyql-security-scan).
+
+### Download a release manually
 
 The scanner loads its security knowledge from a `vyql/` directory at startup. The
 release archive carries both halves, so it works on a machine that has never seen
