@@ -131,6 +131,45 @@ apart from "could not run", give `-exit-code` a distinct value:
 vyql scan -exit-code 3 .   # 3 = findings, 1 = VyQL failed, 2 = bad usage
 ```
 
+### Adopting it on a codebase that already has findings
+
+Triage is worth nothing if it evaporates. A baseline records what you have
+already looked at, keyed on the finding fingerprint — which is anchored to rule
+and location, not line number, so a verdict survives edits elsewhere in the
+file.
+
+```sh
+vyql scan -baseline-write .vyql-baseline.json .   # take the backlog as given
+vyql scan -baseline .vyql-baseline.json .         # fail only on what is new
+```
+
+Entries are written as `accepted` with an empty reason; fill them in as you
+triage, and change the verdict to `false-positive` where the finding is wrong:
+
+```json
+{ "fp": "cfb54bfb4024aa90", "verdict": "false-positive",
+  "reason": "source is a build-time constant, not request data",
+  "rule": "VYQL-INJ-002", "loc": "server.js:5" }
+```
+
+Baselined findings are kept out of both the report and the gate. Anything not in
+the file is new and reported normally.
+
+**Entries that stop matching are reported, not forgotten:**
+
+```
+warning: 4 baseline entries match nothing in this scan
+         the code they excused may have changed; re-triage or remove them:
+           27d5f6e6503511f5  VYQL-INJ-004  app.py:12
+```
+
+A suppression that outlives the code it excused is how these files turn
+dangerous — the code moved, the excuse did not, and nobody looked again.
+
+A malformed baseline, an unknown verdict or a missing file is an error rather
+than an empty baseline. Silently suppressing nothing buries you in findings you
+thought were triaged; silently suppressing everything is worse.
+
 ### What was actually read
 
 "No findings" is only as good as what the scan looked at, so anything left

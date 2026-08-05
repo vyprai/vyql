@@ -177,6 +177,8 @@ func cmdScan(args []string) error {
 	failOn := fs.String("fail-on", defaultFailOn, "exit non-zero when a finding is at or above this severity: none | "+strings.Join(severityOrder, " | "))
 	exitCode := fs.Int("exit-code", 1, "exit status to use when -fail-on is met")
 	coverage := fs.Bool("coverage", false, "report what was parsed, excluded and left unanalysed")
+	baseline := fs.String("baseline", "", "triaged findings to exclude from the report and the gate")
+	baselineWrite := fs.String("baseline-write", "", "record every current finding as accepted, to adopt on an existing codebase")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -193,6 +195,15 @@ func cmdScan(args []string) error {
 	if err != nil {
 		return err
 	}
+	// Loaded up front for the same reason: a bad path or a bad verdict should
+	// cost nothing, and finding out after the scan that the baseline never
+	// applied is the silent no-op these checks exist to prevent.
+	var baselineEntries map[string]baselineEntry
+	if *baseline != "" {
+		if baselineEntries, err = loadBaseline(*baseline); err != nil {
+			return err
+		}
+	}
 	cleanup := applyMaxRAM(*maxRAM)
 	defer cleanup()
 	cacheCleanup := applyScanCache(*cacheDir)
@@ -204,17 +215,20 @@ func cmdScan(args []string) error {
 	scanExcludes = parseExcludes(*exclude)
 	defer func() { scanExcludes = oldExcludes }()
 	return run(paths, *rulesPath, *format, *profileName, scanRunOptions{
-		ShowStats:    *stats,
-		IncludeFlags: *allResults,
-		FlagsOnly:    *flagsOnly,
-		FlagCategory: *flagCategory,
-		FlagKind:     *flagKind,
-		FlagLoc:      *flagLoc,
-		GraphCache:   *incrementalCache,
-		FailOnRank:   failOnRank,
-		FailOnName:   strings.ToLower(strings.TrimSpace(*failOn)),
-		ExitCode:     *exitCode,
-		ShowCoverage: *coverage,
+		ShowStats:     *stats,
+		IncludeFlags:  *allResults,
+		FlagsOnly:     *flagsOnly,
+		FlagCategory:  *flagCategory,
+		FlagKind:      *flagKind,
+		FlagLoc:       *flagLoc,
+		GraphCache:    *incrementalCache,
+		FailOnRank:    failOnRank,
+		FailOnName:    strings.ToLower(strings.TrimSpace(*failOn)),
+		ExitCode:      *exitCode,
+		ShowCoverage:  *coverage,
+		Baseline:      baselineEntries,
+		BaselinePath:  *baseline,
+		BaselineWrite: *baselineWrite,
 	})
 }
 
@@ -619,6 +633,12 @@ type scanRunOptions struct {
 	// warning about unanalysed files prints either way -- that one is not
 	// something a reader should have to ask for.
 	ShowCoverage bool
+	// Baseline holds already-triaged findings by fingerprint. They are kept out
+	// of both the report and the gate, so a run reports what is new.
+	Baseline     map[string]baselineEntry
+	BaselinePath string
+	// BaselineWrite records the current findings instead of applying any.
+	BaselineWrite string
 }
 
 func (o scanRunOptions) wantsFlags() bool {
@@ -689,6 +709,19 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 			syncPath, n, e, l, d)
 	}
 
+	// Recording the current findings is an alternative to reporting them: it is
+	// how a team adopts the scanner on a codebase that already has a backlog.
+	if opts.BaselineWrite != "" {
+		return writeBaseline(opts.BaselineWrite, all)
+	}
+	// Applied before output and before the gate, so a run reports and fails on
+	// what is new rather than on what someone already looked at.
+	var covered []*findings.Finding
+	var staleBaseline []baselineEntry
+	if len(opts.Baseline) > 0 {
+		all, covered, staleBaseline = applyBaseline(all, opts.Baseline)
+	}
+
 	// output
 	var flags []reviewItem
 	if wantsFlags {
@@ -739,6 +772,9 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 			printScanFlags(flags)
 		}
 		printSummaryWithFlags(stats, len(all), len(flags), wantsFlags)
+		if opts.BaselinePath != "" {
+			printBaselineSummary(opts.BaselinePath, covered, staleBaseline)
+		}
 	}
 	if opts.ShowCoverage {
 		printCoverage(stats)
