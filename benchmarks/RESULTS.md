@@ -177,6 +177,33 @@ it (0.129 → 0.193) rather than being traded away. For scale: the entire v2 lin
 commits, the knowledge-layer restructure, +1.00 on BenchmarkJava — moved RealVuln recall
 by 0.001. This one port moves it by 0.318.
 
+#### 6.1.1 Receiver scoping for package-gated bindings
+
+A binding generated for package `P` matches only calls whose receiver resolves to
+`P`, rather than every call sharing the method name once the `dependency()` gate
+opens. Same 62 repos, same scorer:
+
+| VyQL at | TP | FP | Precision | Youden |
+|---|---|---|---|---|
+| before scoping | 977 | 2530 | 0.2786 | −0.3519 |
+| **after scoping** | **977** | **2522** | **0.2792** | **−0.3517** |
+
+**No true positive is lost** — the whole point, since the risk of scoping is
+silently dropping detections rather than noise.
+
+Read the size honestly. Deleting the entire bare-method class scores TP=974 /
+FP=2444, so 86 false positives are attributable to it and this recovers 8 of
+them. The gap is instance receivers: `const zip = new AdmZip(...);
+zip.extractAllTo(...)` reaches a package through a variable, and an import table
+cannot see through one. Rejecting unresolved receivers would close the gap and
+cost real detections — the spec suite fails 6 cases under that policy, including
+adm-zip zip-slip and the autobahn open redirect. `VYQL_UNRESOLVED_RECEIVER=skip`
+selects it for measurement; it is not the default for that reason.
+
+The three protected suites are unchanged at **+1.00 / +0.90 / +1.00**. This class
+of binding contributes nothing there, which is why the noise was invisible to the
+gates while being loud on real code.
+
 Per bucket (`benchmarks/bucket_recall.py`, same 62 repos):
 
 | Bucket | `main` | + detectors |
