@@ -1,0 +1,8 @@
+# Keep every checkout byte-identical across platforms.
+#
+# Git converts line endings on Windows by default, and several things here
+# compare bytes rather than lines: the NIR golden files are matched with a plain
+# string comparison, and the .vyql corpus is parsed and fingerprinted for the
+# scan cache. A CRLF rewrite at checkout makes all ten golden tests fail on
+# Windows and nowhere else, which is a confusing way to learn about it.
+* -text
