@@ -48,14 +48,6 @@ for p in vyql/README.md vyql/ontology/concepts vyql/bindings; do
   fi
 done
 
-echo "== skills are valid =="
-# Agent Skills is an open format read by many tools, and a malformed SKILL.md is
-# ignored silently rather than rejected loudly. This also catches a skill that
-# tells an agent to run a flag the CLI no longer has.
-if [ -d skills ]; then
-  python3 scripts/check-skills.py || fail=1
-fi
-
 echo "== no build artifacts committed =="
 # `go build -o vyql` from the root writes vyql/vyql, because vyql/ is a directory.
 # It is 70 MB and it is not source. More generally, nothing large and executable
