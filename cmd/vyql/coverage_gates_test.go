@@ -1613,3 +1613,64 @@ func cveRankFromSpecName(name string) (int, bool) {
 	rank, err := strconv.Atoi(rest[:cut])
 	return rank, err == nil
 }
+
+// Every sink concept a binding emits must either carry a downstream operation
+// or be recorded as deliberately without one. The failure this prevents is
+// silent: a new sink concept exports a null operation in graph-json, the
+// consuming service sees a finding with no operation, and nothing here noticed.
+func TestEverySinkConceptIsMappedOrDocumented(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(datadir.Root(), "exports", "sink_operations.tsv"))
+	if err != nil {
+		t.Fatalf("read sink_operations.tsv: %v", err)
+	}
+	mapped, documented := map[string]bool{}, map[string]bool{}
+	// "#   ConceptName  --  reason" records a concept left unmapped on purpose.
+	unmapped := regexp.MustCompile(`^#\s+([A-Za-z0-9_]+)\s+--`)
+	for _, line := range strings.Split(string(raw), "\n") {
+		if m := unmapped.FindStringSubmatch(line); m != nil {
+			documented[m[1]] = true
+			continue
+		}
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if name, _, ok := strings.Cut(line, "\t"); ok {
+			mapped[strings.TrimSpace(name)] = true
+		}
+	}
+
+	emitted := map[string]bool{}
+	err = filepath.WalkDir(filepath.Join(datadir.Root(), "bindings"), func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".vyql") {
+			return err
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		for _, m := range regexp.MustCompile(`emit sink ([A-Za-z0-9_.]+)`).FindAllStringSubmatch(string(b), -1) {
+			parts := strings.Split(m[1], ".")
+			emitted[parts[len(parts)-1]] = true
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk bindings: %v", err)
+	}
+	if len(emitted) == 0 {
+		t.Fatal("no sink concepts found; the walk matched nothing")
+	}
+
+	var gap []string
+	for c := range emitted {
+		if !mapped[c] && !documented[c] {
+			gap = append(gap, c)
+		}
+	}
+	sort.Strings(gap)
+	if len(gap) > 0 {
+		t.Fatalf("%d sink concept(s) neither mapped to an operation nor recorded as unmapped in "+
+			"vyql/exports/sink_operations.tsv: %s", len(gap), strings.Join(gap, ", "))
+	}
+	t.Logf("%d sink concepts: %d mapped, %d documented as unmapped", len(emitted), len(mapped), len(documented))
+}
