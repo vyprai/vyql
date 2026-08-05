@@ -10,6 +10,34 @@ behaviour change even when no code changed.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-05
+
+### Fixed
+- **A binding generated for a package matched every call sharing its method
+  name.** Package bindings query a bare method behind a `dependency()` gate, so
+  once any listed package exposed `parse`, every `.parse()` in the project became
+  a deserialization sink — `csv.parse(req.body)` on a local module reported as
+  CRITICAL CWE-502 because `prettier` appeared in `devDependencies`. A call now
+  has to be on the package the binding was generated for.
+
+  This reaches further than the deserialization noise it was reported as.
+  **25,587 bindings** query a bare method: 16,821 sinks, 5,476 taint sources that
+  multiply across every other rule, and **2,301 checks**. A check matching too
+  broadly does not add noise, it removes a real finding — a stray `.validate()`
+  satisfying `core.InputValidation` suppresses an injection report with nothing to
+  show for it. One fix covers all of them.
+
+  Rejection requires positive evidence: a receiver resolved to a *different*
+  package. An unresolved receiver still matches, because an instance carries no
+  import identity — `const zip = new AdmZip(...); zip.extractAllTo(...)` reaches
+  its package through a variable. `VYQL_UNRESOLVED_RECEIVER=skip` selects the
+  stricter policy.
+
+  Measured on RealVuln (62 real repositories): **no true positive lost**, 8 false
+  positives removed. BenchmarkJava, BenchmarkPython and owasp-js are unchanged at
+  +1.00 / +0.90 / +1.00 — this class of binding contributes nothing there, which
+  is why every gate was blind to it. See `benchmarks/RESULTS.md` §6.1.1.
+
 ## [0.2.1] - 2026-08-05
 
 ### Added
