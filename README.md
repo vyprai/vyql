@@ -55,6 +55,16 @@ go install github.com/vyprai/vyql/cmd/vyql@latest
 
 The binary finds its data in the module cache, so no further setup is needed.
 
+### Container
+
+```sh
+docker run --rm -v "$PWD:/work" ghcr.io/vyprai/vyql scan .
+```
+
+About 270 MB, most of it the security knowledge base. Runs as a non-root user,
+so it will not leave root-owned files in a mounted tree. `debian:stable-slim`
+rather than Alpine: the parsers are C linked against glibc.
+
 ### From source
 
 ```sh
