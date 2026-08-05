@@ -4,9 +4,11 @@
 #   curl -fsSL https://raw.githubusercontent.com/vyprai/vyql/main/scripts/install.sh | sh
 #
 # Environment:
-#   VYQL_VERSION      release to install (default: the latest)
-#   VYQL_INSTALL_DIR  where the release is unpacked (default: ~/.local/share/vyql)
-#   VYQL_BIN_DIR      where the binary is linked  (default: ~/.local/bin)
+#   VYQL_VERSION           release to install (default: the latest)
+#   VYQL_INSTALL_DIR       where the release is unpacked (default: ~/.local/share/vyql)
+#   VYQL_BIN_DIR           where the binary is linked  (default: ~/.local/bin)
+#   VYQL_INSTALL_BASE_URL  mirror serving <base>/<version>/<asset>
+#                          (default: the GitHub release downloads)
 #
 # POSIX sh on purpose: this runs before VyQL is installed, on whatever shell the
 # machine has, and bashisms are how an installer breaks on the one platform
@@ -80,7 +82,10 @@ case "$version" in
 esac
 
 name="vyql_${version}_${platform}"
-base="https://github.com/${REPO}/releases/download/${version}"
+# Release assets come from GitHub, which is where the checksums and build
+# provenance live. VYQL_INSTALL_BASE_URL points the download at a mirror that
+# serves the same "<base>/<version>/<asset>" layout.
+base="${VYQL_INSTALL_BASE_URL:-https://github.com/${REPO}/releases/download}/${version}"
 
 say "vyql ${version} for ${platform}"
 

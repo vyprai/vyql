@@ -35,6 +35,10 @@ Picks the right build for your platform, verifies its published SHA-256, unpacks
 it under `~/.local/share/vyql`, and puts `vyql` in `~/.local/bin`. Set
 `VYQL_VERSION`, `VYQL_INSTALL_DIR` or `VYQL_BIN_DIR` to change any of that.
 
+Release assets come from the GitHub release, which is where the checksums and
+build provenance live. `VYQL_INSTALL_BASE_URL` points the download at a mirror
+serving the same `<base>/<version>/<asset>` layout.
+
 The checksum is served from the same host as the archive, so it catches a
 corrupted download rather than a compromised release. Pin `VYQL_VERSION` and
 check the sum against a second source if you need more than that.
