@@ -1,9 +1,0 @@
-module bindings.dart.generated.m2a84533f;
-
-binding networkBind0 {
-  requires {
-    dependency("http_multi_server")
-  }
-  query pattern callExpr where callee.method == "HttpMultiServer"
-  emit sink code.NetworkBind at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.go.generated.m14176b54;
-
-binding networkData3 {
-  requires {
-    dependency("cloud.google.com/go/compute/metadata")
-  }
-  query pattern callExpr where callee.method == "InstanceAttributeValueWithContext"
-  emit source code.NetworkData at call.result
-}

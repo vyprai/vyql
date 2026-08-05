@@ -1,9 +1,0 @@
-module bindings.swift.generated.m936ccb7b;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/1024jp/GzipSwift")
-  }
-  query pattern callExpr where callee.method == "gunzipped"
-  emit sink code.Deserialization at args[0]
-}

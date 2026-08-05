@@ -1,9 +1,0 @@
-module bindings.python.generated.m5edd1caa;
-
-binding deserialization3 {
-  requires {
-    dependency("voluptuous")
-  }
-  query pattern callExpr where callee.method == "validate"
-  emit sink code.Deserialization at args[0]
-}

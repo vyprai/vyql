@@ -1,0 +1,65 @@
+module bindings.elixir.generated.m711a0255;
+
+binding userControlledData0 {
+  requires {
+    dependency("luerl")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit source core.UserControlledData at call.result
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("luerl")
+  }
+  query pattern callExpr where callee.method == "path_loadfile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding codeEval2 {
+  requires {
+    dependency("luerl")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CodeEval at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("luerl")
+  }
+  query pattern callExpr where callee.method == "decode_table"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("luerl")
+  }
+  query pattern callExpr where callee.method == "decode_userdata"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("luerl")
+  }
+  query pattern callExpr where callee.method == "decode_luafunc"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("luerl")
+  }
+  query pattern callExpr where callee.method == "decode_erlfunc"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("luerl")
+  }
+  query pattern callExpr where callee.method == "decode_erlmfa"
+  emit sink code.Deserialization at args[0]
+}

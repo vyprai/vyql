@@ -1,9 +1,0 @@
-module bindings.rust.generated.m86000b79;
-
-binding networkBind2 {
-  requires {
-    dependency("socket2")
-  }
-  query pattern callExpr where callee.method == "bind"
-  emit sink code.NetworkBind at args[0]
-}

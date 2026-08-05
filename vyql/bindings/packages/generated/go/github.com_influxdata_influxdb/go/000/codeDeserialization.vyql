@@ -1,9 +1,0 @@
-module bindings.go.generated.m286dcc82;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/influxdata/influxdb")
-  }
-  query pattern callExpr where callee.method == "ParsePoints"
-  emit sink code.Deserialization at args[0]
-}

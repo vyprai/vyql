@@ -1,9 +1,0 @@
-module bindings.rust.generated.mfdf11f24;
-
-binding codeEval1 {
-  requires {
-    dependency("objc")
-  }
-  query pattern callExpr where callee.method == "method_setImplementation"
-  emit sink code.CodeEval at args[0]
-}

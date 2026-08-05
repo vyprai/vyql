@@ -1,9 +1,0 @@
-module bindings.c.generated.mc68d9ca5;
-
-binding deserialization1 {
-  requires {
-    dependency("zziplib")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

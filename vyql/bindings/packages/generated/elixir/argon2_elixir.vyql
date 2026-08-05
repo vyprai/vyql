@@ -1,0 +1,22 @@
+module bindings.elixir.generated.mdd984bf2;
+
+binding weakHash0 {
+  requires {
+    dependency("argon2_elixir")
+  }
+  query pattern callExpr where callee.method == "hash_pwd_salt"
+  emit issue code.WeakHash at call
+}
+
+binding inputValidation1 {
+  requires {
+    dependency("argon2_elixir")
+  }
+  query pattern callExpr where callee.method == "verify_pass"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

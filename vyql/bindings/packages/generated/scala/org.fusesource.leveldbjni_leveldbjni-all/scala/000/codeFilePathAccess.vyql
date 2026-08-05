@@ -1,9 +1,0 @@
-module bindings.scala.generated.mcbc57de5;
-
-binding filePathAccess0 {
-  requires {
-    dependency("org.fusesource.leveldbjni:leveldbjni-all")
-  }
-  query pattern callExpr where callee.method == "open"
-  emit sink code.FilePathAccess at args[0]
-}

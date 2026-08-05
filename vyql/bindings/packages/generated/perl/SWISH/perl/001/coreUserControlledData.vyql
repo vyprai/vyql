@@ -1,9 +1,0 @@
-module bindings.perl.generated.ma7352161;
-
-binding userControlledData1 {
-  requires {
-    dependency("SWISH")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit source core.UserControlledData at call.result
-}

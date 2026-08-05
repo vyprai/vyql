@@ -1,0 +1,49 @@
+module bindings.ruby.generated.m411e6779;
+
+binding cookie0 {
+  requires {
+    dependency("cookiejar")
+  }
+  query pattern callExpr where callee.method == "set_cookie"
+  emit source code.Cookie at call.result
+}
+
+binding cookie1 {
+  requires {
+    dependency("cookiejar")
+  }
+  query pattern callExpr where callee.method == "set_cookie2"
+  emit source code.Cookie at call.result
+}
+
+binding cookie2 {
+  requires {
+    dependency("cookiejar")
+  }
+  query pattern callExpr where callee.method == "set_cookies_from_headers"
+  emit source code.Cookie at call.result
+}
+
+binding cookie3 {
+  requires {
+    dependency("cookiejar")
+  }
+  query pattern callExpr where callee.method == "add_cookie"
+  emit source code.Cookie at call.result
+}
+
+binding cookie4 {
+  requires {
+    dependency("cookiejar")
+  }
+  query pattern callExpr where callee.method == "get_cookies"
+  emit source code.Cookie at call.result
+}
+
+binding cookie5 {
+  requires {
+    dependency("cookiejar")
+  }
+  query pattern callExpr where callee.method == "get_cookie_header"
+  emit source code.Cookie at call.result
+}

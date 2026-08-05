@@ -1,9 +1,0 @@
-module bindings.rust.generated.mdff86bfa;
-
-binding deserialization0 {
-  requires {
-    dependency("brotli-sys")
-  }
-  query pattern callExpr where callee.method == "BrotliDecoderDecompress"
-  emit sink code.Deserialization at args[0]
-}

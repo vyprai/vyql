@@ -1,9 +1,0 @@
-module bindings.php.generated.mc093e29f;
-
-binding fileUse0 {
-  requires {
-    dependency("phpoffice/phpword")
-  }
-  query pattern callExpr where callee.method == "save"
-  emit sink code.FileUseSink at args[0]
-}

@@ -1,0 +1,177 @@
+module bindings.objc.generated.m8ed02bed;
+
+binding networkSend0 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "logSignUpWithMethod"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "logLoginWithMethod"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "logShareWithMethod"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "logInviteWithMethod"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "logPurchaseWithPrice"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "logLevelStart"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend6 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "logLevelEnd"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend7 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "logAddToCartWithPrice"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend8 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "logStartCheckoutWithPrice"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend9 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "logRating"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend10 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "logContentViewWithName"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend11 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "logSearchWithQuery"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend12 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "logCustomEventWithName"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend13 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "CLSLog"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend14 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "CLSLogv"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend15 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "CLSNSLog"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend16 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "CLSNSLogv"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend17 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "setObjectValue"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding userControlledData18 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "setUserIdentifier"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData19 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "setUserName"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData20 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "setUserEmail"
+  emit source core.UserControlledData at call.result
+}
+
+binding secretValue21 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "startWithAPIKey"
+  emit source code.SecretValue at call.result
+}

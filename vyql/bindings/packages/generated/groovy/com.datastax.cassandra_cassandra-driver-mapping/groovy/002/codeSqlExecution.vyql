@@ -1,9 +1,0 @@
-module bindings.groovy.generated.md8ba78b2;
-
-binding sqlExecution2 {
-  requires {
-    dependency("com.datastax.cassandra:cassandra-driver-mapping")
-  }
-  query pattern callExpr where callee.method == "getQuery"
-  emit sink code.SqlExecution at args[0]
-}

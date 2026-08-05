@@ -1,9 +1,0 @@
-module bindings.go.generated.ma2dd4563;
-
-binding responseHeaderWrite7 {
-  requires {
-    dependency("github.com/gobwas/ws")
-  }
-  query pattern callExpr where callee.method == "httpWriteResponseError"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

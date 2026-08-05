@@ -1,0 +1,65 @@
+module bindings.scala.generated.me4992582;
+
+binding urlFetch0 {
+  requires {
+    dependency("com.loopj.android:android-async-http")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("com.loopj.android:android-async-http")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit source core.UserControlledData at call.result
+}
+
+binding urlFetch2 {
+  requires {
+    dependency("com.loopj.android:android-async-http")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("com.loopj.android:android-async-http")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit source core.UserControlledData at call.result
+}
+
+binding urlFetch4 {
+  requires {
+    dependency("com.loopj.android:android-async-http")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("com.loopj.android:android-async-http")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit source core.UserControlledData at call.result
+}
+
+binding urlFetch6 {
+  requires {
+    dependency("com.loopj.android:android-async-http")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("com.loopj.android:android-async-http")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit source core.UserControlledData at call.result
+}

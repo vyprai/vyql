@@ -1,9 +1,0 @@
-module bindings.python.generated.mf74084bb;
-
-binding codeEval0 {
-  requires {
-    dependency("nbclient")
-  }
-  query pattern callExpr where callee.method == "async_execute"
-  emit sink code.CodeEval at args[0]
-}

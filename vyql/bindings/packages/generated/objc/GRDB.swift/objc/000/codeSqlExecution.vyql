@@ -1,9 +1,0 @@
-module bindings.objc.generated.md74ce000;
-
-binding sqlExecution0 {
-  requires {
-    dependency("GRDB.swift")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.SqlExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m3762fed4;
-
-binding httpInput0 {
-  requires {
-    dependency("CGI")
-  }
-  query pattern callExpr where callee.method == "new"
-  emit source code.HttpInput at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.csharp.generated.mdd9493bc;
-
-binding sqlExecution2 {
-  requires {
-    dependency("sqlstreamstore")
-  }
-  query pattern callExpr where callee.method == "ReadStreamBackwards"
-  emit sink code.SqlExecution at args[0]
-}

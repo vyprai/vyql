@@ -1,9 +1,0 @@
-module bindings.swift.generated.mca0c73f6;
-
-binding networkSend0 {
-  requires {
-    dependency("github.com/objcio/tiny-networking")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.NetworkSend at args[0]
-}

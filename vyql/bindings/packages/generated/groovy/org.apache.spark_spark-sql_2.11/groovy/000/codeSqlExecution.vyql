@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mbaac7fc5;
-
-binding sqlExecution0 {
-  requires {
-    dependency("org.apache.spark:spark-sql_2.11")
-  }
-  query pattern callExpr where callee.method == "jdbc"
-  emit sink code.SqlExecution at args[0]
-}

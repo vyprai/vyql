@@ -1,9 +1,0 @@
-module bindings.dart.generated.mca0fc41d;
-
-binding deserialization1 {
-  requires {
-    dependency("jwt_decoder")
-  }
-  query pattern callExpr where callee.method == "tryDecode"
-  emit sink code.Deserialization at args[0]
-}

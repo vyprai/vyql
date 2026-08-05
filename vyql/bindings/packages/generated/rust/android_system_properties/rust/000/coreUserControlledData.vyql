@@ -1,9 +1,0 @@
-module bindings.rust.generated.m83627ce3;
-
-binding userControlledData0 {
-  requires {
-    dependency("android_system_properties")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit source core.UserControlledData at call.result
-}

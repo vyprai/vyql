@@ -1,9 +1,0 @@
-module bindings.scala.generated.mfc9336ae;
-
-binding deserialization1 {
-  requires {
-    dependency("org.springframework.boot:spring-boot-configuration-processor")
-  }
-  query pattern callExpr where callee.method == "readLiteral"
-  emit sink code.Deserialization at args[0]
-}

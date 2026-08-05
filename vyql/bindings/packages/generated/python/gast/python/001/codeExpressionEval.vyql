@@ -1,9 +1,0 @@
-module bindings.python.generated.m07efbf27;
-
-binding expressionEval1 {
-  requires {
-    dependency("gast")
-  }
-  query pattern callExpr where callee.method == "literal_eval"
-  emit sink code.ExpressionEval at args[0]
-}

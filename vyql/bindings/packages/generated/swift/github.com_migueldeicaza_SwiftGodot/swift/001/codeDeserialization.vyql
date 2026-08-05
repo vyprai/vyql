@@ -1,9 +1,0 @@
-module bindings.swift.generated.mef427669;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/migueldeicaza/SwiftGodot")
-  }
-  query pattern callExpr where callee.method == "withUnsafeAccessToData"
-  emit sink code.Deserialization at args[0]
-}

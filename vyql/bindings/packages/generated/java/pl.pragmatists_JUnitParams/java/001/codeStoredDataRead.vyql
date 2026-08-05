@@ -1,9 +1,0 @@
-module bindings.java.generated.me23b1e66;
-
-binding storedDataRead1 {
-  requires {
-    dependency("pl.pragmatists:JUnitParams")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source code.StoredDataRead at call.result
-}

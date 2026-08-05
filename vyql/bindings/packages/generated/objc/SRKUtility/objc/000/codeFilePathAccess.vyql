@@ -1,9 +1,0 @@
-module bindings.objc.generated.m63547d50;
-
-binding filePathAccess0 {
-  requires {
-    dependency("SRKUtility")
-  }
-  query pattern callExpr where callee.method == "playAudioFromFilePath"
-  emit sink code.FilePathAccess at args[0]
-}

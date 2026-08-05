@@ -1,9 +1,0 @@
-module bindings.go.generated.m9c48b66b;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/golang/snappy")
-  }
-  query pattern callExpr where callee.method == "NewReader"
-  emit sink code.Deserialization at args[0]
-}

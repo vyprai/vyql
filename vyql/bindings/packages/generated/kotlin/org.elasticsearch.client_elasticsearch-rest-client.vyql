@@ -1,0 +1,25 @@
+module bindings.kotlin.generated.m4c39035c;
+
+binding networkData0 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-client")
+  }
+  query pattern callExpr where callee.method == "setEntity"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-client")
+  }
+  query pattern callExpr where callee.method == "setJsonEntity"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend2 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-client")
+  }
+  query pattern callExpr where callee.method == "performRequest"
+  emit sink code.NetworkSend at args[0]
+}

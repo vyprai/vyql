@@ -1,9 +1,0 @@
-module bindings.swift.generated.mb1f1a06a;
-
-binding userControlledData0 {
-  requires {
-    dependency("github.com/vinhnx/Shift")
-  }
-  query pattern callExpr where callee.method == "configureWithAppName"
-  emit source core.UserControlledData at call.result
-}

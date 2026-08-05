@@ -1,0 +1,25 @@
+module bindings.objc.generated.mbbb7a8dd;
+
+binding networkData0 {
+  requires {
+    dependency("HappyDNS")
+  }
+  query pattern callExpr where callee.method == "init:networkInfo:"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("HappyDNS")
+  }
+  query pattern callExpr where callee.method == "onNetworkChange:"
+  emit source code.NetworkData at call.result
+}
+
+binding deserialization2 {
+  requires {
+    dependency("HappyDNS")
+  }
+  query pattern callExpr where callee.method == "parse:"
+  emit sink code.Deserialization at args[0]
+}

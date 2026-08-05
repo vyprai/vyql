@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m94a41eab;
-
-binding cliArgument1 {
-  requires {
-    dependency("meow")
-  }
-  query pattern callExpr where callee.method == "parseCommand"
-  emit source code.CliArgument at call.result
-}

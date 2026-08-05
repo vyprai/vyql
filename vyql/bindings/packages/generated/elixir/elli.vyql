@@ -1,0 +1,51 @@
+module bindings.elixir.generated.m89b0616d;
+
+binding httpInput0 {
+  requires {
+    dependency("elli")
+  }
+  query pattern callExpr where callee.method == "get_request"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("elli")
+  }
+  query pattern callExpr where callee.method == "get_headers"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("elli")
+  }
+  query pattern callExpr where callee.method == "do_get_body"
+  emit source code.HttpInput at call.result
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("elli")
+  }
+  query pattern callExpr where callee.method == "uri_decode"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation4 {
+  requires {
+    dependency("elli")
+  }
+  query pattern callExpr where callee.method == "parse_range_set"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

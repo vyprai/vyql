@@ -1,0 +1,73 @@
+module bindings.php.generated.m083f0f32;
+
+binding filePathAccess0 {
+  requires {
+    dependency("league/flysystem-local")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("league/flysystem-local")
+  }
+  query pattern callExpr where callee.method == "writeStream"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("league/flysystem-local")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("league/flysystem-local")
+  }
+  query pattern callExpr where callee.method == "deleteDirectory"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("league/flysystem-local")
+  }
+  query pattern callExpr where callee.method == "createDirectory"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("league/flysystem-local")
+  }
+  query pattern callExpr where callee.method == "copy"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("league/flysystem-local")
+  }
+  query pattern callExpr where callee.method == "move"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("league/flysystem-local")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("league/flysystem-local")
+  }
+  query pattern callExpr where callee.method == "readStream"
+  emit sink code.FilePathAccess at args[0]
+}

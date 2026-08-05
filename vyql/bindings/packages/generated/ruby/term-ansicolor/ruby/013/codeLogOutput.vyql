@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mde62ae8b;
-
-binding logOutput13 {
-  requires {
-    dependency("term-ansicolor")
-  }
-  query pattern callExpr where callee.method == "move_home"
-  emit sink code.LogOutput at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.javascript.generated.ma9247bd3;
-
-binding deserialization1 {
-  requires {
-    dependency("espree")
-  }
-  query pattern callExpr where callee.method == "tokenize"
-  emit sink code.Deserialization at args[0]
-}

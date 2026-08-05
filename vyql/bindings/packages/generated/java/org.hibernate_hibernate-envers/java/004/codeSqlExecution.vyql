@@ -1,9 +1,0 @@
-module bindings.java.generated.md65b6b85;
-
-binding sqlExecution4 {
-  requires {
-    dependency("org.hibernate:hibernate-envers")
-  }
-  query pattern callExpr where callee.method == "addOrder"
-  emit sink code.SqlExecution at args[0]
-}

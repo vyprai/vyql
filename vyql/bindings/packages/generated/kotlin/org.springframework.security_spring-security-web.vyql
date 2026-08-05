@@ -1,0 +1,45 @@
+module bindings.kotlin.generated.md423725c;
+
+binding csrfProtection0 {
+  requires {
+    dependency("org.springframework.security:spring-security-web")
+  }
+  query pattern callExpr where callee.method == "CsrfFilter.doFilterInternal"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding csrfProtection1 {
+  requires {
+    dependency("org.springframework.security:spring-security-web")
+  }
+  query pattern callExpr where callee.method == "CsrfFilter.setRequireCsrfProtectionMatcher"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding csrfProtection2 {
+  requires {
+    dependency("org.springframework.security:spring-security-web")
+  }
+  query pattern callExpr where callee.method == "CsrfFilter.setRequestHandler"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding secretValue3 {
+  requires {
+    dependency("org.springframework.security:spring-security-web")
+  }
+  query pattern callExpr where callee.method == "CsrfToken.getToken"
+  emit source code.SecretValue at call.result
+}

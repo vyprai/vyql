@@ -1,9 +1,0 @@
-module bindings.cpp.generated.me8b04d03;
-
-binding fileUse3 {
-  requires {
-    dependency("minizip")
-  }
-  query pattern callExpr where callee.method == "gzclose"
-  emit sink code.FileUseSink at args[0]
-}

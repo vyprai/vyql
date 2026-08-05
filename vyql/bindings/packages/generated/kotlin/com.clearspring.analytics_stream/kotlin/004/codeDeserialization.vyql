@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1fb7c253;
-
-binding deserialization4 {
-  requires {
-    dependency("com.clearspring.analytics:stream")
-  }
-  query pattern callExpr where callee.method == "readUnsignedVarLong"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.go.generated.mce4c1644;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/google/wire")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

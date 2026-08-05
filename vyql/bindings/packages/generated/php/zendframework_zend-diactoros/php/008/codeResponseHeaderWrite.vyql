@@ -1,9 +1,0 @@
-module bindings.php.generated.m4685cbb4;
-
-binding responseHeaderWrite8 {
-  requires {
-    dependency("zendframework/zend-diactoros")
-  }
-  query pattern callExpr where callee.method == "MessageTrait::withAddedHeader"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

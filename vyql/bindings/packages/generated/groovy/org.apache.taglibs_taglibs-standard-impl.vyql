@@ -1,0 +1,56 @@
+module bindings.groovy.generated.m6f8a6e46;
+
+binding xmlParse0 {
+  requires {
+    dependency("org.apache.taglibs:taglibs-standard-impl")
+  }
+  query pattern callExpr where callee.method == "newXMLReader"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse1 {
+  requires {
+    dependency("org.apache.taglibs:taglibs-standard-impl")
+  }
+  query pattern callExpr where callee.method == "newSAXSource"
+  emit sink code.XmlParse at args[0]
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("org.apache.taglibs:taglibs-standard-impl")
+  }
+  query pattern callExpr where callee.method == "resolveEntity"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("org.apache.taglibs:taglibs-standard-impl")
+  }
+  query pattern callExpr where callee.method == "checkProtocol"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape4 {
+  requires {
+    dependency("org.apache.taglibs:taglibs-standard-impl")
+  }
+  query pattern callExpr where callee.method == "escapeXml"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

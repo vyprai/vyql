@@ -1,9 +1,0 @@
-module bindings.go.generated.m24f722ab;
-
-binding templateRender2 {
-  requires {
-    dependency("github.com/eknkc/amber")
-  }
-  query pattern callExpr where callee.method == "MustCompile"
-  emit sink code.TemplateRender at args[0]
-}

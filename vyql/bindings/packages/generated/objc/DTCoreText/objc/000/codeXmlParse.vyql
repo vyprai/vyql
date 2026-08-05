@@ -1,9 +1,0 @@
-module bindings.objc.generated.mbd1e868a;
-
-binding xmlParse0 {
-  requires {
-    dependency("DTCoreText")
-  }
-  query pattern callExpr where callee.method == "parseStyleBlock"
-  emit sink code.XmlParse at args[0]
-}

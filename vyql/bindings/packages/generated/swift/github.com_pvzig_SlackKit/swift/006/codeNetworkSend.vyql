@@ -1,9 +1,0 @@
-module bindings.swift.generated.m3180263b;
-
-binding networkSend6 {
-  requires {
-    dependency("github.com/pvzig/SlackKit")
-  }
-  query pattern callExpr where callee.method == "sendMeMessage"
-  emit sink code.NetworkSend at args[0]
-}

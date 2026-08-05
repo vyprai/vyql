@@ -1,9 +1,0 @@
-module bindings.python.generated.m37e54522;
-
-binding deserialization3 {
-  requires {
-    dependency("plac")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

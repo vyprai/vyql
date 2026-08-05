@@ -1,9 +1,0 @@
-module bindings.php.generated.m881ac389;
-
-binding urlFetch1 {
-  requires {
-    dependency("padraic/humbug_get_contents")
-  }
-  query pattern callExpr where callee.method == "get_contents"
-  emit sink code.UrlFetch at args[0]
-}

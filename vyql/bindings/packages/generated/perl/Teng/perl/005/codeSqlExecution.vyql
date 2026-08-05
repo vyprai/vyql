@@ -1,9 +1,0 @@
-module bindings.perl.generated.m35656a79;
-
-binding sqlExecution5 {
-  requires {
-    dependency("Teng")
-  }
-  query pattern callExpr where callee.method == "single_by_sql"
-  emit sink code.SqlExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mca9732ab;
-
-binding deserialization0 {
-  requires {
-    dependency("org.codehaus.jackson:jackson-xc")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

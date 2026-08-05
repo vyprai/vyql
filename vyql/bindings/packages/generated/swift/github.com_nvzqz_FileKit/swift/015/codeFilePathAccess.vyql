@@ -1,9 +1,0 @@
-module bindings.swift.generated.mba9fec3c;
-
-binding filePathAccess15 {
-  requires {
-    dependency("github.com/nvzqz/FileKit")
-  }
-  query pattern callExpr where callee.method == "copyFile"
-  emit sink code.FilePathAccess at args[0]
-}

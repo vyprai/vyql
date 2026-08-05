@@ -1,0 +1,33 @@
+module bindings.scala.generated.m66149e43;
+
+binding networkData0 {
+  requires {
+    dependency("org.apache.mina:mina-core")
+  }
+  query pattern callExpr where callee.method == "messageReceived"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("org.apache.mina:mina-core")
+  }
+  query pattern callExpr where callee.method == "messageWriting"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("org.apache.mina:mina-core")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkBind3 {
+  requires {
+    dependency("org.apache.mina:mina-core")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit sink code.NetworkBind at args[0]
+}

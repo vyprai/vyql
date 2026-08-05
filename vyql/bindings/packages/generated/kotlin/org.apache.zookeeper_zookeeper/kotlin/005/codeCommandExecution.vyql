@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.me0df047c;
-
-binding commandExecution5 {
-  requires {
-    dependency("org.apache.zookeeper:zookeeper")
-  }
-  query pattern callExpr where callee.method == "getGroupsCommand"
-  emit sink code.CommandExecution at args[0]
-}

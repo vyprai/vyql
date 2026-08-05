@@ -1,9 +1,0 @@
-module bindings.objc.generated.m61061ea8;
-
-binding weakHash1 {
-  requires {
-    dependency("CHCSVParser")
-  }
-  query pattern presenceNode where node.path ~= "chcsvparser.hash"
-  emit issue code.WeakHash at node
-}

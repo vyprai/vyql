@@ -1,9 +1,0 @@
-module bindings.perl.generated.m93be72f0;
-
-binding networkSend1 {
-  requires {
-    dependency("App-starbucksloginator")
-  }
-  query pattern callExpr where callee.method == "try"
-  emit sink code.NetworkSend at args[0]
-}

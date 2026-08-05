@@ -1,9 +1,0 @@
-module bindings.dart.generated.md0448496;
-
-binding userControlledData4 {
-  requires {
-    dependency("firebase_dynamic_links")
-  }
-  query pattern callExpr where callee.method == "onMethodCall"
-  emit source core.UserControlledData at call.result
-}

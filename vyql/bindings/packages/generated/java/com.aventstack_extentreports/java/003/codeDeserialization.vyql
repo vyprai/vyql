@@ -1,9 +1,0 @@
-module bindings.java.generated.mf12d4d67;
-
-binding deserialization3 {
-  requires {
-    dependency("com.aventstack:extentreports")
-  }
-  query pattern callExpr where callee.method == "loadJSONConfig"
-  emit sink code.Deserialization at args[0]
-}

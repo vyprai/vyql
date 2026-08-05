@@ -1,9 +1,0 @@
-module bindings.python.generated.mfedb9024;
-
-binding deserialization0 {
-  requires {
-    dependency("comtypes")
-  }
-  query pattern callExpr where callee.method == "tlbparser.parse"
-  emit sink code.Deserialization at args[0]
-}

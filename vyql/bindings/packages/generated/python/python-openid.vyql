@@ -1,0 +1,43 @@
+module bindings.python.generated.m64dfebba;
+
+binding httpInput0 {
+  requires {
+    dependency("python-openid")
+  }
+  query pattern callExpr where callee.method == "fromPostArgs"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("python-openid")
+  }
+  query pattern callExpr where callee.method == "fromOpenIDArgs"
+  emit source code.HttpInput at call.result
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("python-openid")
+  }
+  query pattern callExpr where callee.method == "toFormMarkup"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding redirectTarget3 {
+  requires {
+    dependency("python-openid")
+  }
+  query pattern callExpr where callee.method == "toURL"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget4 {
+  requires {
+    dependency("python-openid")
+  }
+  query pattern callExpr where callee.method == "toURLEncoded"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

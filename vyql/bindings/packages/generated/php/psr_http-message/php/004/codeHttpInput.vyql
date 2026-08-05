@@ -1,9 +1,0 @@
-module bindings.php.generated.med01f18a;
-
-binding httpInput4 {
-  requires {
-    dependency("psr/http-message")
-  }
-  query pattern callExpr where callee.method == "getServerParams"
-  emit source code.HttpInput at call.result
-}

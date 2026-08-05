@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m6b07d79b;
-
-binding userControlledData7 {
-  requires {
-    dependency("elixir_ale")
-  }
-  query pattern callExpr where callee.method == "Elixir.ElixirALE.I2C.read_device"
-  emit source core.UserControlledData at call.result
-}

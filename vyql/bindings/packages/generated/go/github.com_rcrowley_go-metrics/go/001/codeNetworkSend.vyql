@@ -1,9 +1,0 @@
-module bindings.go.generated.m38e46b57;
-
-binding networkSend1 {
-  requires {
-    dependency("github.com/rcrowley/go-metrics")
-  }
-  query pattern callExpr where callee.method == "WriteJSONOnce"
-  emit sink code.NetworkSend at args[0]
-}

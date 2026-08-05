@@ -1,9 +1,0 @@
-module bindings.c.generated.m260bfc8a;
-
-binding filePathAccess1 {
-  requires {
-    dependency("qtdoc")
-  }
-  query pattern callExpr where callee.method == "writeAsset"
-  emit sink code.FilePathAccess at args[0]
-}

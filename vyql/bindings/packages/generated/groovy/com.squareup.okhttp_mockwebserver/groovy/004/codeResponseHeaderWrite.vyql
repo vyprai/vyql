@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m417fc301;
-
-binding responseHeaderWrite4 {
-  requires {
-    dependency("com.squareup.okhttp:mockwebserver")
-  }
-  query pattern callExpr where callee.method == "setHeader"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

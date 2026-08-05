@@ -1,9 +1,0 @@
-module bindings.perl.generated.maac68e8c;
-
-binding cliArgument5 {
-  requires {
-    dependency("App-Bin4TSV-6")
-  }
-  query pattern callExpr where callee.path ~= "crosstable"
-  emit source code.CliArgument at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m7b2948e0;
-
-binding userControlledData0 {
-  requires {
-    dependency("provide")
-  }
-  query pattern callExpr where callee.method == "pick_module_to_load"
-  emit source core.UserControlledData at call.result
-}

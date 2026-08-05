@@ -1,9 +1,0 @@
-module bindings.php.generated.m382cda9e;
-
-binding networkSend1 {
-  requires {
-    dependency("react/stream")
-  }
-  query pattern callExpr where callee.method == "handleWrite"
-  emit sink code.NetworkSend at args[0]
-}

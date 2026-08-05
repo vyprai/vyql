@@ -1,0 +1,105 @@
+module bindings.csharp.generated.m2ca3c897;
+
+binding filePathAccess0 {
+  requires {
+    dependency("spring.social.dropbox")
+  }
+  query pattern callExpr where callee.method == "CreateFolder"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("spring.social.dropbox")
+  }
+  query pattern callExpr where callee.method == "Delete"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("spring.social.dropbox")
+  }
+  query pattern callExpr where callee.method == "Move"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("spring.social.dropbox")
+  }
+  query pattern callExpr where callee.method == "Copy"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse4 {
+  requires {
+    dependency("spring.social.dropbox")
+  }
+  query pattern callExpr where callee.method == "UploadFile"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse5 {
+  requires {
+    dependency("spring.social.dropbox")
+  }
+  query pattern callExpr where callee.method == "DownloadFile"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("spring.social.dropbox")
+  }
+  query pattern callExpr where callee.method == "Restore"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("spring.social.dropbox")
+  }
+  query pattern callExpr where callee.method == "Search"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("spring.social.dropbox")
+  }
+  query pattern callExpr where callee.method == "GetShareableLink"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess9 {
+  requires {
+    dependency("spring.social.dropbox")
+  }
+  query pattern callExpr where callee.method == "GetMediaLink"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse10 {
+  requires {
+    dependency("spring.social.dropbox")
+  }
+  query pattern callExpr where callee.method == "DownloadThumbnail"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding filePathAccess11 {
+  requires {
+    dependency("spring.social.dropbox")
+  }
+  query pattern callExpr where callee.method == "GetMetadata"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess12 {
+  requires {
+    dependency("spring.social.dropbox")
+  }
+  query pattern callExpr where callee.method == "GetRevisions"
+  emit sink code.FilePathAccess at args[0]
+}

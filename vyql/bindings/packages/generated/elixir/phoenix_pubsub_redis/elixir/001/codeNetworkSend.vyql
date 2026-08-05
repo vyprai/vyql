@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma23dba96;
-
-binding networkSend1 {
-  requires {
-    dependency("phoenix_pubsub_redis")
-  }
-  query pattern callExpr where callee.method == "direct_broadcast"
-  emit sink code.NetworkSend at args[0]
-}

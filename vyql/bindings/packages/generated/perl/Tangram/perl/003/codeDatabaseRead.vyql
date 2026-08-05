@@ -1,9 +1,0 @@
-module bindings.perl.generated.mad25947f;
-
-binding databaseRead3 {
-  requires {
-    dependency("Tangram")
-  }
-  query pattern callExpr where callee.method == "query_objects"
-  emit sink code.DatabaseReadSink at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.ma0167141;
-
-binding userControlledData2 {
-  requires {
-    dependency("net.java.dev.jna:jna")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit source core.UserControlledData at call.result
-}

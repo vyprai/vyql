@@ -1,9 +1,0 @@
-module bindings.rust.generated.m93103ff1;
-
-binding deserialization1 {
-  requires {
-    dependency("time-macros")
-  }
-  query pattern callExpr where callee.method == "serde_format_description"
-  emit sink code.Deserialization at args[0]
-}

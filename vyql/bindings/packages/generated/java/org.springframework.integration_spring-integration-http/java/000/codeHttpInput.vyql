@@ -1,9 +1,0 @@
-module bindings.java.generated.m44a525fb;
-
-binding httpInput0 {
-  requires {
-    dependency("org.springframework.integration:spring-integration-http")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source code.HttpInput at call.result
-}

@@ -1,0 +1,49 @@
+module bindings.groovy.generated.m8100a046;
+
+binding secretValue0 {
+  requires {
+    dependency("org.apache.maven:maven-artifact")
+  }
+  query pattern callExpr where callee.method == "getPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("org.apache.maven:maven-artifact")
+  }
+  query pattern callExpr where callee.method == "setPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("org.apache.maven:maven-artifact")
+  }
+  query pattern callExpr where callee.method == "getUserName"
+  emit source code.SecretValue at call.result
+}
+
+binding networkConnect3 {
+  requires {
+    dependency("org.apache.maven:maven-artifact")
+  }
+  query pattern callExpr where callee.method == "getHost"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("org.apache.maven:maven-artifact")
+  }
+  query pattern callExpr where callee.method == "getPort"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect5 {
+  requires {
+    dependency("org.apache.maven:maven-artifact")
+  }
+  query pattern callExpr where callee.method == "getProtocol"
+  emit sink code.NetworkConnectSink at args[0]
+}

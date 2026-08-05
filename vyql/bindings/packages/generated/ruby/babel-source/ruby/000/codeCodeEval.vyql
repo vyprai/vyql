@@ -1,9 +1,0 @@
-module bindings.ruby.generated.me6cccd6a;
-
-binding codeEval0 {
-  requires {
-    dependency("babel-source")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.CodeEval at args[0]
-}

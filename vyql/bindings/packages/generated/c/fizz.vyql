@@ -1,0 +1,22 @@
+module bindings.c.generated.md3928364;
+
+binding secretValue0 {
+  requires {
+    dependency("fizz")
+  }
+  query pattern callExpr where callee.method == "getExportedKeyingMaterial"
+  emit source code.SecretValue at call.result
+}
+
+binding certificateValidation1 {
+  requires {
+    dependency("fizz")
+  }
+  query pattern callExpr where callee.method == "FizzClient"
+  emit check core.CertificateValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

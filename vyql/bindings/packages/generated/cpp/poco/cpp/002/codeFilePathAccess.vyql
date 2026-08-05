@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m64dff1c6;
-
-binding filePathAccess2 {
-  requires {
-    dependency("poco")
-  }
-  query pattern callExpr where callee.method == "file"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.m6be95ccf;
-
-binding filePathAccess8 {
-  requires {
-    dependency("com.facebook.fresco:webpsupport")
-  }
-  query pattern callExpr where callee.method == "hookDecodeFile"
-  emit sink code.FilePathAccess at args[0]
-}

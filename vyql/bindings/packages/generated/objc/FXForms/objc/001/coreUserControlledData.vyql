@@ -1,9 +1,0 @@
-module bindings.objc.generated.m56505bf5;
-
-binding userControlledData1 {
-  requires {
-    dependency("FXForms")
-  }
-  query pattern callExpr where callee.method == "setValue:forUndefinedKey:"
-  emit source core.UserControlledData at call.result
-}

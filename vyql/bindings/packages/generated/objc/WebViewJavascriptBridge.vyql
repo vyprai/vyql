@@ -1,0 +1,25 @@
+module bindings.objc.generated.m12ad9fb9;
+
+binding expressionEval0 {
+  requires {
+    dependency("WebViewJavascriptBridge")
+  }
+  query pattern callExpr where callee.method == "send:"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval1 {
+  requires {
+    dependency("WebViewJavascriptBridge")
+  }
+  query pattern callExpr where callee.method == "callHandler:data:responseCallback:"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding codeEval2 {
+  requires {
+    dependency("WebViewJavascriptBridge")
+  }
+  query pattern callExpr where callee.method == "injectJavascriptFile"
+  emit sink code.CodeEval at args[0]
+}

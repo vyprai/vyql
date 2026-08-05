@@ -1,9 +1,0 @@
-module bindings.swift.generated.m03774cb0;
-
-binding weakHash1 {
-  requires {
-    dependency("github.com/airbnb/lottie-ios")
-  }
-  query pattern callExpr where callee.method == "hash"
-  emit issue code.WeakHash at call
-}

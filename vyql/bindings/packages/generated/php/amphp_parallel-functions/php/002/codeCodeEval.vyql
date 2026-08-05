@@ -1,9 +1,0 @@
-module bindings.php.generated.m61a688ee;
-
-binding codeEval2 {
-  requires {
-    dependency("amphp/parallel-functions")
-  }
-  query pattern callExpr where callee.method == "parallelFilter"
-  emit sink code.CodeEval at args[0]
-}

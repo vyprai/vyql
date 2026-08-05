@@ -1,9 +1,0 @@
-module bindings.objc.generated.ma47d933e;
-
-binding userControlledData2 {
-  requires {
-    dependency("ParseFacebookUtils")
-  }
-  query pattern callExpr where callee.method == "handleOpenURL"
-  emit source core.UserControlledData at call.result
-}

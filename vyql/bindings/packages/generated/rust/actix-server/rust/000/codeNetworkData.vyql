@@ -1,9 +1,0 @@
-module bindings.rust.generated.m3ea6117f;
-
-binding networkData0 {
-  requires {
-    dependency("actix-server")
-  }
-  query pattern callExpr where callee.method == "MioListener::accept"
-  emit source code.NetworkData at call.result
-}

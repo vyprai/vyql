@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m6fc3a462;
-
-binding filePathAccess0 {
-  requires {
-    dependency("youtubeextractor")
-  }
-  query pattern callExpr where callee.method == "AudioDownloader.#ctor"
-  emit sink code.FilePathAccess at args[0]
-}

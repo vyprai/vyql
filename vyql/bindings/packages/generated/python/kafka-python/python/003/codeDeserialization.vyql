@@ -1,9 +1,0 @@
-module bindings.python.generated.m38fd08c7;
-
-binding deserialization3 {
-  requires {
-    dependency("kafka-python")
-  }
-  query pattern callExpr where callee.method == "lz4_decode_old_kafka"
-  emit sink code.Deserialization at args[0]
-}

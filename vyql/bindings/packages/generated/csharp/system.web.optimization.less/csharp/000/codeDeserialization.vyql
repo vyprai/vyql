@@ -1,9 +1,0 @@
-module bindings.csharp.generated.mbffe8cc2;
-
-binding deserialization0 {
-  requires {
-    dependency("system.web.optimization.less")
-  }
-  query pattern callExpr where callee.method == "Process"
-  emit sink code.Deserialization at args[0]
-}

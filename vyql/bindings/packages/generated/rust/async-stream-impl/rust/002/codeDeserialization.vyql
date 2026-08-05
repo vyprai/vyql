@@ -1,9 +1,0 @@
-module bindings.rust.generated.ma0c7d08e;
-
-binding deserialization2 {
-  requires {
-    dependency("async-stream-impl")
-  }
-  query pattern callExpr where callee.method == "try_stream_inner"
-  emit sink code.Deserialization at args[0]
-}

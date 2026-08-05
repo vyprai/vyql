@@ -1,9 +1,0 @@
-module bindings.objc.generated.m792df8bf;
-
-binding deserialization1 {
-  requires {
-    dependency("SBJson")
-  }
-  query pattern callExpr where callee.method == "parserWithBlock"
-  emit sink code.Deserialization at args[0]
-}

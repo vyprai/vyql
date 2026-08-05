@@ -1,9 +1,0 @@
-module bindings.php.generated.m52ebe637;
-
-binding nosqlQuery4 {
-  requires {
-    dependency("mongodb/mongodb")
-  }
-  query pattern callExpr where callee.method == "listSearchIndexes"
-  emit sink code.NosqlQuery at args[0]
-}

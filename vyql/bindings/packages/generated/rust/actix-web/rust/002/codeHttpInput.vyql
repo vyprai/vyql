@@ -1,9 +1,0 @@
-module bindings.rust.generated.mfcac2c50;
-
-binding httpInput2 {
-  requires {
-    dependency("actix-web")
-  }
-  query pattern callExpr where callee.method == "cookie"
-  emit source code.HttpInput at call.result
-}

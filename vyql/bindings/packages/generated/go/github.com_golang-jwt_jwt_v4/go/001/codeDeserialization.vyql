@@ -1,9 +1,0 @@
-module bindings.go.generated.m98268312;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/golang-jwt/jwt/v4")
-  }
-  query pattern callExpr where callee.method == "ParseWithClaims"
-  emit sink code.Deserialization at args[0]
-}

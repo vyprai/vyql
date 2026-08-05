@@ -1,9 +1,0 @@
-module bindings.objc.generated.m34da1740;
-
-binding networkData2 {
-  requires {
-    dependency("JXHTTP")
-  }
-  query pattern callExpr where callee.method == "connection:didReceiveResponse:"
-  emit source code.NetworkData at call.result
-}

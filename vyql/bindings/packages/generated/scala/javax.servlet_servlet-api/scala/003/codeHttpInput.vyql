@@ -1,9 +1,0 @@
-module bindings.scala.generated.mfa6b53f4;
-
-binding httpInput3 {
-  requires {
-    dependency("javax.servlet:servlet-api")
-  }
-  query pattern callExpr where callee.method == "parsePostData"
-  emit source code.HttpInput at call.result
-}

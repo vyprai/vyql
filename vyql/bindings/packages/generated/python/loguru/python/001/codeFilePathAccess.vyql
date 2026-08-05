@@ -1,9 +1,0 @@
-module bindings.python.generated.m0130f1de;
-
-binding filePathAccess1 {
-  requires {
-    dependency("loguru")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.FilePathAccess at args[0]
-}

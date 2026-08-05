@@ -1,9 +1,0 @@
-module bindings.go.generated.m72210262;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/syndtr/goleveldb")
-  }
-  query pattern callExpr where callee.method == "Open"
-  emit sink code.FilePathAccess at args[0]
-}

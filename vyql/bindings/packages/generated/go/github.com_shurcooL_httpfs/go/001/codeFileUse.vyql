@@ -1,9 +1,0 @@
-module bindings.go.generated.mb98eddc4;
-
-binding fileUse1 {
-  requires {
-    dependency("github.com/shurcooL/httpfs")
-  }
-  query pattern callExpr where callee.method == "Walk"
-  emit sink code.FileUseSink at args[0]
-}

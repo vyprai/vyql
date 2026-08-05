@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m65f34f41;
-
-binding deserialization0 {
-  requires {
-    dependency("com.jayway.jsonpath:json-path-assert")
-  }
-  query pattern callExpr where callee.method == "JsonAssert.with"
-  emit sink code.Deserialization at args[0]
-}

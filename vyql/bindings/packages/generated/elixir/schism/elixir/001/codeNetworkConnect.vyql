@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m2615c0fc;
-
-binding networkConnect1 {
-  requires {
-    dependency("schism")
-  }
-  query pattern callExpr where callee.method == "heal"
-  emit sink code.NetworkConnectSink at args[0]
-}

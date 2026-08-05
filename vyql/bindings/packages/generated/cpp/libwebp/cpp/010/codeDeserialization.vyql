@@ -1,9 +1,0 @@
-module bindings.cpp.generated.ma68ef4f6;
-
-binding deserialization10 {
-  requires {
-    dependency("libwebp")
-  }
-  query pattern callExpr where callee.method == "VP8ParseProba"
-  emit sink code.Deserialization at args[0]
-}

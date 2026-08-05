@@ -1,9 +1,0 @@
-module bindings.python.generated.mb6c97805;
-
-binding filePathAccess4 {
-  requires {
-    dependency("pyreadline")
-  }
-  query pattern callExpr where callee.method == "sethistoryfilename"
-  emit sink code.FilePathAccess at args[0]
-}

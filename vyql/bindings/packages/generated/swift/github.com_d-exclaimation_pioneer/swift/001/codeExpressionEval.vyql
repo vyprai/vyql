@@ -1,9 +1,0 @@
-module bindings.swift.generated.ma110b9ca;
-
-binding expressionEval1 {
-  requires {
-    dependency("github.com/d-exclaimation/pioneer")
-  }
-  query pattern callExpr where callee.method == "executeOperation"
-  emit sink code.ExpressionEval at args[0]
-}

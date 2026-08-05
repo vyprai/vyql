@@ -1,0 +1,96 @@
+module bindings.php.generated.m382d8800;
+
+binding deserialization0 {
+  requires {
+    dependency("theseer/fdomdocument")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("theseer/fdomdocument")
+  }
+  query pattern callExpr where callee.method == "loadXML"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("theseer/fdomdocument")
+  }
+  query pattern callExpr where callee.method == "loadHTMLFile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("theseer/fdomdocument")
+  }
+  query pattern callExpr where callee.method == "loadHTML"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("theseer/fdomdocument")
+  }
+  query pattern callExpr where callee.method == "appendXML"
+  emit sink code.Deserialization at args[0]
+}
+
+binding xmlParse5 {
+  requires {
+    dependency("theseer/fdomdocument")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse6 {
+  requires {
+    dependency("theseer/fdomdocument")
+  }
+  query pattern callExpr where callee.method == "queryOne"
+  emit sink code.XmlParse at args[0]
+}
+
+binding sqlParameterization7 {
+  requires {
+    dependency("theseer/fdomdocument")
+  }
+  query pattern callExpr where callee.method == "prepare"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding sqlParameterization8 {
+  requires {
+    dependency("theseer/fdomdocument")
+  }
+  query pattern callExpr where callee.method == "prepareQuery"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding sqlParameterization9 {
+  requires {
+    dependency("theseer/fdomdocument")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

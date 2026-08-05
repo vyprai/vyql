@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mfaab5061;
-
-binding userControlledData0 {
-  requires {
-    dependency("ransack")
-  }
-  query pattern callExpr where callee.method == "build"
-  emit source core.UserControlledData at call.result
-}

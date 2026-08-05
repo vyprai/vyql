@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.meafcdfaf;
-
-binding weakHash1 {
-  requires {
-    dependency("com.sun.jersey:jersey-core")
-  }
-  query pattern presenceNode where node.path ~= "com.sun.jersey.jersey.core.hash"
-  emit issue code.WeakHash at node
-}

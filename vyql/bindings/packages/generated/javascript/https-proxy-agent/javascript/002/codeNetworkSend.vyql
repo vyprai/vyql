@@ -1,9 +1,0 @@
-module bindings.javascript.generated.md3ee2f79;
-
-binding networkSend2 {
-  requires {
-    dependency("https-proxy-agent")
-  }
-  query pattern callExpr where callee.method == "HttpsProxyAgent.connect"
-  emit sink code.NetworkSend at args[0]
-}

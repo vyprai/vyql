@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.ma5d53358;
-
-binding networkSend3 {
-  requires {
-    dependency("com.google.api-client:google-api-client")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.NetworkSend at args[0]
-}

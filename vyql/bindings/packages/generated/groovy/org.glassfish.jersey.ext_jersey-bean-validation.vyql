@@ -1,0 +1,66 @@
+module bindings.groovy.generated.me6ee2f81;
+
+binding inputValidation0 {
+  requires {
+    dependency("org.glassfish.jersey.ext:jersey-bean-validation")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation1 {
+  requires {
+    dependency("org.glassfish.jersey.ext:jersey-bean-validation")
+  }
+  query pattern callExpr where callee.method == "validateValue"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("org.glassfish.jersey.ext:jersey-bean-validation")
+  }
+  query pattern callExpr where callee.method == "validateResourceAndInputParams"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("org.glassfish.jersey.ext:jersey-bean-validation")
+  }
+  query pattern callExpr where callee.method == "onValidate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation4 {
+  requires {
+    dependency("org.glassfish.jersey.ext:jersey-bean-validation")
+  }
+  query pattern callExpr where callee.method == "validateResult"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

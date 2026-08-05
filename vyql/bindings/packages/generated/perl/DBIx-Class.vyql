@@ -1,0 +1,17 @@
+module bindings.perl.generated.m7b3875ab;
+
+binding sqlExecution0 {
+  requires {
+    dependency("DBIx-Class")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("DBIx-Class")
+  }
+  query pattern callExpr where callee.method == "connection"
+  emit sink code.SqlExecution at args[0]
+}

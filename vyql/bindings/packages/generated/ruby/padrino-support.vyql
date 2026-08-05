@@ -1,0 +1,25 @@
+module bindings.ruby.generated.m6d1dbfdf;
+
+binding filePathAccess0 {
+  requires {
+    dependency("padrino-support")
+  }
+  query pattern callExpr where callee.method == "glob"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("padrino-support")
+  }
+  query pattern callExpr where callee.method == "glob_require"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding codeEval2 {
+  requires {
+    dependency("padrino-support")
+  }
+  query pattern callExpr where callee.method == "glob_require"
+  emit sink code.CodeEval at args[0]
+}

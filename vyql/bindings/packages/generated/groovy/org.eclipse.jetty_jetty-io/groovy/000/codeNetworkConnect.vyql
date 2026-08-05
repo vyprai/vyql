@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m1e28126f;
-
-binding networkConnect0 {
-  requires {
-    dependency("org.eclipse.jetty:jetty-io")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

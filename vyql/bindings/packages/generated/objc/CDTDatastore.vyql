@@ -1,0 +1,17 @@
+module bindings.objc.generated.m3fd03f38;
+
+binding secretValue0 {
+  requires {
+    dependency("CDTDatastore")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit source code.SecretValue at call.result
+}
+
+binding weakHash1 {
+  requires {
+    dependency("CDTDatastore")
+  }
+  query pattern presenceNode where node.path ~= "cdtdatastore.hash"
+  emit issue code.WeakHash at node
+}

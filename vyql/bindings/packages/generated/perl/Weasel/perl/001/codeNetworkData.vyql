@@ -1,9 +1,0 @@
-module bindings.perl.generated.m03b95396;
-
-binding networkData1 {
-  requires {
-    dependency("Weasel")
-  }
-  query pattern callExpr where callee.method == "get_page_source"
-  emit source code.NetworkData at call.result
-}

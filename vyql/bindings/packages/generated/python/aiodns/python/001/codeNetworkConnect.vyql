@@ -1,9 +1,0 @@
-module bindings.python.generated.m14322b80;
-
-binding networkConnect1 {
-  requires {
-    dependency("aiodns")
-  }
-  query pattern callExpr where callee.method == "query_dns"
-  emit sink code.NetworkConnectSink at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.mbebeef99;
-
-binding deserialization0 {
-  requires {
-    dependency("com.sun.jersey:jersey-json")
-  }
-  query pattern callExpr where callee.method == "unmarshalFromJSON"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.m6aa10232;
-
-binding userControlledData0 {
-  requires {
-    dependency("github.com/CreateAPI/URLQueryEncoder")
-  }
-  query pattern callExpr where callee.method == "encode"
-  emit source core.UserControlledData at call.result
-}

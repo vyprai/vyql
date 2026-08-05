@@ -1,9 +1,0 @@
-module bindings.scala.generated.m108ca5c5;
-
-binding expressionEval2 {
-  requires {
-    dependency("org.glassfish.web:el-impl")
-  }
-  query pattern callExpr where callee.method == "getValue"
-  emit sink code.ExpressionEval at args[0]
-}

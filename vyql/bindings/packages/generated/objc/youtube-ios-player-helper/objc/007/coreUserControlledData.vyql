@@ -1,9 +1,0 @@
-module bindings.objc.generated.ma02a3afe;
-
-binding userControlledData7 {
-  requires {
-    dependency("youtube-ios-player-helper")
-  }
-  query pattern callExpr where callee.method == "loadPlaylistByPlaylistId"
-  emit source core.UserControlledData at call.result
-}

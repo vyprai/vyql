@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m2b60e3ee;
-
-binding deserialization1 {
-  requires {
-    dependency("jest-serializer")
-  }
-  query pattern callExpr where callee.method == "readFileSync"
-  emit sink code.Deserialization at args[0]
-}

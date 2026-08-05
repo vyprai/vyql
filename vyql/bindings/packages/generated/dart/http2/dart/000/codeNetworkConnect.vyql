@@ -1,9 +1,0 @@
-module bindings.dart.generated.mdbd356fd;
-
-binding networkConnect0 {
-  requires {
-    dependency("http2")
-  }
-  query pattern callExpr where callee.method == "ClientConnection"
-  emit sink code.NetworkConnectSink at args[0]
-}

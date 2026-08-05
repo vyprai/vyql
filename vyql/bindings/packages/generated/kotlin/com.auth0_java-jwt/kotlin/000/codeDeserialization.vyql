@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m4f24edc7;
-
-binding deserialization0 {
-  requires {
-    dependency("com.auth0:java-jwt")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

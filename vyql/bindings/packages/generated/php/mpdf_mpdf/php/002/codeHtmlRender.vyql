@@ -1,9 +1,0 @@
-module bindings.php.generated.m540714b3;
-
-binding htmlRender2 {
-  requires {
-    dependency("mpdf/mpdf")
-  }
-  query pattern callExpr where callee.method == "print_ob_select"
-  emit sink code.HtmlRender at args[0]
-}

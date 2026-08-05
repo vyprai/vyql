@@ -1,9 +1,0 @@
-module bindings.dart.generated.ma8b3edac;
-
-binding deserialization1 {
-  requires {
-    dependency("universal_html")
-  }
-  query pattern callExpr where callee.method == "DomParserDriver.parseHtml"
-  emit sink code.Deserialization at args[0]
-}

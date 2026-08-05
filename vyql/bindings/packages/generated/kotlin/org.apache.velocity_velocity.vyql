@@ -1,0 +1,25 @@
+module bindings.kotlin.generated.m0dcb0ab0;
+
+binding templateRender0 {
+  requires {
+    dependency("org.apache.velocity:velocity")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender1 {
+  requires {
+    dependency("org.apache.velocity:velocity")
+  }
+  query pattern callExpr where callee.method == "merge"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender2 {
+  requires {
+    dependency("org.apache.velocity:velocity")
+  }
+  query pattern callExpr where callee.method == "process"
+  emit sink code.TemplateRender at args[0]
+}

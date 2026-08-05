@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m8259ef8b;
-
-binding networkData3 {
-  requires {
-    dependency("websock_adapter")
-  }
-  query pattern callExpr where callee.method == "WebSockAdapter.CowboyAdapter.websocket_init"
-  emit source code.NetworkData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.maf6a4921;
-
-binding pointerUse3 {
-  requires {
-    dependency("net.java.dev.jna:jna")
-  }
-  query pattern callExpr where callee.method == "malloc"
-  emit issue code.PointerUse at call
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.me6c981bb;
-
-binding sqlExecution0 {
-  requires {
-    dependency("github.com/vapor/postgres-kit")
-  }
-  query pattern callExpr where callee.method == "array"
-  emit sink code.SqlExecution at args[0]
-}

@@ -1,0 +1,25 @@
+module bindings.ruby.generated.m14698913;
+
+binding userControlledData0 {
+  requires {
+    dependency("fakeweb")
+  }
+  query pattern callExpr where callee.method == "register_uri"
+  emit source core.UserControlledData at call.result
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("fakeweb")
+  }
+  query pattern callExpr where callee.method == "register_passthrough_uri"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("fakeweb")
+  }
+  query pattern callExpr where callee.method == "request_with_fakeweb"
+  emit sink code.NetworkConnectSink at args[0]
+}

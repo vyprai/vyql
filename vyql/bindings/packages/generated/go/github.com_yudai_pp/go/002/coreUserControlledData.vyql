@@ -1,9 +1,0 @@
-module bindings.go.generated.mb3984e9a;
-
-binding userControlledData2 {
-  requires {
-    dependency("github.com/yudai/pp")
-  }
-  query pattern callExpr where callee.method == "Fprint"
-  emit source core.UserControlledData at call.result
-}

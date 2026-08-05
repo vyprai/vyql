@@ -1,9 +1,0 @@
-module bindings.dart.generated.m5e90730a;
-
-binding networkConnect0 {
-  requires {
-    dependency("cached_network_image")
-  }
-  query pattern callExpr where callee.method == "CachedNetworkImageProvider"
-  emit sink code.NetworkConnectSink at args[0]
-}

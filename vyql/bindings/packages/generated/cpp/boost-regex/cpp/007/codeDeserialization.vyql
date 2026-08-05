@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m685ec8c6;
-
-binding deserialization7 {
-  requires {
-    dependency("boost-regex")
-  }
-  query pattern callExpr where callee.method == "regexecA"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.md38d8135;
-
-binding deserialization1 {
-  requires {
-    dependency("giggsey/libphonenumber-for-php")
-  }
-  query pattern callExpr where callee.method == "parseAndKeepRawInput"
-  emit sink code.Deserialization at args[0]
-}

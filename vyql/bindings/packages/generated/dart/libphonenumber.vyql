@@ -1,0 +1,49 @@
+module bindings.dart.generated.m5e849dd9;
+
+binding deserialization0 {
+  requires {
+    dependency("libphonenumber")
+  }
+  query pattern callExpr where callee.method == "normalizePhoneNumber"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("libphonenumber")
+  }
+  query pattern callExpr where callee.method == "isValidPhoneNumber"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("libphonenumber")
+  }
+  query pattern callExpr where callee.method == "getNameForNumber"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("libphonenumber")
+  }
+  query pattern callExpr where callee.method == "getRegionInfo"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("libphonenumber")
+  }
+  query pattern callExpr where callee.method == "getNumberType"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("libphonenumber")
+  }
+  query pattern callExpr where callee.method == "formatAsYouType"
+  emit sink code.Deserialization at args[0]
+}

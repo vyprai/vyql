@@ -1,9 +1,0 @@
-module bindings.java.generated.m5eab4957;
-
-binding deserialization0 {
-  requires {
-    dependency("com.google.api-client:google-api-client")
-  }
-  query pattern callExpr where callee.method == "GoogleJsonError.parse"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m441454db;
-
-binding deserialization5 {
-  requires {
-    dependency("loofah")
-  }
-  query pattern callExpr where callee.method == "xml_document"
-  emit sink code.Deserialization at args[0]
-}

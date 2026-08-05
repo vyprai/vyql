@@ -1,9 +1,0 @@
-module bindings.perl.generated.m706eda99;
-
-binding sqlExecution1 {
-  requires {
-    dependency("Collection")
-  }
-  query pattern callExpr where callee.method == "_query_dbh"
-  emit sink code.SqlExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.m8406d31a;
-
-binding userControlledData1 {
-  requires {
-    dependency("org.twitter4j:twitter4j-stream")
-  }
-  query pattern callExpr where callee.method == "follow"
-  emit source core.UserControlledData at call.result
-}

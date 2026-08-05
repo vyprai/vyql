@@ -1,9 +1,0 @@
-module bindings.php.generated.m1e757c47;
-
-binding userControlledData6 {
-  requires {
-    dependency("jenssegers/agent")
-  }
-  query pattern callExpr where callee.method == "isRobot"
-  emit source core.UserControlledData at call.result
-}

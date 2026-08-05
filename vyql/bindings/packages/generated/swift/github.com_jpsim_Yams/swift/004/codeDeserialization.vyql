@@ -1,9 +1,0 @@
-module bindings.swift.generated.m9dccd298;
-
-binding deserialization4 {
-  requires {
-    dependency("github.com/jpsim/Yams")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

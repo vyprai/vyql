@@ -1,9 +1,0 @@
-module bindings.rust.generated.mfc2b5290;
-
-binding deserialization0 {
-  requires {
-    dependency("colored")
-  }
-  query pattern callExpr where callee.method == "from_str"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m69730f94;
-
-binding filePathAccess0 {
-  requires {
-    dependency("Locale-Country-Multilingual")
-  }
-  query pattern callExpr where callee.method == "_open_dat"
-  emit sink code.FilePathAccess at args[0]
-}

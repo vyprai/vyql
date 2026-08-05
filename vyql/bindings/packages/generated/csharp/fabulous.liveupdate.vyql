@@ -1,0 +1,17 @@
+module bindings.csharp.generated.mb406e5bf;
+
+binding codeEval0 {
+  requires {
+    dependency("fabulous.liveupdate")
+  }
+  query pattern callExpr where callee.method == "TryEvalDecls"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("fabulous.liveupdate")
+  }
+  query pattern callExpr where callee.method == "EvalDecls"
+  emit sink code.CodeEval at args[0]
+}

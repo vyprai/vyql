@@ -1,9 +1,0 @@
-module bindings.perl.generated.mfddc86fe;
-
-binding databaseRead1 {
-  requires {
-    dependency("KiokuDB")
-  }
-  query pattern callExpr where callee.method == "search"
-  emit sink code.DatabaseReadSink at args[0]
-}

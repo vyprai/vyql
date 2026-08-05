@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mb3f494c8;
-
-binding userControlledData0 {
-  requires {
-    dependency("com.auth0:java-jwt")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit source core.UserControlledData at call.result
-}

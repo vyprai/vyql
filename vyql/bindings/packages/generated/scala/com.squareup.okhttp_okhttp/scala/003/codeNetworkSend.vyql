@@ -1,9 +1,0 @@
-module bindings.scala.generated.md8b105ec;
-
-binding networkSend3 {
-  requires {
-    dependency("com.squareup.okhttp:okhttp")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.NetworkSend at args[0]
-}

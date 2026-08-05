@@ -1,9 +1,0 @@
-module bindings.scala.generated.m7e40519e;
-
-binding networkConnect6 {
-  requires {
-    dependency("org.mule.connectors:mule-sockets-connector")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

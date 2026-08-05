@@ -1,9 +1,0 @@
-module bindings.java.generated.m7afb5fa1;
-
-binding filePathAccess2 {
-  requires {
-    dependency("io.vertx:vertx-core")
-  }
-  query pattern callExpr where callee.method == "open"
-  emit sink code.FilePathAccess at args[0]
-}

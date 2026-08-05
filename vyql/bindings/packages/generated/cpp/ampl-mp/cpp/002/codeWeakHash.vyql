@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m450a9861;
-
-binding weakHash2 {
-  requires {
-    dependency("ampl-mp")
-  }
-  query pattern callExpr where callee.method == "Hash"
-  emit issue code.WeakHash at call
-}

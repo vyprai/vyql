@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m677ca906;
-
-binding deserialization0 {
-  requires {
-    dependency("telegram")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

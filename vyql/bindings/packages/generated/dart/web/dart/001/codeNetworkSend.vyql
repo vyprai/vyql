@@ -1,9 +1,0 @@
-module bindings.dart.generated.m0bf31669;
-
-binding networkSend1 {
-  requires {
-    dependency("web")
-  }
-  query pattern callExpr where callee.method == "postFormData"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.mc371d226;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/tsolomko/BitByteData")
-  }
-  query pattern callExpr where callee.method == "signedInt"
-  emit sink code.Deserialization at args[0]
-}

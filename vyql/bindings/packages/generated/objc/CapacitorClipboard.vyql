@@ -1,0 +1,33 @@
+module bindings.objc.generated.m238143b8;
+
+binding userControlledData0 {
+  requires {
+    dependency("CapacitorClipboard")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("CapacitorClipboard")
+  }
+  query pattern callExpr where callee.method == "readText"
+  emit source core.UserControlledData at call.result
+}
+
+binding storedDataWrite2 {
+  requires {
+    dependency("CapacitorClipboard")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite3 {
+  requires {
+    dependency("CapacitorClipboard")
+  }
+  query pattern callExpr where callee.method == "writeText"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.md2fe0eea;
-
-binding filePathAccess0 {
-  requires {
-    dependency("sentry-native")
-  }
-  query pattern callExpr where callee.method == "sentry_envelope_write_to_file"
-  emit sink code.FilePathAccess at args[0]
-}

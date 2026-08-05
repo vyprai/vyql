@@ -1,0 +1,25 @@
+module bindings.php.generated.mc093e29f;
+
+binding fileUse0 {
+  requires {
+    dependency("phpoffice/phpword")
+  }
+  query pattern callExpr where callee.method == "save"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("phpoffice/phpword")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("phpoffice/phpword")
+  }
+  query pattern callExpr where callee.method == "createReader"
+  emit sink code.Deserialization at args[0]
+}

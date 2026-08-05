@@ -1,9 +1,0 @@
-module bindings.scala.generated.me0f42be9;
-
-binding commandExecution1 {
-  requires {
-    dependency("junit:junit-dep")
-  }
-  query pattern callExpr where callee.method == "runMain"
-  emit sink code.CommandExecution at args[0]
-}

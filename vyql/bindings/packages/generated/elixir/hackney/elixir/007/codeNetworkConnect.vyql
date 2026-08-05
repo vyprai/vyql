@@ -1,9 +1,0 @@
-module bindings.elixir.generated.md39518e8;
-
-binding networkConnect7 {
-  requires {
-    dependency("hackney")
-  }
-  query pattern callExpr where callee.method == "start_conn_with_socket_internal"
-  emit sink code.NetworkConnectSink at args[0]
-}

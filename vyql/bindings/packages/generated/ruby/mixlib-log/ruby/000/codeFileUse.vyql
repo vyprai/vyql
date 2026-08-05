@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mf23a26ca;
-
-binding fileUse0 {
-  requires {
-    dependency("mixlib-log")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.FileUseSink at args[0]
-}

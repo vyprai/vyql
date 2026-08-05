@@ -1,9 +1,0 @@
-module bindings.dart.generated.m6b549c50;
-
-binding cliArgument1 {
-  requires {
-    dependency("dartdoc")
-  }
-  query pattern callExpr where callee.method == "parseArguments"
-  emit source code.CliArgument at call.result
-}

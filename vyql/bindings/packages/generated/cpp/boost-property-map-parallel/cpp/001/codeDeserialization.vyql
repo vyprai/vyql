@@ -1,9 +1,0 @@
-module bindings.cpp.generated.me1363131;
-
-binding deserialization1 {
-  requires {
-    dependency("boost-property-map-parallel")
-  }
-  query pattern callExpr where callee.method == "unsafe_serialize"
-  emit sink code.Deserialization at args[0]
-}

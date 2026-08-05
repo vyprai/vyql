@@ -1,9 +1,0 @@
-module bindings.cpp.generated.ma422cfb9;
-
-binding codeEval3 {
-  requires {
-    dependency("qt5-webchannel")
-  }
-  query pattern callExpr where callee.method == "registerObjects"
-  emit sink code.CodeEval at args[0]
-}

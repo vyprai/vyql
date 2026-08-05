@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m68efebf2;
-
-binding deserialization2 {
-  requires {
-    dependency("nadia")
-  }
-  query pattern callExpr where callee.method == "parse_updates"
-  emit sink code.Deserialization at args[0]
-}

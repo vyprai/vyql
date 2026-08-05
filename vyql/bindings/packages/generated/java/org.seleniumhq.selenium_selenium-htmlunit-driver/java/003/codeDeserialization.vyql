@@ -1,9 +1,0 @@
-module bindings.java.generated.m1572b5b7;
-
-binding deserialization3 {
-  requires {
-    dependency("org.seleniumhq.selenium:selenium-htmlunit-driver")
-  }
-  query pattern callExpr where callee.method == "findElementByXPath"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,0 +1,17 @@
+module bindings.php.generated.mefc9ad8f;
+
+binding deserialization0 {
+  requires {
+    dependency("symfony/polyfill-intl-idn")
+  }
+  query pattern callExpr where callee.method == "idn_to_ascii"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("symfony/polyfill-intl-idn")
+  }
+  query pattern callExpr where callee.method == "idn_to_utf8"
+  emit sink code.Deserialization at args[0]
+}

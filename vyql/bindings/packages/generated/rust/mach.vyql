@@ -1,0 +1,118 @@
+module bindings.rust.generated.mfb74f871;
+
+binding privilegedOp0 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "mach_vm_read"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp1 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "mach_vm_read_list"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp2 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "mach_vm_write"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp3 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "mach_vm_copy"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp4 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "mach_vm_read_overwrite"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp5 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "task_resume"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp6 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "task_suspend"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp7 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "thread_suspend"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp8 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "thread_resume"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp9 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "clock_set_time"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp10 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "clock_set_attributes"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp11 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "mach_port_extract_right"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp12 {
+  requires {
+    dependency("mach")
+  }
+  query pattern callExpr where callee.method == "mach_msg_send"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

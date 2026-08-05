@@ -1,0 +1,97 @@
+module bindings.groovy.generated.md15b4d9e;
+
+binding secretValue0 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "OAuthToken.getSecret"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "AccessGrant.getAccessToken"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "AccessGrant.getRefreshToken"
+  emit source code.SecretValue at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "Connection.getProfileUrl"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "Connection.getImageUrl"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "UserProfile"
+  emit source core.UserControlledData at call.result
+}
+
+binding httpInput6 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "FormMapHttpMessageConverter.read"
+  emit source code.HttpInput at call.result
+}
+
+binding authenticationCheck7 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "ApiBinding.isAuthorized"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck8 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "OAuth2Version.getAuthorizationHeaderValue"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding urlFetch9 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "URIBuilder.queryParam"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch10 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "URIBuilder.queryParams"
+  emit sink code.UrlFetch at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mbbe1ca32;
-
-binding networkData8 {
-  requires {
-    dependency("fog-dynect")
-  }
-  query pattern callExpr where callee.method == "get_record"
-  emit source code.NetworkData at call.result
-}

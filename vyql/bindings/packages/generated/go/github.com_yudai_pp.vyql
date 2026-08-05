@@ -1,0 +1,73 @@
+module bindings.go.generated.mb3984e9a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/yudai/pp")
+  }
+  query pattern callExpr where callee.method == "Fprint"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/yudai/pp")
+  }
+  query pattern callExpr where callee.method == "Fprint"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("github.com/yudai/pp")
+  }
+  query pattern callExpr where callee.method == "Fprint"
+  emit source core.UserControlledData at call.result
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("github.com/yudai/pp")
+  }
+  query pattern callExpr where callee.method == "Fprintf"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("github.com/yudai/pp")
+  }
+  query pattern callExpr where callee.method == "Fprintf"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("github.com/yudai/pp")
+  }
+  query pattern callExpr where callee.method == "Fprintf"
+  emit source core.UserControlledData at call.result
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("github.com/yudai/pp")
+  }
+  query pattern callExpr where callee.method == "Fprintln"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding networkSend7 {
+  requires {
+    dependency("github.com/yudai/pp")
+  }
+  query pattern callExpr where callee.method == "Fprintln"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding userControlledData8 {
+  requires {
+    dependency("github.com/yudai/pp")
+  }
+  query pattern callExpr where callee.method == "Fprintln"
+  emit source core.UserControlledData at call.result
+}

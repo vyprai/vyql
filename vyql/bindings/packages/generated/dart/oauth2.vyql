@@ -1,0 +1,17 @@
+module bindings.dart.generated.m135f127c;
+
+binding networkSend0 {
+  requires {
+    dependency("oauth2")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("oauth2")
+  }
+  query pattern callExpr where callee.method == "parseJsonParameters"
+  emit sink code.Deserialization at args[0]
+}

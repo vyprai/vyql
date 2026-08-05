@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mf6d16e71;
-
-binding databaseRead1 {
-  requires {
-    dependency("com.h2database:h2")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.DatabaseReadSink at args[0]
-}

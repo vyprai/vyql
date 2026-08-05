@@ -1,9 +1,0 @@
-module bindings.go.generated.ma153e8d8;
-
-binding htmlRender1 {
-  requires {
-    dependency("github.com/shurcooL/github_flavored_markdown")
-  }
-  query pattern callExpr where callee.method == "Heading"
-  emit sink code.HtmlRender at args[0]
-}

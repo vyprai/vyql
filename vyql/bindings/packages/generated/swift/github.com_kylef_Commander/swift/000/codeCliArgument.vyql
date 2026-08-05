@@ -1,9 +1,0 @@
-module bindings.swift.generated.m05efabc2;
-
-binding cliArgument0 {
-  requires {
-    dependency("github.com/kylef/Commander")
-  }
-  query pattern callExpr where callee.method == "ArgumentParser.init"
-  emit source code.CliArgument at call.result
-}

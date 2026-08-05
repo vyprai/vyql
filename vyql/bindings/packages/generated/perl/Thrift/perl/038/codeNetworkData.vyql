@@ -1,9 +1,0 @@
-module bindings.perl.generated.mec98890c;
-
-binding networkData38 {
-  requires {
-    dependency("Thrift")
-  }
-  query pattern callExpr where callee.method == "recv_getValues"
-  emit source code.NetworkData at call.result
-}

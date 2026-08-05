@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m7d1994cd;
-
-binding sqlExecution3 {
-  requires {
-    dependency("clickhouse_ecto")
-  }
-  query pattern callExpr where callee.method == "ClickhouseEcto.Query.delete_all"
-  emit sink code.SqlExecution at args[0]
-}

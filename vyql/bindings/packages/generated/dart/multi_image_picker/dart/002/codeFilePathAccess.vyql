@@ -1,9 +1,0 @@
-module bindings.dart.generated.m0f765ad7;
-
-binding filePathAccess2 {
-  requires {
-    dependency("multi_image_picker")
-  }
-  query pattern callExpr where callee.method == "getPath_API11to18"
-  emit sink code.FilePathAccess at args[0]
-}

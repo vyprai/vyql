@@ -1,0 +1,25 @@
+module bindings.elixir.generated.m7b46012f;
+
+binding deserialization0 {
+  requires {
+    dependency("snappyer")
+  }
+  query pattern callExpr where callee.method == "RawUncompress"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("snappyer")
+  }
+  query pattern callExpr where callee.method == "GetUncompressedLength"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("snappyer")
+  }
+  query pattern callExpr where callee.method == "Uncompress"
+  emit sink code.Deserialization at args[0]
+}

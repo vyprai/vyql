@@ -1,9 +1,0 @@
-module bindings.php.generated.me6ca38bd;
-
-binding commandExecution0 {
-  requires {
-    dependency("knplabs/knp-snappy")
-  }
-  query pattern callExpr where callee.method == "executeCommand"
-  emit sink code.CommandExecution at args[0]
-}

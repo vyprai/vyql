@@ -1,9 +1,0 @@
-module bindings.go.generated.m600cfa6d;
-
-binding deserialization7 {
-  requires {
-    dependency("github.com/Microsoft/go-winio")
-  }
-  query pattern callExpr where callee.method == "DecodeExtendedAttributes"
-  emit sink code.Deserialization at args[0]
-}

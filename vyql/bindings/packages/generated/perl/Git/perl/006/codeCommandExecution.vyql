@@ -1,9 +1,0 @@
-module bindings.perl.generated.mc4f12def;
-
-binding commandExecution6 {
-  requires {
-    dependency("Git")
-  }
-  query pattern callExpr where callee.method == "command_close_bidi_pipe"
-  emit sink code.CommandExecution at args[0]
-}

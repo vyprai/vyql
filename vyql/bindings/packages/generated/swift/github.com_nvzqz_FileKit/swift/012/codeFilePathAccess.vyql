@@ -1,9 +1,0 @@
-module bindings.swift.generated.mba9fec3c;
-
-binding filePathAccess12 {
-  requires {
-    dependency("github.com/nvzqz/FileKit")
-  }
-  query pattern callExpr where callee.method == "createFile"
-  emit sink code.FilePathAccess at args[0]
-}

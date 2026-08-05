@@ -1,0 +1,137 @@
+module bindings.go.generated.m69474f76;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseBool"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseInt64"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseInt32"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseBigInt"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseBitString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseObjectIdentifier"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseBase128Int"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseUTCTime"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization8 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseGeneralizedTime"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization9 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseNumericString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization10 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parsePrintableString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization11 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseIA5String"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization12 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseT61String"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization13 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseUTF8String"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization14 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseBMPString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization15 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseTagAndLength"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization16 {
+  requires {
+    dependency("github.com/google/certificate-transparency-go")
+  }
+  query pattern callExpr where callee.method == "parseSequenceOf"
+  emit sink code.Deserialization at args[0]
+}

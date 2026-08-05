@@ -1,0 +1,51 @@
+module bindings.elixir.generated.m7c1cd297;
+
+binding httpInput0 {
+  requires {
+    dependency("vintage_net_wizard")
+  }
+  query pattern callExpr where callee.method == "VintageNetWizard.Web.API.get_body"
+  emit source code.HttpInput at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("vintage_net_wizard")
+  }
+  query pattern callExpr where callee.method == "VintageNetWizard.WiFiConfiguration.json_to_network_config"
+  emit source core.UserControlledData at call.result
+}
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("vintage_net_wizard")
+  }
+  query pattern callExpr where callee.method == "VintageNetWizard.Web.API.send_json"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("vintage_net_wizard")
+  }
+  query pattern callExpr where callee.method == "VintageNetWizard.WiFiConfiguration.Params.validate_password"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation4 {
+  requires {
+    dependency("vintage_net_wizard")
+  }
+  query pattern callExpr where callee.method == "VintageNetWizard.WiFiConfiguration.Params.validate_peap_password"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

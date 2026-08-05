@@ -1,9 +1,0 @@
-module bindings.ruby.generated.ma860ad40;
-
-binding databaseRead2 {
-  requires {
-    dependency("orm_adapter")
-  }
-  query pattern callExpr where callee.method == "find_first"
-  emit sink code.DatabaseReadSink at args[0]
-}

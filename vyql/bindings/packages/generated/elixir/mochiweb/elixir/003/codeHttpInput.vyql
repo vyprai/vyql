@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m2f9a867f;
-
-binding httpInput3 {
-  requires {
-    dependency("mochiweb")
-  }
-  query pattern callExpr where callee.method == "new_request"
-  emit source code.HttpInput at call.result
-}

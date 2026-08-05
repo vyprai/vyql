@@ -1,9 +1,0 @@
-module bindings.scala.generated.m27782ca4;
-
-binding filePathAccess0 {
-  requires {
-    dependency("net.lingala.zip4j:zip4j")
-  }
-  query pattern callExpr where callee.method == "addFile"
-  emit sink code.FilePathAccess at args[0]
-}

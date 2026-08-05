@@ -1,9 +1,0 @@
-module bindings.go.generated.m099dbd26;
-
-binding deserialization0 {
-  requires {
-    dependency("sigs.k8s.io/yaml")
-  }
-  query pattern callExpr where callee.method == "YAMLToJSON"
-  emit sink code.Deserialization at args[0]
-}

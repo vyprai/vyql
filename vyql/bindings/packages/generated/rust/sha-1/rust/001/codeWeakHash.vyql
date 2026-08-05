@@ -1,9 +1,0 @@
-module bindings.rust.generated.m160972de;
-
-binding weakHash1 {
-  requires {
-    dependency("sha-1")
-  }
-  query pattern callExpr where callee.method == "finalize_fixed_core"
-  emit issue code.WeakHash at call
-}

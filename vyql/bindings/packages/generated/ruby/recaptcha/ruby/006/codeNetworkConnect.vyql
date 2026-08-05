@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mdeee483b;
-
-binding networkConnect6 {
-  requires {
-    dependency("recaptcha")
-  }
-  query pattern callExpr where callee.method == "api_verification_enterprise"
-  emit sink code.NetworkConnectSink at args[0]
-}

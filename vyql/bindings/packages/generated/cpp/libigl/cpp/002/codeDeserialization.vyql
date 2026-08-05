@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mc9ecae10;
-
-binding deserialization2 {
-  requires {
-    dependency("libigl")
-  }
-  query pattern callExpr where callee.method == "parse_node_field"
-  emit sink code.Deserialization at args[0]
-}

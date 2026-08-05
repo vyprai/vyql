@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mcffcfc81;
-
-binding codeEval0 {
-  requires {
-    dependency("execjs")
-  }
-  query pattern callExpr where callee.method == "eval"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.mfa07a723;
-
-binding responseHeaderWrite1 {
-  requires {
-    dependency("setasign/fpdf")
-  }
-  query pattern callExpr where callee.method == "Output"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

@@ -1,0 +1,33 @@
+module bindings.elixir.generated.mf6ffbfdd;
+
+binding userControlledData0 {
+  requires {
+    dependency("dotenv")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("dotenv")
+  }
+  query pattern callExpr where callee.method == "load!"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("dotenv")
+  }
+  query pattern callExpr where callee.method == "parse_contents"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("dotenv")
+  }
+  query pattern callExpr where callee.method == "read_env_file"
+  emit source core.UserControlledData at call.result
+}

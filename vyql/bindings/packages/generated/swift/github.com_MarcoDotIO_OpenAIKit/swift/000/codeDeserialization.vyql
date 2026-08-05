@@ -1,9 +1,0 @@
-module bindings.swift.generated.m61394e88;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/MarcoDotIO/OpenAIKit")
-  }
-  query pattern callExpr where callee.method == "parseSRT"
-  emit sink code.Deserialization at args[0]
-}

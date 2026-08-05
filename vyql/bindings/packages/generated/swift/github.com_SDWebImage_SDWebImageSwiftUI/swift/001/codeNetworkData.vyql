@@ -1,9 +1,0 @@
-module bindings.swift.generated.mfe64604a;
-
-binding networkData1 {
-  requires {
-    dependency("github.com/SDWebImage/SDWebImageSwiftUI")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit source code.NetworkData at call.result
-}

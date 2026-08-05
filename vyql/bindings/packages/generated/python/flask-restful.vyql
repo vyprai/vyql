@@ -1,0 +1,17 @@
+module bindings.python.generated.m4ec7167b;
+
+binding userControlledData0 {
+  requires {
+    dependency("flask-restful")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("flask-restful")
+  }
+  query pattern callExpr where callee.method == "parse_args"
+  emit source core.UserControlledData at call.result
+}

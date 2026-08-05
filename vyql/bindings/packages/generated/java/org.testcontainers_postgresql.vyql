@@ -1,0 +1,33 @@
+module bindings.java.generated.m2b10c041;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.testcontainers:postgresql")
+  }
+  query pattern callExpr where callee.method == "getJdbcUrl"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding secretValue1 {
+  requires {
+    dependency("org.testcontainers:postgresql")
+  }
+  query pattern callExpr where callee.method == "getPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("org.testcontainers:postgresql")
+  }
+  query pattern callExpr where callee.method == "getUsername"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("org.testcontainers:postgresql")
+  }
+  query pattern callExpr where callee.method == "getDatabaseName"
+  emit source core.UserControlledData at call.result
+}

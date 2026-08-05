@@ -1,0 +1,17 @@
+module bindings.rust.generated.m05219a4d;
+
+binding deserialization0 {
+  requires {
+    dependency("brotli-decompressor")
+  }
+  query pattern callExpr where callee.method == "brotli_decode_prealloc"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("brotli-decompressor")
+  }
+  query pattern callExpr where callee.method == "brotli_decode"
+  emit sink code.Deserialization at args[0]
+}

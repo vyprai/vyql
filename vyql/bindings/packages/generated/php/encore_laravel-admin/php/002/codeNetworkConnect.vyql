@@ -1,9 +1,0 @@
-module bindings.php.generated.mec6b0a22;
-
-binding networkConnect2 {
-  requires {
-    dependency("encore/laravel-admin")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkConnectSink at args[0]
-}

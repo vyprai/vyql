@@ -1,9 +1,0 @@
-module bindings.swift.generated.m74d7565f;
-
-binding urlFetch0 {
-  requires {
-    dependency("github.com/mapbox/mapbox-maps-ios")
-  }
-  query pattern callExpr where callee.method == "loadStyleURI"
-  emit sink code.UrlFetch at args[0]
-}

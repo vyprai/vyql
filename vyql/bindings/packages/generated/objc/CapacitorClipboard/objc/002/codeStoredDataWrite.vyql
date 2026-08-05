@@ -1,9 +1,0 @@
-module bindings.objc.generated.m238143b8;
-
-binding storedDataWrite2 {
-  requires {
-    dependency("CapacitorClipboard")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.StoredDataWrite at args[0]
-}

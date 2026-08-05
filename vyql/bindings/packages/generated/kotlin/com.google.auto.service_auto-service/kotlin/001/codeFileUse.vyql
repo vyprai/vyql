@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mf5dfe8b3;
-
-binding fileUse1 {
-  requires {
-    dependency("com.google.auto.service:auto-service")
-  }
-  query pattern callExpr where callee.method == "writeServiceFile"
-  emit sink code.FileUseSink at args[0]
-}

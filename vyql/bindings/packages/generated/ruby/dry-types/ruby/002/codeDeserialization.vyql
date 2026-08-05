@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mb30b9b4b;
-
-binding deserialization2 {
-  requires {
-    dependency("dry-types")
-  }
-  query pattern callExpr where callee.method == "visit_params_array"
-  emit sink code.Deserialization at args[0]
-}

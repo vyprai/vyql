@@ -1,9 +1,0 @@
-module bindings.cpp.generated.me1be6155;
-
-binding filePathAccess6 {
-  requires {
-    dependency("acl")
-  }
-  query pattern callExpr where callee.method == "perm_copy_fd"
-  emit sink code.FilePathAccess at args[0]
-}

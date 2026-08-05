@@ -1,9 +1,0 @@
-module bindings.perl.generated.mfa74235d;
-
-binding commandExecution0 {
-  requires {
-    dependency("Jifty")
-  }
-  query pattern callExpr where callee.path ~= "Jifty::system"
-  emit sink code.CommandExecution at args[0]
-}

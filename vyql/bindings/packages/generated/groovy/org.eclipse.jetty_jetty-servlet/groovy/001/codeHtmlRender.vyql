@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m1caae882;
-
-binding htmlRender1 {
-  requires {
-    dependency("org.eclipse.jetty:jetty-servlet")
-  }
-  query pattern callExpr where callee.method == "service"
-  emit sink code.HtmlRender at args[0]
-}

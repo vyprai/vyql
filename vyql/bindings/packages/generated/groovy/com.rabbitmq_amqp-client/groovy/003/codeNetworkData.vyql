@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m3acebe29;
-
-binding networkData3 {
-  requires {
-    dependency("com.rabbitmq:amqp-client")
-  }
-  query pattern callExpr where callee.method == "getBody"
-  emit source code.NetworkData at call.result
-}

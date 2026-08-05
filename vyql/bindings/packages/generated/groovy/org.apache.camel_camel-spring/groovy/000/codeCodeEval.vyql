@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mbe721257;
-
-binding codeEval0 {
-  requires {
-    dependency("org.apache.camel:camel-spring")
-  }
-  query pattern callExpr where callee.method == "parseExpression"
-  emit sink code.CodeEval at args[0]
-}

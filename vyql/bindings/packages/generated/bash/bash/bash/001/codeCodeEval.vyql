@@ -1,9 +1,0 @@
-module bindings.bash.generated.mb2968010;
-
-binding codeEval1 {
-  requires {
-    dependency("bash")
-  }
-  query pattern callExpr where callee.path ~= "bash.eval"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m676b3c51;
-
-binding networkData4 {
-  requires {
-    dependency("qtconnectivity")
-  }
-  query pattern callExpr where callee.method == "QBluetoothSocket::readData"
-  emit source code.NetworkData at call.result
-}

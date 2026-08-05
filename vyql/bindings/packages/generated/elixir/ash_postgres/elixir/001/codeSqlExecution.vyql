@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma8d7fc75;
-
-binding sqlExecution1 {
-  requires {
-    dependency("ash_postgres")
-  }
-  query pattern callExpr where callee.method == "run_aggregate_query"
-  emit sink code.SqlExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mc9ec4dc6;
-
-binding expressionEval0 {
-  requires {
-    dependency("docile")
-  }
-  query pattern callExpr where callee.method == "dsl_eval"
-  emit sink code.ExpressionEval at args[0]
-}

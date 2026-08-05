@@ -1,9 +1,0 @@
-module bindings.groovy.generated.md55d82e7;
-
-binding deserialization0 {
-  requires {
-    dependency("xerces:xercesImpl")
-  }
-  query pattern callExpr where callee.method == "startElement"
-  emit sink code.Deserialization at args[0]
-}

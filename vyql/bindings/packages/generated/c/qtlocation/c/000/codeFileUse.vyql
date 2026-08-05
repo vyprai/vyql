@@ -1,9 +1,0 @@
-module bindings.c.generated.m4c7bdcb9;
-
-binding fileUse0 {
-  requires {
-    dependency("qtlocation")
-  }
-  query pattern callExpr where callee.method == "dumpGeoJSON"
-  emit sink code.FileUseSink at args[0]
-}

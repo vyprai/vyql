@@ -1,9 +1,0 @@
-module bindings.scala.generated.m68041164;
-
-binding deserialization0 {
-  requires {
-    dependency("org.bouncycastle:bcprov-jdk16")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

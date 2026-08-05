@@ -1,0 +1,41 @@
+module bindings.perl.generated.mc61d3835;
+
+binding httpInput0 {
+  requires {
+    dependency("Flea")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit source code.HttpInput at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("Flea")
+  }
+  query pattern callExpr where callee.method == "json"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("Flea")
+  }
+  query pattern callExpr where callee.method == "html"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("Flea")
+  }
+  query pattern callExpr where callee.method == "text"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("Flea")
+  }
+  query pattern callExpr where callee.method == "file"
+  emit sink code.FilePathAccess at args[0]
+}

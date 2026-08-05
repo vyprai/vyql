@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m16a2cff2;
-
-binding sqlExecution3 {
-  requires {
-    dependency("com.github.miemiedev:mybatis-paginator")
-  }
-  query pattern callExpr where callee.method == "getCountString"
-  emit sink code.SqlExecution at args[0]
-}

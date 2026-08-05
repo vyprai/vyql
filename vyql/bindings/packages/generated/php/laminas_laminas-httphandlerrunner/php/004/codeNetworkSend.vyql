@@ -1,9 +1,0 @@
-module bindings.php.generated.m8e8981de;
-
-binding networkSend4 {
-  requires {
-    dependency("laminas/laminas-httphandlerrunner")
-  }
-  query pattern callExpr where callee.method == "LaminasHttpHandlerRunnerEmitterSapiStreamEmitter::emit"
-  emit sink code.NetworkSend at args[0]
-}

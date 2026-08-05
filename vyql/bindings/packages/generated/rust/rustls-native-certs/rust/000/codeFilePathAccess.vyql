@@ -1,9 +1,0 @@
-module bindings.rust.generated.m68f27cb3;
-
-binding filePathAccess0 {
-  requires {
-    dependency("rustls-native-certs")
-  }
-  query pattern callExpr where callee.method == "load_native_certs"
-  emit sink code.FilePathAccess at args[0]
-}

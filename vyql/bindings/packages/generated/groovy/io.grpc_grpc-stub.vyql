@@ -1,0 +1,49 @@
+module bindings.groovy.generated.m727ae6bc;
+
+binding networkSend0 {
+  requires {
+    dependency("io.grpc:grpc-stub")
+  }
+  query pattern callExpr where callee.method == "blockingUnaryCall"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("io.grpc:grpc-stub")
+  }
+  query pattern callExpr where callee.method == "blockingServerStreamingCall"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("io.grpc:grpc-stub")
+  }
+  query pattern callExpr where callee.method == "blockingBidiStreamingCall"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("io.grpc:grpc-stub")
+  }
+  query pattern callExpr where callee.method == "blockingClientStreamingCall"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("io.grpc:grpc-stub")
+  }
+  query pattern callExpr where callee.method == "futureUnaryCall"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("io.grpc:grpc-stub")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

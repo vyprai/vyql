@@ -1,9 +1,0 @@
-module bindings.perl.generated.m95a7fa86;
-
-binding xmlParse1 {
-  requires {
-    dependency("WWW-Wunderground-API")
-  }
-  query pattern callExpr where callee.method == "update"
-  emit sink code.XmlParse at args[0]
-}

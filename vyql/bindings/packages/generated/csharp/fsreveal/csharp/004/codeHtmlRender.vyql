@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m4117d2bd;
-
-binding htmlRender4 {
-  requires {
-    dependency("fsreveal")
-  }
-  query pattern callExpr where callee.method == "GenerateHTML"
-  emit sink code.HtmlRender at args[0]
-}

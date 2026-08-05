@@ -1,9 +1,0 @@
-module bindings.perl.generated.mec98890c;
-
-binding deserialization11 {
-  requires {
-    dependency("Thrift")
-  }
-  query pattern callExpr where callee.method == "readI16"
-  emit sink code.Deserialization at args[0]
-}

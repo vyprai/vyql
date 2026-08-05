@@ -1,9 +1,0 @@
-module bindings.dart.generated.mf030bc6c;
-
-binding userControlledData0 {
-  requires {
-    dependency("firebase_admob")
-  }
-  query pattern callExpr where callee.method == "MobileAdTargetingInfo.contentUrl"
-  emit source core.UserControlledData at call.result
-}

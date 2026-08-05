@@ -1,0 +1,41 @@
+module bindings.groovy.generated.m944f97af;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.testcontainers:postgresql")
+  }
+  query pattern callExpr where callee.method == "getJdbcUrl"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("org.testcontainers:postgresql")
+  }
+  query pattern callExpr where callee.method == "withDatabaseName"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("org.testcontainers:postgresql")
+  }
+  query pattern callExpr where callee.method == "withUsername"
+  emit source core.UserControlledData at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("org.testcontainers:postgresql")
+  }
+  query pattern callExpr where callee.method == "withPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("org.testcontainers:postgresql")
+  }
+  query pattern callExpr where callee.method == "addEnv"
+  emit source code.SecretValue at call.result
+}

@@ -1,9 +1,0 @@
-module bindings.go.generated.m01e2c066;
-
-binding deserialization2 {
-  requires {
-    dependency("github.com/oklog/ulid")
-  }
-  query pattern callExpr where callee.method == "MustParse"
-  emit sink code.Deserialization at args[0]
-}

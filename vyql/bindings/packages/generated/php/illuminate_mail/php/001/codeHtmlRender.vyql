@@ -1,9 +1,0 @@
-module bindings.php.generated.m8d92e74e;
-
-binding htmlRender1 {
-  requires {
-    dependency("illuminate/mail")
-  }
-  query pattern callExpr where callee.method == "raw"
-  emit sink code.HtmlRender at args[0]
-}

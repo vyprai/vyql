@@ -1,9 +1,0 @@
-module bindings.objc.generated.mcfdf93b1;
-
-binding filePathAccess0 {
-  requires {
-    dependency("TSMessages")
-  }
-  query pattern callExpr where callee.method == "addCustomDesignFromFileWithName:"
-  emit sink code.FilePathAccess at args[0]
-}

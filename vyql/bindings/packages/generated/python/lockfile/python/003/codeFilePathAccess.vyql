@@ -1,9 +1,0 @@
-module bindings.python.generated.m5350dad1;
-
-binding filePathAccess3 {
-  requires {
-    dependency("lockfile")
-  }
-  query pattern callExpr where callee.method == "read_pid_from_pidfile"
-  emit sink code.FilePathAccess at args[0]
-}

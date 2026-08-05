@@ -1,0 +1,17 @@
+module bindings.scala.generated.mfae526e8;
+
+binding filePathAccess0 {
+  requires {
+    dependency("net.masterthought:cucumber-reporting")
+  }
+  query pattern callExpr where callee.method == "parseJsonFiles"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("net.masterthought:cucumber-reporting")
+  }
+  query pattern callExpr where callee.method == "parseForFeature"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.java.generated.mdc69555d;
-
-binding expressionEval5 {
-  requires {
-    dependency("oro:oro")
-  }
-  query pattern callExpr where callee.method == "matchesPrefix"
-  emit sink code.ExpressionEval at args[0]
-}

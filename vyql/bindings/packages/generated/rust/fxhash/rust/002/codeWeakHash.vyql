@@ -1,9 +1,0 @@
-module bindings.rust.generated.m9bafc7e4;
-
-binding weakHash2 {
-  requires {
-    dependency("fxhash")
-  }
-  query pattern callExpr where callee.method == "hash_word"
-  emit issue code.WeakHash at call
-}

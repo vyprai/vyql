@@ -1,9 +1,0 @@
-module bindings.c.generated.mcff20ae3;
-
-binding archiveEntryWrite0 {
-  requires {
-    dependency("cereal")
-  }
-  query pattern callExpr where callee.method == "start"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

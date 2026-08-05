@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m614e39f6;
-
-binding networkSend3 {
-  requires {
-    dependency("sdl2-net")
-  }
-  query pattern callExpr where callee.method == "NET_SendDatagram"
-  emit sink code.NetworkSend at args[0]
-}

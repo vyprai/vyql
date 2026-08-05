@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m03a06f99;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.poi:poi-ooxml")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.mff36b5b7;
-
-binding networkData3 {
-  requires {
-    dependency("GooglePlaces")
-  }
-  query pattern callExpr where callee.method == "fetchPlaceFromPlaceID"
-  emit source code.NetworkData at call.result
-}

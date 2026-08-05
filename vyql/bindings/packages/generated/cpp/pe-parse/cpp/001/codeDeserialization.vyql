@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m93bbea6c;
-
-binding deserialization1 {
-  requires {
-    dependency("pe-parse")
-  }
-  query pattern callExpr where callee.method == "parse_resource_table"
-  emit sink code.Deserialization at args[0]
-}

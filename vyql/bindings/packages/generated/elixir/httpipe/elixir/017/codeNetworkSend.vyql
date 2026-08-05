@@ -1,9 +1,0 @@
-module bindings.elixir.generated.md8b53b09;
-
-binding networkSend17 {
-  requires {
-    dependency("httpipe")
-  }
-  query pattern callExpr where callee.method == "execute!"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.csharp.generated.me8cd7832;
-
-binding deserialization1 {
-  requires {
-    dependency("aspnet.security.openidconnect.server")
-  }
-  query pattern callExpr where callee.method == "DeserializeAuthorizationCodeContext"
-  emit sink code.Deserialization at args[0]
-}

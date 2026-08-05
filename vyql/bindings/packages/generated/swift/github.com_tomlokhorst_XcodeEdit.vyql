@@ -1,0 +1,33 @@
+module bindings.swift.generated.mefe4fc46;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/tomlokhorst/XcodeEdit")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("github.com/tomlokhorst/XcodeEdit")
+  }
+  query pattern callExpr where callee.method == "createShellScript"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/tomlokhorst/XcodeEdit")
+  }
+  query pattern callExpr where callee.method == "createFileReference"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse3 {
+  requires {
+    dependency("github.com/tomlokhorst/XcodeEdit")
+  }
+  query pattern callExpr where callee.method == "serialized"
+  emit sink code.FileUseSink at args[0]
+}

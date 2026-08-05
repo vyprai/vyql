@@ -1,9 +1,0 @@
-module bindings.dart.generated.m2ea76b0f;
-
-binding commandExecution0 {
-  requires {
-    dependency("git")
-  }
-  query pattern callExpr where callee.method == "runGit"
-  emit sink code.CommandExecution at args[0]
-}

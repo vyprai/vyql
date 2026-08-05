@@ -1,0 +1,37 @@
+module bindings.cpp.generated.md67db989;
+
+binding secretValue0 {
+  requires {
+    dependency("aws-c-auth")
+  }
+  query pattern callExpr where callee.method == "aws_credentials_get_access_key_id"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("aws-c-auth")
+  }
+  query pattern callExpr where callee.method == "aws_credentials_get_secret_access_key"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("aws-c-auth")
+  }
+  query pattern callExpr where callee.method == "aws_credentials_get_session_token"
+  emit source code.SecretValue at call.result
+}
+
+binding authorizationCheck3 {
+  requires {
+    dependency("aws-c-auth")
+  }
+  query pattern callExpr where callee.method == "aws_validate_v4a_authorization_value"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

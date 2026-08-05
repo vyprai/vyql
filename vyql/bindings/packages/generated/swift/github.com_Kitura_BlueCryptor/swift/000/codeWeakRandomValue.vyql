@@ -1,9 +1,0 @@
-module bindings.swift.generated.mc9a64198;
-
-binding weakRandomValue0 {
-  requires {
-    dependency("github.com/Kitura/BlueCryptor")
-  }
-  query pattern callExpr where callee.method == "Random"
-  emit issue code.WeakRandomValue at call
-}

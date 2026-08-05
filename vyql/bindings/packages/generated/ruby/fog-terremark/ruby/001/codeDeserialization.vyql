@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m2f5c938e;
-
-binding deserialization1 {
-  requires {
-    dependency("fog-terremark")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

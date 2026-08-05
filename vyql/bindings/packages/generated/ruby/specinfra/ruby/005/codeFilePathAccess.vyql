@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mcbd93549;
-
-binding filePathAccess5 {
-  requires {
-    dependency("specinfra")
-  }
-  query pattern callExpr where callee.method == "scp_upload!"
-  emit sink code.FilePathAccess at args[0]
-}

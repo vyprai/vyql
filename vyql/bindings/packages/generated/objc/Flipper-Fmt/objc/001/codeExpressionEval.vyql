@@ -1,9 +1,0 @@
-module bindings.objc.generated.m90c4bb22;
-
-binding expressionEval1 {
-  requires {
-    dependency("Flipper-Fmt")
-  }
-  query pattern callExpr where callee.method == "format"
-  emit sink code.ExpressionEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.mb248d5dd;
-
-binding commandExecution0 {
-  requires {
-    dependency("Module-Setup")
-  }
-  query pattern callExpr where callee.method == "system"
-  emit sink code.CommandExecution at args[0]
-}

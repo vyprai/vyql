@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m8fe0b81c;
-
-binding deserialization2 {
-  requires {
-    dependency("eljiffy")
-  }
-  query pattern callExpr where callee.method == "decode!"
-  emit sink code.Deserialization at args[0]
-}

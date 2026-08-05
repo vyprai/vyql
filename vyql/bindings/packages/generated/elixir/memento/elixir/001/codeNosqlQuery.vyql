@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m82bf2c3c;
-
-binding nosqlQuery1 {
-  requires {
-    dependency("memento")
-  }
-  query pattern callExpr where callee.method == "Memento.Query.write"
-  emit sink code.NosqlQuery at args[0]
-}

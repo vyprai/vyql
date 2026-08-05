@@ -1,9 +1,0 @@
-module bindings.swift.generated.mf185a2af;
-
-binding codeEval2 {
-  requires {
-    dependency("github.com/krzysztofzablocki/Inject")
-  }
-  query pattern callExpr where callee.path ~= "InjectConfiguration.load"
-  emit sink code.CodeEval at args[0]
-}

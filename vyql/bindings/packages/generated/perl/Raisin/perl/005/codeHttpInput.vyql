@@ -1,9 +1,0 @@
-module bindings.perl.generated.m8b46436f;
-
-binding httpInput5 {
-  requires {
-    dependency("Raisin")
-  }
-  query pattern callExpr where callee.method == "post"
-  emit source code.HttpInput at call.result
-}

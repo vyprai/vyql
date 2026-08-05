@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mb81e8809;
-
-binding filePathAccess3 {
-  requires {
-    dependency("pathutil")
-  }
-  query pattern callExpr where callee.method == "glob"
-  emit sink code.FilePathAccess at args[0]
-}

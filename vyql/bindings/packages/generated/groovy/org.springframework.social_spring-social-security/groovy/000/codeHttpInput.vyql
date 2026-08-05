@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m046c5b4d;
-
-binding httpInput0 {
-  requires {
-    dependency("org.springframework.social:spring-social-security")
-  }
-  query pattern callExpr where callee.method == "attemptAuthentication"
-  emit source code.HttpInput at call.result
-}

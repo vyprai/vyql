@@ -1,9 +1,0 @@
-module bindings.go.generated.m0a9603dd;
-
-binding filePathAccess3 {
-  requires {
-    dependency("github.com/karrick/godirwalk")
-  }
-  query pattern callExpr where callee.method == "ReadDirnames"
-  emit sink code.FilePathAccess at args[0]
-}

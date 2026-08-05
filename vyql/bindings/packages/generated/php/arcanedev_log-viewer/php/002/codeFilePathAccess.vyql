@@ -1,9 +1,0 @@
-module bindings.php.generated.mfe15df09;
-
-binding filePathAccess2 {
-  requires {
-    dependency("arcanedev/log-viewer")
-  }
-  query pattern callExpr where callee.method == "ArcanedevLogViewerHttpControllersLogViewerController::download"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.c.generated.m3c846fbc;
-
-binding stdinInput1 {
-  requires {
-    dependency("spirv-cross")
-  }
-  query pattern callExpr where callee.method == "read_spirv_file_stdin"
-  emit source code.StdinInput at call.result
-}

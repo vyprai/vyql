@@ -1,9 +1,0 @@
-module bindings.java.generated.md6205be7;
-
-binding fileUse2 {
-  requires {
-    dependency("io.appium:java-client")
-  }
-  query pattern callExpr where callee.method == "pushFile"
-  emit sink code.FileUseSink at args[0]
-}

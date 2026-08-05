@@ -1,9 +1,0 @@
-module bindings.ruby.generated.me31aab7c;
-
-binding userControlledData0 {
-  requires {
-    dependency("signet")
-  }
-  query pattern callExpr where callee.method == "parse_auth_param_list"
-  emit source core.UserControlledData at call.result
-}

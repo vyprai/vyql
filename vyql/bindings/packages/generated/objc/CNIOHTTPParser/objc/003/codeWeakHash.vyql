@@ -1,9 +1,0 @@
-module bindings.objc.generated.ma6dc1814;
-
-binding weakHash3 {
-  requires {
-    dependency("CNIOHTTPParser")
-  }
-  query pattern presenceNode where node.path ~= "cniohttpparser.hash"
-  emit issue code.WeakHash at node
-}

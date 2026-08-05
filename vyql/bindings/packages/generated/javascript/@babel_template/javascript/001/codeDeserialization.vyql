@@ -1,9 +1,0 @@
-module bindings.javascript.generated.madf65cb8;
-
-binding deserialization1 {
-  requires {
-    dependency("@babel/template")
-  }
-  query pattern callExpr where callee.method == "parseWithCodeFrame"
-  emit sink code.Deserialization at args[0]
-}

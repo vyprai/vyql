@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.me24dd41b;
-
-binding networkSend0 {
-  requires {
-    dependency("org.springframework.kafka:spring-kafka")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

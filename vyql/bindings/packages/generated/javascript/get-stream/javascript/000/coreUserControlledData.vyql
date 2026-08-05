@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mb3b3eb92;
-
-binding userControlledData0 {
-  requires {
-    dependency("get-stream")
-  }
-  query pattern callExpr where callee.method == "getStreamAsBuffer"
-  emit source core.UserControlledData at call.result
-}

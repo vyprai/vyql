@@ -1,9 +1,0 @@
-module bindings.php.generated.m1db1da0e;
-
-binding urlFetch1 {
-  requires {
-    dependency("inertiajs/inertia-laravel")
-  }
-  query pattern callExpr where callee.path ~= "InertiaCommandsStopSsr.handle"
-  emit sink code.UrlFetch at args[0]
-}

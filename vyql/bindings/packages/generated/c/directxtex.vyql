@@ -1,0 +1,33 @@
+module bindings.c.generated.m082d41e3;
+
+binding deserialization0 {
+  requires {
+    dependency("directxtex")
+  }
+  query pattern callExpr where callee.method == "InputStream"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("directxtex")
+  }
+  query pattern callExpr where callee.method == "InputFileStream"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("directxtex")
+  }
+  query pattern callExpr where callee.method == "JPEGDecompress"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("directxtex")
+  }
+  query pattern callExpr where callee.method == "PNGDecompress"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.rust.generated.m7bc32aa6;
-
-binding fileUse10 {
-  requires {
-    dependency("hermit-abi")
-  }
-  query pattern callExpr where callee.method == "writev"
-  emit sink code.FileUseSink at args[0]
-}

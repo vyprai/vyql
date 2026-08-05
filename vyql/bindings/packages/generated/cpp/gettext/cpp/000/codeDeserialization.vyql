@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mab9d5944;
-
-binding deserialization0 {
-  requires {
-    dependency("gettext")
-  }
-  query pattern callExpr where callee.method == "PLURAL_PARSE"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,0 +1,61 @@
+module bindings.java.generated.m4093815c;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity4")
+  }
+  query pattern callExpr where callee.method == "AuthUtils.authorizeUsingAccessExpression"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck1 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity4")
+  }
+  query pattern callExpr where callee.method == "AuthUtils.authorizeUsingUrlCheck"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck2 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity4")
+  }
+  query pattern callExpr where callee.method == "AclAuthUtils.authorizeUsingAccessControlList"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck3 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity4")
+  }
+  query pattern callExpr where callee.method == "Authorization.url"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck4 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity4")
+  }
+  query pattern callExpr where callee.method == "AuthenticationAttrProcessor.doProcess"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.m64d094e6;
-
-binding userControlledData0 {
-  requires {
-    dependency("MLKitPoseDetectionCommon")
-  }
-  query pattern callExpr where callee.method == "processImage:completion:"
-  emit source core.UserControlledData at call.result
-}

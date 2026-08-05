@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mc996bfbb;
-
-binding deserialization0 {
-  requires {
-    dependency("com.opencsv:opencsv")
-  }
-  query pattern callExpr where callee.method == "parseLine"
-  emit sink code.Deserialization at args[0]
-}

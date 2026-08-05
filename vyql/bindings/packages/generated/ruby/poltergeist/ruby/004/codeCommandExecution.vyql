@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mcf1af1b6;
-
-binding commandExecution4 {
-  requires {
-    dependency("poltergeist")
-  }
-  query pattern callExpr where callee.method == "command"
-  emit sink code.CommandExecution at args[0]
-}

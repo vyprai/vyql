@@ -1,9 +1,0 @@
-module bindings.php.generated.m8e8981de;
-
-binding responseHeaderWrite1 {
-  requires {
-    dependency("laminas/laminas-httphandlerrunner")
-  }
-  query pattern callExpr where callee.method == "LaminasHttpHandlerRunnerEmitterSapiEmitter::emit"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

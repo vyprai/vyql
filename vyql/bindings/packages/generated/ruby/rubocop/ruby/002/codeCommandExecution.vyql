@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mfa69ad3c;
-
-binding commandExecution2 {
-  requires {
-    dependency("rubocop")
-  }
-  query pattern callExpr where callee.method == "CLI.run_command"
-  emit sink code.CommandExecution at args[0]
-}

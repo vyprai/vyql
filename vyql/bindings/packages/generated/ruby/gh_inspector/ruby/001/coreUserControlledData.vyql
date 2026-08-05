@@ -1,9 +1,0 @@
-module bindings.ruby.generated.me4874d07;
-
-binding userControlledData1 {
-  requires {
-    dependency("gh_inspector")
-  }
-  query pattern callExpr where callee.method == "Inspector.search_exception"
-  emit source core.UserControlledData at call.result
-}

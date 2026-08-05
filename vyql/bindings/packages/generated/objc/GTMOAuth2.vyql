@@ -1,0 +1,53 @@
+module bindings.objc.generated.mbfdd5025;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("GTMOAuth2")
+  }
+  query pattern callExpr where callee.method == "authorizeRequest:"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding secretValue1 {
+  requires {
+    dependency("GTMOAuth2")
+  }
+  query pattern callExpr where callee.method == "persistenceResponseString"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("GTMOAuth2")
+  }
+  query pattern callExpr where callee.method == "setKeysForResponseString:"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("GTMOAuth2")
+  }
+  query pattern callExpr where callee.method == "setKeysForResponseDictionary:"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("GTMOAuth2")
+  }
+  query pattern callExpr where callee.method == "setKeysForPersistenceResponseString:"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("GTMOAuth2")
+  }
+  query pattern callExpr where callee.method == "setProperty:forKey:"
+  emit source code.SecretValue at call.result
+}

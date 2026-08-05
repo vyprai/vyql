@@ -1,9 +1,0 @@
-module bindings.go.generated.ma0da9afe;
-
-binding httpInput1 {
-  requires {
-    dependency("github.com/mozilla/tls-observatory")
-  }
-  query pattern callExpr where callee.method == "PostCertificateHandler"
-  emit source code.HttpInput at call.result
-}

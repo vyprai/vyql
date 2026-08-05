@@ -1,9 +1,0 @@
-module bindings.java.generated.m7afb5fa1;
-
-binding filePathAccess5 {
-  requires {
-    dependency("io.vertx:vertx-core")
-  }
-  query pattern callExpr where callee.method == "delete"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.m9bd436af;
-
-binding cliArgument0 {
-  requires {
-    dependency("com.beust:jcommander")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit source code.CliArgument at call.result
-}

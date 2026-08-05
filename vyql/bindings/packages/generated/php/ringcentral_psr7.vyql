@@ -1,0 +1,33 @@
+module bindings.php.generated.mb2f75f38;
+
+binding httpInput0 {
+  requires {
+    dependency("ringcentral/psr7")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.HttpInput at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("ringcentral/psr7")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit source code.NetworkData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("ringcentral/psr7")
+  }
+  query pattern callExpr where callee.method == "getPath"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("ringcentral/psr7")
+  }
+  query pattern callExpr where callee.method == "getQuery"
+  emit source core.UserControlledData at call.result
+}

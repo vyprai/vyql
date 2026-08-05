@@ -1,9 +1,0 @@
-module bindings.php.generated.m99cfa80f;
-
-binding deserialization2 {
-  requires {
-    dependency("cakephp/chronos")
-  }
-  query pattern callExpr where callee.method == "parseString"
-  emit sink code.Deserialization at args[0]
-}

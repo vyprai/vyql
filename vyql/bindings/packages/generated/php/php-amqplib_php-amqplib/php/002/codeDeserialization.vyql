@@ -1,9 +1,0 @@
-module bindings.php.generated.m6c87298b;
-
-binding deserialization2 {
-  requires {
-    dependency("php-amqplib/php-amqplib")
-  }
-  query pattern callExpr where callee.method == "PhpAmqpLibWireAMQPReader::read_table"
-  emit sink code.Deserialization at args[0]
-}

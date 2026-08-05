@@ -1,9 +1,0 @@
-module bindings.groovy.generated.md397e5bf;
-
-binding deserialization0 {
-  requires {
-    dependency("org.reflections:reflections")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

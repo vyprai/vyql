@@ -1,9 +1,0 @@
-module bindings.dart.generated.mcf9444db;
-
-binding networkData1 {
-  requires {
-    dependency("network_info_plus")
-  }
-  query pattern callExpr where callee.method == "getWifiBSSID"
-  emit source code.NetworkData at call.result
-}

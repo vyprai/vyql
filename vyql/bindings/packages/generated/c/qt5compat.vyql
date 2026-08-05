@@ -1,0 +1,17 @@
+module bindings.c.generated.m4b8f2053;
+
+binding deserialization0 {
+  requires {
+    dependency("qt5compat")
+  }
+  query pattern callExpr where callee.method == "QTextCodec::toUnicode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("qt5compat")
+  }
+  query pattern callExpr where callee.method == "QTextCodec::convertToUnicode"
+  emit sink code.Deserialization at args[0]
+}

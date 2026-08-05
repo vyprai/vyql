@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mc0281a92;
-
-binding userControlledData4 {
-  requires {
-    dependency("rack-test")
-  }
-  query pattern callExpr where callee.method == "env"
-  emit source core.UserControlledData at call.result
-}

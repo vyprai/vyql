@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mf50eb35c;
-
-binding nosqlQuery0 {
-  requires {
-    dependency("mongo-c-driver")
-  }
-  query pattern callExpr where callee.method == "here"
-  emit sink code.NosqlQuery at args[0]
-}

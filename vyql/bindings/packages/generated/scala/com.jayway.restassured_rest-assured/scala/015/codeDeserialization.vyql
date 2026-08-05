@@ -1,9 +1,0 @@
-module bindings.scala.generated.m68d3b056;
-
-binding deserialization15 {
-  requires {
-    dependency("com.jayway.restassured:rest-assured")
-  }
-  query pattern callExpr where callee.method == "validate"
-  emit sink code.Deserialization at args[0]
-}

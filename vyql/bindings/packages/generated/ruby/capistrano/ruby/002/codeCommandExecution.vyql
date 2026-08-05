@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mbbb9062e;
-
-binding commandExecution2 {
-  requires {
-    dependency("capistrano")
-  }
-  query pattern callExpr where callee.method == "run_remote_ssh_command"
-  emit sink code.CommandExecution at args[0]
-}

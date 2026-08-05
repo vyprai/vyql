@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mc2745928;
-
-binding deserialization0 {
-  requires {
-    dependency("org.codehaus.jackson:jackson-mapper-asl")
-  }
-  query pattern callExpr where callee.method == "readValue"
-  emit sink code.Deserialization at args[0]
-}

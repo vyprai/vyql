@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m944fc6bc;
-
-binding filePathAccess3 {
-  requires {
-    dependency("opusfile")
-  }
-  query pattern callExpr where callee.method == "op_fopen"
-  emit sink code.FilePathAccess at args[0]
-}

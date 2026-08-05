@@ -1,9 +1,0 @@
-module bindings.python.generated.m0ba53fc6;
-
-binding deserialization3 {
-  requires {
-    dependency("vine")
-  }
-  query pattern callExpr where callee.method == "prepare_body"
-  emit sink code.Deserialization at args[0]
-}

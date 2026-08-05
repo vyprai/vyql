@@ -1,9 +1,0 @@
-module bindings.swift.generated.me50545bb;
-
-binding userControlledData2 {
-  requires {
-    dependency("github.com/instacart/Nantes")
-  }
-  query pattern callExpr where callee.method == "enabledTextCheckingTypes"
-  emit source core.UserControlledData at call.result
-}

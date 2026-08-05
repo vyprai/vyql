@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mc2d0f686;
-
-binding commandExecution0 {
-  requires {
-    dependency("fltk")
-  }
-  query pattern callExpr where callee.method == "fl_system"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m27397705;
-
-binding networkSend5 {
-  requires {
-    dependency("Apache-Tika")
-  }
-  query pattern callExpr where callee.method == "tika"
-  emit sink code.NetworkSend at args[0]
-}

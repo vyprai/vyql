@@ -1,0 +1,25 @@
+module bindings.java.generated.m95895e1d;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.xbean:xbean-spring")
+  }
+  query pattern callExpr where callee.method == "ClassPathXmlApplicationContext"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.apache.xbean:xbean-spring")
+  }
+  query pattern callExpr where callee.method == "FileSystemXmlApplicationContext"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("org.apache.xbean:xbean-spring")
+  }
+  query pattern callExpr where callee.method == "ResourceXmlApplicationContext"
+  emit sink code.Deserialization at args[0]
+}

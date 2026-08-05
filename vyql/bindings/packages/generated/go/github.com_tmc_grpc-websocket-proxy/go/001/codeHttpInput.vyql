@@ -1,9 +1,0 @@
-module bindings.go.generated.mf9fca987;
-
-binding httpInput1 {
-  requires {
-    dependency("github.com/tmc/grpc-websocket-proxy")
-  }
-  query pattern callExpr where callee.method == "WebsocketProxy"
-  emit source code.HttpInput at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.md1c0928b;
-
-binding deserialization1 {
-  requires {
-    dependency("boost-graph")
-  }
-  query pattern callExpr where callee.method == "read_graphviz"
-  emit sink code.Deserialization at args[0]
-}

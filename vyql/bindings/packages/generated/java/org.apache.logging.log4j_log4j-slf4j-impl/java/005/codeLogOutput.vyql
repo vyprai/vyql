@@ -1,9 +1,0 @@
-module bindings.java.generated.mbd28dfeb;
-
-binding logOutput5 {
-  requires {
-    dependency("org.apache.logging.log4j:log4j-slf4j-impl")
-  }
-  query pattern callExpr where callee.method == "log"
-  emit sink code.LogOutput at args[0]
-}

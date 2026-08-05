@@ -1,9 +1,0 @@
-module bindings.php.generated.m15019051;
-
-binding databaseRead8 {
-  requires {
-    dependency("geoip2/geoip2")
-  }
-  query pattern callExpr where callee.method == "isp"
-  emit sink code.DatabaseReadSink at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m007728c4;
-
-binding deserialization0 {
-  requires {
-    dependency("org.springframework:spring-web")
-  }
-  query pattern callExpr where callee.method == "parseRanges"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,0 +1,17 @@
+module bindings.objc.generated.mb6cb92df;
+
+binding deserialization0 {
+  requires {
+    dependency("PhoneNumberKit")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("PhoneNumberKit")
+  }
+  query pattern callExpr where callee.method == "parseMultiple"
+  emit sink code.Deserialization at args[0]
+}

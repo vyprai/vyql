@@ -1,9 +1,0 @@
-module bindings.perl.generated.m17a94a95;
-
-binding databaseRead1 {
-  requires {
-    dependency("PLUTO")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit sink code.DatabaseReadSink at args[0]
-}

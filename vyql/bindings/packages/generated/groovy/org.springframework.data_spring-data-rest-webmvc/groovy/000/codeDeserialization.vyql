@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m33d42400;
-
-binding deserialization0 {
-  requires {
-    dependency("org.springframework.data:spring-data-rest-webmvc")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

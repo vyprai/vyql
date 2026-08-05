@@ -1,9 +1,0 @@
-module bindings.objc.generated.me36f2000;
-
-binding networkData5 {
-  requires {
-    dependency("RxAlamofire")
-  }
-  query pattern callExpr where callee.method == "data"
-  emit source code.NetworkData at call.result
-}

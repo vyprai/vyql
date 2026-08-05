@@ -1,9 +1,0 @@
-module bindings.perl.generated.m1ea35854;
-
-binding userControlledData0 {
-  requires {
-    dependency("Pod-Usage-CGI")
-  }
-  query pattern callExpr where callee.method == "pod2usage"
-  emit source core.UserControlledData at call.result
-}

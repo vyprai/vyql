@@ -1,9 +1,0 @@
-module bindings.dart.generated.mab46ff19;
-
-binding nosqlQuery5 {
-  requires {
-    dependency("mongo_dart")
-  }
-  query pattern callExpr where callee.method == "createSaslContinueCommand"
-  emit sink code.NosqlQuery at args[0]
-}

@@ -1,0 +1,49 @@
+module bindings.objc.generated.m3b5cdde0;
+
+binding htmlRender0 {
+  requires {
+    dependency("CWStatusBarNotification")
+  }
+  query pattern callExpr where callee.method == "displayNotificationWithMessage:completion:"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender1 {
+  requires {
+    dependency("CWStatusBarNotification")
+  }
+  query pattern callExpr where callee.method == "displayNotificationWithMessage:forDuration:"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("CWStatusBarNotification")
+  }
+  query pattern callExpr where callee.method == "displayNotificationWithAttributedString:completion:"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender3 {
+  requires {
+    dependency("CWStatusBarNotification")
+  }
+  query pattern callExpr where callee.method == "displayNotificationWithAttributedString:forDuration:"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender4 {
+  requires {
+    dependency("CWStatusBarNotification")
+  }
+  query pattern callExpr where callee.method == "displayNotificationWithView:completion:"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender5 {
+  requires {
+    dependency("CWStatusBarNotification")
+  }
+  query pattern callExpr where callee.method == "displayNotificationWithView:forDuration:"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,0 +1,25 @@
+module bindings.groovy.generated.m86f69a8e;
+
+binding deserialization0 {
+  requires {
+    dependency("com.opencsv:opencsv")
+  }
+  query pattern callExpr where callee.method == "parseLine"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.opencsv:opencsv")
+  }
+  query pattern callExpr where callee.method == "readNext"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("com.opencsv:opencsv")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

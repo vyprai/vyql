@@ -1,9 +1,0 @@
-module bindings.go.generated.mbf80db64;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("gopkg.in/yaml.v3")
-  }
-  query pattern callExpr where callee.method == "yaml_parser_set_input_string"
-  emit sink code.StoredDataWrite at args[0]
-}

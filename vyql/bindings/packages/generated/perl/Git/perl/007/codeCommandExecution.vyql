@@ -1,9 +1,0 @@
-module bindings.perl.generated.mc4f12def;
-
-binding commandExecution7 {
-  requires {
-    dependency("Git")
-  }
-  query pattern callExpr where callee.method == "command_noisy"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.mc84d0226;
-
-binding weakHash3 {
-  requires {
-    dependency("SwiftNIOFoundationCompat")
-  }
-  query pattern presenceNode where node.path ~= "swiftniofoundationcompat.hash"
-  emit issue code.WeakHash at node
-}

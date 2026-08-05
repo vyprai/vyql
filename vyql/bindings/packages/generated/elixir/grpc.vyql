@@ -1,0 +1,33 @@
+module bindings.elixir.generated.mc1d2b8cf;
+
+binding networkConnect0 {
+  requires {
+    dependency("grpc")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("grpc")
+  }
+  query pattern callExpr where callee.method == "send_request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("grpc")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}
+
+binding deserialization3 {
+  requires {
+    dependency("grpc")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

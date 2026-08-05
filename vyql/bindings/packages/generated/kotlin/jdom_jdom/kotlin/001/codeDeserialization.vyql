@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.me099a3fc;
-
-binding deserialization1 {
-  requires {
-    dependency("jdom:jdom")
-  }
-  query pattern callExpr where callee.method == "build(org.xml.sax.InputSource)"
-  emit sink code.Deserialization at args[0]
-}

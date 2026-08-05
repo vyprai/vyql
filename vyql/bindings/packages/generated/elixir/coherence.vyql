@@ -1,0 +1,72 @@
+module bindings.elixir.generated.m24ddb9d3;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("coherence")
+  }
+  query pattern callExpr where callee.method == "checkpw"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("coherence")
+  }
+  query pattern callExpr where callee.method == "encrypt_password"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("coherence")
+  }
+  query pattern callExpr where callee.method == "validate_password"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("coherence")
+  }
+  query pattern callExpr where callee.method == "validate_current_password"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation4 {
+  requires {
+    dependency("coherence")
+  }
+  query pattern callExpr where callee.method == "validate_coherence_password_reset"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding secretValue5 {
+  requires {
+    dependency("coherence")
+  }
+  query pattern callExpr where callee.method == "user_token"
+  emit source code.SecretValue at call.result
+}

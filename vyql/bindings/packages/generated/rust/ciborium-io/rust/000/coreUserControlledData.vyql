@@ -1,9 +1,0 @@
-module bindings.rust.generated.m1fa76db7;
-
-binding userControlledData0 {
-  requires {
-    dependency("ciborium-io")
-  }
-  query pattern callExpr where callee.method == "read_exact"
-  emit source core.UserControlledData at call.result
-}

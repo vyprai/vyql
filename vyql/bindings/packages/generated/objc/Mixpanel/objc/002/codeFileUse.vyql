@@ -1,9 +1,0 @@
-module bindings.objc.generated.m515659be;
-
-binding fileUse2 {
-  requires {
-    dependency("Mixpanel")
-  }
-  query pattern callExpr where callee.method == "initWithToken"
-  emit sink code.FileUseSink at args[0]
-}

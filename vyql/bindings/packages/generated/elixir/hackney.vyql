@@ -1,0 +1,81 @@
+module bindings.elixir.generated.md39518e8;
+
+binding networkConnect0 {
+  requires {
+    dependency("hackney")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("hackney")
+  }
+  query pattern callExpr where callee.method == "connect_direct"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding urlFetch2 {
+  requires {
+    dependency("hackney")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch3 {
+  requires {
+    dependency("hackney")
+  }
+  query pattern callExpr where callee.method == "do_request"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("hackney")
+  }
+  query pattern callExpr where callee.method == "connect_via_connect_proxy"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect5 {
+  requires {
+    dependency("hackney")
+  }
+  query pattern callExpr where callee.method == "connect_via_socks5_proxy"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect6 {
+  requires {
+    dependency("hackney")
+  }
+  query pattern callExpr where callee.method == "connect_pool_ssl"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect7 {
+  requires {
+    dependency("hackney")
+  }
+  query pattern callExpr where callee.method == "start_conn_with_socket_internal"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect8 {
+  requires {
+    dependency("hackney")
+  }
+  query pattern callExpr where callee.method == "start_conn_with_socket"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect9 {
+  requires {
+    dependency("hackney")
+  }
+  query pattern callExpr where callee.method == "do_connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

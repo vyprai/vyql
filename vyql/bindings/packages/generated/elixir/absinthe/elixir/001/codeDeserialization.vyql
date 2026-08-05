@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m51269d09;
-
-binding deserialization1 {
-  requires {
-    dependency("absinthe")
-  }
-  query pattern callExpr where callee.method == "Absinthe.Blueprint.Input.parse"
-  emit sink code.Deserialization at args[0]
-}

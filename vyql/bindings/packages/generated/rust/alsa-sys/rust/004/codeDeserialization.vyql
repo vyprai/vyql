@@ -1,9 +1,0 @@
-module bindings.rust.generated.m6d7f9c5d;
-
-binding deserialization4 {
-  requires {
-    dependency("alsa-sys")
-  }
-  query pattern callExpr where callee.method == "snd_config_load_override"
-  emit sink code.Deserialization at args[0]
-}

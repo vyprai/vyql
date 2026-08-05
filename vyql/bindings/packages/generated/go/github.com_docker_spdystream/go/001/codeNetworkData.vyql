@@ -1,9 +1,0 @@
-module bindings.go.generated.m90cc954c;
-
-binding networkData1 {
-  requires {
-    dependency("github.com/docker/spdystream")
-  }
-  query pattern callExpr where callee.method == "NewConnectionWithOptions"
-  emit source code.NetworkData at call.result
-}

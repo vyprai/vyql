@@ -1,9 +1,0 @@
-module bindings.perl.generated.m18d6b6ba;
-
-binding networkConnect0 {
-  requires {
-    dependency("Memcached-RateLimit")
-  }
-  query pattern callExpr where callee.method == "new"
-  emit sink code.NetworkConnectSink at args[0]
-}

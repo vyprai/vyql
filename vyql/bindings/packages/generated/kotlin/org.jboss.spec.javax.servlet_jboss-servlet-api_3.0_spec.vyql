@@ -1,0 +1,17 @@
+module bindings.kotlin.generated.m4879cb79;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.jboss.spec.javax.servlet:jboss-servlet-api_3.0_spec")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("org.jboss.spec.javax.servlet:jboss-servlet-api_3.0_spec")
+  }
+  query pattern callExpr where callee.method == "parseQueryString"
+  emit source core.UserControlledData at call.result
+}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m46558618;
-
-binding expressionEval0 {
-  requires {
-    dependency("ognl:ognl")
-  }
-  query pattern callExpr where callee.method == "parseExpression"
-  emit sink code.ExpressionEval at args[0]
-}

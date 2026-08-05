@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m5c3d006c;
-
-binding templateRender3 {
-  requires {
-    dependency("solid")
-  }
-  query pattern callExpr where callee.method == "render!"
-  emit sink code.TemplateRender at args[0]
-}

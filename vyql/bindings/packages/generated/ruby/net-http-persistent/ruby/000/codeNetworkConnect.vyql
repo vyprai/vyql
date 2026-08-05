@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mbc64cf90;
-
-binding networkConnect0 {
-  requires {
-    dependency("net-http-persistent")
-  }
-  query pattern callExpr where callee.path ~= "Net::HTTP::Persistent#request"
-  emit sink code.NetworkConnectSink at args[0]
-}

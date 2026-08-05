@@ -1,0 +1,65 @@
+module bindings.perl.generated.m227799a1;
+
+binding networkData0 {
+  requires {
+    dependency("SNMP")
+  }
+  query pattern callExpr where callee.method == "snmp_get"
+  emit source code.NetworkData at call.result
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("SNMP")
+  }
+  query pattern callExpr where callee.method == "snmp_get"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("SNMP")
+  }
+  query pattern callExpr where callee.method == "snmp_getnext"
+  emit source code.NetworkData at call.result
+}
+
+binding networkConnect3 {
+  requires {
+    dependency("SNMP")
+  }
+  query pattern callExpr where callee.method == "snmp_getnext"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkData4 {
+  requires {
+    dependency("SNMP")
+  }
+  query pattern callExpr where callee.method == "snmp_set"
+  emit source code.NetworkData at call.result
+}
+
+binding networkConnect5 {
+  requires {
+    dependency("SNMP")
+  }
+  query pattern callExpr where callee.method == "snmp_set"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkData6 {
+  requires {
+    dependency("SNMP")
+  }
+  query pattern callExpr where callee.method == "snmp_trap"
+  emit source code.NetworkData at call.result
+}
+
+binding networkConnect7 {
+  requires {
+    dependency("SNMP")
+  }
+  query pattern callExpr where callee.method == "snmp_trap"
+  emit sink code.NetworkConnectSink at args[0]
+}

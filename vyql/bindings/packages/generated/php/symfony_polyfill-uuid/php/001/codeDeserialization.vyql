@@ -1,9 +1,0 @@
-module bindings.php.generated.m04d00a7b;
-
-binding deserialization1 {
-  requires {
-    dependency("symfony/polyfill-uuid")
-  }
-  query pattern callExpr where callee.method == "uuid_unparse"
-  emit sink code.Deserialization at args[0]
-}

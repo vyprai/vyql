@@ -1,9 +1,0 @@
-module bindings.java.generated.m51c331b3;
-
-binding httpInput2 {
-  requires {
-    dependency("com.android.volley:volley")
-  }
-  query pattern callExpr where callee.method == "getPostBody"
-  emit source code.HttpInput at call.result
-}

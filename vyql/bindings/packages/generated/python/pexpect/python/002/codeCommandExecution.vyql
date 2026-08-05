@@ -1,9 +1,0 @@
-module bindings.python.generated.m90ea37e9;
-
-binding commandExecution2 {
-  requires {
-    dependency("pexpect")
-  }
-  query pattern callExpr where callee.method == "spawn"
-  emit sink code.CommandExecution at args[0]
-}

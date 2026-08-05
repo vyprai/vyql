@@ -1,9 +1,0 @@
-module bindings.go.generated.m8b54f450;
-
-binding networkConnect0 {
-  requires {
-    dependency("cloud.google.com/go/iam")
-  }
-  query pattern callExpr where callee.method == "executeHTTPRequestWithResponse"
-  emit sink code.NetworkConnectSink at args[0]
-}

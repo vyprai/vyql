@@ -1,9 +1,0 @@
-module bindings.c.generated.m43a06365;
-
-binding userControlledData4 {
-  requires {
-    dependency("wxwidgets")
-  }
-  query pattern callExpr where callee.method == "ParseAccel"
-  emit source core.UserControlledData at call.result
-}

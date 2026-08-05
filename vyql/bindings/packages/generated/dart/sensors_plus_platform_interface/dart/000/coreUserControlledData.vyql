@@ -1,9 +1,0 @@
-module bindings.dart.generated.m225dead5;
-
-binding userControlledData0 {
-  requires {
-    dependency("sensors_plus_platform_interface")
-  }
-  query pattern callExpr where callee.method == "accelerometerEventStream"
-  emit source core.UserControlledData at call.result
-}

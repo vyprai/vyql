@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mcdbb098d;
-
-binding deserialization1 {
-  requires {
-    dependency("libvorbis")
-  }
-  query pattern callExpr where callee.method == "vorbis_staticbook_unpack"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.m0efc5269;
-
-binding networkSend3 {
-  requires {
-    dependency("io.rest-assured:rest-assured")
-  }
-  query pattern callExpr where callee.method == "delete"
-  emit sink code.NetworkSend at args[0]
-}

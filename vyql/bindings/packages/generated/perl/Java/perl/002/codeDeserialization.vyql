@@ -1,9 +1,0 @@
-module bindings.perl.generated.me3c54fcd;
-
-binding deserialization2 {
-  requires {
-    dependency("Java")
-  }
-  query pattern callExpr where callee.method == "create_object"
-  emit sink code.Deserialization at args[0]
-}

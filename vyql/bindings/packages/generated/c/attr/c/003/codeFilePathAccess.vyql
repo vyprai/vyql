@@ -1,9 +1,0 @@
-module bindings.c.generated.ma3178d8e;
-
-binding filePathAccess3 {
-  requires {
-    dependency("attr")
-  }
-  query pattern callExpr where callee.method == "attr_list"
-  emit sink code.FilePathAccess at args[0]
-}

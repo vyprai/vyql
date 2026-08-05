@@ -1,9 +1,0 @@
-module bindings.objc.generated.m9075ca44;
-
-binding userControlledData0 {
-  requires {
-    dependency("WechatOpenSDK")
-  }
-  query pattern callExpr where callee.method == "handleOpenURL"
-  emit source core.UserControlledData at call.result
-}

@@ -1,0 +1,17 @@
+module bindings.bash.generated.mda4c1fc1;
+
+binding cliArgument0 {
+  requires {
+    dependency("docbook-xsl")
+  }
+  query pattern callExpr where callee.path ~= "dbtoepub"
+  emit source code.CliArgument at call.result
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("docbook-xsl")
+  }
+  query pattern callExpr where callee.path ~= "docbook-xsl-update"
+  emit sink code.CommandExecution at args[0]
+}

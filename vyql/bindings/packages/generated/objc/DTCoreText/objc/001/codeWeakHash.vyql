@@ -1,9 +1,0 @@
-module bindings.objc.generated.mbd1e868a;
-
-binding weakHash1 {
-  requires {
-    dependency("DTCoreText")
-  }
-  query pattern presenceNode where node.path ~= "dtcoretext.hash"
-  emit issue code.WeakHash at node
-}

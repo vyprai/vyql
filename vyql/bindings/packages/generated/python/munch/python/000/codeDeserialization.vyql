@@ -1,9 +1,0 @@
-module bindings.python.generated.ma8174b37;
-
-binding deserialization0 {
-  requires {
-    dependency("munch")
-  }
-  query pattern callExpr where callee.method == "from_yaml"
-  emit sink code.Deserialization at args[0]
-}

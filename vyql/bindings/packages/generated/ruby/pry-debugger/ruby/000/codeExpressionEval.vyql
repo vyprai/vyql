@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m7dcbde41;
-
-binding expressionEval0 {
-  requires {
-    dependency("pry-debugger")
-  }
-  query pattern callExpr where callee.method == "add"
-  emit sink code.ExpressionEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mb7a3f668;
-
-binding sqlExecution2 {
-  requires {
-    dependency("org.apache.commons:commons-dbcp2")
-  }
-  query pattern callExpr where callee.method == "setConnectionInitSqls"
-  emit sink code.SqlExecution at args[0]
-}

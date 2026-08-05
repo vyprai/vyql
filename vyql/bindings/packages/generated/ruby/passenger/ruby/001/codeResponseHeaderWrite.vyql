@@ -1,9 +1,0 @@
-module bindings.ruby.generated.md57970a0;
-
-binding responseHeaderWrite1 {
-  requires {
-    dependency("passenger")
-  }
-  query pattern callExpr where callee.path ~= "start_response"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

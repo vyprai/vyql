@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m4d004884;
-
-binding userControlledData12 {
-  requires {
-    dependency("librsvg")
-  }
-  query pattern callExpr where callee.method == "rsvg_css_parse_vbox"
-  emit source core.UserControlledData at call.result
-}

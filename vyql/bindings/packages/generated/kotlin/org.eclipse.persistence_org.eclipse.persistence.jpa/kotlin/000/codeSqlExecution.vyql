@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m27e506cb;
-
-binding sqlExecution0 {
-  requires {
-    dependency("org.eclipse.persistence:org.eclipse.persistence.jpa")
-  }
-  query pattern callExpr where callee.method == "createQuery"
-  emit sink code.SqlExecution at args[0]
-}

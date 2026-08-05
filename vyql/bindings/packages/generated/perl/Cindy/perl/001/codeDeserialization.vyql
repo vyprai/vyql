@@ -1,9 +1,0 @@
-module bindings.perl.generated.mc0f0dde0;
-
-binding deserialization1 {
-  requires {
-    dependency("Cindy")
-  }
-  query pattern callExpr where callee.method == "parse_xml_string"
-  emit sink code.Deserialization at args[0]
-}

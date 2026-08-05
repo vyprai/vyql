@@ -1,9 +1,0 @@
-module bindings.go.generated.ma2dd4563;
-
-binding responseHeaderWrite5 {
-  requires {
-    dependency("github.com/gobwas/ws")
-  }
-  query pattern callExpr where callee.method == "httpWriteUpgradeRequest"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

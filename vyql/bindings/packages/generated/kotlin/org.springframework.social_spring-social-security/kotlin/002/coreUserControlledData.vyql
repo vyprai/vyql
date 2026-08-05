@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1fdb3140;
-
-binding userControlledData2 {
-  requires {
-    dependency("org.springframework.social:spring-social-security")
-  }
-  query pattern callExpr where callee.method == "SocialUser"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.m1bb9a520;
-
-binding deserialization1 {
-  requires {
-    dependency("HandyJSON")
-  }
-  query pattern callExpr where callee.method == "deserializeFrom"
-  emit sink code.Deserialization at args[0]
-}

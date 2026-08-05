@@ -1,0 +1,33 @@
+module bindings.elixir.generated.md81f6f4f;
+
+binding userControlledData0 {
+  requires {
+    dependency("ueberauth_identity")
+  }
+  query pattern callExpr where callee.method == "uid"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("ueberauth_identity")
+  }
+  query pattern callExpr where callee.method == "info"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("ueberauth_identity")
+  }
+  query pattern callExpr where callee.method == "credentials"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("ueberauth_identity")
+  }
+  query pattern callExpr where callee.method == "extra"
+  emit source core.UserControlledData at call.result
+}

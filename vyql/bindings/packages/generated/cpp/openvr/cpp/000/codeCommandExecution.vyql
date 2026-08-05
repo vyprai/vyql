@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m0287ba33;
-
-binding commandExecution0 {
-  requires {
-    dependency("openvr")
-  }
-  query pattern callExpr where callee.method == "LaunchApplicationFromMimeType"
-  emit sink code.CommandExecution at args[0]
-}

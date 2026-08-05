@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m7b984fba;
-
-binding userControlledData7 {
-  requires {
-    dependency("com.amazonaws:aws-lambda-java-core")
-  }
-  query pattern callExpr where callee.method == "getIdentity"
-  emit source core.UserControlledData at call.result
-}

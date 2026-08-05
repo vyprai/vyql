@@ -1,9 +1,0 @@
-module bindings.swift.generated.mc18252ef;
-
-binding networkSend1 {
-  requires {
-    dependency("github.com/NozeIO/swift-nio-redis-client")
-  }
-  query pattern callExpr where callee.method == "psubscribe"
-  emit sink code.NetworkSend at args[0]
-}

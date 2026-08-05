@@ -1,0 +1,81 @@
+module bindings.rust.generated.m9bafc7e4;
+
+binding weakHash0 {
+  requires {
+    dependency("fxhash")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash1 {
+  requires {
+    dependency("fxhash")
+  }
+  query pattern callExpr where callee.method == "finish"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash2 {
+  requires {
+    dependency("fxhash")
+  }
+  query pattern callExpr where callee.method == "hash_word"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash3 {
+  requires {
+    dependency("fxhash")
+  }
+  query pattern callExpr where callee.method == "write_u8"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash4 {
+  requires {
+    dependency("fxhash")
+  }
+  query pattern callExpr where callee.method == "write_u16"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash5 {
+  requires {
+    dependency("fxhash")
+  }
+  query pattern callExpr where callee.method == "write_u32"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash6 {
+  requires {
+    dependency("fxhash")
+  }
+  query pattern callExpr where callee.method == "write_u64"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash7 {
+  requires {
+    dependency("fxhash")
+  }
+  query pattern callExpr where callee.method == "write_usize"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash8 {
+  requires {
+    dependency("fxhash")
+  }
+  query pattern callExpr where callee.method == "write32"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash9 {
+  requires {
+    dependency("fxhash")
+  }
+  query pattern callExpr where callee.method == "write64"
+  emit issue code.WeakHash at call
+}

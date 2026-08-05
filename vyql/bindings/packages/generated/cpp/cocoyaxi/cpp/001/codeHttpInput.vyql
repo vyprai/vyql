@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m2661708c;
-
-binding httpInput1 {
-  requires {
-    dependency("cocoyaxi")
-  }
-  query pattern callExpr where callee.method == "parse_http_req"
-  emit source code.HttpInput at call.result
-}

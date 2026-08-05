@@ -1,9 +1,0 @@
-module bindings.rust.generated.m62f8a4cd;
-
-binding weakHash1 {
-  requires {
-    dependency("twox-hash")
-  }
-  query pattern callExpr where callee.method == "oneshot_with_seed"
-  emit issue code.WeakHash at call
-}

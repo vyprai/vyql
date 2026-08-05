@@ -1,9 +1,0 @@
-module bindings.objc.generated.m99062b4b;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("TensorFlowLiteObjC")
-  }
-  query pattern callExpr where callee.method == "ResetJitCompilerFlags"
-  emit sink code.StoredDataWrite at args[0]
-}

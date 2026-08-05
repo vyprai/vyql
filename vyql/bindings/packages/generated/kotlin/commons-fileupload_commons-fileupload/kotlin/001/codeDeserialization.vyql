@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m44df4644;
-
-binding deserialization1 {
-  requires {
-    dependency("commons-fileupload:commons-fileupload")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

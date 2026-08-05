@@ -1,0 +1,17 @@
+module bindings.perl.generated.m1aafe339;
+
+binding secretValue0 {
+  requires {
+    dependency("Crypt-GCrypt")
+  }
+  query pattern callExpr where callee.method == "setkey"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("Crypt-GCrypt")
+  }
+  query pattern callExpr where callee.method == "setiv"
+  emit source code.SecretValue at call.result
+}

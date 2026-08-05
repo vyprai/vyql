@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m4013f612;
-
-binding networkData1 {
-  requires {
-    dependency("rome:rome")
-  }
-  query pattern callExpr where callee.method == "XmlReader"
-  emit source code.NetworkData at call.result
-}

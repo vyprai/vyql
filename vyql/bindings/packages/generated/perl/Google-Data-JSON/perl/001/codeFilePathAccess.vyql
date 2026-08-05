@@ -1,9 +1,0 @@
-module bindings.perl.generated.mf3d3c1f8;
-
-binding filePathAccess1 {
-  requires {
-    dependency("Google-Data-JSON")
-  }
-  query pattern callExpr where callee.method == "new"
-  emit sink code.FilePathAccess at args[0]
-}

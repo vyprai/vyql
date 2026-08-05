@@ -1,9 +1,0 @@
-module bindings.php.generated.mca3f8814;
-
-binding networkSend2 {
-  requires {
-    dependency("facade/flare-client-php")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit sink code.NetworkSend at args[0]
-}

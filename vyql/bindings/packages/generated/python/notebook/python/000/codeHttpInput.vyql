@@ -1,9 +1,0 @@
-module bindings.python.generated.m9f68f3c1;
-
-binding httpInput0 {
-  requires {
-    dependency("notebook")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit source code.HttpInput at call.result
-}

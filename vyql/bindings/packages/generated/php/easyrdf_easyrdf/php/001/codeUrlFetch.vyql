@@ -1,9 +1,0 @@
-module bindings.php.generated.mebd9a39f;
-
-binding urlFetch1 {
-  requires {
-    dependency("easyrdf/easyrdf")
-  }
-  query pattern callExpr where callee.method == "EasyRdfGraph::load"
-  emit sink code.UrlFetch at args[0]
-}

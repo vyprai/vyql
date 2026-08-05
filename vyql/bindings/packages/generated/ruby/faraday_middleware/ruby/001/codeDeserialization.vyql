@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m3781d3f1;
-
-binding deserialization1 {
-  requires {
-    dependency("faraday_middleware")
-  }
-  query pattern callExpr where callee.method == "ParseJson#process_response"
-  emit sink code.Deserialization at args[0]
-}

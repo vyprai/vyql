@@ -1,9 +1,0 @@
-module bindings.java.generated.m2106962d;
-
-binding archiveEntryWrite4 {
-  requires {
-    dependency("org.eclipse.jgit:org.eclipse.jgit")
-  }
-  query pattern callExpr where callee.method == "archive"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

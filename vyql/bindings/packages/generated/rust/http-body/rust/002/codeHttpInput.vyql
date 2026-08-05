@@ -1,9 +1,0 @@
-module bindings.rust.generated.mbd07b293;
-
-binding httpInput2 {
-  requires {
-    dependency("http-body")
-  }
-  query pattern callExpr where callee.method == "into_trailers"
-  emit source code.HttpInput at call.result
-}

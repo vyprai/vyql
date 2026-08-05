@@ -1,9 +1,0 @@
-module bindings.scala.generated.mb7dbc103;
-
-binding htmlRender0 {
-  requires {
-    dependency("org.springframework.security:spring-security-taglibs")
-  }
-  query pattern callExpr where callee.method == "writeMessage"
-  emit sink code.HtmlRender at args[0]
-}

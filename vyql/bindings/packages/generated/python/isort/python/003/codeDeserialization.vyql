@@ -1,9 +1,0 @@
-module bindings.python.generated.m69004ac7;
-
-binding deserialization3 {
-  requires {
-    dependency("isort")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m9974d4d4;
-
-binding deserialization7 {
-  requires {
-    dependency("microsoft.data.services.client")
-  }
-  query pattern callExpr where callee.method == "ConvertPrimitiveValue"
-  emit sink code.Deserialization at args[0]
-}

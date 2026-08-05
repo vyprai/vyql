@@ -1,9 +1,0 @@
-module bindings.php.generated.m23fc3e07;
-
-binding httpInput1 {
-  requires {
-    dependency("symfony-cmf/routing")
-  }
-  query pattern callExpr where callee.method == "matchRequest"
-  emit source code.HttpInput at call.result
-}

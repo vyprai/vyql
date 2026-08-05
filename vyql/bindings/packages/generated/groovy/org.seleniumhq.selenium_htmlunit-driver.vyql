@@ -1,0 +1,34 @@
+module bindings.groovy.generated.mdf68fcd6;
+
+binding redirectTarget0 {
+  requires {
+    dependency("org.seleniumhq.selenium:htmlunit-driver")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("org.seleniumhq.selenium:htmlunit-driver")
+  }
+  query pattern callExpr where callee.method == "sendKeys"
+  emit source core.UserControlledData at call.result
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("org.seleniumhq.selenium:htmlunit-driver")
+  }
+  query pattern callExpr where callee.method == "setHTTPProxy"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect3 {
+  requires {
+    dependency("org.seleniumhq.selenium:htmlunit-driver")
+  }
+  query pattern callExpr where callee.method == "setAutoProxy"
+  emit sink code.NetworkConnectSink at args[0]
+}

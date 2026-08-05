@@ -1,0 +1,57 @@
+module bindings.cpp.generated.mba04978c;
+
+binding weakHash0 {
+  requires {
+    dependency("libxcrypt")
+  }
+  query pattern callExpr where callee.method == "MD5_Init"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash1 {
+  requires {
+    dependency("libxcrypt")
+  }
+  query pattern callExpr where callee.method == "MD5_Update"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash2 {
+  requires {
+    dependency("libxcrypt")
+  }
+  query pattern callExpr where callee.method == "MD5_Final"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash3 {
+  requires {
+    dependency("libxcrypt")
+  }
+  query pattern callExpr where callee.method == "sha1_init_ctx"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash4 {
+  requires {
+    dependency("libxcrypt")
+  }
+  query pattern callExpr where callee.method == "sha1_process_bytes"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash5 {
+  requires {
+    dependency("libxcrypt")
+  }
+  query pattern callExpr where callee.method == "sha1_finish_ctx"
+  emit issue code.WeakHash at call
+}
+
+binding weakCipher6 {
+  requires {
+    dependency("libxcrypt")
+  }
+  query pattern callExpr where callee.method == "des_crypt_block"
+  emit issue code.WeakCipher at call
+}

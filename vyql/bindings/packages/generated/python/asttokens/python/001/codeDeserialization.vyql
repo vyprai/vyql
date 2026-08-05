@@ -1,9 +1,0 @@
-module bindings.python.generated.medc2fb30;
-
-binding deserialization1 {
-  requires {
-    dependency("asttokens")
-  }
-  query pattern callExpr where callee.method == "ASTTokens.mark_tokens"
-  emit sink code.Deserialization at args[0]
-}

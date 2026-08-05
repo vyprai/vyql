@@ -1,9 +1,0 @@
-module bindings.python.generated.m16b485ee;
-
-binding deserialization2 {
-  requires {
-    dependency("bottle")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

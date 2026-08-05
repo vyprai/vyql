@@ -1,9 +1,0 @@
-module bindings.python.generated.mad97f1d3;
-
-binding httpInput3 {
-  requires {
-    dependency("requests-mock")
-  }
-  query pattern callExpr where callee.method == "last_request"
-  emit source code.HttpInput at call.result
-}

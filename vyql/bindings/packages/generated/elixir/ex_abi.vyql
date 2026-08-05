@@ -1,0 +1,33 @@
+module bindings.elixir.generated.m1e2b77c7;
+
+binding deserialization0 {
+  requires {
+    dependency("ex_abi")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("ex_abi")
+  }
+  query pattern callExpr where callee.method == "find_and_decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("ex_abi")
+  }
+  query pattern callExpr where callee.method == "parse_specification"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("ex_abi")
+  }
+  query pattern callExpr where callee.method == "parse!"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.mbeb82f6c;
-
-binding weakHash1 {
-  requires {
-    dependency("github.com/apple/swift-nio-ssl")
-  }
-  query pattern callExpr where callee.method == "hash"
-  emit issue code.WeakHash at call
-}

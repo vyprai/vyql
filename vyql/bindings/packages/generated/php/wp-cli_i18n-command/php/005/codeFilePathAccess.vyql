@@ -1,9 +1,0 @@
-module bindings.php.generated.m321695dd;
-
-binding filePathAccess5 {
-  requires {
-    dependency("wp-cli/i18n-command")
-  }
-  query pattern callExpr where callee.method == "MakeJsonCommand::make_json"
-  emit sink code.FilePathAccess at args[0]
-}

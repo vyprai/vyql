@@ -1,9 +1,0 @@
-module bindings.perl.generated.m2f4ec88b;
-
-binding cookie0 {
-  requires {
-    dependency("Jifty-Plugin-Comment")
-  }
-  query pattern callExpr where callee.method == "fetch_comment_cookie"
-  emit source code.Cookie at call.result
-}

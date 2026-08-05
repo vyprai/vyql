@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m2ece8fc8;
-
-binding databaseRead0 {
-  requires {
-    dependency("org.springframework.data:spring-data-elasticsearch")
-  }
-  query pattern callExpr where callee.method == "search"
-  emit sink code.DatabaseReadSink at args[0]
-}

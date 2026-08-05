@@ -1,0 +1,49 @@
+module bindings.kotlin.generated.mc4650048;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("org.springframework.data:spring-data-mongodb")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.springframework.data:spring-data-mongodb")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding nosqlQuery2 {
+  requires {
+    dependency("org.springframework.data:spring-data-mongodb")
+  }
+  query pattern callExpr where callee.method == "updateOne"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery3 {
+  requires {
+    dependency("org.springframework.data:spring-data-mongodb")
+  }
+  query pattern callExpr where callee.method == "updateMulti"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery4 {
+  requires {
+    dependency("org.springframework.data:spring-data-mongodb")
+  }
+  query pattern callExpr where callee.method == "upsert"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery5 {
+  requires {
+    dependency("org.springframework.data:spring-data-mongodb")
+  }
+  query pattern callExpr where callee.method == "remove"
+  emit sink code.NosqlQuery at args[0]
+}

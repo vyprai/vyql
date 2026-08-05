@@ -1,9 +1,0 @@
-module bindings.python.generated.md92dbb22;
-
-binding userControlledData2 {
-  requires {
-    dependency("django-import-export")
-  }
-  query pattern callExpr where callee.method == "get_export_data"
-  emit source core.UserControlledData at call.result
-}

@@ -1,0 +1,49 @@
+module bindings.cpp.generated.ma70876e4;
+
+binding networkData0 {
+  requires {
+    dependency("libpcap")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("libpcap")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend2 {
+  requires {
+    dependency("libpcap")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("libpcap")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("libpcap")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding commandExecution5 {
+  requires {
+    dependency("libpcap")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

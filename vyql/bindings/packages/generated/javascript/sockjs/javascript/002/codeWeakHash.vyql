@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m77236a9a;
-
-binding weakHash2 {
-  requires {
-    dependency("sockjs")
-  }
-  query pattern callExpr where callee.method == "sha1_base64"
-  emit issue code.WeakHash at call
-}

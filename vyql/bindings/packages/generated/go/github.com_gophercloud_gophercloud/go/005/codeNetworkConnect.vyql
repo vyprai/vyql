@@ -1,9 +1,0 @@
-module bindings.go.generated.mcea9b916;
-
-binding networkConnect5 {
-  requires {
-    dependency("github.com/gophercloud/gophercloud")
-  }
-  query pattern callExpr where callee.method == "ParseResponse"
-  emit sink code.NetworkConnectSink at args[0]
-}

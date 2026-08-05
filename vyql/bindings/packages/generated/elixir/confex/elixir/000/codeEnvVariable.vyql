@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma6195ec2;
-
-binding envVariable0 {
-  requires {
-    dependency("confex")
-  }
-  query pattern callExpr where callee.method == "Confex.Adapters.SystemEnvironment.fetch_value"
-  emit source code.EnvVariable at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m477c4003;
-
-binding networkConnect4 {
-  requires {
-    dependency("guzzlehttp/guzzle")
-  }
-  query pattern callExpr where callee.method == "requestAsync"
-  emit sink code.NetworkConnectSink at args[0]
-}

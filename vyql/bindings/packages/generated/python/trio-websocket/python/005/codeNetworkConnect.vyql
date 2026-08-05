@@ -1,9 +1,0 @@
-module bindings.python.generated.m240fa5ae;
-
-binding networkConnect5 {
-  requires {
-    dependency("trio-websocket")
-  }
-  query pattern callExpr where callee.method == "serve_websocket"
-  emit sink code.NetworkConnectSink at args[0]
-}

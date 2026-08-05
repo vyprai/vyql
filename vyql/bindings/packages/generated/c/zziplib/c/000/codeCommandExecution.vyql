@@ -1,9 +1,0 @@
-module bindings.c.generated.mc68d9ca5;
-
-binding commandExecution0 {
-  requires {
-    dependency("zziplib")
-  }
-  query pattern callExpr where callee.method == "spawn"
-  emit sink code.CommandExecution at args[0]
-}

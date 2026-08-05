@@ -1,9 +1,0 @@
-module bindings.perl.generated.m1a62625e;
-
-binding filePathAccess4 {
-  requires {
-    dependency("Caroline")
-  }
-  query pattern callExpr where callee.method == "write_history_file"
-  emit sink code.FilePathAccess at args[0]
-}

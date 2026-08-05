@@ -1,9 +1,0 @@
-module bindings.scala.generated.mc22d5a93;
-
-binding sqlExecution0 {
-  requires {
-    dependency("postgresql:postgresql")
-  }
-  query pattern callExpr where callee.method == "createSimpleQuery"
-  emit sink code.SqlExecution at args[0]
-}

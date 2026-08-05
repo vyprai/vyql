@@ -1,9 +1,0 @@
-module bindings.php.generated.m1d0184d9;
-
-binding userControlledData2 {
-  requires {
-    dependency("nette/bootstrap")
-  }
-  query pattern callExpr where callee.method == "addStaticParameters"
-  emit source core.UserControlledData at call.result
-}

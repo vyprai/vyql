@@ -1,9 +1,0 @@
-module bindings.swift.generated.m4fcc3235;
-
-binding networkData3 {
-  requires {
-    dependency("github.com/grpc/grpc-swift")
-  }
-  query pattern callExpr where callee.method == "serialize"
-  emit source code.NetworkData at call.result
-}

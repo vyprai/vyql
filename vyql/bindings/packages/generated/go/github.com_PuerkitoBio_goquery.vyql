@@ -1,0 +1,33 @@
+module bindings.go.generated.me312f8bb;
+
+binding urlFetch0 {
+  requires {
+    dependency("github.com/PuerkitoBio/goquery")
+  }
+  query pattern callExpr where callee.method == "NewDocument"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/PuerkitoBio/goquery")
+  }
+  query pattern callExpr where callee.method == "NewDocumentFromReader"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/PuerkitoBio/goquery")
+  }
+  query pattern callExpr where callee.method == "NewDocumentFromResponse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding htmlRender3 {
+  requires {
+    dependency("github.com/PuerkitoBio/goquery")
+  }
+  query pattern callExpr where callee.method == "Render"
+  emit sink code.HtmlRender at args[0]
+}

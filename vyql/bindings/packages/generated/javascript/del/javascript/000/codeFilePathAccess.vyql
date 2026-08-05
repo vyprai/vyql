@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mbf124e76;
-
-binding filePathAccess0 {
-  requires {
-    dependency("del")
-  }
-  query pattern callExpr where callee.method == "deleteAsync"
-  emit sink code.FilePathAccess at args[0]
-}

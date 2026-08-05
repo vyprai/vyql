@@ -1,9 +1,0 @@
-module bindings.dart.generated.m566b51ec;
-
-binding storedDataRead1 {
-  requires {
-    dependency("isar")
-  }
-  query pattern callExpr where callee.method == "exportJsonRawSync"
-  emit source code.StoredDataRead at call.result
-}

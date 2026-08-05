@@ -1,9 +1,0 @@
-module bindings.c.generated.me87f9701;
-
-binding networkConnect4 {
-  requires {
-    dependency("qtconnectivity")
-  }
-  query pattern callExpr where callee.method == "QBluetoothSocket::connectToHost"
-  emit sink code.NetworkConnectSink at args[0]
-}

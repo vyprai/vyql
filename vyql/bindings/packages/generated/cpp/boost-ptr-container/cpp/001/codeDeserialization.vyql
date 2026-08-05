@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m9a936437;
-
-binding deserialization1 {
-  requires {
-    dependency("boost-ptr-container")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

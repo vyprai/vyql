@@ -1,9 +1,0 @@
-module bindings.go.generated.md6dcc4ff;
-
-binding httpInput0 {
-  requires {
-    dependency("google.golang.org/appengine")
-  }
-  query pattern callExpr where callee.method == "NewContext"
-  emit source code.HttpInput at call.result
-}

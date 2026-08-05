@@ -1,0 +1,49 @@
+module bindings.ruby.generated.mca980e10;
+
+binding filePathAccess0 {
+  requires {
+    dependency("net-scp")
+  }
+  query pattern callExpr where callee.method == "upload!"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("net-scp")
+  }
+  query pattern callExpr where callee.method == "upload!"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("net-scp")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("net-scp")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData4 {
+  requires {
+    dependency("net-scp")
+  }
+  query pattern callExpr where callee.method == "download!"
+  emit source code.NetworkData at call.result
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("net-scp")
+  }
+  query pattern callExpr where callee.method == "download!"
+  emit sink code.FilePathAccess at args[0]
+}

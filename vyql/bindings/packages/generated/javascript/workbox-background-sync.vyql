@@ -1,0 +1,25 @@
+module bindings.javascript.generated.m2ad1be90;
+
+binding networkData0 {
+  requires {
+    dependency("workbox-background-sync")
+  }
+  query pattern callExpr where callee.method == "pushRequest"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("workbox-background-sync")
+  }
+  query pattern callExpr where callee.method == "unshiftRequest"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend2 {
+  requires {
+    dependency("workbox-background-sync")
+  }
+  query pattern callExpr where callee.method == "replayRequests"
+  emit sink code.NetworkSend at args[0]
+}

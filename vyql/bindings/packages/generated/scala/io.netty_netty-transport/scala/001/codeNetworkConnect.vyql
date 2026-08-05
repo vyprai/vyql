@@ -1,9 +1,0 @@
-module bindings.scala.generated.m4f063e23;
-
-binding networkConnect1 {
-  requires {
-    dependency("io.netty:netty-transport")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

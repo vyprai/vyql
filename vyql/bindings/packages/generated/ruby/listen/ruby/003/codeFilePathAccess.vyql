@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m8df885c9;
-
-binding filePathAccess3 {
-  requires {
-    dependency("listen")
-  }
-  query pattern callExpr where callee.method == "file_data"
-  emit sink code.FilePathAccess at args[0]
-}

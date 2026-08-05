@@ -1,9 +1,0 @@
-module bindings.go.generated.md61646f0;
-
-binding deserialization2 {
-  requires {
-    dependency("github.com/golang-sql/civil")
-  }
-  query pattern callExpr where callee.method == "ParseDateTime"
-  emit sink code.Deserialization at args[0]
-}

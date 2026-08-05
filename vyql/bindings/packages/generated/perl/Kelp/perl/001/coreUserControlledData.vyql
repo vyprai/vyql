@@ -1,9 +1,0 @@
-module bindings.perl.generated.m3a5159c9;
-
-binding userControlledData1 {
-  requires {
-    dependency("Kelp")
-  }
-  query pattern callExpr where callee.method == "body_parameters"
-  emit source core.UserControlledData at call.result
-}

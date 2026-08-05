@@ -1,9 +1,0 @@
-module bindings.perl.generated.m008a507f;
-
-binding networkData2 {
-  requires {
-    dependency("Starman")
-  }
-  query pattern callExpr where callee.method == "_read_headers"
-  emit source code.NetworkData at call.result
-}

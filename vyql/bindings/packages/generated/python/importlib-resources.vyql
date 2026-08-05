@@ -1,0 +1,33 @@
+module bindings.python.generated.me717aba2;
+
+binding filePathAccess0 {
+  requires {
+    dependency("importlib-resources")
+  }
+  query pattern callExpr where callee.method == "open_text"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("importlib-resources")
+  }
+  query pattern callExpr where callee.method == "read_binary"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("importlib-resources")
+  }
+  query pattern callExpr where callee.method == "path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("importlib-resources")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

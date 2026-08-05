@@ -1,9 +1,0 @@
-module bindings.perl.generated.m5e234a59;
-
-binding userControlledData5 {
-  requires {
-    dependency("SpamMonkey")
-  }
-  query pattern callExpr where callee.method == "test_bodylike"
-  emit source core.UserControlledData at call.result
-}

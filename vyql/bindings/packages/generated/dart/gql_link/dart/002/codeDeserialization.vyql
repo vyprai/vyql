@@ -1,9 +1,0 @@
-module bindings.dart.generated.mfd6aa07a;
-
-binding deserialization2 {
-  requires {
-    dependency("gql_link")
-  }
-  query pattern callExpr where callee.method == "parseError"
-  emit sink code.Deserialization at args[0]
-}

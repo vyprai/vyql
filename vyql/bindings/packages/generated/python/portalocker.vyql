@@ -1,0 +1,25 @@
+module bindings.python.generated.mffc7db44;
+
+binding filePathAccess0 {
+  requires {
+    dependency("portalocker")
+  }
+  query pattern callExpr where callee.method == "lock"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("portalocker")
+  }
+  query pattern callExpr where callee.method == "unlock"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("portalocker")
+  }
+  query pattern callExpr where callee.method == "open_atomic"
+  emit sink code.FilePathAccess at args[0]
+}

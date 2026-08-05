@@ -1,9 +1,0 @@
-module bindings.scala.generated.ma91ee222;
-
-binding sqlExecution2 {
-  requires {
-    dependency("com.baomidou:mybatis-plus-generator")
-  }
-  query pattern callExpr where callee.method == "primaryKeySql"
-  emit sink code.SqlExecution at args[0]
-}

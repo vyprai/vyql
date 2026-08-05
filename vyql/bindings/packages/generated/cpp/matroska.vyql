@@ -1,0 +1,49 @@
+module bindings.cpp.generated.mee0e4fc9;
+
+binding deserialization0 {
+  requires {
+    dependency("matroska")
+  }
+  query pattern callExpr where callee.method == "ReadHead"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("matroska")
+  }
+  query pattern callExpr where callee.method == "ReadTracks"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("matroska")
+  }
+  query pattern callExpr where callee.method == "ReadCodec"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("matroska")
+  }
+  query pattern callExpr where callee.method == "ReadFrame"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("matroska")
+  }
+  query pattern callExpr where callee.method == "ReadData"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("matroska")
+  }
+  query pattern callExpr where callee.method == "ReadInternalHead"
+  emit sink code.Deserialization at args[0]
+}

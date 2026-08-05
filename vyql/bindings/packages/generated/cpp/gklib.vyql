@@ -1,0 +1,184 @@
+module bindings.cpp.generated.m5d6a286e;
+
+binding filePathAccess0 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_fopen"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_fclose"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding storedDataRead2 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_read"
+  emit source code.StoredDataRead at call.result
+}
+
+binding fileUse3 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_write"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding storedDataRead4 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_getline"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataRead5 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_i32readfile"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataRead6 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_i64readfile"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataRead7 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_zreadfile"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataRead8 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_creadfilebin"
+  emit source code.StoredDataRead at call.result
+}
+
+binding fileUse9 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_cwritefilebin"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding storedDataRead10 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_i32readfilebin"
+  emit source code.StoredDataRead at call.result
+}
+
+binding fileUse11 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_i32writefilebin"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding storedDataRead12 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_i64readfilebin"
+  emit source code.StoredDataRead at call.result
+}
+
+binding fileUse13 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_i64writefilebin"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding storedDataRead14 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_zreadfilebin"
+  emit source code.StoredDataRead at call.result
+}
+
+binding regexCompile15 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "re_compile_fastmap"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding regexCompile16 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "re_search"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding regexCompile17 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "re_search_2"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding regexCompile18 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "re_match"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding regexCompile19 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "re_match_2"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding regexCompile20 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "re_exec"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding regexCompile21 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "regexec"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

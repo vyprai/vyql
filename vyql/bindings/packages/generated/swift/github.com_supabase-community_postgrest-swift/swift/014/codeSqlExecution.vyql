@@ -1,9 +1,0 @@
-module bindings.swift.generated.m82477a6a;
-
-binding sqlExecution14 {
-  requires {
-    dependency("github.com/supabase-community/postgrest-swift")
-  }
-  query pattern callExpr where callee.method == "like"
-  emit sink code.SqlExecution at args[0]
-}

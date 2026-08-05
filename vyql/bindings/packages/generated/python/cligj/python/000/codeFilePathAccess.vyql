@@ -1,9 +1,0 @@
-module bindings.python.generated.mf95d0453;
-
-binding filePathAccess0 {
-  requires {
-    dependency("cligj")
-  }
-  query pattern callExpr where callee.method == "normalize_feature_inputs"
-  emit sink code.FilePathAccess at args[0]
-}

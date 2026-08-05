@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mbe721257;
-
-binding userControlledData3 {
-  requires {
-    dependency("org.apache.camel:camel-spring")
-  }
-  query pattern callExpr where callee.method == "getHeaders"
-  emit source core.UserControlledData at call.result
-}

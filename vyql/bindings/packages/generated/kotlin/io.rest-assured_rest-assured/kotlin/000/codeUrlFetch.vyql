@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m191318b4;
-
-binding urlFetch0 {
-  requires {
-    dependency("io.rest-assured:rest-assured")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit sink code.UrlFetch at args[0]
-}

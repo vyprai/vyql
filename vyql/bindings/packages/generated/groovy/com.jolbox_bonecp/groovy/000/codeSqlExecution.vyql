@@ -1,9 +1,0 @@
-module bindings.groovy.generated.me9edd465;
-
-binding sqlExecution0 {
-  requires {
-    dependency("com.jolbox:bonecp")
-  }
-  query pattern callExpr where callee.method == "getConnection"
-  emit sink code.SqlExecution at args[0]
-}

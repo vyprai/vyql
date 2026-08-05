@@ -1,0 +1,17 @@
+module bindings.python.generated.meaa5f734;
+
+binding deserialization0 {
+  requires {
+    dependency("jedi")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("jedi")
+  }
+  query pattern callExpr where callee.method == "parse_and_get_code"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m8593331a;
-
-binding networkSend4 {
-  requires {
-    dependency("celluloid-io")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

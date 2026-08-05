@@ -1,9 +1,0 @@
-module bindings.rust.generated.mf35ca464;
-
-binding userControlledData0 {
-  requires {
-    dependency("async-channel")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit source core.UserControlledData at call.result
-}

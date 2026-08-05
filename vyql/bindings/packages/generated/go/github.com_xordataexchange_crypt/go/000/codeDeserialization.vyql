@@ -1,9 +1,0 @@
-module bindings.go.generated.m60d3ca0e;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/xordataexchange/crypt")
-  }
-  query pattern callExpr where callee.method == "Decode"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.m98e3ffbb;
-
-binding nosqlQuery6 {
-  requires {
-    dependency("github.com/parse-community/Parse-Swift")
-  }
-  query pattern callExpr where callee.method == "create"
-  emit sink code.NosqlQuery at args[0]
-}

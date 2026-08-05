@@ -1,9 +1,0 @@
-module bindings.perl.generated.m979e51fd;
-
-binding weakHash2 {
-  requires {
-    dependency("Pinto")
-  }
-  query pattern presenceNode where node.path ~= "pinto.hash"
-  emit issue code.WeakHash at node
-}

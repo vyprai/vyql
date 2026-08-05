@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m75300182;
-
-binding networkConnect1 {
-  requires {
-    dependency("org.eclipse.paho:org.eclipse.paho.client.mqttv3")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

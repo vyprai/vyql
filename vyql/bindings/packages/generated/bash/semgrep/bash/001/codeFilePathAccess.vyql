@@ -1,9 +1,0 @@
-module bindings.bash.generated.mb77f0ad3;
-
-binding filePathAccess1 {
-  requires {
-    dependency("semgrep")
-  }
-  query pattern callExpr where callee.path ~= "semgrep-core"
-  emit sink code.FilePathAccess at args[0]
-}

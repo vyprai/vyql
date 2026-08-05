@@ -1,9 +1,0 @@
-module bindings.dart.generated.mcd9bc5e7;
-
-binding filePathAccess2 {
-  requires {
-    dependency("flutter_launcher_icons")
-  }
-  query pattern callExpr where callee.method == "createDirIfNotExist"
-  emit sink code.FilePathAccess at args[0]
-}

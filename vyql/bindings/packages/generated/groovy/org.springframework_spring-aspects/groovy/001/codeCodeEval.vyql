@@ -1,9 +1,0 @@
-module bindings.groovy.generated.md8ae2f05;
-
-binding codeEval1 {
-  requires {
-    dependency("org.springframework:spring-aspects")
-  }
-  query pattern callExpr where callee.method == "throwAny"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.c.generated.mce19183a;
-
-binding cliArgument1 {
-  requires {
-    dependency("argparse")
-  }
-  query pattern callExpr where callee.method == "ArgumentParser.parse_known_args"
-  emit source code.CliArgument at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m6fdc023b;
-
-binding userControlledData3 {
-  requires {
-    dependency("y18n")
-  }
-  query pattern callExpr where callee.method == "updateLocale"
-  emit source core.UserControlledData at call.result
-}

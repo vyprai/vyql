@@ -1,9 +1,0 @@
-module bindings.dart.generated.m4505a75e;
-
-binding commandExecution1 {
-  requires {
-    dependency("process_run")
-  }
-  query pattern callExpr where callee.method == "processCmdRun"
-  emit sink code.CommandExecution at args[0]
-}

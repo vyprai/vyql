@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m90787a7a;
-
-binding filePathAccess1 {
-  requires {
-    dependency("bootstrap")
-  }
-  query pattern callExpr where callee.method == "write_cached_files"
-  emit sink code.FilePathAccess at args[0]
-}

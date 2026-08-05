@@ -1,9 +1,0 @@
-module bindings.perl.generated.m01c752d3;
-
-binding userControlledData1 {
-  requires {
-    dependency("Jedi")
-  }
-  query pattern callExpr where callee.method == "params"
-  emit source core.UserControlledData at call.result
-}

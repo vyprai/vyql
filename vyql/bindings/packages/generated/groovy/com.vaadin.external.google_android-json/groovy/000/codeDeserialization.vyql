@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m9e3f6801;
-
-binding deserialization0 {
-  requires {
-    dependency("com.vaadin.external.google:android-json")
-  }
-  query pattern callExpr where callee.method == "JSONObject.<init>(String)"
-  emit sink code.Deserialization at args[0]
-}

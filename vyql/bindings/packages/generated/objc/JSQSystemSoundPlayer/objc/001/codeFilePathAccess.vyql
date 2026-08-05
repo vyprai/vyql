@@ -1,9 +1,0 @@
-module bindings.objc.generated.m30457d73;
-
-binding filePathAccess1 {
-  requires {
-    dependency("JSQSystemSoundPlayer")
-  }
-  query pattern callExpr where callee.method == "preloadSoundWithFilename:"
-  emit sink code.FilePathAccess at args[0]
-}

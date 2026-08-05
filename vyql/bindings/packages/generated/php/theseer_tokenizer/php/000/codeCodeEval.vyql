@@ -1,9 +1,0 @@
-module bindings.php.generated.m845f0980;
-
-binding codeEval0 {
-  requires {
-    dependency("theseer/tokenizer")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.CodeEval at args[0]
-}

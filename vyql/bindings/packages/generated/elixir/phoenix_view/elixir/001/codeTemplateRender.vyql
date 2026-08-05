@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mea77056c;
-
-binding templateRender1 {
-  requires {
-    dependency("phoenix_view")
-  }
-  query pattern callExpr where callee.method == "render_layout"
-  emit sink code.TemplateRender at args[0]
-}

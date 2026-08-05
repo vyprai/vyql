@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mf285e1da;
-
-binding userControlledData1 {
-  requires {
-    dependency("org.springframework.amqp:spring-amqp")
-  }
-  query pattern callExpr where callee.method == "getBody"
-  emit source core.UserControlledData at call.result
-}

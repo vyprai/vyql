@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m9e2b0c5f;
-
-binding networkSend1 {
-  requires {
-    dependency("org.apache.avro:avro-ipc")
-  }
-  query pattern callExpr where callee.method == "writeBuffers"
-  emit sink code.NetworkSend at args[0]
-}

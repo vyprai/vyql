@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mcf1af1b6;
-
-binding networkSend7 {
-  requires {
-    dependency("poltergeist")
-  }
-  query pattern callExpr where callee.method == "add_header"
-  emit sink code.NetworkSend at args[0]
-}

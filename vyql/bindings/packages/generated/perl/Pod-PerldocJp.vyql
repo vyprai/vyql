@@ -1,0 +1,17 @@
+module bindings.perl.generated.m1d8e6e20;
+
+binding urlFetch0 {
+  requires {
+    dependency("Pod-PerldocJp")
+  }
+  query pattern callExpr where callee.method == "grand_search_init"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("Pod-PerldocJp")
+  }
+  query pattern callExpr where callee.method == "grand_search_init"
+  emit sink code.FileUseSink at args[0]
+}

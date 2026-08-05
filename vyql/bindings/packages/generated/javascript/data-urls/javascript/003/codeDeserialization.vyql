@@ -1,9 +1,0 @@
-module bindings.javascript.generated.ma4a51d5a;
-
-binding deserialization3 {
-  requires {
-    dependency("data-urls")
-  }
-  query pattern callExpr where callee.method == "forgivingBase64Decode"
-  emit sink code.Deserialization at args[0]
-}

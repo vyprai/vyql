@@ -1,9 +1,0 @@
-module bindings.php.generated.m9b98bcea;
-
-binding cookie3 {
-  requires {
-    dependency("zendframework/zend-http")
-  }
-  query pattern callExpr where callee.method == "addCookie"
-  emit source code.Cookie at call.result
-}

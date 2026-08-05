@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m506f786d;
-
-binding networkConnect2 {
-  requires {
-    dependency("debugger")
-  }
-  query pattern callExpr where callee.method == "start_remote"
-  emit sink code.NetworkConnectSink at args[0]
-}

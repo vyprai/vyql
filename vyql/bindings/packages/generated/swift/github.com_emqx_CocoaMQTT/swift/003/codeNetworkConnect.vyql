@@ -1,9 +1,0 @@
-module bindings.swift.generated.m26d4449f;
-
-binding networkConnect3 {
-  requires {
-    dependency("github.com/emqx/CocoaMQTT")
-  }
-  query pattern callExpr where callee.method == "buildConnection"
-  emit sink code.NetworkConnectSink at args[0]
-}

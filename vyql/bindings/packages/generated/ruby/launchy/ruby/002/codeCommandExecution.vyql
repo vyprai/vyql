@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mf4c31fe6;
-
-binding commandExecution2 {
-  requires {
-    dependency("launchy")
-  }
-  query pattern callExpr where callee.method == "wet_run"
-  emit sink code.CommandExecution at args[0]
-}

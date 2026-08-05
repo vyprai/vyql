@@ -1,9 +1,0 @@
-module bindings.python.generated.mafcd9c02;
-
-binding filePathAccess4 {
-  requires {
-    dependency("identify")
-  }
-  query pattern callExpr where callee.method == "parse_shebang_from_file"
-  emit sink code.FilePathAccess at args[0]
-}

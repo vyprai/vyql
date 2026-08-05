@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m3271f7a0;
-
-binding weakCipher1 {
-  requires {
-    dependency("ruby-rc4")
-  }
-  query pattern callExpr where callee.method == "encrypt"
-  emit issue code.WeakCipher at call
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m9de101ea;
-
-binding filePathAccess9 {
-  requires {
-    dependency("pathlib2")
-  }
-  query pattern callExpr where callee.method == "readlink"
-  emit sink code.FilePathAccess at args[0]
-}

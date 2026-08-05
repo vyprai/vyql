@@ -1,9 +1,0 @@
-module bindings.swift.generated.mda5bfed3;
-
-binding storedDataWrite11 {
-  requires {
-    dependency("github.com/kean/Pulse")
-  }
-  query pattern callExpr where callee.method == "storeRequest"
-  emit sink code.StoredDataWrite at args[0]
-}

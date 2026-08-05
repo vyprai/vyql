@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m60828c0a;
-
-binding deserialization3 {
-  requires {
-    dependency("entities")
-  }
-  query pattern callExpr where callee.method == "decodeXML"
-  emit sink code.Deserialization at args[0]
-}

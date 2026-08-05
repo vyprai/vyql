@@ -1,9 +1,0 @@
-module bindings.swift.generated.m61394e88;
-
-binding networkSend11 {
-  requires {
-    dependency("github.com/MarcoDotIO/OpenAIKit")
-  }
-  query pattern callExpr where callee.method == "createTranslation"
-  emit sink code.NetworkSend at args[0]
-}

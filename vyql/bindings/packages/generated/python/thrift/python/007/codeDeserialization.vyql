@@ -1,9 +1,0 @@
-module bindings.python.generated.m7083342f;
-
-binding deserialization7 {
-  requires {
-    dependency("thrift")
-  }
-  query pattern callExpr where callee.method == "readI64"
-  emit sink code.Deserialization at args[0]
-}

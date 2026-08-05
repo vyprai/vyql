@@ -1,9 +1,0 @@
-module bindings.php.generated.mc0c56509;
-
-binding urlFetch1 {
-  requires {
-    dependency("maxmind/web-service-common")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit sink code.UrlFetch at args[0]
-}

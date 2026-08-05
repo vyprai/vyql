@@ -1,9 +1,0 @@
-module bindings.dart.generated.m1d875bbd;
-
-binding codeEval2 {
-  requires {
-    dependency("webview_flutter_platform_interface")
-  }
-  query pattern callExpr where callee.method == "runJavaScriptReturningResult"
-  emit sink code.CodeEval at args[0]
-}

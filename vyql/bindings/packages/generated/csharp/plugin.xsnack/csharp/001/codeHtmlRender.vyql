@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m01c7135e;
-
-binding htmlRender1 {
-  requires {
-    dependency("plugin.xsnack")
-  }
-  query pattern callExpr where callee.method == "ShowMessage"
-  emit sink code.HtmlRender at args[0]
-}

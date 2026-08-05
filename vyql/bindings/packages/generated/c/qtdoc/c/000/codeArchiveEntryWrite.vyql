@@ -1,9 +1,0 @@
-module bindings.c.generated.m260bfc8a;
-
-binding archiveEntryWrite0 {
-  requires {
-    dependency("qtdoc")
-  }
-  query pattern callExpr where callee.method == "unzip"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

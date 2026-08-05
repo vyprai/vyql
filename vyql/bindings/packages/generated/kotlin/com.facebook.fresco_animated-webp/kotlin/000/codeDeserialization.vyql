@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mb50205ad;
-
-binding deserialization0 {
-  requires {
-    dependency("com.facebook.fresco:animated-webp")
-  }
-  query pattern callExpr where callee.method == "createFromByteArray"
-  emit sink code.Deserialization at args[0]
-}

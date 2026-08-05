@@ -1,9 +1,0 @@
-module bindings.scala.generated.mf1617c93;
-
-binding sqlExecution2 {
-  requires {
-    dependency("com.github.miemiedev:mybatis-paginator")
-  }
-  query pattern callExpr where callee.method == "getCountString"
-  emit sink code.SqlExecution at args[0]
-}

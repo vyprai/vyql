@@ -1,9 +1,0 @@
-module bindings.objc.generated.mc0faafde;
-
-binding networkSend4 {
-  requires {
-    dependency("SwiftNIOTLS")
-  }
-  query pattern callExpr where callee.method == "CNIOLinux_sendmmsg"
-  emit sink code.NetworkSend at args[0]
-}

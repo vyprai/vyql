@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m5d6a286e;
-
-binding storedDataRead10 {
-  requires {
-    dependency("gklib")
-  }
-  query pattern callExpr where callee.method == "gk_i32readfilebin"
-  emit source code.StoredDataRead at call.result
-}

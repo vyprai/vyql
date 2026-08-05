@@ -1,0 +1,73 @@
+module bindings.objc.generated.m7bcff2f3;
+
+binding secretValue0 {
+  requires {
+    dependency("SAMKeychain")
+  }
+  query pattern callExpr where callee.method == "passwordForService"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("SAMKeychain")
+  }
+  query pattern callExpr where callee.method == "passwordDataForService"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("SAMKeychain")
+  }
+  query pattern callExpr where callee.method == "allAccounts"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("SAMKeychain")
+  }
+  query pattern callExpr where callee.method == "accountsForService"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("SAMKeychain")
+  }
+  query pattern callExpr where callee.method == "fetchAll"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("SAMKeychain")
+  }
+  query pattern callExpr where callee.method == "fetch"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue6 {
+  requires {
+    dependency("SAMKeychain")
+  }
+  query pattern callExpr where callee.method == "setPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue7 {
+  requires {
+    dependency("SAMKeychain")
+  }
+  query pattern callExpr where callee.method == "setPasswordData"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue8 {
+  requires {
+    dependency("SAMKeychain")
+  }
+  query pattern callExpr where callee.method == "save"
+  emit source code.SecretValue at call.result
+}

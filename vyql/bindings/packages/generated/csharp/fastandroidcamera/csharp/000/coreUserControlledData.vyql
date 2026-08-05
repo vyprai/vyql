@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m0cc8b083;
-
-binding userControlledData0 {
-  requires {
-    dependency("fastandroidcamera")
-  }
-  query pattern callExpr where callee.method == "AddCallbackBuffer"
-  emit source core.UserControlledData at call.result
-}

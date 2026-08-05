@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m641f9acf;
-
-binding networkConnect0 {
-  requires {
-    dependency("heroku-api")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit sink code.NetworkConnectSink at args[0]
-}

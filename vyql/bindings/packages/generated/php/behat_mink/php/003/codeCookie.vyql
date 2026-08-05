@@ -1,9 +1,0 @@
-module bindings.php.generated.m44f70df4;
-
-binding cookie3 {
-  requires {
-    dependency("behat/mink")
-  }
-  query pattern callExpr where callee.method == "setCookie"
-  emit source code.Cookie at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m3fba08c6;
-
-binding weakCipher1 {
-  requires {
-    dependency("cocossharp.pcl.shared")
-  }
-  query pattern callExpr where callee.method == "Lidgren.Network.NetXorEncryption.Decrypt"
-  emit issue code.WeakCipher at call
-}

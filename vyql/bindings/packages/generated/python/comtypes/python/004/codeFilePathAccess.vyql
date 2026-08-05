@@ -1,9 +1,0 @@
-module bindings.python.generated.mfedb9024;
-
-binding filePathAccess4 {
-  requires {
-    dependency("comtypes")
-  }
-  query pattern callExpr where callee.method == "typeinfo.LoadTypeLibEx"
-  emit sink code.FilePathAccess at args[0]
-}

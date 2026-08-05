@@ -1,9 +1,0 @@
-module bindings.ruby.generated.ma66d92b3;
-
-binding filePathAccess8 {
-  requires {
-    dependency("mini_portile2")
-  }
-  query pattern callExpr where callee.method == "tar_command"
-  emit sink code.FilePathAccess at args[0]
-}

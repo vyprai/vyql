@@ -1,9 +1,0 @@
-module bindings.cpp.generated.md0e9ae1e;
-
-binding cliArgument3 {
-  requires {
-    dependency("libvpx")
-  }
-  query pattern callExpr where callee.method == "arg_parse_enum"
-  emit source code.CliArgument at call.result
-}

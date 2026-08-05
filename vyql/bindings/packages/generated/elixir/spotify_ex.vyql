@@ -1,0 +1,33 @@
+module bindings.elixir.generated.m73783765;
+
+binding urlFetch0 {
+  requires {
+    dependency("spotify_ex")
+  }
+  query pattern callExpr where callee.method == "Spotify.Client.get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch1 {
+  requires {
+    dependency("spotify_ex")
+  }
+  query pattern callExpr where callee.method == "Spotify.Client.put"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch2 {
+  requires {
+    dependency("spotify_ex")
+  }
+  query pattern callExpr where callee.method == "Spotify.Client.post"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch3 {
+  requires {
+    dependency("spotify_ex")
+  }
+  query pattern callExpr where callee.method == "Spotify.Client.delete"
+  emit sink code.UrlFetch at args[0]
+}

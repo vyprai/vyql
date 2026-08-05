@@ -1,9 +1,0 @@
-module bindings.php.generated.m9cb9a275;
-
-binding deserialization1 {
-  requires {
-    dependency("scrivo/highlight.php")
-  }
-  query pattern callExpr where callee.method == "decodeRef"
-  emit sink code.Deserialization at args[0]
-}

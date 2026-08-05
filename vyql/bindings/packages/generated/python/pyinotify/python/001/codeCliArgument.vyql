@@ -1,9 +1,0 @@
-module bindings.python.generated.m22216d57;
-
-binding cliArgument1 {
-  requires {
-    dependency("pyinotify")
-  }
-  query pattern callExpr where callee.method == "command_line"
-  emit source code.CliArgument at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m9db0069f;
-
-binding networkData4 {
-  requires {
-    dependency("zug")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit source code.NetworkData at call.result
-}

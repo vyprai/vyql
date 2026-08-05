@@ -1,9 +1,0 @@
-module bindings.php.generated.me493e472;
-
-binding urlFetch0 {
-  requires {
-    dependency("fzaninotto/faker")
-  }
-  query pattern callExpr where callee.method == "Faker\\Provider\\Image::image"
-  emit sink code.UrlFetch at args[0]
-}

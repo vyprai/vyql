@@ -1,9 +1,0 @@
-module bindings.perl.generated.mf49eb6bb;
-
-binding filePathAccess0 {
-  requires {
-    dependency("qbit")
-  }
-  query pattern callExpr where callee.method == "readfile"
-  emit sink code.FilePathAccess at args[0]
-}

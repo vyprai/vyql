@@ -1,9 +1,0 @@
-module bindings.ruby.generated.md6355825;
-
-binding deserialization17 {
-  requires {
-    dependency("sawyer")
-  }
-  query pattern callExpr where callee.method == "parse_links"
-  emit sink code.Deserialization at args[0]
-}

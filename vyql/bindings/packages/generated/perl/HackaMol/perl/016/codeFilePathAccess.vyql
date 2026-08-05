@@ -1,9 +1,0 @@
-module bindings.perl.generated.md871dd99;
-
-binding filePathAccess16 {
-  requires {
-    dependency("HackaMol")
-  }
-  query pattern callExpr where callee.method == "_open_file_unless_fh"
-  emit sink code.FilePathAccess at args[0]
-}

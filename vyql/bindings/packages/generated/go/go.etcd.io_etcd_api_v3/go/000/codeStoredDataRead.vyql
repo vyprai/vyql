@@ -1,9 +1,0 @@
-module bindings.go.generated.m50dab3f4;
-
-binding storedDataRead0 {
-  requires {
-    dependency("go.etcd.io/etcd/api/v3")
-  }
-  query pattern callExpr where callee.method == "request_KV_Range_0"
-  emit source code.StoredDataRead at call.result
-}

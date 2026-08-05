@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mbe96c352;
-
-binding networkSend1 {
-  requires {
-    dependency("dalli")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkSend at args[0]
-}

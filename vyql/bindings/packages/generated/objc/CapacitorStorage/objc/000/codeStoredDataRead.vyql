@@ -1,9 +1,0 @@
-module bindings.objc.generated.md55c3441;
-
-binding storedDataRead0 {
-  requires {
-    dependency("CapacitorStorage")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit source code.StoredDataRead at call.result
-}

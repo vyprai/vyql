@@ -1,9 +1,0 @@
-module bindings.php.generated.mdb2a4161;
-
-binding userControlledData1 {
-  requires {
-    dependency("laravel/nexmo-notification-channel")
-  }
-  query pattern callExpr where callee.method == "content"
-  emit source core.UserControlledData at call.result
-}

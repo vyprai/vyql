@@ -1,9 +1,0 @@
-module bindings.swift.generated.m5e9c1c43;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/HeroTransitions/Hero")
-  }
-  query pattern callExpr where callee.method == "tokenize"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mc737ee23;
-
-binding storedDataWrite3 {
-  requires {
-    dependency("org.fusesource.leveldbjni:leveldbjni-all")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.StoredDataWrite at args[0]
-}

@@ -1,0 +1,17 @@
+module bindings.scala.generated.m14da1a45;
+
+binding deserialization0 {
+  requires {
+    dependency("org.jooq:jooq-codegen")
+  }
+  query pattern callExpr where callee.method == "GenerationTool.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("org.jooq:jooq-codegen")
+  }
+  query pattern callExpr where callee.method == "GenerationTool.compile"
+  emit sink code.CodeEval at args[0]
+}

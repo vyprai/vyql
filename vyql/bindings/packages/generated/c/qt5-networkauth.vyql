@@ -1,0 +1,17 @@
+module bindings.c.generated.m9c49fefa;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("qt5-networkauth")
+  }
+  query pattern callExpr where callee.method == "QAbstractOAuth::generateRandomString"
+  emit issue code.WeakRandomValue at call
+}
+
+binding weakRandomValue1 {
+  requires {
+    dependency("qt5-networkauth")
+  }
+  query pattern callExpr where callee.method == "QAbstractOAuth2Private::generateRandomState"
+  emit issue code.WeakRandomValue at call
+}

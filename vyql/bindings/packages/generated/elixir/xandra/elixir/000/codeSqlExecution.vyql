@@ -1,9 +1,0 @@
-module bindings.elixir.generated.me2a15873;
-
-binding sqlExecution0 {
-  requires {
-    dependency("xandra")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.SqlExecution at args[0]
-}

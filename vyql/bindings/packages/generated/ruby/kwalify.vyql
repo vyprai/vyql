@@ -1,0 +1,25 @@
+module bindings.ruby.generated.m4a69434d;
+
+binding deserialization0 {
+  requires {
+    dependency("kwalify")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("kwalify")
+  }
+  query pattern callExpr where callee.method == "parse_file"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("kwalify")
+  }
+  query pattern callExpr where callee.method == "parse_file"
+  emit sink code.FilePathAccess at args[0]
+}

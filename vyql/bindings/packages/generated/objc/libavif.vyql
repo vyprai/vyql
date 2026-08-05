@@ -1,0 +1,41 @@
+module bindings.objc.generated.mf608c243;
+
+binding deserialization0 {
+  requires {
+    dependency("libavif")
+  }
+  query pattern callExpr where callee.method == "avifDecoderRead"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("libavif")
+  }
+  query pattern callExpr where callee.method == "avifDecoderReadMemory"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("libavif")
+  }
+  query pattern callExpr where callee.method == "avifDecoderReadFile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("libavif")
+  }
+  query pattern callExpr where callee.method == "avifIOCreateMemoryReader"
+  emit source core.UserControlledData at call.result
+}
+
+binding fileUse4 {
+  requires {
+    dependency("libavif")
+  }
+  query pattern callExpr where callee.method == "avifIOCreateFileReader"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.dart.generated.m8fd627db;
-
-binding urlFetch1 {
-  requires {
-    dependency("intro_slider")
-  }
-  query pattern callExpr where callee.method == "IntroSliderTab.backgroundNetworkImage"
-  emit sink code.UrlFetch at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.m3f83fbfd;
-
-binding deserialization1 {
-  requires {
-    dependency("Imaginary")
-  }
-  query pattern callExpr where callee.method == "decompress"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,0 +1,17 @@
+module bindings.dart.generated.m0f8f2bb6;
+
+binding secretValue0 {
+  requires {
+    dependency("google_api_headers")
+  }
+  query pattern callExpr where callee.method == "getHeaders"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("google_api_headers")
+  }
+  query pattern callExpr where callee.method == "onMethodCall"
+  emit source code.SecretValue at call.result
+}

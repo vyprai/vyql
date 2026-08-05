@@ -1,0 +1,17 @@
+module bindings.perl.generated.mf7cfc876;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Forest")
+  }
+  query pattern callExpr where callee.method == "Forest::Tree::Builder::SimpleTextFile.new"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("Forest")
+  }
+  query pattern callExpr where callee.method == "Forest::Tree::Reader::SimpleTextFile.read"
+  emit sink code.FileUseSink at args[0]
+}

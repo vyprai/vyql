@@ -1,9 +1,0 @@
-module bindings.objc.generated.mc1361ff5;
-
-binding deserialization1 {
-  requires {
-    dependency("MSAL")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

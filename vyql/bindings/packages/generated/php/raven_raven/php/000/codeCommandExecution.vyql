@@ -1,9 +1,0 @@
-module bindings.php.generated.m38ab1c67;
-
-binding commandExecution0 {
-  requires {
-    dependency("raven/raven")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.CommandExecution at args[0]
-}

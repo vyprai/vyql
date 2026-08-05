@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m27d530fb;
-
-binding sqlExecution0 {
-  requires {
-    dependency("pg")
-  }
-  query pattern callExpr where callee.method == "pgconn_send_query_params"
-  emit sink code.SqlExecution at args[0]
-}

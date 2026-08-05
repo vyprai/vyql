@@ -1,9 +1,0 @@
-module bindings.rust.generated.m98f0c63e;
-
-binding codeEval3 {
-  requires {
-    dependency("zbus_macros")
-  }
-  query pattern callExpr where callee.method == "derive_dbus_error"
-  emit sink code.CodeEval at args[0]
-}

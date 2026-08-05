@@ -1,9 +1,0 @@
-module bindings.swift.generated.mb1ceacea;
-
-binding networkSend1 {
-  requires {
-    dependency("github.com/halcyonmobile/RestBird")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.NetworkSend at args[0]
-}

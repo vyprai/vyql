@@ -1,9 +1,0 @@
-module bindings.go.generated.m0ffe9431;
-
-binding weakRandomValue1 {
-  requires {
-    dependency("github.com/d2g/dhcp4client")
-  }
-  query pattern callExpr where callee.method == "MathGenerateXID"
-  emit issue code.WeakRandomValue at call
-}

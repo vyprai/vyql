@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m1d0d8b8d;
-
-binding codeEval2 {
-  requires {
-    dependency("qtwebview")
-  }
-  query pattern callExpr where callee.method == "runJavaScript"
-  emit sink code.CodeEval at args[0]
-}

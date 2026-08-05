@@ -1,9 +1,0 @@
-module bindings.dart.generated.me435d651;
-
-binding storedDataRead3 {
-  requires {
-    dependency("shared_preferences_android")
-  }
-  query pattern callExpr where callee.method == "getValueByKey"
-  emit source code.StoredDataRead at call.result
-}

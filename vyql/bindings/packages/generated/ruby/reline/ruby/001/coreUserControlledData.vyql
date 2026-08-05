@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mc4443419;
-
-binding userControlledData1 {
-  requires {
-    dependency("reline")
-  }
-  query pattern callExpr where callee.method == "readmultiline"
-  emit source core.UserControlledData at call.result
-}

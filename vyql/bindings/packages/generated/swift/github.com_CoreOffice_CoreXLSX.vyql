@@ -1,0 +1,73 @@
+module bindings.swift.generated.mea7ae01c;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/CoreOffice/CoreXLSX")
+  }
+  query pattern callExpr where callee.method == "parseRelationships"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/CoreOffice/CoreXLSX")
+  }
+  query pattern callExpr where callee.method == "parseDocumentPaths"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/CoreOffice/CoreXLSX")
+  }
+  query pattern callExpr where callee.method == "parseStyles"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/CoreOffice/CoreXLSX")
+  }
+  query pattern callExpr where callee.method == "parseSharedStrings"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/CoreOffice/CoreXLSX")
+  }
+  query pattern callExpr where callee.method == "parseComments"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("github.com/CoreOffice/CoreXLSX")
+  }
+  query pattern callExpr where callee.method == "parseWorkbooks"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("github.com/CoreOffice/CoreXLSX")
+  }
+  query pattern callExpr where callee.method == "parseWorksheetPathsAndNames"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("github.com/CoreOffice/CoreXLSX")
+  }
+  query pattern callExpr where callee.method == "parseWorksheetPaths"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization8 {
+  requires {
+    dependency("github.com/CoreOffice/CoreXLSX")
+  }
+  query pattern callExpr where callee.method == "parseWorksheet"
+  emit sink code.Deserialization at args[0]
+}

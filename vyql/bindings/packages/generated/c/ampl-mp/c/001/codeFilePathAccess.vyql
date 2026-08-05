@@ -1,9 +1,0 @@
-module bindings.c.generated.m63c25a31;
-
-binding filePathAccess1 {
-  requires {
-    dependency("ampl-mp")
-  }
-  query pattern callExpr where callee.method == "copyAllFiles"
-  emit sink code.FilePathAccess at args[0]
-}

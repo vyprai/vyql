@@ -1,9 +1,0 @@
-module bindings.objc.generated.m84615035;
-
-binding networkSend0 {
-  requires {
-    dependency("GoogleUtilities")
-  }
-  query pattern callExpr where callee.method == "postURL"
-  emit sink code.NetworkSend at args[0]
-}

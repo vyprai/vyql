@@ -1,9 +1,0 @@
-module bindings.swift.generated.mf3b5e932;
-
-binding networkConnect6 {
-  requires {
-    dependency("github.com/WalletConnect/WalletConnectSwift")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkConnectSink at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m4f20c1a4;
-
-binding cookie0 {
-  requires {
-    dependency("javax.servlet:javax.servlet-api")
-  }
-  query pattern callExpr where callee.method == "getCookies"
-  emit source code.Cookie at call.result
-}

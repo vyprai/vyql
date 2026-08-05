@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m3d6229d7;
-
-binding cliArgument1 {
-  requires {
-    dependency("org.quartz-scheduler:quartz")
-  }
-  query pattern callExpr where callee.method == "CronExpression.validateExpression"
-  emit source code.CliArgument at call.result
-}

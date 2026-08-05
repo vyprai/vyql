@@ -1,0 +1,25 @@
+module bindings.go.generated.m3dd11f3e;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/flynn/go-shlex")
+  }
+  query pattern callExpr where callee.method == "Split"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/flynn/go-shlex")
+  }
+  query pattern callExpr where callee.method == "NewLexer"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/flynn/go-shlex")
+  }
+  query pattern callExpr where callee.method == "NewTokenizer"
+  emit sink code.Deserialization at args[0]
+}

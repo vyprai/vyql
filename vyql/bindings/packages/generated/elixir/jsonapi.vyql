@@ -1,0 +1,17 @@
+module bindings.elixir.generated.mc239d183;
+
+binding deserialization0 {
+  requires {
+    dependency("jsonapi")
+  }
+  query pattern callExpr where callee.method == "JSONAPI.Deserializer.call"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("jsonapi")
+  }
+  query pattern callExpr where callee.method == "JSONAPI.QueryParser.call"
+  emit sink code.Deserialization at args[0]
+}

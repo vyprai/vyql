@@ -1,9 +1,0 @@
-module bindings.go.generated.m4f608b1f;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/gobwas/httphead")
-  }
-  query pattern callExpr where callee.method == "ScanCookie"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m93be72f0;
-
-binding cliArgument3 {
-  requires {
-    dependency("App-starbucksloginator")
-  }
-  query pattern callExpr where callee.path ~= "starbucksloginator"
-  emit source code.CliArgument at call.result
-}

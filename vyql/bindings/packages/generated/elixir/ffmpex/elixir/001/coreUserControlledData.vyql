@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m2d581aab;
-
-binding userControlledData1 {
-  requires {
-    dependency("ffmpex")
-  }
-  query pattern callExpr where callee.method == "add_output_file"
-  emit source core.UserControlledData at call.result
-}

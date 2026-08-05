@@ -1,0 +1,49 @@
+module bindings.python.generated.md5162a41;
+
+binding deserialization0 {
+  requires {
+    dependency("aniso8601")
+  }
+  query pattern callExpr where callee.method == "parse_date"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("aniso8601")
+  }
+  query pattern callExpr where callee.method == "parse_time"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("aniso8601")
+  }
+  query pattern callExpr where callee.method == "parse_datetime"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("aniso8601")
+  }
+  query pattern callExpr where callee.method == "parse_duration"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("aniso8601")
+  }
+  query pattern callExpr where callee.method == "parse_interval"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("aniso8601")
+  }
+  query pattern callExpr where callee.method == "parse_repeating_interval"
+  emit sink code.Deserialization at args[0]
+}

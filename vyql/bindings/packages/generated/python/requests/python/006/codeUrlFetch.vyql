@@ -1,9 +1,0 @@
-module bindings.python.generated.mbba44898;
-
-binding urlFetch6 {
-  requires {
-    dependency("requests")
-  }
-  query pattern callExpr where callee.method == "head"
-  emit sink code.UrlFetch at args[0]
-}

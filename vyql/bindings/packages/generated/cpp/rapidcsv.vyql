@@ -1,0 +1,33 @@
+module bindings.cpp.generated.m7b5f7815;
+
+binding filePathAccess0 {
+  requires {
+    dependency("rapidcsv")
+  }
+  query pattern callExpr where callee.method == "Load"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("rapidcsv")
+  }
+  query pattern callExpr where callee.method == "Save"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("rapidcsv")
+  }
+  query pattern callExpr where callee.method == "ParseCsv"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("rapidcsv")
+  }
+  query pattern callExpr where callee.method == "ReadCsv"
+  emit sink code.Deserialization at args[0]
+}

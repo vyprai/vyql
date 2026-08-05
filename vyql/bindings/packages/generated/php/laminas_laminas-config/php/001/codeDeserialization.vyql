@@ -1,9 +1,0 @@
-module bindings.php.generated.m22e9362e;
-
-binding deserialization1 {
-  requires {
-    dependency("laminas/laminas-config")
-  }
-  query pattern callExpr where callee.method == "fromString"
-  emit sink code.Deserialization at args[0]
-}

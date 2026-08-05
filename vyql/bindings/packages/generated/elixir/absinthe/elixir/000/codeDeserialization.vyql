@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m51269d09;
-
-binding deserialization0 {
-  requires {
-    dependency("absinthe")
-  }
-  query pattern callExpr where callee.method == "Absinthe.Lexer.tokenize"
-  emit sink code.Deserialization at args[0]
-}

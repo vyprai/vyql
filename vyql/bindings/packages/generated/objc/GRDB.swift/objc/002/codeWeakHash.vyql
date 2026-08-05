@@ -1,9 +1,0 @@
-module bindings.objc.generated.md74ce000;
-
-binding weakHash2 {
-  requires {
-    dependency("GRDB.swift")
-  }
-  query pattern presenceNode where node.path ~= "grdb.swift.hash"
-  emit issue code.WeakHash at node
-}

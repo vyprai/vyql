@@ -1,9 +1,0 @@
-module bindings.python.generated.m4ccc92d1;
-
-binding commandExecution2 {
-  requires {
-    dependency("sphinx-rtd-theme")
-  }
-  query pattern callExpr where callee.method == "UpdateTranslationsCommand.run"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m1e4919e3;
-
-binding userControlledData1 {
-  requires {
-    dependency("python-subunit")
-  }
-  query pattern callExpr where callee.method == "run_filter_script"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.go.generated.m685a0320;
-
-binding deserialization2 {
-  requires {
-    dependency("golang.org/x/mod")
-  }
-  query pattern callExpr where callee.method == "ParseLax"
-  emit sink code.Deserialization at args[0]
-}

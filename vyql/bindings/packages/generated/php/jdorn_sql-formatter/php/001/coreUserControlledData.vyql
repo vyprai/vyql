@@ -1,9 +1,0 @@
-module bindings.php.generated.m636aa103;
-
-binding userControlledData1 {
-  requires {
-    dependency("jdorn/sql-formatter")
-  }
-  query pattern callExpr where callee.method == "SqlFormatter::highlight"
-  emit source core.UserControlledData at call.result
-}

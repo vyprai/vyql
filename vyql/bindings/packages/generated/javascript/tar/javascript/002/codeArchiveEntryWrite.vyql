@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mcbc58268;
-
-binding archiveEntryWrite2 {
-  requires {
-    dependency("tar")
-  }
-  query pattern callExpr where callee.method == "extractFile"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

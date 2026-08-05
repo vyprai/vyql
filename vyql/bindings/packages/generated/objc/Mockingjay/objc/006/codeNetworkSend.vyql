@@ -1,9 +1,0 @@
-module bindings.objc.generated.mc8a5efdc;
-
-binding networkSend6 {
-  requires {
-    dependency("Mockingjay")
-  }
-  query pattern callExpr where callee.method == "jsonData"
-  emit sink code.NetworkSend at args[0]
-}

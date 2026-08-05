@@ -1,0 +1,25 @@
+module bindings.elixir.generated.m898477b0;
+
+binding sqlExecution0 {
+  requires {
+    dependency("crudry")
+  }
+  query pattern callExpr where callee.method == "list"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("crudry")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("crudry")
+  }
+  query pattern callExpr where callee.method == "filter"
+  emit sink code.SqlExecution at args[0]
+}

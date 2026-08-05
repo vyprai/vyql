@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1cbc8173;
-
-binding sqlExecution4 {
-  requires {
-    dependency("org.springframework.session:spring-session-jdbc")
-  }
-  query pattern callExpr where callee.method == "setUpdateSessionAttributeQuery"
-  emit sink code.SqlExecution at args[0]
-}

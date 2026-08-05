@@ -1,9 +1,0 @@
-module bindings.c.generated.mc44ec011;
-
-binding deserialization0 {
-  requires {
-    dependency("json-c")
-  }
-  query pattern callExpr where callee.method == "json_tokener_parse"
-  emit sink code.Deserialization at args[0]
-}

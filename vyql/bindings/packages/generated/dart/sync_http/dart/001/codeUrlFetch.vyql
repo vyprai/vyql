@@ -1,9 +1,0 @@
-module bindings.dart.generated.m1b328543;
-
-binding urlFetch1 {
-  requires {
-    dependency("sync_http")
-  }
-  query pattern callExpr where callee.method == "postUrl"
-  emit sink code.UrlFetch at args[0]
-}

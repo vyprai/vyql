@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m11ed67cf;
-
-binding networkBind1 {
-  requires {
-    dependency("reagent")
-  }
-  query pattern callExpr where callee.method == "Reagent.Listener.start_link"
-  emit sink code.NetworkBind at args[0]
-}

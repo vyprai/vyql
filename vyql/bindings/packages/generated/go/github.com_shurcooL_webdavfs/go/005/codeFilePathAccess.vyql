@@ -1,9 +1,0 @@
-module bindings.go.generated.m08dfef3f;
-
-binding filePathAccess5 {
-  requires {
-    dependency("github.com/shurcooL/webdavfs")
-  }
-  query pattern callExpr where callee.method == "MkdirAll"
-  emit sink code.FilePathAccess at args[0]
-}

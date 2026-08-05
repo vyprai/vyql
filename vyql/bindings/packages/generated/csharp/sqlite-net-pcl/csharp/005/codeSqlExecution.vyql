@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m78741b33;
-
-binding sqlExecution5 {
-  requires {
-    dependency("sqlite-net-pcl")
-  }
-  query pattern callExpr where callee.method == "Delete"
-  emit sink code.SqlExecution at args[0]
-}

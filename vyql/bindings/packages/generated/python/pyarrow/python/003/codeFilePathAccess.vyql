@@ -1,9 +1,0 @@
-module bindings.python.generated.m4aa0977e;
-
-binding filePathAccess3 {
-  requires {
-    dependency("pyarrow")
-  }
-  query pattern callExpr where callee.method == "get_file_info"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.mdc58121e;
-
-binding deserialization3 {
-  requires {
-    dependency("com.facebook.fresco:animated-gif")
-  }
-  query pattern callExpr where callee.method == "decodeFromByteBuffer"
-  emit sink code.Deserialization at args[0]
-}

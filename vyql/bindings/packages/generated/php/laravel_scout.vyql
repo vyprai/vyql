@@ -1,0 +1,57 @@
+module bindings.php.generated.mf0404b66;
+
+binding cliArgument0 {
+  requires {
+    dependency("laravel/scout")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("laravel/scout")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument2 {
+  requires {
+    dependency("laravel/scout")
+  }
+  query pattern callExpr where callee.method == "where"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument3 {
+  requires {
+    dependency("laravel/scout")
+  }
+  query pattern callExpr where callee.method == "whereIn"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument4 {
+  requires {
+    dependency("laravel/scout")
+  }
+  query pattern callExpr where callee.method == "whereNotIn"
+  emit source code.CliArgument at call.result
+}
+
+binding sqlExecution5 {
+  requires {
+    dependency("laravel/scout")
+  }
+  query pattern callExpr where callee.method == "raw"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution6 {
+  requires {
+    dependency("laravel/scout")
+  }
+  query pattern callExpr where callee.method == "withRawResults"
+  emit sink code.SqlExecution at args[0]
+}

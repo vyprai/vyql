@@ -1,0 +1,25 @@
+module bindings.php.generated.m09cebc4d;
+
+binding xmlParse0 {
+  requires {
+    dependency("nb/oxymel")
+  }
+  query pattern callExpr where callee.method == "raw"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse1 {
+  requires {
+    dependency("nb/oxymel")
+  }
+  query pattern callExpr where callee.method == "tag"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse2 {
+  requires {
+    dependency("nb/oxymel")
+  }
+  query pattern callExpr where callee.method == "cdata"
+  emit sink code.XmlParse at args[0]
+}

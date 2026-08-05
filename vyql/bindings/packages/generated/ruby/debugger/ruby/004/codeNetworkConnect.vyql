@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m506f786d;
-
-binding networkConnect4 {
-  requires {
-    dependency("debugger")
-  }
-  query pattern callExpr where callee.method == "start_client"
-  emit sink code.NetworkConnectSink at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.me44b1ac9;
-
-binding filePathAccess0 {
-  requires {
-    dependency("org.apache.zookeeper:zookeeper")
-  }
-  query pattern callExpr where callee.method == "create"
-  emit sink code.FilePathAccess at args[0]
-}

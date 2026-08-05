@@ -1,9 +1,0 @@
-module bindings.scala.generated.m761cb333;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.spark:spark-streaming_2.11")
-  }
-  query pattern callExpr where callee.method == "org.apache.spark.streaming.api.python.PythonDStream.loads"
-  emit sink code.Deserialization at args[0]
-}

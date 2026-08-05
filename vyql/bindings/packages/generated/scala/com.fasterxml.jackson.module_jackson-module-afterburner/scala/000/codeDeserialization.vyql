@@ -1,9 +1,0 @@
-module bindings.scala.generated.m6ee8ba3c;
-
-binding deserialization0 {
-  requires {
-    dependency("com.fasterxml.jackson.module:jackson-module-afterburner")
-  }
-  query pattern callExpr where callee.method == "updateBuilder"
-  emit sink code.Deserialization at args[0]
-}

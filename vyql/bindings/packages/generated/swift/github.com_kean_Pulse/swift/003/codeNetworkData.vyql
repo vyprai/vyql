@@ -1,9 +1,0 @@
-module bindings.swift.generated.mda5bfed3;
-
-binding networkData3 {
-  requires {
-    dependency("github.com/kean/Pulse")
-  }
-  query pattern callExpr where callee.method == "streamTask"
-  emit source code.NetworkData at call.result
-}

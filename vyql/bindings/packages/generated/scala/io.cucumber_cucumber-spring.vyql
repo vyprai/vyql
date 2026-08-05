@@ -1,0 +1,17 @@
+module bindings.scala.generated.mce2856b5;
+
+binding filePathAccess0 {
+  requires {
+    dependency("io.cucumber:cucumber-spring")
+  }
+  query pattern callExpr where callee.method == "loadGlue"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding urlFetch1 {
+  requires {
+    dependency("io.cucumber:cucumber-spring")
+  }
+  query pattern callExpr where callee.method == "loadGlue"
+  emit sink code.UrlFetch at args[0]
+}

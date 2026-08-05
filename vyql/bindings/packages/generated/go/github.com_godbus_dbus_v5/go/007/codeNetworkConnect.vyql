@@ -1,9 +1,0 @@
-module bindings.go.generated.m5ad90ce2;
-
-binding networkConnect7 {
-  requires {
-    dependency("github.com/godbus/dbus/v5")
-  }
-  query pattern callExpr where callee.method == "SystemBus"
-  emit sink code.NetworkConnectSink at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.go.generated.mb7f09ede;
-
-binding weakHash6 {
-  requires {
-    dependency("github.com/dgryski/go-farm")
-  }
-  query pattern callExpr where callee.method == "Hash128WithSeed"
-  emit issue code.WeakHash at call
-}

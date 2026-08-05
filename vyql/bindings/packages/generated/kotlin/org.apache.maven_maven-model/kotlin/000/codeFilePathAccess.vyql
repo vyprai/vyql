@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mf3d31c38;
-
-binding filePathAccess0 {
-  requires {
-    dependency("org.apache.maven:maven-model")
-  }
-  query pattern callExpr where callee.method == "setPomFile"
-  emit sink code.FilePathAccess at args[0]
-}

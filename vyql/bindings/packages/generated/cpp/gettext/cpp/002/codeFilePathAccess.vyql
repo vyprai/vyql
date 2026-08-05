@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mab9d5944;
-
-binding filePathAccess2 {
-  requires {
-    dependency("gettext")
-  }
-  query pattern callExpr where callee.method == "bindtextdomain"
-  emit sink code.FilePathAccess at args[0]
-}

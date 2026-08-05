@@ -1,9 +1,0 @@
-module bindings.php.generated.m3984059d;
-
-binding filePathAccess0 {
-  requires {
-    dependency("symfony/maker-bundle")
-  }
-  query pattern callExpr where callee.method == "dumpFile"
-  emit sink code.FilePathAccess at args[0]
-}

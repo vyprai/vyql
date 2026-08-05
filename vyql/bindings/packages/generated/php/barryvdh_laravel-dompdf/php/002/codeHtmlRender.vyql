@@ -1,9 +1,0 @@
-module bindings.php.generated.m9b329d65;
-
-binding htmlRender2 {
-  requires {
-    dependency("barryvdh/laravel-dompdf")
-  }
-  query pattern callExpr where callee.method == "loadView"
-  emit sink code.HtmlRender at args[0]
-}

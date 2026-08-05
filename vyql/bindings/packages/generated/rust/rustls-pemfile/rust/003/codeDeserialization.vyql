@@ -1,9 +1,0 @@
-module bindings.rust.generated.m9dbb5270;
-
-binding deserialization3 {
-  requires {
-    dependency("rustls-pemfile")
-  }
-  query pattern callExpr where callee.method == "crls"
-  emit sink code.Deserialization at args[0]
-}

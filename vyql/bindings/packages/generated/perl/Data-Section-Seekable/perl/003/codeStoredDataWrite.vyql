@@ -1,9 +1,0 @@
-module bindings.perl.generated.md08a3cdc;
-
-binding storedDataWrite3 {
-  requires {
-    dependency("Data-Section-Seekable")
-  }
-  query pattern callExpr where callee.method == "header"
-  emit sink code.StoredDataWrite at args[0]
-}

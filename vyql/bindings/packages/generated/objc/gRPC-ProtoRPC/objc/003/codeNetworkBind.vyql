@@ -1,9 +1,0 @@
-module bindings.objc.generated.m4b3b1680;
-
-binding networkBind3 {
-  requires {
-    dependency("gRPC-ProtoRPC")
-  }
-  query pattern callExpr where callee.method == "grpc_server_add_http2_port"
-  emit sink code.NetworkBind at args[0]
-}

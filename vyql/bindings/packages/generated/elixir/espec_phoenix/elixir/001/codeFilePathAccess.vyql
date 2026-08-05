@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m651c5321;
-
-binding filePathAccess1 {
-  requires {
-    dependency("espec_phoenix")
-  }
-  query pattern callExpr where callee.method == "append_to"
-  emit sink code.FilePathAccess at args[0]
-}

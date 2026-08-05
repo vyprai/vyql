@@ -1,9 +1,0 @@
-module bindings.c.generated.ma7c2e50a;
-
-binding networkSend0 {
-  requires {
-    dependency("thrift")
-  }
-  query pattern callExpr where callee.method == "socket_send"
-  emit sink code.NetworkSend at args[0]
-}

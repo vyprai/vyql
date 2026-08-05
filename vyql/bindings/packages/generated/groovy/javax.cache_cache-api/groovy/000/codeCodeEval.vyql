@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m13b059ce;
-
-binding codeEval0 {
-  requires {
-    dependency("javax.cache:cache-api")
-  }
-  query pattern callExpr where callee.method == "getClassLoader"
-  emit sink code.CodeEval at args[0]
-}

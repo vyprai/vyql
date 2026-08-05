@@ -1,9 +1,0 @@
-module bindings.objc.generated.m5d49181c;
-
-binding networkSend1 {
-  requires {
-    dependency("Moya")
-  }
-  query pattern callExpr where callee.method == "add"
-  emit sink code.NetworkSend at args[0]
-}

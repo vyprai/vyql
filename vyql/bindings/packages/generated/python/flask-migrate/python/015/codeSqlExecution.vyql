@@ -1,9 +1,0 @@
-module bindings.python.generated.m87404f83;
-
-binding sqlExecution15 {
-  requires {
-    dependency("flask-migrate")
-  }
-  query pattern callExpr where callee.method == "run_migrations_online"
-  emit sink code.SqlExecution at args[0]
-}

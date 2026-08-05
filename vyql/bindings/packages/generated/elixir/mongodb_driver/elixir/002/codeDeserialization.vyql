@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma393e52c;
-
-binding deserialization2 {
-  requires {
-    dependency("mongodb_driver")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

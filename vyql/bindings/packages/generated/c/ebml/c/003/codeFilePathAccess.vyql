@@ -1,9 +1,0 @@
-module bindings.c.generated.m26a84cad;
-
-binding filePathAccess3 {
-  requires {
-    dependency("ebml")
-  }
-  query pattern callExpr where callee.method == "open"
-  emit sink code.FilePathAccess at args[0]
-}

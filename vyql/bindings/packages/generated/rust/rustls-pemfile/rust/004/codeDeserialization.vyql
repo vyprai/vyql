@@ -1,9 +1,0 @@
-module bindings.rust.generated.m9dbb5270;
-
-binding deserialization4 {
-  requires {
-    dependency("rustls-pemfile")
-  }
-  query pattern callExpr where callee.method == "rsa_private_keys"
-  emit sink code.Deserialization at args[0]
-}

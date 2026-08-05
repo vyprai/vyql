@@ -1,0 +1,41 @@
+module bindings.objc.generated.m48a85977;
+
+binding deserialization0 {
+  requires {
+    dependency("Base64")
+  }
+  query pattern callExpr where callee.method == "stringFromBase64String"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("Base64")
+  }
+  query pattern callExpr where callee.method == "stringFromBase64UrlEncodedString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("Base64")
+  }
+  query pattern callExpr where callee.method == "dataWithBase64String"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("Base64")
+  }
+  query pattern callExpr where callee.method == "dataWithBase64UrlEncodedString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("Base64")
+  }
+  query pattern callExpr where callee.method == "dataFromBase64String"
+  emit sink code.Deserialization at args[0]
+}

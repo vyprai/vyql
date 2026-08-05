@@ -1,9 +1,0 @@
-module bindings.java.generated.m912ff882;
-
-binding networkSend5 {
-  requires {
-    dependency("com.sun.jersey:jersey-client")
-  }
-  query pattern callExpr where callee.method == "put"
-  emit sink code.NetworkSend at args[0]
-}

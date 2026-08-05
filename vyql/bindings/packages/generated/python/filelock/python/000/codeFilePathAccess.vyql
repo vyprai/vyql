@@ -1,9 +1,0 @@
-module bindings.python.generated.m70248109;
-
-binding filePathAccess0 {
-  requires {
-    dependency("filelock")
-  }
-  query pattern callExpr where callee.method == "lock_file"
-  emit sink code.FilePathAccess at args[0]
-}

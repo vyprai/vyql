@@ -1,9 +1,0 @@
-module bindings.perl.generated.md5b7d42a;
-
-binding logOutput3 {
-  requires {
-    dependency("Log-Log4perl-AutoCategorize")
-  }
-  query pattern callExpr where callee.method == "set_debug"
-  emit sink code.LogOutput at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.m785d34ef;
-
-binding deserialization0 {
-  requires {
-    dependency("org.xerial.snappy:snappy-java")
-  }
-  query pattern callExpr where callee.method == "uncompress"
-  emit sink code.Deserialization at args[0]
-}

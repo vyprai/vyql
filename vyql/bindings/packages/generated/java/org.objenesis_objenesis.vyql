@@ -1,0 +1,33 @@
+module bindings.java.generated.mf19c4e95;
+
+binding deserialization0 {
+  requires {
+    dependency("org.objenesis:objenesis")
+  }
+  query pattern callExpr where callee.method == "newInstance"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.objenesis:objenesis")
+  }
+  query pattern callExpr where callee.method == "getInstantiatorOf"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("org.objenesis:objenesis")
+  }
+  query pattern callExpr where callee.method == "newSerializableInstance"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("org.objenesis:objenesis")
+  }
+  query pattern callExpr where callee.method == "getSerializableObjectInstantiatorOf"
+  emit sink code.Deserialization at args[0]
+}

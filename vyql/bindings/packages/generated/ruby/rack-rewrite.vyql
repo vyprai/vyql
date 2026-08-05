@@ -1,0 +1,61 @@
+module bindings.ruby.generated.me18a81ce;
+
+binding redirectTarget0 {
+  requires {
+    dependency("rack-rewrite")
+  }
+  query pattern callExpr where callee.method == "r301"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget1 {
+  requires {
+    dependency("rack-rewrite")
+  }
+  query pattern callExpr where callee.method == "r302"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget2 {
+  requires {
+    dependency("rack-rewrite")
+  }
+  query pattern callExpr where callee.method == "r303"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget3 {
+  requires {
+    dependency("rack-rewrite")
+  }
+  query pattern callExpr where callee.method == "r307"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("rack-rewrite")
+  }
+  query pattern callExpr where callee.method == "send_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("rack-rewrite")
+  }
+  query pattern callExpr where callee.method == "x_send_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding networkSend6 {
+  requires {
+    dependency("rack-rewrite")
+  }
+  query pattern callExpr where callee.method == "send_data"
+  emit sink code.NetworkSend at args[0]
+}

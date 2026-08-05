@@ -1,9 +1,0 @@
-module bindings.python.generated.me62479b2;
-
-binding filePathAccess0 {
-  requires {
-    dependency("xgboost")
-  }
-  query pattern callExpr where callee.method == "load_model"
-  emit sink code.FilePathAccess at args[0]
-}

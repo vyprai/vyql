@@ -1,9 +1,0 @@
-module bindings.c.generated.m3ee0926b;
-
-binding codeEval2 {
-  requires {
-    dependency("qt5-webview")
-  }
-  query pattern callExpr where callee.method == "runJavaScriptPrivate"
-  emit sink code.CodeEval at args[0]
-}

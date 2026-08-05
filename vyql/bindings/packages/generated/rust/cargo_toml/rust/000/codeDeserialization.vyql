@@ -1,9 +1,0 @@
-module bindings.rust.generated.m7f9d1c19;
-
-binding deserialization0 {
-  requires {
-    dependency("cargo_toml")
-  }
-  query pattern callExpr where callee.method == "from_path"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,0 +1,22 @@
+module bindings.groovy.generated.me419c2f4;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.xerial:sqlite-jdbc")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlParameterization1 {
+  requires {
+    dependency("org.xerial:sqlite-jdbc")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,9 +1,0 @@
-module bindings.php.generated.md3b5d498;
-
-binding userControlledData4 {
-  requires {
-    dependency("tijsverkoyen/css-to-inline-styles")
-  }
-  query pattern callExpr where callee.method == "getCssFromStyleTags"
-  emit source core.UserControlledData at call.result
-}

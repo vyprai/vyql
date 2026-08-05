@@ -1,0 +1,17 @@
+module bindings.perl.generated.m4ddb520c;
+
+binding commandExecution0 {
+  requires {
+    dependency("Pandoc")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("Pandoc")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

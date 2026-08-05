@@ -1,9 +1,0 @@
-module bindings.java.generated.m11a8167b;
-
-binding sqlExecution2 {
-  requires {
-    dependency("org.liquibase:liquibase-core")
-  }
-  query pattern callExpr where callee.method == "updateCountSql"
-  emit sink code.SqlExecution at args[0]
-}

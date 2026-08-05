@@ -1,9 +1,0 @@
-module bindings.swift.generated.mb1ceacea;
-
-binding networkData3 {
-  requires {
-    dependency("github.com/halcyonmobile/RestBird")
-  }
-  query pattern callExpr where callee.method == "headers"
-  emit source code.NetworkData at call.result
-}

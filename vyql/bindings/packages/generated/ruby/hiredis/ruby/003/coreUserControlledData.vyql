@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mfcdfa016;
-
-binding userControlledData3 {
-  requires {
-    dependency("hiredis")
-  }
-  query pattern callExpr where callee.method == "reader_gets"
-  emit source core.UserControlledData at call.result
-}

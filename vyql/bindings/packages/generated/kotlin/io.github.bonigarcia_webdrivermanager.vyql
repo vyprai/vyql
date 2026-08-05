@@ -1,0 +1,25 @@
+module bindings.kotlin.generated.m232fb4c7;
+
+binding deserialization0 {
+  requires {
+    dependency("io.github.bonigarcia:webdrivermanager")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding httpInput1 {
+  requires {
+    dependency("io.github.bonigarcia:webdrivermanager")
+  }
+  query pattern callExpr where callee.method == "handleRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("io.github.bonigarcia:webdrivermanager")
+  }
+  query pattern callExpr where callee.method == "exchange"
+  emit sink code.NetworkConnectSink at args[0]
+}

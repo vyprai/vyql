@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.ma81629d0;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.kafka:kafka-streams")
-  }
-  query pattern callExpr where callee.method == "TaskId.parse"
-  emit sink code.Deserialization at args[0]
-}

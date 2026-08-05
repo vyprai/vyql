@@ -1,0 +1,17 @@
+module bindings.rust.generated.m64bae933;
+
+binding deserialization0 {
+  requires {
+    dependency("png")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("png")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.mcf19b29f;
-
-binding fileUse12 {
-  requires {
-    dependency("LKDBHelper")
-  }
-  query pattern callExpr where callee.method == "getFilenamesWithDir:"
-  emit sink code.FileUseSink at args[0]
-}

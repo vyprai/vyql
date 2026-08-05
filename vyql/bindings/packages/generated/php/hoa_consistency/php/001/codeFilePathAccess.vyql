@@ -1,9 +1,0 @@
-module bindings.php.generated.m1109cb5f;
-
-binding filePathAccess1 {
-  requires {
-    dependency("hoa/consistency")
-  }
-  query pattern callExpr where callee.method == "requireFile"
-  emit sink code.FilePathAccess at args[0]
-}

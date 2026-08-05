@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m63009774;
-
-binding cliArgument0 {
-  requires {
-    dependency("scss_lint")
-  }
-  query pattern callExpr where callee.method == "SCSSLint::Options.parse"
-  emit source code.CliArgument at call.result
-}

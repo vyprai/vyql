@@ -1,9 +1,0 @@
-module bindings.perl.generated.mc2679962;
-
-binding commandExecution1 {
-  requires {
-    dependency("Metabrik")
-  }
-  query pattern callExpr where callee.method == "cmd_to_code"
-  emit sink code.CommandExecution at args[0]
-}

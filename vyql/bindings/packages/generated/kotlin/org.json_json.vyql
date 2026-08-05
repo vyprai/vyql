@@ -1,0 +1,22 @@
+module bindings.kotlin.generated.m3dbcad4c;
+
+binding htmlEscape0 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "XML.escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "XML.toJSONObject"
+  emit sink code.Deserialization at args[0]
+}

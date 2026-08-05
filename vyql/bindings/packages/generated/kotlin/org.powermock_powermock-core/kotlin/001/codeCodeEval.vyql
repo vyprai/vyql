@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mad42afce;
-
-binding codeEval1 {
-  requires {
-    dependency("org.powermock:powermock-core")
-  }
-  query pattern callExpr where callee.method == "defineClass"
-  emit sink code.CodeEval at args[0]
-}

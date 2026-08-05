@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mc7c52aa2;
-
-binding networkSend2 {
-  requires {
-    dependency("brod")
-  }
-  query pattern callExpr where callee.method == "sync_produce_request"
-  emit sink code.NetworkSend at args[0]
-}

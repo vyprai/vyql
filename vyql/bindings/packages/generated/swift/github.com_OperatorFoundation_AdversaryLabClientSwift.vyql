@@ -1,0 +1,65 @@
+module bindings.swift.generated.m21ea1486;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/OperatorFoundation/AdversaryLabClientSwift")
+  }
+  query pattern callExpr where callee.method == "RawPacket.connection"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/OperatorFoundation/AdversaryLabClientSwift")
+  }
+  query pattern callExpr where callee.method == "RawPacket.ip_packet"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("github.com/OperatorFoundation/AdversaryLabClientSwift")
+  }
+  query pattern callExpr where callee.method == "RawPacket.tcp_packet"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("github.com/OperatorFoundation/AdversaryLabClientSwift")
+  }
+  query pattern callExpr where callee.method == "RawPacket.payload"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("github.com/OperatorFoundation/AdversaryLabClientSwift")
+  }
+  query pattern callExpr where callee.method == "RawPacket.timestamp"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("github.com/OperatorFoundation/AdversaryLabClientSwift")
+  }
+  query pattern callExpr where callee.method == "RawPacket.allow_block"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("github.com/OperatorFoundation/AdversaryLabClientSwift")
+  }
+  query pattern callExpr where callee.method == "RawPacket.in_out"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("github.com/OperatorFoundation/AdversaryLabClientSwift")
+  }
+  query pattern callExpr where callee.method == "RawPacket.handshake"
+  emit source core.UserControlledData at call.result
+}

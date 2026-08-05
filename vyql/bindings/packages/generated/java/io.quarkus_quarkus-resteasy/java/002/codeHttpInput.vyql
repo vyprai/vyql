@@ -1,9 +1,0 @@
-module bindings.java.generated.m0f1fd39c;
-
-binding httpInput2 {
-  requires {
-    dependency("io.quarkus:quarkus-resteasy")
-  }
-  query pattern callExpr where callee.method == "extractCookies"
-  emit source code.HttpInput at call.result
-}

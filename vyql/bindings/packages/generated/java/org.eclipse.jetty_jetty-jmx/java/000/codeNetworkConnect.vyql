@@ -1,9 +1,0 @@
-module bindings.java.generated.mff23d5ba;
-
-binding networkConnect0 {
-  requires {
-    dependency("org.eclipse.jetty:jetty-jmx")
-  }
-  query pattern callExpr where callee.method == "createServerSocket"
-  emit sink code.NetworkConnectSink at args[0]
-}

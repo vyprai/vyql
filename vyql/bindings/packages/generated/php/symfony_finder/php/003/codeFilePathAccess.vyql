@@ -1,9 +1,0 @@
-module bindings.php.generated.m99eb93c4;
-
-binding filePathAccess3 {
-  requires {
-    dependency("symfony/finder")
-  }
-  query pattern callExpr where callee.method == "filter"
-  emit sink code.FilePathAccess at args[0]
-}

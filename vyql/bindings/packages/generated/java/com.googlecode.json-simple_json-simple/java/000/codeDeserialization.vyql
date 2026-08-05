@@ -1,9 +1,0 @@
-module bindings.java.generated.m0d14f34e;
-
-binding deserialization0 {
-  requires {
-    dependency("com.googlecode.json-simple:json-simple")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

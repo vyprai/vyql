@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.me4f8d7af;
-
-binding networkSend4 {
-  requires {
-    dependency("com.sun.jersey:jersey-client")
-  }
-  query pattern callExpr where callee.method == "delete"
-  emit sink code.NetworkSend at args[0]
-}

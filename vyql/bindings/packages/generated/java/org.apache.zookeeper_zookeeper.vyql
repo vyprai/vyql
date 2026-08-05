@@ -1,0 +1,25 @@
+module bindings.java.generated.mab1cb069;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "getGroupsCommand"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "getGroupsForUserCommand"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution2 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "getUlimitMemoryCommand"
+  emit sink code.CommandExecution at args[0]
+}

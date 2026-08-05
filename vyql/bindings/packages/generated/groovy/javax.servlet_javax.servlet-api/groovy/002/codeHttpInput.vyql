@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m4f20c1a4;
-
-binding httpInput2 {
-  requires {
-    dependency("javax.servlet:javax.servlet-api")
-  }
-  query pattern callExpr where callee.method == "getQueryString"
-  emit source code.HttpInput at call.result
-}

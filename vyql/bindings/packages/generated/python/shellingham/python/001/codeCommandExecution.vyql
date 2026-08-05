@@ -1,9 +1,0 @@
-module bindings.python.generated.m6a2e3b3a;
-
-binding commandExecution1 {
-  requires {
-    dependency("shellingham")
-  }
-  query pattern callExpr where callee.method == "get_shell"
-  emit sink code.CommandExecution at args[0]
-}

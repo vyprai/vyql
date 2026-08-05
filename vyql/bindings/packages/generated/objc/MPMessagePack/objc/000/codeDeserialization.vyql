@@ -1,9 +1,0 @@
-module bindings.objc.generated.mc69dac79;
-
-binding deserialization0 {
-  requires {
-    dependency("MPMessagePack")
-  }
-  query pattern callExpr where callee.method == "readObject"
-  emit sink code.Deserialization at args[0]
-}

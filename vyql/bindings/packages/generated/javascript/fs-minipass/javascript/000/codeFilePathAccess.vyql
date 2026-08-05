@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m1b756111;
-
-binding filePathAccess0 {
-  requires {
-    dependency("fs-minipass")
-  }
-  query pattern callExpr where callee.method == "ReadStream"
-  emit sink code.FilePathAccess at args[0]
-}

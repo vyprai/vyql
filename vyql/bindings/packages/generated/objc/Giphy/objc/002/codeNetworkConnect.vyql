@@ -1,9 +1,0 @@
-module bindings.objc.generated.m882eaacf;
-
-binding networkConnect2 {
-  requires {
-    dependency("Giphy")
-  }
-  query pattern callExpr where callee.method == "downloadAssetData"
-  emit sink code.NetworkConnectSink at args[0]
-}

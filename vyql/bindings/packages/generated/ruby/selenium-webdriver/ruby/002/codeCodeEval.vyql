@@ -1,9 +1,0 @@
-module bindings.ruby.generated.me91e1897;
-
-binding codeEval2 {
-  requires {
-    dependency("selenium-webdriver")
-  }
-  query pattern callExpr where callee.method == "execute_async_script"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,0 +1,17 @@
+module bindings.objc.generated.m9e3b01a3;
+
+binding userControlledData0 {
+  requires {
+    dependency("SwiftKVC")
+  }
+  query pattern callExpr where callee.method == "subscript"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("SwiftKVC")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit source core.UserControlledData at call.result
+}

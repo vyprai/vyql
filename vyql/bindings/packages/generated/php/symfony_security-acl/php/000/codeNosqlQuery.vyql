@@ -1,9 +1,0 @@
-module bindings.php.generated.m628c3e85;
-
-binding nosqlQuery0 {
-  requires {
-    dependency("symfony/security-acl")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit sink code.NosqlQuery at args[0]
-}

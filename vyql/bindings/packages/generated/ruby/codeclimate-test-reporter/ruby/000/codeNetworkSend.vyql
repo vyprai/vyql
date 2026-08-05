@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mc749145d;
-
-binding networkSend0 {
-  requires {
-    dependency("codeclimate-test-reporter")
-  }
-  query pattern callExpr where callee.method == "post_results"
-  emit sink code.NetworkSend at args[0]
-}

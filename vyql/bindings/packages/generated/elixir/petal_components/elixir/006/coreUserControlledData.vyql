@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma2e6b1a0;
-
-binding userControlledData6 {
-  requires {
-    dependency("petal_components")
-  }
-  query pattern callExpr where callee.method == "textarea"
-  emit source core.UserControlledData at call.result
-}

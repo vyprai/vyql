@@ -1,9 +1,0 @@
-module bindings.scala.generated.m32d8b300;
-
-binding expressionEval0 {
-  requires {
-    dependency("org.apache.lucene:lucene-queries")
-  }
-  query pattern callExpr where callee.method == "IntervalQuery"
-  emit sink code.ExpressionEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m5fad7f45;
-
-binding htmlRender1 {
-  requires {
-    dependency("bunit.web")
-  }
-  query pattern callExpr where callee.method == "MarkupMatches"
-  emit sink code.HtmlRender at args[0]
-}

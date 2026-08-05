@@ -1,9 +1,0 @@
-module bindings.objc.generated.mef2186dc;
-
-binding weakHash6 {
-  requires {
-    dependency("RHCategoryKit")
-  }
-  query pattern callExpr where callee.method == "rh_stringWithMD5Encode"
-  emit issue code.WeakHash at call
-}

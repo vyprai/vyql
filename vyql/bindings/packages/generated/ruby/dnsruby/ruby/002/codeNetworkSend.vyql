@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m11e43799;
-
-binding networkSend2 {
-  requires {
-    dependency("dnsruby")
-  }
-  query pattern callExpr where callee.method == "query_raw"
-  emit sink code.NetworkSend at args[0]
-}

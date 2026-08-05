@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mfd150d70;
-
-binding deserialization1 {
-  requires {
-    dependency("net.sf.jasperreports:jasperreports")
-  }
-  query pattern callExpr where callee.method == "loadList"
-  emit sink code.Deserialization at args[0]
-}

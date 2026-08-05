@@ -1,0 +1,97 @@
+module bindings.dart.generated.m8bc63517;
+
+binding networkData0 {
+  requires {
+    dependency("basic_utils")
+  }
+  query pattern callExpr where callee.method == "getForFullResponse"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("basic_utils")
+  }
+  query pattern callExpr where callee.method == "getForJson"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData2 {
+  requires {
+    dependency("basic_utils")
+  }
+  query pattern callExpr where callee.method == "getForString"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend3 {
+  requires {
+    dependency("basic_utils")
+  }
+  query pattern callExpr where callee.method == "postForFullResponse"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("basic_utils")
+  }
+  query pattern callExpr where callee.method == "postForJson"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("basic_utils")
+  }
+  query pattern callExpr where callee.method == "postForString"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend6 {
+  requires {
+    dependency("basic_utils")
+  }
+  query pattern callExpr where callee.method == "putForFullResponse"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend7 {
+  requires {
+    dependency("basic_utils")
+  }
+  query pattern callExpr where callee.method == "putForJson"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend8 {
+  requires {
+    dependency("basic_utils")
+  }
+  query pattern callExpr where callee.method == "putForString"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend9 {
+  requires {
+    dependency("basic_utils")
+  }
+  query pattern callExpr where callee.method == "deleteForFullResponse"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend10 {
+  requires {
+    dependency("basic_utils")
+  }
+  query pattern callExpr where callee.method == "deleteForJson"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend11 {
+  requires {
+    dependency("basic_utils")
+  }
+  query pattern callExpr where callee.method == "deleteForString"
+  emit sink code.NetworkSend at args[0]
+}

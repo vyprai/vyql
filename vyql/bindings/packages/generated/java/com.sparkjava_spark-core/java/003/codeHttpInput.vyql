@@ -1,9 +1,0 @@
-module bindings.java.generated.m887e3238;
-
-binding httpInput3 {
-  requires {
-    dependency("com.sparkjava:spark-core")
-  }
-  query pattern callExpr where callee.path ~= "com.sparkjava.spark.core.cookie"
-  emit source code.HttpInput at call.result
-}

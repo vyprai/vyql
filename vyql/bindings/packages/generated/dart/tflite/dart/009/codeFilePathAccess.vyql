@@ -1,9 +1,0 @@
-module bindings.dart.generated.m97f3efaf;
-
-binding filePathAccess9 {
-  requires {
-    dependency("tflite")
-  }
-  query pattern callExpr where callee.method == "runSegmentationOnFrame"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.m88168c46;
-
-binding httpInput2 {
-  requires {
-    dependency("ch.qos.logback:logback-access")
-  }
-  query pattern callExpr where callee.method == "getRequestHeader"
-  emit source code.HttpInput at call.result
-}

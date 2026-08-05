@@ -1,9 +1,0 @@
-module bindings.perl.generated.mec98890c;
-
-binding deserialization0 {
-  requires {
-    dependency("Thrift")
-  }
-  query pattern callExpr where callee.method == "readMessageBegin"
-  emit sink code.Deserialization at args[0]
-}

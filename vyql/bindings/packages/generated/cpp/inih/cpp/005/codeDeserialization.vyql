@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m510cd015;
-
-binding deserialization5 {
-  requires {
-    dependency("inih")
-  }
-  query pattern callExpr where callee.method == "INIReader"
-  emit sink code.Deserialization at args[0]
-}

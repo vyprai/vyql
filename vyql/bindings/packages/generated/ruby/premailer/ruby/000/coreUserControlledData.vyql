@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m0c6e3ccb;
-
-binding userControlledData0 {
-  requires {
-    dependency("premailer")
-  }
-  query pattern callExpr where callee.method == "initialize"
-  emit source core.UserControlledData at call.result
-}

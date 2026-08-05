@@ -1,9 +1,0 @@
-module bindings.objc.generated.mf3b55e37;
-
-binding deserialization1 {
-  requires {
-    dependency("YapDatabase")
-  }
-  query pattern callExpr where callee.method == "registerObjectDeserializer:forCollection:"
-  emit sink code.Deserialization at args[0]
-}

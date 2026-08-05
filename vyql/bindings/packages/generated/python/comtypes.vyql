@@ -1,0 +1,49 @@
+module bindings.python.generated.mfedb9024;
+
+binding deserialization0 {
+  requires {
+    dependency("comtypes")
+  }
+  query pattern callExpr where callee.method == "tlbparser.parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("comtypes")
+  }
+  query pattern callExpr where callee.method == "persist.Load"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("comtypes")
+  }
+  query pattern callExpr where callee.method == "persist.Save"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("comtypes")
+  }
+  query pattern callExpr where callee.method == "typeinfo.LoadRegTypeLib"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("comtypes")
+  }
+  query pattern callExpr where callee.method == "typeinfo.LoadTypeLibEx"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("comtypes")
+  }
+  query pattern callExpr where callee.method == "typeinfo.LoadTypeLib"
+  emit sink code.FilePathAccess at args[0]
+}

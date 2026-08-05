@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m7c7b01a3;
-
-binding sqlExecution0 {
-  requires {
-    dependency("org.mybatis:mybatis")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit sink code.SqlExecution at args[0]
-}

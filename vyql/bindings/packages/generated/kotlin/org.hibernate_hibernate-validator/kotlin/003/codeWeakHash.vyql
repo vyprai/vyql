@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mbf6c07c3;
-
-binding weakHash3 {
-  requires {
-    dependency("org.hibernate:hibernate-validator")
-  }
-  query pattern callExpr where callee.method == "hash"
-  emit issue code.WeakHash at call
-}

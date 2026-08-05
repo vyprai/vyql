@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m2ab085a4;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.ant:ant")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

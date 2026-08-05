@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m026eb1b8;
-
-binding commandExecution0 {
-  requires {
-    dependency("magnum")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.CommandExecution at args[0]
-}

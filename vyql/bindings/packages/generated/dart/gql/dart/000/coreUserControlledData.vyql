@@ -1,9 +1,0 @@
-module bindings.dart.generated.mad9163af;
-
-binding userControlledData0 {
-  requires {
-    dependency("gql")
-  }
-  query pattern callExpr where callee.method == "tokenize"
-  emit source core.UserControlledData at call.result
-}

@@ -1,0 +1,25 @@
+module bindings.dart.generated.m3bab8286;
+
+binding secretValue0 {
+  requires {
+    dependency("stripe_android")
+  }
+  query pattern callExpr where callee.method == "createTokenFromCard"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("stripe_android")
+  }
+  query pattern callExpr where callee.method == "createTokenFromBankAccount"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("stripe_android")
+  }
+  query pattern callExpr where callee.method == "createTokenFromPii"
+  emit source code.SecretValue at call.result
+}

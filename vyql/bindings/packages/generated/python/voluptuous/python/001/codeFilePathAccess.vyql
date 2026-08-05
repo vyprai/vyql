@@ -1,9 +1,0 @@
-module bindings.python.generated.m5edd1caa;
-
-binding filePathAccess1 {
-  requires {
-    dependency("voluptuous")
-  }
-  query pattern callExpr where callee.method == "IsFile"
-  emit sink code.FilePathAccess at args[0]
-}

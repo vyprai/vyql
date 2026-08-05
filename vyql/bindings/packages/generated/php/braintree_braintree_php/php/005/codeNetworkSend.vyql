@@ -1,9 +1,0 @@
-module bindings.php.generated.mf0879722;
-
-binding networkSend5 {
-  requires {
-    dependency("braintree/braintree_php")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit sink code.NetworkSend at args[0]
-}

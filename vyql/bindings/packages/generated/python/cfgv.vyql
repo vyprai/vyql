@@ -1,0 +1,26 @@
+module bindings.python.generated.m8bff7fd6;
+
+binding userControlledData0 {
+  requires {
+    dependency("cfgv")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit source core.UserControlledData at call.result
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("cfgv")
+  }
+  query pattern callExpr where callee.method == "load_from_filename"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding regexCompile2 {
+  requires {
+    dependency("cfgv")
+  }
+  query pattern callExpr where callee.method == "check_regex"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

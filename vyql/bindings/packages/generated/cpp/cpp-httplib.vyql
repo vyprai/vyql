@@ -1,0 +1,98 @@
+module bindings.cpp.generated.mb7311fac;
+
+binding userControlledData0 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "get_header_value"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "parse_url"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "parse_port"
+  emit source core.UserControlledData at call.result
+}
+
+binding deserialization3 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding redirectTarget5 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "set_redirect"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding networkConnect7 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "set_file_content"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding networkSend9 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding responseHeaderWrite10 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "set_header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding weakHash11 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "hash_core"
+  emit issue code.WeakHash at call
+}

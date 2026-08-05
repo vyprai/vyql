@@ -1,0 +1,17 @@
+module bindings.go.generated.m80b49e9e;
+
+binding codeEval0 {
+  requires {
+    dependency("github.com/sonatard/noctx")
+  }
+  query pattern callExpr where callee.method == "Run"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("github.com/sonatard/noctx")
+  }
+  query pattern callExpr where callee.method == "main"
+  emit sink code.CodeEval at args[0]
+}

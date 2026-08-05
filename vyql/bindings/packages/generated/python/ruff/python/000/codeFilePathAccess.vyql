@@ -1,9 +1,0 @@
-module bindings.python.generated.md6d022b9;
-
-binding filePathAccess0 {
-  requires {
-    dependency("ruff")
-  }
-  query pattern callExpr where callee.method == "check"
-  emit sink code.FilePathAccess at args[0]
-}

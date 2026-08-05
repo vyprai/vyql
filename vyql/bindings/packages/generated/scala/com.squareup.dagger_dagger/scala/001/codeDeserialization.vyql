@@ -1,9 +1,0 @@
-module bindings.scala.generated.mda9a57d4;
-
-binding deserialization1 {
-  requires {
-    dependency("com.squareup.dagger:dagger")
-  }
-  query pattern callExpr where callee.method == "makeGraph"
-  emit sink code.Deserialization at args[0]
-}

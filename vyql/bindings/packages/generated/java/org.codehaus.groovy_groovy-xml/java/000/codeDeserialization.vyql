@@ -1,9 +1,0 @@
-module bindings.java.generated.m7e0605b3;
-
-binding deserialization0 {
-  requires {
-    dependency("org.codehaus.groovy:groovy-xml")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

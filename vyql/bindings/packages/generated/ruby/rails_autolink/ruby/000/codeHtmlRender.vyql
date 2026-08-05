@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m7b3b1e13;
-
-binding htmlRender0 {
-  requires {
-    dependency("rails_autolink")
-  }
-  query pattern callExpr where callee.method == "auto_link"
-  emit sink code.HtmlRender at args[0]
-}

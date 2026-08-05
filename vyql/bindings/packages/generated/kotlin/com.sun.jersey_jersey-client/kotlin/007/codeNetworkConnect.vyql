@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.me4f8d7af;
-
-binding networkConnect7 {
-  requires {
-    dependency("com.sun.jersey:jersey-client")
-  }
-  query pattern callExpr where callee.method == "setConnectTimeout"
-  emit sink code.NetworkConnectSink at args[0]
-}

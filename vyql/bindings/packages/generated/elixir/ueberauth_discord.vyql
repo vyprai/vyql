@@ -1,0 +1,17 @@
+module bindings.elixir.generated.m00016ffb;
+
+binding userControlledData0 {
+  requires {
+    dependency("ueberauth_discord")
+  }
+  query pattern callExpr where callee.method == "handle_callback!"
+  emit source core.UserControlledData at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("ueberauth_discord")
+  }
+  query pattern callExpr where callee.method == "get_token!"
+  emit source code.SecretValue at call.result
+}

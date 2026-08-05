@@ -1,9 +1,0 @@
-module bindings.objc.generated.ma8ea894d;
-
-binding networkSend1 {
-  requires {
-    dependency("SwiftyStoreKit")
-  }
-  query pattern callExpr where callee.method == "validate"
-  emit sink code.NetworkSend at args[0]
-}

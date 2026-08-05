@@ -1,9 +1,0 @@
-module bindings.php.generated.mb928c19c;
-
-binding httpInput3 {
-  requires {
-    dependency("topthink/framework")
-  }
-  query pattern callExpr where callee.method == "cookie"
-  emit source code.HttpInput at call.result
-}

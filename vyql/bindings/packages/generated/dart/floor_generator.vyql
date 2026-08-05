@@ -1,0 +1,17 @@
+module bindings.dart.generated.m6081d797;
+
+binding sqlExecution0 {
+  requires {
+    dependency("floor_generator")
+  }
+  query pattern callExpr where callee.method == "QueryProcessor"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("floor_generator")
+  }
+  query pattern callExpr where callee.method == "findVariables"
+  emit sink code.SqlExecution at args[0]
+}

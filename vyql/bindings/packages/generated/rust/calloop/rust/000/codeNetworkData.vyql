@@ -1,9 +1,0 @@
-module bindings.rust.generated.m8e94cf14;
-
-binding networkData0 {
-  requires {
-    dependency("calloop")
-  }
-  query pattern callExpr where callee.method == "poll_read"
-  emit source code.NetworkData at call.result
-}

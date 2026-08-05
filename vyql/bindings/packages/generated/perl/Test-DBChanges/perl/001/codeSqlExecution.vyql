@@ -1,9 +1,0 @@
-module bindings.perl.generated.m5884e7db;
-
-binding sqlExecution1 {
-  requires {
-    dependency("Test-DBChanges")
-  }
-  query pattern callExpr where callee.method == "_db_fetch"
-  emit sink code.SqlExecution at args[0]
-}

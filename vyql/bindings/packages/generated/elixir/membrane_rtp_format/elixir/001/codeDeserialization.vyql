@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mfc30ae77;
-
-binding deserialization1 {
-  requires {
-    dependency("membrane_rtp_format")
-  }
-  query pattern callExpr where callee.method == "register"
-  emit sink code.Deserialization at args[0]
-}

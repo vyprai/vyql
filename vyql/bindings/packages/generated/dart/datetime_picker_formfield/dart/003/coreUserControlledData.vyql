@@ -1,9 +1,0 @@
-module bindings.dart.generated.m70c9abb4;
-
-binding userControlledData3 {
-  requires {
-    dependency("datetime_picker_formfield")
-  }
-  query pattern callExpr where callee.method == "onSubmitted"
-  emit source core.UserControlledData at call.result
-}

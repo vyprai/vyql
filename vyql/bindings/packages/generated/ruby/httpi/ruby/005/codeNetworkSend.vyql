@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m0f13fa05;
-
-binding networkSend5 {
-  requires {
-    dependency("httpi")
-  }
-  query pattern callExpr where callee.method == "head"
-  emit sink code.NetworkSend at args[0]
-}

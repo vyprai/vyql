@@ -1,9 +1,0 @@
-module bindings.swift.generated.m0a1aee7d;
-
-binding userControlledData1 {
-  requires {
-    dependency("github.com/SwiftPackageIndex/SPIManifest")
-  }
-  query pattern callExpr where callee.method == "init"
-  emit source core.UserControlledData at call.result
-}

@@ -1,0 +1,41 @@
+module bindings.kotlin.generated.m4f24edc7;
+
+binding deserialization0 {
+  requires {
+    dependency("com.auth0:java-jwt")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.auth0:java-jwt")
+  }
+  query pattern callExpr where callee.method == "verify"
+  emit sink code.Deserialization at args[0]
+}
+
+binding secretValue2 {
+  requires {
+    dependency("com.auth0:java-jwt")
+  }
+  query pattern callExpr where callee.method == "getSubject"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("com.auth0:java-jwt")
+  }
+  query pattern callExpr where callee.method == "getAudience"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("com.auth0:java-jwt")
+  }
+  query pattern callExpr where callee.method == "getClaim"
+  emit source code.SecretValue at call.result
+}

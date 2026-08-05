@@ -1,9 +1,0 @@
-module bindings.go.generated.m3f54ace6;
-
-binding networkConnect1 {
-  requires {
-    dependency("github.com/hailocab/go-hostpool")
-  }
-  query pattern callExpr where callee.method == "NewEpsilonGreedy"
-  emit sink code.NetworkConnectSink at args[0]
-}

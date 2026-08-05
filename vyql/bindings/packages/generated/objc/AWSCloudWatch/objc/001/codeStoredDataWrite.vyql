@@ -1,9 +1,0 @@
-module bindings.objc.generated.md46e50e9;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("AWSCloudWatch")
-  }
-  query pattern callExpr where callee.method == "setUp"
-  emit sink code.StoredDataWrite at args[0]
-}

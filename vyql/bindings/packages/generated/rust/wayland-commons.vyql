@@ -1,0 +1,25 @@
+module bindings.rust.generated.m62e9465d;
+
+binding networkSend0 {
+  requires {
+    dependency("wayland-commons")
+  }
+  query pattern callExpr where callee.method == "send_msg"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData1 {
+  requires {
+    dependency("wayland-commons")
+  }
+  query pattern callExpr where callee.method == "rcv_msg"
+  emit source code.NetworkData at call.result
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("wayland-commons")
+  }
+  query pattern callExpr where callee.method == "dup_fd_cloexec"
+  emit sink code.FilePathAccess at args[0]
+}

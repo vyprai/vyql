@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m26e066b8;
-
-binding networkData0 {
-  requires {
-    dependency("io.netty:netty-buffer")
-  }
-  query pattern callExpr where callee.method == "ByteBufInputStream.read"
-  emit source code.NetworkData at call.result
-}

@@ -1,0 +1,17 @@
+module bindings.scala.generated.m324a4e61;
+
+binding deserialization0 {
+  requires {
+    dependency("javax.xml.bind:jaxb-api")
+  }
+  query pattern callExpr where callee.method == "unmarshal"
+  emit sink code.Deserialization at args[0]
+}
+
+binding xmlParse1 {
+  requires {
+    dependency("javax.xml.bind:jaxb-api")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}

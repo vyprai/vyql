@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m00890e63;
-
-binding weakHash4 {
-  requires {
-    dependency("org.apache.pig:pig")
-  }
-  query pattern callExpr where callee.method == "sum"
-  emit issue code.WeakHash at call
-}

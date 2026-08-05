@@ -1,9 +1,0 @@
-module bindings.scala.generated.mda6a07ad;
-
-binding filePathAccess1 {
-  requires {
-    dependency("org.apache.pdfbox:pdfbox")
-  }
-  query pattern callExpr where callee.method == "loadXFDF"
-  emit sink code.FilePathAccess at args[0]
-}

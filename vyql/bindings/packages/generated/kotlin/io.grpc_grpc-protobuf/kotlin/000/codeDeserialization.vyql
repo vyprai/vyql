@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mdb893ba8;
-
-binding deserialization0 {
-  requires {
-    dependency("io.grpc:grpc-protobuf")
-  }
-  query pattern callExpr where callee.method == "marshaller"
-  emit sink code.Deserialization at args[0]
-}

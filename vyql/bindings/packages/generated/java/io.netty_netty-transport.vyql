@@ -1,0 +1,33 @@
+module bindings.java.generated.maa48f2c3;
+
+binding networkConnect0 {
+  requires {
+    dependency("io.netty:netty-transport")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkBind1 {
+  requires {
+    dependency("io.netty:netty-transport")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit sink code.NetworkBind at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("io.netty:netty-transport")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend3 {
+  requires {
+    dependency("io.netty:netty-transport")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

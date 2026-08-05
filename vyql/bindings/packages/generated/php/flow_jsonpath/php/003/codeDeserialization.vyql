@@ -1,9 +1,0 @@
-module bindings.php.generated.ma47aeaca;
-
-binding deserialization3 {
-  requires {
-    dependency("flow/jsonpath")
-  }
-  query pattern callExpr where callee.method == "FlowJSONPathJSONPathLexer::parseExpression"
-  emit sink code.Deserialization at args[0]
-}

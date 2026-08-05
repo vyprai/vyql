@@ -1,0 +1,25 @@
+module bindings.elixir.generated.mb2000e52;
+
+binding filePathAccess0 {
+  requires {
+    dependency("circuits_uart")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("circuits_uart")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("circuits_uart")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

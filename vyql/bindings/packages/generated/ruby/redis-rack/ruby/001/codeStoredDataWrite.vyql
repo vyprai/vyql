@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m058b6a47;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("redis-rack")
-  }
-  query pattern callExpr where callee.method == "write_session"
-  emit sink code.StoredDataWrite at args[0]
-}

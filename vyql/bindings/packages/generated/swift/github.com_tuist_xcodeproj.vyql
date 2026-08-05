@@ -1,0 +1,65 @@
+module bindings.swift.generated.md62bcff4;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/tuist/xcodeproj")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("github.com/tuist/xcodeproj")
+  }
+  query pattern callExpr where callee.method == "writeWorkspace"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/tuist/xcodeproj")
+  }
+  query pattern callExpr where callee.method == "writePBXProj"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("github.com/tuist/xcodeproj")
+  }
+  query pattern callExpr where callee.method == "writeSharedData"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("github.com/tuist/xcodeproj")
+  }
+  query pattern callExpr where callee.method == "writeUserData"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("github.com/tuist/xcodeproj")
+  }
+  query pattern callExpr where callee.method == "writeSchemes"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("github.com/tuist/xcodeproj")
+  }
+  query pattern callExpr where callee.method == "writeBreakPoints"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding networkConnect7 {
+  requires {
+    dependency("github.com/tuist/xcodeproj")
+  }
+  query pattern callExpr where callee.method == "addSwiftPackage"
+  emit sink code.NetworkConnectSink at args[0]
+}

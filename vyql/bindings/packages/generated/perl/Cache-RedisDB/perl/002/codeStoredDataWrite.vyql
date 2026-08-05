@@ -1,9 +1,0 @@
-module bindings.perl.generated.m923fa815;
-
-binding storedDataWrite2 {
-  requires {
-    dependency("Cache-RedisDB")
-  }
-  query pattern callExpr where callee.method == "set"
-  emit sink code.StoredDataWrite at args[0]
-}

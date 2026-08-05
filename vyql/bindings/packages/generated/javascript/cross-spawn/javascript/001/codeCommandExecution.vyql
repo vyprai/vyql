@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m2cbd08e3;
-
-binding commandExecution1 {
-  requires {
-    dependency("cross-spawn")
-  }
-  query pattern callExpr where callee.method == "spawnSync"
-  emit sink code.CommandExecution at args[0]
-}

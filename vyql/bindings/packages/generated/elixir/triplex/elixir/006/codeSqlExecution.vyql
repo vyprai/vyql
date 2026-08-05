@@ -1,9 +1,0 @@
-module bindings.elixir.generated.me859b561;
-
-binding sqlExecution6 {
-  requires {
-    dependency("triplex")
-  }
-  query pattern callExpr where callee.path ~= "mix.tasks.triplex.migrate.run"
-  emit sink code.SqlExecution at args[0]
-}

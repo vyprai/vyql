@@ -1,9 +1,0 @@
-module bindings.scala.generated.mc93536dc;
-
-binding httpInput3 {
-  requires {
-    dependency("org.atmosphere:atmosphere-runtime")
-  }
-  query pattern callExpr where callee.method == "getRequestedSessionId"
-  emit source code.HttpInput at call.result
-}

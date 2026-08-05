@@ -1,9 +1,0 @@
-module bindings.rust.generated.md1392577;
-
-binding filePathAccess4 {
-  requires {
-    dependency("core-foundation")
-  }
-  query pattern callExpr where callee.method == "resources_path"
-  emit sink code.FilePathAccess at args[0]
-}

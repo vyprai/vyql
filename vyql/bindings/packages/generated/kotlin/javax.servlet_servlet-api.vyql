@@ -1,0 +1,220 @@
+module bindings.kotlin.generated.ma8d8feef;
+
+binding httpInput0 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getParameter"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getParameterValues"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getParameterMap"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getReader"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getInputStream"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getAttribute"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput6 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getHeader"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput7 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getHeaders"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput8 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getHeaderNames"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput9 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getCookies"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput10 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getQueryString"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput11 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getRequestURI"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput12 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getRequestURL"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput13 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getPathInfo"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput14 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getServletPath"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput15 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getName"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput16 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getValue"
+  emit source code.HttpInput at call.result
+}
+
+binding htmlRender17 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getWriter"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender18 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getOutputStream"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding redirectTarget19 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "sendRedirect"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding responseHeaderWrite20 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "addHeader"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite21 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "setHeader"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding filePathAccess22 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "forward"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess23 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "include"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding inputValidation24 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "encodeURL"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation25 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "encodeRedirectURL"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

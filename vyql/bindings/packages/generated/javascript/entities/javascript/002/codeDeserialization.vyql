@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m60828c0a;
-
-binding deserialization2 {
-  requires {
-    dependency("entities")
-  }
-  query pattern callExpr where callee.method == "decodeHTMLStrict"
-  emit sink code.Deserialization at args[0]
-}

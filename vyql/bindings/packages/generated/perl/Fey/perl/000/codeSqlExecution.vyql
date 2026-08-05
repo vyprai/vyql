@@ -1,9 +1,0 @@
-module bindings.perl.generated.mfdc7efdb;
-
-binding sqlExecution0 {
-  requires {
-    dependency("Fey")
-  }
-  query pattern callExpr where callee.method == "sql"
-  emit sink code.SqlExecution at args[0]
-}

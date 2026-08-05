@@ -1,9 +1,0 @@
-module bindings.java.generated.mfe97f080;
-
-binding deserialization9 {
-  requires {
-    dependency("org.springframework.session:spring-session-jdbc")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

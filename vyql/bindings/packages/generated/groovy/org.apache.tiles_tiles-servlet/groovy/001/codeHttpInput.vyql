@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m85491e43;
-
-binding httpInput1 {
-  requires {
-    dependency("org.apache.tiles:tiles-servlet")
-  }
-  query pattern callExpr where callee.method == "doPost"
-  emit source code.HttpInput at call.result
-}

@@ -1,0 +1,105 @@
+module bindings.elixir.generated.m1bd8beb9;
+
+binding responseHeaderWrite0 {
+  requires {
+    dependency("corsica")
+  }
+  query pattern callExpr where callee.method == "send_preflight_resp"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("corsica")
+  }
+  query pattern callExpr where callee.method == "put_cors_simple_resp_headers"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("corsica")
+  }
+  query pattern callExpr where callee.method == "put_cors_preflight_resp_headers"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite3 {
+  requires {
+    dependency("corsica")
+  }
+  query pattern callExpr where callee.method == "put_cors_preflight_resp_headers_no_check"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite4 {
+  requires {
+    dependency("corsica")
+  }
+  query pattern callExpr where callee.method == "put_common_headers"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite5 {
+  requires {
+    dependency("corsica")
+  }
+  query pattern callExpr where callee.method == "put_allow_credentials_header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite6 {
+  requires {
+    dependency("corsica")
+  }
+  query pattern callExpr where callee.method == "put_allow_origin_header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite7 {
+  requires {
+    dependency("corsica")
+  }
+  query pattern callExpr where callee.method == "update_vary_header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite8 {
+  requires {
+    dependency("corsica")
+  }
+  query pattern callExpr where callee.method == "put_allow_methods_header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite9 {
+  requires {
+    dependency("corsica")
+  }
+  query pattern callExpr where callee.method == "put_allow_headers_header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite10 {
+  requires {
+    dependency("corsica")
+  }
+  query pattern callExpr where callee.method == "put_allow_private_network_header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite11 {
+  requires {
+    dependency("corsica")
+  }
+  query pattern callExpr where callee.method == "put_max_age_header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite12 {
+  requires {
+    dependency("corsica")
+  }
+  query pattern callExpr where callee.method == "put_expose_headers_header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

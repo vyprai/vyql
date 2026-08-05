@@ -1,9 +1,0 @@
-module bindings.c.generated.m43a06365;
-
-binding cliArgument1 {
-  requires {
-    dependency("wxwidgets")
-  }
-  query pattern callExpr where callee.method == "OnCmdLineParsed"
-  emit source code.CliArgument at call.result
-}

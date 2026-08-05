@@ -1,9 +1,0 @@
-module bindings.dart.generated.m92f3ed1f;
-
-binding codeEval0 {
-  requires {
-    dependency("webdriver")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.CodeEval at args[0]
-}

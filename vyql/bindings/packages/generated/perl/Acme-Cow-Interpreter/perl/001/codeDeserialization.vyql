@@ -1,9 +1,0 @@
-module bindings.perl.generated.me2578e40;
-
-binding deserialization1 {
-  requires {
-    dependency("Acme-Cow-Interpreter")
-  }
-  query pattern callExpr where callee.method == "parse_file"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m321695dd;
-
-binding deserialization3 {
-  requires {
-    dependency("wp-cli/i18n-command")
-  }
-  query pattern callExpr where callee.method == "JsonSchemaExtractor::extract_strings_using_i18n_schema"
-  emit sink code.Deserialization at args[0]
-}

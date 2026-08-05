@@ -1,9 +1,0 @@
-module bindings.go.generated.mfa9130b4;
-
-binding deserialization0 {
-  requires {
-    dependency("gopkg.in/gcfg.v1")
-  }
-  query pattern callExpr where callee.method == "ReadStringInto"
-  emit sink code.Deserialization at args[0]
-}

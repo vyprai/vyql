@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.me099a3fc;
-
-binding deserialization0 {
-  requires {
-    dependency("jdom:jdom")
-  }
-  query pattern callExpr where callee.method == "build(org.w3c.dom.Document)"
-  emit sink code.Deserialization at args[0]
-}

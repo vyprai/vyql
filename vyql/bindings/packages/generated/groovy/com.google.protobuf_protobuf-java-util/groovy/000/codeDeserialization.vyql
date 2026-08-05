@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m628e5c29;
-
-binding deserialization0 {
-  requires {
-    dependency("com.google.protobuf:protobuf-java-util")
-  }
-  query pattern callExpr where callee.method == "merge"
-  emit sink code.Deserialization at args[0]
-}

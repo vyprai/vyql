@@ -1,9 +1,0 @@
-module bindings.php.generated.m38885b37;
-
-binding userControlledData1 {
-  requires {
-    dependency("sebastian/type")
-  }
-  query pattern callExpr where callee.method == "Type::fromName"
-  emit source core.UserControlledData at call.result
-}

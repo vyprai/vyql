@@ -1,0 +1,17 @@
+module bindings.perl.generated.m4cd39f33;
+
+binding userControlledData0 {
+  requires {
+    dependency("XXX")
+  }
+  query pattern callExpr where callee.method == "_set_dump_module"
+  emit source core.UserControlledData at call.result
+}
+
+binding codeEval1 {
+  requires {
+    dependency("XXX")
+  }
+  query pattern callExpr where callee.method == "_xxx_dump"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m26218a5f;
-
-binding sqlExecution2 {
-  requires {
-    dependency("Mojo-InfluxDB")
-  }
-  query pattern callExpr where callee.method == "raw_query_p"
-  emit sink code.SqlExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mc8cf5d9a;
-
-binding responseHeaderWrite5 {
-  requires {
-    dependency("cowboy")
-  }
-  query pattern callExpr where callee.method == "cowboy_req:set_resp_headers_list"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

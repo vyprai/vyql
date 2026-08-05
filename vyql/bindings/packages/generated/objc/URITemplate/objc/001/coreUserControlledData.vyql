@@ -1,9 +1,0 @@
-module bindings.objc.generated.m7f728b56;
-
-binding userControlledData1 {
-  requires {
-    dependency("URITemplate")
-  }
-  query pattern callExpr where callee.method == "extract"
-  emit source core.UserControlledData at call.result
-}

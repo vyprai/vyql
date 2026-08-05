@@ -1,9 +1,0 @@
-module bindings.scala.generated.m16284c04;
-
-binding networkSend7 {
-  requires {
-    dependency("com.mashape.unirest:unirest-java")
-  }
-  query pattern callExpr where callee.method == "delete"
-  emit sink code.NetworkSend at args[0]
-}

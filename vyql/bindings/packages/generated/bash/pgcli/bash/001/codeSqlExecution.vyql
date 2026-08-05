@@ -1,9 +1,0 @@
-module bindings.bash.generated.mf01a1501;
-
-binding sqlExecution1 {
-  requires {
-    dependency("pgcli")
-  }
-  query pattern callExpr where callee.path ~= "pgcli"
-  emit sink code.SqlExecution at args.any
-}

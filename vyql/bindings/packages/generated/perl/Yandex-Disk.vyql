@@ -1,0 +1,41 @@
+module bindings.perl.generated.md985d210;
+
+binding secretValue0 {
+  requires {
+    dependency("Yandex-Disk")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit source code.SecretValue at call.result
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("Yandex-Disk")
+  }
+  query pattern callExpr where callee.method == "uploadFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("Yandex-Disk")
+  }
+  query pattern callExpr where callee.method == "uploadFile"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData3 {
+  requires {
+    dependency("Yandex-Disk")
+  }
+  query pattern callExpr where callee.method == "downloadFile"
+  emit source code.NetworkData at call.result
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("Yandex-Disk")
+  }
+  query pattern callExpr where callee.method == "downloadFile"
+  emit sink code.FilePathAccess at args[0]
+}

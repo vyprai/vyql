@@ -1,9 +1,0 @@
-module bindings.perl.generated.mc265bf40;
-
-binding urlFetch2 {
-  requires {
-    dependency("pip")
-  }
-  query pattern callExpr where callee.method == "fetch_any"
-  emit sink code.UrlFetch at args[0]
-}

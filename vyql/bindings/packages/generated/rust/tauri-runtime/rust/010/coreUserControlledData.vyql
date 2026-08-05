@@ -1,9 +1,0 @@
-module bindings.rust.generated.m24cf5420;
-
-binding userControlledData10 {
-  requires {
-    dependency("tauri-runtime")
-  }
-  query pattern callExpr where callee.method == "opener"
-  emit source core.UserControlledData at call.result
-}

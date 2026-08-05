@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m67aaa542;
-
-binding deserialization2 {
-  requires {
-    dependency("boringssl")
-  }
-  query pattern callExpr where callee.method == "ParseOCSPResponseData"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.c.generated.ma9bf29d9;
-
-binding userControlledData0 {
-  requires {
-    dependency("ctre")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.ma4c9cd1e;
-
-binding networkSend1 {
-  requires {
-    dependency("io.netty:netty-handler")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkSend at args[0]
-}

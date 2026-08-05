@@ -1,9 +1,0 @@
-module bindings.go.generated.ma8943996;
-
-binding weakHash1 {
-  requires {
-    dependency("github.com/allegro/bigcache")
-  }
-  query pattern callExpr where callee.method == "Hash"
-  emit issue code.WeakHash at call
-}

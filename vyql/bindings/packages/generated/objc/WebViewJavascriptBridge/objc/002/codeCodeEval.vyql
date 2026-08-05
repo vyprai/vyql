@@ -1,9 +1,0 @@
-module bindings.objc.generated.m12ad9fb9;
-
-binding codeEval2 {
-  requires {
-    dependency("WebViewJavascriptBridge")
-  }
-  query pattern callExpr where callee.method == "injectJavascriptFile"
-  emit sink code.CodeEval at args[0]
-}

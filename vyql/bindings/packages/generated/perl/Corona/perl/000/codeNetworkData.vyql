@@ -1,9 +1,0 @@
-module bindings.perl.generated.m0b13d399;
-
-binding networkData0 {
-  requires {
-    dependency("Corona")
-  }
-  query pattern callExpr where callee.method == "Plack::Handler::Corona::run"
-  emit source code.NetworkData at call.result
-}

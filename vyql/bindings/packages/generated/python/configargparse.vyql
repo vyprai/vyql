@@ -1,0 +1,25 @@
+module bindings.python.generated.m04882151;
+
+binding cliArgument0 {
+  requires {
+    dependency("configargparse")
+  }
+  query pattern callExpr where callee.method == "parse_args"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("configargparse")
+  }
+  query pattern callExpr where callee.method == "parse_known_args"
+  emit source code.CliArgument at call.result
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("configargparse")
+  }
+  query pattern callExpr where callee.method == "write_config_file"
+  emit sink code.FilePathAccess at args[0]
+}

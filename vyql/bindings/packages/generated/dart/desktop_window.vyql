@@ -1,0 +1,64 @@
+module bindings.dart.generated.m3f72b36e;
+
+binding privilegedOp0 {
+  requires {
+    dependency("desktop_window")
+  }
+  query pattern callExpr where callee.method == "setWindowSize"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp1 {
+  requires {
+    dependency("desktop_window")
+  }
+  query pattern callExpr where callee.method == "setMinWindowSize"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp2 {
+  requires {
+    dependency("desktop_window")
+  }
+  query pattern callExpr where callee.method == "setMaxWindowSize"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp3 {
+  requires {
+    dependency("desktop_window")
+  }
+  query pattern callExpr where callee.method == "setFullScreen"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp4 {
+  requires {
+    dependency("desktop_window")
+  }
+  query pattern callExpr where callee.method == "toggleFullScreen"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp5 {
+  requires {
+    dependency("desktop_window")
+  }
+  query pattern callExpr where callee.method == "setBorders"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp6 {
+  requires {
+    dependency("desktop_window")
+  }
+  query pattern callExpr where callee.method == "toggleBorders"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

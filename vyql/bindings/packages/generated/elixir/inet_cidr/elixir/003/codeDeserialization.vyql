@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m2a39501e;
-
-binding deserialization3 {
-  requires {
-    dependency("inet_cidr")
-  }
-  query pattern callExpr where callee.method == "parse_address"
-  emit sink code.Deserialization at args[0]
-}

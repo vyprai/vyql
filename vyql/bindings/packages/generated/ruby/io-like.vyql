@@ -1,0 +1,91 @@
+module bindings.ruby.generated.mee840174;
+
+binding networkData0 {
+  requires {
+    dependency("io-like")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("io-like")
+  }
+  query pattern callExpr where callee.method == "read_nonblock"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData2 {
+  requires {
+    dependency("io-like")
+  }
+  query pattern callExpr where callee.method == "readline"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("io-like")
+  }
+  query pattern callExpr where callee.method == "readlines"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData4 {
+  requires {
+    dependency("io-like")
+  }
+  query pattern callExpr where callee.method == "readpartial"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData5 {
+  requires {
+    dependency("io-like")
+  }
+  query pattern callExpr where callee.method == "sysread"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend6 {
+  requires {
+    dependency("io-like")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend7 {
+  requires {
+    dependency("io-like")
+  }
+  query pattern callExpr where callee.method == "write_nonblock"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend8 {
+  requires {
+    dependency("io-like")
+  }
+  query pattern callExpr where callee.method == "syswrite"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding privilegedOp9 {
+  requires {
+    dependency("io-like")
+  }
+  query pattern callExpr where callee.method == "fcntl"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}
+
+binding privilegedOp10 {
+  requires {
+    dependency("io-like")
+  }
+  query pattern callExpr where callee.method == "ioctl"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
+}

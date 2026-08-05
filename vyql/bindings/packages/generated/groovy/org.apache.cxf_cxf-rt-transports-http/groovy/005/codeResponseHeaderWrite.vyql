@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mbfa501c2;
-
-binding responseHeaderWrite5 {
-  requires {
-    dependency("org.apache.cxf:cxf-rt-transports-http")
-  }
-  query pattern callExpr where callee.method == "writeToMessageHeaders"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

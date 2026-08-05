@@ -1,9 +1,0 @@
-module bindings.rust.generated.m62e9465d;
-
-binding filePathAccess2 {
-  requires {
-    dependency("wayland-commons")
-  }
-  query pattern callExpr where callee.method == "dup_fd_cloexec"
-  emit sink code.FilePathAccess at args[0]
-}

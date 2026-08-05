@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mcf869497;
-
-binding deserialization3 {
-  requires {
-    dependency("kf5attica")
-  }
-  query pattern callExpr where callee.method == "parseMetadataXml"
-  emit sink code.Deserialization at args[0]
-}

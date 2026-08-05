@@ -1,9 +1,0 @@
-module bindings.swift.generated.mf637575e;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/vapor/mysql-kit")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

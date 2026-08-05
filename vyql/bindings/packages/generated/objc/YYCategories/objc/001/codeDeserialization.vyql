@@ -1,9 +1,0 @@
-module bindings.objc.generated.m482886bc;
-
-binding deserialization1 {
-  requires {
-    dependency("YYCategories")
-  }
-  query pattern callExpr where callee.method == "jsonValueDecoded"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.dart.generated.m6b549c50;
-
-binding deserialization0 {
-  requires {
-    dependency("dartdoc")
-  }
-  query pattern callExpr where callee.method == "fromYamlMap"
-  emit sink code.Deserialization at args[0]
-}

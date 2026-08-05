@@ -1,9 +1,0 @@
-module bindings.groovy.generated.md30241c6;
-
-binding networkData4 {
-  requires {
-    dependency("org.apache.cxf:cxf-rt-rs-client")
-  }
-  query pattern callExpr where callee.method == "readBody"
-  emit source code.NetworkData at call.result
-}

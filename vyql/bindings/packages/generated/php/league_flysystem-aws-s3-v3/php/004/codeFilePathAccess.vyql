@@ -1,9 +1,0 @@
-module bindings.php.generated.m053b035d;
-
-binding filePathAccess4 {
-  requires {
-    dependency("league/flysystem-aws-s3-v3")
-  }
-  query pattern callExpr where callee.method == "delete"
-  emit sink code.FilePathAccess at args[0]
-}

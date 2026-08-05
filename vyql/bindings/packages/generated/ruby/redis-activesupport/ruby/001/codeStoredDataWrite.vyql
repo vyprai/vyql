@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m4ca39d61;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("redis-activesupport")
-  }
-  query pattern callExpr where callee.method == "delete_matched"
-  emit sink code.StoredDataWrite at args[0]
-}

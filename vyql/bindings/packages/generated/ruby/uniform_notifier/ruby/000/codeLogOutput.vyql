@@ -1,9 +1,0 @@
-module bindings.ruby.generated.md3dd0ad5;
-
-binding logOutput0 {
-  requires {
-    dependency("uniform_notifier")
-  }
-  query pattern callExpr where callee.method == "inline_notify"
-  emit sink code.LogOutput at args[0]
-}

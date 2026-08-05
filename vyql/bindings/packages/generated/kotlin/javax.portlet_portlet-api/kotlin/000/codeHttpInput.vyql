@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m55d2a3ff;
-
-binding httpInput0 {
-  requires {
-    dependency("javax.portlet:portlet-api")
-  }
-  query pattern callExpr where callee.method == "getReader"
-  emit source code.HttpInput at call.result
-}

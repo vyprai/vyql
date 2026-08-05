@@ -1,9 +1,0 @@
-module bindings.rust.generated.m137cc19f;
-
-binding weakRandomValue0 {
-  requires {
-    dependency("security-framework-sys")
-  }
-  query pattern callExpr where callee.method == "SecRandomCopyBytes"
-  emit issue code.WeakRandomValue at call
-}

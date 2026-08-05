@@ -1,9 +1,0 @@
-module bindings.python.generated.m141dac45;
-
-binding codeEval0 {
-  requires {
-    dependency("mccabe")
-  }
-  query pattern callExpr where callee.method == "get_code_complexity"
-  emit sink code.CodeEval at args[0]
-}

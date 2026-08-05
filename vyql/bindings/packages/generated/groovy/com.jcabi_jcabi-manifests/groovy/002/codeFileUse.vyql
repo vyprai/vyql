@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m0870e703;
-
-binding fileUse2 {
-  requires {
-    dependency("com.jcabi:jcabi-manifests")
-  }
-  query pattern callExpr where callee.method == "FilesMfs.fetch"
-  emit sink code.FileUseSink at args[0]
-}

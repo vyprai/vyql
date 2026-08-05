@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m30e3c4d5;
-
-binding sqlExecution1 {
-  requires {
-    dependency("org.apache.tomcat:tomcat-dbcp")
-  }
-  query pattern callExpr where callee.method == "prepareStatement"
-  emit sink code.SqlExecution at args[0]
-}

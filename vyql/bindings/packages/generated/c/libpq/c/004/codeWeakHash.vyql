@@ -1,9 +1,0 @@
-module bindings.c.generated.mf5b5c569;
-
-binding weakHash4 {
-  requires {
-    dependency("libpq")
-  }
-  query pattern callExpr where callee.method == "pg_sha1_update"
-  emit issue code.WeakHash at call
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.mad065374;
-
-binding httpInput5 {
-  requires {
-    dependency("laminas/laminas-mvc")
-  }
-  query pattern callExpr where callee.method == "fromRoute"
-  emit source code.HttpInput at call.result
-}

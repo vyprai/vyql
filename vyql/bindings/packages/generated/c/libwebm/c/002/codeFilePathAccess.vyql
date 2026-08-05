@@ -1,9 +1,0 @@
-module bindings.c.generated.m80d8b7bb;
-
-binding filePathAccess2 {
-  requires {
-    dependency("libwebm")
-  }
-  query pattern callExpr where callee.method == "Open"
-  emit sink code.FilePathAccess at args[0]
-}

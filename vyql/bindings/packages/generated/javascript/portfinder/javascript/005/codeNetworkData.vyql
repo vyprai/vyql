@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mf007b446;
-
-binding networkData5 {
-  requires {
-    dependency("portfinder")
-  }
-  query pattern callExpr where callee.method == "getSocketPromise"
-  emit source code.NetworkData at call.result
-}

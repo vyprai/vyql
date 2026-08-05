@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m426aedd2;
-
-binding deserialization1 {
-  requires {
-    dependency("tinyply")
-  }
-  query pattern callExpr where callee.method == "parse_header"
-  emit sink code.Deserialization at args[0]
-}

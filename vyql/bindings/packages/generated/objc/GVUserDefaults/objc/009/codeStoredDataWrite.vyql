@@ -1,9 +1,0 @@
-module bindings.objc.generated.mde09a442;
-
-binding storedDataWrite9 {
-  requires {
-    dependency("GVUserDefaults")
-  }
-  query pattern callExpr where callee.method == "doubleSetter"
-  emit sink code.StoredDataWrite at args[0]
-}

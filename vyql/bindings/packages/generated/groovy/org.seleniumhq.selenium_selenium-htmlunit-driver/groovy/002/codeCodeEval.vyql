@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mc4092905;
-
-binding codeEval2 {
-  requires {
-    dependency("org.seleniumhq.selenium:selenium-htmlunit-driver")
-  }
-  query pattern callExpr where callee.method == "executeAsyncScript"
-  emit sink code.CodeEval at args[0]
-}

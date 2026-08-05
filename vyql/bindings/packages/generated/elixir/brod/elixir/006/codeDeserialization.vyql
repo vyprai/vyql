@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mc7c52aa2;
-
-binding deserialization6 {
-  requires {
-    dependency("brod")
-  }
-  query pattern callExpr where callee.method == "parse_fetch_rsp"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m8bff7fd6;
-
-binding userControlledData0 {
-  requires {
-    dependency("cfgv")
-  }
-  query pattern callExpr where callee.method == "validate"
-  emit source core.UserControlledData at call.result
-}

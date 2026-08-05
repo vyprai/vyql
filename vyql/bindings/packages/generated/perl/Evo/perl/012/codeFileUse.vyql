@@ -1,9 +1,0 @@
-module bindings.perl.generated.m21559073;
-
-binding fileUse12 {
-  requires {
-    dependency("Evo")
-  }
-  query pattern callExpr where callee.method == "read_ref"
-  emit sink code.FileUseSink at args[0]
-}

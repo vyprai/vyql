@@ -1,9 +1,0 @@
-module bindings.python.generated.m3a7d1447;
-
-binding filePathAccess0 {
-  requires {
-    dependency("flax")
-  }
-  query pattern callExpr where callee.method == "GFile"
-  emit sink code.FilePathAccess at args[0]
-}

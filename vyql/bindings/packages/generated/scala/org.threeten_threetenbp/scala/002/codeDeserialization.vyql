@@ -1,9 +1,0 @@
-module bindings.scala.generated.m012bfd53;
-
-binding deserialization2 {
-  requires {
-    dependency("org.threeten:threetenbp")
-  }
-  query pattern callExpr where callee.method == "readExternal"
-  emit sink code.Deserialization at args[0]
-}

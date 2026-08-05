@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mb7311fac;
-
-binding networkConnect7 {
-  requires {
-    dependency("cpp-httplib")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

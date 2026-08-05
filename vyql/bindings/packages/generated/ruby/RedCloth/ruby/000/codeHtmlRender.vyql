@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m81ec1fbf;
-
-binding htmlRender0 {
-  requires {
-    dependency("RedCloth")
-  }
-  query pattern callExpr where callee.method == "red_parse_title"
-  emit sink code.HtmlRender at args[0]
-}

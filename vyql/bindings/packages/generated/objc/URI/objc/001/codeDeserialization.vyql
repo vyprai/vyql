@@ -1,9 +1,0 @@
-module bindings.objc.generated.m124622f0;
-
-binding deserialization1 {
-  requires {
-    dependency("URI")
-  }
-  query pattern callExpr where callee.method == "http_parser_parse_url"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m8d92e74e;
-
-binding filePathAccess3 {
-  requires {
-    dependency("illuminate/mail")
-  }
-  query pattern callExpr where callee.method == "attach"
-  emit sink code.FilePathAccess at args[0]
-}

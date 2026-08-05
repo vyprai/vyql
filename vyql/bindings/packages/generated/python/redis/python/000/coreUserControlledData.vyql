@@ -1,9 +1,0 @@
-module bindings.python.generated.m722a53df;
-
-binding userControlledData0 {
-  requires {
-    dependency("redis")
-  }
-  query pattern callExpr where callee.method == "from_url"
-  emit source core.UserControlledData at call.result
-}

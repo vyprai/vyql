@@ -1,0 +1,17 @@
+module bindings.kotlin.generated.me316e0b2;
+
+binding urlFetch0 {
+  requires {
+    dependency("com.sun.jersey:jersey-bundle")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding httpInput1 {
+  requires {
+    dependency("com.sun.jersey:jersey-bundle")
+  }
+  query pattern callExpr where callee.path ~= "com.sun.jersey.jersey.bundle.cookie"
+  emit source code.HttpInput at call.result
+}

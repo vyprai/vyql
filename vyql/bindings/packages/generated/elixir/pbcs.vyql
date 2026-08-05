@@ -1,0 +1,17 @@
+module bindings.elixir.generated.m0cab1da7;
+
+binding deserialization0 {
+  requires {
+    dependency("pbcs")
+  }
+  query pattern callExpr where callee.method == "decrypt"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("pbcs")
+  }
+  query pattern callExpr where callee.method == "content_decrypt"
+  emit sink code.Deserialization at args[0]
+}

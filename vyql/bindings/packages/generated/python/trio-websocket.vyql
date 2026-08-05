@@ -1,0 +1,105 @@
+module bindings.python.generated.m240fa5ae;
+
+binding networkSend0 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "send_message"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "open_websocket"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "connect_websocket"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect3 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "open_websocket_url"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "connect_websocket_url"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect5 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "serve_websocket"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect6 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "accept"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "headers"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData8 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "path"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData9 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "url"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData10 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "proposed_subprotocols"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData11 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "local"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData12 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "remote"
+  emit source core.UserControlledData at call.result
+}

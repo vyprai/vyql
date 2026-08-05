@@ -1,0 +1,41 @@
+module bindings.php.generated.mdee1b9f3;
+
+binding filePathAccess0 {
+  requires {
+    dependency("gettext/gettext")
+  }
+  query pattern callExpr where callee.method == "loadFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("gettext/gettext")
+  }
+  query pattern callExpr where callee.method == "loadFile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("gettext/gettext")
+  }
+  query pattern callExpr where callee.method == "loadString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("gettext/gettext")
+  }
+  query pattern callExpr where callee.method == "readFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("gettext/gettext")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

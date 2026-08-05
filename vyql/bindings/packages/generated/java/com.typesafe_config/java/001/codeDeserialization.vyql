@@ -1,9 +1,0 @@
-module bindings.java.generated.maaf8a3b9;
-
-binding deserialization1 {
-  requires {
-    dependency("com.typesafe:config")
-  }
-  query pattern callExpr where callee.method == "ConfigFactory.parseString"
-  emit sink code.Deserialization at args[0]
-}

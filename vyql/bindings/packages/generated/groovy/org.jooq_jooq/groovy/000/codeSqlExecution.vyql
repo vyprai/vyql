@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mec774d33;
-
-binding sqlExecution0 {
-  requires {
-    dependency("org.jooq:jooq")
-  }
-  query pattern callExpr where callee.method == "queryTimeout"
-  emit sink code.SqlExecution at args[0]
-}

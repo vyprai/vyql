@@ -1,9 +1,0 @@
-module bindings.dart.generated.m63ed77d5;
-
-binding networkSend7 {
-  requires {
-    dependency("http")
-  }
-  query pattern callExpr where callee.method == "patch"
-  emit sink code.NetworkSend at args[0]
-}

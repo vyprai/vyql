@@ -1,9 +1,0 @@
-module bindings.c.generated.m24f1ac9c;
-
-binding deserialization0 {
-  requires {
-    dependency("tsl-sparse-map")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

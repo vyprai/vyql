@@ -1,9 +1,0 @@
-module bindings.c.generated.ma7c2e50a;
-
-binding fileUse14 {
-  requires {
-    dependency("thrift")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.FileUseSink at args[0]
-}

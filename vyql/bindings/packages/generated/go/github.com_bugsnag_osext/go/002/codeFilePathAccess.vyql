@@ -1,9 +1,0 @@
-module bindings.go.generated.m73543500;
-
-binding filePathAccess2 {
-  requires {
-    dependency("github.com/bugsnag/osext")
-  }
-  query pattern callExpr where callee.method == "GetExePath"
-  emit sink code.FilePathAccess at args[0]
-}

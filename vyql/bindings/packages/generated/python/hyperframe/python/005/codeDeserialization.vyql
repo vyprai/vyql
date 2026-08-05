@@ -1,9 +1,0 @@
-module bindings.python.generated.m961f1c1f;
-
-binding deserialization5 {
-  requires {
-    dependency("hyperframe")
-  }
-  query pattern callExpr where callee.method == "explain"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,0 +1,89 @@
+module bindings.perl.generated.m40f6fa45;
+
+binding httpInput0 {
+  requires {
+    dependency("Gepok")
+  }
+  query pattern callExpr where callee.method == "_prepare_env"
+  emit source code.HttpInput at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("Gepok")
+  }
+  query pattern callExpr where callee.method == "_write_sock"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding commandExecution2 {
+  requires {
+    dependency("Gepok")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("Gepok")
+  }
+  query pattern callExpr where callee.method == "pid_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("Gepok")
+  }
+  query pattern callExpr where callee.method == "scoreboard_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("Gepok")
+  }
+  query pattern callExpr where callee.method == "error_log_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("Gepok")
+  }
+  query pattern callExpr where callee.method == "access_log_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding secretValue7 {
+  requires {
+    dependency("Gepok")
+  }
+  query pattern callExpr where callee.method == "ssl_key_file"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue8 {
+  requires {
+    dependency("Gepok")
+  }
+  query pattern callExpr where callee.method == "ssl_cert_file"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue9 {
+  requires {
+    dependency("Gepok")
+  }
+  query pattern callExpr where callee.method == "ssl_ca_file"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue10 {
+  requires {
+    dependency("Gepok")
+  }
+  query pattern callExpr where callee.method == "ssl_ca_path"
+  emit source code.SecretValue at call.result
+}

@@ -1,9 +1,0 @@
-module bindings.rust.generated.m8d948af7;
-
-binding fileUse5 {
-  requires {
-    dependency("fs2")
-  }
-  query pattern callExpr where callee.method == "unlock"
-  emit sink code.FileUseSink at args[0]
-}

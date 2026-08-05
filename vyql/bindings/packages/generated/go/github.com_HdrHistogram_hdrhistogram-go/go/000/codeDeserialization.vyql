@@ -1,9 +1,0 @@
-module bindings.go.generated.mdfca5b43;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/HdrHistogram/hdrhistogram-go")
-  }
-  query pattern callExpr where callee.method == "Decode"
-  emit sink code.Deserialization at args[0]
-}

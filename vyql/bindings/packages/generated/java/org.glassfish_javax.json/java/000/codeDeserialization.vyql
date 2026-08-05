@@ -1,9 +1,0 @@
-module bindings.java.generated.m19269745;
-
-binding deserialization0 {
-  requires {
-    dependency("org.glassfish:javax.json")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

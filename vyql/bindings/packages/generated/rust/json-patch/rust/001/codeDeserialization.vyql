@@ -1,9 +1,0 @@
-module bindings.rust.generated.m00378b39;
-
-binding deserialization1 {
-  requires {
-    dependency("json-patch")
-  }
-  query pattern callExpr where callee.method == "patch_unsafe"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.m4b7ff71b;
-
-binding expressionEval2 {
-  requires {
-    dependency("PromiseKit")
-  }
-  query pattern callExpr where callee.method == "promiseWithIntegerAdapterBlock"
-  emit sink code.ExpressionEval at args[0]
-}

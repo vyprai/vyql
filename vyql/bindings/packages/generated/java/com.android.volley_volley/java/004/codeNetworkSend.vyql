@@ -1,9 +1,0 @@
-module bindings.java.generated.m51c331b3;
-
-binding networkSend4 {
-  requires {
-    dependency("com.android.volley:volley")
-  }
-  query pattern callExpr where callee.method == "performRequest"
-  emit sink code.NetworkSend at args[0]
-}

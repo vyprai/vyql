@@ -1,9 +1,0 @@
-module bindings.php.generated.m78f74363;
-
-binding filePathAccess2 {
-  requires {
-    dependency("laravel/dusk")
-  }
-  query pattern callExpr where callee.method == "mkdir"
-  emit sink code.FilePathAccess at args[0]
-}

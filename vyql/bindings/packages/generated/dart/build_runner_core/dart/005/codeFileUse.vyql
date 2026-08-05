@@ -1,9 +1,0 @@
-module bindings.dart.generated.ma9a3f89e;
-
-binding fileUse5 {
-  requires {
-    dependency("build_runner_core")
-  }
-  query pattern callExpr where callee.method == "writeAsBytesSync"
-  emit sink code.FileUseSink at args[0]
-}

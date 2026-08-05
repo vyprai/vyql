@@ -1,9 +1,0 @@
-module bindings.go.generated.m0d5c1b99;
-
-binding userControlledData1 {
-  requires {
-    dependency("github.com/bgentry/speakeasy")
-  }
-  query pattern callExpr where callee.method == "FAsk"
-  emit source core.UserControlledData at call.result
-}

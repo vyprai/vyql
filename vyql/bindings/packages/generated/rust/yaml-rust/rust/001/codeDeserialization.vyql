@@ -1,9 +1,0 @@
-module bindings.rust.generated.mb49ce6f2;
-
-binding deserialization1 {
-  requires {
-    dependency("yaml-rust")
-  }
-  query pattern callExpr where callee.method == "load_from_str"
-  emit sink code.Deserialization at args[0]
-}

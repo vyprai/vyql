@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m84182253;
-
-binding filePathAccess1 {
-  requires {
-    dependency("bakeware")
-  }
-  query pattern callExpr where callee.method == "rm_fr"
-  emit sink code.FilePathAccess at args[0]
-}

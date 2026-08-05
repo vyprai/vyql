@@ -1,9 +1,0 @@
-module bindings.perl.generated.m1abe2f3e;
-
-binding nosqlQuery0 {
-  requires {
-    dependency("Daemonise")
-  }
-  query pattern callExpr where callee.method == "find_job"
-  emit sink code.NosqlQuery at args[0]
-}

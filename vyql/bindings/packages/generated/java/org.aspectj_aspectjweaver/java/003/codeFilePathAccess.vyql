@@ -1,9 +1,0 @@
-module bindings.java.generated.mab1966f5;
-
-binding filePathAccess3 {
-  requires {
-    dependency("org.aspectj:aspectjweaver")
-  }
-  query pattern callExpr where callee.method == "FileUtil.createTempFile"
-  emit sink code.FilePathAccess at args[0]
-}

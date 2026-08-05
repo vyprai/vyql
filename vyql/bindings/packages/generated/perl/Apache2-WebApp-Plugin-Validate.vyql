@@ -1,0 +1,118 @@
+module bindings.perl.generated.m8cbcb66c;
+
+binding inputValidation0 {
+  requires {
+    dependency("Apache2-WebApp-Plugin-Validate")
+  }
+  query pattern callExpr where callee.method == "currency"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation1 {
+  requires {
+    dependency("Apache2-WebApp-Plugin-Validate")
+  }
+  query pattern callExpr where callee.method == "date"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("Apache2-WebApp-Plugin-Validate")
+  }
+  query pattern callExpr where callee.method == "date_is_future"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("Apache2-WebApp-Plugin-Validate")
+  }
+  query pattern callExpr where callee.method == "date_is_past"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation4 {
+  requires {
+    dependency("Apache2-WebApp-Plugin-Validate")
+  }
+  query pattern callExpr where callee.method == "domain"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation5 {
+  requires {
+    dependency("Apache2-WebApp-Plugin-Validate")
+  }
+  query pattern callExpr where callee.method == "email"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation6 {
+  requires {
+    dependency("Apache2-WebApp-Plugin-Validate")
+  }
+  query pattern callExpr where callee.method == "integer"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation7 {
+  requires {
+    dependency("Apache2-WebApp-Plugin-Validate")
+  }
+  query pattern callExpr where callee.method == "html"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation8 {
+  requires {
+    dependency("Apache2-WebApp-Plugin-Validate")
+  }
+  query pattern callExpr where callee.method == "url"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

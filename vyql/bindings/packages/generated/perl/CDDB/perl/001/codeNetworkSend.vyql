@@ -1,9 +1,0 @@
-module bindings.perl.generated.mc51f2d06;
-
-binding networkSend1 {
-  requires {
-    dependency("CDDB")
-  }
-  query pattern callExpr where callee.method == "command"
-  emit sink code.NetworkSend at args[0]
-}

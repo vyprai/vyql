@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m26399977;
-
-binding userControlledData0 {
-  requires {
-    dependency("jekyll-avatar")
-  }
-  query pattern callExpr where callee.method == "initialize"
-  emit source core.UserControlledData at call.result
-}

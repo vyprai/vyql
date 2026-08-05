@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m6f8a6e46;
-
-binding xmlParse0 {
-  requires {
-    dependency("org.apache.taglibs:taglibs-standard-impl")
-  }
-  query pattern callExpr where callee.method == "newXMLReader"
-  emit sink code.XmlParse at args[0]
-}

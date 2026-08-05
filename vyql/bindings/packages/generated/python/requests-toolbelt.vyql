@@ -1,0 +1,17 @@
+module bindings.python.generated.m051ea694;
+
+binding networkConnect0 {
+  requires {
+    dependency("requests-toolbelt")
+  }
+  query pattern callExpr where callee.method == "requests_toolbelt.sessions.BaseUrlSession.request"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("requests-toolbelt")
+  }
+  query pattern callExpr where callee.method == "requests_toolbelt.sessions.BaseUrlSession.request"
+  emit sink code.NetworkSend at args[0]
+}

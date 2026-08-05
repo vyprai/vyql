@@ -1,9 +1,0 @@
-module bindings.go.generated.mfd18c1a7;
-
-binding filePathAccess1 {
-  requires {
-    dependency("github.com/vishvananda/netns")
-  }
-  query pattern callExpr where callee.method == "GetFromPid"
-  emit sink code.FilePathAccess at args[0]
-}

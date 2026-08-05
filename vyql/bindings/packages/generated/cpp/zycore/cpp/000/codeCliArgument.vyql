@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m8d9b2a95;
-
-binding cliArgument0 {
-  requires {
-    dependency("zycore")
-  }
-  query pattern callExpr where callee.method == "ZyanArgParse"
-  emit source code.CliArgument at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.md718625b;
-
-binding networkSend1 {
-  requires {
-    dependency("org.apache.cxf:cxf-rt-transports-http-jetty")
-  }
-  query pattern callExpr where callee.method == "service"
-  emit sink code.NetworkSend at args[0]
-}

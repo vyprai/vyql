@@ -1,9 +1,0 @@
-module bindings.php.generated.m9b98bcea;
-
-binding urlFetch4 {
-  requires {
-    dependency("zendframework/zend-http")
-  }
-  query pattern callExpr where callee.method == "setHeaders"
-  emit sink code.UrlFetch at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m9240400f;
-
-binding networkSend1 {
-  requires {
-    dependency("com.google.appengine:appengine-api-1.0-sdk")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

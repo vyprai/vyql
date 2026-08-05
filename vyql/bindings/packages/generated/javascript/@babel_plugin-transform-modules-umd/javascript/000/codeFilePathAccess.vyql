@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m6ba4091d;
-
-binding filePathAccess0 {
-  requires {
-    dependency("@babel/plugin-transform-modules-umd")
-  }
-  query pattern callExpr where callee.method == "exit"
-  emit sink code.FilePathAccess at args[0]
-}

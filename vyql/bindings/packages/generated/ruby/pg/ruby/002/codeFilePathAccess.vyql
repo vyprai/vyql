@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m27d530fb;
-
-binding filePathAccess2 {
-  requires {
-    dependency("pg")
-  }
-  query pattern callExpr where callee.method == "rb_thread_call_without_gvl"
-  emit sink code.FilePathAccess at args[0]
-}

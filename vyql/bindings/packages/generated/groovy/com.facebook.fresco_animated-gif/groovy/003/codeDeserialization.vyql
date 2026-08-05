@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m0df727e0;
-
-binding deserialization3 {
-  requires {
-    dependency("com.facebook.fresco:animated-gif")
-  }
-  query pattern callExpr where callee.method == "nativeCreateFromFileDescriptor"
-  emit sink code.Deserialization at args[0]
-}

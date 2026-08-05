@@ -1,0 +1,49 @@
+module bindings.c.generated.mfd531f33;
+
+binding deserialization0 {
+  requires {
+    dependency("boost-serialization")
+  }
+  query pattern callExpr where callee.method == "load_override"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("boost-serialization")
+  }
+  query pattern callExpr where callee.method == "serialize"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("boost-serialization")
+  }
+  query pattern callExpr where callee.method == "load_map_collection"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("boost-serialization")
+  }
+  query pattern callExpr where callee.method == "load_set_collection"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("boost-serialization")
+  }
+  query pattern callExpr where callee.method == "load_construct_data"
+  emit sink code.Deserialization at args[0]
+}
+
+binding storedDataWrite5 {
+  requires {
+    dependency("boost-serialization")
+  }
+  query pattern callExpr where callee.method == "save"
+  emit sink code.StoredDataWrite at args[0]
+}

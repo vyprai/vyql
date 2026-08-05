@@ -1,0 +1,17 @@
+module bindings.objc.generated.m75ea5ac7;
+
+binding deserialization0 {
+  requires {
+    dependency("lottie-ios")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding weakHash1 {
+  requires {
+    dependency("lottie-ios")
+  }
+  query pattern presenceNode where node.path ~= "lottie.ios.hash"
+  emit issue code.WeakHash at node
+}

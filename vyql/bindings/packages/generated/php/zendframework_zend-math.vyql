@@ -1,0 +1,41 @@
+module bindings.php.generated.m7cea5654;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("zendframework/zend-math")
+  }
+  query pattern callExpr where callee.method == "ZendMathRand::getBytes"
+  emit issue code.WeakRandomValue at call
+}
+
+binding weakRandomValue1 {
+  requires {
+    dependency("zendframework/zend-math")
+  }
+  query pattern callExpr where callee.method == "ZendMathRand::getBoolean"
+  emit issue code.WeakRandomValue at call
+}
+
+binding weakRandomValue2 {
+  requires {
+    dependency("zendframework/zend-math")
+  }
+  query pattern callExpr where callee.method == "ZendMathRand::getInteger"
+  emit issue code.WeakRandomValue at call
+}
+
+binding weakRandomValue3 {
+  requires {
+    dependency("zendframework/zend-math")
+  }
+  query pattern callExpr where callee.method == "ZendMathRand::getFloat"
+  emit issue code.WeakRandomValue at call
+}
+
+binding weakRandomValue4 {
+  requires {
+    dependency("zendframework/zend-math")
+  }
+  query pattern callExpr where callee.method == "ZendMathRand::getString"
+  emit issue code.WeakRandomValue at call
+}

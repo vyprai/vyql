@@ -1,9 +1,0 @@
-module bindings.python.generated.mecd2f6e9;
-
-binding commandExecution0 {
-  requires {
-    dependency("dominate")
-  }
-  query pattern callExpr where callee.method == "system"
-  emit sink code.CommandExecution at args[0]
-}

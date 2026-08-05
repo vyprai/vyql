@@ -1,9 +1,0 @@
-module bindings.go.generated.mdb7303fd;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/fzipp/gocyclo")
-  }
-  query pattern callExpr where callee.method == "Analyze"
-  emit sink code.Deserialization at args[0]
-}

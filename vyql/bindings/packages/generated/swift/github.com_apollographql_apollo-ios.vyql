@@ -1,0 +1,33 @@
+module bindings.swift.generated.m662babba;
+
+binding networkSend0 {
+  requires {
+    dependency("github.com/apollographql/apollo-ios")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/apollographql/apollo-ios")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/apollographql/apollo-ios")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("github.com/apollographql/apollo-ios")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

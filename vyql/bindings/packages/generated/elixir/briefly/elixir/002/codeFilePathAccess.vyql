@@ -1,9 +1,0 @@
-module bindings.elixir.generated.me9fddd14;
-
-binding filePathAccess2 {
-  requires {
-    dependency("briefly")
-  }
-  query pattern callExpr where callee.method == "cleanup"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m5dadfcc8;
-
-binding weakHash1 {
-  requires {
-    dependency("org.apache.commons:commons-collections4")
-  }
-  query pattern presenceNode where node.path ~= "org.apache.commons.commons.collections4.hash"
-  emit issue code.WeakHash at node
-}

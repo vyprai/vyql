@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m13455b6b;
-
-binding deserialization1 {
-  requires {
-    dependency("libnice")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

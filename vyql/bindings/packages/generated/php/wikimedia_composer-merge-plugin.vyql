@@ -1,0 +1,17 @@
+module bindings.php.generated.m64716db4;
+
+binding deserialization0 {
+  requires {
+    dependency("wikimedia/composer-merge-plugin")
+  }
+  query pattern callExpr where callee.method == "readPackageJson"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("wikimedia/composer-merge-plugin")
+  }
+  query pattern callExpr where callee.method == "mergeFile"
+  emit sink code.Deserialization at args[0]
+}

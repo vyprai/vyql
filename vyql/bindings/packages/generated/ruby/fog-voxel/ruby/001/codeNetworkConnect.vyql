@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m0a76e97f;
-
-binding networkConnect1 {
-  requires {
-    dependency("fog-voxel")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit sink code.NetworkConnectSink at args[0]
-}

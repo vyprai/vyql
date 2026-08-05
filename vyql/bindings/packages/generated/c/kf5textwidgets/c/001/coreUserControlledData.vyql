@@ -1,9 +1,0 @@
-module bindings.c.generated.m68b4f673;
-
-binding userControlledData1 {
-  requires {
-    dependency("kf5textwidgets")
-  }
-  query pattern callExpr where callee.method == "replace"
-  emit source core.UserControlledData at call.result
-}

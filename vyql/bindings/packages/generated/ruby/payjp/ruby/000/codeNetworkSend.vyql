@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m971fbd3c;
-
-binding networkSend0 {
-  requires {
-    dependency("payjp")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.dart.generated.m94504740;
-
-binding filePathAccess0 {
-  requires {
-    dependency("path_provider_android")
-  }
-  query pattern callExpr where callee.method == "createTempFile"
-  emit sink code.FilePathAccess at args[0]
-}

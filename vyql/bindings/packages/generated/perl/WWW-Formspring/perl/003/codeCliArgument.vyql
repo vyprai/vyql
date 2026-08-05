@@ -1,9 +1,0 @@
-module bindings.perl.generated.mbe603286;
-
-binding cliArgument3 {
-  requires {
-    dependency("WWW-Formspring")
-  }
-  query pattern callExpr where callee.method == "inbox_block"
-  emit source code.CliArgument at call.result
-}

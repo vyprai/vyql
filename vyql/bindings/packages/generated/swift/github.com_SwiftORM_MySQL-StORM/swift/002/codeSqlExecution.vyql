@@ -1,9 +1,0 @@
-module bindings.swift.generated.m6dfd3bf0;
-
-binding sqlExecution2 {
-  requires {
-    dependency("github.com/SwiftORM/MySQL-StORM")
-  }
-  query pattern callExpr where callee.method == "insert"
-  emit sink code.SqlExecution at args[0]
-}

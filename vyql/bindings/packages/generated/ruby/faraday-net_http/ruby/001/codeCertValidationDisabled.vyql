@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m096e689f;
-
-binding certValidationDisabled1 {
-  requires {
-    dependency("faraday-net_http")
-  }
-  query pattern callExpr where callee.method == "configure_ssl"
-  emit issue code.CertValidationDisabled at call
-}

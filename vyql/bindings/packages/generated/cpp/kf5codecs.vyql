@@ -1,0 +1,41 @@
+module bindings.cpp.generated.m9a902388;
+
+binding deserialization0 {
+  requires {
+    dependency("kf5codecs")
+  }
+  query pattern callExpr where callee.method == "quotedPrintableDecode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("kf5codecs")
+  }
+  query pattern callExpr where callee.method == "uudecode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("kf5codecs")
+  }
+  query pattern callExpr where callee.method == "base64Decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("kf5codecs")
+  }
+  query pattern callExpr where callee.method == "base45Decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("kf5codecs")
+  }
+  query pattern callExpr where callee.method == "decodeRFC2047String"
+  emit sink code.Deserialization at args[0]
+}

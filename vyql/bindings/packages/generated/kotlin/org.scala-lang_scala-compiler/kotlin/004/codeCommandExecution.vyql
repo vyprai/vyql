@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m4b05a11d;
-
-binding commandExecution4 {
-  requires {
-    dependency("org.scala-lang:scala-compiler")
-  }
-  query pattern callExpr where callee.method == "process"
-  emit sink code.CommandExecution at args[0]
-}

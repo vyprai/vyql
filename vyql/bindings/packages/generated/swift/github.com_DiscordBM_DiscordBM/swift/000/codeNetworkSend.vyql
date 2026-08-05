@@ -1,9 +1,0 @@
-module bindings.swift.generated.ma6e9eeed;
-
-binding networkSend0 {
-  requires {
-    dependency("github.com/DiscordBM/DiscordBM")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

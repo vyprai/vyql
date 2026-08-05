@@ -1,0 +1,33 @@
+module bindings.swift.generated.m4ba7f8dd;
+
+binding networkConnect0 {
+  requires {
+    dependency("github.com/brightdigit/PrchNIO")
+  }
+  query pattern callExpr where callee.method == "beginRequest"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/brightdigit/PrchNIO")
+  }
+  query pattern callExpr where callee.method == "beginRequest"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding httpInput2 {
+  requires {
+    dependency("github.com/brightdigit/PrchNIO")
+  }
+  query pattern callExpr where callee.method == "statusCode"
+  emit source code.HttpInput at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("github.com/brightdigit/PrchNIO")
+  }
+  query pattern callExpr where callee.method == "data"
+  emit source code.NetworkData at call.result
+}

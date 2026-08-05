@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.md55a4588;
-
-binding userControlledData0 {
-  requires {
-    dependency("org.apache.tiles:tiles-jsp")
-  }
-  query pattern callExpr where callee.method == "getPreparer"
-  emit source core.UserControlledData at call.result
-}

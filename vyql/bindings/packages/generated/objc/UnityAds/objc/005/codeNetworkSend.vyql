@@ -1,9 +1,0 @@
-module bindings.objc.generated.m89200495;
-
-binding networkSend5 {
-  requires {
-    dependency("UnityAds")
-  }
-  query pattern callExpr where callee.method == "loadBanner"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mb451c9ce;
-
-binding codeEval0 {
-  requires {
-    dependency("cglib:cglib")
-  }
-  query pattern callExpr where callee.method == "defineClass"
-  emit sink code.CodeEval at args[0]
-}

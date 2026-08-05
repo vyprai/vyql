@@ -1,0 +1,33 @@
+module bindings.dart.generated.m42a72c4e;
+
+binding userControlledData0 {
+  requires {
+    dependency("pasteboard")
+  }
+  query pattern callExpr where callee.method == "files"
+  emit source core.UserControlledData at call.result
+}
+
+binding fileUse1 {
+  requires {
+    dependency("pasteboard")
+  }
+  query pattern callExpr where callee.method == "writeImage"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse2 {
+  requires {
+    dependency("pasteboard")
+  }
+  query pattern callExpr where callee.method == "writeFiles"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse3 {
+  requires {
+    dependency("pasteboard")
+  }
+  query pattern callExpr where callee.method == "writeText"
+  emit sink code.FileUseSink at args[0]
+}

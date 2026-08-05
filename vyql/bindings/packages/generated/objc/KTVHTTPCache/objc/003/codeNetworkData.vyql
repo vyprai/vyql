@@ -1,9 +1,0 @@
-module bindings.objc.generated.meac4888f;
-
-binding networkData3 {
-  requires {
-    dependency("KTVHTTPCache")
-  }
-  query pattern callExpr where callee.method == "downloadSetAdditionalHeaders"
-  emit source code.NetworkData at call.result
-}

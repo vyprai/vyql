@@ -1,9 +1,0 @@
-module bindings.java.generated.mde0c0649;
-
-binding deserialization2 {
-  requires {
-    dependency("rome:rome")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

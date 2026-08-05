@@ -1,9 +1,0 @@
-module bindings.perl.generated.m1fe87d91;
-
-binding networkConnect6 {
-  requires {
-    dependency("IOMux")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkConnectSink at args[0]
-}

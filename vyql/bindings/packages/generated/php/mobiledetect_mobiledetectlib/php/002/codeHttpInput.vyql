@@ -1,9 +1,0 @@
-module bindings.php.generated.m4be3a9f8;
-
-binding httpInput2 {
-  requires {
-    dependency("mobiledetect/mobiledetectlib")
-  }
-  query pattern callExpr where callee.method == "match"
-  emit source code.HttpInput at call.result
-}

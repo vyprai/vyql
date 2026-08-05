@@ -1,0 +1,30 @@
+module bindings.go.generated.m97579f60;
+
+binding cliArgument0 {
+  requires {
+    dependency("github.com/opencontainers/runtime-spec")
+  }
+  query pattern callExpr where callee.method == "main"
+  emit source code.CliArgument at call.result
+}
+
+binding stdinInput1 {
+  requires {
+    dependency("github.com/opencontainers/runtime-spec")
+  }
+  query pattern callExpr where callee.method == "main"
+  emit source code.StdinInput at call.result
+}
+
+binding pathCanonicalization2 {
+  requires {
+    dependency("github.com/opencontainers/runtime-spec")
+  }
+  query pattern callExpr where callee.method == "formatFilePath"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

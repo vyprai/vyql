@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m0de09588;
-
-binding deserialization1 {
-  requires {
-    dependency("org.apache.httpcomponents:httpcore")
-  }
-  query pattern callExpr where callee.method == "create"
-  emit sink code.Deserialization at args[0]
-}

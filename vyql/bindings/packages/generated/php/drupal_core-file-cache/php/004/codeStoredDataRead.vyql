@@ -1,9 +1,0 @@
-module bindings.php.generated.m6ff03c2c;
-
-binding storedDataRead4 {
-  requires {
-    dependency("drupal/core-file-cache")
-  }
-  query pattern callExpr where callee.method == "fetch"
-  emit source code.StoredDataRead at call.result
-}

@@ -1,0 +1,17 @@
+module bindings.dart.generated.m0b0e66e7;
+
+binding networkConnect0 {
+  requires {
+    dependency("flutter_web_auth")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("flutter_web_auth")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit source core.UserControlledData at call.result
+}

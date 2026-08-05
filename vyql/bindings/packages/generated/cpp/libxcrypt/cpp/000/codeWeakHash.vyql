@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mba04978c;
-
-binding weakHash0 {
-  requires {
-    dependency("libxcrypt")
-  }
-  query pattern callExpr where callee.method == "MD5_Init"
-  emit issue code.WeakHash at call
-}

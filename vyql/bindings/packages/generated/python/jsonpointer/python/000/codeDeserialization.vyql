@@ -1,9 +1,0 @@
-module bindings.python.generated.mc8b4eb67;
-
-binding deserialization0 {
-  requires {
-    dependency("jsonpointer")
-  }
-  query pattern callExpr where callee.method == "resolve_pointer"
-  emit sink code.Deserialization at args[0]
-}

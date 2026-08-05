@@ -1,0 +1,65 @@
+module bindings.objc.generated.m76c30cad;
+
+binding deserialization0 {
+  requires {
+    dependency("XMLDictionary")
+  }
+  query pattern callExpr where callee.method == "dictionaryWithParser"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("XMLDictionary")
+  }
+  query pattern callExpr where callee.method == "dictionaryWithFile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("XMLDictionary")
+  }
+  query pattern callExpr where callee.method == "dictionaryWithData"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("XMLDictionary")
+  }
+  query pattern callExpr where callee.method == "dictionaryWithString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("XMLDictionary")
+  }
+  query pattern callExpr where callee.method == "dictionaryWithXMLParser"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("XMLDictionary")
+  }
+  query pattern callExpr where callee.method == "dictionaryWithXMLData"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("XMLDictionary")
+  }
+  query pattern callExpr where callee.method == "dictionaryWithXMLString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("XMLDictionary")
+  }
+  query pattern callExpr where callee.method == "dictionaryWithXMLFile"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.m1d250a97;
-
-binding networkSend5 {
-  requires {
-    dependency("github.com/googleapis/google-auth-library-swift")
-  }
-  query pattern callExpr where callee.method == "performRequest"
-  emit sink code.NetworkSend at args[0]
-}

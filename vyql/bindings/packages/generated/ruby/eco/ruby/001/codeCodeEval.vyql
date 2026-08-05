@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m70c2ab7f;
-
-binding codeEval1 {
-  requires {
-    dependency("eco")
-  }
-  query pattern callExpr where callee.method == "context_for"
-  emit sink code.CodeEval at args[0]
-}

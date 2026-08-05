@@ -1,9 +1,0 @@
-module bindings.perl.generated.m217f2f69;
-
-binding filePathAccess0 {
-  requires {
-    dependency("Net-IPFromZip")
-  }
-  query pattern callExpr where callee.method == "reverse"
-  emit sink code.FilePathAccess at args[0]
-}

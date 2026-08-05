@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m6213b8f8;
-
-binding deserialization0 {
-  requires {
-    dependency("mustermann")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

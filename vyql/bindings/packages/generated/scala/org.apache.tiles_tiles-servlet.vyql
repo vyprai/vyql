@@ -1,0 +1,41 @@
+module bindings.scala.generated.m18f0ea4d;
+
+binding httpInput0 {
+  requires {
+    dependency("org.apache.tiles:tiles-servlet")
+  }
+  query pattern callExpr where callee.method == "doGet"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("org.apache.tiles:tiles-servlet")
+  }
+  query pattern callExpr where callee.method == "doPost"
+  emit source code.HttpInput at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("org.apache.tiles:tiles-servlet")
+  }
+  query pattern callExpr where callee.method == "getDefinitionName"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("org.apache.tiles:tiles-servlet")
+  }
+  query pattern callExpr where callee.method == "mutate"
+  emit source core.UserControlledData at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("org.apache.tiles:tiles-servlet")
+  }
+  query pattern callExpr where callee.method == "doFilter"
+  emit source code.HttpInput at call.result
+}

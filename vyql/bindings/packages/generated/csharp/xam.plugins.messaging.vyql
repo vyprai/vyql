@@ -1,0 +1,33 @@
+module bindings.csharp.generated.mac090037;
+
+binding networkSend0 {
+  requires {
+    dependency("xam.plugins.messaging")
+  }
+  query pattern callExpr where callee.method == "SendEmail"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("xam.plugins.messaging")
+  }
+  query pattern callExpr where callee.method == "MakePhoneCall"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("xam.plugins.messaging")
+  }
+  query pattern callExpr where callee.method == "SendSms"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("xam.plugins.messaging")
+  }
+  query pattern callExpr where callee.method == "SendSmsInBackground"
+  emit sink code.NetworkSend at args[0]
+}

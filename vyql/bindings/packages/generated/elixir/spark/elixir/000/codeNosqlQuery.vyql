@@ -1,9 +1,0 @@
-module bindings.elixir.generated.md3302f2a;
-
-binding nosqlQuery0 {
-  requires {
-    dependency("spark")
-  }
-  query pattern callExpr where callee.method == "find"
-  emit sink code.NosqlQuery at args[0]
-}

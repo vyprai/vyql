@@ -1,0 +1,17 @@
+module bindings.swift.generated.ma4950829;
+
+binding networkConnect0 {
+  requires {
+    dependency("github.com/matomo-org/matomo-sdk-ios")
+  }
+  query pattern callExpr where callee.method == "URLSessionDispatcher.send(events:success:failure:)"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/matomo-org/matomo-sdk-ios")
+  }
+  query pattern callExpr where callee.method == "URLSessionDispatcher.send(events:success:failure:)"
+  emit sink code.NetworkSend at args[0]
+}

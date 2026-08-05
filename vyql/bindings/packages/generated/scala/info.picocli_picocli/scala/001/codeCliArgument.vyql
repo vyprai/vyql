@@ -1,9 +1,0 @@
-module bindings.scala.generated.mde751e8f;
-
-binding cliArgument1 {
-  requires {
-    dependency("info.picocli:picocli")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit source code.CliArgument at call.result
-}

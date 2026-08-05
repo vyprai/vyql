@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m78957447;
-
-binding deserialization3 {
-  requires {
-    dependency("org.apache.pdfbox:pdfbox")
-  }
-  query pattern callExpr where callee.method == "parseHex"
-  emit sink code.Deserialization at args[0]
-}

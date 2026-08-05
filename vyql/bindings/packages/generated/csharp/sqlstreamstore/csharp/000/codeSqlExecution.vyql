@@ -1,9 +1,0 @@
-module bindings.csharp.generated.mdd9493bc;
-
-binding sqlExecution0 {
-  requires {
-    dependency("sqlstreamstore")
-  }
-  query pattern callExpr where callee.method == "AppendToStream"
-  emit sink code.SqlExecution at args[0]
-}

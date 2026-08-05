@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m06b56adb;
-
-binding networkSend1 {
-  requires {
-    dependency("org.springframework.social:spring-social-facebook")
-  }
-  query pattern callExpr where callee.method == "publish"
-  emit sink code.NetworkSend at args[0]
-}

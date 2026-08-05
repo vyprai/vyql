@@ -1,9 +1,0 @@
-module bindings.python.generated.m0dc49fb6;
-
-binding userControlledData4 {
-  requires {
-    dependency("jeepney")
-  }
-  query pattern callExpr where callee.method == "parse_addresses"
-  emit source core.UserControlledData at call.result
-}

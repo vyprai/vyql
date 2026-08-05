@@ -1,0 +1,33 @@
+module bindings.groovy.generated.md6ab6dfb;
+
+binding deserialization0 {
+  requires {
+    dependency("org.bouncycastle:bcpkix-jdk15on")
+  }
+  query pattern callExpr where callee.method == "parseBytes"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.bouncycastle:bcpkix-jdk15on")
+  }
+  query pattern callExpr where callee.method == "parseNonEmptyASN1"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("org.bouncycastle:bcpkix-jdk15on")
+  }
+  query pattern callExpr where callee.method == "parseStream"
+  emit sink code.Deserialization at args[0]
+}
+
+binding secretValue3 {
+  requires {
+    dependency("org.bouncycastle:bcpkix-jdk15on")
+  }
+  query pattern callExpr where callee.method == "getPassword"
+  emit source code.SecretValue at call.result
+}

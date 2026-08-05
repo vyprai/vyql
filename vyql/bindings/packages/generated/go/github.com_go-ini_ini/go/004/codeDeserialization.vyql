@@ -1,9 +1,0 @@
-module bindings.go.generated.md714ef1d;
-
-binding deserialization4 {
-  requires {
-    dependency("github.com/go-ini/ini")
-  }
-  query pattern callExpr where callee.method == "LoadSources"
-  emit sink code.Deserialization at args[0]
-}

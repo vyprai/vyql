@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mede61e8c;
-
-binding deserialization0 {
-  requires {
-    dependency("authlogic")
-  }
-  query pattern callExpr where callee.method == "Authlogic::CookieCredentials#parse"
-  emit sink code.Deserialization at args[0]
-}

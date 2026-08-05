@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m1a2bd651;
-
-binding filePathAccess6 {
-  requires {
-    dependency("yasm")
-  }
-  query pattern callExpr where callee.method == "yasm_add_include_path"
-  emit sink code.FilePathAccess at args[0]
-}

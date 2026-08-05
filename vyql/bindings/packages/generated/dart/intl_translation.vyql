@@ -1,0 +1,17 @@
+module bindings.dart.generated.md348b2cc;
+
+binding deserialization0 {
+  requires {
+    dependency("intl_translation")
+  }
+  query pattern callExpr where callee.method == "parseFile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("intl_translation")
+  }
+  query pattern callExpr where callee.method == "parseContent"
+  emit sink code.Deserialization at args[0]
+}

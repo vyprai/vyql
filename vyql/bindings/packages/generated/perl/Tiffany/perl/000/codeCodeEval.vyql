@@ -1,9 +1,0 @@
-module bindings.perl.generated.made1002a;
-
-binding codeEval0 {
-  requires {
-    dependency("Tiffany")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.CodeEval at args[0]
-}

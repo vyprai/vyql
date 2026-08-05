@@ -1,0 +1,17 @@
+module bindings.dart.generated.m2df4b16d;
+
+binding userControlledData0 {
+  requires {
+    dependency("libphonenumber_plugin")
+  }
+  query pattern callExpr where callee.method == "normalizePhoneNumber"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("libphonenumber_plugin")
+  }
+  query pattern callExpr where callee.method == "parsePhoneNumber"
+  emit source core.UserControlledData at call.result
+}

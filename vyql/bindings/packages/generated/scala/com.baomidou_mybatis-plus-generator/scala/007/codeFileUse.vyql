@@ -1,9 +1,0 @@
-module bindings.scala.generated.ma91ee222;
-
-binding fileUse7 {
-  requires {
-    dependency("com.baomidou:mybatis-plus-generator")
-  }
-  query pattern callExpr where callee.method == "createFile"
-  emit sink code.FileUseSink at args[0]
-}

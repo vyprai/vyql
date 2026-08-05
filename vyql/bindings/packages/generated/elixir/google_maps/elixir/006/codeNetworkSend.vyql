@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m553964c8;
-
-binding networkSend6 {
-  requires {
-    dependency("google_maps")
-  }
-  query pattern callExpr where callee.method == "place_autocomplete"
-  emit sink code.NetworkSend at args[0]
-}

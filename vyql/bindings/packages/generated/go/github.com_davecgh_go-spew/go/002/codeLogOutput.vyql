@@ -1,9 +1,0 @@
-module bindings.go.generated.m80404178;
-
-binding logOutput2 {
-  requires {
-    dependency("github.com/davecgh/go-spew")
-  }
-  query pattern callExpr where callee.method == "Fprintf"
-  emit sink code.LogOutput at args[0]
-}

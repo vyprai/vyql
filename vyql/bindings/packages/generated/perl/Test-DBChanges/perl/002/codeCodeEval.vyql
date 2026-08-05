@@ -1,9 +1,0 @@
-module bindings.perl.generated.m5884e7db;
-
-binding codeEval2 {
-  requires {
-    dependency("Test-DBChanges")
-  }
-  query pattern callExpr where callee.method == "changeset_for_code"
-  emit sink code.CodeEval at args[0]
-}

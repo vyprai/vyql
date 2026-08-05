@@ -1,0 +1,25 @@
+module bindings.dart.generated.md5338a86;
+
+binding networkSend0 {
+  requires {
+    dependency("share_plus_web")
+  }
+  query pattern callExpr where callee.method == "SharePlusPlugin.share"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("share_plus_web")
+  }
+  query pattern callExpr where callee.method == "SharePlusPlugin.shareFiles"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("share_plus_web")
+  }
+  query pattern callExpr where callee.method == "SharePlusPlugin.shareXFiles"
+  emit sink code.NetworkSend at args[0]
+}

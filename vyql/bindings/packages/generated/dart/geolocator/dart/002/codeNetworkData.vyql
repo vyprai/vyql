@@ -1,9 +1,0 @@
-module bindings.dart.generated.m11923f86;
-
-binding networkData2 {
-  requires {
-    dependency("geolocator")
-  }
-  query pattern callExpr where callee.method == "getPositionStream"
-  emit source code.NetworkData at call.result
-}

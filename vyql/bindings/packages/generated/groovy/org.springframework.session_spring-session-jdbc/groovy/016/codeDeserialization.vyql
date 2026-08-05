@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m59519c26;
-
-binding deserialization16 {
-  requires {
-    dependency("org.springframework.session:spring-session-jdbc")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

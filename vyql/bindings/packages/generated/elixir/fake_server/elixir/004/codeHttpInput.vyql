@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m6666bade;
-
-binding httpInput4 {
-  requires {
-    dependency("fake_server")
-  }
-  query pattern callExpr where callee.method == "FakeServer.Request.path"
-  emit source code.HttpInput at call.result
-}

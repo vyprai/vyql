@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m47da9b45;
-
-binding nosqlQuery53 {
-  requires {
-    dependency("aws-sdk-dynamodb")
-  }
-  query pattern callExpr where callee.method == "update_table_replica_auto_scaling"
-  emit sink code.NosqlQuery at args[0]
-}

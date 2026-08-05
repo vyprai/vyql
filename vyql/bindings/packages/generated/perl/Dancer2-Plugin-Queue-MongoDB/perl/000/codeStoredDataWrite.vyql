@@ -1,9 +1,0 @@
-module bindings.perl.generated.ma6b12da1;
-
-binding storedDataWrite0 {
-  requires {
-    dependency("Dancer2-Plugin-Queue-MongoDB")
-  }
-  query pattern callExpr where callee.method == "add_msg"
-  emit sink code.StoredDataWrite at args[0]
-}

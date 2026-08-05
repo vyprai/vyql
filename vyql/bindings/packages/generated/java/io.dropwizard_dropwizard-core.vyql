@@ -1,0 +1,33 @@
+module bindings.java.generated.m816041d7;
+
+binding userControlledData0 {
+  requires {
+    dependency("io.dropwizard:dropwizard-core")
+  }
+  query pattern callExpr where callee.method == "Cli.run"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("io.dropwizard:dropwizard-core")
+  }
+  query pattern callExpr where callee.method == "Command.configure"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("io.dropwizard:dropwizard-core")
+  }
+  query pattern callExpr where callee.method == "ConfiguredCommand.configure"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("io.dropwizard:dropwizard-core")
+  }
+  query pattern callExpr where callee.method == "SslReloadTask.execute"
+  emit source core.UserControlledData at call.result
+}

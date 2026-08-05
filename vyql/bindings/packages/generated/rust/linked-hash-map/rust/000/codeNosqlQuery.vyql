@@ -1,9 +1,0 @@
-module bindings.rust.generated.m3799e2cf;
-
-binding nosqlQuery0 {
-  requires {
-    dependency("linked-hash-map")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit sink code.NosqlQuery at args[0]
-}

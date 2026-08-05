@@ -1,9 +1,0 @@
-module bindings.php.generated.m845f0980;
-
-binding xmlParse3 {
-  requires {
-    dependency("theseer/tokenizer")
-  }
-  query pattern callExpr where callee.method == "appendToWriter"
-  emit sink code.XmlParse at args[0]
-}

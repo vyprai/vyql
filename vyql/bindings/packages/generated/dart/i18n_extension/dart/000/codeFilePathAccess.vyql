@@ -1,9 +1,0 @@
-module bindings.dart.generated.md0f5c057;
-
-binding filePathAccess0 {
-  requires {
-    dependency("i18n_extension")
-  }
-  query pattern callExpr where callee.method == "defaultLoadByFile"
-  emit sink code.FilePathAccess at args[0]
-}

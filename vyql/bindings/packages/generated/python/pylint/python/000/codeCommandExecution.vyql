@@ -1,9 +1,0 @@
-module bindings.python.generated.m04eb7f88;
-
-binding commandExecution0 {
-  requires {
-    dependency("pylint")
-  }
-  query pattern callExpr where callee.method == "run_pylint"
-  emit sink code.CommandExecution at args[0]
-}

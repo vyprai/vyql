@@ -1,9 +1,0 @@
-module bindings.perl.generated.m935fdd23;
-
-binding storedDataWrite2 {
-  requires {
-    dependency("Session")
-  }
-  query pattern callExpr where callee.method == "set"
-  emit sink code.StoredDataWrite at args[0]
-}

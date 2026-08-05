@@ -1,0 +1,17 @@
+module bindings.swift.generated.m03d71708;
+
+binding networkSend0 {
+  requires {
+    dependency("github.com/jpsim/SourceKitten")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/jpsim/SourceKitten")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

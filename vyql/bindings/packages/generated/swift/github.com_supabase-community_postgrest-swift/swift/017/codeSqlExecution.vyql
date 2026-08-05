@@ -1,9 +1,0 @@
-module bindings.swift.generated.m82477a6a;
-
-binding sqlExecution17 {
-  requires {
-    dependency("github.com/supabase-community/postgrest-swift")
-  }
-  query pattern callExpr where callee.method == "overlaps"
-  emit sink code.SqlExecution at args[0]
-}

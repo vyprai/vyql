@@ -1,0 +1,25 @@
+module bindings.kotlin.generated.mfe2e1864;
+
+binding xmlParse0 {
+  requires {
+    dependency("net.sf.dozer:dozer")
+  }
+  query pattern callExpr where callee.method == "addMapping"
+  emit sink code.XmlParse at args[0]
+}
+
+binding urlFetch1 {
+  requires {
+    dependency("net.sf.dozer:dozer")
+  }
+  query pattern callExpr where callee.method == "setMappingFiles"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("net.sf.dozer:dozer")
+  }
+  query pattern callExpr where callee.method == "setMappingFiles"
+  emit sink code.FilePathAccess at args[0]
+}

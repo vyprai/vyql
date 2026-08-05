@@ -1,9 +1,0 @@
-module bindings.csharp.generated.mc283524e;
-
-binding htmlRender1 {
-  requires {
-    dependency("formatwith")
-  }
-  query pattern callExpr where callee.method == "FormattableWith"
-  emit sink code.HtmlRender at args[0]
-}

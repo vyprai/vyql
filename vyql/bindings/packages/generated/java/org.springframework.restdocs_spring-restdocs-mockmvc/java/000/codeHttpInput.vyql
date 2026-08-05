@@ -1,9 +1,0 @@
-module bindings.java.generated.m11bf0fc9;
-
-binding httpInput0 {
-  requires {
-    dependency("org.springframework.restdocs:spring-restdocs-mockmvc")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit source code.HttpInput at call.result
-}

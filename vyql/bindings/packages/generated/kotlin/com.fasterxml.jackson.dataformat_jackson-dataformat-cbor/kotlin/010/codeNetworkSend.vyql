@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m2d34304f;
-
-binding networkSend10 {
-  requires {
-    dependency("com.fasterxml.jackson.dataformat:jackson-dataformat-cbor")
-  }
-  query pattern callExpr where callee.method == "writeStartArray"
-  emit sink code.NetworkSend at args[0]
-}

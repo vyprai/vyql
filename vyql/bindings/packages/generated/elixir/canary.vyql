@@ -1,0 +1,109 @@
+module bindings.elixir.generated.m5920a603;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("canary")
+  }
+  query pattern callExpr where callee.method == "authorize_resource"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck1 {
+  requires {
+    dependency("canary")
+  }
+  query pattern callExpr where callee.method == "load_resource"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck2 {
+  requires {
+    dependency("canary")
+  }
+  query pattern callExpr where callee.method == "load_and_authorize_resource"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck3 {
+  requires {
+    dependency("canary")
+  }
+  query pattern callExpr where callee.method == "check_authorization"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck4 {
+  requires {
+    dependency("canary")
+  }
+  query pattern callExpr where callee.method == "handle_unauthorized"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck5 {
+  requires {
+    dependency("canary")
+  }
+  query pattern callExpr where callee.method == "authorize_controller"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck6 {
+  requires {
+    dependency("canary")
+  }
+  query pattern callExpr where callee.method == "do_authorize_controller"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck7 {
+  requires {
+    dependency("canary")
+  }
+  query pattern callExpr where callee.method == "verify_authorized_resource"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck8 {
+  requires {
+    dependency("canary")
+  }
+  query pattern callExpr where callee.method == "verify_resource"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

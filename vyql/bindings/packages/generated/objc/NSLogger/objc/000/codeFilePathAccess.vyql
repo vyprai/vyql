@@ -1,9 +1,0 @@
-module bindings.objc.generated.mfd249e23;
-
-binding filePathAccess0 {
-  requires {
-    dependency("NSLogger")
-  }
-  query pattern callExpr where callee.method == "LoggerSetBufferFile"
-  emit sink code.FilePathAccess at args[0]
-}

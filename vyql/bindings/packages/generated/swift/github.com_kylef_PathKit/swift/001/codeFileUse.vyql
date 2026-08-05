@@ -1,9 +1,0 @@
-module bindings.swift.generated.m015b46cb;
-
-binding fileUse1 {
-  requires {
-    dependency("github.com/kylef/PathKit")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.FileUseSink at args[0]
-}

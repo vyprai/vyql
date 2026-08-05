@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m802cb70c;
-
-binding sqlExecution1 {
-  requires {
-    dependency("myxql")
-  }
-  query pattern callExpr where callee.method == "query!"
-  emit sink code.SqlExecution at args[0]
-}

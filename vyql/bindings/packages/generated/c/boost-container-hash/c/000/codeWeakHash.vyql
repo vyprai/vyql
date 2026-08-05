@@ -1,9 +1,0 @@
-module bindings.c.generated.m714f6a33;
-
-binding weakHash0 {
-  requires {
-    dependency("boost-container-hash")
-  }
-  query pattern callExpr where callee.method == "hash_value"
-  emit issue code.WeakHash at call
-}

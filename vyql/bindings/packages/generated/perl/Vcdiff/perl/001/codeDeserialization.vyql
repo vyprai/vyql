@@ -1,9 +1,0 @@
-module bindings.perl.generated.m27866dfd;
-
-binding deserialization1 {
-  requires {
-    dependency("Vcdiff")
-  }
-  query pattern callExpr where callee.method == "patch"
-  emit sink code.Deserialization at args[0]
-}

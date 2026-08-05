@@ -1,9 +1,0 @@
-module bindings.dart.generated.m996a60eb;
-
-binding filePathAccess2 {
-  requires {
-    dependency("watcher")
-  }
-  query pattern callExpr where callee.method == "delete"
-  emit sink code.FilePathAccess at args[0]
-}

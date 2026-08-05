@@ -1,9 +1,0 @@
-module bindings.scala.generated.mfae526e8;
-
-binding deserialization1 {
-  requires {
-    dependency("net.masterthought:cucumber-reporting")
-  }
-  query pattern callExpr where callee.method == "parseForFeature"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.mbbfcbacd;
-
-binding deserialization2 {
-  requires {
-    dependency("nette/neon")
-  }
-  query pattern callExpr where callee.method == "NetteNeonNeon::decode"
-  emit sink code.Deserialization at args[0]
-}

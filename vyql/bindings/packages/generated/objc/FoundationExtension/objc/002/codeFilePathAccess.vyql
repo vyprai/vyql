@@ -1,9 +1,0 @@
-module bindings.objc.generated.mc7263894;
-
-binding filePathAccess2 {
-  requires {
-    dependency("FoundationExtension")
-  }
-  query pattern callExpr where callee.method == "scheduledEventStreamWithPath:latency:flags:delegate:"
-  emit sink code.FilePathAccess at args[0]
-}

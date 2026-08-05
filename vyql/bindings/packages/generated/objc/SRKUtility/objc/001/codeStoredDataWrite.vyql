@@ -1,9 +1,0 @@
-module bindings.objc.generated.m63547d50;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("SRKUtility")
-  }
-  query pattern callExpr where callee.method == "saveValueForKey"
-  emit sink code.StoredDataWrite at args[0]
-}

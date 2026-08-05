@@ -1,9 +1,0 @@
-module bindings.python.generated.m478a68cf;
-
-binding htmlRender2 {
-  requires {
-    dependency("mkdocs")
-  }
-  query pattern callExpr where callee.method == "on_page_content"
-  emit sink code.HtmlRender at args[0]
-}

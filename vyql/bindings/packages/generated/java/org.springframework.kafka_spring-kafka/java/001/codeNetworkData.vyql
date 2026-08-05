@@ -1,9 +1,0 @@
-module bindings.java.generated.mfc7c20f6;
-
-binding networkData1 {
-  requires {
-    dependency("org.springframework.kafka:spring-kafka")
-  }
-  query pattern callExpr where callee.method == "receive"
-  emit source code.NetworkData at call.result
-}

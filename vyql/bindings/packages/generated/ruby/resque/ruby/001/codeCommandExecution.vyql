@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m2bdb1d7d;
-
-binding commandExecution1 {
-  requires {
-    dependency("resque")
-  }
-  query pattern callExpr where callee.method == "perform_with_fork"
-  emit sink code.CommandExecution at args[0]
-}

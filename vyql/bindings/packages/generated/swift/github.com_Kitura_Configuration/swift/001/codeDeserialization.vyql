@@ -1,9 +1,0 @@
-module bindings.swift.generated.m9592d749;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/Kitura/Configuration")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

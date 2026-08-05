@@ -1,9 +1,0 @@
-module bindings.swift.generated.mbb53f57a;
-
-binding networkSend1 {
-  requires {
-    dependency("github.com/tesseract-one/WebSocket.swift")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

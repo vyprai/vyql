@@ -1,9 +1,0 @@
-module bindings.php.generated.m856f3b76;
-
-binding filePathAccess1 {
-  requires {
-    dependency("blade-ui-kit/blade-icons")
-  }
-  query pattern callExpr where callee.method == "scanLocal"
-  emit sink code.FilePathAccess at args[0]
-}

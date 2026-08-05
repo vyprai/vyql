@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m624a5039;
-
-binding filePathAccess0 {
-  requires {
-    dependency("update-browserslist-db")
-  }
-  query pattern callExpr where callee.method == "module.exports"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mbca90048;
-
-binding userControlledData3 {
-  requires {
-    dependency("ipaddr.js")
-  }
-  query pattern callExpr where callee.method == "isValidCIDR"
-  emit source core.UserControlledData at call.result
-}

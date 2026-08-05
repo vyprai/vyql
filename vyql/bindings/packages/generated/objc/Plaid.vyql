@@ -1,0 +1,17 @@
+module bindings.objc.generated.madd08928;
+
+binding secretValue0 {
+  requires {
+    dependency("Plaid")
+  }
+  query pattern callExpr where callee.method == "createWithLinkTokenConfiguration:error:"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("Plaid")
+  }
+  query pattern callExpr where callee.method == "createWithLinkTokenConfiguration:onLoad:error:"
+  emit source code.SecretValue at call.result
+}

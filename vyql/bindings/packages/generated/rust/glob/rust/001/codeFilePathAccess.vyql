@@ -1,9 +1,0 @@
-module bindings.rust.generated.m5376b15c;
-
-binding filePathAccess1 {
-  requires {
-    dependency("glob")
-  }
-  query pattern callExpr where callee.method == "glob_with"
-  emit sink code.FilePathAccess at args[0]
-}

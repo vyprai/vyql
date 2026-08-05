@@ -1,9 +1,0 @@
-module bindings.python.generated.mb15e1e42;
-
-binding httpInput1 {
-  requires {
-    dependency("uritemplate")
-  }
-  query pattern callExpr where callee.method == "partial"
-  emit source code.HttpInput at call.result
-}

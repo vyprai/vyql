@@ -1,0 +1,34 @@
+module bindings.csharp.generated.m1534383c;
+
+binding regexCompile0 {
+  requires {
+    dependency("materialdesignextensions")
+  }
+  query pattern callExpr where callee.method == "ParseFilterRegularExpressions"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("materialdesignextensions")
+  }
+  query pattern callExpr where callee.method == "CreateNewDirectory"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("materialdesignextensions")
+  }
+  query pattern callExpr where callee.method == "SelectDirectory"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("materialdesignextensions")
+  }
+  query pattern callExpr where callee.method == "SelectFile"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.m0a430c53;
-
-binding networkSend1 {
-  requires {
-    dependency("FirebaseMessaging")
-  }
-  query pattern callExpr where callee.method == "AddJUnitFailure"
-  emit sink code.NetworkSend at args[0]
-}

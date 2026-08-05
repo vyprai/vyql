@@ -1,0 +1,73 @@
+module bindings.objc.generated.ma399f56c;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("ParseFacebookUtilsV4")
+  }
+  query pattern callExpr where callee.method == "logInInBackgroundWithReadPermissions"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("ParseFacebookUtilsV4")
+  }
+  query pattern callExpr where callee.method == "logInInBackgroundWithPublishPermissions"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck2 {
+  requires {
+    dependency("ParseFacebookUtilsV4")
+  }
+  query pattern callExpr where callee.method == "logInInBackgroundWithAccessToken"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck3 {
+  requires {
+    dependency("ParseFacebookUtilsV4")
+  }
+  query pattern callExpr where callee.method == "linkUserInBackground"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck4 {
+  requires {
+    dependency("ParseFacebookUtilsV4")
+  }
+  query pattern callExpr where callee.method == "unlinkUserInBackground"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck5 {
+  requires {
+    dependency("ParseFacebookUtilsV4")
+  }
+  query pattern callExpr where callee.method == "authenticateAsyncWithReadPermissions"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m7ab87d2b;
-
-binding networkConnect6 {
-  requires {
-    dependency("tentacat")
-  }
-  query pattern callExpr where callee.method == "post"
-  emit sink code.NetworkConnectSink at args[0]
-}

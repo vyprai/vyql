@@ -1,9 +1,0 @@
-module bindings.go.generated.ma206a1a4;
-
-binding userControlledData1 {
-  requires {
-    dependency("github.com/hashicorp/consul/api")
-  }
-  query pattern callExpr where callee.method == "ParseServiceAddr"
-  emit source core.UserControlledData at call.result
-}

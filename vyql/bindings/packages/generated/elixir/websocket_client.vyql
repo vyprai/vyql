@@ -1,0 +1,17 @@
+module bindings.elixir.generated.m03934a52;
+
+binding networkData0 {
+  requires {
+    dependency("websocket_client")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit source code.NetworkData at call.result
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("websocket_client")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

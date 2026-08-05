@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m2ca3c897;
-
-binding fileUse10 {
-  requires {
-    dependency("spring.social.dropbox")
-  }
-  query pattern callExpr where callee.method == "DownloadThumbnail"
-  emit sink code.FileUseSink at args[0]
-}

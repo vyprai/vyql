@@ -1,9 +1,0 @@
-module bindings.objc.generated.ma3a84a11;
-
-binding networkConnect8 {
-  requires {
-    dependency("Amplitude")
-  }
-  query pattern callExpr where callee.method == "setServerUrl:"
-  emit sink code.NetworkConnectSink at args[0]
-}

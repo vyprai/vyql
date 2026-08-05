@@ -1,9 +1,0 @@
-module bindings.c.generated.mc021190d;
-
-binding filePathAccess1 {
-  requires {
-    dependency("kubazip")
-  }
-  query pattern callExpr where callee.method == "zip_entry_open"
-  emit sink code.FilePathAccess at args[0]
-}

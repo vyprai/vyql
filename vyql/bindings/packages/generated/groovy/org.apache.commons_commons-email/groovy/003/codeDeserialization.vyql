@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m77308004;
-
-binding deserialization3 {
-  requires {
-    dependency("org.apache.commons:commons-email")
-  }
-  query pattern callExpr where callee.method == "setMailSessionFromJNDI"
-  emit sink code.Deserialization at args[0]
-}

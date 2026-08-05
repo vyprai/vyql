@@ -1,0 +1,49 @@
+module bindings.python.generated.md01d46f3;
+
+binding filePathAccess0 {
+  requires {
+    dependency("wheel")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding archiveEntryWrite1 {
+  requires {
+    dependency("wheel")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding archiveEntryWrite2 {
+  requires {
+    dependency("wheel")
+  }
+  query pattern callExpr where callee.method == "write_files"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding archiveEntryWrite3 {
+  requires {
+    dependency("wheel")
+  }
+  query pattern callExpr where callee.method == "writestr"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding archiveEntryWrite4 {
+  requires {
+    dependency("wheel")
+  }
+  query pattern callExpr where callee.method == "unpack"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding archiveEntryWrite5 {
+  requires {
+    dependency("wheel")
+  }
+  query pattern callExpr where callee.method == "unpack_f"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

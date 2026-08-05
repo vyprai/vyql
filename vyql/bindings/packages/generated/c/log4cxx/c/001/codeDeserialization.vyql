@@ -1,9 +1,0 @@
-module bindings.c.generated.me8985f20;
-
-binding deserialization1 {
-  requires {
-    dependency("log4cxx")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

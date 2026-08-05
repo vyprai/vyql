@@ -1,9 +1,0 @@
-module bindings.java.generated.mcf337d65;
-
-binding filePathAccess5 {
-  requires {
-    dependency("org.jooq:jooq-codegen")
-  }
-  query pattern callExpr where callee.method == "Files.mkdirs"
-  emit sink code.FilePathAccess at args[0]
-}

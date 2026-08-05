@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m5ea8ee10;
-
-binding deserialization2 {
-  requires {
-    dependency("parson")
-  }
-  query pattern callExpr where callee.method == "json_parse_string"
-  emit sink code.Deserialization at args[0]
-}

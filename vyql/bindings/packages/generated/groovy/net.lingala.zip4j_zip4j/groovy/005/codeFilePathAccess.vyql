@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m18ea75ce;
-
-binding filePathAccess5 {
-  requires {
-    dependency("net.lingala.zip4j:zip4j")
-  }
-  query pattern callExpr where callee.method == "extractFile"
-  emit sink code.FilePathAccess at args[0]
-}

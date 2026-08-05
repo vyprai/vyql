@@ -1,9 +1,0 @@
-module bindings.ruby.generated.me3853743;
-
-binding deserialization5 {
-  requires {
-    dependency("webdrivers")
-  }
-  query pattern callExpr where callee.method == "decompress_file"
-  emit sink code.Deserialization at args[0]
-}

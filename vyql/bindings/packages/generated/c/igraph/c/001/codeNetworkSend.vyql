@@ -1,9 +1,0 @@
-module bindings.c.generated.m07707a64;
-
-binding networkSend1 {
-  requires {
-    dependency("igraph")
-  }
-  query pattern callExpr where callee.method == "igraph_sparsemat_add"
-  emit sink code.NetworkSend at args[0]
-}

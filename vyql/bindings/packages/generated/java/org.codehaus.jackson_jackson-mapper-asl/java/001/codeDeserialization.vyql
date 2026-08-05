@@ -1,9 +1,0 @@
-module bindings.java.generated.m349a194a;
-
-binding deserialization1 {
-  requires {
-    dependency("org.codehaus.jackson:jackson-mapper-asl")
-  }
-  query pattern callExpr where callee.method == "readTree"
-  emit sink code.Deserialization at args[0]
-}

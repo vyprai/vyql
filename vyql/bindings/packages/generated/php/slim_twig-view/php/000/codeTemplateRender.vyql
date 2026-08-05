@@ -1,9 +1,0 @@
-module bindings.php.generated.md811e02f;
-
-binding templateRender0 {
-  requires {
-    dependency("slim/twig-view")
-  }
-  query pattern callExpr where callee.method == "render"
-  emit sink code.TemplateRender at args[0]
-}

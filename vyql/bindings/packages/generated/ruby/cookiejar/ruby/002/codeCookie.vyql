@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m411e6779;
-
-binding cookie2 {
-  requires {
-    dependency("cookiejar")
-  }
-  query pattern callExpr where callee.method == "set_cookies_from_headers"
-  emit source code.Cookie at call.result
-}

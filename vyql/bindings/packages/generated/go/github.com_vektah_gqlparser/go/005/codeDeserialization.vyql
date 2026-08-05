@@ -1,9 +1,0 @@
-module bindings.go.generated.mdbc03d38;
-
-binding deserialization5 {
-  requires {
-    dependency("github.com/vektah/gqlparser")
-  }
-  query pattern callExpr where callee.method == "ParseSchema"
-  emit sink code.Deserialization at args[0]
-}

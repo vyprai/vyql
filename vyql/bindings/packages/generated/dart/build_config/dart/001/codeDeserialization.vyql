@@ -1,9 +1,0 @@
-module bindings.dart.generated.md1712474;
-
-binding deserialization1 {
-  requires {
-    dependency("build_config")
-  }
-  query pattern callExpr where callee.path ~= "BuildConfig.fromBuildConfigDir"
-  emit sink code.Deserialization at args[0]
-}

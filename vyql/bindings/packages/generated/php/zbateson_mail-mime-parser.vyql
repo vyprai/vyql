@@ -1,0 +1,17 @@
+module bindings.php.generated.m072731ef;
+
+binding deserialization0 {
+  requires {
+    dependency("zbateson/mail-mime-parser")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("zbateson/mail-mime-parser")
+  }
+  query pattern callExpr where callee.method == "addAttachmentPartFromFile"
+  emit sink code.FilePathAccess at args[0]
+}

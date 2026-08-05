@@ -1,9 +1,0 @@
-module bindings.python.generated.m899e57cd;
-
-binding deserialization1 {
-  requires {
-    dependency("tinycss2")
-  }
-  query pattern callExpr where callee.method == "parse_one_declaration"
-  emit sink code.Deserialization at args[0]
-}

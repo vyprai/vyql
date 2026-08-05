@@ -1,9 +1,0 @@
-module bindings.scala.generated.m1d6f42b7;
-
-binding deserialization1 {
-  requires {
-    dependency("org.apache.shiro:shiro-core")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

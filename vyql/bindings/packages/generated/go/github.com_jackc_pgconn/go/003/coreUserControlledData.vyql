@@ -1,9 +1,0 @@
-module bindings.go.generated.maab03f2b;
-
-binding userControlledData3 {
-  requires {
-    dependency("github.com/jackc/pgconn")
-  }
-  query pattern callExpr where callee.method == "ConnectWithOptions"
-  emit source core.UserControlledData at call.result
-}

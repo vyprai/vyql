@@ -1,9 +1,0 @@
-module bindings.go.generated.m785e0061;
-
-binding userControlledData5 {
-  requires {
-    dependency("github.com/gliderlabs/ssh")
-  }
-  query pattern callExpr where callee.method == "SetAgentRequested"
-  emit source core.UserControlledData at call.result
-}

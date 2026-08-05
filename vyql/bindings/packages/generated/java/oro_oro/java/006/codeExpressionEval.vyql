@@ -1,9 +1,0 @@
-module bindings.java.generated.mdc69555d;
-
-binding expressionEval6 {
-  requires {
-    dependency("oro:oro")
-  }
-  query pattern callExpr where callee.method == "contains"
-  emit sink code.ExpressionEval at args[0]
-}

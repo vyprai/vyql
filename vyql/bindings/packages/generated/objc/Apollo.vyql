@@ -1,0 +1,25 @@
+module bindings.objc.generated.md9f09ab7;
+
+binding sqlExecution0 {
+  requires {
+    dependency("Apollo")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("Apollo")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("Apollo")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

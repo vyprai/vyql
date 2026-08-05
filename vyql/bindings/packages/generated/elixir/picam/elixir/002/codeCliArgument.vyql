@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m9f998ed7;
-
-binding cliArgument2 {
-  requires {
-    dependency("picam")
-  }
-  query pattern callExpr where callee.method == "parse_args"
-  emit source code.CliArgument at call.result
-}

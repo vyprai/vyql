@@ -1,9 +1,0 @@
-module bindings.swift.generated.m9037b4c7;
-
-binding networkSend1 {
-  requires {
-    dependency("github.com/daltoniam/Starscream")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkSend at args[0]
-}

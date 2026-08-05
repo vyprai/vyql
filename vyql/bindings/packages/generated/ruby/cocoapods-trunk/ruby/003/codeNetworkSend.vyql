@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m02cc521c;
-
-binding networkSend3 {
-  requires {
-    dependency("cocoapods-trunk")
-  }
-  query pattern callExpr where callee.method == "request_path"
-  emit sink code.NetworkSend at args[0]
-}

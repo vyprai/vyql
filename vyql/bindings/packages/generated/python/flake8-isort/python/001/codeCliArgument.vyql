@@ -1,9 +1,0 @@
-module bindings.python.generated.m1f58d38d;
-
-binding cliArgument1 {
-  requires {
-    dependency("flake8-isort")
-  }
-  query pattern callExpr where callee.method == "parse_options"
-  emit source code.CliArgument at call.result
-}

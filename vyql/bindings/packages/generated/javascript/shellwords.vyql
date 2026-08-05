@@ -1,0 +1,22 @@
+module bindings.javascript.generated.mbc2a4e0a;
+
+binding cliArgument0 {
+  requires {
+    dependency("shellwords")
+  }
+  query pattern callExpr where callee.method == "split"
+  emit source code.CliArgument at call.result
+}
+
+binding shellEscape1 {
+  requires {
+    dependency("shellwords")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

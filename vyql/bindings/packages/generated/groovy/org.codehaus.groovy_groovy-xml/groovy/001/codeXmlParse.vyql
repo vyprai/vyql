@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m112c533d;
-
-binding xmlParse1 {
-  requires {
-    dependency("org.codehaus.groovy:groovy-xml")
-  }
-  query pattern callExpr where callee.method == "parseText"
-  emit sink code.XmlParse at args[0]
-}

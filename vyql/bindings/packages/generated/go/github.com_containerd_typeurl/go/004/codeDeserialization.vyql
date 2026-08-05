@@ -1,9 +1,0 @@
-module bindings.go.generated.m720e5850;
-
-binding deserialization4 {
-  requires {
-    dependency("github.com/containerd/typeurl")
-  }
-  query pattern callExpr where callee.method == "unmarshal"
-  emit sink code.Deserialization at args[0]
-}

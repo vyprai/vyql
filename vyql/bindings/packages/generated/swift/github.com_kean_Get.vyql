@@ -1,0 +1,57 @@
+module bindings.swift.generated.m342303c4;
+
+binding networkSend0 {
+  requires {
+    dependency("github.com/kean/Get")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/kean/Get")
+  }
+  query pattern callExpr where callee.method == "download"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("github.com/kean/Get")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding httpInput3 {
+  requires {
+    dependency("github.com/kean/Get")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("github.com/kean/Get")
+  }
+  query pattern callExpr where callee.method == "url"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  requires {
+    dependency("github.com/kean/Get")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput6 {
+  requires {
+    dependency("github.com/kean/Get")
+  }
+  query pattern callExpr where callee.method == "headers"
+  emit source code.HttpInput at call.result
+}

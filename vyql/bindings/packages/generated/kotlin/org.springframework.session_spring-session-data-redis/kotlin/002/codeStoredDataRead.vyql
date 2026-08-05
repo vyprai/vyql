@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m60412f76;
-
-binding storedDataRead2 {
-  requires {
-    dependency("org.springframework.session:spring-session-data-redis")
-  }
-  query pattern callExpr where callee.method == "getAttribute"
-  emit source code.StoredDataRead at call.result
-}

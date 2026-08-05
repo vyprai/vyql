@@ -1,9 +1,0 @@
-module bindings.java.generated.mf0bf139c;
-
-binding networkSend0 {
-  requires {
-    dependency("org.eclipse.jetty:jetty-client")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m2495c6ff;
-
-binding networkData1 {
-  requires {
-    dependency("python-engineio")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit source code.NetworkData at call.result
-}

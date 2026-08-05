@@ -1,9 +1,0 @@
-module bindings.dart.generated.m8bc63517;
-
-binding networkSend5 {
-  requires {
-    dependency("basic_utils")
-  }
-  query pattern callExpr where callee.method == "postForString"
-  emit sink code.NetworkSend at args[0]
-}

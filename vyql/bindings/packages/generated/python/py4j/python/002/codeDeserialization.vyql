@@ -1,9 +1,0 @@
-module bindings.python.generated.m4afec63d;
-
-binding deserialization2 {
-  requires {
-    dependency("py4j")
-  }
-  query pattern callExpr where callee.method == "get_command_part"
-  emit sink code.Deserialization at args[0]
-}

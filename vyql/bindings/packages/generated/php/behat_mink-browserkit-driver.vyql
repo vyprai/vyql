@@ -1,0 +1,58 @@
+module bindings.php.generated.m26dcc6cc;
+
+binding urlFetch0 {
+  requires {
+    dependency("behat/mink-browserkit-driver")
+  }
+  query pattern callExpr where callee.method == "visit"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding redirectTarget1 {
+  requires {
+    dependency("behat/mink-browserkit-driver")
+  }
+  query pattern callExpr where callee.method == "visit"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("behat/mink-browserkit-driver")
+  }
+  query pattern callExpr where callee.method == "setRequestHeader"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding cookie3 {
+  requires {
+    dependency("behat/mink-browserkit-driver")
+  }
+  query pattern callExpr where callee.method == "setCookie"
+  emit source code.Cookie at call.result
+}
+
+binding htmlRender4 {
+  requires {
+    dependency("behat/mink-browserkit-driver")
+  }
+  query pattern callExpr where callee.method == "setValue"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding xpathQuery5 {
+  requires {
+    dependency("behat/mink-browserkit-driver")
+  }
+  query pattern callExpr where callee.method == "click"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("behat/mink-browserkit-driver")
+  }
+  query pattern callExpr where callee.method == "submitForm"
+  emit source core.UserControlledData at call.result
+}

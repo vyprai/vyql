@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m7b583f38;
-
-binding filePathAccess4 {
-  requires {
-    dependency("lmdb")
-  }
-  query pattern callExpr where callee.method == "mdb_env_copyfd"
-  emit sink code.FilePathAccess at args[0]
-}

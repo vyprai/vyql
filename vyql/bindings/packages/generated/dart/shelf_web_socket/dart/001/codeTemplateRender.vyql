@@ -1,9 +1,0 @@
-module bindings.dart.generated.m63a883b0;
-
-binding templateRender1 {
-  requires {
-    dependency("shelf_web_socket")
-  }
-  query pattern callExpr where callee.method == "_htmlResponse"
-  emit sink code.TemplateRender at args[0]
-}

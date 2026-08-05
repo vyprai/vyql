@@ -1,0 +1,25 @@
+module bindings.javascript.generated.m29372ecf;
+
+binding userControlledData0 {
+  requires {
+    dependency("parseurl")
+  }
+  query pattern callExpr where callee.method == "parseurl"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("parseurl")
+  }
+  query pattern callExpr where callee.method == "originalurl"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("parseurl")
+  }
+  query pattern callExpr where callee.method == "fastparse"
+  emit source core.UserControlledData at call.result
+}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mb21b01b4;
-
-binding cliArgument1 {
-  requires {
-    dependency("jasper")
-  }
-  query pattern callExpr where callee.method == "cmdopts_parse"
-  emit source code.CliArgument at call.result
-}

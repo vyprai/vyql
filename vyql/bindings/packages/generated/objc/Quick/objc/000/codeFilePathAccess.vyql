@@ -1,9 +1,0 @@
-module bindings.objc.generated.m298408d7;
-
-binding filePathAccess0 {
-  requires {
-    dependency("Quick")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.FilePathAccess at args[0]
-}

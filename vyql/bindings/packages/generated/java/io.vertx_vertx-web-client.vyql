@@ -1,0 +1,25 @@
+module bindings.java.generated.m5e3f7f2e;
+
+binding networkConnect0 {
+  requires {
+    dependency("io.vertx:vertx-web-client")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("io.vertx:vertx-web-client")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("io.vertx:vertx-web-client")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

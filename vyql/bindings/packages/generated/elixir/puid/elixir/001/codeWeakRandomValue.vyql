@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m170affd5;
-
-binding weakRandomValue1 {
-  requires {
-    dependency("puid")
-  }
-  query pattern callExpr where callee.method == "generate"
-  emit issue code.WeakRandomValue at call
-}

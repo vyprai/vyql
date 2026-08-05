@@ -1,0 +1,17 @@
+module bindings.python.generated.m4b74f36c;
+
+binding storedDataRead0 {
+  requires {
+    dependency("gitdb")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.StoredDataRead at call.result
+}
+
+binding fileUse1 {
+  requires {
+    dependency("gitdb")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

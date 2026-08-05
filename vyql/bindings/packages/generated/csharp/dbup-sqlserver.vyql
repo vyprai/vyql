@@ -1,0 +1,25 @@
+module bindings.csharp.generated.m878be40c;
+
+binding sqlExecution0 {
+  requires {
+    dependency("dbup-sqlserver")
+  }
+  query pattern callExpr where callee.method == "SqlScriptExecutor.ExecuteCommandsWithinExceptionHandler"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding secretValue1 {
+  requires {
+    dependency("dbup-sqlserver")
+  }
+  query pattern callExpr where callee.method == "SqlConnectionManager.#ctor"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("dbup-sqlserver")
+  }
+  query pattern callExpr where callee.method == "AzureSqlConnectionManager.#ctor"
+  emit source code.SecretValue at call.result
+}

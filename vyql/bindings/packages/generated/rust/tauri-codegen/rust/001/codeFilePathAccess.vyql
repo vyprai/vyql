@@ -1,9 +1,0 @@
-module bindings.rust.generated.me6084cbb;
-
-binding filePathAccess1 {
-  requires {
-    dependency("tauri-codegen")
-  }
-  query pattern callExpr where callee.method == "open"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.ma3856659;
-
-binding expressionEval0 {
-  requires {
-    dependency("org.apache.tomcat:tomcat-jasper-el")
-  }
-  query pattern callExpr where callee.method == "createValueExpression"
-  emit sink code.ExpressionEval at args[0]
-}

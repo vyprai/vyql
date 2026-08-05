@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m26768a6c;
-
-binding filePathAccess0 {
-  requires {
-    dependency("libspatialite")
-  }
-  query pattern callExpr where callee.method == "dump_shapefile"
-  emit sink code.FilePathAccess at args[0]
-}

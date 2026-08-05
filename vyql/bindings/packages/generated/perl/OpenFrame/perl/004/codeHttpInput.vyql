@@ -1,9 +1,0 @@
-module bindings.perl.generated.mce95b754;
-
-binding httpInput4 {
-  requires {
-    dependency("OpenFrame")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit source code.HttpInput at call.result
-}

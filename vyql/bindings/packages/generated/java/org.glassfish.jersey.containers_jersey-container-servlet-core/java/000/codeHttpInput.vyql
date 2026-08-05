@@ -1,9 +1,0 @@
-module bindings.java.generated.mbcfbfb01;
-
-binding httpInput0 {
-  requires {
-    dependency("org.glassfish.jersey.containers:jersey-container-servlet-core")
-  }
-  query pattern callExpr where callee.method == "service"
-  emit source code.HttpInput at call.result
-}

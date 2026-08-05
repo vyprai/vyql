@@ -1,9 +1,0 @@
-module bindings.c.generated.md1de69a0;
-
-binding expressionEval3 {
-  requires {
-    dependency("muparser")
-  }
-  query pattern callExpr where callee.method == "mupEvalBulk"
-  emit sink code.ExpressionEval at args[0]
-}

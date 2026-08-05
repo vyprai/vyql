@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m0508ac04;
-
-binding networkData1 {
-  requires {
-    dependency("org.apache.activemq:activemq-all")
-  }
-  query pattern callExpr where callee.method == "receiveBodyNoWait"
-  emit source code.NetworkData at call.result
-}

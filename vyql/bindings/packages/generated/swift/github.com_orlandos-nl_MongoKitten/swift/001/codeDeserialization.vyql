@@ -1,9 +1,0 @@
-module bindings.swift.generated.m64cf68f9;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/orlandos-nl/MongoKitten")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

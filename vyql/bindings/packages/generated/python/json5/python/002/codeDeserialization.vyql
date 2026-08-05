@@ -1,9 +1,0 @@
-module bindings.python.generated.m430b8655;
-
-binding deserialization2 {
-  requires {
-    dependency("json5")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

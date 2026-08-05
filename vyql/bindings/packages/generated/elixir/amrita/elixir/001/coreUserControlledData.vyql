@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma1046b3f;
-
-binding userControlledData1 {
-  requires {
-    dependency("amrita")
-  }
-  query pattern callExpr where callee.method == "Mix.Tasks.Amrita.run"
-  emit source core.UserControlledData at call.result
-}

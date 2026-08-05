@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m62861130;
-
-binding deserialization1 {
-  requires {
-    dependency("net.logstash.logback:logstash-logback-encoder")
-  }
-  query pattern callExpr where callee.method == "readFully"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,0 +1,41 @@
+module bindings.dart.generated.mbd732551;
+
+binding filePathAccess0 {
+  requires {
+    dependency("barback")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("barback")
+  }
+  query pattern callExpr where callee.method == "readAsString"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("barback")
+  }
+  query pattern callExpr where callee.method == "openRead"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("barback")
+  }
+  query pattern callExpr where callee.method == "deserializeId"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("barback")
+  }
+  query pattern callExpr where callee.method == "deserializeStream"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,37 @@
+module bindings.rust.generated.maacb195e;
+
+binding deserialization0 {
+  requires {
+    dependency("schannel")
+  }
+  query pattern callExpr where callee.method == "import_pkcs12"
+  emit sink code.Deserialization at args[0]
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("schannel")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding networkData2 {
+  requires {
+    dependency("schannel")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend3 {
+  requires {
+    dependency("schannel")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

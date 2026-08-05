@@ -1,9 +1,0 @@
-module bindings.objc.generated.m26887366;
-
-binding urlFetch6 {
-  requires {
-    dependency("IDMPhotoBrowser")
-  }
-  query pattern callExpr where callee.method == "initWithPhotoURLs"
-  emit sink code.UrlFetch at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m2661708c;
-
-binding networkSend8 {
-  requires {
-    dependency("cocoyaxi")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

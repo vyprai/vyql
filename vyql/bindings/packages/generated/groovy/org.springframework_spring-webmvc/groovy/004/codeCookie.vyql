@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m9b5f4120;
-
-binding cookie4 {
-  requires {
-    dependency("org.springframework:spring-webmvc")
-  }
-  query pattern callExpr where callee.method == "cookies"
-  emit source code.Cookie at call.result
-}

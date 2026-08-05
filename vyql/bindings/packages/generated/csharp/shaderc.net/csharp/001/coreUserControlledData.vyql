@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m5af6e3b4;
-
-binding userControlledData1 {
-  requires {
-    dependency("shaderc.net")
-  }
-  query pattern callExpr where callee.method == "TryParseVersionProfile"
-  emit source core.UserControlledData at call.result
-}

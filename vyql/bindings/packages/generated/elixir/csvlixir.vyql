@@ -1,0 +1,30 @@
+module bindings.elixir.generated.me1a04725;
+
+binding filePathAccess0 {
+  requires {
+    dependency("csvlixir")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("csvlixir")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("csvlixir")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

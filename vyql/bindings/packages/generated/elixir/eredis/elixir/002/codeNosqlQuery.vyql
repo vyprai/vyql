@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma0551b2d;
-
-binding nosqlQuery2 {
-  requires {
-    dependency("eredis")
-  }
-  query pattern callExpr where callee.method == "do_pipeline"
-  emit sink code.NosqlQuery at args[0]
-}

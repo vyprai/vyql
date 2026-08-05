@@ -1,0 +1,33 @@
+module bindings.kotlin.generated.md89f3358;
+
+binding xmlParse0 {
+  requires {
+    dependency("commons-digester:commons-digester")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("commons-digester:commons-digester")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding xmlParse2 {
+  requires {
+    dependency("commons-digester:commons-digester")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.XmlParse at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("commons-digester:commons-digester")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

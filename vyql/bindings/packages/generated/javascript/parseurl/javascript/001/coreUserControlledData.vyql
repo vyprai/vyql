@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m29372ecf;
-
-binding userControlledData1 {
-  requires {
-    dependency("parseurl")
-  }
-  query pattern callExpr where callee.method == "originalurl"
-  emit source core.UserControlledData at call.result
-}

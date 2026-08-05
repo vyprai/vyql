@@ -1,9 +1,0 @@
-module bindings.dart.generated.m6331c3af;
-
-binding storedDataRead7 {
-  requires {
-    dependency("hive")
-  }
-  query pattern callExpr where callee.method == "LazyBoxImpl.get"
-  emit source code.StoredDataRead at call.result
-}

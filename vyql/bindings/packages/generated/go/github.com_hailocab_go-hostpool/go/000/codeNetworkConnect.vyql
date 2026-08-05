@@ -1,9 +1,0 @@
-module bindings.go.generated.m3f54ace6;
-
-binding networkConnect0 {
-  requires {
-    dependency("github.com/hailocab/go-hostpool")
-  }
-  query pattern callExpr where callee.method == "New"
-  emit sink code.NetworkConnectSink at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.m0d138574;
-
-binding networkConnect7 {
-  requires {
-    dependency("com.twilio.sdk:twilio")
-  }
-  query pattern callExpr where callee.method == "AccountDeleter.delete"
-  emit sink code.NetworkConnectSink at args[0]
-}

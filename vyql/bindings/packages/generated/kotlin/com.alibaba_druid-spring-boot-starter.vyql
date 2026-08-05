@@ -1,0 +1,81 @@
+module bindings.kotlin.generated.m94ad0752;
+
+binding secretValue0 {
+  requires {
+    dependency("com.alibaba:druid-spring-boot-starter")
+  }
+  query pattern callExpr where callee.method == "getLoginPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("com.alibaba:druid-spring-boot-starter")
+  }
+  query pattern callExpr where callee.method == "setLoginPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("com.alibaba:druid-spring-boot-starter")
+  }
+  query pattern callExpr where callee.method == "getLoginUsername"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("com.alibaba:druid-spring-boot-starter")
+  }
+  query pattern callExpr where callee.method == "setLoginUsername"
+  emit source code.SecretValue at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("com.alibaba:druid-spring-boot-starter")
+  }
+  query pattern callExpr where callee.method == "getUrlPattern"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("com.alibaba:druid-spring-boot-starter")
+  }
+  query pattern callExpr where callee.method == "setUrlPattern"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("com.alibaba:druid-spring-boot-starter")
+  }
+  query pattern callExpr where callee.method == "getAllow"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("com.alibaba:druid-spring-boot-starter")
+  }
+  query pattern callExpr where callee.method == "setAllow"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData8 {
+  requires {
+    dependency("com.alibaba:druid-spring-boot-starter")
+  }
+  query pattern callExpr where callee.method == "getDeny"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData9 {
+  requires {
+    dependency("com.alibaba:druid-spring-boot-starter")
+  }
+  query pattern callExpr where callee.method == "setDeny"
+  emit source core.UserControlledData at call.result
+}

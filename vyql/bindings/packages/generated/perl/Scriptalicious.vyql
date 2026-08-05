@@ -1,0 +1,17 @@
+module bindings.perl.generated.md853f997;
+
+binding commandExecution0 {
+  requires {
+    dependency("Scriptalicious")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("Scriptalicious")
+  }
+  query pattern callExpr where callee.method == "run_err"
+  emit sink code.CommandExecution at args[0]
+}

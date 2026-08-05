@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m03268d36;
-
-binding httpInput2 {
-  requires {
-    dependency("crow")
-  }
-  query pattern callExpr where callee.method == "handle_upgrade"
-  emit source code.HttpInput at call.result
-}

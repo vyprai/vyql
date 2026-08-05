@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mda51fdd0;
-
-binding responseHeaderWrite1 {
-  requires {
-    dependency("unicorn")
-  }
-  query pattern callExpr where callee.path ~= "e103_response_write"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

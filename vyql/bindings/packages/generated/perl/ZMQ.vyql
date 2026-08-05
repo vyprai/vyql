@@ -1,0 +1,25 @@
+module bindings.perl.generated.me1aa2d6f;
+
+binding networkData0 {
+  requires {
+    dependency("ZMQ")
+  }
+  query pattern callExpr where callee.method == "term"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("ZMQ")
+  }
+  query pattern callExpr where callee.method == "send_multipart"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("ZMQ")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,49 @@
+module bindings.c.generated.m9c1cd67a;
+
+binding deserialization0 {
+  requires {
+    dependency("symengine")
+  }
+  query pattern callExpr where callee.method == "parse_0"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("symengine")
+  }
+  query pattern callExpr where callee.method == "parse_double"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("symengine")
+  }
+  query pattern callExpr where callee.method == "parse_many_doubles"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("symengine")
+  }
+  query pattern callExpr where callee.method == "parse_many_doubles_implicit_mul"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("symengine")
+  }
+  query pattern callExpr where callee.method == "parse_long_expr1"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("symengine")
+  }
+  query pattern callExpr where callee.method == "parse_long_expr2"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.mfecd0fc9;
-
-binding deserialization0 {
-  requires {
-    dependency("YYText")
-  }
-  query pattern callExpr where callee.method == "parseText"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,0 +1,17 @@
+module bindings.go.generated.m73f3f35e;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/vishvananda/netlink")
+  }
+  query pattern callExpr where callee.method == "ParseAddr"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/vishvananda/netlink")
+  }
+  query pattern callExpr where callee.method == "ParseIPNet"
+  emit sink code.Deserialization at args[0]
+}

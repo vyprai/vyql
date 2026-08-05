@@ -1,9 +1,0 @@
-module bindings.python.generated.m9de70683;
-
-binding networkConnect1 {
-  requires {
-    dependency("flower")
-  }
-  query pattern callExpr where callee.method == "Flower.start"
-  emit sink code.NetworkConnectSink at args[0]
-}

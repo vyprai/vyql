@@ -1,0 +1,17 @@
+module bindings.scala.generated.m45bda900;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.velocity:velocity-engine-core")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding htmlRender1 {
+  requires {
+    dependency("org.apache.velocity:velocity-engine-core")
+  }
+  query pattern callExpr where callee.method == "merge"
+  emit sink code.HtmlRender at args[0]
+}

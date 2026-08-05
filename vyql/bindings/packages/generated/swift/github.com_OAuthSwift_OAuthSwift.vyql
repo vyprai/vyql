@@ -1,0 +1,17 @@
+module bindings.swift.generated.m53ee6ce7;
+
+binding secretValue0 {
+  requires {
+    dependency("github.com/OAuthSwift/OAuthSwift")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit source code.SecretValue at call.result
+}
+
+binding weakHash1 {
+  requires {
+    dependency("github.com/OAuthSwift/OAuthSwift")
+  }
+  query pattern callExpr where callee.method == "updateRequest"
+  emit issue code.WeakHash at call
+}

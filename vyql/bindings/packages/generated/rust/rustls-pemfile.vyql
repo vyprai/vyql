@@ -1,0 +1,65 @@
+module bindings.rust.generated.m9dbb5270;
+
+binding deserialization0 {
+  requires {
+    dependency("rustls-pemfile")
+  }
+  query pattern callExpr where callee.method == "certs"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("rustls-pemfile")
+  }
+  query pattern callExpr where callee.method == "private_key"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("rustls-pemfile")
+  }
+  query pattern callExpr where callee.method == "csr"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("rustls-pemfile")
+  }
+  query pattern callExpr where callee.method == "crls"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("rustls-pemfile")
+  }
+  query pattern callExpr where callee.method == "rsa_private_keys"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("rustls-pemfile")
+  }
+  query pattern callExpr where callee.method == "pkcs8_private_keys"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("rustls-pemfile")
+  }
+  query pattern callExpr where callee.method == "ec_private_keys"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("rustls-pemfile")
+  }
+  query pattern callExpr where callee.method == "public_keys"
+  emit sink code.Deserialization at args[0]
+}

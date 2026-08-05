@@ -1,9 +1,0 @@
-module bindings.go.generated.mef2883f0;
-
-binding sqlExecution2 {
-  requires {
-    dependency("github.com/erikstmartin/go-testdb")
-  }
-  query pattern callExpr where callee.method == "StubQuery"
-  emit sink code.SqlExecution at args[0]
-}

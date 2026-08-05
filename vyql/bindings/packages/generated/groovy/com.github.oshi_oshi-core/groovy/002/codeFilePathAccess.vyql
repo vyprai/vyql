@@ -1,9 +1,0 @@
-module bindings.groovy.generated.maabdcd95;
-
-binding filePathAccess2 {
-  requires {
-    dependency("com.github.oshi:oshi-core")
-  }
-  query pattern callExpr where callee.method == "readAllBytesAsBuffer"
-  emit sink code.FilePathAccess at args[0]
-}

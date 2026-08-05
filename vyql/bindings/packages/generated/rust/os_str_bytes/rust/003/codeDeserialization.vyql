@@ -1,9 +1,0 @@
-module bindings.rust.generated.m54612438;
-
-binding deserialization3 {
-  requires {
-    dependency("os_str_bytes")
-  }
-  query pattern callExpr where callee.method == "cow_from_raw_bytes"
-  emit sink code.Deserialization at args[0]
-}

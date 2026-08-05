@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m516adbe5;
-
-binding deserialization1 {
-  requires {
-    dependency("fugit")
-  }
-  query pattern callExpr where callee.method == "do_parse"
-  emit sink code.Deserialization at args[0]
-}

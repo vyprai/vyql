@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mee0e4fc9;
-
-binding deserialization4 {
-  requires {
-    dependency("matroska")
-  }
-  query pattern callExpr where callee.method == "ReadData"
-  emit sink code.Deserialization at args[0]
-}

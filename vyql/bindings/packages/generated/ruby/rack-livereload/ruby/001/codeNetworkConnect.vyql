@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m6665dbcb;
-
-binding networkConnect1 {
-  requires {
-    dependency("rack-livereload")
-  }
-  query pattern callExpr where callee.method == "Connector"
-  emit sink code.NetworkConnectSink at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m001f1d31;
-
-binding filePathAccess4 {
-  requires {
-    dependency("knplabs/gaufrette")
-  }
-  query pattern callExpr where callee.method == "listKeys"
-  emit sink code.FilePathAccess at args[0]
-}

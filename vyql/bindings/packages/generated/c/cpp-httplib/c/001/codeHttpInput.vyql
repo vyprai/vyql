@@ -1,9 +1,0 @@
-module bindings.c.generated.m6e12301c;
-
-binding httpInput1 {
-  requires {
-    dependency("cpp-httplib")
-  }
-  query pattern callExpr where callee.method == "Server.listen"
-  emit source code.HttpInput at call.result
-}

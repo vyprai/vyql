@@ -1,9 +1,0 @@
-module bindings.cpp.generated.ma6dea878;
-
-binding userControlledData0 {
-  requires {
-    dependency("opentelemetry-cpp")
-  }
-  query pattern callExpr where callee.method == "UrlDecode"
-  emit source core.UserControlledData at call.result
-}

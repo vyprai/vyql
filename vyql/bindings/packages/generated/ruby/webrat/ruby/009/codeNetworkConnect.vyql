@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m0d1769df;
-
-binding networkConnect9 {
-  requires {
-    dependency("webrat")
-  }
-  query pattern callExpr where callee.method == "post"
-  emit sink code.NetworkConnectSink at args[0]
-}

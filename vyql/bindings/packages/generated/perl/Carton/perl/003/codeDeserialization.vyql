@@ -1,9 +1,0 @@
-module bindings.perl.generated.m27a90614;
-
-binding deserialization3 {
-  requires {
-    dependency("Carton")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

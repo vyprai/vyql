@@ -1,9 +1,0 @@
-module bindings.php.generated.m387f0eec;
-
-binding filePathAccess1 {
-  requires {
-    dependency("illuminate/support")
-  }
-  query pattern callExpr where callee.method == "Env::writeVariable"
-  emit sink code.FilePathAccess at args[0]
-}

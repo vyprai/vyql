@@ -1,9 +1,0 @@
-module bindings.swift.generated.m61394e88;
-
-binding userControlledData3 {
-  requires {
-    dependency("github.com/MarcoDotIO/OpenAIKit")
-  }
-  query pattern callExpr where callee.method == "decodeBase64Image"
-  emit source core.UserControlledData at call.result
-}

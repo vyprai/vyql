@@ -1,9 +1,0 @@
-module bindings.python.generated.mdb720e11;
-
-binding sqlExecution0 {
-  requires {
-    dependency("motor")
-  }
-  query pattern callExpr where callee.method == "find"
-  emit sink code.SqlExecution at args[0]
-}

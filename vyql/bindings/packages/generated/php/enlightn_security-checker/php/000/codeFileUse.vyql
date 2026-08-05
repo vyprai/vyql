@@ -1,9 +1,0 @@
-module bindings.php.generated.me4f39690;
-
-binding fileUse0 {
-  requires {
-    dependency("enlightn/security-checker")
-  }
-  query pattern callExpr where callee.method == "storeAdvisoriesArchive"
-  emit sink code.FileUseSink at args[0]
-}

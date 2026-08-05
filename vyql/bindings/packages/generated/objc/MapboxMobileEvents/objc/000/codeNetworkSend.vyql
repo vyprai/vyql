@@ -1,9 +1,0 @@
-module bindings.objc.generated.m89a104be;
-
-binding networkSend0 {
-  requires {
-    dependency("MapboxMobileEvents")
-  }
-  query pattern callExpr where callee.method == "postMetadata:filePaths:completionHandler:"
-  emit sink code.NetworkSend at args[0]
-}

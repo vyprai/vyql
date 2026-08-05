@@ -1,0 +1,61 @@
+module bindings.kotlin.generated.ma17503b3;
+
+binding storedDataRead0 {
+  requires {
+    dependency("com.firebaseui:firebase-ui-auth")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.StoredDataRead at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("com.firebaseui:firebase-ui-auth")
+  }
+  query pattern callExpr where callee.method == "setScopes"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("com.firebaseui:firebase-ui-auth")
+  }
+  query pattern callExpr where callee.method == "setCustomParameters"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("com.firebaseui:firebase-ui-auth")
+  }
+  query pattern callExpr where callee.method == "setCredentialManagerEnabled"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("com.firebaseui:firebase-ui-auth")
+  }
+  query pattern callExpr where callee.method == "setLockOrientation"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("com.firebaseui:firebase-ui-auth")
+  }
+  query pattern callExpr where callee.method == "setResetPasswordSettings"
+  emit source core.UserControlledData at call.result
+}
+
+binding authenticationCheck6 {
+  requires {
+    dependency("com.firebaseui:firebase-ui-auth")
+  }
+  query pattern callExpr where callee.method == "AuthUI.Builder.build"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

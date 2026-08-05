@@ -1,9 +1,0 @@
-module bindings.php.generated.mb928c19c;
-
-binding xmlParse5 {
-  requires {
-    dependency("topthink/framework")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.XmlParse at args[0]
-}

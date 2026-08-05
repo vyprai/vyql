@@ -1,9 +1,0 @@
-module bindings.java.generated.m44a525fb;
-
-binding urlFetch3 {
-  requires {
-    dependency("org.springframework.integration:spring-integration-http")
-  }
-  query pattern callExpr where callee.method == "outboundChannelAdapter"
-  emit sink code.UrlFetch at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.mf16b9b9d;
-
-binding deserialization1 {
-  requires {
-    dependency("org.springframework.security:spring-security-web")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

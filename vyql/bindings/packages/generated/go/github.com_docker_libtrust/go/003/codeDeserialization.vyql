@@ -1,9 +1,0 @@
-module bindings.go.generated.m802ba669;
-
-binding deserialization3 {
-  requires {
-    dependency("github.com/docker/libtrust")
-  }
-  query pattern callExpr where callee.method == "UnmarshalPublicKeyJWK"
-  emit sink code.Deserialization at args[0]
-}

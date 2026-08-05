@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m0319cc00;
-
-binding networkBind5 {
-  requires {
-    dependency("socket")
-  }
-  query pattern callExpr where callee.method == "listen!"
-  emit sink code.NetworkBind at args[0]
-}

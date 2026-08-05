@@ -1,9 +1,0 @@
-module bindings.swift.generated.m5375fbcd;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/groue/GRDB.swift")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.FilePathAccess at args[0]
-}

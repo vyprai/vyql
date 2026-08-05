@@ -1,0 +1,57 @@
+module bindings.kotlin.generated.me099a3fc;
+
+binding deserialization0 {
+  requires {
+    dependency("jdom:jdom")
+  }
+  query pattern callExpr where callee.method == "build(org.w3c.dom.Document)"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("jdom:jdom")
+  }
+  query pattern callExpr where callee.method == "build(org.xml.sax.InputSource)"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("jdom:jdom")
+  }
+  query pattern callExpr where callee.method == "build(java.io.InputStream)"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("jdom:jdom")
+  }
+  query pattern callExpr where callee.method == "build(java.io.File)"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("jdom:jdom")
+  }
+  query pattern callExpr where callee.method == "build(java.net.URL)"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("jdom:jdom")
+  }
+  query pattern callExpr where callee.method == "build(java.io.Reader)"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("jdom:jdom")
+  }
+  query pattern callExpr where callee.method == "build(java.lang.String)"
+  emit sink code.Deserialization at args[0]
+}

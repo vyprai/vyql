@@ -1,9 +1,0 @@
-module bindings.scala.generated.m17ef70a0;
-
-binding userControlledData1 {
-  requires {
-    dependency("org.apache.tomcat.embed:tomcat-embed-core")
-  }
-  query pattern callExpr where callee.method == "getSubmittedFileName"
-  emit source core.UserControlledData at call.result
-}

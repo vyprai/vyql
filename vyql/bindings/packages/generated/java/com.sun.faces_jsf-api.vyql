@@ -1,0 +1,54 @@
+module bindings.java.generated.m314d4390;
+
+binding inputValidation0 {
+  requires {
+    dependency("com.sun.faces:jsf-api")
+  }
+  query pattern callExpr where callee.method == "javax.faces.component.MethodBindingValidator.validate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding httpInput1 {
+  requires {
+    dependency("com.sun.faces:jsf-api")
+  }
+  query pattern callExpr where callee.method == "javax.faces.application.Resource.getRequestPath"
+  emit source code.HttpInput at call.result
+}
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("com.sun.faces:jsf-api")
+  }
+  query pattern callExpr where callee.method == "javax.faces.application.Resource.getResponseHeaders"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding codeEval3 {
+  requires {
+    dependency("com.sun.faces:jsf-api")
+  }
+  query pattern callExpr where callee.method == "javax.faces.component.UIComponent.setValueExpression"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval4 {
+  requires {
+    dependency("com.sun.faces:jsf-api")
+  }
+  query pattern callExpr where callee.method == "javax.faces.component.UICommand.setAction"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval5 {
+  requires {
+    dependency("com.sun.faces:jsf-api")
+  }
+  query pattern callExpr where callee.method == "javax.faces.component.UICommand.setActionListener"
+  emit sink code.CodeEval at args[0]
+}

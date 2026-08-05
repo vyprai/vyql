@@ -1,9 +1,0 @@
-module bindings.scala.generated.mb454fd56;
-
-binding userControlledData2 {
-  requires {
-    dependency("org.apache.tomcat.embed:tomcat-embed-websocket")
-  }
-  query pattern callExpr where callee.method == "getQueryString"
-  emit source core.UserControlledData at call.result
-}

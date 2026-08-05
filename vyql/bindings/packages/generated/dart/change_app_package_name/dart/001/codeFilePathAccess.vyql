@@ -1,9 +1,0 @@
-module bindings.dart.generated.mf2c48db6;
-
-binding filePathAccess1 {
-  requires {
-    dependency("change_app_package_name")
-  }
-  query pattern callExpr where callee.method == "replaceInFile"
-  emit sink code.FilePathAccess at args[0]
-}

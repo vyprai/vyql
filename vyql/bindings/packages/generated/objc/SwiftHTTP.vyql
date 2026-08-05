@@ -1,0 +1,70 @@
+module bindings.objc.generated.m61035d9b;
+
+binding networkSend0 {
+  requires {
+    dependency("SwiftHTTP")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("SwiftHTTP")
+  }
+  query pattern callExpr where callee.method == "Download"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("SwiftHTTP")
+  }
+  query pattern callExpr where callee.method == "New"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("SwiftHTTP")
+  }
+  query pattern callExpr where callee.method == "appendParametersAsQueryString"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("SwiftHTTP")
+  }
+  query pattern callExpr where callee.method == "appendParametersAsUrlEncoding"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("SwiftHTTP")
+  }
+  query pattern callExpr where callee.method == "appendParametersAsMultiPartFormData"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("SwiftHTTP")
+  }
+  query pattern callExpr where callee.method == "appendParametersAsJSON"
+  emit source core.UserControlledData at call.result
+}
+
+binding certificateValidation7 {
+  requires {
+    dependency("SwiftHTTP")
+  }
+  query pattern callExpr where callee.method == "isValid"
+  emit check core.CertificateValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

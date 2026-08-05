@@ -1,9 +1,0 @@
-module bindings.groovy.generated.me6e37004;
-
-binding deserialization0 {
-  requires {
-    dependency("com.ibm.icu:icu4j")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

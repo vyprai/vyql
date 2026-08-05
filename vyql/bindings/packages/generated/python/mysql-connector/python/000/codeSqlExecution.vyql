@@ -1,9 +1,0 @@
-module bindings.python.generated.me0dce8aa;
-
-binding sqlExecution0 {
-  requires {
-    dependency("mysql-connector")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.SqlExecution at args[0]
-}

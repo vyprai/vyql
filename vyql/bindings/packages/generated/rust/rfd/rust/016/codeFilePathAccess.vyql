@@ -1,9 +1,0 @@
-module bindings.rust.generated.mb7a130a2;
-
-binding filePathAccess16 {
-  requires {
-    dependency("rfd")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mc02e5a58;
-
-binding userControlledData1 {
-  requires {
-    dependency("slugger")
-  }
-  query pattern callExpr where callee.method == "slugify"
-  emit source core.UserControlledData at call.result
-}

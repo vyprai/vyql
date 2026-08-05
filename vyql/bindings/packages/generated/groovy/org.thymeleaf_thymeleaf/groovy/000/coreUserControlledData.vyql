@@ -1,9 +1,0 @@
-module bindings.groovy.generated.md13c02bf;
-
-binding userControlledData0 {
-  requires {
-    dependency("org.thymeleaf:thymeleaf")
-  }
-  query pattern callExpr where callee.method == "getQueryString"
-  emit source core.UserControlledData at call.result
-}

@@ -1,0 +1,62 @@
+module bindings.php.generated.mb928c19c;
+
+binding sqlExecution0 {
+  requires {
+    dependency("topthink/framework")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlParameterization1 {
+  requires {
+    dependency("topthink/framework")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding secretValue2 {
+  requires {
+    dependency("topthink/framework")
+  }
+  query pattern callExpr where callee.method == "token"
+  emit source code.SecretValue at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("topthink/framework")
+  }
+  query pattern callExpr where callee.method == "cookie"
+  emit source code.HttpInput at call.result
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("topthink/framework")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding xmlParse5 {
+  requires {
+    dependency("topthink/framework")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding weakHash6 {
+  requires {
+    dependency("topthink/framework")
+  }
+  query pattern presenceNode where node.path ~= "topthink.framework.hash"
+  emit issue code.WeakHash at node
+}

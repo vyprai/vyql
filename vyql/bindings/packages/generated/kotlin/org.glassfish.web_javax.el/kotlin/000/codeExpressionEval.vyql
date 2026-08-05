@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.md198fb05;
-
-binding expressionEval0 {
-  requires {
-    dependency("org.glassfish.web:javax.el")
-  }
-  query pattern callExpr where callee.method == "invoke"
-  emit sink code.ExpressionEval at args[0]
-}

@@ -1,0 +1,33 @@
+module bindings.csharp.generated.m59d4f4d9;
+
+binding deserialization0 {
+  requires {
+    dependency("fable.parsimmon")
+  }
+  query pattern callExpr where callee.method == "Parsimmon"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("fable.parsimmon")
+  }
+  query pattern callExpr where callee.method == "createLanguage"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("fable.parsimmon")
+  }
+  query pattern callExpr where callee.method == "parseBufferFor"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("fable.parsimmon")
+  }
+  query pattern callExpr where callee.method == "parseBuffer"
+  emit sink code.Deserialization at args[0]
+}

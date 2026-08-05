@@ -1,9 +1,0 @@
-module bindings.go.generated.m8fd37668;
-
-binding nosqlQuery2 {
-  requires {
-    dependency("cloud.google.com/go/datastore")
-  }
-  query pattern callExpr where callee.method == "NewQuery"
-  emit sink code.NosqlQuery at args[0]
-}

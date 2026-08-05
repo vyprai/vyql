@@ -1,9 +1,0 @@
-module bindings.go.generated.m61f6f98f;
-
-binding filePathAccess1 {
-  requires {
-    dependency("github.com/mattn/go-zglob")
-  }
-  query pattern callExpr where callee.method == "GlobFollowSymlinks"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,0 +1,51 @@
+module bindings.perl.generated.m92833b84;
+
+binding inputValidation0 {
+  requires {
+    dependency("Starch")
+  }
+  query pattern callExpr where callee.method == "cookie_secure"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation1 {
+  requires {
+    dependency("Starch")
+  }
+  query pattern callExpr where callee.method == "cookie_http_only"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding cookie2 {
+  requires {
+    dependency("Starch")
+  }
+  query pattern callExpr where callee.method == "cookie_args"
+  emit source code.Cookie at call.result
+}
+
+binding cookie3 {
+  requires {
+    dependency("Starch")
+  }
+  query pattern callExpr where callee.method == "cookie_set_args"
+  emit source code.Cookie at call.result
+}
+
+binding cookie4 {
+  requires {
+    dependency("Starch")
+  }
+  query pattern callExpr where callee.method == "cookie_delete_args"
+  emit source code.Cookie at call.result
+}

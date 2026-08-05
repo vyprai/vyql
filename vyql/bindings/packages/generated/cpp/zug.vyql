@@ -1,0 +1,41 @@
+module bindings.cpp.generated.m9db0069f;
+
+binding networkData0 {
+  requires {
+    dependency("zug")
+  }
+  query pattern callExpr where callee.method == "read_"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("zug")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData2 {
+  requires {
+    dependency("zug")
+  }
+  query pattern callExpr where callee.method == "readbuf"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("zug")
+  }
+  query pattern callExpr where callee.method == "write_inputs"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData4 {
+  requires {
+    dependency("zug")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit source code.NetworkData at call.result
+}

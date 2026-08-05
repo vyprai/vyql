@@ -1,9 +1,0 @@
-module bindings.javascript.generated.me42c4159;
-
-binding responseHeaderWrite4 {
-  requires {
-    dependency("cookie")
-  }
-  query pattern callExpr where callee.method == "serialize"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

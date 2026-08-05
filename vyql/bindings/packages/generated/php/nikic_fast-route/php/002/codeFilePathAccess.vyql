@@ -1,9 +1,0 @@
-module bindings.php.generated.mcbe74e61;
-
-binding filePathAccess2 {
-  requires {
-    dependency("nikic/fast-route")
-  }
-  query pattern callExpr where callee.method == "writeToFile"
-  emit sink code.FilePathAccess at args[0]
-}

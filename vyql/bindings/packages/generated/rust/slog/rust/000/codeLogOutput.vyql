@@ -1,9 +1,0 @@
-module bindings.rust.generated.m21a9cbf5;
-
-binding logOutput0 {
-  requires {
-    dependency("slog")
-  }
-  query pattern callExpr where callee.method == "log"
-  emit sink code.LogOutput at args[0]
-}

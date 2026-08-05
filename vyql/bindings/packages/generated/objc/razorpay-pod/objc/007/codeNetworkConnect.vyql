@@ -1,9 +1,0 @@
-module bindings.objc.generated.m42f45fae;
-
-binding networkConnect7 {
-  requires {
-    dependency("razorpay-pod")
-  }
-  query pattern callExpr where callee.method == "startTransaction"
-  emit sink code.NetworkConnectSink at args[0]
-}

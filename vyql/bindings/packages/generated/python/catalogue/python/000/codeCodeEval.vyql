@@ -1,9 +1,0 @@
-module bindings.python.generated.mf26f2d09;
-
-binding codeEval0 {
-  requires {
-    dependency("catalogue")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.CodeEval at args[0]
-}

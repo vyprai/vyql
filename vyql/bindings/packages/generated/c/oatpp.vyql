@@ -1,0 +1,41 @@
+module bindings.c.generated.mcf656555;
+
+binding deserialization0 {
+  requires {
+    dependency("oatpp")
+  }
+  query pattern callExpr where callee.method == "parseScheme"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("oatpp")
+  }
+  query pattern callExpr where callee.method == "parseAuthority"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("oatpp")
+  }
+  query pattern callExpr where callee.method == "parsePath"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("oatpp")
+  }
+  query pattern callExpr where callee.method == "parseQueryParams"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("oatpp")
+  }
+  query pattern callExpr where callee.method == "parseUrl"
+  emit sink code.Deserialization at args[0]
+}

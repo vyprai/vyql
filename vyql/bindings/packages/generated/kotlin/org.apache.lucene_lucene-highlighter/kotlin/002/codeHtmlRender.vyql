@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.ma1ee5524;
-
-binding htmlRender2 {
-  requires {
-    dependency("org.apache.lucene:lucene-highlighter")
-  }
-  query pattern callExpr where callee.method == "highlightTerm"
-  emit sink code.HtmlRender at args[0]
-}

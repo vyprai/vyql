@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m90b9fe8b;
-
-binding storedDataRead0 {
-  requires {
-    dependency("aws-sdk-s3")
-  }
-  query pattern callExpr where callee.method == "get_object"
-  emit source code.StoredDataRead at call.result
-}

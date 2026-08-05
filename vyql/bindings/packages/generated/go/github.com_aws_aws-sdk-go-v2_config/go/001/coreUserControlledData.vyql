@@ -1,9 +1,0 @@
-module bindings.go.generated.maa96c7f6;
-
-binding userControlledData1 {
-  requires {
-    dependency("github.com/aws/aws-sdk-go-v2/config")
-  }
-  query pattern callExpr where callee.method == "getSharedConfigProfile"
-  emit source core.UserControlledData at call.result
-}

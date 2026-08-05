@@ -1,9 +1,0 @@
-module bindings.swift.generated.ma2581bad;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/keefertaylor/Base58Swift")
-  }
-  query pattern callExpr where callee.method == "base58Decode"
-  emit sink code.Deserialization at args[0]
-}

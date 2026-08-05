@@ -1,9 +1,0 @@
-module bindings.go.generated.m785e0061;
-
-binding networkData1 {
-  requires {
-    dependency("github.com/gliderlabs/ssh")
-  }
-  query pattern callExpr where callee.method == "ListenAndServe"
-  emit source code.NetworkData at call.result
-}

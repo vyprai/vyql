@@ -1,9 +1,0 @@
-module bindings.rust.generated.md509b086;
-
-binding deserialization0 {
-  requires {
-    dependency("digest")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mea10675c;
-
-binding networkSend4 {
-  requires {
-    dependency("ueberauth_github")
-  }
-  query pattern callExpr where callee.method == "get_token!"
-  emit sink code.NetworkSend at args[0]
-}

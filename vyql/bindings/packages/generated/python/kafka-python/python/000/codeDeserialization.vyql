@@ -1,9 +1,0 @@
-module bindings.python.generated.m38fd08c7;
-
-binding deserialization0 {
-  requires {
-    dependency("kafka-python")
-  }
-  query pattern callExpr where callee.method == "gzip_decode"
-  emit sink code.Deserialization at args[0]
-}

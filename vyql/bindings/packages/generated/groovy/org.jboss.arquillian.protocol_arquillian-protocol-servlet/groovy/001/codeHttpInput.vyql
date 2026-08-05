@@ -1,9 +1,0 @@
-module bindings.groovy.generated.ma1c40bb3;
-
-binding httpInput1 {
-  requires {
-    dependency("org.jboss.arquillian.protocol:arquillian-protocol-servlet")
-  }
-  query pattern callExpr where callee.method == "doGet"
-  emit source code.HttpInput at call.result
-}

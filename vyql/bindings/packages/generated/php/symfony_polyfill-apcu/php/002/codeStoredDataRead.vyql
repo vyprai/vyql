@@ -1,9 +1,0 @@
-module bindings.php.generated.mc187badd;
-
-binding storedDataRead2 {
-  requires {
-    dependency("symfony/polyfill-apcu")
-  }
-  query pattern callExpr where callee.method == "apcu_fetch"
-  emit source code.StoredDataRead at call.result
-}

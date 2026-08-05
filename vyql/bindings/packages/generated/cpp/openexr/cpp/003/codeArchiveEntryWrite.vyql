@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m437ce122;
-
-binding archiveEntryWrite3 {
-  requires {
-    dependency("openexr")
-  }
-  query pattern callExpr where callee.method == "writeValueTo"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

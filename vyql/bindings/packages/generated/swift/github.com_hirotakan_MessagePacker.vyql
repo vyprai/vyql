@@ -1,0 +1,17 @@
+module bindings.swift.generated.m92105e6b;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/hirotakan/MessagePacker")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/hirotakan/MessagePacker")
+  }
+  query pattern callExpr where callee.method == "encode"
+  emit source core.UserControlledData at call.result
+}

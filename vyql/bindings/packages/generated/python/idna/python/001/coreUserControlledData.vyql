@@ -1,9 +1,0 @@
-module bindings.python.generated.m9e834c3e;
-
-binding userControlledData1 {
-  requires {
-    dependency("idna")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit source core.UserControlledData at call.result
-}

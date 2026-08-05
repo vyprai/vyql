@@ -1,9 +1,0 @@
-module bindings.perl.generated.m214f1c8e;
-
-binding filePathAccess9 {
-  requires {
-    dependency("Webinject")
-  }
-  query pattern callExpr where callee.method == "unlink"
-  emit sink code.FilePathAccess at args[0]
-}

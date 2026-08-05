@@ -1,9 +1,0 @@
-module bindings.rust.generated.m886322e0;
-
-binding filePathAccess0 {
-  requires {
-    dependency("git2")
-  }
-  query pattern callExpr where callee.method == "open"
-  emit sink code.FilePathAccess at args[0]
-}

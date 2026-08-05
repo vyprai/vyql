@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m05072649;
-
-binding deserialization1 {
-  requires {
-    dependency("org.springframework.hateoas:spring-hateoas")
-  }
-  query pattern callExpr where callee.method == "parseLinks"
-  emit sink code.Deserialization at args[0]
-}

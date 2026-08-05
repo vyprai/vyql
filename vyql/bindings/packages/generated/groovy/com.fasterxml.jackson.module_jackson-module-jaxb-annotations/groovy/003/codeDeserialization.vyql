@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mdef73e86;
-
-binding deserialization3 {
-  requires {
-    dependency("com.fasterxml.jackson.module:jackson-module-jaxb-annotations")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

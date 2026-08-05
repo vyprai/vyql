@@ -1,9 +1,0 @@
-module bindings.groovy.generated.ma146939c;
-
-binding deserialization0 {
-  requires {
-    dependency("com.fasterxml.jackson.dataformat:jackson-dataformat-cbor")
-  }
-  query pattern callExpr where callee.method == "nextToken"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.rust.generated.m24fe5b9d;
-
-binding userControlledData1 {
-  requires {
-    dependency("generator")
-  }
-  query pattern callExpr where callee.method == "raw_send"
-  emit source core.UserControlledData at call.result
-}

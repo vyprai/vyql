@@ -1,9 +1,0 @@
-module bindings.dart.generated.m94504740;
-
-binding filePathAccess1 {
-  requires {
-    dependency("path_provider_android")
-  }
-  query pattern callExpr where callee.method == "getExternalStoragePublicDirectory"
-  emit sink code.FilePathAccess at args[0]
-}

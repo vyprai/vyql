@@ -1,0 +1,17 @@
+module bindings.objc.generated.m21c070e8;
+
+binding deserialization0 {
+  requires {
+    dependency("SKPhotoBrowser")
+  }
+  query pattern callExpr where callee.method == "animatedImageWithAnimatedGIFData:"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("SKPhotoBrowser")
+  }
+  query pattern callExpr where callee.method == "animatedImageWithAnimatedGIFURL:"
+  emit sink code.Deserialization at args[0]
+}

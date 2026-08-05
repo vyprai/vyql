@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mb5c8f190;
-
-binding codeEval2 {
-  requires {
-    dependency("better_errors")
-  }
-  query pattern callExpr where callee.method == "eval_local_variable"
-  emit sink code.CodeEval at args[0]
-}

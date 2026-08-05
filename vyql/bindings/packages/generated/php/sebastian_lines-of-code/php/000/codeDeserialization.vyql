@@ -1,9 +1,0 @@
-module bindings.php.generated.m690ade04;
-
-binding deserialization0 {
-  requires {
-    dependency("sebastian/lines-of-code")
-  }
-  query pattern callExpr where callee.method == "countInSourceFile"
-  emit sink code.Deserialization at args[0]
-}

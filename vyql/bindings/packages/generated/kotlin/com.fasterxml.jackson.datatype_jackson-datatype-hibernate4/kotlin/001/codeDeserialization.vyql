@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m99488f23;
-
-binding deserialization1 {
-  requires {
-    dependency("com.fasterxml.jackson.datatype:jackson-datatype-hibernate4")
-  }
-  query pattern callExpr where callee.method == "setupModule"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mf0826d08;
-
-binding cliArgument0 {
-  requires {
-    dependency("io.dropwizard:dropwizard-core")
-  }
-  query pattern callExpr where callee.method == "Cli.parseArgs"
-  emit source code.CliArgument at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m09cac5cb;
-
-binding deserialization1 {
-  requires {
-    dependency("marshmallow")
-  }
-  query pattern callExpr where callee.method == "loads"
-  emit sink code.Deserialization at args[0]
-}

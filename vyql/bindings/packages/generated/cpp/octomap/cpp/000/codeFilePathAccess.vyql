@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m5124a248;
-
-binding filePathAccess0 {
-  requires {
-    dependency("octomap")
-  }
-  query pattern callExpr where callee.method == "writeMap"
-  emit sink code.FilePathAccess at args[0]
-}

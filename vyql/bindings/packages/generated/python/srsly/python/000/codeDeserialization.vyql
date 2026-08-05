@@ -1,9 +1,0 @@
-module bindings.python.generated.maf509f95;
-
-binding deserialization0 {
-  requires {
-    dependency("srsly")
-  }
-  query pattern callExpr where callee.method == "json_loads"
-  emit sink code.Deserialization at args[0]
-}

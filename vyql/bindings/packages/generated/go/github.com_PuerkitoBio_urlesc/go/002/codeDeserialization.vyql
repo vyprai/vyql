@@ -1,9 +1,0 @@
-module bindings.go.generated.m6fb97f09;
-
-binding deserialization2 {
-  requires {
-    dependency("github.com/PuerkitoBio/urlesc")
-  }
-  query pattern callExpr where callee.method == "unescapeUserinfo"
-  emit sink code.Deserialization at args[0]
-}

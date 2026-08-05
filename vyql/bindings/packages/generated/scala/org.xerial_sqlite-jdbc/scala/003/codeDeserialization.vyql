@@ -1,9 +1,0 @@
-module bindings.scala.generated.mc8dc7a4e;
-
-binding deserialization3 {
-  requires {
-    dependency("org.xerial:sqlite-jdbc")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

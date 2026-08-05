@@ -1,9 +1,0 @@
-module bindings.ruby.generated.ma4385b30;
-
-binding filePathAccess2 {
-  requires {
-    dependency("bootsnap")
-  }
-  query pattern callExpr where callee.method == "precompile_yaml"
-  emit sink code.FilePathAccess at args[0]
-}

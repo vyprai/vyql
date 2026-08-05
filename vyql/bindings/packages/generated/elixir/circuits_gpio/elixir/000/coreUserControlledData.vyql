@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m59dae0ab;
-
-binding userControlledData0 {
-  requires {
-    dependency("circuits_gpio")
-  }
-  query pattern callExpr where callee.method == "read_gpio"
-  emit source core.UserControlledData at call.result
-}

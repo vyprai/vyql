@@ -1,9 +1,0 @@
-module bindings.perl.generated.mccbdae7a;
-
-binding userControlledData1 {
-  requires {
-    dependency("Gftracks")
-  }
-  query pattern callExpr where callee.method == "shell"
-  emit source core.UserControlledData at call.result
-}

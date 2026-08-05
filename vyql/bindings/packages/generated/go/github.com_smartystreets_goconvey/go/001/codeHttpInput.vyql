@@ -1,9 +1,0 @@
-module bindings.go.generated.m898cef88;
-
-binding httpInput1 {
-  requires {
-    dependency("github.com/smartystreets/goconvey")
-  }
-  query pattern callExpr where callee.method == "serveHTTP"
-  emit source code.HttpInput at call.result
-}

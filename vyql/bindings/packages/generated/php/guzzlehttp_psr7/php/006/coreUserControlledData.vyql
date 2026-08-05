@@ -1,9 +1,0 @@
-module bindings.php.generated.m710fd6f4;
-
-binding userControlledData6 {
-  requires {
-    dependency("guzzlehttp/psr7")
-  }
-  query pattern callExpr where callee.method == "getQuery"
-  emit source core.UserControlledData at call.result
-}

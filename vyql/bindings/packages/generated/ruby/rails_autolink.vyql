@@ -1,0 +1,51 @@
+module bindings.ruby.generated.m7b3b1e13;
+
+binding htmlRender0 {
+  requires {
+    dependency("rails_autolink")
+  }
+  query pattern callExpr where callee.method == "auto_link"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender1 {
+  requires {
+    dependency("rails_autolink")
+  }
+  query pattern callExpr where callee.method == "auto_link_urls"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("rails_autolink")
+  }
+  query pattern callExpr where callee.method == "auto_link_email_addresses"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlEscape3 {
+  requires {
+    dependency("rails_autolink")
+  }
+  query pattern callExpr where callee.method == "conditional_sanitize"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape4 {
+  requires {
+    dependency("rails_autolink")
+  }
+  query pattern callExpr where callee.method == "conditional_html_safe"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

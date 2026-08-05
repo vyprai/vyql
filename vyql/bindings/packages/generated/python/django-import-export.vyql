@@ -1,0 +1,33 @@
+module bindings.python.generated.md92dbb22;
+
+binding deserialization0 {
+  requires {
+    dependency("django-import-export")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("django-import-export")
+  }
+  query pattern callExpr where callee.method == "process_import"
+  emit sink code.Deserialization at args[0]
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("django-import-export")
+  }
+  query pattern callExpr where callee.method == "get_export_data"
+  emit source core.UserControlledData at call.result
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("django-import-export")
+  }
+  query pattern callExpr where callee.method == "write_to_tmp_storage"
+  emit sink code.FilePathAccess at args[0]
+}

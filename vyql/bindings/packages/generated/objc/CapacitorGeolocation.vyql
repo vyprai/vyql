@@ -1,0 +1,29 @@
+module bindings.objc.generated.m49aab0f0;
+
+binding networkData0 {
+  requires {
+    dependency("CapacitorGeolocation")
+  }
+  query pattern callExpr where callee.method == "getCurrentPosition"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("CapacitorGeolocation")
+  }
+  query pattern callExpr where callee.method == "watchPosition"
+  emit source code.NetworkData at call.result
+}
+
+binding authorizationCheck2 {
+  requires {
+    dependency("CapacitorGeolocation")
+  }
+  query pattern callExpr where callee.method == "requestPermissions"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

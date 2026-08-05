@@ -1,9 +1,0 @@
-module bindings.swift.generated.m6911f1ff;
-
-binding userControlledData0 {
-  requires {
-    dependency("github.com/omochi/RichJSONParser")
-  }
-  query pattern callExpr where callee.method == "init"
-  emit source core.UserControlledData at call.result
-}

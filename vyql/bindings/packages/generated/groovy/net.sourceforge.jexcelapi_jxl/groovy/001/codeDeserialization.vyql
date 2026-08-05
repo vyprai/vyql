@@ -1,9 +1,0 @@
-module bindings.groovy.generated.ma018a3fd;
-
-binding deserialization1 {
-  requires {
-    dependency("net.sourceforge.jexcelapi:jxl")
-  }
-  query pattern callExpr where callee.method == "DVParser"
-  emit sink code.Deserialization at args[0]
-}

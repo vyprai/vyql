@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mf19351e5;
-
-binding sqlExecution1 {
-  requires {
-    dependency("com.baomidou:mybatis-plus-generator")
-  }
-  query pattern callExpr where callee.method == "tablesSql"
-  emit sink code.SqlExecution at args[0]
-}

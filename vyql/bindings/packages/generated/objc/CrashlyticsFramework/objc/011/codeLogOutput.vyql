@@ -1,9 +1,0 @@
-module bindings.objc.generated.m1ca6539f;
-
-binding logOutput11 {
-  requires {
-    dependency("CrashlyticsFramework")
-  }
-  query pattern callExpr where callee.method == "CLSNSLogv"
-  emit sink code.LogOutput at args[0]
-}

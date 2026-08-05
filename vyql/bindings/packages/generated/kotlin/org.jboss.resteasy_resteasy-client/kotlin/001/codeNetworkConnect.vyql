@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.ma95f9599;
-
-binding networkConnect1 {
-  requires {
-    dependency("org.jboss.resteasy:resteasy-client")
-  }
-  query pattern callExpr where callee.method == "invoke"
-  emit sink code.NetworkConnectSink at args[0]
-}

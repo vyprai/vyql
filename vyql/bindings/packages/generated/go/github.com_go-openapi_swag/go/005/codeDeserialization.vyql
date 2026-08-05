@@ -1,9 +1,0 @@
-module bindings.go.generated.m9d786d35;
-
-binding deserialization5 {
-  requires {
-    dependency("github.com/go-openapi/swag")
-  }
-  query pattern callExpr where callee.method == "YAMLData"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.md237ae6d;
-
-binding cookie5 {
-  requires {
-    dependency("javax.ws.rs:jsr311-api")
-  }
-  query pattern callExpr where callee.method == "getName"
-  emit source code.Cookie at call.result
-}

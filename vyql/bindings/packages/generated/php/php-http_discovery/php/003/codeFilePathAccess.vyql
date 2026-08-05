@@ -1,9 +1,0 @@
-module bindings.php.generated.m9d6302fc;
-
-binding filePathAccess3 {
-  requires {
-    dependency("php-http/discovery")
-  }
-  query pattern callExpr where callee.method == "Psr17Factory.createStreamFromFile"
-  emit sink code.FilePathAccess at args[0]
-}

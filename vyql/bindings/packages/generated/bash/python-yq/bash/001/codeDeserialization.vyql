@@ -1,9 +1,0 @@
-module bindings.bash.generated.ma6c04443;
-
-binding deserialization1 {
-  requires {
-    dependency("python-yq")
-  }
-  query pattern callExpr where callee.path ~= "python-yq"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m20758425;
-
-binding cliArgument0 {
-  requires {
-    dependency("jakub-onderka/php-var-dump-check")
-  }
-  query pattern callExpr where callee.method == "JakubOnderkaPhpVarDumpCheckSettings::parseArguments"
-  emit source code.CliArgument at call.result
-}

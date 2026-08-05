@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mbd77e0a1;
-
-binding filePathAccess3 {
-  requires {
-    dependency("org.apache.curator:curator-client")
-  }
-  query pattern callExpr where callee.method == "ZKPaths.mkdirs(ZooKeeper,String)"
-  emit sink code.FilePathAccess at args[0]
-}

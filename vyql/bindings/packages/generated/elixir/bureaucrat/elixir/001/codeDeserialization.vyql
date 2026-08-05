@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m99226009;
-
-binding deserialization1 {
-  requires {
-    dependency("bureaucrat")
-  }
-  query pattern callExpr where callee.method == "Bureaucrat.JSON.decode!"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.mb9e07678;
-
-binding deserialization0 {
-  requires {
-    dependency("tablib")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m4ddb520c;
-
-binding deserialization1 {
-  requires {
-    dependency("Pandoc")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

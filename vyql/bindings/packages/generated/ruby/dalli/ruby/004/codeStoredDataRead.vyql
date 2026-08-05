@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mbe96c352;
-
-binding storedDataRead4 {
-  requires {
-    dependency("dalli")
-  }
-  query pattern callExpr where callee.method == "get_multi_hash"
-  emit source code.StoredDataRead at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m5f5fcb35;
-
-binding filePathAccess0 {
-  requires {
-    dependency("url_mount")
-  }
-  query pattern callExpr where callee.method == "initialize"
-  emit sink code.FilePathAccess at args[0]
-}

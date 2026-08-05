@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m2bcf48ce;
-
-binding filePathAccess0 {
-  requires {
-    dependency("jest-resolve")
-  }
-  query pattern callExpr where callee.method == "baseResolver"
-  emit sink code.FilePathAccess at args[0]
-}

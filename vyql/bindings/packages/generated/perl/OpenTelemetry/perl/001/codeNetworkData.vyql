@@ -1,9 +1,0 @@
-module bindings.perl.generated.m165bcce2;
-
-binding networkData1 {
-  requires {
-    dependency("OpenTelemetry")
-  }
-  query pattern callExpr where callee.method == "inject"
-  emit source code.NetworkData at call.result
-}

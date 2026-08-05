@@ -1,9 +1,0 @@
-module bindings.python.generated.mb27372cf;
-
-binding deserialization0 {
-  requires {
-    dependency("nbformat")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.c.generated.mb1dc6f5d;
-
-binding deserialization1 {
-  requires {
-    dependency("toml11")
-  }
-  query pattern callExpr where callee.method == "parse_str"
-  emit sink code.Deserialization at args[0]
-}

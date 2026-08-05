@@ -1,9 +1,0 @@
-module bindings.objc.generated.m68bf71d8;
-
-binding filePathAccess7 {
-  requires {
-    dependency("SPTPersistentCache")
-  }
-  query pattern callExpr where callee.method == "stat:statStruct:"
-  emit sink code.FilePathAccess at args[0]
-}

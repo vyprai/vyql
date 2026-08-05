@@ -1,9 +1,0 @@
-module bindings.php.generated.meb96413c;
-
-binding sqlExecution3 {
-  requires {
-    dependency("dama/doctrine-test-bundle")
-  }
-  query pattern callExpr where callee.method == "rollBack"
-  emit sink code.SqlExecution at args[0]
-}

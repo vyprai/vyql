@@ -1,9 +1,0 @@
-module bindings.swift.generated.mcb2efc93;
-
-binding filePathAccess7 {
-  requires {
-    dependency("github.com/onevcat/Kingfisher")
-  }
-  query pattern callExpr where callee.method == "cachePath"
-  emit sink code.FilePathAccess at args[0]
-}

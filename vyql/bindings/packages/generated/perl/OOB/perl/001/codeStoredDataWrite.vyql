@@ -1,9 +1,0 @@
-module bindings.perl.generated.m9bf8f4a7;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("OOB")
-  }
-  query pattern callExpr where callee.method == "OOB_set"
-  emit sink code.StoredDataWrite at args[0]
-}

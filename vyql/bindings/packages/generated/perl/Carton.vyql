@@ -1,0 +1,41 @@
+module bindings.perl.generated.m27a90614;
+
+binding commandExecution0 {
+  requires {
+    dependency("Carton")
+  }
+  query pattern callExpr where callee.method == "cmd_run"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("Carton")
+  }
+  query pattern callExpr where callee.method == "cmd_exec"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("Carton")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("Carton")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("Carton")
+  }
+  query pattern callExpr where callee.method == "load_json"
+  emit sink code.Deserialization at args[0]
+}

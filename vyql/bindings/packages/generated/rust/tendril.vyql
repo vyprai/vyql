@@ -1,0 +1,130 @@
+module bindings.rust.generated.mdf8e1b02;
+
+binding inputValidation0 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation1 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "validate_prefix"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "validate_suffix"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "validate_subseq"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation4 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "revalidate_subset"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding deserialization5 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "process"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "new_from_encoding_rs_decoder"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "utf8"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization8 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "decode_to_sink"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization9 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "check_decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization10 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "decode_utf8_encoding_rs"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization11 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "decode_koi8_u_encoding_rs"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization12 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "decode_windows_949_encoding_rs"
+  emit sink code.Deserialization at args[0]
+}

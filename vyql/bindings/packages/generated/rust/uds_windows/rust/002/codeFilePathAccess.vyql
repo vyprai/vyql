@@ -1,9 +1,0 @@
-module bindings.rust.generated.m71105256;
-
-binding filePathAccess2 {
-  requires {
-    dependency("uds_windows")
-  }
-  query pattern callExpr where callee.method == "sockaddr_un"
-  emit sink code.FilePathAccess at args[0]
-}

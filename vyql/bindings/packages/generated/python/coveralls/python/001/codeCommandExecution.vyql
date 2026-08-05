@@ -1,9 +1,0 @@
-module bindings.python.generated.m3f03d843;
-
-binding commandExecution1 {
-  requires {
-    dependency("coveralls")
-  }
-  query pattern callExpr where callee.method == "run_command"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.md8b53b09;
-
-binding networkSend2 {
-  requires {
-    dependency("httpipe")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit sink code.NetworkSend at args[0]
-}

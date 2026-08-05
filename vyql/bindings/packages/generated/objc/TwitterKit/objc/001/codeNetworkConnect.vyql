@@ -1,9 +1,0 @@
-module bindings.objc.generated.mad0b6a3d;
-
-binding networkConnect1 {
-  requires {
-    dependency("TwitterKit")
-  }
-  query pattern callExpr where callee.method == "sendTwitterRequest:completion:"
-  emit sink code.NetworkConnectSink at args[0]
-}

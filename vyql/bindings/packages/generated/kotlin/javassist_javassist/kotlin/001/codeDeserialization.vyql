@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m947596de;
-
-binding deserialization1 {
-  requires {
-    dependency("javassist:javassist")
-  }
-  query pattern callExpr where callee.method == "loadClassByDelegation"
-  emit sink code.Deserialization at args[0]
-}

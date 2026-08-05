@@ -1,0 +1,33 @@
+module bindings.java.generated.mfbaeb030;
+
+binding secretValue0 {
+  requires {
+    dependency("org.springframework.boot:spring-boot-autoconfigure")
+  }
+  query pattern callExpr where callee.method == "getPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("org.springframework.boot:spring-boot-autoconfigure")
+  }
+  query pattern callExpr where callee.method == "determinePassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("org.springframework.boot:spring-boot-autoconfigure")
+  }
+  query pattern callExpr where callee.method == "getKeyStorePassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("org.springframework.boot:spring-boot-autoconfigure")
+  }
+  query pattern callExpr where callee.method == "getTrustStorePassword"
+  emit source code.SecretValue at call.result
+}

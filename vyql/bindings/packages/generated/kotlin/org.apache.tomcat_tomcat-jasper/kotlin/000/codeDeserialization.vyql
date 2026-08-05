@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m776a4a28;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.tomcat:tomcat-jasper")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

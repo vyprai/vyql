@@ -1,9 +1,0 @@
-module bindings.php.generated.m4c9e4bf5;
-
-binding networkSend6 {
-  requires {
-    dependency("yiisoft/yii2-swiftmailer")
-  }
-  query pattern callExpr where callee.method == "sendMessage"
-  emit sink code.NetworkSend at args[0]
-}

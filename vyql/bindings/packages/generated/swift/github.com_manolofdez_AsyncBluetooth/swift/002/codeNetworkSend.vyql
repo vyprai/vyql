@@ -1,9 +1,0 @@
-module bindings.swift.generated.mcfba857c;
-
-binding networkSend2 {
-  requires {
-    dependency("github.com/manolofdez/AsyncBluetooth")
-  }
-  query pattern callExpr where callee.method == "writeValue"
-  emit sink code.NetworkSend at args[0]
-}

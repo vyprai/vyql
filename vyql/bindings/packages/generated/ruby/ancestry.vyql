@@ -1,0 +1,49 @@
+module bindings.ruby.generated.m373ebbc3;
+
+binding sqlExecution0 {
+  requires {
+    dependency("ancestry")
+  }
+  query pattern callExpr where callee.method == "unscoped_where"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("ancestry")
+  }
+  query pattern callExpr where callee.method == "scope_depth"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding codeEval2 {
+  requires {
+    dependency("ancestry")
+  }
+  query pattern callExpr where callee.method == "check_ancestry_integrity!"
+  emit sink code.CodeEval at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("ancestry")
+  }
+  query pattern callExpr where callee.method == "arrange"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution4 {
+  requires {
+    dependency("ancestry")
+  }
+  query pattern callExpr where callee.method == "arrange_nodes"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("ancestry")
+  }
+  query pattern callExpr where callee.method == "parse_ancestry_column"
+  emit sink code.Deserialization at args[0]
+}

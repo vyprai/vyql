@@ -1,9 +1,0 @@
-module bindings.dart.generated.me53cda8b;
-
-binding userControlledData1 {
-  requires {
-    dependency("firebase_analytics")
-  }
-  query pattern callExpr where callee.method == "setUserId"
-  emit source core.UserControlledData at call.result
-}

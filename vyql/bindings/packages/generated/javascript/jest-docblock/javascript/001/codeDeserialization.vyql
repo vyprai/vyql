@@ -1,9 +1,0 @@
-module bindings.javascript.generated.md643d983;
-
-binding deserialization1 {
-  requires {
-    dependency("jest-docblock")
-  }
-  query pattern callExpr where callee.method == "parseWithComments"
-  emit sink code.Deserialization at args[0]
-}

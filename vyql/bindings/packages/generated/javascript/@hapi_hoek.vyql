@@ -1,0 +1,22 @@
+module bindings.javascript.generated.m632c12eb;
+
+binding htmlEscape0 {
+  requires {
+    dependency("@hapi/hoek")
+  }
+  query pattern callExpr where callee.method == "escapeHtml"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("@hapi/hoek")
+  }
+  query pattern callExpr where callee.method == "escapeHeaderAttribute"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

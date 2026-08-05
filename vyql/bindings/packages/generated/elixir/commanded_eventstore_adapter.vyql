@@ -1,0 +1,57 @@
+module bindings.elixir.generated.m132a1317;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("commanded_eventstore_adapter")
+  }
+  query pattern callExpr where callee.method == "append_to_stream"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("commanded_eventstore_adapter")
+  }
+  query pattern callExpr where callee.method == "record_snapshot"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataRead2 {
+  requires {
+    dependency("commanded_eventstore_adapter")
+  }
+  query pattern callExpr where callee.method == "stream_forward"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataRead3 {
+  requires {
+    dependency("commanded_eventstore_adapter")
+  }
+  query pattern callExpr where callee.method == "subscribe_to"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataRead4 {
+  requires {
+    dependency("commanded_eventstore_adapter")
+  }
+  query pattern callExpr where callee.method == "read_snapshot"
+  emit source code.StoredDataRead at call.result
+}
+
+binding deserialization5 {
+  requires {
+    dependency("commanded_eventstore_adapter")
+  }
+  query pattern callExpr where callee.method == "to_event_data"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("commanded_eventstore_adapter")
+  }
+  query pattern callExpr where callee.method == "to_snapshot_data"
+  emit sink code.Deserialization at args[0]
+}

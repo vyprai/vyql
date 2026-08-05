@@ -1,9 +1,0 @@
-module bindings.ruby.generated.ma96f0f9a;
-
-binding nosqlQuery0 {
-  requires {
-    dependency("bson_ext")
-  }
-  query pattern callExpr where callee.method == "bson_buffer_get_max_size"
-  emit sink code.NosqlQuery at args[0]
-}

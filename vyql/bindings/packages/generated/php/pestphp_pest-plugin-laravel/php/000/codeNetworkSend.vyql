@@ -1,9 +1,0 @@
-module bindings.php.generated.m0f2ba173;
-
-binding networkSend0 {
-  requires {
-    dependency("pestphp/pest-plugin-laravel")
-  }
-  query pattern callExpr where callee.method == "withHeaders"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m4b4a65da;
-
-binding commandExecution0 {
-  requires {
-    dependency("org.apache.hadoop:hadoop-yarn-client")
-  }
-  query pattern callExpr where callee.method == "run"
-  emit sink code.CommandExecution at args[0]
-}

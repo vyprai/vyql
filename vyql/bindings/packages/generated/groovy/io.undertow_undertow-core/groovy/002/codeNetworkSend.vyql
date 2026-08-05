@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m7cd5c635;
-
-binding networkSend2 {
-  requires {
-    dependency("io.undertow:undertow-core")
-  }
-  query pattern callExpr where callee.method == "remoteEndpointFailedToSendInitialSettings"
-  emit sink code.NetworkSend at args[0]
-}

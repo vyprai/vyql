@@ -1,0 +1,65 @@
+module bindings.kotlin.generated.m2e1ff025;
+
+binding httpInput0 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit source code.HttpInput at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "filterFormParameters"
+  emit source core.UserControlledData at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "createRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "onHeader"
+  emit source code.HttpInput at call.result
+}
+
+binding htmlRender4 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding responseHeaderWrite5 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "writeStatusAndHeaders"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite6 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "writeHeaders"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite7 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "writeStatus"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.m0cb6a173;
-
-binding filePathAccess11 {
-  requires {
-    dependency("SAMCategories")
-  }
-  query pattern callExpr where callee.method == "sam_applicationSupportDirectoryURL"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mb50b2c7b;
-
-binding networkData1 {
-  requires {
-    dependency("connection")
-  }
-  query pattern callExpr where callee.method == "recv"
-  emit source code.NetworkData at call.result
-}

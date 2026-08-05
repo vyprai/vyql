@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m5f396801;
-
-binding networkSend5 {
-  requires {
-    dependency("scenic_driver_nerves_rpi")
-  }
-  query pattern callExpr where callee.method == "send_font_miss"
-  emit sink code.NetworkSend at args[0]
-}

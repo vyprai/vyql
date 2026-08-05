@@ -1,0 +1,25 @@
+module bindings.rust.generated.m1e6d61dd;
+
+binding dynamicCodeLoad0 {
+  requires {
+    dependency("proc-macro2")
+  }
+  query pattern callExpr where callee.method == "compile_probe_unstable"
+  emit sink code.DynamicCodeLoad at args[0]
+}
+
+binding secretValue1 {
+  requires {
+    dependency("proc-macro2")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit source code.SecretValue at call.result
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("proc-macro2")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

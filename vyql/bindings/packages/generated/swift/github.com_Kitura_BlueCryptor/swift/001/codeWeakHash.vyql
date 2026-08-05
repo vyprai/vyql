@@ -1,9 +1,0 @@
-module bindings.swift.generated.mc9a64198;
-
-binding weakHash1 {
-  requires {
-    dependency("github.com/Kitura/BlueCryptor")
-  }
-  query pattern callExpr where callee.method == "digest"
-  emit issue code.WeakHash at call
-}

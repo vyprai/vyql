@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m9d11b122;
-
-binding cliArgument0 {
-  requires {
-    dependency("byebug")
-  }
-  query pattern callExpr where callee.method == "match"
-  emit source code.CliArgument at call.result
-}

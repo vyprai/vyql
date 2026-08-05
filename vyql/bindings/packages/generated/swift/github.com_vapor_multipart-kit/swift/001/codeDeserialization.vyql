@@ -1,9 +1,0 @@
-module bindings.swift.generated.md66c2ee4;
-
-binding deserialization1 {
-  requires {
-    dependency("github.com/vapor/multipart-kit")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

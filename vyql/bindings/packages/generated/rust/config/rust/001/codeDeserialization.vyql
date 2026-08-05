@@ -1,9 +1,0 @@
-module bindings.rust.generated.m9c201208;
-
-binding deserialization1 {
-  requires {
-    dependency("config")
-  }
-  query pattern callExpr where callee.method == "deserialize_enum"
-  emit sink code.Deserialization at args[0]
-}

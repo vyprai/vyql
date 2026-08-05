@@ -1,9 +1,0 @@
-module bindings.php.generated.me7b7042d;
-
-binding fileUse0 {
-  requires {
-    dependency("laravel/jetstream")
-  }
-  query pattern callExpr where callee.method == "updateProfilePhoto"
-  emit sink code.FileUseSink at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mf08a8ff3;
-
-binding logOutput2 {
-  requires {
-    dependency("logster")
-  }
-  query pattern callExpr where callee.method == "Logster.Formatters.JSON.format"
-  emit sink code.LogOutput at args[0]
-}

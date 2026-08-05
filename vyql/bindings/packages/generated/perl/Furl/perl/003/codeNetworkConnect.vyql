@@ -1,9 +1,0 @@
-module bindings.perl.generated.m8a0a79e4;
-
-binding networkConnect3 {
-  requires {
-    dependency("Furl")
-  }
-  query pattern callExpr where callee.method == "connect_ssl_over_proxy"
-  emit sink code.NetworkConnectSink at args[0]
-}

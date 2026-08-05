@@ -1,0 +1,25 @@
+module bindings.elixir.generated.m4513d69d;
+
+binding httpInput0 {
+  requires {
+    dependency("cauldron")
+  }
+  query pattern callExpr where callee.method == "Cauldron.HTTP.run"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("cauldron")
+  }
+  query pattern callExpr where callee.method == "Cauldron.Request.read"
+  emit source code.HttpInput at call.result
+}
+
+binding networkSend2 {
+  requires {
+    dependency("cauldron")
+  }
+  query pattern callExpr where callee.method == "Cauldron.Response.send"
+  emit sink code.NetworkSend at args[0]
+}

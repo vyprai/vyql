@@ -1,9 +1,0 @@
-module bindings.python.generated.m40d3cdd1;
-
-binding filePathAccess5 {
-  requires {
-    dependency("imageio")
-  }
-  query pattern callExpr where callee.method == "volwrite"
-  emit sink code.FilePathAccess at args[0]
-}

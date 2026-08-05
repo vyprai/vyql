@@ -1,9 +1,0 @@
-module bindings.perl.generated.m9de57798;
-
-binding responseHeaderWrite0 {
-  requires {
-    dependency("Plack-Middleware-CrossOrigin")
-  }
-  query pattern callExpr where callee.method == "prepare_app"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m85a76522;
-
-binding networkData7 {
-  requires {
-    dependency("tds")
-  }
-  query pattern callExpr where callee.method == "recv"
-  emit source code.NetworkData at call.result
-}

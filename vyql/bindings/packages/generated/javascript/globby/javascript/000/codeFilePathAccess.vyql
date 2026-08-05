@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mb053e00e;
-
-binding filePathAccess0 {
-  requires {
-    dependency("globby")
-  }
-  query pattern callExpr where callee.method == "globby"
-  emit sink code.FilePathAccess at args[0]
-}

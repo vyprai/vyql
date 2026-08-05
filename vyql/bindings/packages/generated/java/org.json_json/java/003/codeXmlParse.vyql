@@ -1,9 +1,0 @@
-module bindings.java.generated.mc025dab7;
-
-binding xmlParse3 {
-  requires {
-    dependency("org.json:json")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.XmlParse at args[0]
-}

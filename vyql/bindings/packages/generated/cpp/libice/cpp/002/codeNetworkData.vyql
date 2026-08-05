@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m9b5ee6dd;
-
-binding networkData2 {
-  requires {
-    dependency("libice")
-  }
-  query pattern callExpr where callee.method == "IceAcceptConnection"
-  emit source code.NetworkData at call.result
-}

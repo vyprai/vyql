@@ -1,9 +1,0 @@
-module bindings.python.generated.m4aa0977e;
-
-binding fileUse5 {
-  requires {
-    dependency("pyarrow")
-  }
-  query pattern callExpr where callee.method == "delete_dir"
-  emit sink code.FileUseSink at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m09cebc4d;
-
-binding xmlParse2 {
-  requires {
-    dependency("nb/oxymel")
-  }
-  query pattern callExpr where callee.method == "cdata"
-  emit sink code.XmlParse at args[0]
-}

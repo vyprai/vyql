@@ -1,0 +1,81 @@
+module bindings.python.generated.m98a9c2da;
+
+binding networkSend0 {
+  requires {
+    dependency("kubernetes")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("kubernetes")
+  }
+  query pattern callExpr where callee.method == "GET"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("kubernetes")
+  }
+  query pattern callExpr where callee.method == "HEAD"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("kubernetes")
+  }
+  query pattern callExpr where callee.method == "OPTIONS"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("kubernetes")
+  }
+  query pattern callExpr where callee.method == "DELETE"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("kubernetes")
+  }
+  query pattern callExpr where callee.method == "POST"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend6 {
+  requires {
+    dependency("kubernetes")
+  }
+  query pattern callExpr where callee.method == "PUT"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend7 {
+  requires {
+    dependency("kubernetes")
+  }
+  query pattern callExpr where callee.method == "PATCH"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding commandExecution8 {
+  requires {
+    dependency("kubernetes")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding storedDataWrite9 {
+  requires {
+    dependency("kubernetes")
+  }
+  query pattern callExpr where callee.method == "replace"
+  emit sink code.StoredDataWrite at args[0]
+}

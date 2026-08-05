@@ -1,9 +1,0 @@
-module bindings.php.generated.maa180515;
-
-binding storedDataWrite0 {
-  requires {
-    dependency("google/cloud-storage")
-  }
-  query pattern callExpr where callee.method == "upload"
-  emit sink code.StoredDataWrite at args[0]
-}

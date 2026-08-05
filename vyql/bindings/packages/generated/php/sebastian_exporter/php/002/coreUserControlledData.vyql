@@ -1,9 +1,0 @@
-module bindings.php.generated.m5306ffb4;
-
-binding userControlledData2 {
-  requires {
-    dependency("sebastian/exporter")
-  }
-  query pattern callExpr where callee.method == "shortenedRecursiveExport"
-  emit source core.UserControlledData at call.result
-}

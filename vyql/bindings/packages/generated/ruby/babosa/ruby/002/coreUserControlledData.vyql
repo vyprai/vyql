@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mc2203c1e;
-
-binding userControlledData2 {
-  requires {
-    dependency("babosa")
-  }
-  query pattern callExpr where callee.method == "normalize!"
-  emit source core.UserControlledData at call.result
-}

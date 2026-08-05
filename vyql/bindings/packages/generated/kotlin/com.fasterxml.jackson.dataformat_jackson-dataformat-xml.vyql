@@ -1,0 +1,17 @@
+module bindings.kotlin.generated.m3133f086;
+
+binding deserialization0 {
+  requires {
+    dependency("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
+  }
+  query pattern callExpr where callee.method == "readValue"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
+  }
+  query pattern callExpr where callee.method == "createParser"
+  emit sink code.Deserialization at args[0]
+}

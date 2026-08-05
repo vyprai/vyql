@@ -1,0 +1,33 @@
+module bindings.perl.generated.m4f4583e7;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("Exobrain")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("Exobrain")
+  }
+  query pattern callExpr where callee.method == "tzset"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding urlFetch2 {
+  requires {
+    dependency("Exobrain")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("Exobrain")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.Deserialization at args[0]
+}

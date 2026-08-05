@@ -1,9 +1,0 @@
-module bindings.java.generated.md718625b;
-
-binding networkData2 {
-  requires {
-    dependency("org.apache.cxf:cxf-rt-transports-http-jetty")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source code.NetworkData at call.result
-}

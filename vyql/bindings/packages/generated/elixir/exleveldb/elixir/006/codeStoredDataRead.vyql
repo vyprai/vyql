@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m23562f2c;
-
-binding storedDataRead6 {
-  requires {
-    dependency("exleveldb")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit source code.StoredDataRead at call.result
-}

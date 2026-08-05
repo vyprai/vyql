@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m531e4588;
-
-binding filePathAccess0 {
-  requires {
-    dependency("sprockets-rails")
-  }
-  query pattern callExpr where callee.method == "Sprockets::Rails::AssetUrlProcessor.call"
-  emit sink code.FilePathAccess at args[0]
-}

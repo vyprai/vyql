@@ -1,9 +1,0 @@
-module bindings.dart.generated.m0449321d;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("cookie_jar")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.StoredDataWrite at args[0]
-}

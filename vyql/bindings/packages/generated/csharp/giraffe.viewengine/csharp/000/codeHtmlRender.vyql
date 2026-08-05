@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m5515bad8;
-
-binding htmlRender0 {
-  requires {
-    dependency("giraffe.viewengine")
-  }
-  query pattern callExpr where callee.method == "rawText"
-  emit sink code.HtmlRender at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m4c232184;
-
-binding networkSend1 {
-  requires {
-    dependency("ruby_gntp")
-  }
-  query pattern callExpr where callee.method == "send_and_recieve"
-  emit sink code.NetworkSend at args[0]
-}

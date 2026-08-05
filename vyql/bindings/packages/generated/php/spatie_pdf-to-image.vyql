@@ -1,0 +1,17 @@
+module bindings.php.generated.mb6d23c29;
+
+binding filePathAccess0 {
+  requires {
+    dependency("spatie/pdf-to-image")
+  }
+  query pattern callExpr where callee.method == "save"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("spatie/pdf-to-image")
+  }
+  query pattern callExpr where callee.method == "saveAllPages"
+  emit sink code.FilePathAccess at args[0]
+}

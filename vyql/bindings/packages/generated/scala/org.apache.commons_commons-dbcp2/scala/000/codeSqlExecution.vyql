@@ -1,9 +1,0 @@
-module bindings.scala.generated.m2dcf3a75;
-
-binding sqlExecution0 {
-  requires {
-    dependency("org.apache.commons:commons-dbcp2")
-  }
-  query pattern callExpr where callee.method == "setValidationQuery"
-  emit sink code.SqlExecution at args[0]
-}

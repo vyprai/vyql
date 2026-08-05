@@ -1,0 +1,17 @@
+module bindings.scala.generated.m102b49cd;
+
+binding deserialization0 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-gson")
+  }
+  query pattern callExpr where callee.method == "responseBodyConverter"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-gson")
+  }
+  query pattern callExpr where callee.method == "convert"
+  emit sink code.Deserialization at args[0]
+}

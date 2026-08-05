@@ -1,9 +1,0 @@
-module bindings.objc.generated.mfd249e23;
-
-binding networkSend5 {
-  requires {
-    dependency("NSLogger")
-  }
-  query pattern callExpr where callee.method == "LogMessageRawF"
-  emit sink code.NetworkSend at args[0]
-}

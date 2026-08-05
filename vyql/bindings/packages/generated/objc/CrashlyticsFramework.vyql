@@ -1,0 +1,97 @@
+module bindings.objc.generated.m1ca6539f;
+
+binding secretValue0 {
+  requires {
+    dependency("CrashlyticsFramework")
+  }
+  query pattern callExpr where callee.method == "startWithAPIKey"
+  emit source code.SecretValue at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("CrashlyticsFramework")
+  }
+  query pattern callExpr where callee.method == "setObjectValue"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("CrashlyticsFramework")
+  }
+  query pattern callExpr where callee.method == "setIntValue"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("CrashlyticsFramework")
+  }
+  query pattern callExpr where callee.method == "setBoolValue"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("CrashlyticsFramework")
+  }
+  query pattern callExpr where callee.method == "setFloatValue"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("CrashlyticsFramework")
+  }
+  query pattern callExpr where callee.method == "setUserIdentifier"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("CrashlyticsFramework")
+  }
+  query pattern callExpr where callee.method == "setUserName"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("CrashlyticsFramework")
+  }
+  query pattern callExpr where callee.method == "setUserEmail"
+  emit source core.UserControlledData at call.result
+}
+
+binding logOutput8 {
+  requires {
+    dependency("CrashlyticsFramework")
+  }
+  query pattern callExpr where callee.method == "CLSLog"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput9 {
+  requires {
+    dependency("CrashlyticsFramework")
+  }
+  query pattern callExpr where callee.method == "CLSLogv"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput10 {
+  requires {
+    dependency("CrashlyticsFramework")
+  }
+  query pattern callExpr where callee.method == "CLSNSLog"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput11 {
+  requires {
+    dependency("CrashlyticsFramework")
+  }
+  query pattern callExpr where callee.method == "CLSNSLogv"
+  emit sink code.LogOutput at args[0]
+}

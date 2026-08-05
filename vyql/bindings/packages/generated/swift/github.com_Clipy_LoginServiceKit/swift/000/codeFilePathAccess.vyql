@@ -1,9 +1,0 @@
-module bindings.swift.generated.m5c9608b6;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/Clipy/LoginServiceKit")
-  }
-  query pattern callExpr where callee.method == "addLoginItems"
-  emit sink code.FilePathAccess at args[0]
-}

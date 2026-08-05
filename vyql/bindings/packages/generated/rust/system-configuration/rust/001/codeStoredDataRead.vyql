@@ -1,9 +1,0 @@
-module bindings.rust.generated.mdb0b5b88;
-
-binding storedDataRead1 {
-  requires {
-    dependency("system-configuration")
-  }
-  query pattern callExpr where callee.method == "get_proxies"
-  emit source code.StoredDataRead at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.dart.generated.m883133c9;
-
-binding userControlledData2 {
-  requires {
-    dependency("smart_auth")
-  }
-  query pattern callExpr where callee.method == "getSmsWithUserConsentApi"
-  emit source core.UserControlledData at call.result
-}

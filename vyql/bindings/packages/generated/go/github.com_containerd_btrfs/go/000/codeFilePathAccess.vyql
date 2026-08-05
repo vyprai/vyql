@@ -1,9 +1,0 @@
-module bindings.go.generated.mce0b0ff2;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/containerd/btrfs")
-  }
-  query pattern callExpr where callee.method == "SubvolCreate"
-  emit sink code.FilePathAccess at args[0]
-}

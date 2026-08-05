@@ -1,0 +1,25 @@
+module bindings.scala.generated.mdd9d5759;
+
+binding httpInput0 {
+  requires {
+    dependency("com.google.inject.extensions:guice-servlet")
+  }
+  query pattern callExpr where callee.method == "getOriginalRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("com.google.inject.extensions:guice-servlet")
+  }
+  query pattern callExpr where callee.method == "getRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("com.google.inject.extensions:guice-servlet")
+  }
+  query pattern callExpr where callee.method == "getResponse"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.m7b506522;
-
-binding networkConnect3 {
-  requires {
-    dependency("github.com/zcash/ZcashLightClientKit")
-  }
-  query pattern callExpr where callee.method == "connectToLightwalletd"
-  emit sink code.NetworkConnectSink at args[0]
-}

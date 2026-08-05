@@ -1,9 +1,0 @@
-module bindings.scala.generated.me4c7e1c2;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("org.apache.hadoop:hadoop-yarn-common")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.StoredDataWrite at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m2c142896;
-
-binding filePathAccess0 {
-  requires {
-    dependency("milon/barcode")
-  }
-  query pattern callExpr where callee.method == "setStorPath"
-  emit sink code.FilePathAccess at args[0]
-}

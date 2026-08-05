@@ -1,0 +1,41 @@
+module bindings.python.generated.m90ea37e9;
+
+binding commandExecution0 {
+  requires {
+    dependency("pexpect")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("pexpect")
+  }
+  query pattern callExpr where callee.method == "runu"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution2 {
+  requires {
+    dependency("pexpect")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution3 {
+  requires {
+    dependency("pexpect")
+  }
+  query pattern callExpr where callee.method == "run_command"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("pexpect")
+  }
+  query pattern callExpr where callee.method == "split_command_line"
+  emit source core.UserControlledData at call.result
+}

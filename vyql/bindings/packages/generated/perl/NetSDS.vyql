@@ -1,0 +1,25 @@
+module bindings.perl.generated.m2249bc7a;
+
+binding sqlExecution0 {
+  requires {
+    dependency("NetSDS")
+  }
+  query pattern callExpr where callee.method == "fetch_call"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding httpInput1 {
+  requires {
+    dependency("NetSDS")
+  }
+  query pattern callExpr where callee.method == "url_param"
+  emit source code.HttpInput at call.result
+}
+
+binding cookie2 {
+  requires {
+    dependency("NetSDS")
+  }
+  query pattern callExpr where callee.method == "get_cookie"
+  emit source code.Cookie at call.result
+}

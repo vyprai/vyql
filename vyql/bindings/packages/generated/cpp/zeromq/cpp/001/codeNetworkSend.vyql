@@ -1,9 +1,0 @@
-module bindings.cpp.generated.ma6751493;
-
-binding networkSend1 {
-  requires {
-    dependency("zeromq")
-  }
-  query pattern callExpr where callee.method == "zmq_msg_send"
-  emit sink code.NetworkSend at args[0]
-}

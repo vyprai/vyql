@@ -1,9 +1,0 @@
-module bindings.rust.generated.maacb195e;
-
-binding networkData2 {
-  requires {
-    dependency("schannel")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source code.NetworkData at call.result
-}

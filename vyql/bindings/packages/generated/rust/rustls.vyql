@@ -1,0 +1,41 @@
+module bindings.rust.generated.m53e123db;
+
+binding networkData0 {
+  requires {
+    dependency("rustls")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("rustls")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("rustls")
+  }
+  query pattern callExpr where callee.method == "from"
+  emit sink code.Deserialization at args[0]
+}
+
+binding secretValue3 {
+  requires {
+    dependency("rustls")
+  }
+  query pattern callExpr where callee.method == "header_protection_key"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("rustls")
+  }
+  query pattern callExpr where callee.method == "keys"
+  emit source code.SecretValue at call.result
+}

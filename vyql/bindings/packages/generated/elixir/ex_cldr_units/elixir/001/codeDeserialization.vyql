@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mf29915c4;
-
-binding deserialization1 {
-  requires {
-    dependency("ex_cldr_units")
-  }
-  query pattern callExpr where callee.method == "Cldr.Unit.parse_unit_name"
-  emit sink code.Deserialization at args[0]
-}

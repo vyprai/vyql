@@ -1,9 +1,0 @@
-module bindings.c.generated.m3ee0926b;
-
-binding htmlRender1 {
-  requires {
-    dependency("qt5-webview")
-  }
-  query pattern callExpr where callee.method == "loadHtml"
-  emit sink code.HtmlRender at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.c.generated.mc9fceeff;
-
-binding deserialization0 {
-  requires {
-    dependency("jansson")
-  }
-  query pattern callExpr where callee.method == "json_loads"
-  emit sink code.Deserialization at args[0]
-}

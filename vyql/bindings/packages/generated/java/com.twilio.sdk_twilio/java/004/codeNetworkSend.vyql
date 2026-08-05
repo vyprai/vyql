@@ -1,9 +1,0 @@
-module bindings.java.generated.m0d138574;
-
-binding networkSend4 {
-  requires {
-    dependency("com.twilio.sdk:twilio")
-  }
-  query pattern callExpr where callee.method == "AccountReader.read"
-  emit sink code.NetworkSend at args[0]
-}

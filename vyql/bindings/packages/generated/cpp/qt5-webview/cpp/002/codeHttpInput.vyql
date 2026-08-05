@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m6f4e821b;
-
-binding httpInput2 {
-  requires {
-    dependency("qt5-webview")
-  }
-  query pattern callExpr where callee.method == "loadHtml"
-  emit source code.HttpInput at call.result
-}

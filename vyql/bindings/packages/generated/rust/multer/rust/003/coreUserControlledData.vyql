@@ -1,9 +1,0 @@
-module bindings.rust.generated.mdb8da629;
-
-binding userControlledData3 {
-  requires {
-    dependency("multer")
-  }
-  query pattern callExpr where callee.method == "text"
-  emit source core.UserControlledData at call.result
-}

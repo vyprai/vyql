@@ -1,9 +1,0 @@
-module bindings.dart.generated.m1887021b;
-
-binding deserialization1 {
-  requires {
-    dependency("csv")
-  }
-  query pattern callExpr where callee.method == "decodeWithHeaders"
-  emit sink code.Deserialization at args[0]
-}

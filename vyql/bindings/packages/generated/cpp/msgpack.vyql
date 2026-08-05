@@ -1,0 +1,25 @@
+module bindings.cpp.generated.mdd67d3d1;
+
+binding deserialization0 {
+  requires {
+    dependency("msgpack")
+  }
+  query pattern callExpr where callee.path ~= "msgpack/v2/parse.hpp::execute"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("msgpack")
+  }
+  query pattern callExpr where callee.path ~= "msgpack/v2/parse.hpp::parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("msgpack")
+  }
+  query pattern callExpr where callee.path ~= "msgpack/v3/parse.hpp::execute"
+  emit sink code.Deserialization at args[0]
+}

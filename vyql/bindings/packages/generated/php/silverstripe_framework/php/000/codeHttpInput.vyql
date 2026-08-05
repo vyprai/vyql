@@ -1,9 +1,0 @@
-module bindings.php.generated.m99099147;
-
-binding httpInput0 {
-  requires {
-    dependency("silverstripe/framework")
-  }
-  query pattern callExpr where callee.method == "SilverStripe\\Control\\HTTPRequest::getBody"
-  emit source code.HttpInput at call.result
-}

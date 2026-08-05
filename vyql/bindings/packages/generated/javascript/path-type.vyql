@@ -1,0 +1,17 @@
+module bindings.javascript.generated.mca5a416b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("path-type")
+  }
+  query pattern callExpr where callee.method == "isType"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("path-type")
+  }
+  query pattern callExpr where callee.method == "isTypeSync"
+  emit sink code.FilePathAccess at args[0]
+}

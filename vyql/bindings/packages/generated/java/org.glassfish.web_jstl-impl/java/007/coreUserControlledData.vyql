@@ -1,9 +1,0 @@
-module bindings.java.generated.mddb29b43;
-
-binding userControlledData7 {
-  requires {
-    dependency("org.glassfish.web:jstl-impl")
-  }
-  query pattern callExpr where callee.method == "setStartRow"
-  emit source core.UserControlledData at call.result
-}

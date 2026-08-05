@@ -1,9 +1,0 @@
-module bindings.php.generated.mde571bb4;
-
-binding networkConnect7 {
-  requires {
-    dependency("pusher/pusher-php-server")
-  }
-  query pattern callExpr where callee.method == "make_request"
-  emit sink code.NetworkConnectSink at args[0]
-}

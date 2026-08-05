@@ -1,9 +1,0 @@
-module bindings.scala.generated.mcd9ab0bc;
-
-binding userControlledData2 {
-  requires {
-    dependency("org.springframework.security:spring-security-jwt")
-  }
-  query pattern callExpr where callee.method == "decodeAndVerify"
-  emit source core.UserControlledData at call.result
-}

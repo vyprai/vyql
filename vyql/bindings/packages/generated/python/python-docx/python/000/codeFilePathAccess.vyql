@@ -1,9 +1,0 @@
-module bindings.python.generated.m2b2b7e1b;
-
-binding filePathAccess0 {
-  requires {
-    dependency("python-docx")
-  }
-  query pattern callExpr where callee.method == "docx.opc.package.OpcPackage.open"
-  emit sink code.FilePathAccess at args[0]
-}

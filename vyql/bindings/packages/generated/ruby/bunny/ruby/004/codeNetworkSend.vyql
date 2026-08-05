@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m0994f068;
-
-binding networkSend4 {
-  requires {
-    dependency("bunny")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkSend at args[0]
-}

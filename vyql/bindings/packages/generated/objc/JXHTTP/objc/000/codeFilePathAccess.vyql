@@ -1,9 +1,0 @@
-module bindings.objc.generated.m34da1740;
-
-binding filePathAccess0 {
-  requires {
-    dependency("JXHTTP")
-  }
-  query pattern callExpr where callee.method == "initWithFilePath"
-  emit sink code.FilePathAccess at args[0]
-}

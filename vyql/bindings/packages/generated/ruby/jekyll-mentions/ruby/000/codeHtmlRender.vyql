@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m636c76a5;
-
-binding htmlRender0 {
-  requires {
-    dependency("jekyll-mentions")
-  }
-  query pattern callExpr where callee.method == "mentionify"
-  emit sink code.HtmlRender at args[0]
-}

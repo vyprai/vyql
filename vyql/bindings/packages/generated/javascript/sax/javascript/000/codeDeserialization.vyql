@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m2d672d5d;
-
-binding deserialization0 {
-  requires {
-    dependency("sax")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.Deserialization at args[0]
-}

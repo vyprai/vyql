@@ -1,0 +1,25 @@
+module bindings.objc.generated.m2ad5443e;
+
+binding deserialization0 {
+  requires {
+    dependency("Polyline")
+  }
+  query pattern callExpr where callee.method == "decodePolyline"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("Polyline")
+  }
+  query pattern callExpr where callee.method == "decodeLevels"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("Polyline")
+  }
+  query pattern callExpr where callee.method == "decodeSingleCoordinate"
+  emit sink code.Deserialization at args[0]
+}

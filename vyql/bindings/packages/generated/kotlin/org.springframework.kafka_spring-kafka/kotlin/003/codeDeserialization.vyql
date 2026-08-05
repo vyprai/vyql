@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.me24dd41b;
-
-binding deserialization3 {
-  requires {
-    dependency("org.springframework.kafka:spring-kafka")
-  }
-  query pattern callExpr where callee.method == "getValueDeserializer"
-  emit sink code.Deserialization at args[0]
-}

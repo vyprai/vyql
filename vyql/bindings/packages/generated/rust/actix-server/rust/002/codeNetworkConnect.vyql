@@ -1,9 +1,0 @@
-module bindings.rust.generated.m3ea6117f;
-
-binding networkConnect2 {
-  requires {
-    dependency("actix-server")
-  }
-  query pattern callExpr where callee.method == "TestServer::connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

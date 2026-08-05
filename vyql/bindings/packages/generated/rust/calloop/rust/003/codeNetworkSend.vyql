@@ -1,9 +1,0 @@
-module bindings.rust.generated.m8e94cf14;
-
-binding networkSend3 {
-  requires {
-    dependency("calloop")
-  }
-  query pattern callExpr where callee.method == "poll_write_vectored"
-  emit sink code.NetworkSend at args[0]
-}

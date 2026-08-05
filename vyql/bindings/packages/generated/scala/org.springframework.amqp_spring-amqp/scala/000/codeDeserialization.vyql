@@ -1,9 +1,0 @@
-module bindings.scala.generated.mb8442c3c;
-
-binding deserialization0 {
-  requires {
-    dependency("org.springframework.amqp:spring-amqp")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

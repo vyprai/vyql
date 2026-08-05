@@ -1,9 +1,0 @@
-module bindings.objc.generated.mca543c21;
-
-binding filePathAccess0 {
-  requires {
-    dependency("YYWebImage")
-  }
-  query pattern callExpr where callee.method == "initWithPath:"
-  emit sink code.FilePathAccess at args[0]
-}

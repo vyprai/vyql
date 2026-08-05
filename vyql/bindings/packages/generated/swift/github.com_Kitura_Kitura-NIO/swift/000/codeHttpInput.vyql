@@ -1,9 +1,0 @@
-module bindings.swift.generated.mfbff4752;
-
-binding httpInput0 {
-  requires {
-    dependency("github.com/Kitura/Kitura-NIO")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source code.HttpInput at call.result
-}

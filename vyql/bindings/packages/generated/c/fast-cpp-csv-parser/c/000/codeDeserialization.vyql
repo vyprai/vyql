@@ -1,9 +1,0 @@
-module bindings.c.generated.mf77fa09e;
-
-binding deserialization0 {
-  requires {
-    dependency("fast-cpp-csv-parser")
-  }
-  query pattern callExpr where callee.method == "LineReader"
-  emit sink code.Deserialization at args[0]
-}

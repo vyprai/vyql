@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m4c232184;
-
-binding networkSend2 {
-  requires {
-    dependency("ruby_gntp")
-  }
-  query pattern callExpr where callee.method == "notify"
-  emit sink code.NetworkSend at args[0]
-}

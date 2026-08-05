@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mbfd06dfa;
-
-binding networkSend1 {
-  requires {
-    dependency("swoosh")
-  }
-  query pattern callExpr where callee.method == "text_body"
-  emit sink code.NetworkSend at args[0]
-}

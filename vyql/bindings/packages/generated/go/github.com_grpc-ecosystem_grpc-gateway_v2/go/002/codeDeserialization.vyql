@@ -1,9 +1,0 @@
-module bindings.go.generated.ma6dcd0bf;
-
-binding deserialization2 {
-  requires {
-    dependency("github.com/grpc-ecosystem/grpc-gateway/v2")
-  }
-  query pattern callExpr where callee.method == "parseField"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.rust.generated.me5130b49;
-
-binding weakRandomValue2 {
-  requires {
-    dependency("rand_hc")
-  }
-  query pattern callExpr where callee.method == "try_fill_bytes"
-  emit issue code.WeakRandomValue at call
-}

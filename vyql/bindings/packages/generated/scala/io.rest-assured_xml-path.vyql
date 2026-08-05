@@ -1,0 +1,129 @@
+module bindings.scala.generated.m4212472c;
+
+binding xmlParse0 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse1 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getList"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse2 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getMap"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse3 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getObject"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse4 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getInt"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse5 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getBoolean"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse6 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getNode"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse7 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getNodeChildren"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse8 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getChar"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse9 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getByte"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse10 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getShort"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse11 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getFloat"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse12 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getDouble"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse13 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getLong"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse14 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getString"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse15 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getUUID"
+  emit sink code.XmlParse at args[0]
+}

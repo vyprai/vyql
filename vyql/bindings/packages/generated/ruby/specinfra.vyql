@@ -1,0 +1,78 @@
+module bindings.ruby.generated.mcbd93549;
+
+binding commandExecution0 {
+  requires {
+    dependency("specinfra")
+  }
+  query pattern callExpr where callee.method == "run_command"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("specinfra")
+  }
+  query pattern callExpr where callee.method == "spawn_command"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution2 {
+  requires {
+    dependency("specinfra")
+  }
+  query pattern callExpr where callee.method == "docker_run!"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("specinfra")
+  }
+  query pattern callExpr where callee.method == "send_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("specinfra")
+  }
+  query pattern callExpr where callee.method == "send_directory"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("specinfra")
+  }
+  query pattern callExpr where callee.method == "scp_upload!"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse6 {
+  requires {
+    dependency("specinfra")
+  }
+  query pattern callExpr where callee.method == "check_contains"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding shellEscape7 {
+  requires {
+    dependency("specinfra")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding deserialization8 {
+  requires {
+    dependency("specinfra")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

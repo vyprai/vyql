@@ -1,9 +1,0 @@
-module bindings.objc.generated.m4eae030a;
-
-binding networkConnect4 {
-  requires {
-    dependency("CocoaAsyncSocket")
-  }
-  query pattern callExpr where callee.method == "connectToHost"
-  emit sink code.NetworkConnectSink at args[0]
-}

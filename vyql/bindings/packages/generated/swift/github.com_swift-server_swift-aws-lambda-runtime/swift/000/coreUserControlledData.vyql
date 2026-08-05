@@ -1,9 +1,0 @@
-module bindings.swift.generated.mfd5810ea;
-
-binding userControlledData0 {
-  requires {
-    dependency("github.com/swift-server/swift-aws-lambda-runtime")
-  }
-  query pattern callExpr where callee.method == "run"
-  emit source core.UserControlledData at call.result
-}

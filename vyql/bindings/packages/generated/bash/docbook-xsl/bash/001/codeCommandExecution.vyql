@@ -1,9 +1,0 @@
-module bindings.bash.generated.mda4c1fc1;
-
-binding commandExecution1 {
-  requires {
-    dependency("docbook-xsl")
-  }
-  query pattern callExpr where callee.path ~= "docbook-xsl-update"
-  emit sink code.CommandExecution at args[0]
-}

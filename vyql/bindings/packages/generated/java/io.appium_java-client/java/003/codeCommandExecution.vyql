@@ -1,9 +1,0 @@
-module bindings.java.generated.md6205be7;
-
-binding commandExecution3 {
-  requires {
-    dependency("io.appium:java-client")
-  }
-  query pattern callExpr where callee.method == "executeCdpCommand"
-  emit sink code.CommandExecution at args[0]
-}

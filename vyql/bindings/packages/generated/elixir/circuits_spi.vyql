@@ -1,0 +1,25 @@
+module bindings.elixir.generated.m6fc05958;
+
+binding filePathAccess0 {
+  requires {
+    dependency("circuits_spi")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("circuits_spi")
+  }
+  query pattern callExpr where callee.method == "transfer"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("circuits_spi")
+  }
+  query pattern callExpr where callee.method == "transfer"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,17 @@
+module bindings.go.generated.m00629108;
+
+binding secretValue0 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/adal")
+  }
+  query pattern callExpr where callee.method == "OAuthToken"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/adal")
+  }
+  query pattern callExpr where callee.method == "SignJwt"
+  emit source code.SecretValue at call.result
+}

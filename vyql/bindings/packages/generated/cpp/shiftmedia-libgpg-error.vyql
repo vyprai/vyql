@@ -1,0 +1,41 @@
+module bindings.cpp.generated.me91e92d2;
+
+binding fileUse0 {
+  requires {
+    dependency("shiftmedia-libgpg-error")
+  }
+  query pattern callExpr where callee.method == "scheme_load_file"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("shiftmedia-libgpg-error")
+  }
+  query pattern callExpr where callee.method == "scheme_load_string"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval2 {
+  requires {
+    dependency("shiftmedia-libgpg-error")
+  }
+  query pattern callExpr where callee.method == "scheme_load_memory"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval3 {
+  requires {
+    dependency("shiftmedia-libgpg-error")
+  }
+  query pattern callExpr where callee.method == "scheme_eval"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval4 {
+  requires {
+    dependency("shiftmedia-libgpg-error")
+  }
+  query pattern callExpr where callee.method == "ffi_scheme_eval"
+  emit sink code.CodeEval at args[0]
+}

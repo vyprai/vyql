@@ -1,0 +1,33 @@
+module bindings.php.generated.m6c87298b;
+
+binding deserialization0 {
+  requires {
+    dependency("php-amqplib/php-amqplib")
+  }
+  query pattern callExpr where callee.method == "PhpAmqpLibWireAMQPReader::read_shortstr"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("php-amqplib/php-amqplib")
+  }
+  query pattern callExpr where callee.method == "PhpAmqpLibWireAMQPReader::read_longstr"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("php-amqplib/php-amqplib")
+  }
+  query pattern callExpr where callee.method == "PhpAmqpLibWireAMQPReader::read_table"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("php-amqplib/php-amqplib")
+  }
+  query pattern callExpr where callee.method == "PhpAmqpLibWireAMQPReader::read_array"
+  emit sink code.Deserialization at args[0]
+}

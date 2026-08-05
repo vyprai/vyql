@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m10df7187;
-
-binding dynamicCodeLoad0 {
-  requires {
-    dependency("org.codehaus.janino:janino")
-  }
-  query pattern callExpr where callee.method == "compile"
-  emit sink code.DynamicCodeLoad at args[0]
-}

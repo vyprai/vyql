@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m5103d1c9;
-
-binding filePathAccess13 {
-  requires {
-    dependency("express")
-  }
-  query pattern callExpr where callee.method == "res.download"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.mfa3371a7;
-
-binding deserialization1 {
-  requires {
-    dependency("net.sf.json-lib:json-lib")
-  }
-  query pattern callExpr where callee.method == "XMLSerializer.read"
-  emit sink code.Deserialization at args[0]
-}

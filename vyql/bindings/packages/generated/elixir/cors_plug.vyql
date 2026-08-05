@@ -1,0 +1,25 @@
+module bindings.elixir.generated.m5d5d8ef7;
+
+binding responseHeaderWrite0 {
+  requires {
+    dependency("cors_plug")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("cors_plug")
+  }
+  query pattern callExpr where callee.method == "add_cors_headers"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding httpInput2 {
+  requires {
+    dependency("cors_plug")
+  }
+  query pattern callExpr where callee.method == "request_origin"
+  emit source code.HttpInput at call.result
+}

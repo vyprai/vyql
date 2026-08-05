@@ -1,9 +1,0 @@
-module bindings.java.generated.mf19c4e95;
-
-binding deserialization1 {
-  requires {
-    dependency("org.objenesis:objenesis")
-  }
-  query pattern callExpr where callee.method == "getInstantiatorOf"
-  emit sink code.Deserialization at args[0]
-}

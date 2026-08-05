@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mb412538c;
-
-binding userControlledData0 {
-  requires {
-    dependency("org.slf4j:slf4j-ext")
-  }
-  query pattern callExpr where callee.method == "premain"
-  emit source core.UserControlledData at call.result
-}

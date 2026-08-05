@@ -1,9 +1,0 @@
-module bindings.python.generated.m3e19f429;
-
-binding filePathAccess2 {
-  requires {
-    dependency("atomicwrites")
-  }
-  query pattern callExpr where callee.method == "move_atomic"
-  emit sink code.FilePathAccess at args[0]
-}

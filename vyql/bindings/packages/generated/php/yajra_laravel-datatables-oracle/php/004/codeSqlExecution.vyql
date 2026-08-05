@@ -1,9 +1,0 @@
-module bindings.php.generated.m206708aa;
-
-binding sqlExecution4 {
-  requires {
-    dependency("yajra/laravel-datatables-oracle")
-  }
-  query pattern callExpr where callee.method == "applyFilterColumn"
-  emit sink code.SqlExecution at args[0]
-}

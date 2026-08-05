@@ -1,9 +1,0 @@
-module bindings.php.generated.m8bca0df5;
-
-binding codeEval2 {
-  requires {
-    dependency("symfony/expression-language")
-  }
-  query pattern callExpr where callee.method == "evaluate"
-  emit sink code.CodeEval at args[0]
-}

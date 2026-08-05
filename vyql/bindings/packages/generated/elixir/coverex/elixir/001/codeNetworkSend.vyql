@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m42ababd7;
-
-binding networkSend1 {
-  requires {
-    dependency("coverex")
-  }
-  query pattern callExpr where callee.method == "post_coveralls"
-  emit sink code.NetworkSend at args[0]
-}

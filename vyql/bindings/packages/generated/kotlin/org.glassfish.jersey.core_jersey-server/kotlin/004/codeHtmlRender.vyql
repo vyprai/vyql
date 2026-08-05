@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m971d5e41;
-
-binding htmlRender4 {
-  requires {
-    dependency("org.glassfish.jersey.core:jersey-server")
-  }
-  query pattern callExpr where callee.method == "ContainerResponse.write"
-  emit sink code.HtmlRender at args[0]
-}

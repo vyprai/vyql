@@ -1,9 +1,0 @@
-module bindings.python.generated.m98a05381;
-
-binding userControlledData7 {
-  requires {
-    dependency("soundfile")
-  }
-  query pattern callExpr where callee.method == "buffer_write"
-  emit source core.UserControlledData at call.result
-}

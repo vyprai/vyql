@@ -1,9 +1,0 @@
-module bindings.c.generated.me696b3a4;
-
-binding storedDataWrite2 {
-  requires {
-    dependency("mongo-cxx-driver")
-  }
-  query pattern callExpr where callee.method == "setup"
-  emit sink code.StoredDataWrite at args[0]
-}

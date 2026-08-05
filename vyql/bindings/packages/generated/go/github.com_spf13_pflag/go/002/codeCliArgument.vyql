@@ -1,9 +1,0 @@
-module bindings.go.generated.md77bbe6d;
-
-binding cliArgument2 {
-  requires {
-    dependency("github.com/spf13/pflag")
-  }
-  query pattern callExpr where callee.method == "Parse"
-  emit source code.CliArgument at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.ma66d92b3;
-
-binding filePathAccess7 {
-  requires {
-    dependency("mini_portile2")
-  }
-  query pattern callExpr where callee.method == "which"
-  emit sink code.FilePathAccess at args[0]
-}

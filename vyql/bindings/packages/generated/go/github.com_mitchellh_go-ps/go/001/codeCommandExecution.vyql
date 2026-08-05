@@ -1,9 +1,0 @@
-module bindings.go.generated.md84009be;
-
-binding commandExecution1 {
-  requires {
-    dependency("github.com/mitchellh/go-ps")
-  }
-  query pattern callExpr where callee.method == "FindProcess"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.dart.generated.m605bf67e;
-
-binding deserialization0 {
-  requires {
-    dependency("country_picker")
-  }
-  query pattern callExpr where callee.method == "Country.parse"
-  emit sink code.Deserialization at args[0]
-}

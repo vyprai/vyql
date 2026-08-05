@@ -1,9 +1,0 @@
-module bindings.php.generated.mf3aa1cae;
-
-binding filePathAccess2 {
-  requires {
-    dependency("respect/validation")
-  }
-  query pattern callExpr where callee.method == "readable"
-  emit sink code.FilePathAccess at args[0]
-}

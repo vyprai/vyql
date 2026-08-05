@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mcbf3d81a;
-
-binding networkSend9 {
-  requires {
-    dependency("gen_smtp")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

@@ -1,0 +1,17 @@
+module bindings.java.generated.m208cab76;
+
+binding xmlParse0 {
+  requires {
+    dependency("com.sun.faces:jsf-impl")
+  }
+  query pattern callExpr where callee.method == "resolveEntity"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse1 {
+  requires {
+    dependency("com.sun.faces:jsf-impl")
+  }
+  query pattern callExpr where callee.method == "resolveResource"
+  emit sink code.XmlParse at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.bash.generated.m237d9dd8;
-
-binding sqlExecution1 {
-  requires {
-    dependency("golang-migrate")
-  }
-  query pattern callExpr where callee.path ~= "migrate"
-  emit sink code.SqlExecution at args.any
-}

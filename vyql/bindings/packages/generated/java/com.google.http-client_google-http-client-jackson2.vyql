@@ -1,0 +1,57 @@
+module bindings.java.generated.mc57e4ba1;
+
+binding deserialization0 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "createJsonParser"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "JacksonParser"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "getText"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "getByteValue"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "getDoubleValue"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "getIntValue"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "getFloatValue"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-module bindings.dart.generated.mf886b3e1;
-
-binding httpInput8 {
-  requires {
-    dependency("shelf_router")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit source code.HttpInput at call.result
-}

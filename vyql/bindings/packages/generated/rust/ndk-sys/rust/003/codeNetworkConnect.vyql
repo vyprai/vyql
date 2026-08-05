@@ -1,9 +1,0 @@
-module bindings.rust.generated.m7c64ffc3;
-
-binding networkConnect3 {
-  requires {
-    dependency("ndk-sys")
-  }
-  query pattern callExpr where callee.method == "recv"
-  emit sink code.NetworkConnectSink at args[0]
-}

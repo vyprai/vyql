@@ -1,9 +1,0 @@
-module bindings.python.generated.m2a5e00b5;
-
-binding commandExecution4 {
-  requires {
-    dependency("python-daemon")
-  }
-  query pattern callExpr where callee.method == "fork_then_exit_parent"
-  emit sink code.CommandExecution at args[0]
-}

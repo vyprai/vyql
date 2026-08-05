@@ -1,0 +1,41 @@
+module bindings.java.generated.m51c331b3;
+
+binding httpInput0 {
+  requires {
+    dependency("com.android.volley:volley")
+  }
+  query pattern callExpr where callee.method == "getUrl"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("com.android.volley:volley")
+  }
+  query pattern callExpr where callee.method == "getHeaders"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("com.android.volley:volley")
+  }
+  query pattern callExpr where callee.method == "getPostBody"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("com.android.volley:volley")
+  }
+  query pattern callExpr where callee.method == "getParams"
+  emit source code.HttpInput at call.result
+}
+
+binding networkSend4 {
+  requires {
+    dependency("com.android.volley:volley")
+  }
+  query pattern callExpr where callee.method == "performRequest"
+  emit sink code.NetworkSend at args[0]
+}

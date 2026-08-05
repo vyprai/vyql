@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m8f316b0e;
-
-binding weakHash9 {
-  requires {
-    dependency("tracy")
-  }
-  query pattern callExpr where callee.method == "XXH64_copyState"
-  emit issue code.WeakHash at call
-}

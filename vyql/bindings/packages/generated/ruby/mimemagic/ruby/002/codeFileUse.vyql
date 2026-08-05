@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mea43a185;
-
-binding fileUse2 {
-  requires {
-    dependency("mimemagic")
-  }
-  query pattern callExpr where callee.method == "by_magic"
-  emit sink code.FileUseSink at args[0]
-}

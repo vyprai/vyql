@@ -1,9 +1,0 @@
-module bindings.go.generated.m4f608b1f;
-
-binding deserialization4 {
-  requires {
-    dependency("github.com/gobwas/httphead")
-  }
-  query pattern callExpr where callee.method == "ScanTokens"
-  emit sink code.Deserialization at args[0]
-}

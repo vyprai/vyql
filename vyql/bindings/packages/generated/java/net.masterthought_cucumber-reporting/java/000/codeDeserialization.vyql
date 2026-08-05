@@ -1,9 +1,0 @@
-module bindings.java.generated.md5001608;
-
-binding deserialization0 {
-  requires {
-    dependency("net.masterthought:cucumber-reporting")
-  }
-  query pattern callExpr where callee.method == "ReportParser.parseJsonFiles"
-  emit sink code.Deserialization at args[0]
-}

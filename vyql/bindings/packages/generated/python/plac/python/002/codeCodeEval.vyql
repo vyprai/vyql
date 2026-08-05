@@ -1,9 +1,0 @@
-module bindings.python.generated.m37e54522;
-
-binding codeEval2 {
-  requires {
-    dependency("plac")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.CodeEval at args[0]
-}

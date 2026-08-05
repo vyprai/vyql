@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mdd93e840;
-
-binding filePathAccess1 {
-  requires {
-    dependency("org.apache.pdfbox:pdfbox")
-  }
-  query pattern callExpr where callee.method == "loadXFDF"
-  emit sink code.FilePathAccess at args[0]
-}

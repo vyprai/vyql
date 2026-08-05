@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m711a0255;
-
-binding deserialization7 {
-  requires {
-    dependency("luerl")
-  }
-  query pattern callExpr where callee.method == "decode_erlmfa"
-  emit sink code.Deserialization at args[0]
-}

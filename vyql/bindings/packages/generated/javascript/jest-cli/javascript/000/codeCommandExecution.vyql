@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m4d55cef0;
-
-binding commandExecution0 {
-  requires {
-    dependency("jest-cli")
-  }
-  query pattern callExpr where callee.method == "run"
-  emit sink code.CommandExecution at args[0]
-}

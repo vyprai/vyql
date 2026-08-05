@@ -1,0 +1,41 @@
+module bindings.scala.generated.m0779b6f2;
+
+binding httpInput0 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "createRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "filterFormParameters"
+  emit source code.HttpInput at call.result
+}
+
+binding networkSend3 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "writeStatusAndHeaders"
+  emit sink code.NetworkSend at args[0]
+}

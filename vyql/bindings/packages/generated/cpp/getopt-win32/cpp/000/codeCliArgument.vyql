@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mcd3ba3ee;
-
-binding cliArgument0 {
-  requires {
-    dependency("getopt-win32")
-  }
-  query pattern callExpr where callee.method == "getopt_a"
-  emit source code.CliArgument at call.result
-}

@@ -1,0 +1,54 @@
+module bindings.php.generated.mcf2cb2a6;
+
+binding archiveEntryWrite0 {
+  requires {
+    dependency("maennchen/zipstream-php")
+  }
+  query pattern callExpr where callee.method == "addFile"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("maennchen/zipstream-php")
+  }
+  query pattern callExpr where callee.method == "addFileFromPath"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding archiveEntryWrite2 {
+  requires {
+    dependency("maennchen/zipstream-php")
+  }
+  query pattern callExpr where callee.method == "addFileFromStream"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding archiveEntryWrite3 {
+  requires {
+    dependency("maennchen/zipstream-php")
+  }
+  query pattern callExpr where callee.method == "addFileFromPsr7Stream"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding archiveEntryWrite4 {
+  requires {
+    dependency("maennchen/zipstream-php")
+  }
+  query pattern callExpr where callee.method == "addFileFromCallback"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding inputValidation5 {
+  requires {
+    dependency("maennchen/zipstream-php")
+  }
+  query pattern callExpr where callee.method == "filterFilename"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

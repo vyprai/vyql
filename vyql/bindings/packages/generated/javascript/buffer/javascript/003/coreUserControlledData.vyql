@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mfcb2fad5;
-
-binding userControlledData3 {
-  requires {
-    dependency("buffer")
-  }
-  query pattern callExpr where callee.method == "Buffer.prototype.slice"
-  emit source core.UserControlledData at call.result
-}

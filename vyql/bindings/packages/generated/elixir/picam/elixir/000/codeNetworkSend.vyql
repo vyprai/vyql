@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m9f998ed7;
-
-binding networkSend0 {
-  requires {
-    dependency("picam")
-  }
-  query pattern callExpr where callee.method == "Picam.Camera.start_stream"
-  emit sink code.NetworkSend at args[0]
-}

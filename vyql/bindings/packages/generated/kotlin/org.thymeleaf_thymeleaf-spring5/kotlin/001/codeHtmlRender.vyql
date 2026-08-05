@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m39791a19;
-
-binding htmlRender1 {
-  requires {
-    dependency("org.thymeleaf:thymeleaf-spring5")
-  }
-  query pattern callExpr where callee.method == "processStream"
-  emit sink code.HtmlRender at args[0]
-}

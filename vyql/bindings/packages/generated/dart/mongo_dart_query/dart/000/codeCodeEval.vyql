@@ -1,9 +1,0 @@
-module bindings.dart.generated.m1ec4b138;
-
-binding codeEval0 {
-  requires {
-    dependency("mongo_dart_query")
-  }
-  query pattern callExpr where callee.method == "jsQuery"
-  emit sink code.CodeEval at args[0]
-}

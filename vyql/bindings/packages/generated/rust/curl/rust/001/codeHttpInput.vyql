@@ -1,9 +1,0 @@
-module bindings.rust.generated.m485ce3f4;
-
-binding httpInput1 {
-  requires {
-    dependency("curl")
-  }
-  query pattern callExpr where callee.method == "cookie"
-  emit source code.HttpInput at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.ma83b2c5c;
-
-binding deserialization1 {
-  requires {
-    dependency("com.opencsv:opencsv")
-  }
-  query pattern callExpr where callee.method == "parseLine"
-  emit sink code.Deserialization at args[0]
-}

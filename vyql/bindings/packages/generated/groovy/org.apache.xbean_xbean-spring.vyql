@@ -1,0 +1,33 @@
+module bindings.groovy.generated.m6536ebb3;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.xbean:xbean-spring")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("org.apache.xbean:xbean-spring")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("org.apache.xbean:xbean-spring")
+  }
+  query pattern callExpr where callee.method == "rebind"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("org.apache.xbean:xbean-spring")
+  }
+  query pattern callExpr where callee.method == "unbind"
+  emit source core.UserControlledData at call.result
+}

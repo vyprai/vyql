@@ -1,9 +1,0 @@
-module bindings.go.generated.m44d84f91;
-
-binding deserialization10 {
-  requires {
-    dependency("sourcegraph.com/sourcegraph/go-diff")
-  }
-  query pattern callExpr where callee.method == "NewHunksReader"
-  emit sink code.Deserialization at args[0]
-}

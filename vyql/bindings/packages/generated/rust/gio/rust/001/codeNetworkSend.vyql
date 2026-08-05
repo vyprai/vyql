@@ -1,9 +1,0 @@
-module bindings.rust.generated.m88506601;
-
-binding networkSend1 {
-  requires {
-    dependency("gio")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.NetworkSend at args[0]
-}

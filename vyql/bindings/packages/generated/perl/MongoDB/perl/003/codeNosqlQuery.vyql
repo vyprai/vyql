@@ -1,9 +1,0 @@
-module bindings.perl.generated.m38b82529;
-
-binding nosqlQuery3 {
-  requires {
-    dependency("MongoDB")
-  }
-  query pattern callExpr where callee.method == "write_query"
-  emit sink code.NosqlQuery at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m488a57e9;
-
-binding storedDataWrite1 {
-  requires {
-    dependency("illuminate/session")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.StoredDataWrite at args[0]
-}

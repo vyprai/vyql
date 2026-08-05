@@ -1,9 +1,0 @@
-module bindings.java.generated.mce5e8387;
-
-binding responseHeaderWrite4 {
-  requires {
-    dependency("org.springframework:spring-webflux")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

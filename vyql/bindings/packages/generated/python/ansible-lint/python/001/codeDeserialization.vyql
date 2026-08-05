@@ -1,9 +1,0 @@
-module bindings.python.generated.mc0597870;
-
-binding deserialization1 {
-  requires {
-    dependency("ansible-lint")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

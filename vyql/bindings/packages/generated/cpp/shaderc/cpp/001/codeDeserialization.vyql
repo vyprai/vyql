@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m0644515f;
-
-binding deserialization1 {
-  requires {
-    dependency("shaderc")
-  }
-  query pattern callExpr where callee.method == "ParseResourceSettings"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.ma4385b30;
-
-binding filePathAccess5 {
-  requires {
-    dependency("bootsnap")
-  }
-  query pattern callExpr where callee.method == "bs_rb_fetch"
-  emit sink code.FilePathAccess at args[0]
-}

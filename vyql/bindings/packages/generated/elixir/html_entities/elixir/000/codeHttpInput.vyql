@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mffdc188a;
-
-binding httpInput0 {
-  requires {
-    dependency("html_entities")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit source code.HttpInput at call.result
-}

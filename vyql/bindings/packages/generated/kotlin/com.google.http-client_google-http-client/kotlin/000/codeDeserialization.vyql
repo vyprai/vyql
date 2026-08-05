@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m06e9ae0e;
-
-binding deserialization0 {
-  requires {
-    dependency("com.google.http-client:google-http-client")
-  }
-  query pattern callExpr where callee.method == "IOUtils.deserialize"
-  emit sink code.Deserialization at args[0]
-}

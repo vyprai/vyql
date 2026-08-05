@@ -1,9 +1,0 @@
-module bindings.php.generated.md47d0bbb;
-
-binding networkConnect0 {
-  requires {
-    dependency("predis/predis")
-  }
-  query pattern callExpr where callee.method == "connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

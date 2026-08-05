@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m0a5f1497;
-
-binding filePathAccess3 {
-  requires {
-    dependency("@istanbuljs/load-nyc-config")
-  }
-  query pattern callExpr where callee.method == "loadNycConfig"
-  emit sink code.FilePathAccess at args[0]
-}

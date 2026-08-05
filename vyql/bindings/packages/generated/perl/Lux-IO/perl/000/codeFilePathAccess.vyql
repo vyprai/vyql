@@ -1,9 +1,0 @@
-module bindings.perl.generated.mc3e15545;
-
-binding filePathAccess0 {
-  requires {
-    dependency("Lux-IO")
-  }
-  query pattern callExpr where callee.method == "btree_open"
-  emit sink code.FilePathAccess at args[0]
-}

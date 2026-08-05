@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.maf65a911;
-
-binding userControlledData10 {
-  requires {
-    dependency("javax.mail:javax.mail-api")
-  }
-  query pattern callExpr where callee.method == "getNonMatchingHeaders"
-  emit source core.UserControlledData at call.result
-}

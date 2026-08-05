@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mf960e945;
-
-binding networkSend1 {
-  requires {
-    dependency("oauth2")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit sink code.NetworkSend at args[0]
-}

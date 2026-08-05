@@ -1,9 +1,0 @@
-module bindings.perl.generated.m1a2efc41;
-
-binding deserialization4 {
-  requires {
-    dependency("Plagger")
-  }
-  query pattern callExpr where callee.method == "LoadFile"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mcc5a44a6;
-
-binding networkConnect0 {
-  requires {
-    dependency("kafka_protocol")
-  }
-  query pattern callExpr where callee.method == "start"
-  emit sink code.NetworkConnectSink at args[0]
-}

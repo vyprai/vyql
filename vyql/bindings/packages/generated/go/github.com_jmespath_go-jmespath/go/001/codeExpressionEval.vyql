@@ -1,9 +1,0 @@
-module bindings.go.generated.m1b31d66b;
-
-binding expressionEval1 {
-  requires {
-    dependency("github.com/jmespath/go-jmespath")
-  }
-  query pattern callExpr where callee.method == "MustCompile"
-  emit sink code.ExpressionEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.ma02a3afe;
-
-binding codeEval0 {
-  requires {
-    dependency("youtube-ios-player-helper")
-  }
-  query pattern callExpr where callee.method == "evaluateJavaScript"
-  emit sink code.CodeEval at args[0]
-}

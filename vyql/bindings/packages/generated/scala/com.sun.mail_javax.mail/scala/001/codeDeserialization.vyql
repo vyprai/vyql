@@ -1,9 +1,0 @@
-module bindings.scala.generated.mcbb5b18a;
-
-binding deserialization1 {
-  requires {
-    dependency("com.sun.mail:javax.mail")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

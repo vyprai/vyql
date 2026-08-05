@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mb7311fac;
-
-binding userControlledData2 {
-  requires {
-    dependency("cpp-httplib")
-  }
-  query pattern callExpr where callee.method == "parse_port"
-  emit source core.UserControlledData at call.result
-}

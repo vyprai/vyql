@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m4d004884;
-
-binding userControlledData8 {
-  requires {
-    dependency("librsvg")
-  }
-  query pattern callExpr where callee.method == "rsvg_css_parse_font_variant"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m50799a04;
-
-binding codeEval1 {
-  requires {
-    dependency("boost-compute")
-  }
-  query pattern callExpr where callee.method == "create_with_binary_file"
-  emit sink code.CodeEval at args[0]
-}
