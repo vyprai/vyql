@@ -85,7 +85,7 @@ First public release.
   because a clean result over a tree that was mostly skipped reads exactly like
   a clean result over one that was fully read. `-coverage` gives the full
   account of what was parsed, excluded and left unanalysed.
-- **An [Agent Skill](skills/vyql-security-scan/)** for scanning and triage,
+- **An [Agent Skill](https://github.com/vyprai/claude-plugins)** for scanning and triage,
   written to the open SKILL.md format so it works across agent tools rather than
   one vendor's.
 - **A [GitHub Action](https://github.com/vyprai/vyql-action)**:

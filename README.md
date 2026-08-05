@@ -93,6 +93,28 @@ cd vyql
 make build          # -> bin/vyql
 ```
 
+### As an agent skill
+
+For Claude Code, VyQL ships as a plugin that teaches the agent to run a scan and
+triage what comes back:
+
+```
+/plugin marketplace add vyprai/claude-plugins
+/plugin install vyql@vypr
+```
+
+Then ask for a security scan in the ordinary way. The skill installs the `vyql`
+binary if it is missing, after asking — a security tool that downloads and runs
+binaries unprompted has the wrong instincts.
+
+It lives in [vyprai/claude-plugins](https://github.com/vyprai/claude-plugins)
+rather than here, so installing it copies 32 KB instead of cloning a repository
+whose knowledge base is several hundred megabytes.
+
+`skills/vyql-security-scan/` there follows the [Agent
+Skills](https://agentskills.io) format, which is not Claude-specific: any tool
+that reads a `SKILL.md` can use it directly, without the plugin manifests.
+
 ### Check what you have
 
 ```sh
