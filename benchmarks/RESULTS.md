@@ -61,7 +61,6 @@ with `--update` to pull each corpus.
 ```sh
 ./benchmarks/fetch-corpora.sh
 
-cd go
 VYQL_BENCH=1 BENCH_DIR=/tmp/bench/BenchmarkJava    go test -count=1 -v ./cmd/vyql/ -run TestOWASPBenchmark
 VYQL_BENCH=1 BENCH_DIR=/tmp/bench/BenchmarkPython  go test -count=1 -v ./cmd/vyql/ -run TestOWASPBenchmark
 VYQL_BENCH=1 BENCH_DIR=/tmp/bench/ports/owasp-js   go test -count=1 -v ./cmd/vyql/ -run TestOWASPBenchmark
@@ -252,7 +251,7 @@ numbers in §3.1.
 
 ```sh
 ./benchmarks/fetch-corpora.sh     # clones RealVuln and its 66 target repos, once
-cd go && go build -o /tmp/vyql ./cmd/vyql && cd ..
+go build -o /tmp/vyql ./cmd/vyql
 
 # pooled scorecard
 python3 benchmarks/score_realvuln.py /tmp/bench/Real-Vuln-Benchmark /tmp/vyql "$PWD/vyql"
