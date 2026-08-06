@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tsc "github.com/tree-sitter/tree-sitter-c/bindings/go"
@@ -15,6 +16,23 @@ import (
 
 	"github.com/vyprai/vyql/internal/extract/nir"
 )
+
+// ccRe returns the compiled form of a fixed pattern, compiling it at most once. The C
+// frontend's semantic analyses ask for the same ~56 constant patterns on every file they
+// inspect, and compiling one is thousands of times the cost of looking it up — measured at
+// 7% of all scan CPU on a C-heavy corpus. Patterns built at runtime (QuoteMeta on source
+// identifiers) do not go through here: their population is unbounded, and caching them
+// would trade the compile churn for permanent retention.
+var ccReCache sync.Map // pattern string -> *regexp.Regexp
+
+func ccRe(pattern string) *regexp.Regexp {
+	if v, ok := ccReCache.Load(pattern); ok {
+		return v.(*regexp.Regexp)
+	}
+	re := regexp.MustCompile(pattern)
+	ccReCache.Store(pattern, re)
+	return re
+}
 
 // ccConv walks a tree-sitter C CST into NIR. C has no string-concat operator:
 // data reaches a buffer through writer functions (sprintf/strcpy/...), so those
@@ -449,7 +467,7 @@ func ccFunctionNameFromText(text string) string {
 	if idx := strings.Index(header, "{"); idx >= 0 {
 		header = header[:idx]
 	}
-	m := regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*)\s*\([^()]*\)\s*$`).FindStringSubmatch(header)
+	m := ccRe(`([A-Za-z_][A-Za-z0-9_]*)\s*\([^()]*\)\s*$`).FindStringSubmatch(header)
 	if len(m) == 2 {
 		return m[1]
 	}
@@ -1659,8 +1677,8 @@ func (c *ccConv) ccPostCopyMissingBoundsObservations(fn *tree_sitter.Node) []nir
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	assignRe := regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\+=([A-Za-z_][A-Za-z0-9_]*)`)
-	memcpyRe := regexp.MustCompile(`\bmemcpy\(([^,]+),([^,]+),([^)]+)\)`)
+	assignRe := ccRe(`\b([A-Za-z_][A-Za-z0-9_]*)\+=([A-Za-z_][A-Za-z0-9_]*)`)
+	memcpyRe := ccRe(`\bmemcpy\(([^,]+),([^,]+),([^)]+)\)`)
 	seen := map[string]bool{}
 	var out []nir.Stmt
 	for _, a := range assignRe.FindAllStringSubmatchIndex(text, -1) {
@@ -1711,7 +1729,7 @@ func (c *ccConv) ccNumericParserMissingProgressObservations(fn *tree_sitter.Node
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	atolRe := regexp.MustCompile(`\bfio_atol\(\(char\*\*\)&?([A-Za-z_][A-Za-z0-9_]*)\)`)
+	atolRe := ccRe(`\bfio_atol\(\(char\*\*\)&?([A-Za-z_][A-Za-z0-9_]*)\)`)
 	for _, m := range atolRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 4 {
 			continue
@@ -1756,7 +1774,7 @@ func (c *ccConv) ccPointerOffsetMissingRemainingSizeObservations(fn *tree_sitter
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	guardRe := regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\+([A-Za-z_][A-Za-z0-9_]*)\+1>([A-Za-z_][A-Za-z0-9_]*)`)
+	guardRe := ccRe(`\b([A-Za-z_][A-Za-z0-9_]*)\+([A-Za-z_][A-Za-z0-9_]*)\+1>([A-Za-z_][A-Za-z0-9_]*)`)
 	for _, m := range guardRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 8 {
 			continue
@@ -1794,7 +1812,7 @@ func (c *ccConv) ccDhcpOptionLengthUncheckedReadObservations(fn *tree_sitter.Nod
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	loopRe := regexp.MustCompile(`while\(([A-Za-z_][A-Za-z0-9_]*)<([A-Za-z_][A-Za-z0-9_]*)\)`)
+	loopRe := ccRe(`while\(([A-Za-z_][A-Za-z0-9_]*)<([A-Za-z_][A-Za-z0-9_]*)\)`)
 	for _, m := range loopRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 6 {
 			continue
@@ -2489,7 +2507,7 @@ func (c *ccConv) ccTrailingEscapeStringOverreadObservations(fn *tree_sitter.Node
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	loopRe := regexp.MustCompile(`while\(\*([A-Za-z_][A-Za-z0-9_]*)!='\\"'&&\*([A-Za-z_][A-Za-z0-9_]*)&&\+\+([A-Za-z_][A-Za-z0-9_]*)\)`)
+	loopRe := ccRe(`while\(\*([A-Za-z_][A-Za-z0-9_]*)!='\\"'&&\*([A-Za-z_][A-Za-z0-9_]*)&&\+\+([A-Za-z_][A-Za-z0-9_]*)\)`)
 	for _, m := range loopRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 8 {
 			continue
@@ -2729,10 +2747,10 @@ func (c *ccConv) ccRubyCgiEscapeHTMLAllocationObservations(fn *tree_sitter.Node)
 		return nil
 	}
 	if strings.Contains(text, "typedefcharescape_buf[HTML_ESCAPE_MAX_LEN]") ||
-		regexp.MustCompile(`ALLOCV_N\([^,]*escape_buf[^,]*,[^,]*,RSTRING_LEN\(`).MatchString(text) {
+		ccRe(`ALLOCV_N\([^,]*escape_buf[^,]*,[^,]*,RSTRING_LEN\(`).MatchString(text) {
 		return nil
 	}
-	if !regexp.MustCompile(`ALLOCV_N\([^,]+,[^,]+,RSTRING_LEN\([^)]+\)\*HTML_ESCAPE_MAX_LEN\)`).MatchString(text) {
+	if !ccRe(`ALLOCV_N\([^,]+,[^,]+,RSTRING_LEN\([^)]+\)\*HTML_ESCAPE_MAX_LEN\)`).MatchString(text) {
 		return nil
 	}
 	loc := c.loc(body)
@@ -2759,13 +2777,13 @@ func (c *ccConv) ccPythonUnicodeEscapeAllocationObservations(fn *tree_sitter.Nod
 	if !strings.Contains(text, "PyString_FromStringAndSize(NULL,") || !strings.Contains(text, ">=0x10000") {
 		return nil
 	}
-	if !regexp.MustCompile(`\*[A-Za-z_][A-Za-z0-9_]*\+\+='U'`).MatchString(text) {
+	if !ccRe(`\*[A-Za-z_][A-Za-z0-9_]*\+\+='U'`).MatchString(text) {
 		return nil
 	}
-	if regexp.MustCompile(`10\*[A-Za-z_][A-Za-z0-9_]*`).MatchString(text) {
+	if ccRe(`10\*[A-Za-z_][A-Za-z0-9_]*`).MatchString(text) {
 		return nil
 	}
-	if !regexp.MustCompile(`6\*[A-Za-z_][A-Za-z0-9_]*`).MatchString(text) {
+	if !ccRe(`6\*[A-Za-z_][A-Za-z0-9_]*`).MatchString(text) {
 		return nil
 	}
 	loc := c.loc(body)
@@ -2795,7 +2813,7 @@ func (c *ccConv) ccFormattedPlaceholderAllocationObservations(fn *tree_sitter.No
 	if strings.Contains(text, "*6+16") || strings.Contains(text, "snprintf(") {
 		return nil
 	}
-	if !regexp.MustCompile(`newSV\(strlen\([^)]+\)\*3\)`).MatchString(text) {
+	if !ccRe(`newSV\(strlen\([^)]+\)\*3\)`).MatchString(text) {
 		return nil
 	}
 	loc := c.loc(body)
@@ -2825,7 +2843,7 @@ func (c *ccConv) ccSniffCsvExternalAccessObservations(fn *tree_sitter.Node) []ni
 	if strings.Contains(text, "enable_external_access") {
 		return nil
 	}
-	if !regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*->path=[A-Za-z_][A-Za-z0-9_]*\.inputs\[[^]]+\]\.ToString\(\)`).MatchString(text) {
+	if !ccRe(`[A-Za-z_][A-Za-z0-9_]*->path=[A-Za-z_][A-Za-z0-9_]*\.inputs\[[^]]+\]\.ToString\(\)`).MatchString(text) {
 		return nil
 	}
 	loc := c.loc(body)
@@ -2852,7 +2870,7 @@ func (c *ccConv) ccCimgPnmDimensionOverflowObservations(fn *tree_sitter.Node) []
 	if !strings.Contains(text, "fsize(") {
 		return nil
 	}
-	productRe := regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\*([A-Za-z_][A-Za-z0-9_]*)\*([A-Za-z_][A-Za-z0-9_]*)>([A-Za-z_][A-Za-z0-9_]*)`)
+	productRe := ccRe(`\b([A-Za-z_][A-Za-z0-9_]*)\*([A-Za-z_][A-Za-z0-9_]*)\*([A-Za-z_][A-Za-z0-9_]*)>([A-Za-z_][A-Za-z0-9_]*)`)
 	for _, m := range productRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 10 {
 			continue
@@ -2891,7 +2909,7 @@ func (c *ccConv) ccJpegSetjmpConstructorObservations(fn *tree_sitter.Node) []nir
 		return nil
 	}
 	if strings.Contains(text, "DIP__DECLARE_JPEG_EXIT") ||
-		regexp.MustCompile(`memcpy\([^,]*setjmp_buffer,[^,]*setjmp_buffer`).MatchString(text) {
+		ccRe(`memcpy\([^,]*setjmp_buffer,[^,]*setjmp_buffer`).MatchString(text) {
 		return nil
 	}
 	loc := c.loc(body)
@@ -2958,7 +2976,7 @@ func (c *ccConv) ccUncheckedNullableResultDerefObservations(fn *tree_sitter.Node
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	assignRe := regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*(?:->|\.)[A-Za-z_][A-Za-z0-9_]*)=[A-Za-z_][A-Za-z0-9_]*\(`)
+	assignRe := ccRe(`\b([A-Za-z_][A-Za-z0-9_]*(?:->|\.)[A-Za-z_][A-Za-z0-9_]*)=[A-Za-z_][A-Za-z0-9_]*\(`)
 	for _, m := range assignRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 4 {
 			continue
@@ -3036,7 +3054,7 @@ func (c *ccConv) ccGlibCommandLineAssemblyObservations(fn *tree_sitter.Node) []n
 	if !strings.Contains(text, "g_app_info_create_from_commandline(") || strings.Contains(text, "g_shell_quote(") {
 		return nil
 	}
-	appendRe := regexp.MustCompile(`g_string_append_printf\([^,]+,"[^"]*%s"`)
+	appendRe := ccRe(`g_string_append_printf\([^,]+,"[^"]*%s"`)
 	if !appendRe.MatchString(text) {
 		return nil
 	}
@@ -3061,7 +3079,7 @@ func (c *ccConv) ccWebRequestPathTraversalObservations(fn *tree_sitter.Node) []n
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	sourceRe := regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)=http_request_(?:param_get|get_query_string)\(`)
+	sourceRe := ccRe(`\b([A-Za-z_][A-Za-z0-9_]*)=http_request_(?:param_get|get_query_string)\(`)
 	for _, m := range sourceRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 4 {
 			continue
@@ -3172,7 +3190,7 @@ func (c *ccConv) ccFat12SuccessorBoundsObservations(fn *tree_sitter.Node) []nir.
 			continue
 		}
 		cluster := text[m[2]:m[3]]
-		fsRe := regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*)->fat_bits`)
+		fsRe := ccRe(`([A-Za-z_][A-Za-z0-9_]*)->fat_bits`)
 		for _, fm := range fsRe.FindAllStringSubmatchIndex(text, -1) {
 			if len(fm) < 4 {
 				continue
@@ -3210,7 +3228,7 @@ func (c *ccConv) ccShiftedClusterAllocationObservations(fn *tree_sitter.Node) []
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	allocRe := regexp.MustCompile(`malloc\(CLUSTER_SIZE\(\*([^)]+)\)\)`)
+	allocRe := ccRe(`malloc\(CLUSTER_SIZE\(\*([^)]+)\)\)`)
 	for _, m := range allocRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 4 {
 			continue
@@ -3296,7 +3314,7 @@ func (c *ccConv) ccUnboundedFgetcFixedBufferObservations(fn *tree_sitter.Node) [
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	bufRe := regexp.MustCompile(`char([A-Za-z_][A-Za-z0-9_]*)\[[^]]+\]`)
+	bufRe := ccRe(`char([A-Za-z_][A-Za-z0-9_]*)\[[^]]+\]`)
 	for _, m := range bufRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 4 {
 			continue
@@ -3340,7 +3358,7 @@ func (c *ccConv) ccCgifSignedFrameCountObservations(fn *tree_sitter.Node) []nir.
 	if !ccCgifFrameLoopRe.MatchString(text) {
 		return nil
 	}
-	if regexp.MustCompile(`for\([^;]*;[^;]*MULU16\([^)]*\.config\.width[^)]*\.config\.height[^)]*\)`).MatchString(text) {
+	if ccRe(`for\([^;]*;[^;]*MULU16\([^)]*\.config\.width[^)]*\.config\.height[^)]*\)`).MatchString(text) {
 		return nil
 	}
 	loc := c.loc(body)
@@ -3364,7 +3382,7 @@ func (c *ccConv) ccProtocolFrameBindingObservations(fn *tree_sitter.Node) []nir.
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	peerRe := regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*(?:->|\.)peercallno)==([A-Za-z_][A-Za-z0-9_]*)`)
+	peerRe := ccRe(`([A-Za-z_][A-Za-z0-9_]*(?:->|\.)peercallno)==([A-Za-z_][A-Za-z0-9_]*)`)
 	for _, m := range peerRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 6 {
 			continue
@@ -3423,7 +3441,7 @@ func (c *ccConv) ccFilesystemImageDirentTraversalObservations(fn *tree_sitter.No
 		if !strings.Contains(text, pathBuf+"["+pathLen+"+"+nameLen+"]=0") || !strings.Contains(text, "expand_fs("+pathBuf+",") {
 			continue
 		}
-		if regexp.MustCompile(`strchr\([^,]+,'/'\)`).MatchString(text) || regexp.MustCompile(`strcmp\([^,]+,"\.\."\)`).MatchString(text) {
+		if ccRe(`strchr\([^,]+,'/'\)`).MatchString(text) || ccRe(`strcmp\([^,]+,"\.\."\)`).MatchString(text) {
 			continue
 		}
 		loc := c.loc(body)
@@ -3449,7 +3467,7 @@ func (c *ccConv) ccProtocolCommandInjectionObservations(fn *tree_sitter.Node) []
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	parseRe := regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*)=strtoul\([^,]+,[^,]+,10\)`)
+	parseRe := ccRe(`([A-Za-z_][A-Za-z0-9_]*)=strtoul\([^,]+,[^,]+,10\)`)
 	for _, m := range parseRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 4 {
 			continue
@@ -3495,16 +3513,16 @@ func (c *ccConv) ccJpegSubsamplingRatioObservations(fn *tree_sitter.Node) []nir.
 	if !strings.Contains(text, "stbi__malloc_mad2(") {
 		return nil
 	}
-	if !regexp.MustCompile(`if\([A-Za-z_][A-Za-z0-9_]*(?:->|\.)img_comp\[[^]]+\]\.h>[A-Za-z_][A-Za-z0-9_]*\)`).MatchString(text) ||
-		!regexp.MustCompile(`if\([A-Za-z_][A-Za-z0-9_]*(?:->|\.)img_comp\[[^]]+\]\.v>[A-Za-z_][A-Za-z0-9_]*\)`).MatchString(text) {
+	if !ccRe(`if\([A-Za-z_][A-Za-z0-9_]*(?:->|\.)img_comp\[[^]]+\]\.h>[A-Za-z_][A-Za-z0-9_]*\)`).MatchString(text) ||
+		!ccRe(`if\([A-Za-z_][A-Za-z0-9_]*(?:->|\.)img_comp\[[^]]+\]\.v>[A-Za-z_][A-Za-z0-9_]*\)`).MatchString(text) {
 		return nil
 	}
-	if !regexp.MustCompile(`img_comp\[[^]]+\]\.x=.*img_comp\[[^]]+\]\.h.*\+[^;]*/[A-Za-z_][A-Za-z0-9_]*`).MatchString(text) ||
-		!regexp.MustCompile(`img_comp\[[^]]+\]\.y=.*img_comp\[[^]]+\]\.v.*\+[^;]*/[A-Za-z_][A-Za-z0-9_]*`).MatchString(text) {
+	if !ccRe(`img_comp\[[^]]+\]\.x=.*img_comp\[[^]]+\]\.h.*\+[^;]*/[A-Za-z_][A-Za-z0-9_]*`).MatchString(text) ||
+		!ccRe(`img_comp\[[^]]+\]\.y=.*img_comp\[[^]]+\]\.v.*\+[^;]*/[A-Za-z_][A-Za-z0-9_]*`).MatchString(text) {
 		return nil
 	}
-	if regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*%[A-Za-z_][A-Za-z0-9_]*(?:->|\.)img_comp\[[^]]+\]\.h`).MatchString(text) ||
-		regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*%[A-Za-z_][A-Za-z0-9_]*(?:->|\.)img_comp\[[^]]+\]\.v`).MatchString(text) {
+	if ccRe(`[A-Za-z_][A-Za-z0-9_]*%[A-Za-z_][A-Za-z0-9_]*(?:->|\.)img_comp\[[^]]+\]\.h`).MatchString(text) ||
+		ccRe(`[A-Za-z_][A-Za-z0-9_]*%[A-Za-z_][A-Za-z0-9_]*(?:->|\.)img_comp\[[^]]+\]\.v`).MatchString(text) {
 		return nil
 	}
 	loc := c.loc(body)
@@ -3534,7 +3552,7 @@ func (c *ccConv) ccCipherWithoutIntegrityHashObservations(fn *tree_sitter.Node) 
 	if strings.Count(text, `="none"`) < 2 || !strings.Contains(text, `strcmp(`) || !strings.Contains(text, `"none"`) {
 		return nil
 	}
-	rejectRe := regexp.MustCompile(`strcmp\([^,]+,"none"\)!=0\)&&\(strcmp\([^,]+,"none"\)==0`)
+	rejectRe := ccRe(`strcmp\([^,]+,"none"\)!=0\)&&\(strcmp\([^,]+,"none"\)==0`)
 	if rejectRe.MatchString(text) {
 		return nil
 	}
@@ -3559,7 +3577,7 @@ func (c *ccConv) ccRepeatedKeyfileSubstitutionObservations(fn *tree_sitter.Node)
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	readRe := regexp.MustCompile(`fread\(([A-Za-z_][A-Za-z0-9_]*),1,[^,]+,([A-Za-z_][A-Za-z0-9_]*)\)`)
+	readRe := ccRe(`fread\(([A-Za-z_][A-Za-z0-9_]*),1,[^,]+,([A-Za-z_][A-Za-z0-9_]*)\)`)
 	for _, m := range readRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 6 {
 			continue
@@ -3637,7 +3655,7 @@ func (c *ccConv) ccFdtNameValidationObservations(fn *tree_sitter.Node) []nir.Stm
 		!strings.Contains(text, "of_new_property(") {
 		return nil
 	}
-	if strings.Contains(text, "is_allowed_input_name(") || regexp.MustCompile(`strchr\([^,]+,'/'\)`).MatchString(text) {
+	if strings.Contains(text, "is_allowed_input_name(") || ccRe(`strchr\([^,]+,'/'\)`).MatchString(text) {
 		return nil
 	}
 	loc := c.loc(body)
@@ -3747,7 +3765,7 @@ func (c *ccConv) ccProtocolFrameLengthUint16WrapObservations(fn *tree_sitter.Nod
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	declRe := regexp.MustCompile(`uint16_t([A-Za-z_][A-Za-z0-9_]*)=\(?([0-9]+)u?\+[^;]*(?:ntohs|nswap16|read_u?16|load_u?16)\(`)
+	declRe := ccRe(`uint16_t([A-Za-z_][A-Za-z0-9_]*)=\(?([0-9]+)u?\+[^;]*(?:ntohs|nswap16|read_u?16|load_u?16)\(`)
 	for _, m := range declRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 6 {
 			continue
@@ -3829,7 +3847,7 @@ func (c *ccConv) ccTLSProxyRedirectCertVerificationBypassObservations(fn *tree_s
 		!containsAnyString(text, []string{"set_proxy(", "proxy_host", "proxyHost"}) {
 		return nil
 	}
-	proxyDisableRe := regexp.MustCompile(`if\([^)]*[Pp]roxy[^)]*\)[^{;]*\{[^{}]*enable_server_certificate_verification\(false\)[^{}]*enable_server_hostname_verification\(false\)`)
+	proxyDisableRe := ccRe(`if\([^)]*[Pp]roxy[^)]*\)[^{;]*\{[^{}]*enable_server_certificate_verification\(false\)[^{}]*enable_server_hostname_verification\(false\)`)
 	if !proxyDisableRe.MatchString(text) {
 		return nil
 	}
@@ -3861,7 +3879,7 @@ func (c *ccConv) ccCryptoImproperBlindingObservations(fn *tree_sitter.Node) []ni
 
 func ccCryptoImproperBlindingText(raw string) bool {
 	text := compactCExprText(cCommentRe.ReplaceAllString(raw, ""))
-	randRe := regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*)\.Randomize\(`)
+	randRe := ccRe(`([A-Za-z_][A-Za-z0-9_]*)\.Randomize\(`)
 	for _, m := range randRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 4 {
 			continue
@@ -3906,7 +3924,7 @@ func (c *ccConv) ccWindowsRemotePathCredentialObservations(fn *tree_sitter.Node)
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	existsRe := regexp.MustCompile(`QFileInfo::exists\(([A-Za-z_][A-Za-z0-9_]*)\)`)
+	existsRe := ccRe(`QFileInfo::exists\(([A-Za-z_][A-Za-z0-9_]*)\)`)
 	for _, m := range existsRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 4 {
 			continue
@@ -3948,10 +3966,10 @@ func (c *ccConv) ccLibreOfficeDibHeaderUnderflowObservations(fn *tree_sitter.Nod
 		!strings.Contains(text, "ReadBytes(") {
 		return nil
 	}
-	if !regexp.MustCompile(`getDIBV5HeaderSize\(\)-[A-Za-z_][A-Za-z0-9_]*`).MatchString(text) {
+	if !ccRe(`getDIBV5HeaderSize\(\)-[A-Za-z_][A-Za-z0-9_]*`).MatchString(text) {
 		return nil
 	}
-	if strings.Contains(text, "bSafeRead=false") || regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*>[A-Za-z_][A-Za-z0-9_]*HeaderSize`).MatchString(text) {
+	if strings.Contains(text, "bSafeRead=false") || ccRe(`[A-Za-z_][A-Za-z0-9_]*>[A-Za-z_][A-Za-z0-9_]*HeaderSize`).MatchString(text) {
 		return nil
 	}
 	loc := c.loc(body)
@@ -4035,11 +4053,11 @@ func (c *ccConv) ccIcmpEchoPayloadLengthObservations(fn *tree_sitter.Node) []nir
 		!strings.Contains(text, "FreeRTOS_ntohs(") {
 		return nil
 	}
-	if !regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*=[A-Za-z_][A-Za-z0-9_]*-sizeof`).MatchString(text) {
+	if !ccRe(`[A-Za-z_][A-Za-z0-9_]*=[A-Za-z_][A-Za-z0-9_]*-sizeof`).MatchString(text) {
 		return nil
 	}
-	if regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*<sizeof\(`).MatchString(text) ||
-		regexp.MustCompile(`sizeof\([^)]*\)>[A-Za-z_][A-Za-z0-9_]*`).MatchString(text) {
+	if ccRe(`[A-Za-z_][A-Za-z0-9_]*<sizeof\(`).MatchString(text) ||
+		ccRe(`sizeof\([^)]*\)>[A-Za-z_][A-Za-z0-9_]*`).MatchString(text) {
 		return nil
 	}
 	loc := c.loc(body)
@@ -4069,7 +4087,7 @@ func (c *ccConv) ccIsolateLevelIncrementObservations(fn *tree_sitter.Node) []nir
 		!strings.Contains(text, "run_per_isolate_level") {
 		return nil
 	}
-	if !regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*\+\+`).MatchString(text) {
+	if !ccRe(`[A-Za-z_][A-Za-z0-9_]*\+\+`).MatchString(text) {
 		return nil
 	}
 	if strings.Contains(text, "FRIBIDI_BIDI_MAX_EXPLICIT_LEVEL-1") {
@@ -4164,7 +4182,7 @@ func (c *ccConv) ccChakraScopeSlotObservations(fn *tree_sitter.Node) []nir.Stmt 
 	}
 	if strings.Contains(text, "setPropertyIdForScopeSlotArray(") ||
 		strings.Contains(text, "FatalInternalError()") ||
-		regexp.MustCompile(`slot<0.*slot>=scopeSlotCount`).MatchString(text) {
+		ccRe(`slot<0.*slot>=scopeSlotCount`).MatchString(text) {
 		return nil
 	}
 	loc := c.loc(body)
@@ -4399,7 +4417,7 @@ func ccHasClampAssignment(text, target, capacity, written string) bool {
 	if end := strings.Index(stmt, ";"); end >= 0 {
 		stmt = stmt[:end]
 	}
-	withoutCasts := regexp.MustCompile(`\([^)]*\)`).ReplaceAllString(stmt, "")
+	withoutCasts := ccRe(`\([^)]*\)`).ReplaceAllString(stmt, "")
 	return withoutCasts == target+"="+capacity+"-"+written
 }
 
