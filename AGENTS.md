@@ -135,6 +135,11 @@ What actually drifts, in order of how often it has:
 3. **Flags and severity vocabulary.** `-fail-on` takes
    `none info low medium high critical`; the action's input description repeats
    that list, and a change here does not update it there.
+4. **The agent flow**, `scope → scan → coverage → list → verify → reproduce`,
+   is written out in four places: this README, `site/index.html`, the plugin
+   repository's README, and the skill itself. The skill is the one that has to
+   be right, because it is the only copy anything executes. If the others
+   disagree with it they are wrong, not the skill.
 
 The skill also carries a version that is **not** the CLI's. Claude Code uses it
 as an update cache key, so a skill edit that does not bump it reaches nobody;
