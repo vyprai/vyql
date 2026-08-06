@@ -93,6 +93,8 @@ h1,h2,h3 { line-height:var(--leading-tight); letter-spacing:var(--tracking-title
 h1 { font-size:var(--text-page-title); }
 h2 { font-size:var(--text-section); margin-bottom:var(--space-4); }
 h3 { font-size:var(--text-card-title); }
+section h3 { margin-top:var(--space-6); margin-bottom:var(--space-2); }
+.card h3 { margin-top:0; }
 p { margin:var(--space-3) 0; max-width:var(--column-w); }
 a { color:var(--brand); text-decoration:none; }
 a:hover { text-decoration:underline; }
@@ -305,6 +307,53 @@ analysis profile: HTTP API server (api)
            clean run over code nothing read looks the same as a genuinely clean run.</p>
       </div>
     </div>
+  </section>
+
+  <section>
+    <h2>Quickstart</h2>
+
+    <h3>From the terminal</h3>
+    <p>Four commands cover almost everything:</p>
+<pre class="sample">vyql scan .                      <i># everything in this tree</i>
+vyql explain .                   <i># why each finding fired</i>
+vyql scan -fail-on none .        <i># report without failing the shell</i>
+vyql scan -baseline .vyql-baseline.json .   <i># only what is new</i></pre>
+    <p>
+      Reviewing a change rather than a repo is a different question. Scan both
+      sides and diff, which keys on a fingerprint so moving a function doesn't
+      read as a new finding:
+    </p>
+<pre class="sample">git worktree add -q /tmp/base $(git merge-base HEAD origin/main)
+vyql scan --format json /tmp/base &gt; before.json
+vyql scan --format json .        &gt; after.json
+vyql diff before.json after.json</pre>
+
+    <h3>Through an agent</h3>
+    <p>
+      VyQL ships as an agent skill, so you can ask instead of remembering flags.
+      In Claude Code:
+    </p>
+<pre class="sample">/plugin marketplace add vyprai/claude-plugins
+/plugin install vyql@vypr</pre>
+    <p>Then say what you want:</p>
+<pre class="sample"><i>audit this repo for security problems</i>
+<i>did my branch introduce anything?</i>
+<i>is finding 3 real, or a false positive?</i>
+<i>write me a test that proves finding 1</i></pre>
+    <p>
+      It runs the commands, reports what was read before what it found, and asks
+      before installing anything or writing a reproduction. The skill is a plain
+      <a href="https://agentskills.io">SKILL.md</a>, an open format, so any agent
+      that reads it can follow the same steps. Claude Code is just the one with
+      an installer.
+    </p>
+
+    <h3>Either way, the same shape</h3>
+    <p>
+      Scope what you are looking at, scan, read the coverage line, look at the
+      list, verify the ones that matter, and reproduce if you need proof. Stop
+      wherever you have your answer. Most scans end at the list.
+    </p>
   </section>
 
   <section>

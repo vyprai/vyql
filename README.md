@@ -131,6 +131,64 @@ platform: darwin/arm64
 Worth quoting in a bug report: findings depend on the version of the security
 knowledge as much as on the engine.
 
+## How you use it
+
+The same shape whether you drive the CLI yourself or ask an agent.
+
+```
+scope  →  scan  →  coverage  →  list  →  verify  →  reproduce
+```
+
+**Scope.** Whole repo, or just what a change introduced. These are different
+questions: on a codebase with a backlog, scanning everything at review time
+buries the two findings your branch added under two hundred it did not. For a
+diff, scan both sides and use `vyql diff`.
+
+**Scan.** `vyql scan .` with no configuration. There is nothing to pick.
+
+**Coverage.** Read the `scanned` line before the findings. A clean report over a
+tree that was mostly skipped looks exactly like a clean report over a tree that
+was fully read, and only that line tells them apart.
+
+**List.** Everything it found, by severity, each with a location.
+
+**Verify.** Pick one, or all the high ones. `explain` gives the proof tree,
+`query` and `trace` check whether the source and the path are what the finding
+claims. This is static verification: it establishes the path holds up, not that
+the bug is exploitable.
+
+**Reproduce.** Optionally, a failing test that fails today and passes once you
+fix it. Local only.
+
+Stop wherever you have your answer. A list is a complete answer to "what is wrong
+here", and most scans end there.
+
+### Driving it with an agent
+
+The same flow, without remembering the commands:
+
+```
+/plugin marketplace add vyprai/claude-plugins
+/plugin install vyql@vypr
+```
+
+Then ask in the ordinary way:
+
+```
+audit this repo for security problems
+did my branch introduce anything?
+is finding 3 real, or a false positive?
+write me a test that proves finding 1
+```
+
+The skill runs the right commands, reports coverage before findings, and holds
+the line on what a verdict means. It asks before installing anything and before
+writing a reproduction.
+
+`skills/vyql-security-scan/` in that repository is a plain
+[SKILL.md](https://agentskills.io), which is an open format. Any agent that reads
+it can follow the same flow; Claude Code is just the one with an installer.
+
 ## Scan something
 
 ```sh
