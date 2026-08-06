@@ -45,6 +45,10 @@ jobs:
           test -s site/fonts/geist-variable.woff2
           test -s site/fonts/geist-mono-variable.woff2
           test -s site/fonts/OFL.txt
+          # The custom domain lives in the published artifact, not in repo
+          # settings. A missing CNAME silently reverts the site to
+          # vyprai.github.io and the canonical then points somewhere else.
+          grep -qx "vyql.vyprsec.ai" site/CNAME
           # Third-party requests are the thing this page deliberately does not
           # make; a font or script CDN creeping in should fail here.
           if grep -nE 'https?://(fonts|cdn|unpkg|jsdelivr|ajax)\.' site/index.html; then
