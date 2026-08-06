@@ -1,15 +1,14 @@
 # Benchmark results
 
-The measured record of what VyQL scores on `main`, and on which corpus. Every number here
-was produced by `TestOWASPBenchmark`; none is carried over from memory or from a different
-corpus. Earlier figures are in the git history rather than here, so nothing on this page
-needs reading past to reach a current number.
+What VyQL currently scores on `main`, and on which corpus. Every number here came
+out of `TestOWASPBenchmark`. Older figures live in git history rather than on this
+page, so you never have to read past a stale number to find the current one.
 
 Machine: MBP M3 Pro, 11 cores, 18 GB. Last updated 2026-08-06.
 
-> **Read the corpus column before comparing anything.** The single largest source of
-> confusion in this project has been treating scores from the synthetic ports as scores
-> from the public OWASP suites. They are different corpora and they do not agree.
+> **Check the corpus column before comparing anything.** Scores from our synthetic
+> ports get mistaken for scores from the public OWASP suites more than any other
+> mix-up here. Different corpora, different numbers.
 
 ## 1. Metrics: what the number means
 

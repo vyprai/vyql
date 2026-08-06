@@ -1,21 +1,20 @@
 # Contributing to VyQL
 
-Most useful contributions are **security knowledge, not Go**. If a scan misses
-something your framework does, or reports something that is actually safe, the
-fix is usually a binding or a rule in `vyql/`, with no engine change.
+The most useful contributions are **security knowledge, not Go**. If a scan
+misses something your framework does, or flags something that is actually safe,
+the fix is usually a binding or a rule in `vyql/`. No engine change needed.
 
 ## Before your first change
 
-Two things bite everyone once.
+Two things catch everyone out once.
 
-**`go test` must always be `go test -count=1`.** The Go test cache keys on source
-files and does not track the `.vyql` data files. Without `-count=1` a cached pass
-will hide a change to the security knowledge base entirely. Your edit looks like
-a no-op. `make test` does this for you.
+**Always use `go test -count=1`.** The Go test cache keys on source files and
+ignores the `.vyql` data files, so without it a cached pass hides your change
+completely and the edit looks like a no-op. `make test` handles this.
 
-**`CGO_ENABLED=1` is required.** The parsers are C. Without cgo the build
-constraints exclude them silently rather than failing, and you get a binary that
-cannot parse anything.
+**You need `CGO_ENABLED=1`.** The parsers are C. Without cgo the build
+constraints quietly exclude them and you end up with a binary that cannot parse
+anything.
 
 ```sh
 make build     # -> bin/

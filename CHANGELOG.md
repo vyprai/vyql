@@ -4,9 +4,9 @@ Notable changes to VyQL. The format follows [Keep a
 Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [semantic
 versioning](https://semver.org/spec/v2.0.0.html).
 
-Rule and binding additions change what a scan reports, so they are treated as
-user-visible changes and listed here. A new finding appearing in CI is a
-behaviour change even when no code changed.
+New rules and bindings change what a scan reports, so they get listed here like
+any other user-visible change. A finding that suddenly appears in your CI is a
+behaviour change, even if no code moved.
 
 ## [Unreleased]
 

@@ -7,14 +7,13 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/vyprai/vyql/cmd/vyql.svg)](https://pkg.go.dev/github.com/vyprai/vyql/cmd/vyql)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-A multi-language security scanner that follows tainted data through your code and
-tells you why each finding is a finding.
+A security scanner for 22 languages. It follows untrusted input through your
+code and tells you why it thinks each finding is real.
 
-VyQL is two things: a small Go engine, and a large body of security knowledge
-written as data. The engine builds one language-agnostic graph of your program
-and answers questions about it. Everything it knows about frameworks, sinks,
-sanitizers and vulnerability classes lives in `vyql/` as text you can read, edit
-and add to without touching Go.
+There are two parts. A small Go engine builds one graph of your program and
+answers questions about it. Everything the engine knows about frameworks, sinks,
+sanitizers and vulnerability classes lives in `vyql/` as plain text you can read
+and edit.
 
 ```
 pattern  →  concept  →  binding  →  rule
@@ -22,8 +21,8 @@ pattern  →  concept  →  binding  →  rule
 
 A **pattern** is a shape in the code. A **binding** attaches a **concept**
 (`code.SqlExecution`, `core.HtmlEscape`) to it. A **rule** says which
-combinations of concepts are a vulnerability. Adding coverage for a new framework
-is usually a new binding, not new Go.
+combinations add up to a vulnerability. To cover a new framework you usually
+write a binding, not Go.
 
 ## Install
 
@@ -153,9 +152,8 @@ analysis profile: HTTP API server (api)
 ```
 
 Every finding shows the source, the sink, the path between them, and **the
-neutralizing controls it looked for and did not find**. If a scanner tells you
-something is vulnerable, it should be able to tell you what would have made it
-safe.
+controls that would have stopped it**. If you already have one of those controls
+in place, `explain` will tell you why it didn't apply here.
 
 ```sh
 vyql scan --format sarif ./my-project > results.sarif
@@ -185,10 +183,9 @@ vyql scan -exit-code 3 .   # 3 = findings, 1 = VyQL failed, 2 = bad usage
 
 ### Adopting it on a codebase that already has findings
 
-Triage is worth nothing if it evaporates. A baseline records what you have
-already looked at, keyed on the finding fingerprint. That fingerprint is
-anchored to rule and location rather than line number, so a verdict survives
-edits elsewhere in the file.
+A baseline records what you have already triaged, keyed on the finding
+fingerprint. The fingerprint is anchored to rule and location rather than line
+number, so your verdict survives edits elsewhere in the file.
 
 ```sh
 vyql scan -baseline-write .vyql-baseline.json .   # take the backlog as given
@@ -215,17 +212,17 @@ warning: 4 baseline entries match nothing in this scan
            27d5f6e6503511f5  VYQL-INJ-004  app.py:12
 ```
 
-A suppression that outlives the code it excused is how these files turn
-dangerous. The code moved, the excuse stayed, and nobody looked again.
+Otherwise a suppression outlives the code it excused: the code moves, the
+excuse stays, and nobody looks again.
 
-A malformed baseline, an unknown verdict or a missing file is an error rather
-than an empty baseline. Silently suppressing nothing buries you in findings you
-thought were triaged; silently suppressing everything is worse.
+A malformed baseline, an unknown verdict or a missing file is an error, not an
+empty baseline. Failing loudly beats silently suppressing everything or
+nothing.
 
 ### What was actually read
 
-"No findings" is only as good as what the scan looked at, so anything left
-unanalysed is reported whether you ask or not:
+"No findings" only means something if you know what was read. Anything left
+unanalysed gets reported whether you ask or not:
 
 ```
 scanned python:1 textpattern:1 — 9 finding(s)
@@ -476,11 +473,10 @@ Measured on the public OWASP Benchmark suites, scored by Youden index
 | BenchmarkJava | 2,740 | +1.00 |
 | BenchmarkPython | 1,230 | +0.90 |
 
-Reproduce them yourself. `benchmarks/fetch-corpora.sh` fetches the corpora (they
-are GPL and are not vendored here), and
-[benchmarks/RESULTS.md](benchmarks/RESULTS.md) records the method, the
-per-category numbers, and the known corpus defects. Scores from our synthetic
-language ports are recorded separately there and are **not** comparable to these.
+Run them yourself: `benchmarks/fetch-corpora.sh` pulls the corpora, which are
+GPL and not vendored here. [benchmarks/RESULTS.md](benchmarks/RESULTS.md) has the
+method, per-category numbers and known corpus defects. Scores from our own
+language ports live there too, and are **not** comparable to these.
 
 ## License
 

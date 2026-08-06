@@ -8,18 +8,18 @@ Use GitHub's [private vulnerability
 reporting](https://github.com/vyprai/vyql/security/advisories/new), or email
 **security@vyprsec.ai**.
 
-Include what you would want to receive: what the issue is, how to trigger it, and
-what an attacker gets. A minimal reproducer is worth more than a description.
+Tell us what the issue is, how to trigger it, and what an attacker gets out of
+it. A small reproducer is worth more than a long description.
 
-We will acknowledge within 3 working days and tell you what we intend to do. If
-we disagree that it is a vulnerability we will say so and why, rather than
-letting the report go quiet.
+We will reply within 3 working days and tell you what we plan to do. If we
+disagree that it is a vulnerability we will say so and explain why, rather than
+leaving you without an answer.
 
 ## What is in scope
 
-VyQL reads untrusted input by design. It parses whatever source tree you point
-it at. Anything that lets a **scanned repository** affect the machine running the
-scan is in scope and is treated seriously:
+VyQL parses whatever source tree you point it at, so it reads untrusted input
+by design. Anything that lets a **scanned repository** affect the machine running
+the scan is in scope:
 
 - code execution, or any write outside the output paths, triggered by scanned content
 - path traversal out of the scan root

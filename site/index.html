@@ -229,25 +229,25 @@ header.site .inner {
   <p class="overline">Open source · Apache-2.0</p>
   <h1>A security scanner that shows its working.</h1>
   <p class="lede">
-    VyQL traces untrusted input through your code to the places where it turns
-    dangerous. Every finding also lists the safeguards it went looking for and
-    didn't find.
+    VyQL follows untrusted input through your code and flags where it reaches
+    something dangerous. When it flags something, it also tells you which
+    safeguards it checked for and didn't find.
   </p>
 
   <div class="cta">
     <pre><span>$ </span>curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh</pre>
     <p class="cta-note">
-      macOS and Linux, on amd64 and arm64. There's also
-      <a href="https://github.com/vyprai/vyql#install">Homebrew, a container image, and <code>go install</code></a>.
-      No account, no API key, and it doesn't phone home.
+      macOS and Linux, amd64 and arm64.
+      <a href="https://github.com/vyprai/vyql#install">Homebrew, Docker and <code>go install</code></a>
+      work too. No signup, no API key, nothing gets sent anywhere.
     </p>
   </div>
 
   <section>
     <h2>What a finding looks like</h2>
     <p>
-      A small Express app that takes a filename from the query string and hands
-      it to the filesystem:
+      An Express app that takes a filename from the query string and passes it
+      to the filesystem:
     </p>
 <pre class="sample"><i>// app.js</i>
 const express = require("express");
@@ -259,8 +259,7 @@ app.get("/download", (req, res) =&gt; {
   res.send(fs.readFileSync("/var/data/" + name));
 });</pre>
     <p>
-      Scanning it takes no setup, no config file and no choosing which rules to
-      run:
+      No config file, no picking which rules to run:
     </p>
 <pre class="sample">$ vyql scan .
 analysis profile: HTTP API server (api)
@@ -275,35 +274,35 @@ analysis profile: HTTP API server (api)
       control dominates the path; none found anywhere on flows</i>
     <i>unless endpoint coveredBy core.PathAccessCheck: not satisfied, no guard on sink</i></pre>
     <p>
-      The last two lines are the ones that matter. If a scanner tells you code is
-      vulnerable, it should also tell you what would have made it safe. And when you
-      do have a control in place, it should say why that control didn't count.
-      Without that you are left guessing whether to trust the finding or ignore it.
+      Look at the last two lines. Most scanners tell you something is wrong and
+      leave you to work out what to do about it. This one names the controls that
+      would have fixed it, and if you already have one in place, why it didn't
+      apply here.
     </p>
   </section>
 
   <section>
-    <h2>How it works</h2>
+    <h2>What you're getting</h2>
     <div class="grid">
       <div class="card">
         <h3>Knowledge as data</h3>
-        <p>A small Go engine, plus 12,400 <code>.vyql</code> files you can open and edit.
-           Covering a new framework usually means writing a binding, not patching Go.</p>
+        <p>A small Go engine plus 12,400 <code>.vyql</code> files you can open and edit.
+           Adding a framework usually means writing a binding, not patching Go.</p>
       </div>
       <div class="card">
         <h3>One graph, 22 languages</h3>
-        <p>Java, Python and JavaScript are the most complete. Others go from full taint
-           tracking down to simpler coverage, and the scan tells you which you got.</p>
+        <p>Java, Python and JavaScript are the most complete. Coverage thins out from
+           there, and the scan tells you what you actually got.</p>
       </div>
       <div class="card">
-        <h3>Built for a pipeline</h3>
-        <p><code>scan</code> exits 1 on anything high or critical, with no setup.
-           SARIF and JSON output. A baseline for codebases that already have findings.</p>
+        <h3>Built for CI</h3>
+        <p><code>scan</code> exits 1 on anything high or critical. SARIF and JSON output.
+           Baseline files if you're adopting it on a codebase that already has findings.</p>
       </div>
       <div class="card">
-        <h3>It tells you what it skipped</h3>
-        <p>Files that no frontend could read get reported whether you ask or not.
-           A clean result on a tree nobody parsed looks exactly like a real clean result.</p>
+        <h3>It admits what it missed</h3>
+        <p>Files it couldn't parse get reported whether you ask or not. Otherwise a
+           clean run over code nothing read looks the same as a genuinely clean run.</p>
       </div>
     </div>
   </section>
