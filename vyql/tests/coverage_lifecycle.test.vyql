@@ -50,3 +50,61 @@ test "lifecycle: go mutex lock with unlock is clean"
       mu.Unlock()
   }
   ```
+
+test "lifecycle: go mutex lock released by defer is clean"
+  lang go
+  reject VYQL-LIFE-001
+  code
+  ```
+  package main
+  import "sync"
+  func f(mu *sync.Mutex) {
+      mu.Lock()
+      defer mu.Unlock()
+  }
+  ```
+
+test "lifecycle: go deferred unlock releases a lock taken in a branch"
+  lang go
+  reject VYQL-LIFE-001
+  code
+  ```
+  package main
+  import "sync"
+  func f(mu *sync.Mutex, ok bool) {
+      if ok {
+          mu.Lock()
+          defer mu.Unlock()
+      }
+  }
+  ```
+
+test "lifecycle: go deferred unlock inside a closure releases the closure's lock"
+  lang go
+  reject VYQL-LIFE-001
+  code
+  ```
+  package main
+  import "sync"
+  func f(mu *sync.Mutex) func() {
+      return func() {
+          mu.Lock()
+          defer mu.Unlock()
+      }
+  }
+  ```
+
+test "lifecycle: go unlock deferred only on one branch is reported"
+  lang go
+  expect VYQL-LIFE-001
+  code
+  ```
+  package main
+  import "sync"
+  func f(mu *sync.Mutex, ok bool) {
+      mu.Lock()
+      if ok {
+          defer mu.Unlock()
+      }
+  }
+  ```

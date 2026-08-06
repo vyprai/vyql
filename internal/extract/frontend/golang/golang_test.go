@@ -8,6 +8,7 @@ import (
 
 	gofrontend "github.com/vyprai/vyql/internal/extract/frontend/golang"
 	"github.com/vyprai/vyql/internal/extract/lowering"
+	"github.com/vyprai/vyql/internal/extract/nir"
 )
 
 func TestGoFunctionContextIncludesIndexAndSliceTokens(t *testing.T) {
@@ -696,5 +697,57 @@ func fixed(logger Logger, ctx Context, mp Manifest) {
 	}
 	if count != 1 {
 		t.Fatalf("coder manifest info log observations = %d, want 1; nodes=%#v", count, nodes)
+	}
+}
+
+// The Go frontend translates `defer` into nir.Defer and leaves placement to the lowerer.
+// Before this existed the statement matched no case in the converter and the deferred call
+// vanished from the IR, so `defer mu.Unlock()` looked like a lock that is never released.
+func TestGoDeferStatementReachesNIR(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "lock.go")
+	src := []byte(`package lock
+
+import "sync"
+
+func f(mu *sync.Mutex) {
+	mu.Lock()
+	defer mu.Unlock()
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var found []nir.Defer
+	for _, m := range prog.Modules {
+		for _, s := range m.Body {
+			fn, ok := s.(nir.FuncDef)
+			if !ok {
+				continue
+			}
+			for _, b := range fn.Body {
+				if d, ok := b.(nir.Defer); ok {
+					found = append(found, d)
+				}
+			}
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("want one nir.Defer in the function body, got %d", len(found))
+	}
+	call, ok := found[0].Call.(nir.Call)
+	if !ok {
+		t.Fatalf("deferred call = %T, want nir.Call", found[0].Call)
+	}
+	if call.Path != "mu.Unlock" {
+		t.Errorf("deferred call path = %q, want mu.Unlock", call.Path)
+	}
+	if !strings.HasSuffix(found[0].Loc, ":7") {
+		t.Errorf("nir.Defer loc = %q, want the defer statement's line 7", found[0].Loc)
 	}
 }

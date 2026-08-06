@@ -10,6 +10,30 @@ behaviour change even when no code changed.
 
 ## [Unreleased]
 
+### Fixed
+- **Go's `defer` was dropped from the IR, so a deferred release read as no
+  release at all.** The frontend's statement conversion had no case for
+  `*ast.DeferStmt`, so `defer mu.Unlock()` produced no node — nothing emitted
+  `core.LockRelease`, and `VYQL-LIFE-001` reported every `mu.Lock()` paired with
+  a deferred unlock as a lock that may never be released. The idiomatic Go
+  spelling was the one that failed; writing `mu.Unlock()` on its own line worked.
+
+  This was never specific to locks. Every rule asking "is this released on every
+  path" reads the same coverage, so `defer f.Close()`, `defer resp.Body.Close()`
+  and `defer tx.Rollback()` were invisible to it too — the whole reason `defer`
+  exists in Go is to make cleanup unconditional, and it was the one form the
+  engine could not see.
+
+  `defer` now lowers to `nir.Defer`, and the lowerer places the call after the
+  function body so its CFG order post-dominates everything the body acquired.
+  The region stays the one the `defer` was written in, so a defer registered
+  inside a branch still does not cover code outside that branch, and registrations
+  are emitted LIFO to match the order they run in.
+
+  All 24 benchmark corpora are byte-identical before and after — they contain no
+  lifecycle cases, so they could not see this in either direction. See
+  `benchmarks/RESULTS.md` §3.1.3.
+
 ## [0.2.2] - 2026-08-05
 
 ### Fixed

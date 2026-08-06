@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/vyprai/vyql/internal/extract/nir"
 	"github.com/vyprai/vyql/internal/ontology"
 	"github.com/vyprai/vyql/internal/parser"
+	"github.com/vyprai/vyql/internal/solvers"
 	"github.com/vyprai/vyql/internal/usg"
 )
 
@@ -1139,5 +1141,148 @@ func TestPlainDictGetWithDefaultStillFlowsContainerTaint(t *testing.T) {
 	}
 	if !reachable[findNodeID(t, g, "code.Arg", "loc", "app.py:3")] {
 		t.Errorf("dict.get(key, default) must not be treated as a composite key read")
+	}
+}
+
+// nodeOrder returns a node's CFG order as the number it is, so comparisons do not
+// depend on decimal string ordering.
+func nodeOrder(t *testing.T, n usg.Node) int {
+	t.Helper()
+	v, err := strconv.Atoi(n.Prop("order"))
+	if err != nil {
+		t.Fatalf("node %s has no numeric order: %q", n.ID, n.Prop("order"))
+	}
+	return v
+}
+
+// callNodeByPath returns the single lowered call node whose callee path is want.
+func callNodeByPath(t *testing.T, g usg.Store, want string) usg.Node {
+	t.Helper()
+	ids, _ := g.NodesOfType("code.Call")
+	var found []usg.Node
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") == want {
+			found = append(found, n)
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("want exactly one %s call, got %d", want, len(found))
+	}
+	return found[0]
+}
+
+func deferProgram(body ...nir.Stmt) nir.Program {
+	return nir.Program{Modules: []nir.Module{{
+		Key: "app", File: "app.go",
+		Body: []nir.Stmt{nir.FuncDef{Name: "f", Body: body, Loc: "app.go:1"}},
+	}}}
+}
+
+func callStmt(path, loc string) nir.ExprStmt {
+	base, method, _ := strings.Cut(path, ".")
+	return nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Attr{Base: nir.Name{ID: base, Loc: loc}, Attr: method, Path: path, Loc: loc},
+		Path:   path, Method: method, Loc: loc,
+	}}
+}
+
+func deferStmt(path, loc string) nir.Defer {
+	return nir.Defer{Call: callStmt(path, loc).Value, Loc: loc}
+}
+
+// A deferred call runs when the function returns, so it must be lowered after everything
+// the body did — that ordering is what makes a deferred release post-dominate an
+// acquisition above it.
+func TestLowerDeferPlacesCallAfterTheFunctionBody(t *testing.T) {
+	g, err := Lower(deferProgram(
+		callStmt("mu.Lock", "app.go:2"),
+		deferStmt("mu.Unlock", "app.go:3"),
+		callStmt("w.Work", "app.go:4"),
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	lock := callNodeByPath(t, g, "mu.Lock")
+	unlock := callNodeByPath(t, g, "mu.Unlock")
+	work := callNodeByPath(t, g, "w.Work")
+
+	if unlock.Prop("region") != lock.Prop("region") {
+		t.Errorf("deferred call region = %q, want the body's %q", unlock.Prop("region"), lock.Prop("region"))
+	}
+	if nodeOrder(t, unlock) <= nodeOrder(t, work) {
+		t.Errorf("deferred call order %d must follow the last body statement's %d",
+			nodeOrder(t, unlock), nodeOrder(t, work))
+	}
+	if !solvers.PostDominates(g, unlock.ID, lock.ID) {
+		t.Error("deferred release must post-dominate the acquisition above it")
+	}
+	// The call keeps the source location it was written at, so findings point at the defer.
+	if unlock.Prop("loc") != "app.go:3" {
+		t.Errorf("deferred call loc = %q, want app.go:3", unlock.Prop("loc"))
+	}
+}
+
+// Registering a defer inside a branch only runs it when that branch is taken, so it must
+// keep the branch's region and must NOT post-dominate an acquisition outside it.
+func TestLowerDeferInBranchDoesNotPostDominateAcquisitionOutsideIt(t *testing.T) {
+	g, err := Lower(deferProgram(
+		callStmt("mu.Lock", "app.go:2"),
+		nir.If{Then: []nir.Stmt{deferStmt("mu.Unlock", "app.go:4")}, Loc: "app.go:3"},
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	lock := callNodeByPath(t, g, "mu.Lock")
+	unlock := callNodeByPath(t, g, "mu.Unlock")
+
+	if r := unlock.Prop("region"); !strings.HasPrefix(r, lock.Prop("region")+"/") {
+		t.Errorf("conditionally deferred call region = %q, want one nested under %q", r, lock.Prop("region"))
+	}
+	if solvers.PostDominates(g, unlock.ID, lock.ID) {
+		t.Error("a defer registered inside a branch must not post-dominate code outside it")
+	}
+}
+
+// Deferred calls run last-in-first-out, so their lowered order must be the reverse of
+// the order they were registered in.
+func TestLowerDeferEmitsRegistrationsInReverseOrder(t *testing.T) {
+	g, err := Lower(deferProgram(
+		deferStmt("a.First", "app.go:2"),
+		deferStmt("b.Second", "app.go:3"),
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	first := callNodeByPath(t, g, "a.First")
+	second := callNodeByPath(t, g, "b.Second")
+	if nodeOrder(t, second) >= nodeOrder(t, first) {
+		t.Errorf("defers run LIFO: order(second)=%d must precede order(first)=%d",
+			nodeOrder(t, second), nodeOrder(t, first))
+	}
+}
+
+// Each function owns its defers: a nested function's registrations run at ITS return, and
+// must not be emitted into the enclosing function's region.
+func TestLowerDeferDoesNotEscapeIntoTheEnclosingFunction(t *testing.T) {
+	g, err := Lower(nir.Program{Modules: []nir.Module{{
+		Key: "app", File: "app.go",
+		Body: []nir.Stmt{nir.FuncDef{Name: "outer", Body: []nir.Stmt{
+			callStmt("mu.Lock", "app.go:2"),
+			nir.FuncDef{Name: "inner", Body: []nir.Stmt{
+				deferStmt("mu.Unlock", "app.go:4"),
+			}, Loc: "app.go:3"},
+		}, Loc: "app.go:1"}},
+	}}}, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	lock := callNodeByPath(t, g, "mu.Lock")
+	unlock := callNodeByPath(t, g, "mu.Unlock")
+	if unlock.Prop("region") == lock.Prop("region") {
+		t.Errorf("inner function's defer landed in the outer region %q", lock.Prop("region"))
+	}
+	if solvers.PostDominates(g, unlock.ID, lock.ID) {
+		t.Error("a defer in a nested function must not post-dominate the enclosing function")
 	}
 }
