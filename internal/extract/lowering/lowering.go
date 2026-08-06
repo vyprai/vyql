@@ -801,10 +801,10 @@ func (s *scope) clone() *scope {
 }
 
 // deferredCall is one registration from a nir.Defer, held until its function body ends.
-// region is where the `defer` was written and sc is the scope as of that point — the
+// region is where the `defer` was written and sc is the scope as of that point — a
 // deferred call's arguments are evaluated at registration, not at return.
 type deferredCall struct {
-	call   nir.Expr
+	body   []nir.Stmt
 	region string
 	sc     *scope
 }
@@ -826,7 +826,7 @@ func (l *lowerer) flushDeferred() {
 	save := l.region
 	for i := len(frame) - 1; i >= 0; i-- {
 		l.region = frame[i].region
-		l.stmt(nir.ExprStmt{Value: frame[i].call}, frame[i].sc)
+		l.block(frame[i].body, frame[i].sc)
 	}
 	l.region = save
 }
@@ -914,6 +914,8 @@ func collectLocalDecls(stmts []nir.Stmt, local map[string]bool) {
 				collectLocalDecls(h, local)
 			}
 			collectLocalDecls(s.Finally, local)
+		case nir.Defer:
+			collectLocalDecls(s.Body, local)
 		}
 	}
 }
@@ -943,7 +945,9 @@ func collectStmtNames(st nir.Stmt, used map[string]bool) {
 	case nir.ExprStmt:
 		collectExprNames(s.Value, used)
 	case nir.Defer:
-		collectExprNames(s.Call, used)
+		for _, child := range s.Body {
+			collectStmtNames(child, used)
+		}
 	case nir.Block:
 		for _, child := range s.Stmts {
 			collectStmtNames(child, used)
@@ -1118,6 +1122,8 @@ func classMemberContextTokens(stmts []nir.Stmt) []string {
 					walk(h)
 				}
 				walk(st.Finally)
+			case nir.Defer:
+				walk(st.Body)
 			}
 		}
 	}
@@ -2117,7 +2123,7 @@ func estimateStmtNodes(st nir.Stmt) int {
 	case nir.ExprStmt:
 		return estimateExprNodes(s.Value)
 	case nir.Defer:
-		return estimateExprNodes(s.Call)
+		return estimateStmtListNodes(s.Body)
 	case nir.FuncDef:
 		return 2 + len(s.Params) + len(s.ParamEntries) + len(s.ResultEntries) + estimateStmtListNodes(s.Body)
 	case nir.ClassDef:
@@ -2978,12 +2984,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 	case nir.Defer:
 		if n := len(l.deferred); n > 0 {
-			l.deferred[n-1] = append(l.deferred[n-1], deferredCall{call: st.Call, region: l.region, sc: sc.clone()})
+			l.deferred[n-1] = append(l.deferred[n-1], deferredCall{body: st.Body, region: l.region, sc: sc.clone()})
 			return
 		}
-		// Outside any function body there is no return to defer to, so the call is the
+		// Outside any function body there is no return to defer to, so the body is the
 		// only thing left to model. Lowering it in place beats dropping it.
-		l.stmt(nir.ExprStmt{Value: st.Call}, sc)
+		l.block(st.Body, sc)
 	case nir.Block:
 		l.block(st.Stmts, sc)
 	// Structured control flow (B1). Until the CFG lowering lands (B1.2), these flatten
@@ -4453,7 +4459,7 @@ func (l *lowerer) addrTakenStmts(stmts []nir.Stmt) {
 			}
 			l.addrTakenStmts(st.Finally)
 		case nir.Defer:
-			l.addrTakenExpr(st.Call)
+			l.addrTakenStmts(st.Body)
 		}
 	}
 }

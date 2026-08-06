@@ -1563,7 +1563,7 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 	case *ast.DeferStmt:
 		// The call runs when the enclosing function returns, on every path out of it.
 		// nir.Defer records that; the lowerer decides where in the CFG it lands.
-		return nir.Defer{Call: c.expr(st.Call), Loc: c.loc(st.Pos())}
+		return nir.Defer{Body: []nir.Stmt{nir.ExprStmt{Value: c.expr(st.Call)}}, Loc: c.loc(st.Pos())}
 	case *ast.DeclStmt:
 		return c.declStmt(st)
 	case *ast.BlockStmt:

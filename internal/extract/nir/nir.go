@@ -314,14 +314,16 @@ type Try struct {
 	Loc           string
 }
 
-// Defer registers Call to run when the enclosing function returns, by whatever path it
-// returns (Go's `defer`, Swift's `defer`). Placement is the lowerer's job: it emits the
-// call after the whole function body, so the call's `order` follows everything the body
-// did — which is what lets a deferred release post-dominate an acquisition above it — while
-// keeping the control region the `defer` was written in, so registering one inside a branch
-// only releases on that branch.
+// Defer registers Body to run when the enclosing function returns, by whatever path it
+// returns. Body is a statement list because the construct is: Go defers one call
+// (`defer f()`), Swift a block (`defer { … }`).
+//
+// Placement is the lowerer's job: it emits Body after the whole function body, so those
+// nodes' `order` follows everything the function did — which is what lets a deferred
+// release post-dominate an acquisition above it — while keeping the control region the
+// `defer` was written in, so registering one inside a branch only releases on that branch.
 type Defer struct {
-	Call Expr
+	Body []Stmt
 	Loc  string
 }
 

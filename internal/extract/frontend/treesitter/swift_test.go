@@ -153,3 +153,69 @@ adapter.clearCache()
 	}
 	t.Fatalf("module context missing startup-order token")
 }
+
+// Swift's grammar has no defer_statement — `defer { … }` parses as a call to an
+// identifier of that name with a trailing closure. The frontend must recognise that shape
+// and emit nir.Defer, so the lowerer places the block at the function's exit instead of
+// inlining it where the `defer` was written.
+func TestSwiftDeferBecomesNIRDefer(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "lock.swift")
+	src := []byte(`import Foundation
+
+func f(_ mu: NSLock) {
+	mu.lock()
+	defer { mu.unlock() }
+	work()
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractSwift([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var fn nir.FuncDef
+	for _, st := range prog.Modules[0].Body {
+		if d, ok := st.(nir.FuncDef); ok && d.Name == "f" {
+			fn = d
+		}
+	}
+	if fn.Name == "" {
+		t.Fatal("func f not found")
+	}
+
+	var defers []nir.Defer
+	for _, st := range fn.Body {
+		if d, ok := st.(nir.Defer); ok {
+			defers = append(defers, d)
+		}
+	}
+	if len(defers) != 1 {
+		t.Fatalf("want one nir.Defer in the body, got %d (body %T)", len(defers), fn.Body)
+	}
+	if len(defers[0].Body) != 1 {
+		t.Fatalf("deferred block = %d statements, want 1", len(defers[0].Body))
+	}
+	stmt, ok := defers[0].Body[0].(nir.ExprStmt)
+	if !ok {
+		t.Fatalf("deferred statement = %T, want nir.ExprStmt", defers[0].Body[0])
+	}
+	call, ok := stmt.Value.(nir.Call)
+	if !ok || call.Path != "mu.unlock" {
+		t.Errorf("deferred call = %#v, want a call to mu.unlock", stmt.Value)
+	}
+
+	// The block must NOT also be inlined at the `defer` — that would lower it twice.
+	for _, st := range fn.Body {
+		es, ok := st.(nir.ExprStmt)
+		if !ok {
+			continue
+		}
+		if c, ok := es.Value.(nir.Call); ok && c.Path == "mu.unlock" {
+			t.Error("deferred call was also lowered inline at the defer statement")
+		}
+	}
+}

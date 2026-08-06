@@ -1188,7 +1188,7 @@ func callStmt(path, loc string) nir.ExprStmt {
 }
 
 func deferStmt(path, loc string) nir.Defer {
-	return nir.Defer{Call: callStmt(path, loc).Value, Loc: loc}
+	return nir.Defer{Body: []nir.Stmt{callStmt(path, loc)}, Loc: loc}
 }
 
 // A deferred call runs when the function returns, so it must be lowered after everything

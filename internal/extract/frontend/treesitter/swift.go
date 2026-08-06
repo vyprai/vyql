@@ -246,6 +246,9 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		out := []nir.Stmt{nir.ExprStmt{Value: result}}
 		return append(out, c.trailingLambdaStmts(resultNode)...)
 	case "call_expression", "navigation_expression":
+		if body, ok := c.swDeferBody(n); ok {
+			return []nir.Stmt{nir.Defer{Body: body, Loc: L}}
+		}
 		out := []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 		return append(out, c.trailingLambdaStmts(n)...)
 	case "control_transfer_statement":
@@ -369,6 +372,33 @@ func (c *swConv) swOp(n *tree_sitter.Node) string {
 		}
 	}
 	return "?"
+}
+
+// swDeferBody reports whether n is a `defer { … }` statement, and returns the block it
+// defers. Swift's grammar has no defer_statement — `defer` parses as a call to an
+// identifier of that name carrying a trailing closure — so it is recognised by shape.
+//
+// Matching it here keeps the block out of trailingLambdaStmts, which would otherwise
+// lower it inline at the `defer` rather than at the function's exit.
+func (c *swConv) swDeferBody(n *tree_sitter.Node) ([]nir.Stmt, bool) {
+	if n.Kind() != "call_expression" {
+		return nil, false
+	}
+	kids := c.namedChildren(n)
+	if len(kids) < 2 || kids[0].Kind() != "simple_identifier" || c.text(kids[0]) != "defer" {
+		return nil, false
+	}
+	for _, ch := range kids[1:] {
+		if ch.Kind() != "call_suffix" {
+			continue
+		}
+		for _, sub := range c.namedChildren(ch) {
+			if sub.Kind() == "lambda_literal" {
+				return c.collectBlocks(sub), true
+			}
+		}
+	}
+	return nil, false
 }
 
 func (c *swConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
