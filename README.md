@@ -123,8 +123,8 @@ vyql version
 
 ```
 vyql v0.2.3
-commit: 337710842c77d1155e6691372c0f2aeeaa704702
-built:  2026-08-06T13:00:00Z
+commit: 46b81d245502c975c3b4056eaae449ff33808fec
+built:  2026-08-06T14:47:54Z
 go:     go1.26.4
 platform: darwin/arm64
 ```
