@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VyQL: open-source taint analysis that shows its working</title>
+<title>VyQL: findings you can argue with</title>
 <meta name="description" content="Open source security scanner for 22 languages. Traces untrusted input to where it turns dangerous, and lists the safeguards that are missing.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2048%2048%22%3E%3Crect%20width%3D%2248%22%20height%3D%2248%22%20rx%3D%2210%22%20fill%3D%22%2318181b%22%2F%3E%3Cg%20fill%3D%22%23fafafa%22%3E%3Cpath%20d%3D%22M29.5412%2029.6729C30.6105%2028.7102%2031.4124%2028.9144%2032.7504%2028.7822C36.9842%2028.3639%2040.6943%2029.0429%2042.0693%2027.625C43.2355%2026.4226%2043.3017%2028.0989%2042.67%2029.1347C42.5417%2029.345%2042.116%2029.7155%2042.5172%2029.9224C42.9184%2030.1292%2045.646%2032.4975%2045.9959%2034.6758C46.0382%2034.9394%2045.7442%2035.0902%2045.5353%2034.9321C43.4457%2033.3502%2043.1056%2032.351%2037.9444%2031.0907C32.7833%2029.8304%2028.8549%2030.2909%2029.5412%2029.6729Z%22%2F%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M21.3937%209.1017C28.8707%208.80018%2030.2851%209.10171%2034.9043%2010.9272C39.5234%2012.7527%2042.0903%2014.9609%2041.0181%2017.9699L38.564%2023.7931C37.945%2025.4224%2035.6453%2024.9317%2036.1052%2023.2961C36.505%2022.45%2035.749%2021.5096%2034.9043%2021.8022L22.3444%2026.1524C21.9162%2026.3008%2021.7931%2026.8841%2022.1204%2027.2138L29.9869%2035.1384C30.3612%2035.5155%2030.97%2035.4039%2031.2049%2034.9151C31.8085%2033.6026%2033.955%2034.2568%2033.5046%2035.5693C33.5046%2035.5693%2033.495%2035.7288%2032.4218%2038.0186C32.4218%2038.0186%2031.9619%2039%2030.8886%2039C29.6313%2039%2026.9132%2037.3663%2026.9132%2037.3663L13.2612%2030.009C9.99125%2028.6006%203.18256%2024.5161%202.21136%2020.6275C0.156223%2012.3989%2013.5735%209.41707%2021.3937%209.1017ZM29.9794%2015.1894C27.5725%2014.1936%2024.3067%2014.084%2022.6202%2014.5352C22.0076%2014.6991%2021.7302%2015.1087%2022.0061%2015.843C22.0061%2015.843%2022.9236%2017.6028%2023.9998%2018.1332C25.4142%2018.8303%2026.9124%2018.6235%2028.1393%2017.9696C29.3661%2017.3157%2030.2851%2016.0066%2030.2851%2016.0066C30.4571%2015.7574%2030.488%2015.4483%2029.9794%2015.1894Z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
 <link rel="canonical" href="https://vyprsec.ai/vyql/">
-<meta property="og:title" content="VyQL: open-source taint analysis that shows its working">
+<meta property="og:title" content="VyQL: findings you can argue with">
 <meta property="og:description" content="If a path exists, VyQL shows you every hop. If a control covers it, VyQL stays quiet. Open source, Apache-2.0.">
 <meta property="og:url" content="https://vyprsec.ai/vyql/">
 <meta property="og:type" content="website">
@@ -137,7 +137,7 @@ th,td { text-align:left; padding:var(--space-2) var(--space-3); border-bottom:1p
 th { font-weight:500; color:var(--muted-foreground); font-size:var(--text-meta); }
 td.num { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
 
-.grid { display:grid; gap:var(--space-4); grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
+.grid { display:grid; gap:var(--space-4); grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); }
 .card {
   background:var(--card); border:1px solid var(--border); border-radius:var(--radius-card);
   padding:var(--space-4); box-shadow:0 1px 2px rgba(0,0,0,.04);
@@ -236,11 +236,11 @@ header.site .inner {
 <main>
 
   <p class="overline">Open source · Apache-2.0</p>
-  <h1>Open-source taint analysis that follows untrusted input to the point it
-    turns dangerous, and names the controls that would have stopped it.</h1>
+  <h1>Findings you can argue with.</h1>
   <p class="lede">
-    If a path exists, VyQL shows you every hop. If a control covers it, VyQL
-    stays quiet.
+    VyQL follows untrusted input through your code to the point it turns
+    dangerous, and names the controls that would have stopped it. If a path
+    exists, it shows you every hop. If a control covers it, it stays quiet.
   </p>
 
   <div class="cta">
