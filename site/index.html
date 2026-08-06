@@ -74,7 +74,7 @@ body {
   font-family:var(--font-sans); font-size:var(--text-body); line-height:var(--leading-body);
   -webkit-font-smoothing:antialiased;
 }
-main { max-width:var(--content-w); margin:0 auto; padding:var(--space-12) var(--space-6) var(--space-8); }
+main { max-width:var(--content-w); margin:0 auto; padding:var(--space-8) var(--space-6); }
 section { margin-top:var(--space-12); }
 h1,h2,h3 { line-height:var(--leading-tight); letter-spacing:var(--tracking-title); font-weight:600; margin:0; }
 h1 { font-size:var(--text-page-title); }
@@ -135,9 +135,56 @@ footer {
 }
 footer .inner { max-width:var(--content-w); margin:0 auto; display:flex; flex-wrap:wrap; gap:var(--space-4); justify-content:space-between; }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration:.01ms !important; transition-duration:.01ms !important; } }
+
+/* Header. Secondary routes only -- the install command in the hero stays the
+   one primary action. Sticky because the page is long enough that "how do I
+   get to the repo" should never require scrolling back. */
+header.site {
+  position:sticky; top:0; z-index:10;
+  background:color-mix(in srgb, var(--background) 88%, transparent);
+  backdrop-filter:saturate(180%) blur(12px);
+  border-bottom:1px solid var(--border);
+}
+header.site .inner {
+  max-width:var(--content-w); margin:0 auto;
+  padding:var(--space-3) var(--space-6);
+  display:flex; align-items:center; gap:var(--space-4);
+}
+.wordmark {
+  font-weight:600; font-size:var(--text-card-title); letter-spacing:var(--tracking-title);
+  color:var(--foreground); margin-right:auto;
+}
+.wordmark:hover { text-decoration:none; }
+.navlink { color:var(--muted-foreground); font-size:var(--text-ui); }
+.navlink:hover { color:var(--foreground); text-decoration:none; }
+.ghstar {
+  display:inline-flex; align-items:center; gap:var(--space-2);
+  height:var(--control-h,32px); padding:0 var(--space-3);
+  background:var(--primary); color:var(--primary-foreground);
+  border-radius:7px; font-size:var(--text-ui); font-weight:500;
+  box-shadow:0 1px 2px rgba(0,0,0,.10);
+  transition:opacity var(--duration-micro) var(--ease-out);
+}
+.ghstar:hover { text-decoration:none; opacity:.9; }
+.ghstar svg { width:15px; height:15px; fill:currentColor; }
+@media (max-width:560px) {
+  .navlink.optional { display:none; }
+  header.site .inner { padding-left:var(--space-4); padding-right:var(--space-4); }
+}
 </style>
 </head>
 <body>
+<header class="site">
+  <div class="inner">
+    <a class="wordmark" href="/vyql/">VyQL</a>
+    <a class="navlink optional" href="https://github.com/vyprai/vyql/blob/main/docs/README.md">Docs</a>
+    <a class="navlink optional" href="https://vyprsec.ai">VYPR</a>
+    <a class="ghstar" href="https://github.com/vyprai/vyql" rel="noopener">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      Star on GitHub
+    </a>
+  </div>
+</header>
 <main>
 
   <p class="overline">Open source · Apache-2.0</p>
