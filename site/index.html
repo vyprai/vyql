@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VyQL: a security scanner that shows its working</title>
+<title>VyQL: open-source taint analysis that shows its working</title>
 <meta name="description" content="Open source security scanner for 22 languages. Traces untrusted input to where it turns dangerous, and lists the safeguards that are missing.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2318181b'/%3E%3Cpath d='M8 10l8 13 8-13' fill='none' stroke='%23fafafa' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="canonical" href="https://vyprsec.ai/vyql/">
-<meta property="og:title" content="VyQL: a security scanner that shows its working">
-<meta property="og:description" content="Traces untrusted input to where it turns dangerous, and tells you what would have made it safe. Apache-2.0.">
+<meta property="og:title" content="VyQL: open-source taint analysis that shows its working">
+<meta property="og:description" content="If a path exists, VyQL shows you every hop. If a control covers it, VyQL stays quiet. Open source, Apache-2.0.">
 <meta property="og:url" content="https://vyprsec.ai/vyql/">
 <meta property="og:type" content="website">
 <script>try{var t=localStorage.getItem("vyql-theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
@@ -90,7 +90,7 @@ body {
 main { max-width:var(--content-w); margin:0 auto; padding:var(--space-8) var(--space-6); }
 section { margin-top:var(--space-12); }
 h1,h2,h3 { line-height:var(--leading-tight); letter-spacing:var(--tracking-title); font-weight:600; margin:0; }
-h1 { font-size:var(--text-page-title); }
+h1 { font-size:var(--text-page-title); max-width:var(--column-w); }
 h2 { font-size:var(--text-section); margin-bottom:var(--space-4); }
 h3 { font-size:var(--text-card-title); }
 section h3 { margin-top:var(--space-6); margin-bottom:var(--space-2); }
@@ -230,11 +230,11 @@ header.site .inner {
 <main>
 
   <p class="overline">Open source · Apache-2.0</p>
-  <h1>A security scanner that shows its working.</h1>
+  <h1>Open-source taint analysis that follows untrusted input to the point it
+    turns dangerous, and names the controls that would have stopped it.</h1>
   <p class="lede">
-    VyQL follows untrusted input through your code and flags where it reaches
-    something dangerous. When it flags something, it also tells you which
-    safeguards it checked for and didn't find.
+    If a path exists, VyQL shows you every hop. If a control covers it, VyQL
+    stays quiet.
   </p>
 
   <div class="cta">
@@ -247,7 +247,7 @@ header.site .inner {
   </div>
 
   <section>
-    <h2>Other ways to install</h2>
+    <h2>Other Ways to Install</h2>
     <table>
       <tbody>
         <tr><td>Homebrew</td><td><code>brew install vyprai/tap/vyql</code></td></tr>
@@ -258,15 +258,15 @@ header.site .inner {
       </tbody>
     </table>
     <p>
-      Every one of these carries the security knowledge with it, so there is no
-      second setup step and nothing to point at a server.
+      Every one carries the security knowledge with it. No second setup step,
+      and nothing to point at a server.
     </p>
   </section>
 
   <section>
     <h2>Quickstart</h2>
 
-    <h3>From the terminal</h3>
+    <h3>From the Terminal</h3>
     <p>Four commands cover almost everything:</p>
 <pre class="sample">vyql scan .                      <i># everything in this tree</i>
 vyql explain .                   <i># why each finding fired</i>
@@ -282,7 +282,7 @@ vyql scan --format json /tmp/base &gt; before.json
 vyql scan --format json .        &gt; after.json
 vyql diff before.json after.json</pre>
 
-    <h3>Through an agent</h3>
+    <h3>Through an Agent</h3>
     <p>
       VyQL ships as an agent skill, so you can ask instead of remembering flags.
       In Claude Code:
@@ -331,7 +331,7 @@ vyql diff before.json after.json</pre>
       an installer.
     </p>
 
-    <h3>Either way, the same shape</h3>
+    <h3>Either Way, the Same Shape</h3>
     <p>
       Scope what you are looking at, scan, read the coverage line, look at the
       list, verify the ones that matter, and reproduce if you need proof. Stop
@@ -340,7 +340,7 @@ vyql diff before.json after.json</pre>
   </section>
 
   <section>
-    <h2>What a finding looks like</h2>
+    <h2>What a Finding Looks Like</h2>
     <p>
       An Express app that takes a filename from the query string and passes it
       to the filesystem:
@@ -371,22 +371,21 @@ analysis profile: HTTP API server (api)
     <i>unless endpoint coveredBy core.PathAccessCheck: not satisfied, no guard on sink</i></pre>
     <p>
       Look at the last two lines. Most scanners tell you something is wrong and
-      leave you to work out what to do about it. This one names the controls that
-      would have fixed it, and if you already have one in place, why it didn't
-      apply here.
+      leave the rest to you. VyQL names the control that would have fixed it. If
+      you already have that control, it tells you why it didn't apply.
     </p>
   </section>
 
   <section>
-    <h2>What you're getting</h2>
+    <h2>What You Get</h2>
     <div class="grid">
       <div class="card">
-        <h3>Knowledge as data</h3>
+        <h3>Knowledge as Data</h3>
         <p>A small Go engine plus 12,400 <code>.vyql</code> files you can open and edit.
            Adding a framework usually means writing a binding, not patching Go.</p>
       </div>
       <div class="card">
-        <h3>One graph, 22 languages</h3>
+        <h3>One Graph, 22 Languages</h3>
         <p>Java, Python and JavaScript are the most complete. Coverage thins out from
            there, and the scan tells you what you actually got.</p>
       </div>
@@ -396,7 +395,7 @@ analysis profile: HTTP API server (api)
            Baseline files if you're adopting it on a codebase that already has findings.</p>
       </div>
       <div class="card">
-        <h3>It admits what it missed</h3>
+        <h3>It Admits What It Missed</h3>
         <p>Files it couldn't parse get reported whether you ask or not. Otherwise a
            clean run over code nothing read looks the same as a genuinely clean run.</p>
       </div>
