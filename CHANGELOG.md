@@ -10,7 +10,28 @@ behaviour change even when no code changed.
 
 ## [Unreleased]
 
+### Added
+- **Swift lock lifecycle.** A `.lock()` / `.unlock()` pair — the shape `NSLock`,
+  `NSRecursiveLock`, `NSCondition` and `NSConditionLock` all share — plus
+  `os_unfair_lock` and `pthread_mutex` called directly, now emit
+  `code.LockAcquire` and `core.LockRelease`, so `VYQL-LIFE-001` covers Swift. It
+  previously had no lock vocabulary at all, so the rule could not fire there in
+  either direction. Matching is on the method name, so a `.lock()` that is not a
+  mutex is reported too; the rule is medium-severity advisory for that reason,
+  and Go's equivalent binding is broader still.
+
 ### Fixed
+- **Swift's `defer { … }` ran where it was written, not at function exit.** Swift's
+  grammar has no `defer_statement` — `defer` parses as a call to an identifier of
+  that name carrying a trailing closure — so the block fell through to the generic
+  trailing-closure handling and was lowered inline. That is accidentally right when
+  the `defer` follows what it cleans up and wrong otherwise: a release written
+  above its acquisition landed *before* it in CFG order and read as never
+  released. `defer` is now recognised by shape and lowered as `nir.Defer`.
+
+  Shipping Swift lock bindings without this would have created exactly the false
+  positive that PR #27 fixed for Go.
+
 - **Go's `defer` was dropped from the IR, so a deferred release read as no
   release at all.** The frontend's statement conversion had no case for
   `*ast.DeferStmt`, so `defer mu.Unlock()` produced no node — nothing emitted

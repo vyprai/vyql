@@ -94,6 +94,90 @@ test "lifecycle: go deferred unlock inside a closure releases the closure's lock
   }
   ```
 
+test "lifecycle: swift lock without unlock is reported"
+  lang swift
+  expect VYQL-LIFE-001
+  code
+  ```
+  import Foundation
+  func f(_ mu: NSLock) {
+      mu.lock()
+  }
+  ```
+
+test "lifecycle: swift lock with unlock is clean"
+  lang swift
+  reject VYQL-LIFE-001
+  code
+  ```
+  import Foundation
+  func f(_ mu: NSLock) {
+      mu.lock()
+      mu.unlock()
+  }
+  ```
+
+test "lifecycle: swift lock released by defer is clean"
+  lang swift
+  reject VYQL-LIFE-001
+  code
+  ```
+  import Foundation
+  func f(_ mu: NSLock) {
+      mu.lock()
+      defer { mu.unlock() }
+  }
+  ```
+
+test "lifecycle: swift defer written above the acquire still releases it"
+  lang swift
+  reject VYQL-LIFE-001
+  code
+  ```
+  import Foundation
+  func f(_ mu: NSLock) {
+      defer { mu.unlock() }
+      mu.lock()
+  }
+  ```
+
+test "lifecycle: swift unlock deferred only on one branch is reported"
+  lang swift
+  expect VYQL-LIFE-001
+  code
+  ```
+  import Foundation
+  func f(_ mu: NSLock, _ ok: Bool) {
+      mu.lock()
+      if ok {
+          defer { mu.unlock() }
+      }
+  }
+  ```
+
+test "lifecycle: swift pthread mutex without unlock is reported"
+  lang swift
+  expect VYQL-LIFE-001
+  code
+  ```
+  import Foundation
+  func f(_ m: UnsafeMutablePointer<pthread_mutex_t>) {
+      pthread_mutex_lock(m)
+  }
+  ```
+
+test "lifecycle: swift pthread mutex released by defer is clean"
+  lang swift
+  reject VYQL-LIFE-001
+  code
+  ```
+  import Foundation
+  func f(_ m: UnsafeMutablePointer<pthread_mutex_t>) {
+      pthread_mutex_lock(m)
+      defer { pthread_mutex_unlock(m) }
+  }
+  ```
+
 test "lifecycle: go unlock deferred only on one branch is reported"
   lang go
   expect VYQL-LIFE-001

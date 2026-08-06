@@ -740,9 +740,17 @@ func f(mu *sync.Mutex) {
 	if len(found) != 1 {
 		t.Fatalf("want one nir.Defer in the function body, got %d", len(found))
 	}
-	call, ok := found[0].Call.(nir.Call)
+	// Go defers exactly one call, so the deferred block holds exactly that statement.
+	if len(found[0].Body) != 1 {
+		t.Fatalf("deferred body = %d statements, want 1", len(found[0].Body))
+	}
+	stmt, ok := found[0].Body[0].(nir.ExprStmt)
 	if !ok {
-		t.Fatalf("deferred call = %T, want nir.Call", found[0].Call)
+		t.Fatalf("deferred statement = %T, want nir.ExprStmt", found[0].Body[0])
+	}
+	call, ok := stmt.Value.(nir.Call)
+	if !ok {
+		t.Fatalf("deferred call = %T, want nir.Call", stmt.Value)
 	}
 	if call.Path != "mu.Unlock" {
 		t.Errorf("deferred call path = %q, want mu.Unlock", call.Path)

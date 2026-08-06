@@ -123,11 +123,12 @@ they are where the next Python precision work belongs.
 Every category that needs taint to reach a sink is short; the four saturated ones
 are constant/API-shape.
 
-#### 3.1.3 Go `defer` lowering — no movement
+#### 3.1.3 `defer` lowering and Swift lock bindings — no movement
 
-All 267 per-category `TP/FN/FP/TN` rows are identical before and after. These corpora
-carry no lifecycle cases, so `VYQL-LIFE-001` never fires on them either way; the change
-is covered by `vyql/tests/coverage_lifecycle.test.vyql` instead.
+All 267 per-category `TP/FN/FP/TN` rows are identical before and after, for the Go and
+the Swift work alike. These corpora carry no lifecycle cases, so `VYQL-LIFE-001` never
+fires on them either way; that work is covered by
+`vyql/tests/coverage_lifecycle.test.vyql` instead.
 
 ### 3.2 Runtime
 

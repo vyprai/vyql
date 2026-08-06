@@ -477,3 +477,48 @@ binding ownershipCheck82 {
     }
   }
 }
+
+binding lockAcquire83 {
+  query pattern callExpr where callee.method == "lock"
+  emit issue code.LockAcquire at call
+}
+
+binding lockAcquire84 {
+  query pattern callExpr where callee.path ~= "os_unfair_lock_lock"
+  emit issue code.LockAcquire at call
+}
+
+binding lockAcquire85 {
+  query pattern callExpr where callee.path ~= "pthread_mutex_lock"
+  emit issue code.LockAcquire at call
+}
+
+binding lockRelease86 {
+  query pattern callExpr where callee.method == "unlock"
+  emit check core.LockRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding lockRelease87 {
+  query pattern callExpr where callee.path ~= "os_unfair_lock_unlock"
+  emit check core.LockRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding lockRelease88 {
+  query pattern callExpr where callee.path ~= "pthread_mutex_unlock"
+  emit check core.LockRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}
