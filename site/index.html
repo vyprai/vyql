@@ -301,29 +301,41 @@ vyql diff before.json after.json</pre>
     </p>
 <pre class="sample"><b class="who">you</b>  audit this repo for security problems
 
-     <i>scanned python:14 javascript:3, 2 files unread (.kt)
-     7 findings. 2 critical, 3 high, 2 medium.
-     1. VYQL-INJ-002  critical  api/users.py:88   request body reaches a shell
-     2. VYQL-PATH-001 high      api/files.py:23   query param reaches open()
-     ...</i>
+     <i>scanned python:14 javascript:3, 2 files unread (.kt)</i>
+     <i>7 findings. 2 critical, 3 high, 2 medium.</i>
+     <i>1. VYQL-INJ-002  critical  api/users.py:88  request body reaches a shell</i>
+     <i>2. VYQL-PATH-001 high      api/files.py:23  query param reaches open()</i>
+     <i>...</i>
 
-<b class="who">you</b>  is 2 real?
+<b class="who">you</b>  verify the high ones
 
-     <i>api/files.py is a request handler, so the surface is right, and the
-     source is untrusted. But there is a startswith() check two lines up
-     that VyQL did not model as containment.
-     False positive, and a binding gap worth reporting.</i>
+     <i>4 families: INJ (2), PATH (3), CRY (1), CFG (1). Verifying all four,</i>
+     <i>one agent each. Nothing deferred.</i>
 
-<b class="who">you</b>  what about 1
+     <i>INJ   1 real, 1 false positive</i>
+     <i>PATH  3 false positives, all through the same startswith() guard</i>
+     <i>CRY   1 real</i>
+     <i>CFG   1 unresolved, needs to know whether debug mode ships</i>
 
-     <i>Real. The path carries the value with no escaping, and nothing
-     dominates it. Fix is core.ShellEscape: use subprocess with a list
-     rather than shell=True.</i>
+     <i>The three PATH findings share a cause. That guard is a containment</i>
+     <i>check VyQL does not model, so it is a binding gap, not three bugs.</i>
 
-<b class="who">you</b>  write me a test that proves it
+<b class="who">you</b>  what about the INJ one
 
-     <i>Written to tests/test_users_injection.py. It fails now and passes
-     once the fix lands. Shall I run it?</i></pre>
+     <i>Real. api/users.py:88 is a request handler and the path carries the</i>
+     <i>value with no escaping. Fix is core.ShellEscape: subprocess with a</i>
+     <i>list rather than shell=True.</i>
+
+<b class="who">you</b>  prove it
+
+     <i>Booting from a clean worktree at the scanned commit.</i>
+     <i>POST /users/import with a payload of "; id" returns uid=0(root).</i>
+     <i>Torn down.</i>
+
+<b class="who">you</b>  fix it then
+
+     <i>One file, api/users.py, introducing subprocess with an argument list.</i>
+     <i>Shall I?</i></pre>
     <p>
       A reproduction runs against your own machine and nothing else, and the
       skill asks before executing one. Writing it is the deliverable; running it

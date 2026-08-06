@@ -136,7 +136,7 @@ knowledge as much as on the engine.
 The same shape whether you drive the CLI yourself or ask an agent.
 
 ```
-scope  →  scan  →  coverage  →  list  →  verify  →  reproduce
+scope  →  scan  →  coverage  →  list  →  verify  →  reproduce  →  fix
 ```
 
 **Scope.** Whole repo, or just what a change introduced. These are different
@@ -152,13 +152,17 @@ was fully read, and only that line tells them apart.
 
 **List.** Everything it found, by severity, each with a location.
 
-**Verify.** Pick one, or all the high ones. `explain` gives the proof tree,
-`query` and `trace` check whether the source and the path are what the finding
-claims. This is static verification: it establishes the path holds up, not that
-the bug is exploitable.
+**Verify.** Pick one, or all the high ones. Findings are grouped by rule family
+and verified an agent at a time, four families at most, because a systematic
+false positive arrives as a whole family. This is static verification: it
+establishes the path holds up, not that the bug is exploitable.
 
-**Reproduce.** Optionally, a failing test that fails today and passes once you
-fix it. Local only.
+**Reproduce.** Optionally, boot the app from a clean worktree and exploit that.
+If it will not boot cold, a failing test instead. Local only, never the instance
+you are already running.
+
+**Fix.** Optionally, and only if you ask. The default is to name the control and
+leave the edit to you.
 
 Stop wherever you have your answer. A list is a complete answer to "what is wrong
 here", and most scans end there.
@@ -183,21 +187,35 @@ you  audit this repo for security problems
      2. VYQL-PATH-001 high      api/files.py:23  query param reaches open()
      ...
 
-you  is 2 real?
+you  verify the high ones
 
-     api/files.py is a request handler and the source is untrusted, but
-     there is a startswith() check two lines up that VyQL did not model
-     as containment. False positive, and a binding gap worth reporting.
+     4 families: INJ (2), PATH (3), CRY (1), CFG (1). Verifying all four,
+     one agent each. Nothing deferred.
 
-you  what about 1
+     INJ   1 real, 1 false positive
+     PATH  3 false positives, all through the same startswith() guard
+     CRY   1 real
+     CFG   1 unresolved, needs to know whether debug mode ships
 
-     Real. The path carries the value with no escaping. Fix is
-     core.ShellEscape: subprocess with a list rather than shell=True.
+     The three PATH findings share a cause. That guard is a containment
+     check VyQL does not model, so it is a binding gap, not three bugs.
 
-you  write me a test that proves it
+you  what about the INJ one
 
-     Written to tests/test_users_injection.py. It fails now and passes
-     once the fix lands. Shall I run it?
+     Real. api/users.py:88 is a request handler and the path carries the
+     value with no escaping. Fix is core.ShellEscape: subprocess with a
+     list rather than shell=True.
+
+you  prove it
+
+     Booting from a clean worktree at the scanned commit.
+     POST /users/import with a payload of "; id" returns uid=0(root).
+     Torn down.
+
+you  fix it then
+
+     One file, api/users.py, introducing subprocess with an argument list.
+     Shall I?
 ```
 
 You never restate which finding you mean, because the list is still in the
