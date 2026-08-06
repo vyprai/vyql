@@ -12,7 +12,9 @@
 package lowering
 
 import (
+	"encoding/hex"
 	"fmt"
+	"hash/fnv"
 	"sort"
 	"strconv"
 	"strings"
@@ -81,6 +83,7 @@ type lowerer struct {
 
 	curModule     string   // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
 	curNS         string   // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
+	curFile       string   // the module's display path; curNS is a hash, so language sniffs read THIS
 	curClass      string   // "" = none
 	curDecorators []string // syntax annotations/decorators on the enclosing function
 
@@ -832,7 +835,7 @@ func (l *lowerer) flushDeferred() {
 }
 
 func (l *lowerer) promoteCapturedJSBindings(stmts []nir.Stmt, params []string, sc *scope, loc string) {
-	if !isJSLikeModule(l.curNS) {
+	if !isJSLikeModule(l.curFile) {
 		return
 	}
 	for name := range freeNames(stmts, params) {
@@ -2212,14 +2215,59 @@ func (l *lowerer) nid(prefix string) string {
 	return l.curNS + "\x1f" + prefix + "#" + strconv.Itoa(l.modCtr[l.curNS])
 }
 
-// ModuleNS is a module's per-FILE node-id namespace: the file path (unique per file) so node
-// ids stay file-local and stable even for languages whose resolution Key is "" (PHP, Ruby,
-// …). Cross-module references use the resolution Key; node ids use this.
+// ModuleNS is a module's per-FILE node-id namespace, derived from the file path (unique per
+// file) so node ids stay file-local and stable even for languages whose resolution Key is ""
+// (PHP, Ruby, …). Cross-module references use the resolution Key; node ids use this.
+//
+// The namespace is a 64-bit hash of the path, not the path itself. Every node in a module
+// carries the namespace in its id — and, via curNS, in its control-region path — so on deep
+// source trees the raw path (over a hundred bytes on a typical Java repository) was being
+// repeated per node; 17 bytes carries the same identity. Everything that consumes the
+// namespace treats it as an opaque token (nid, NodeModule, graphsync.moduleOf, the
+// incremental cache keys), and the shipped finding fingerprint hashes rule id + location +
+// concept, so ids never reach a baseline file. checkModuleNSCollisions guards the one thing
+// the path gave for free: no two files sharing a namespace.
 func ModuleNS(m nir.Module) string {
-	if m.File != "" {
-		return m.File
+	path := m.File
+	if path == "" {
+		path = m.Key
 	}
-	return m.Key
+	h := fnv.New64a()
+	h.Write([]byte(path))
+	var b [17]byte
+	b[0] = 'm'
+	hex.Encode(b[1:], h.Sum(nil))
+	return string(b[:])
+}
+
+// checkModuleNSCollisions rejects a program in which two distinct files hash to the same
+// node-id namespace — the collision would silently merge the two modules' nodes. With a
+// 64-bit namespace the probability is ~n²/2⁶⁵ (about 3e-10 at a hundred thousand files),
+// so this exists to turn "effectively never" into "never silently".
+func checkModuleNSCollisions(mods []nir.Module) error {
+	seen := make(map[string]string, len(mods))
+	for _, m := range mods {
+		path := m.File
+		if path == "" {
+			path = m.Key
+		}
+		if err := noteModuleNS(seen, ModuleNS(m), path); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// noteModuleNS records one namespace→path claim, rejecting a second path claiming the same
+// namespace. Split from the loop above because the collision branch is not reachable
+// through ModuleNS without an actual 64-bit hash collision, and an untestable error path
+// is indistinguishable from a wrong one.
+func noteModuleNS(seen map[string]string, ns, path string) error {
+	if prev, ok := seen[ns]; ok && prev != path {
+		return fmt.Errorf("module namespace collision: %q and %q both hash to %s — rename one file", prev, path, ns)
+	}
+	seen[ns] = path
+	return nil
 }
 
 func moduleTech(file string) string {
@@ -2357,8 +2405,11 @@ func (l *lowerer) exists(id string) bool {
 // --- entry --------------------------------------------------------------
 
 func (l *lowerer) run() error {
+	if err := checkModuleNSCollisions(l.prog.Modules); err != nil {
+		return err
+	}
 	for _, m := range l.prog.Modules {
-		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
+		l.curModule, l.curClass, l.curNS, l.curFile = m.Key, "", ModuleNS(m), m.File
 		l.moduleTech[m.Key] = moduleTech(m.File)
 		l.importTables[m.Key] = importTable(m)
 		for _, imp := range m.Imports {
@@ -2368,7 +2419,7 @@ func (l *lowerer) run() error {
 	}
 	l.collectAddressTaken()
 	for _, m := range l.prog.Modules {
-		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
+		l.curModule, l.curClass, l.curNS, l.curFile = m.Key, "", ModuleNS(m), m.File
 		l.block(m.Body, l.moduleScope(m))
 	}
 	return nil
