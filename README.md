@@ -196,11 +196,15 @@ you  what about 1
 
 you  write me a test that proves it
 
-     Writes a failing test. Local only, and it asks before running it.
+     Written to tests/test_users_injection.py. It fails now and passes
+     once the fix lands. Shall I run it?
 ```
 
 You never restate which finding you mean, because the list is still in the
 conversation. A single question works too, but the flow is what it is built for.
+
+A reproduction runs against your own machine and nothing else, and the skill asks
+before executing one. Writing it is the deliverable; running it is your call.
 
 The skill runs the right commands, reports coverage before findings, and holds
 the line on what a verdict means. It asks before installing anything and before
