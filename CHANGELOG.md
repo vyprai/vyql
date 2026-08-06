@@ -10,15 +10,7 @@ behaviour change even when no code changed.
 
 ## [Unreleased]
 
-### Changed
-- **Node ids no longer embed the file path.** The id namespace is a 17-byte hash
-  of the path instead of the path itself, which was repeated on every node in a
-  module — over a hundred bytes per node on a deep Java tree. `query`, `graph`
-  and `match` output shows ids as `m4be5c7…Call#14` rather than `app.jsCall#14`;
-  the loc column still names the file and line. Finding fingerprints hash rule
-  id + location + concept, not ids, so existing `-baseline` files are unaffected.
-  Two files hashing to one namespace would silently merge their nodes, so the
-  scan now refuses that program outright (~3e-10 at a hundred thousand files).
+## [0.2.3] - 2026-08-06
 
 ### Added
 - **Swift lock lifecycle.** A `.lock()` / `.unlock()` pair — the shape `NSLock`,
@@ -30,7 +22,23 @@ behaviour change even when no code changed.
   mutex is reported too; the rule is medium-severity advisory for that reason,
   and Go's equivalent binding is broader still.
 
+### Changed
+- **Node ids no longer embed the file path.** The id namespace is a 17-byte hash
+  of the path instead of the path itself, which was repeated on every node in a
+  module — over a hundred bytes per node on a deep Java tree. `query`, `graph`
+  and `match` output shows ids as `m4be5c7…Call#14` rather than `app.jsCall#14`;
+  the loc column still names the file and line. Finding fingerprints hash rule
+  id + location + concept, not ids, so existing `-baseline` files are unaffected.
+  Two files hashing to one namespace would silently merge their nodes, so the
+  scan now refuses that program outright (~3e-10 at a hundred thousand files).
+
 ### Fixed
+- **`VYQL_CPUPROFILE` and `VYQL_MEMPROFILE` produced nothing on a real scan.**
+  `main` exited through `os.Exit`, which does not run deferred functions, so the
+  deferred profile flushes were skipped whenever a scan met its `-fail-on`
+  threshold — that is, on any codebase worth profiling. The CPU profile was a
+  0-byte file and the heap profile was never written at all.
+
 - **Swift's `defer { … }` ran where it was written, not at function exit.** Swift's
   grammar has no `defer_statement` — `defer` parses as a call to an identifier of
   that name carrying a trailing closure — so the block fell through to the generic
@@ -98,6 +106,28 @@ behaviour change even when no code changed.
   is unconditionally attached to its try statement.
 
   All 24 benchmark corpora are unchanged, BenchmarkJava's 2,740 cases included.
+
+### Performance
+- **A scan allocates a third less, and is materially faster on generated code.**
+  Found by profiling rather than by reading, and each step measured: the C
+  frontend recompiled 47 constant regexes per call (7.3% of scan CPU); a shared
+  tree-sitter helper allocated three times per node visit, including a cursor at
+  every leaf; nine `strings.NewReplacer` values were rebuilt per call; and branch
+  lowering copied the whole variable scope four times per `if` — quadratic within
+  one function, which is why a single large generated file could exhaust memory
+  while thousands of ordinary files did not.
+
+  Measured against 0.2.2 on a ~5,900-file Java repository: **11.58 GB allocated →
+  9.49 GB (−18%)**. On generated code, where the quadratic bit hardest: **22.98 GB
+  → 8.33 GB (−64%)** and **15.3 s → 11.3 s wall (−26%)**.
+
+  Peak memory is unchanged. It tracks live heap plus GC headroom rather than
+  allocation rate, so a third less garbage does not lower the ceiling — bounding
+  the caches that hold the live heap was tried, measured, and reverted because it
+  made both memory and time worse.
+
+  Findings are byte-identical throughout: the same 1,460 findings with the same
+  fingerprints on that repository, and all 24 benchmark corpora unchanged.
 
 ## [0.2.2] - 2026-08-05
 
