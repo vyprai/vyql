@@ -5,7 +5,7 @@ was produced by `TestOWASPBenchmark`; none is carried over from memory or from a
 corpus. Earlier figures are in the git history rather than here, so nothing on this page
 needs reading past to reach a current number.
 
-Machine: MBP M3 Pro, 11 cores, 18 GB. Last updated 2026-08-04.
+Machine: MBP M3 Pro, 11 cores, 18 GB. Last updated 2026-08-06.
 
 > **Read the corpus column before comparing anything.** The single largest source of
 > confusion in this project has been treating scores from the synthetic ports as scores
@@ -23,8 +23,8 @@ categories (the mean of each category's `J`). It is *not* precision.
 | FPR | `FP / (FP+TN)` | of the safe cases, how many did we flag |
 | **Youden** | `TPR − FPR` | 1.0 = perfect, 0.0 = no better than chance |
 
-Macro (mean of per-category `J`) and micro (pooled counts) differ, sometimes a lot — see
-§4 for a case where they differ by 0.15 because of a corpus defect.
+Macro (mean of per-category `J`) and micro (pooled counts) differ, sometimes a lot — §4
+records a corpus defect that once drove them 0.15 apart.
 
 Per-suite on `main`:
 
@@ -35,7 +35,8 @@ Per-suite on `main`:
 | owasp-js (port) | **+1.00** |
 
 Python recall is exactly 1.0 (452/452, zero false negatives); every point below
-+1.00 there is a false positive, broken down per category in §3.1.1.
++1.00 there is a false positive, broken down per category in §3.1.1. owasp-go is
+short the other way, entirely on recall (§3.1.2).
 
 ## 2. Corpora
 
@@ -70,11 +71,16 @@ VYQL_BENCH=1 BENCH_DIR=/tmp/bench/ports/owasp-js   go test -count=1 -v ./cmd/vyq
 
 ### 3.1 Full corpora
 
+Every fetched corpus, measured 2026-08-06 on `main` (`54cd1809a`) in one sweep:
+
 | Corpus | Youden macro |
 |---|---|
 | BenchmarkJava (2,740) | **+1.00** |
 | BenchmarkPython (1,230) | **+0.90** |
-| owasp-js (2,740) | **+1.00** |
+| owasp-go (2,740) | **+0.78** |
+| owasp-bash, -c, -cpp, -csharp, -dart, -elixir, -groovy, -js, -kotlin, -lua, -objc, -perl, -php, -powershell, -python, -ruby, -rust, -scala, -solidity, -swift, -typescript | **+1.00** each |
+
+owasp-go is the only port below +1.00.
 
 #### 3.1.1 Python — every point below +1.00 is a false positive
 
@@ -98,6 +104,31 @@ precision, with **FP=99** against **TN=679**.
 `pathtraver` and `xpathi` carry 83 of the 99 false positives between them, so
 they are where the next Python precision work belongs.
 
+#### 3.1.2 owasp-go — every point below +1.00 is a false negative
+
+**FP=0 in all eleven categories**; the gap to +1.00 is entirely recall,
+**FN=302** against **TP=1,113**.
+
+| category | Youden | TP | FN |
+|---|---|---|---|
+| crypto, hash, securecookie, weakrand | **+1.00** | 513 | 0 |
+| pathtraver | **+0.69** | 92 | 41 |
+| cmdi | **+0.67** | 84 | 42 |
+| sqli | **+0.67** | 181 | 91 |
+| trustbound | **+0.67** | 56 | 27 |
+| xpathi | **+0.67** | 10 | 5 |
+| xss | **+0.66** | 163 | 83 |
+| ldapi | **+0.52** | 14 | 13 |
+
+Every category that needs taint to reach a sink is short; the four saturated ones
+are constant/API-shape.
+
+#### 3.1.3 Go `defer` lowering — no movement
+
+All 267 per-category `TP/FN/FP/TN` rows are identical before and after. These corpora
+carry no lifecycle cases, so `VYQL-LIFE-001` never fires on them either way; the change
+is covered by `vyql/tests/coverage_lifecycle.test.vyql` instead.
+
 ### 3.2 Runtime
 
 | Corpus | Time |
@@ -107,21 +138,13 @@ they are where the next Python precision work belongs.
 
 ## 4. Known corpus defects
 
-**`owasp-js` `ldapi` and `xpathi` have zero true negatives.**
+None open. `owasp-js` `ldapi`/`xpathi` generated no safe variants, so `TN=0` pinned their
+Youden at +0.00 and held the port's macro at +0.79 against a micro of +0.94; the
+2026-08-06 sweep scores both and the two now agree at +1.00.
 
-```
-ldapi    TP=27  FN=0  FP=32  TN=0
-xpathi   TP=15  FN=0  FP=20  TN=0
-```
-
-With `TN=0`, `FPR` is 1.0 by construction and Youden is pinned at +0.00 no matter what the
-engine does. Two of eleven categories are structurally unscoreable, which is the whole
-reason the JS port's macro (+0.79) and micro (+0.94) averages diverge so far.
-
-The same categories behave normally on BenchmarkJava (`ldapi` FP=2/TN=30, `xpathi`
-FP=1/TN=19), so this is specific to the port — either its safe variants are not generated
-for those categories, or the JS adapter lacks the LDAP/XPath sanitizer bindings Java has.
-**Fix this before +0.78/+0.79 is used as a CI floor.**
+**Check `TN` per category before reading any port's macro as an engine number** — a
+category with no safe variants scores worse than the engine earns, and a macro and micro
+that diverge far apart is the give-away.
 
 ## 5. CI floors
 
@@ -132,7 +155,7 @@ point below measured, to absorb upstream corpus revisions without a spurious red
 |---|---|---|
 | BenchmarkJava | +1.00 | TP=1415, FN=0, FP=0, TN=1325, +1.00 |
 | BenchmarkPython | +0.90 | TP=452, FN=0, +0.90 |
-| owasp-js | +1.00 | *not gated yet* — see §4 |
+| owasp-js | +1.00 | now gateable — the §4 defect that blocked it is fixed |
 
 Each floor asserts its own corpus's true-positive count: BenchmarkJava has 1,415 and
 BenchmarkPython has 452. A floor carrying the wrong corpus's count fails on every commit,

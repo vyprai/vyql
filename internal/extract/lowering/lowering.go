@@ -96,6 +96,12 @@ type lowerer struct {
 	modOrder  map[string]int
 	modBranch map[string]int
 
+	// deferred is a stack of the nir.Defer registrations seen in each function body
+	// currently being lowered — one frame per function, so a nested function's defers
+	// never escape into its parent's. Each frame is emitted at the end of its function
+	// body; see flushDeferred for why placement is deferred rather than in-place.
+	deferred [][]deferredCall
+
 	// container element-sensitivity: per-container-node taint of individual constant
 	// keys/indices, so `m.put("kB", tainted); m.get("kA")` reads a clean element rather
 	// than the whole (over-approximated) container. Keyed by container node id.
@@ -794,6 +800,37 @@ func (s *scope) clone() *scope {
 	return c
 }
 
+// deferredCall is one registration from a nir.Defer, held until its function body ends.
+// region is where the `defer` was written and sc is the scope as of that point — the
+// deferred call's arguments are evaluated at registration, not at return.
+type deferredCall struct {
+	call   nir.Expr
+	region string
+	sc     *scope
+}
+
+// flushDeferred lowers the innermost function's deferred calls and pops its frame.
+//
+// They are emitted here, after the entire body, rather than where they were written: a
+// node's `order` is assigned when it is lowered, so emitting last is what gives a deferred
+// release a higher order than everything the body acquired — the second half of what
+// solvers.PostDominates asks for. The first half is the region, and each call keeps the one
+// its `defer` was written in, which is what distinguishes a release that really does run on
+// every path from one registered inside a branch that may never be taken.
+//
+// Reverse order matches the LIFO order defers actually run in, so two of them are ordered
+// correctly relative to each other as well.
+func (l *lowerer) flushDeferred() {
+	frame := l.deferred[len(l.deferred)-1]
+	l.deferred = l.deferred[:len(l.deferred)-1]
+	save := l.region
+	for i := len(frame) - 1; i >= 0; i-- {
+		l.region = frame[i].region
+		l.stmt(nir.ExprStmt{Value: frame[i].call}, frame[i].sc)
+	}
+	l.region = save
+}
+
 func (l *lowerer) promoteCapturedJSBindings(stmts []nir.Stmt, params []string, sc *scope, loc string) {
 	if !isJSLikeModule(l.curNS) {
 		return
@@ -905,6 +942,8 @@ func collectStmtNames(st nir.Stmt, used map[string]bool) {
 		collectExprNames(s.Value, used)
 	case nir.ExprStmt:
 		collectExprNames(s.Value, used)
+	case nir.Defer:
+		collectExprNames(s.Call, used)
 	case nir.Block:
 		for _, child := range s.Stmts {
 			collectStmtNames(child, used)
@@ -2077,6 +2116,8 @@ func estimateStmtNodes(st nir.Stmt) int {
 		return 1 + estimateExprNodes(s.Value)
 	case nir.ExprStmt:
 		return estimateExprNodes(s.Value)
+	case nir.Defer:
+		return estimateExprNodes(s.Call)
 	case nir.FuncDef:
 		return 2 + len(s.Params) + len(s.ParamEntries) + len(s.ResultEntries) + estimateStmtListNodes(s.Body)
 	case nir.ClassDef:
@@ -2700,7 +2741,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		saveDecorators := l.curDecorators
 		l.curDecorators = append(append([]string{}, st.ContextTokens...), st.Decorators...)
 		l.functionContextAnalysisEvent(st.Loc, l.curDecorators)
+		l.deferred = append(l.deferred, nil)
 		l.block(st.Body, inner)
+		l.flushDeferred()
 		l.curDecorators = saveDecorators
 		l.region = saveRegion
 	case nir.Assign:
@@ -2933,6 +2976,14 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				delete(sc.cnst, v)
 			}
 		}
+	case nir.Defer:
+		if n := len(l.deferred); n > 0 {
+			l.deferred[n-1] = append(l.deferred[n-1], deferredCall{call: st.Call, region: l.region, sc: sc.clone()})
+			return
+		}
+		// Outside any function body there is no return to defer to, so the call is the
+		// only thing left to model. Lowering it in place beats dropping it.
+		l.stmt(nir.ExprStmt{Value: st.Call}, sc)
 	case nir.Block:
 		l.block(st.Stmts, sc)
 	// Structured control flow (B1). Until the CFG lowering lands (B1.2), these flatten
@@ -4401,6 +4452,8 @@ func (l *lowerer) addrTakenStmts(stmts []nir.Stmt) {
 				l.addrTakenStmts(h)
 			}
 			l.addrTakenStmts(st.Finally)
+		case nir.Defer:
+			l.addrTakenExpr(st.Call)
 		}
 	}
 }

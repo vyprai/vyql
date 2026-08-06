@@ -27,7 +27,7 @@ func init() {
 		Name{}, Const{}, Attr{}, Index{}, Call{}, Format{}, Seq{}, Pair{}, Lambda{}, Thru{},
 		BinOp{}, Unary{}, Ternary{},
 		Assign{}, AugAssign{}, Return{}, ExprStmt{}, FuncDef{}, ClassDef{}, Block{}, If{},
-		Loop{}, Switch{}, Try{}, Validation{}, Terminate{},
+		Loop{}, Switch{}, Try{}, Defer{}, Validation{}, Terminate{},
 	} {
 		gob.Register(v)
 	}
@@ -314,6 +314,17 @@ type Try struct {
 	Loc           string
 }
 
+// Defer registers Call to run when the enclosing function returns, by whatever path it
+// returns (Go's `defer`, Swift's `defer`). Placement is the lowerer's job: it emits the
+// call after the whole function body, so the call's `order` follows everything the body
+// did — which is what lets a deferred release post-dominate an acquisition above it — while
+// keeping the control region the `defer` was written in, so registering one inside a branch
+// only releases on that branch.
+type Defer struct {
+	Call Expr
+	Loc  string
+}
+
 func (Assign) isStmt()     {}
 func (AugAssign) isStmt()  {}
 func (Return) isStmt()     {}
@@ -327,6 +338,7 @@ func (If) isStmt()         {}
 func (Loop) isStmt()       {}
 func (Switch) isStmt()     {}
 func (Try) isStmt()        {}
+func (Defer) isStmt()      {}
 
 // Import is one import binding. Module is the target module key (source-root
 // key) or file path; Symbol is set for `from m import s` (empty for plain module
