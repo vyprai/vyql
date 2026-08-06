@@ -75,10 +75,17 @@ type compiledRuleSet struct {
 
 var compiledRulesCache sync.Map // map[rules source]compiledRuleSet
 
-func main() {
+func main() { os.Exit(vyqlMain()) }
+
+// vyqlMain runs the CLI and RETURNS the process exit code rather than calling os.Exit.
+// Everything that has to happen before the process goes away is deferred here — flushing
+// the CPU and heap profiles above all. os.Exit does not run deferred functions, so exiting
+// from inside wrote an empty cpu.prof and no heap profile at all on any scan that met its
+// -fail-on threshold, which is to say on any codebase worth profiling.
+func vyqlMain() (code int) {
 	if len(os.Args) < 2 {
 		usage()
-		os.Exit(2)
+		return 2
 	}
 	// Opt-in CPU profile for local performance work (explicit env, no behavior change):
 	// VYQL_CPUPROFILE=/path/to/cpu.prof vyql scan ...
@@ -86,11 +93,11 @@ func main() {
 		f, err := os.Create(p)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "vyql: cpuprofile: "+err.Error())
-			os.Exit(1)
+			return 1
 		}
 		if err := pprof.StartCPUProfile(f); err != nil {
 			fmt.Fprintln(os.Stderr, "vyql: cpuprofile: "+err.Error())
-			os.Exit(1)
+			return 1
 		}
 		defer pprof.StopCPUProfile()
 	}
@@ -118,10 +125,11 @@ func main() {
 	}
 	// the data dir (ontology/taxonomy/packs) is required; a missing one panics
 	// deep in loading — recover into a clean message rather than a stack trace.
+	// Registered last so it runs FIRST: the profile flushes above still happen.
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintln(os.Stderr, "vyql: "+fmt.Sprint(r))
-			os.Exit(1)
+			code = 1
 		}
 	}()
 
@@ -154,7 +162,7 @@ func main() {
 		cmdVersion()
 	default:
 		usage()
-		os.Exit(2)
+		return 2
 	}
 	if err != nil {
 		// A met -fail-on threshold is a successful scan with a non-zero status,
@@ -164,11 +172,12 @@ func main() {
 		var gated *thresholdMet
 		if errors.As(err, &gated) {
 			fmt.Fprintln(os.Stderr, gated.Error())
-			os.Exit(gated.code)
+			return gated.code
 		}
 		fmt.Fprintln(os.Stderr, "vyql: "+err.Error())
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 // cmdScan is the primary `vyql scan` command: full pipeline → findings report.

@@ -392,7 +392,7 @@ func solSemanticFunctionTokens(text string) []string {
 }
 
 func solCompactText(s string) string {
-	return strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(s)
+	return compactWhitespaceReplacer.Replace(s)
 }
 
 func (c *solConv) expr(n *tree_sitter.Node) nir.Expr {

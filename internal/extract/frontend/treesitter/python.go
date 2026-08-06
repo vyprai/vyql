@@ -110,16 +110,27 @@ func field(n *tree_sitter.Node, name string) *tree_sitter.Node {
 	return n.ChildByFieldName(name)
 }
 
+// namedChildren returns a node's named children. Every treesitter frontend walks the CST
+// through this, so its allocation cost is multiplied by every node in every file.
+//
+// Indexing with NamedChild rather than cursor-walking with NamedChildren matters because
+// Walk allocates a TreeCursor per call — including at every leaf, which is most of a tree —
+// and NamedChildren then allocates a []Node that this function only reads pointers out of.
+// Indexing allocates neither, and returning nil for a childless node skips the slice too.
+// NamedChild is documented as log(i) per index against the cursor's constant, which is the
+// trade being made: the child counts in real source are small enough that removing two
+// allocations per visited node wins.
 func namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
 	if n == nil {
 		return nil
 	}
-	cursor := n.Walk()
-	defer cursor.Close()
-	nodes := n.NamedChildren(cursor)
-	out := make([]*tree_sitter.Node, len(nodes))
-	for i := range nodes {
-		out[i] = &nodes[i]
+	k := n.NamedChildCount()
+	if k == 0 {
+		return nil
+	}
+	out := make([]*tree_sitter.Node, 0, k)
+	for i := uint(0); i < k; i++ {
+		out = append(out, n.NamedChild(i))
 	}
 	return out
 }

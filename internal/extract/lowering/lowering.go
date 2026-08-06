@@ -3019,7 +3019,13 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		b := l.nextBranch()
 		before := cloneStrMap(sc.node)
-		beforeIter := cloneIterationFacts(sc.iter)
+		// The snapshot is an ALIAS, not a copy: sc.iter is immediately repointed at a
+		// private clone, so a branch never mutates the map this refers to. Only the two
+		// per-branch clones below are real copies — a lowerer clones these maps once per
+		// branch and the map grows with the function, so halving the count halves the
+		// quadratic term that lets one large generated function exhaust memory.
+		beforeIter := sc.iter
+		sc.iter = cloneIterationFacts(beforeIter)
 		l.inRegion("if"+b+".t", func() {
 			if name, ok := allowlistMembershipVar(st.Cond); ok && before[name] != "" {
 				loc := st.Loc
@@ -3034,12 +3040,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			l.block(st.Then, sc)
 		})
 		thenB := cloneStrMap(sc.node)
-		thenIter := cloneIterationFacts(sc.iter)
+		thenIter := sc.iter // already private to the then-branch
 		sc.node = cloneStrMap(before)
 		sc.iter = cloneIterationFacts(beforeIter)
 		l.inRegion("if"+b+".e", func() { l.block(st.Else, sc) })
 		elseB := cloneStrMap(sc.node)
-		elseIter := cloneIterationFacts(sc.iter)
+		elseIter := sc.iter
 		sc.node = before
 		sc.iter = stableIterationFacts(thenIter, elseIter)
 		l.mergeBindings(sc, before, []map[string]string{thenB, elseB})
@@ -3052,7 +3058,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	case nir.Loop:
 		l.eval(st.Cond, sc)
 		before := cloneStrMap(sc.node)
-		beforeIter := cloneIterationFacts(sc.iter)
+		beforeIter := sc.iter
+		sc.iter = cloneIterationFacts(beforeIter)
 		iterNode := l.eval(st.Iter, sc)
 		if iterNode != "" {
 			for _, name := range st.Vars {
@@ -3065,7 +3072,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		l.inRegion("loop"+l.nextBranch(), func() { l.block(st.Body, sc) })
 		bodyB := cloneStrMap(sc.node)
-		bodyIter := cloneIterationFacts(sc.iter)
+		bodyIter := sc.iter
 		sc.node = before
 		sc.iter = stableIterationFacts(beforeIter, bodyIter)
 		l.mergeBindings(sc, before, []map[string]string{bodyB})
@@ -3099,7 +3106,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		b := l.nextBranch()
 		before := cloneStrMap(sc.node)
-		beforeIter := cloneIterationFacts(sc.iter)
+		beforeIter := sc.iter
 		var branches []map[string]string
 		var iterBranches []map[string][]string
 		for i, c := range st.Cases {
@@ -3107,13 +3114,14 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			sc.iter = cloneIterationFacts(beforeIter)
 			l.inRegion("sw"+b+".c"+strconv.Itoa(i), func() { l.block(c, sc) })
 			branches = append(branches, cloneStrMap(sc.node))
-			iterBranches = append(iterBranches, cloneIterationFacts(sc.iter))
+			iterBranches = append(iterBranches, sc.iter) // private to this case
+
 		}
 		sc.node = cloneStrMap(before)
 		sc.iter = cloneIterationFacts(beforeIter)
 		l.inRegion("sw"+b+".d", func() { l.block(st.Default, sc) })
 		branches = append(branches, cloneStrMap(sc.node))
-		iterBranches = append(iterBranches, cloneIterationFacts(sc.iter))
+		iterBranches = append(iterBranches, sc.iter) // private to the default arm
 		sc.node = before
 		sc.iter = stableIterationFacts(iterBranches...)
 		l.mergeBindings(sc, before, branches)
@@ -3407,6 +3415,10 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	return l.node("Const", "?:0", nil)
 }
 
+// A strings.Replacer builds a lookup trie on first use, so constructing one inside the
+// function rebuilds and discards that trie on every call. Hoisted to build it once.
+var binopNameReplacer = strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "mul", "+", "add", "-", "sub")
+
 func binopMethod(op string) string {
 	switch op {
 	case "+":
@@ -3443,8 +3455,12 @@ func binopMethod(op string) string {
 	if op == "" {
 		return "op"
 	}
-	return strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "mul", "+", "add", "-", "sub").Replace(op)
+	return binopNameReplacer.Replace(op)
 }
+
+// A strings.Replacer builds a lookup trie on first use, so constructing one inside the
+// function rebuilds and discards that trie on every call. Hoisted to build it once.
+var unaryNameReplacer = strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "deref", "+", "pos", "-", "neg")
 
 func unaryMethod(op string) string {
 	switch op {
@@ -3462,7 +3478,7 @@ func unaryMethod(op string) string {
 	if op == "" {
 		return "op"
 	}
-	return strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "deref", "+", "pos", "-", "neg").Replace(op)
+	return unaryNameReplacer.Replace(op)
 }
 
 func isMissingTernaryArm(e nir.Expr) bool {

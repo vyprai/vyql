@@ -1,6 +1,7 @@
 package lowering
 
 import (
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -70,11 +71,17 @@ func (l *lowerer) constIterationValues(expr nir.Expr, sc *scope) ([]string, bool
 	}
 }
 
+// cloneIterationFacts copies an iteration-facts map for a branch.
+//
+// It copies the map's key/slice-header pairs and NOT the backing arrays, because the
+// values are immutable once stored: every write assigns a freshly built slice and nothing
+// appends into one in place. Copying the arrays too duplicated the bulk of the data on
+// every branch, and the lowerer clones these maps up to five times per `if` and once per
+// switch case — quadratic in the number of branches in a function, which is how a single
+// large generated file could exhaust memory.
 func cloneIterationFacts(in map[string][]string) map[string][]string {
 	out := make(map[string][]string, len(in))
-	for name, values := range in {
-		out[name] = append([]string(nil), values...)
-	}
+	maps.Copy(out, in)
 	return out
 }
 
@@ -92,7 +99,7 @@ func stableIterationFacts(states ...map[string][]string) map[string][]string {
 			}
 		}
 		if stable {
-			out[name] = append([]string(nil), values...)
+			out[name] = values // immutable once stored; see cloneIterationFacts
 		}
 	}
 	return out

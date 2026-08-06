@@ -342,12 +342,16 @@ func (c *conv) moduleContextStmts(gd *ast.GenDecl) []nir.Stmt {
 	return out
 }
 
+// A strings.Replacer builds a lookup trie on first use, so constructing one inside the
+// function rebuilds and discards that trie on every call. Hoisted to build it once.
+var goCompactWhitespaceReplacer = strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "")
+
 func compactGoNode(fset *token.FileSet, n ast.Node) string {
 	var buf bytes.Buffer
 	if err := format.Node(&buf, fset, n); err != nil {
 		return ""
 	}
-	text := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(buf.String())
+	text := goCompactWhitespaceReplacer.Replace(buf.String())
 	if len(text) > 4096 {
 		text = text[:4096]
 	}

@@ -1383,6 +1383,10 @@ func (c *ccConv) paramList(decl *tree_sitter.Node) *tree_sitter.Node {
 	return nil
 }
 
+// A strings.Replacer builds a lookup trie on first use, so constructing one inside the
+// function rebuilds and discards that trie on every call. Hoisted to build it once.
+var cPointerSpacingReplacer = strings.NewReplacer("*", " * ", "&", " & ")
+
 func (c *ccConv) paramsFromSignatureText(s string) ([]string, map[string]string) {
 	out := map[string]string{}
 	body := strings.Index(s, "{")
@@ -1403,7 +1407,7 @@ func (c *ccConv) paramsFromSignatureText(s string) ([]string, map[string]string)
 		if eq := strings.Index(part, "="); eq >= 0 {
 			part = strings.TrimSpace(part[:eq])
 		}
-		spaced := strings.NewReplacer("*", " * ", "&", " & ").Replace(part)
+		spaced := cPointerSpacingReplacer.Replace(part)
 		fields := strings.Fields(spaced)
 		if len(fields) == 0 {
 			continue

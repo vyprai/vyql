@@ -1114,8 +1114,13 @@ func javaIntLiteral(raw string) string {
 	return raw
 }
 
+// compactWhitespaceReplacer strips layout from source text. A strings.Replacer builds a
+// lookup trie on first use, so constructing one per call rebuilds and discards that trie
+// on every token — hot enough on a large corpus to be a measurable share of all allocation.
+var compactWhitespaceReplacer = strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "")
+
 func javaCompactText(s string) string {
-	return strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(s)
+	return compactWhitespaceReplacer.Replace(s)
 }
 
 func javaStringToken(raw string) string {
