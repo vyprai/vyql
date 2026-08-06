@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VyQL — a security scanner that shows its working</title>
+<meta name="description" content="Open-source multi-language taint and graph security scanner. Follows tainted data from source to sink and names the neutralizing controls that are missing.">
+<link rel="canonical" href="https://vyprsec.ai/vyql/">
+<meta property="og:title" content="VyQL — a security scanner that shows its working">
+<meta property="og:description" content="Follows tainted data from source to sink, and names the controls that would have made it safe. Apache-2.0.">
+<meta property="og:url" content="https://vyprsec.ai/vyql/">
+<meta property="og:type" content="website">
+<style>
+/* VYPR design system tokens (vyprai/vysual, docs/TOKENS.md).
+   Values are copied rather than imported: vysual is a private React package and
+   this page is served from a public repository. Copied values can drift, so the
+   set here is deliberately small -- surfaces, lines, brand, and the scales this
+   page actually uses. */
+:root {
+  --background:#ffffff; --foreground:#09090b;
+  --card:#ffffff; --card-foreground:#09090b;
+  --muted:#f4f4f5; --muted-foreground:#71717a;
+  --border:#e4e4e7; --code-bg:#fafafa;
+  --brand:oklch(50% .13 262); --ring:oklch(55% .13 262);
+  --primary:#18181b; --primary-foreground:#fafafa;
+  --destructive:#dc2626;
+
+  --radius-sm:6px; --radius:10px; --radius-card:12px;
+  --space-2:8px; --space-3:12px; --space-4:16px; --space-6:24px; --space-8:32px; --space-12:48px;
+  --text-page-title:30px; --text-section:20px; --text-card-title:16px;
+  --text-body:14.5px; --text-ui:13.5px; --text-meta:12.5px; --text-micro:11.5px;
+  --leading-body:1.65; --leading-ui:1.5; --leading-tight:1.4;
+  --tracking-title:-0.02em; --tracking-overline:0.08em;
+  --content-w:880px; --column-w:720px;
+  --ease-out:cubic-bezier(.2,0,0,1); --duration-micro:120ms;
+
+  /* Geist is the design system's typeface. vysual self-hosts it precisely so
+     nothing is fetched from a third party; this page keeps that property by
+     falling back to the system stack rather than adding a font CDN. */
+  --font-sans:"Geist Variable","Geist",ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --font-mono:"Geist Mono Variable","Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background:#000000; --foreground:#fafafa;
+    --card:#101012; --card-foreground:#fafafa;
+    --muted:#1c1c1f; --muted-foreground:#a1a1aa;
+    --border:#26262a; --code-bg:#131316;
+    --brand:oklch(72% .11 262); --ring:oklch(70% .11 262);
+    --primary:#fafafa; --primary-foreground:#18181b;
+    --destructive:#ef4444;
+  }
+}
+*,*::before,*::after { box-sizing:border-box; }
+body {
+  margin:0; background:var(--background); color:var(--foreground);
+  font-family:var(--font-sans); font-size:var(--text-body); line-height:var(--leading-body);
+  -webkit-font-smoothing:antialiased;
+}
+main { max-width:var(--content-w); margin:0 auto; padding:var(--space-12) var(--space-6) var(--space-8); }
+section { margin-top:var(--space-12); }
+h1,h2,h3 { line-height:var(--leading-tight); letter-spacing:var(--tracking-title); font-weight:600; margin:0; }
+h1 { font-size:var(--text-page-title); }
+h2 { font-size:var(--text-section); margin-bottom:var(--space-4); }
+h3 { font-size:var(--text-card-title); }
+p { margin:var(--space-3) 0; max-width:var(--column-w); }
+a { color:var(--brand); text-decoration:none; }
+a:hover { text-decoration:underline; }
+a:focus-visible { outline:1px solid var(--ring); outline-offset:2px; border-radius:var(--radius-sm); }
+code,kbd,pre { font-family:var(--font-mono); }
+.overline {
+  font-size:var(--text-micro); letter-spacing:var(--tracking-overline);
+  text-transform:uppercase; color:var(--muted-foreground); font-weight:500;
+}
+.lede { font-size:var(--text-section); color:var(--muted-foreground); max-width:var(--column-w); margin-top:var(--space-4); }
+
+/* The single call to action. One command, selectable in one gesture. */
+.cta { margin:var(--space-8) 0 var(--space-3); }
+.cta pre {
+  background:var(--code-bg); border:1px solid var(--border); border-radius:var(--radius);
+  padding:var(--space-4); overflow-x:auto; margin:0;
+  font-size:var(--text-ui); line-height:var(--leading-ui);
+}
+.cta pre span { color:var(--muted-foreground); user-select:none; }
+.cta-note { font-size:var(--text-meta); color:var(--muted-foreground); margin-top:var(--space-2); }
+
+pre.sample {
+  background:var(--code-bg); border:1px solid var(--border); border-radius:var(--radius-card);
+  padding:var(--space-4); overflow-x:auto;
+  font-size:var(--text-meta); line-height:var(--leading-ui); margin:var(--space-4) 0;
+}
+pre.sample b { font-weight:600; color:var(--destructive); }
+pre.sample i { font-style:normal; color:var(--muted-foreground); }
+
+table { border-collapse:collapse; width:100%; font-size:var(--text-ui); margin:var(--space-4) 0; }
+th,td { text-align:left; padding:var(--space-2) var(--space-3); border-bottom:1px solid var(--border); }
+th { font-weight:500; color:var(--muted-foreground); font-size:var(--text-meta); }
+td.num { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+
+.grid { display:grid; gap:var(--space-4); grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
+.card {
+  background:var(--card); border:1px solid var(--border); border-radius:var(--radius-card);
+  padding:var(--space-4); box-shadow:0 1px 2px rgba(0,0,0,.04);
+}
+.card h3 { margin-bottom:var(--space-2); }
+.card p { font-size:var(--text-ui); color:var(--muted-foreground); margin:0; }
+
+footer {
+  border-top:1px solid var(--border); margin-top:var(--space-12);
+  padding:var(--space-6); font-size:var(--text-meta); color:var(--muted-foreground);
+}
+footer .inner { max-width:var(--content-w); margin:0 auto; display:flex; flex-wrap:wrap; gap:var(--space-4); justify-content:space-between; }
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration:.01ms !important; transition-duration:.01ms !important; } }
+</style>
+</head>
+<body>
+<main>
+
+  <p class="overline">Open source · Apache-2.0</p>
+  <h1>A security scanner that shows its working.</h1>
+  <p class="lede">
+    VyQL follows tainted data from where it enters your code to where it does damage —
+    and names the neutralizing controls it looked for and did not find.
+  </p>
+
+  <div class="cta">
+    <pre><span>$ </span>curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh</pre>
+    <p class="cta-note">
+      macOS and Linux, amd64 and arm64. Also
+      <a href="https://github.com/vyprai/vyql#install">Homebrew, a container, and <code>go install</code></a>.
+      No account, no key, no telemetry.
+    </p>
+  </div>
+
+  <section>
+    <h2>What a finding looks like</h2>
+    <p>
+      Six lines of Express, scanned with no configuration. This is the real output,
+      not an illustration:
+    </p>
+<pre class="sample">$ vyql scan .
+analysis profile: HTTP API server (api)
+
+2 finding(s):
+
+[P3] [<b>HIGH</b>] VYQL-PATH-001  <i>(conf=high, fp=c61843fd71a2284b)</i>
+    source: code.HttpInput @ app.js:6
+    sink: code.FilePathAccess @ app.js:7
+    taint path: app.jsAttr#80 -&gt; app.jsFormat#81 -&gt; app.jsArg#83
+    <i>unless path coveredBy core.PathCanonicalization: not satisfied — no neutralizing
+      control dominates the path; none found anywhere on flows</i>
+    <i>unless endpoint coveredBy core.PathAccessCheck: not satisfied — no guard on sink</i></pre>
+    <p>
+      Those last two lines are the point. A scanner that tells you something is vulnerable
+      should be able to tell you what would have made it safe — and if you already have that
+      control, why it did not count. That is what makes a finding arguable instead of a
+      thing to be believed or ignored.
+    </p>
+  </section>
+
+  <section>
+    <h2>Measured, on corpora you can fetch yourself</h2>
+    <table>
+      <thead>
+        <tr><th>Suite</th><th>Cases</th><th>Youden (TPR − FPR)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>OWASP BenchmarkJava</td><td class="num">2,740</td><td class="num">+1.00</td></tr>
+        <tr><td>OWASP BenchmarkPython</td><td class="num">1,230</td><td class="num">+0.90</td></tr>
+        <tr><td>owasp-js and 20 other ports</td><td class="num">2,740 each</td><td class="num">+1.00</td></tr>
+        <tr><td>owasp-go</td><td class="num">2,740</td><td class="num">+0.78</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Go is the weak one, and it is weak in a specific way: <b>zero false positives in all
+      eleven categories</b>, with the whole gap on recall — 302 cases it does not find.
+      That is written down rather than left out, because a table with only the good rows
+      is not evidence.
+    </p>
+    <p>
+      The public OWASP suites are GPL, so VyQL clones them at run time rather than vendoring
+      them — <code>./benchmarks/fetch-corpora.sh</code> and one <code>go test</code> reproduces
+      every number above.
+      <a href="https://github.com/vyprai/vyql/blob/main/benchmarks/RESULTS.md">The method, the
+      corpus caveats and the known defects</a> are written down, including where the score
+      flatters the engine and why.
+    </p>
+  </section>
+
+  <section>
+    <h2>How it is built</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Knowledge as data</h3>
+        <p>A small Go engine plus 12,400 <code>.vyql</code> files you can read and edit.
+           Coverage for a new framework is usually a binding, not a patch.</p>
+      </div>
+      <div class="card">
+        <h3>One graph, 22 languages</h3>
+        <p>Java, Python and JavaScript/TypeScript are the reference frontends;
+           the rest range down to call-and-concat coverage, and the scan says which.</p>
+      </div>
+      <div class="card">
+        <h3>Made for a pipeline</h3>
+        <p><code>scan</code> exits 1 on HIGH or CRITICAL with no configuration.
+           SARIF and JSON out; a baseline for a codebase that already has findings.</p>
+      </div>
+      <div class="card">
+        <h3>It tells you what it skipped</h3>
+        <p>Files no frontend matched are reported whether you ask or not — a clean result
+           over a tree that was mostly unread reads exactly like a clean result.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Where it runs</h2>
+    <table>
+      <tbody>
+        <tr><td>GitHub Actions</td><td><a href="https://github.com/marketplace/actions/vyql-security-scan">vyql-security-scan</a></td></tr>
+        <tr><td>Homebrew</td><td><code>brew install vyprai/tap/vyql</code></td></tr>
+        <tr><td>Container</td><td><code>docker run --rm -v "$PWD:/work" ghcr.io/vyprai/vyql scan .</code></td></tr>
+        <tr><td>Claude Code</td><td><code>/plugin marketplace add vyprai/claude-plugins</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+</main>
+
+<footer>
+  <div class="inner">
+    <span>
+      <a href="https://github.com/vyprai/vyql">GitHub</a> ·
+      <a href="https://github.com/vyprai/vyql/blob/main/CHANGELOG.md">Changelog</a> ·
+      <a href="https://github.com/vyprai/vyql/blob/main/docs/README.md">Docs</a> ·
+      <a href="https://github.com/vyprai/vyql/blob/main/SECURITY.md">Security</a>
+    </span>
+    <span>Apache-2.0 · built by the team behind <a href="https://vyprsec.ai">VYPR</a></span>
+  </div>
+</footer>
+</body>
+</html>

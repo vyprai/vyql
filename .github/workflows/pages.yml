@@ -1,0 +1,54 @@
+name: pages
+
+# Publishes site/ to GitHub Pages. The page is static HTML with no build step:
+# nothing here can fail in a way that leaves a half-rendered page up, and the
+# published bytes are the ones in the repository.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A queued run should not race a running one onto the live site, but an
+# in-flight deploy is worth finishing rather than cancelling half way.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the page is complete
+        run: |
+          set -euo pipefail
+          test -f site/index.html
+          # The install command is the page's only call to action. A page that
+          # loses it still looks fine and converts nobody.
+          grep -q "dl.vyprsec.ai/vyql/install.sh" site/index.html
+          # Third-party requests are the thing this page deliberately does not
+          # make; a font or script CDN creeping in should fail here.
+          if grep -nE 'https?://(fonts|cdn|unpkg|jsdelivr|ajax)\.' site/index.html; then
+            echo "::error::site/index.html fetches from a third-party host"
+            exit 1
+          fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
