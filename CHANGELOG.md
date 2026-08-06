@@ -55,6 +55,40 @@ behaviour change even when no code changed.
   lifecycle cases, so they could not see this in either direction. See
   `benchmarks/RESULTS.md` §3.1.3.
 
+- **A resource released in a `finally` block counted as never released.** The
+  lowerer gave `finally` a control region of its own, nested under the try. A
+  control region means "may be skipped" — true of the try body and of every
+  handler, and false of a `finally`, which is the one nested block that always
+  runs. Post-dominance rejects a release nested deeper than its acquisition as
+  conditionally skipped, so the most conventional way to write the safe form
+  reported a leak:
+
+  ```java
+  lock.lock();
+  try { work(); } finally { lock.unlock(); }   // reported as never released
+  ```
+
+  `finally` now lowers into the region the try statement itself sits in, after
+  the body and the handlers, so a release there post-dominates the acquisition
+  whether that acquisition is above the try, inside its body, or inside a
+  handler. Java try-with-resources was already correct — its implicit `close()`
+  is appended to the try body, not to a `finally`.
+
+  C# reached the same false positive by a second route and is fixed with it: its
+  frontend folded `finally` into the try body rather than populating
+  `Try.Finally`, so `Monitor.Enter(o); try { … } finally { Monitor.Exit(o); }`
+  reported a lock that is never released. The clause is now split out. C#
+  `using` and Python `with` are a different gap and still uncovered — their
+  release is implicit, so there is no node to post-dominate; Python has no lock
+  bindings at all, so it reports nothing either way rather than reporting
+  wrongly.
+
+  The distinction against a `defer`, which keeps the region it was written in, is
+  real: a `defer` inside a branch is conditionally *registered*, while a `finally`
+  is unconditionally attached to its try statement.
+
+  All 24 benchmark corpora are unchanged, BenchmarkJava's 2,740 cases included.
+
 ## [0.2.2] - 2026-08-05
 
 ### Fixed

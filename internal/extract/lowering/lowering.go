@@ -3132,7 +3132,14 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 			l.inRegion("try"+b+".h"+strconv.Itoa(i), func() { l.block(h, sc) })
 		}
-		l.inRegion("try"+b+".f", func() { l.block(st.Finally, sc) })
+		// A `finally` runs on every path out of the try statement, so it belongs to the
+		// region the statement itself sits in — lowered after the body and the handlers,
+		// but NOT inside a region of its own. A control region means "may be skipped",
+		// which is true of the body and every handler and false of this: given its own
+		// region, `finally` reads as a conditional branch and a release written there
+		// post-dominates nothing, so `lock(); try { … } finally { unlock(); }` reports a
+		// lock that is never released.
+		l.block(st.Finally, sc)
 		sc.iter = map[string][]string{}
 	}
 }
