@@ -449,7 +449,7 @@ func (c *csConv) csAnalysisStmt(path, method, loc string, tokens ...string) nir.
 }
 
 func csCompactText(s string) string {
-	return strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(s)
+	return compactWhitespaceReplacer.Replace(s)
 }
 
 func (c *csConv) csStructuredContextTokens(fn *tree_sitter.Node, name string) []string {

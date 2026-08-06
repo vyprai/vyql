@@ -432,3 +432,39 @@ func TestLoadRulesDefault(t *testing.T) {
 		t.Fatalf("default rules should include authored pack rules, got %d source(s)", len(sources))
 	}
 }
+
+// vyqlMain must return its exit code rather than calling os.Exit, so the deferred profile
+// flushes still run. `scan` gates with a non-zero status on any HIGH finding, which is to
+// say on any codebase worth profiling — exiting from inside wrote an empty cpu.prof and no
+// heap profile at all.
+func TestVyqlMainFlushesProfilesOnGatedNonZeroExit(t *testing.T) {
+	dir := t.TempDir()
+	// A command injection from an argv-supplied value: HIGH, so -fail-on gates the scan.
+	src := "package main\n\nimport (\n\t\"os\"\n\t\"os/exec\"\n)\n\n" +
+		"func main() {\n\tcmd := exec.Command(\"sh\", \"-c\", os.Args[1])\n\t_ = cmd.Run()\n}\n"
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cpu := filepath.Join(dir, "cpu.prof")
+	mem := filepath.Join(dir, "mem.prof")
+	t.Setenv("VYQL_CPUPROFILE", cpu)
+	t.Setenv("VYQL_MEMPROFILE", mem)
+
+	saved := os.Args
+	os.Args = []string{"vyql", "scan", "-cache", "off", dir}
+	defer func() { os.Args = saved }()
+
+	code := vyqlMain()
+	if code == 0 {
+		t.Fatalf("want a gated non-zero exit code for a HIGH finding, got %d", code)
+	}
+	for _, p := range []string{cpu, mem} {
+		st, err := os.Stat(p)
+		if err != nil {
+			t.Fatalf("profile %s was never written on a non-zero exit: %v", filepath.Base(p), err)
+		}
+		if st.Size() == 0 {
+			t.Errorf("profile %s is empty — the deferred flush did not run", filepath.Base(p))
+		}
+	}
+}

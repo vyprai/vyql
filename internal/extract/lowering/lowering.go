@@ -3407,6 +3407,10 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	return l.node("Const", "?:0", nil)
 }
 
+// A strings.Replacer builds a lookup trie on first use, so constructing one inside the
+// function rebuilds and discards that trie on every call. Hoisted to build it once.
+var binopNameReplacer = strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "mul", "+", "add", "-", "sub")
+
 func binopMethod(op string) string {
 	switch op {
 	case "+":
@@ -3443,8 +3447,12 @@ func binopMethod(op string) string {
 	if op == "" {
 		return "op"
 	}
-	return strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "mul", "+", "add", "-", "sub").Replace(op)
+	return binopNameReplacer.Replace(op)
 }
+
+// A strings.Replacer builds a lookup trie on first use, so constructing one inside the
+// function rebuilds and discards that trie on every call. Hoisted to build it once.
+var unaryNameReplacer = strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "deref", "+", "pos", "-", "neg")
 
 func unaryMethod(op string) string {
 	switch op {
@@ -3462,7 +3470,7 @@ func unaryMethod(op string) string {
 	if op == "" {
 		return "op"
 	}
-	return strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "deref", "+", "pos", "-", "neg").Replace(op)
+	return unaryNameReplacer.Replace(op)
 }
 
 func isMissingTernaryArm(e nir.Expr) bool {

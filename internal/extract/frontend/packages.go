@@ -188,8 +188,12 @@ func addPackagePathPrefixes(out map[string]bool, name string) {
 	}
 }
 
+// A strings.Replacer builds a lookup trie on first use, so constructing one inside the
+// function rebuilds and discards that trie on every call. Hoisted to build it once.
+var packageStemReplacer = strings.NewReplacer("/", "_", "\\", "_")
+
 func addPackageStem(out map[string]bool, name string) {
-	stem := strings.NewReplacer("/", "_", "\\", "_").Replace(name)
+	stem := packageStemReplacer.Replace(name)
 	if stem != "" {
 		out[strings.ToLower(stem)] = true
 	}

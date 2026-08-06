@@ -2752,6 +2752,10 @@ func lowerV2OperatorShapes(binding string, cmp V2BinaryExpr, neg bool) ([]v2Call
 	return out, nil
 }
 
+// A strings.Replacer builds a lookup trie on first use, so constructing one inside the
+// function rebuilds and discards that trie on every call. Hoisted to build it once.
+var v2BinaryOperatorNameReplacer = strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "mul", "+", "add", "-", "sub")
+
 func v2BinaryOperatorMethod(op string) string {
 	switch op {
 	case "+":
@@ -2788,7 +2792,7 @@ func v2BinaryOperatorMethod(op string) string {
 	if op == "" {
 		return "op"
 	}
-	return strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "mul", "+", "add", "-", "sub").Replace(op)
+	return v2BinaryOperatorNameReplacer.Replace(op)
 }
 
 func mergeV2CallShapes(binding string, left, right v2CallShape) (v2CallShape, error) {
