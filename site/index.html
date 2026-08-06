@@ -129,6 +129,7 @@ pre.sample {
   font-size:var(--text-meta); line-height:var(--leading-ui); margin:var(--space-4) 0;
 }
 pre.sample b { font-weight:600; color:var(--destructive); }
+pre.sample b.who { color:var(--brand); }
 pre.sample i { font-style:normal; color:var(--muted-foreground); }
 
 table { border-collapse:collapse; width:100%; font-size:var(--text-ui); margin:var(--space-4) 0; }
@@ -239,11 +240,99 @@ header.site .inner {
   <div class="cta">
     <pre><span>$ </span>curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh</pre>
     <p class="cta-note">
-      macOS and Linux, amd64 and arm64.
-      <a href="https://github.com/vyprai/vyql#install">Homebrew, Docker and <code>go install</code></a>
-      work too. No signup, no API key, nothing gets sent anywhere.
+      macOS and Linux, amd64 and arm64. Verifies its checksum, installs to
+      <code>~/.local/bin</code>. No signup, no API key, nothing gets sent
+      anywhere.
     </p>
   </div>
+
+  <section>
+    <h2>Other ways to install</h2>
+    <table>
+      <tbody>
+        <tr><td>Homebrew</td><td><code>brew install vyprai/tap/vyql</code></td></tr>
+        <tr><td>Container</td><td><code>docker run --rm -v "$PWD:/work" ghcr.io/vyprai/vyql scan .</code></td></tr>
+        <tr><td>Go</td><td><code>go install github.com/vyprai/vyql/cmd/vyql@latest</code></td></tr>
+        <tr><td>GitHub Actions</td><td><a href="https://github.com/marketplace/actions/vyql-security-scan">vyql-security-scan</a></td></tr>
+        <tr><td>Claude Code</td><td><code>/plugin marketplace add vyprai/claude-plugins</code></td></tr>
+      </tbody>
+    </table>
+    <p>
+      Every one of these carries the security knowledge with it, so there is no
+      second setup step and nothing to point at a server.
+    </p>
+  </section>
+
+  <section>
+    <h2>Quickstart</h2>
+
+    <h3>From the terminal</h3>
+    <p>Four commands cover almost everything:</p>
+<pre class="sample">vyql scan .                      <i># everything in this tree</i>
+vyql explain .                   <i># why each finding fired</i>
+vyql scan -fail-on none .        <i># report without failing the shell</i>
+vyql scan -baseline .vyql-baseline.json .   <i># only what is new</i></pre>
+    <p>
+      Reviewing a change rather than a repo is a different question. Scan both
+      sides and diff, which keys on a fingerprint so moving a function doesn't
+      read as a new finding:
+    </p>
+<pre class="sample">git worktree add -q /tmp/base $(git merge-base HEAD origin/main)
+vyql scan --format json /tmp/base &gt; before.json
+vyql scan --format json .        &gt; after.json
+vyql diff before.json after.json</pre>
+
+    <h3>Through an agent</h3>
+    <p>
+      VyQL ships as an agent skill, so you can ask instead of remembering flags.
+      In Claude Code:
+    </p>
+<pre class="sample">/plugin marketplace add vyprai/claude-plugins
+/plugin install vyql@vypr</pre>
+    <p>
+      Then it is a conversation. Each turn builds on the last, so you never
+      re-state which finding you mean:
+    </p>
+<pre class="sample"><b class="who">you</b>  audit this repo for security problems
+
+     <i>scanned python:14 javascript:3, 2 files unread (.kt)
+     7 findings. 2 critical, 3 high, 2 medium.
+     1. VYQL-INJ-002  critical  api/users.py:88   request body reaches a shell
+     2. VYQL-PATH-001 high      api/files.py:23   query param reaches open()
+     ...</i>
+
+<b class="who">you</b>  is 2 real?
+
+     <i>api/files.py is a request handler, so the surface is right, and the
+     source is untrusted. But there is a startswith() check two lines up
+     that VyQL did not model as containment.
+     False positive, and a binding gap worth reporting.</i>
+
+<b class="who">you</b>  what about 1
+
+     <i>Real. The path carries the value with no escaping, and nothing
+     dominates it. Fix is core.ShellEscape: use subprocess with a list
+     rather than shell=True.</i>
+
+<b class="who">you</b>  write me a test that proves it
+
+     <i>Writes tests/test_users_injection.py, fails today, passes once fixed.
+     Local only, and it asks before running anything.</i></pre>
+    <p>
+      It runs the commands, reports what was read before what it found, and asks
+      before installing anything or writing a reproduction. The skill is a plain
+      <a href="https://agentskills.io">SKILL.md</a>, an open format, so any agent
+      that reads it can follow the same steps. Claude Code is just the one with
+      an installer.
+    </p>
+
+    <h3>Either way, the same shape</h3>
+    <p>
+      Scope what you are looking at, scan, read the coverage line, look at the
+      list, verify the ones that matter, and reproduce if you need proof. Stop
+      wherever you have your answer. Most scans end at the list.
+    </p>
+  </section>
 
   <section>
     <h2>What a finding looks like</h2>
@@ -307,65 +396,6 @@ analysis profile: HTTP API server (api)
            clean run over code nothing read looks the same as a genuinely clean run.</p>
       </div>
     </div>
-  </section>
-
-  <section>
-    <h2>Quickstart</h2>
-
-    <h3>From the terminal</h3>
-    <p>Four commands cover almost everything:</p>
-<pre class="sample">vyql scan .                      <i># everything in this tree</i>
-vyql explain .                   <i># why each finding fired</i>
-vyql scan -fail-on none .        <i># report without failing the shell</i>
-vyql scan -baseline .vyql-baseline.json .   <i># only what is new</i></pre>
-    <p>
-      Reviewing a change rather than a repo is a different question. Scan both
-      sides and diff, which keys on a fingerprint so moving a function doesn't
-      read as a new finding:
-    </p>
-<pre class="sample">git worktree add -q /tmp/base $(git merge-base HEAD origin/main)
-vyql scan --format json /tmp/base &gt; before.json
-vyql scan --format json .        &gt; after.json
-vyql diff before.json after.json</pre>
-
-    <h3>Through an agent</h3>
-    <p>
-      VyQL ships as an agent skill, so you can ask instead of remembering flags.
-      In Claude Code:
-    </p>
-<pre class="sample">/plugin marketplace add vyprai/claude-plugins
-/plugin install vyql@vypr</pre>
-    <p>Then say what you want:</p>
-<pre class="sample"><i>audit this repo for security problems</i>
-<i>did my branch introduce anything?</i>
-<i>is finding 3 real, or a false positive?</i>
-<i>write me a test that proves finding 1</i></pre>
-    <p>
-      It runs the commands, reports what was read before what it found, and asks
-      before installing anything or writing a reproduction. The skill is a plain
-      <a href="https://agentskills.io">SKILL.md</a>, an open format, so any agent
-      that reads it can follow the same steps. Claude Code is just the one with
-      an installer.
-    </p>
-
-    <h3>Either way, the same shape</h3>
-    <p>
-      Scope what you are looking at, scan, read the coverage line, look at the
-      list, verify the ones that matter, and reproduce if you need proof. Stop
-      wherever you have your answer. Most scans end at the list.
-    </p>
-  </section>
-
-  <section>
-    <h2>Where it runs</h2>
-    <table>
-      <tbody>
-        <tr><td>GitHub Actions</td><td><a href="https://github.com/marketplace/actions/vyql-security-scan">vyql-security-scan</a></td></tr>
-        <tr><td>Homebrew</td><td><code>brew install vyprai/tap/vyql</code></td></tr>
-        <tr><td>Container</td><td><code>docker run --rm -v "$PWD:/work" ghcr.io/vyprai/vyql scan .</code></td></tr>
-        <tr><td>Claude Code</td><td><code>/plugin marketplace add vyprai/claude-plugins</code></td></tr>
-      </tbody>
-    </table>
   </section>
 
 </main>

@@ -172,14 +172,35 @@ The same flow, without remembering the commands:
 /plugin install vyql@vypr
 ```
 
-Then ask in the ordinary way:
+Then it is a conversation, and each turn builds on the last:
 
 ```
-audit this repo for security problems
-did my branch introduce anything?
-is finding 3 real, or a false positive?
-write me a test that proves finding 1
+you  audit this repo for security problems
+
+     scanned python:14 javascript:3, 2 files unread (.kt)
+     7 findings. 2 critical, 3 high, 2 medium.
+     1. VYQL-INJ-002  critical  api/users.py:88  request body reaches a shell
+     2. VYQL-PATH-001 high      api/files.py:23  query param reaches open()
+     ...
+
+you  is 2 real?
+
+     api/files.py is a request handler and the source is untrusted, but
+     there is a startswith() check two lines up that VyQL did not model
+     as containment. False positive, and a binding gap worth reporting.
+
+you  what about 1
+
+     Real. The path carries the value with no escaping. Fix is
+     core.ShellEscape: subprocess with a list rather than shell=True.
+
+you  write me a test that proves it
+
+     Writes a failing test. Local only, and it asks before running it.
 ```
+
+You never restate which finding you mean, because the list is still in the
+conversation. A single question works too, but the flow is what it is built for.
 
 The skill runs the right commands, reports coverage before findings, and holds
 the line on what a verdict means. It asks before installing anything and before
