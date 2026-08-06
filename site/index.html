@@ -246,8 +246,8 @@ header.site .inner {
   <section>
     <h2>What a finding looks like</h2>
     <p>
-      Here is the whole program. It reads a filename off the query string and
-      passes it straight to the filesystem:
+      A small Express app that takes a filename from the query string and hands
+      it to the filesystem:
     </p>
 <pre class="sample"><i>// app.js</i>
 const express = require("express");
@@ -259,8 +259,8 @@ app.get("/download", (req, res) =&gt; {
   res.send(fs.readFileSync("/var/data/" + name));
 });</pre>
     <p>
-      Scanned with no setup, no config file and no rules to pick. This is the
-      actual output:
+      Scanning it takes no setup, no config file and no choosing which rules to
+      run:
     </p>
 <pre class="sample">$ vyql scan .
 analysis profile: HTTP API server (api)
