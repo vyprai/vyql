@@ -246,7 +246,21 @@ header.site .inner {
   <section>
     <h2>What a finding looks like</h2>
     <p>
-      Six lines of Express, scanned with no setup. This is the actual output:
+      Here is the whole program. It reads a filename off the query string and
+      passes it straight to the filesystem:
+    </p>
+<pre class="sample"><i>// app.js</i>
+const express = require("express");
+const fs = require("fs");
+const app = express();
+
+app.get("/download", (req, res) =&gt; {
+  const name = req.query.name;
+  res.send(fs.readFileSync("/var/data/" + name));
+});</pre>
+    <p>
+      Scanned with no setup, no config file and no rules to pick. This is the
+      actual output:
     </p>
 <pre class="sample">$ vyql scan .
 analysis profile: HTTP API server (api)

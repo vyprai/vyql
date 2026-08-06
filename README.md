@@ -44,7 +44,7 @@ corrupted download rather than a compromised release. Pin `VYQL_VERSION` and
 check the sum against a second source if you need more than that.
 
 Linux and macOS, amd64 and arm64. On Windows it says so rather than failing
-obscurely — use WSL, or the [GitHub
+obscurely. Use WSL, or the [GitHub
 Action](https://github.com/marketplace/actions/vyql-security-scan).
 
 ### Download a release manually
@@ -104,8 +104,8 @@ triage what comes back:
 ```
 
 Then ask for a security scan in the ordinary way. The skill installs the `vyql`
-binary if it is missing, after asking — a security tool that downloads and runs
-binaries unprompted has the wrong instincts.
+binary if it is missing, but asks first. A security tool that downloads and
+runs binaries unprompted has the wrong instincts.
 
 It lives in [vyprai/claude-plugins](https://github.com/vyprai/claude-plugins)
 rather than here, so installing it copies 32 KB instead of cloning a repository
@@ -186,9 +186,9 @@ vyql scan -exit-code 3 .   # 3 = findings, 1 = VyQL failed, 2 = bad usage
 ### Adopting it on a codebase that already has findings
 
 Triage is worth nothing if it evaporates. A baseline records what you have
-already looked at, keyed on the finding fingerprint — which is anchored to rule
-and location, not line number, so a verdict survives edits elsewhere in the
-file.
+already looked at, keyed on the finding fingerprint. That fingerprint is
+anchored to rule and location rather than line number, so a verdict survives
+edits elsewhere in the file.
 
 ```sh
 vyql scan -baseline-write .vyql-baseline.json .   # take the backlog as given
@@ -216,7 +216,7 @@ warning: 4 baseline entries match nothing in this scan
 ```
 
 A suppression that outlives the code it excused is how these files turn
-dangerous — the code moved, the excuse did not, and nobody looked again.
+dangerous. The code moved, the excuse stayed, and nobody looked again.
 
 A malformed baseline, an unknown verdict or a missing file is an error rather
 than an empty baseline. Silently suppressing nothing buries you in findings you
@@ -261,7 +261,7 @@ The diagnostic commands are the point of the design: you interrogate the analysi
 instead of guessing at it. Every one takes paths just as `scan` does, so `.` scans
 the current directory.
 
-**`explain`** — each finding's full proof tree, including the negation evidence:
+**`explain`** prints each finding's full proof tree, including the negation evidence:
 every `unless` clause the rule carries and whether it was satisfied. Usually the
 fastest answer to "why did this fire".
 
@@ -270,21 +270,21 @@ vyql explain .
 vyql explain -rules vyql/packs/injection .   # narrow to one pack or file
 ```
 
-**`match`** — every node a binding attached a concept to. If your source or sink
+**`match`** lists every node a binding attached a concept to. If your source or sink
 is not listed, no rule can fire, because rules match concepts.
 
 ```sh
 vyql match .
 ```
 
-**`resolve`** — which calls resolved to a body and which did not. Taint stops at
+**`resolve`** shows which calls resolved to a body and which did not. Taint stops at
 an unresolved call, so this is where a missing cross-function flow shows up.
 
 ```sh
 vyql resolve .
 ```
 
-**`trace`** — follows taint from source to sink, or shows where it stops. Both
+**`trace`** follows taint from source to sink, or shows where it stops. Both
 filters match on a substring of the concept name.
 
 ```sh
@@ -293,7 +293,7 @@ vyql trace -from HttpInput -to SqlExecution .
 vyql trace -to FilePathAccess .              # every path into file access
 ```
 
-**`query`** — the graph by predicate, for when you want to look rather than be
+**`query`** searches the graph by predicate, for when you want to look rather than be
 told.
 
 ```sh
@@ -306,7 +306,7 @@ vyql query -concept HttpInput -count .       # just how many
 vyql query -from HttpInput -to SqlExecution .  # reachability between concepts
 ```
 
-**`graph`** — the whole graph, or taint reachability per source. Verbose, and
+**`graph`** dumps the whole graph, or taint reachability per source. Verbose, and
 definitive when the others all look right.
 
 ```sh
@@ -418,7 +418,7 @@ vyql validate-binding -file vyql/bindings/python/python/558.vyql
 }
 ```
 
-Then confirm it attaches what you expect on real code — `match` lists what was
+Then confirm it attaches what you expect on real code. `match` lists what was
 labelled, and `definitions explain` names the binding responsible:
 
 ```sh
@@ -476,7 +476,7 @@ Measured on the public OWASP Benchmark suites, scored by Youden index
 | BenchmarkJava | 2,740 | +1.00 |
 | BenchmarkPython | 1,230 | +0.90 |
 
-Reproduce them yourself — `benchmarks/fetch-corpora.sh` fetches the corpora (they
+Reproduce them yourself. `benchmarks/fetch-corpora.sh` fetches the corpora (they
 are GPL and are not vendored here), and
 [benchmarks/RESULTS.md](benchmarks/RESULTS.md) records the method, the
 per-category numbers, and the known corpus defects. Scores from our synthetic
@@ -485,6 +485,6 @@ language ports are recorded separately there and are **not** comparable to these
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE) and
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — the last covers the vendored
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The last one covers the vendored
 tree-sitter grammars, the MITRE CWE/CAPEC taxonomies, and the ecosyste.ms package
 snapshot, which is CC-BY-SA 4.0.

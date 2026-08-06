@@ -17,7 +17,7 @@ letting the report go quiet.
 
 ## What is in scope
 
-VyQL reads untrusted input by design — it parses whatever source tree you point
+VyQL reads untrusted input by design. It parses whatever source tree you point
 it at. Anything that lets a **scanned repository** affect the machine running the
 scan is in scope and is treated seriously:
 
