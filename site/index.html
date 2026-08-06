@@ -5,12 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VyQL — a security scanner that shows its working</title>
 <meta name="description" content="Open-source multi-language taint and graph security scanner. Follows tainted data from source to sink and names the neutralizing controls that are missing.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2318181b'/%3E%3Cpath d='M8 10l8 13 8-13' fill='none' stroke='%23fafafa' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="canonical" href="https://vyprsec.ai/vyql/">
 <meta property="og:title" content="VyQL — a security scanner that shows its working">
 <meta property="og:description" content="Follows tainted data from source to sink, and names the controls that would have made it safe. Apache-2.0.">
 <meta property="og:url" content="https://vyprsec.ai/vyql/">
 <meta property="og:type" content="website">
+<link rel="preload" href="fonts/geist-variable.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+/* Geist, served from this origin. vysual self-hosts for the same reason: a font
+   CDN is a third-party request on every page load, which a security tool's own
+   page should not be making. SIL OFL 1.1 — see fonts/OFL.txt.
+   Variable upright only; the page uses 400/500/600 and no italics. */
+@font-face {
+  font-family:"Geist Variable";
+  src:url("fonts/geist-variable.woff2") format("woff2-variations");
+  font-weight:100 900; font-style:normal; font-display:swap;
+}
+@font-face {
+  font-family:"Geist Mono Variable";
+  src:url("fonts/geist-mono-variable.woff2") format("woff2-variations");
+  font-weight:100 900; font-style:normal; font-display:swap;
+}
+
 /* VYPR design system tokens (vyprai/vysual, docs/TOKENS.md).
    Values are copied rather than imported: vysual is a private React package and
    this page is served from a public repository. Copied values can drift, so the
@@ -67,7 +84,14 @@ p { margin:var(--space-3) 0; max-width:var(--column-w); }
 a { color:var(--brand); text-decoration:none; }
 a:hover { text-decoration:underline; }
 a:focus-visible { outline:1px solid var(--ring); outline-offset:2px; border-radius:var(--radius-sm); }
-code,kbd,pre { font-family:var(--font-mono); }
+/* Ligatures off. Geist Mono renders "--" as one long dash and "->" as an
+   arrow, which is decorative in prose and wrong here: every code block on this
+   page is a command someone is meant to read character by character and
+   retype. */
+code,kbd,pre {
+  font-family:var(--font-mono);
+  font-variant-ligatures:none; font-feature-settings:"liga" 0,"calt" 0;
+}
 .overline {
   font-size:var(--text-micro); letter-spacing:var(--tracking-overline);
   text-transform:uppercase; color:var(--muted-foreground); font-weight:500;

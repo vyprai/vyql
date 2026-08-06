@@ -39,6 +39,12 @@ jobs:
           # The install command is the page's only call to action. A page that
           # loses it still looks fine and converts nobody.
           grep -q "dl.vyprsec.ai/vyql/install.sh" site/index.html
+          # The fonts are served from this origin on purpose. A missing file
+          # falls back to system-ui and looks merely slightly off, so nothing
+          # else would report it.
+          test -s site/fonts/geist-variable.woff2
+          test -s site/fonts/geist-mono-variable.woff2
+          test -s site/fonts/OFL.txt
           # Third-party requests are the thing this page deliberately does not
           # make; a font or script CDN creeping in should fail here.
           if grep -nE 'https?://(fonts|cdn|unpkg|jsdelivr|ajax)\.' site/index.html; then
