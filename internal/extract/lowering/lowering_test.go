@@ -1172,10 +1172,11 @@ func callNodeByPath(t *testing.T, g usg.Store, want string) usg.Node {
 	return found[0]
 }
 
-func deferProgram(body ...nir.Stmt) nir.Program {
+// funcProgram wraps body in a single function `f` in a one-module program.
+func funcProgram(file string, body ...nir.Stmt) nir.Program {
 	return nir.Program{Modules: []nir.Module{{
-		Key: "app", File: "app.go",
-		Body: []nir.Stmt{nir.FuncDef{Name: "f", Body: body, Loc: "app.go:1"}},
+		Key: "app", File: file,
+		Body: []nir.Stmt{nir.FuncDef{Name: "f", Body: body, Loc: file + ":1"}},
 	}}}
 }
 
@@ -1195,7 +1196,7 @@ func deferStmt(path, loc string) nir.Defer {
 // the body did — that ordering is what makes a deferred release post-dominate an
 // acquisition above it.
 func TestLowerDeferPlacesCallAfterTheFunctionBody(t *testing.T) {
-	g, err := Lower(deferProgram(
+	g, err := Lower(funcProgram("app.go",
 		callStmt("mu.Lock", "app.go:2"),
 		deferStmt("mu.Unlock", "app.go:3"),
 		callStmt("w.Work", "app.go:4"),
@@ -1226,7 +1227,7 @@ func TestLowerDeferPlacesCallAfterTheFunctionBody(t *testing.T) {
 // Registering a defer inside a branch only runs it when that branch is taken, so it must
 // keep the branch's region and must NOT post-dominate an acquisition outside it.
 func TestLowerDeferInBranchDoesNotPostDominateAcquisitionOutsideIt(t *testing.T) {
-	g, err := Lower(deferProgram(
+	g, err := Lower(funcProgram("app.go",
 		callStmt("mu.Lock", "app.go:2"),
 		nir.If{Then: []nir.Stmt{deferStmt("mu.Unlock", "app.go:4")}, Loc: "app.go:3"},
 	), true)
@@ -1247,7 +1248,7 @@ func TestLowerDeferInBranchDoesNotPostDominateAcquisitionOutsideIt(t *testing.T)
 // Deferred calls run last-in-first-out, so their lowered order must be the reverse of
 // the order they were registered in.
 func TestLowerDeferEmitsRegistrationsInReverseOrder(t *testing.T) {
-	g, err := Lower(deferProgram(
+	g, err := Lower(funcProgram("app.go",
 		deferStmt("a.First", "app.go:2"),
 		deferStmt("b.Second", "app.go:3"),
 	), true)
@@ -1284,5 +1285,75 @@ func TestLowerDeferDoesNotEscapeIntoTheEnclosingFunction(t *testing.T) {
 	}
 	if solvers.PostDominates(g, unlock.ID, lock.ID) {
 		t.Error("a defer in a nested function must not post-dominate the enclosing function")
+	}
+}
+
+// A `finally` runs on every path out of the try statement, so its nodes belong to the
+// region the statement sits in — not to a nested one, which would read as skippable.
+func TestLowerFinallyRunsInTheEnclosingRegion(t *testing.T) {
+	g, err := Lower(funcProgram("app.java",
+		callStmt("lock.lock", "app.java:2"),
+		nir.Try{
+			Body:    []nir.Stmt{callStmt("w.work", "app.java:4")},
+			Finally: []nir.Stmt{callStmt("lock.unlock", "app.java:6")},
+			Loc:     "app.java:3",
+		},
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	acquire := callNodeByPath(t, g, "lock.lock")
+	release := callNodeByPath(t, g, "lock.unlock")
+	body := callNodeByPath(t, g, "w.work")
+
+	if release.Prop("region") != acquire.Prop("region") {
+		t.Errorf("finally region = %q, want the enclosing %q", release.Prop("region"), acquire.Prop("region"))
+	}
+	if body.Prop("region") == acquire.Prop("region") {
+		t.Errorf("try body must keep its own region, got the enclosing %q", body.Prop("region"))
+	}
+	if nodeOrder(t, release) <= nodeOrder(t, body) {
+		t.Errorf("finally order %d must follow the try body's %d", nodeOrder(t, release), nodeOrder(t, body))
+	}
+	if !solvers.PostDominates(g, release.ID, acquire.ID) {
+		t.Error("a release in finally must post-dominate an acquisition above the try")
+	}
+}
+
+// The same holds for an acquisition made INSIDE the try body: the finally still runs.
+func TestLowerFinallyPostDominatesTheTryBody(t *testing.T) {
+	g, err := Lower(funcProgram("app.java",
+		nir.Try{
+			Body:    []nir.Stmt{callStmt("lock.lock", "app.java:3")},
+			Finally: []nir.Stmt{callStmt("lock.unlock", "app.java:5")},
+			Loc:     "app.java:2",
+		},
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	if !solvers.PostDominates(g, callNodeByPath(t, g, "lock.unlock").ID, callNodeByPath(t, g, "lock.lock").ID) {
+		t.Error("a release in finally must post-dominate an acquisition in the try body")
+	}
+}
+
+// A try/finally written inside a branch still only runs when that branch is taken, so it
+// must NOT cover an acquisition outside it.
+func TestLowerFinallyInBranchDoesNotCoverAcquisitionOutsideIt(t *testing.T) {
+	g, err := Lower(funcProgram("app.java",
+		callStmt("lock.lock", "app.java:2"),
+		nir.If{Then: []nir.Stmt{
+			nir.Try{
+				Body:    []nir.Stmt{callStmt("w.work", "app.java:5")},
+				Finally: []nir.Stmt{callStmt("lock.unlock", "app.java:6")},
+				Loc:     "app.java:4",
+			},
+		}, Loc: "app.java:3"},
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	if solvers.PostDominates(g, callNodeByPath(t, g, "lock.unlock").ID, callNodeByPath(t, g, "lock.lock").ID) {
+		t.Error("a finally inside a branch must not post-dominate code outside that branch")
 	}
 }

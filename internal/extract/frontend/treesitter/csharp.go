@@ -196,7 +196,7 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "while_statement", "for_statement", "do_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_statement", "using_statement":
-		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
+		return []nir.Stmt{c.csTry(n)}
 	case "switch_statement":
 		return []nir.Stmt{c.csSwitch(n)}
 	case "lock_statement", "block", "checked_statement":
@@ -820,11 +820,36 @@ func (c *csConv) csSwitch(n *tree_sitter.Node) nir.Stmt {
 	return nir.Switch{Subject: c.expr(field(n, "value")), Cases: cases, Labels: labels, Default: deflt}
 }
 
+// csTry splits a `finally` clause out of the try statement. A `finally` runs on every
+// path out of the statement, which is what lets a release written there cover an
+// acquisition above or inside the try; folded into the body it reads as code that may be
+// skipped and covers nothing. `using` carries no finally clause, so it still lowers to a
+// body-only Try.
+func (c *csConv) csTry(n *tree_sitter.Node) nir.Try {
+	var finally []nir.Stmt
+	for _, ch := range children(n) {
+		if ch.Kind() == "finally_clause" {
+			finally = append(finally, c.collectBlocks(ch)...)
+		}
+	}
+	body := c.collectBlocksSkipping(n, func(kind string) bool { return kind == "finally_clause" })
+	return nir.Try{Body: body, Finally: finally}
+}
+
 func (c *csConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
+	return c.collectBlocksSkipping(n, nil)
+}
+
+// collectBlocksSkipping is collectBlocks with a filter: a child whose kind `skip` reports
+// is neither collected nor descended into.
+func (c *csConv) collectBlocksSkipping(n *tree_sitter.Node, skip func(kind string) bool) []nir.Stmt {
 	var out []nir.Stmt
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
+			if skip != nil && skip(ch.Kind()) {
+				continue
+			}
 			switch ch.Kind() {
 			case "block":
 				out = append(out, c.block(ch)...)

@@ -26,6 +26,136 @@ test "lifecycle: lock released on the same path is clean (c)"
   }
   ```
 
+test "lifecycle: csharp monitor released in finally is clean"
+  lang csharp
+  reject VYQL-LIFE-001
+  code
+  ```
+  using System.Threading;
+  public class A {
+      private readonly object _lock = new object();
+      void Work() {}
+      public void F() { Monitor.Enter(_lock); try { Work(); } finally { Monitor.Exit(_lock); } }
+  }
+  ```
+
+test "lifecycle: csharp monitor entered inside the try and released in finally is clean"
+  lang csharp
+  reject VYQL-LIFE-001
+  code
+  ```
+  using System.Threading;
+  public class A {
+      private readonly object _lock = new object();
+      void Work() {}
+      public void F() { try { Monitor.Enter(_lock); Work(); } finally { Monitor.Exit(_lock); } }
+  }
+  ```
+
+test "lifecycle: csharp monitor never exited is reported"
+  lang csharp
+  expect VYQL-LIFE-001
+  code
+  ```
+  using System.Threading;
+  public class A {
+      private readonly object _lock = new object();
+      void Work() {}
+      public void F() { Monitor.Enter(_lock); Work(); }
+  }
+  ```
+
+test "lifecycle: csharp finally that runs before the acquire is reported"
+  lang csharp
+  expect VYQL-LIFE-001
+  code
+  ```
+  using System.Threading;
+  public class A {
+      private readonly object _lock = new object();
+      void Work() {}
+      public void F() { try { Work(); } finally { Monitor.Exit(_lock); } Monitor.Enter(_lock); }
+  }
+  ```
+
+test "lifecycle: csharp finally inside a branch does not release a lock outside it"
+  lang csharp
+  expect VYQL-LIFE-001
+  code
+  ```
+  using System.Threading;
+  public class A {
+      private readonly object _lock = new object();
+      void Work() {}
+      public void F(bool ok) { Monitor.Enter(_lock); if (ok) { try { Work(); } finally { Monitor.Exit(_lock); } } }
+  }
+  ```
+
+test "lifecycle: java lock released in finally is clean"
+  lang java
+  reject VYQL-LIFE-001
+  code
+  ```
+  import java.util.concurrent.locks.ReentrantLock;
+  public class A {
+      private final ReentrantLock lock = new ReentrantLock();
+      void work() {}
+      void f() { lock.lock(); try { work(); } finally { lock.unlock(); } }
+  }
+  ```
+
+test "lifecycle: java lock taken inside the try and released in finally is clean"
+  lang java
+  reject VYQL-LIFE-001
+  code
+  ```
+  import java.util.concurrent.locks.ReentrantLock;
+  public class A {
+      private final ReentrantLock lock = new ReentrantLock();
+      void work() {}
+      void f() { try { lock.lock(); work(); } finally { lock.unlock(); } }
+  }
+  ```
+
+test "lifecycle: java lock with catch but no finally is reported"
+  lang java
+  expect VYQL-LIFE-001
+  code
+  ```
+  import java.util.concurrent.locks.ReentrantLock;
+  public class A {
+      private final ReentrantLock lock = new ReentrantLock();
+      void work() {}
+      void f() { lock.lock(); try { work(); } catch (Exception e) { work(); } }
+  }
+  ```
+
+test "lifecycle: java finally that runs before the acquire is reported"
+  lang java
+  expect VYQL-LIFE-001
+  code
+  ```
+  import java.util.concurrent.locks.ReentrantLock;
+  public class A {
+      private final ReentrantLock lock = new ReentrantLock();
+      void work() {}
+      void f() { try { work(); } finally { lock.unlock(); } lock.lock(); }
+  }
+  ```
+
+test "lifecycle: java finally inside a branch does not release a lock outside it"
+  lang java
+  expect VYQL-LIFE-001
+  code
+  ```
+  import java.util.concurrent.locks.ReentrantLock;
+  public class A {
+      private final ReentrantLock lock = new ReentrantLock();
+      void work() {}
+      void f(boolean ok) { lock.lock(); if (ok) { try { work(); } finally { lock.unlock(); } } }
+  }
+  ```
+
 test "lifecycle: go mutex lock without unlock is reported"
   lang go
   expect VYQL-LIFE-001
