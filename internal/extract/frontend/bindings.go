@@ -367,15 +367,15 @@ func (c *valueTokenCache) sinkValueRaw(s usg.Store, idx *flowTokenIndex, call us
 }
 
 func buildSinkValueRaw(s usg.Store, idx *flowTokenIndex, call usg.Node, argIndex int, includeFlow bool) string {
-	var b strings.Builder
+	// The parts are collected first and joined once. An unsized Builder grows by doubling,
+	// and the flowing-token strings this concatenates are large on generated code — the
+	// doubling copies alone were a third of all allocation on such a corpus. Join allocates
+	// the exact final size; the parts slice is a few pointers against that.
+	var parts []string
 	addRaw := func(text string) {
-		if text == "" {
-			return
+		if text != "" {
+			parts = append(parts, text)
 		}
-		if b.Len() > 0 {
-			b.WriteByte(0)
-		}
-		b.WriteString(text)
 	}
 	addRaw(call.Prop("str_args"))
 	addArg := func(arg string) {
@@ -403,7 +403,10 @@ func buildSinkValueRaw(s usg.Store, idx *flowTokenIndex, call usg.Node, argIndex
 	if includeFlow {
 		addRaw(flowingStringTokens(s, idx, call.ID, call.Prop("str_args")))
 	}
-	return b.String()
+	if len(parts) == 1 {
+		return parts[0] // no separator, no copy
+	}
+	return strings.Join(parts, "\x00")
 }
 
 type directSinkSegments struct {
