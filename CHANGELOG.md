@@ -10,6 +10,16 @@ behaviour change even when no code changed.
 
 ## [Unreleased]
 
+### Changed
+- **Node ids no longer embed the file path.** The id namespace is a 17-byte hash
+  of the path instead of the path itself, which was repeated on every node in a
+  module — over a hundred bytes per node on a deep Java tree. `query`, `graph`
+  and `match` output shows ids as `m4be5c7…Call#14` rather than `app.jsCall#14`;
+  the loc column still names the file and line. Finding fingerprints hash rule
+  id + location + concept, not ids, so existing `-baseline` files are unaffected.
+  Two files hashing to one namespace would silently merge their nodes, so the
+  scan now refuses that program outright (~3e-10 at a hundred thousand files).
+
 ### Added
 - **Swift lock lifecycle.** A `.lock()` / `.unlock()` pair — the shape `NSLock`,
   `NSRecursiveLock`, `NSCondition` and `NSConditionLock` all share — plus

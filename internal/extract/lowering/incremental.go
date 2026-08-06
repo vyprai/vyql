@@ -43,6 +43,9 @@ type DeltaCache interface {
 // lowered (cache miss or not content-addressed) — the caller uses it to drive incremental
 // binding labeling (re-label only fresh modules; replay cached labels for the rest).
 func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[string]string, cache DeltaCache, sync *graphsync.Collector) (usg.Store, map[string]bool, error) {
+	if err := checkModuleNSCollisions(prog.Modules); err != nil {
+		return nil, nil, err
+	}
 	l := newLowerer(prog, resolveImports, ctorTypes)
 	l.parseCache = cache
 	// Preallocate the graph maps to the previous scan's node count (cached) — the whole graph is
@@ -68,7 +71,7 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 	p1raws := batchGetRaw(cache, p1keys)
 	p1writes := map[string][]byte{}
 	for i, m := range l.prog.Modules {
-		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
+		l.curModule, l.curClass, l.curNS, l.curFile = m.Key, "", ModuleNS(m), m.File
 		if m.Hash != "" {
 			if raw, ok := p1raws[p1keys[i]]; ok {
 				if d, err := decodePass1(raw); err == nil {
@@ -116,7 +119,7 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 	raws := batchGetRaw(cache, keys)
 	writes := map[string][]byte{}
 	for i, m := range l.prog.Modules {
-		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
+		l.curModule, l.curClass, l.curNS, l.curFile = m.Key, "", ModuleNS(m), m.File
 		ns := ModuleNS(m)
 		sync.Present(ns)
 		if m.Hash == "" { // not content-addressed (e.g. native Go frontend) → always fresh
