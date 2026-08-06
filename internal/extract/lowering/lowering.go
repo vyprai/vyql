@@ -771,7 +771,7 @@ func (l *lowerer) mergeDeltas(sc *scope, before map[string]string, deltas []map[
 			l.flow(s, phi)
 		}
 		sc.setNode(v, phi)
-		delete(sc.cnst, v) // a merged value is no longer a known constant
+		sc.delCnst(v) // a merged value is no longer a known constant
 	}
 }
 
@@ -783,11 +783,18 @@ type scope struct {
 	iter map[string][]string
 	lex  map[string]bool // JS/TS captured lexical bindings shared across nested functions
 
-	// jn journals writes to node while branchDepth > 0, so branch lowering can undo to a
-	// mark instead of snapshotting and restoring the whole map. A clone starts with both
-	// zeroed: marks never span scope objects.
+	// jn journals writes to node; jc, jt and jl do the same for cnst, typ and lex. The
+	// journals record only while a frame is open, and the two kinds of frame differ on
+	// purpose: a BRANCH restores node alone, because a constant or a type learned in one
+	// arm is deliberately still visible to the next, while a FUNCTION body restores all
+	// four, because a nested function's bindings must not leak into its parent. A clone
+	// starts with everything zeroed: marks never span scope objects.
 	jn          []nodeWrite
+	jc          []cnstWrite
+	jt          []typWrite
+	jl          []lexWrite
 	branchDepth int
+	funcDepth   int
 }
 
 func newScope() *scope {
@@ -870,7 +877,7 @@ func (s *scope) markNode() int { return len(s.jn) }
 // function, which is how a single large generated file could exhaust memory — is now
 // O(writes in the branch). Straight-line code (branchDepth 0) pays nothing.
 func (s *scope) setNode(k, v string) {
-	if s.branchDepth > 0 {
+	if s.branchDepth > 0 || s.funcDepth > 0 {
 		old, had := s.node[k]
 		s.jn = append(s.jn, nodeWrite{key: k, old: old, had: had})
 	}
@@ -889,6 +896,121 @@ func (s *scope) undoNode(mark int) {
 		}
 	}
 	s.jn = s.jn[:mark]
+}
+
+type cnstWrite struct {
+	key string
+	old string
+	had bool
+}
+
+type typWrite struct {
+	key string
+	old [2]string
+	had bool
+}
+
+type lexWrite struct {
+	key string
+	old bool
+	had bool
+}
+
+// setCnst, delCnst, setTyp and setLex journal only inside a FUNCTION frame. Branch
+// lowering never restored these maps, so journaling them at branch depth would change
+// which facts survive an arm.
+func (s *scope) setCnst(k, v string) {
+	if s.funcDepth > 0 {
+		old, had := s.cnst[k]
+		s.jc = append(s.jc, cnstWrite{key: k, old: old, had: had})
+	}
+	s.cnst[k] = v
+}
+
+func (s *scope) delCnst(k string) {
+	if s.funcDepth > 0 {
+		if old, had := s.cnst[k]; had {
+			s.jc = append(s.jc, cnstWrite{key: k, old: old, had: had})
+		}
+	}
+	delete(s.cnst, k)
+}
+
+func (s *scope) setTyp(k string, v [2]string) {
+	if s.funcDepth > 0 {
+		old, had := s.typ[k]
+		s.jt = append(s.jt, typWrite{key: k, old: old, had: had})
+	}
+	s.typ[k] = v
+}
+
+func (s *scope) setLex(k string, v bool) {
+	if s.funcDepth > 0 {
+		old, had := s.lex[k]
+		s.jl = append(s.jl, lexWrite{key: k, old: old, had: had})
+	}
+	s.lex[k] = v
+}
+
+func (s *scope) undoCnst(mark int) {
+	for i := len(s.jc) - 1; i >= mark; i-- {
+		e := s.jc[i]
+		if e.had {
+			s.cnst[e.key] = e.old
+		} else {
+			delete(s.cnst, e.key)
+		}
+	}
+	s.jc = s.jc[:mark]
+}
+
+func (s *scope) undoTyp(mark int) {
+	for i := len(s.jt) - 1; i >= mark; i-- {
+		e := s.jt[i]
+		if e.had {
+			s.typ[e.key] = e.old
+		} else {
+			delete(s.typ, e.key)
+		}
+	}
+	s.jt = s.jt[:mark]
+}
+
+func (s *scope) undoLex(mark int) {
+	for i := len(s.jl) - 1; i >= mark; i-- {
+		e := s.jl[i]
+		if e.had {
+			s.lex[e.key] = e.old
+		} else {
+			delete(s.lex, e.key)
+		}
+	}
+	s.jl = s.jl[:mark]
+}
+
+// funcMark opens a function frame: it marks all four journals and swaps in a private
+// iteration-facts map. undoFunc closes it, restoring the enclosing scope exactly. This is
+// what replaced copying the whole scope per nested function — on generated code, which is
+// dense in hoisted closures, that copy was the largest single allocation left.
+type funcMark struct {
+	n, c, t, x int
+	iter       map[string][]string
+}
+
+func (s *scope) markFunc() funcMark {
+	m := funcMark{n: len(s.jn), c: len(s.jc), t: len(s.jt), x: len(s.jl), iter: s.iter}
+	s.iter = cloneIterationFacts(s.iter)
+	s.funcDepth++
+	return m
+}
+
+func (s *scope) undoFunc(m funcMark) {
+	s.funcDepth--
+	s.undoLex(m.x)
+	s.undoTyp(m.t)
+	s.undoCnst(m.c)
+	s.undoNode(m.n)
+	s.iter = m.iter
 }
 
 // nodeDelta reports the branch lowered since mark as (final binding per written variable,
@@ -933,7 +1055,8 @@ func (l *lowerer) ensureLexicalBinding(sc *scope, name, loc string) {
 	slot := l.nodeInline("Name", loc, map[string]string{"lexical_binding": "true"}, name, name, "", "")
 	l.flow(sc.node[name], slot)
 	sc.setNode(name, slot)
-	sc.lex[name] = true
+	sc.setLex(name, true)
+
 }
 
 func freeNames(stmts []nir.Stmt, params []string) map[string]bool {
@@ -2826,13 +2949,20 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.promoteCapturedJSBindings(st.Body, st.Params, sc, st.Loc)
 		// closure capture: a nested function sees the enclosing scope's bindings, so a free
 		// variable's taint flows into the body. Params are reseeded below, shadowing.
-		inner := sc.clone()
+		//
+		// The body lowers against the ENCLOSING scope inside a function frame rather than
+		// against a copy of it: every write is journaled and undone on exit, so the parent
+		// is restored exactly while the body still reads the parent's bindings. The
+		// promotion above stays outside the frame — a promoted lexical binding is meant to
+		// outlive the function that triggered it.
+		fm := sc.markFunc()
+		inner := sc
 		if info != nil {
 			for name, id := range info.params {
 				inner.setNode(name, id)
 				if typ := info.paramTypes[name]; typ != "" {
 					if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
-						inner.typ[name] = [2]string{cm, typ}
+						inner.setTyp(name, [2]string{cm, typ})
 					}
 				}
 			}
@@ -2849,7 +2979,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 		}
 		if l.curClass != "" && len(st.Params) > 0 && st.Params[0] == l.selfName {
-			inner.typ[l.selfName] = [2]string{l.curModule, l.curClass}
+			inner.setTyp(l.selfName, [2]string{l.curModule, l.curClass})
 		}
 		// languages with no explicit self param (C#) still need a STABLE `this` node per method
 		// so `this.Field` writes/reads — and inheritance-aware implicit-`this` member refs —
@@ -2861,12 +2991,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		if l.curClass != "" && inner.node["this"] == "" && info != nil && info.selfNode != "" &&
 			len(l.classMemberSet(l.curModule, l.curClass)) > 0 {
 			inner.setNode("this", info.selfNode)
-			inner.typ["this"] = [2]string{l.curModule, l.curClass}
+			inner.setTyp("this", [2]string{l.curModule, l.curClass})
 		}
 		// seed enclosing-class field receivers so `field.method()` resolves
 		for fld, typ := range l.classFields[l.curModule+"::"+l.curClass] {
 			if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
-				inner.typ[fld] = [2]string{cm, typ}
+				inner.setTyp(fld, [2]string{cm, typ})
 			}
 		}
 		// each function gets a distinct region ROOT, so structural dominance never spans
@@ -2878,7 +3008,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.functionContextAnalysisEvent(st.Loc, l.curDecorators)
 		l.deferred = append(l.deferred, nil)
 		l.block(st.Body, inner)
-		l.flushDeferred()
+		l.flushDeferred() // deferred bodies belong to THIS function, so flush inside the frame
+		sc.undoFunc(fm)
 		l.curDecorators = saveDecorators
 		l.region = saveRegion
 	case nir.Assign:
@@ -2999,12 +3130,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			if sc.lex[t] && !st.Decl {
 				l.flow(targetVal, sc.node[t])
 				if targetHasTyp {
-					sc.typ[t] = targetTyp
+					sc.setTyp(t, targetTyp)
 				}
 				if cv != "" {
-					sc.cnst[t] = cv // x = "literal"
+					sc.setCnst(t, cv) // x = "literal"
 				} else {
-					delete(sc.cnst, t) // reassigned to a non-constant -> value unknown
+					sc.delCnst(t) // reassigned to a non-constant -> value unknown
 				}
 				continue
 			}
@@ -3012,12 +3143,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				l.flow(targetVal, slot)
 				sc.setNode(t, slot)
 				if targetHasTyp {
-					sc.typ[t] = targetTyp
+					sc.setTyp(t, targetTyp)
 				}
 				if cv != "" {
-					sc.cnst[t] = cv // x = "literal"
+					sc.setCnst(t, cv) // x = "literal"
 				} else {
-					delete(sc.cnst, t) // reassigned to a non-constant → value unknown
+					sc.delCnst(t) // reassigned to a non-constant → value unknown
 				}
 				continue
 			}
@@ -3026,12 +3157,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 			sc.setNode(t, targetVal)
 			if targetHasTyp {
-				sc.typ[t] = targetTyp
+				sc.setTyp(t, targetTyp)
 			}
 			if cv != "" {
-				sc.cnst[t] = cv // x = "literal"
+				sc.setCnst(t, cv) // x = "literal"
 			} else {
-				delete(sc.cnst, t) // reassigned to a non-constant → value unknown
+				sc.delCnst(t) // reassigned to a non-constant → value unknown
 			}
 		}
 	case nir.AugAssign:
@@ -3040,13 +3171,13 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.flow(sc.node[st.Target], n)
 		if sc.lex[st.Target] {
 			l.flow(n, sc.node[st.Target])
-			delete(sc.cnst, st.Target)
+			sc.delCnst(st.Target)
 			return
 		}
 		if slot := l.moduleGlobalSlot(st.Target); slot != "" {
 			l.flow(n, slot)
 			sc.setNode(st.Target, slot)
-			delete(sc.cnst, st.Target)
+			sc.delCnst(st.Target)
 			return
 		}
 		sc.setNode(st.Target, n)
@@ -3108,7 +3239,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				}
 				l.flow(callNode, n) // call node carries its args' taint
 				sc.setNode(v, n)
-				delete(sc.cnst, v)
+				sc.delCnst(v)
 			}
 		}
 	case nir.Defer:
@@ -3191,7 +3322,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		if zgOK {
 			if observed := zgBefore; observed != "" {
 				sc.setNode(zgName, l.guardObservation("analysis.guard.value_exclusion", "value_exclusion", observed, "", "value=0"))
-				delete(sc.cnst, zgName)
+				sc.delCnst(zgName)
 			}
 		}
 	case nir.Loop:
@@ -3207,7 +3338,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 					continue
 				}
 				sc.setNode(name, iterNode)
-				delete(sc.cnst, name)
+				sc.delCnst(name)
 			}
 		}
 		l.inRegion("loop"+l.nextBranch(), func() { l.block(st.Body, sc) })
@@ -3281,7 +3412,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			if i < len(st.HandlerParams) {
 				if name := strings.TrimSpace(st.HandlerParams[i]); name != "" {
 					sc.setNode(name, exn)
-					delete(sc.cnst, name)
+					sc.delCnst(name)
 				}
 			}
 			l.inRegion("try"+b+".h"+strconv.Itoa(i), func() { l.block(h, sc) })
@@ -3528,8 +3659,10 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		l.functionContextAnalysisEvent(ex.Loc, ex.ContextTokens)
 		// closure capture: the lambda body sees the enclosing scope (free vars carry taint);
 		// params are reseeded fresh, shadowing. A sink inside an inline callback (res.format
-		// thunk, .then, event handler) thus fires with the captured taint.
-		inner := sc.clone()
+		// thunk, .then, event handler) thus fires with the captured taint. Journaled and
+		// undone on exit, as for a named function.
+		fm := sc.markFunc()
+		inner := sc
 		var paramNodes []string
 		paramByName := map[string]string{}
 		for _, p := range ex.Params {
@@ -3542,7 +3675,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			inner.setNode(p, pn)
 			if typ := ex.ParamTypes[p]; typ != "" {
 				if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
-					inner.typ[p] = [2]string{cm, typ}
+					inner.setTyp(p, [2]string{cm, typ})
 				}
 			}
 			paramNodes = append(paramNodes, pn)
@@ -3553,6 +3686,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			}
 		}
 		l.block(ex.Body, inner)
+		sc.undoFunc(fm)
 		l.region = saveRegion
 		fn := l.node("Func", ex.Loc, nil)
 		l.lambdaParams[fn] = paramNodes // for higher-order callback dispatch
@@ -4743,7 +4877,7 @@ func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result, recv
 		}
 		if effect.SourceResult {
 			sc.setNode(dest, result)
-			delete(sc.cnst, dest)
+			sc.delCnst(dest)
 			continue
 		}
 		if effect.SourceArg < 0 || effect.SourceArg >= len(argVals) {
@@ -4751,7 +4885,7 @@ func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result, recv
 		}
 		if effect.Identity {
 			sc.setNode(dest, argVals[effect.SourceArg])
-			delete(sc.cnst, dest)
+			sc.delCnst(dest)
 			continue
 		}
 		n := l.node("Concat", call.Loc, nil)
@@ -4762,7 +4896,7 @@ func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result, recv
 			l.flow(argVals[i], n)
 		}
 		sc.setNode(dest, n)
-		delete(sc.cnst, dest)
+		sc.delCnst(dest)
 	}
 }
 

@@ -1435,3 +1435,72 @@ func TestScopeCloneDropsTheJournal(t *testing.T) {
 		t.Fatalf("clone disturbed by parent undo: x = %q", inner.node["x"])
 	}
 }
+
+// A function frame restores all four maps, unlike a branch which restores only node: a
+// nested function's params, types and constants must not leak into its parent.
+func TestScopeFuncFrameRestoresEveryMap(t *testing.T) {
+	sc := newScope()
+	sc.setNode("v", "outer")
+	sc.setCnst("v", "OUTER")
+	sc.setTyp("v", [2]string{"m", "Outer"})
+	sc.setLex("v", true)
+	sc.iter["v"] = []string{"a"}
+	outerIter := sc.iter
+
+	fm := sc.markFunc()
+	if sc.iter["v"][0] != "a" {
+		t.Fatal("frame must start from the enclosing iteration facts")
+	}
+	sc.setNode("v", "inner")
+	sc.setCnst("v", "INNER")
+	sc.setTyp("v", [2]string{"m", "Inner"})
+	sc.setLex("w", true)
+	sc.delCnst("gone")
+	sc.iter["v"] = []string{"b"}
+	sc.undoFunc(fm)
+
+	if got := sc.node["v"]; got != "outer" {
+		t.Errorf("node = %q, want outer", got)
+	}
+	if got := sc.cnst["v"]; got != "OUTER" {
+		t.Errorf("cnst = %q, want OUTER", got)
+	}
+	if got := sc.typ["v"]; got != [2]string{"m", "Outer"} {
+		t.Errorf("typ = %v, want {m Outer}", got)
+	}
+	if _, ok := sc.lex["w"]; ok {
+		t.Error("a lexical flag set inside the frame leaked out")
+	}
+	if len(sc.iter["v"]) != 1 || sc.iter["v"][0] != "a" {
+		t.Errorf("iter = %v, want [a]", sc.iter["v"])
+	}
+	// Not just equal contents — the SAME map object, so a later write through the
+	// enclosing reference is visible on the scope.
+	outerIter["probe"] = []string{"seen"}
+	if got := sc.iter["probe"]; len(got) != 1 || got[0] != "seen" {
+		t.Errorf("frame restored a different map object: probe = %v", got)
+	}
+	if sc.funcDepth != 0 || len(sc.jc) != 0 || len(sc.jt) != 0 || len(sc.jl) != 0 {
+		t.Errorf("journals not unwound: depth=%d c=%d t=%d l=%d",
+			sc.funcDepth, len(sc.jc), len(sc.jt), len(sc.jl))
+	}
+}
+
+// A BRANCH must NOT restore cnst/typ/lex — a constant learned in one arm stays visible to
+// the next, which is the behaviour the pre-journal code had and findings depend on.
+func TestScopeBranchDoesNotRestoreConstants(t *testing.T) {
+	sc := newScope()
+	sc.branchDepth++
+	m := sc.markNode()
+	sc.setNode("v", "branch")
+	sc.setCnst("v", "LEARNED")
+	sc.undoNode(m)
+	sc.branchDepth--
+
+	if _, ok := sc.node["v"]; ok {
+		t.Error("branch undo must restore node")
+	}
+	if got := sc.cnst["v"]; got != "LEARNED" {
+		t.Errorf("cnst = %q — a branch must NOT restore constants", got)
+	}
+}
