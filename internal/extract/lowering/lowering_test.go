@@ -1357,3 +1357,81 @@ func TestLowerFinallyInBranchDoesNotCoverAcquisitionOutsideIt(t *testing.T) {
 		t.Error("a finally inside a branch must not post-dominate code outside that branch")
 	}
 }
+
+// The journal must restore exactly: sets over existing keys, sets of new keys, and nested
+// marks — undoNode(mark) leaves the map byte-equal to its state at the mark.
+func TestScopeJournalUndoRestoresExactly(t *testing.T) {
+	sc := newScope()
+	sc.setNode("kept", "v0") // depth 0: not journaled, permanent
+	sc.branchDepth++
+	m := sc.markNode()
+	sc.setNode("kept", "v1")  // overwrite existing
+	sc.setNode("fresh", "f1") // brand-new key
+	sc.setNode("fresh", "f2") // overwritten twice — undo must restore absence, not f1
+	inner := sc.markNode()
+	sc.setNode("kept", "v2")
+	sc.undoNode(inner)
+	if sc.node["kept"] != "v1" {
+		t.Fatalf("inner undo: kept = %q, want v1", sc.node["kept"])
+	}
+	delta, before := sc.nodeDelta(m)
+	if e := delta["kept"]; !e.present || e.val != "v1" {
+		t.Fatalf("delta[kept] = %+v, want present v1", e)
+	}
+	if e := delta["fresh"]; !e.present || e.val != "f2" {
+		t.Fatalf("delta[fresh] = %+v, want present f2", e)
+	}
+	if before["kept"] != "v0" {
+		t.Fatalf("before[kept] = %q, want v0", before["kept"])
+	}
+	if _, ok := before["fresh"]; ok {
+		t.Fatal("fresh had no pre-branch value; before must not invent one")
+	}
+	sc.undoNode(m)
+	sc.branchDepth--
+	if sc.node["kept"] != "v0" {
+		t.Fatalf("outer undo: kept = %q, want v0", sc.node["kept"])
+	}
+	if _, ok := sc.node["fresh"]; ok {
+		t.Fatal("outer undo must remove the branch-created key entirely")
+	}
+	if len(sc.jn) != 0 {
+		t.Fatalf("journal not truncated: %d entries", len(sc.jn))
+	}
+}
+
+// Writes outside any branch are permanent and unjournaled — straight-line code, the
+// overwhelmingly common case, must pay nothing for the journal's existence.
+func TestScopeJournalIsFreeOutsideBranches(t *testing.T) {
+	sc := newScope()
+	for i := range 100 {
+		sc.setNode("v", strconv.Itoa(i))
+	}
+	if len(sc.jn) != 0 {
+		t.Fatalf("depth-0 writes were journaled: %d entries", len(sc.jn))
+	}
+	if sc.node["v"] != "99" {
+		t.Fatalf("v = %q, want 99", sc.node["v"])
+	}
+}
+
+// A clone must not inherit the parent's journal: its writes are nobody else's to undo,
+// and undoing the parent must not disturb the clone.
+func TestScopeCloneDropsTheJournal(t *testing.T) {
+	sc := newScope()
+	sc.branchDepth++
+	m := sc.markNode()
+	sc.setNode("x", "branch")
+	inner := sc.clone()
+	if inner.branchDepth != 0 || len(inner.jn) != 0 {
+		t.Fatalf("clone inherited journal state: depth=%d entries=%d", inner.branchDepth, len(inner.jn))
+	}
+	inner.setNode("x", "inner") // depth 0 on the clone: permanent there
+	sc.undoNode(m)
+	if sc.node["x"] != "" {
+		t.Fatalf("parent undo: x = %q, want unset", sc.node["x"])
+	}
+	if inner.node["x"] != "inner" {
+		t.Fatalf("clone disturbed by parent undo: x = %q", inner.node["x"])
+	}
+}

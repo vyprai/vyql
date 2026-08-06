@@ -165,7 +165,7 @@ func (l *lowerer) applyValidation(st nir.Validation, sc *scope) {
 	}
 	for name, node := range sc.node {
 		if node != "" && reachable[node] {
-			sc.node[name] = l.characterRejectionCall(node, st.Loc, pattern)
+			sc.setNode(name, l.characterRejectionCall(node, st.Loc, pattern))
 		}
 	}
 }

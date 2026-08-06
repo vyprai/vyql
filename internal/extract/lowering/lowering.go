@@ -15,6 +15,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"hash/fnv"
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -714,25 +715,22 @@ func (l *lowerer) propConst(e nir.Expr) (string, bool) {
 	return "", false
 }
 
-func cloneStrMap(m map[string]string) map[string]string {
-	out := make(map[string]string, len(m))
-	for k, v := range m {
-		out[k] = v
-	}
-	return out
-}
-
 // mergeBindings reconciles variable bindings after branches (flow-sensitive JOIN): a
 // variable reassigned in any branch becomes a Phi flowing from every branch's value AND the
 // pre-branch value (a branch may not execute). A variable tainted on ANY path therefore
 // stays tainted past the join — last-write-wins, which silently dropped taint from a sibling
 // branch, is gone. Straight-line reassignment (e.g. x = sanitize(x)) is NOT a branch and is
 // unaffected, so sanitizers still work.
-func (l *lowerer) mergeBindings(sc *scope, before map[string]string, branches []map[string]string) {
+// mergeDeltas joins the branches' final bindings with Phi nodes, exactly as the full-map
+// merge did, but driven by each branch's journal delta: a variable no branch wrote can
+// never need a Phi, so scanning the whole scope per branch bought nothing. `before` is the
+// union of the branches' pre-branch values; a variable absent from it was unbound before
+// the branch, which reads as "" exactly as it did from the old snapshot map.
+func (l *lowerer) mergeDeltas(sc *scope, before map[string]string, deltas []map[string]branchEnd) {
 	changed := map[string]bool{}
-	for _, br := range branches {
-		for v, n := range br {
-			if before[v] != n {
+	for _, d := range deltas {
+		for v, e := range d {
+			if e.present && e.val != before[v] {
 				changed[v] = true
 			}
 		}
@@ -745,8 +743,15 @@ func (l *lowerer) mergeBindings(sc *scope, before map[string]string, branches []
 	for _, v := range vars {
 		phi := l.node("Phi", "?:0", nil)
 		srcs := map[string]bool{}
-		for _, br := range branches {
-			val := br[v]
+		for _, d := range deltas {
+			val := ""
+			if e, ok := d[v]; ok {
+				if e.present {
+					val = e.val
+				}
+			} else {
+				val = before[v] // this branch never touched v, so it ended at the pre-branch value
+			}
 			if val == "" {
 				val = before[v]
 			}
@@ -765,7 +770,7 @@ func (l *lowerer) mergeBindings(sc *scope, before map[string]string, branches []
 		for _, s := range srcIDs {
 			l.flow(s, phi)
 		}
-		sc.node[v] = phi
+		sc.setNode(v, phi)
 		delete(sc.cnst, v) // a merged value is no longer a known constant
 	}
 }
@@ -777,12 +782,21 @@ type scope struct {
 	cnst map[string]string // variable -> its string-constant value (lightweight const-prop)
 	iter map[string][]string
 	lex  map[string]bool // JS/TS captured lexical bindings shared across nested functions
+
+	// jn journals writes to node while branchDepth > 0, so branch lowering can undo to a
+	// mark instead of snapshotting and restoring the whole map. A clone starts with both
+	// zeroed: marks never span scope objects.
+	jn          []nodeWrite
+	branchDepth int
 }
 
 func newScope() *scope {
 	return &scope{node: map[string]string{}, typ: map[string][2]string{}, cnst: map[string]string{}, iter: map[string][]string{}, lex: map[string]bool{}}
 }
 
+// clone snapshots the scope's current state for an independent consumer (a function body,
+// a deferred call). The journal is deliberately NOT carried over: marks never span scope
+// objects, and the clone's writes are nobody else's to undo.
 func (s *scope) clone() *scope {
 	c := newScope()
 	for k, v := range s.node {
@@ -834,6 +848,70 @@ func (l *lowerer) flushDeferred() {
 	l.region = save
 }
 
+// nodeWrite is one journaled write to scope.node: the key and what it held before.
+type nodeWrite struct {
+	key string
+	old string
+	had bool
+}
+
+// branchEnd is a branch's final binding for one journaled variable.
+type branchEnd struct {
+	val     string
+	present bool
+}
+
+func (s *scope) markNode() int { return len(s.jn) }
+
+// setNode writes a variable binding, journaling the previous value while a branch is being
+// lowered so the write can be undone before the branch's sibling is lowered from the same
+// starting state. This is what replaced the full map copies the branch lowering used to
+// take: a snapshot-and-restore that was O(scope width) per branch — quadratic within one
+// function, which is how a single large generated file could exhaust memory — is now
+// O(writes in the branch). Straight-line code (branchDepth 0) pays nothing.
+func (s *scope) setNode(k, v string) {
+	if s.branchDepth > 0 {
+		old, had := s.node[k]
+		s.jn = append(s.jn, nodeWrite{key: k, old: old, had: had})
+	}
+	s.node[k] = v
+}
+
+// undoNode unwinds every journaled write back to mark, restoring scope.node to the state
+// it had when the mark was taken.
+func (s *scope) undoNode(mark int) {
+	for i := len(s.jn) - 1; i >= mark; i-- {
+		e := s.jn[i]
+		if e.had {
+			s.node[e.key] = e.old
+		} else {
+			delete(s.node, e.key)
+		}
+	}
+	s.jn = s.jn[:mark]
+}
+
+// nodeDelta reports the branch lowered since mark as (final binding per written variable,
+// pre-branch value per written variable) — the two things the Phi merge needs, at a cost
+// proportional to the branch's writes rather than to the scope's size. Call it BEFORE
+// undoNode; the journal entries it reads are truncated by the undo.
+func (s *scope) nodeDelta(mark int) (map[string]branchEnd, map[string]string) {
+	if len(s.jn) == mark {
+		return nil, nil
+	}
+	delta := make(map[string]branchEnd)
+	before := make(map[string]string)
+	for i := mark; i < len(s.jn); i++ {
+		e := s.jn[i]
+		if _, seen := delta[e.key]; !seen && e.had {
+			before[e.key] = e.old
+		}
+		cur, ok := s.node[e.key]
+		delta[e.key] = branchEnd{val: cur, present: ok}
+	}
+	return delta, before
+}
+
 func (l *lowerer) promoteCapturedJSBindings(stmts []nir.Stmt, params []string, sc *scope, loc string) {
 	if !isJSLikeModule(l.curFile) {
 		return
@@ -854,7 +932,7 @@ func (l *lowerer) ensureLexicalBinding(sc *scope, name, loc string) {
 	}
 	slot := l.nodeInline("Name", loc, map[string]string{"lexical_binding": "true"}, name, name, "", "")
 	l.flow(sc.node[name], slot)
-	sc.node[name] = slot
+	sc.setNode(name, slot)
 	sc.lex[name] = true
 }
 
@@ -2442,7 +2520,7 @@ func (l *lowerer) moduleScope(m nir.Module) *scope {
 				map[string]string{"module_global": "true"}, name, name, "", "")
 			globals[name] = slot
 		}
-		sc.node[name] = slot
+		sc.setNode(name, slot)
 	}
 	return sc
 }
@@ -2751,7 +2829,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		inner := sc.clone()
 		if info != nil {
 			for name, id := range info.params {
-				inner.node[name] = id
+				inner.setNode(name, id)
 				if typ := info.paramTypes[name]; typ != "" {
 					if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
 						inner.typ[name] = [2]string{cm, typ}
@@ -2759,9 +2837,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				}
 			}
 			if argsParam := info.params[nir.JSArgumentsParam]; argsParam != "" {
-				inner.node["arguments"] = argsParam
+				inner.setNode("arguments", argsParam)
 			}
-			inner.node["__ret__"] = info.ret
+			inner.setNode("__ret__", info.ret)
 		}
 		if info != nil {
 			for _, pe := range l.effectiveParamEntries(info) {
@@ -2782,7 +2860,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// Use the STABLE funcInfo.selfNode so call sites can alias the receiver to it.
 		if l.curClass != "" && inner.node["this"] == "" && info != nil && info.selfNode != "" &&
 			len(l.classMemberSet(l.curModule, l.curClass)) > 0 {
-			inner.node["this"] = info.selfNode
+			inner.setNode("this", info.selfNode)
 			inner.typ["this"] = [2]string{l.curModule, l.curClass}
 		}
 		// seed enclosing-class field receivers so `field.method()` resolves
@@ -2932,7 +3010,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 			if slot := l.moduleGlobalSlot(t); slot != "" && !localDecl {
 				l.flow(targetVal, slot)
-				sc.node[t] = slot
+				sc.setNode(t, slot)
 				if targetHasTyp {
 					sc.typ[t] = targetTyp
 				}
@@ -2946,7 +3024,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			if st.Decl {
 				delete(sc.lex, t)
 			}
-			sc.node[t] = targetVal
+			sc.setNode(t, targetVal)
 			if targetHasTyp {
 				sc.typ[t] = targetTyp
 			}
@@ -2967,11 +3045,11 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		if slot := l.moduleGlobalSlot(st.Target); slot != "" {
 			l.flow(n, slot)
-			sc.node[st.Target] = slot
+			sc.setNode(st.Target, slot)
 			delete(sc.cnst, st.Target)
 			return
 		}
-		sc.node[st.Target] = n
+		sc.setNode(st.Target, n)
 	case nir.Return:
 		rv := l.eval(st.Value, sc)
 		l.flow(rv, sc.node["__ret__"])
@@ -3029,7 +3107,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 					l.flow(cur, n) // preserve the builder's existing taint (`var b` may be unbound)
 				}
 				l.flow(callNode, n) // call node carries its args' taint
-				sc.node[v] = n
+				sc.setNode(v, n)
 				delete(sc.cnst, v)
 			}
 		}
@@ -3069,64 +3147,76 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			return
 		}
 		b := l.nextBranch()
-		before := cloneStrMap(sc.node)
-		// The snapshot is an ALIAS, not a copy: sc.iter is immediately repointed at a
-		// private clone, so a branch never mutates the map this refers to. Only the two
-		// per-branch clones below are real copies — a lowerer clones these maps once per
-		// branch and the map grows with the function, so halving the count halves the
-		// quadratic term that lets one large generated function exhaust memory.
+		// The post-merge guard below needs one variable's PRE-branch value; captured up
+		// front, since the journal restores the map itself rather than keeping a copy.
+		zgName, zgOK := zeroExitGuardName(st.Cond, st.Then, st.Else)
+		zgBefore := ""
+		if zgOK {
+			zgBefore = sc.node[zgName]
+		}
+		// iter snapshots stay map-copies (they are shallow since the values are immutable);
+		// node snapshots are journal marks — undoNode restores, nodeDelta reports.
 		beforeIter := sc.iter
 		sc.iter = cloneIterationFacts(beforeIter)
+		mark := sc.markNode()
+		sc.branchDepth++
 		l.inRegion("if"+b+".t", func() {
-			if name, ok := allowlistMembershipVar(st.Cond); ok && before[name] != "" {
+			// Nothing is journaled yet, so sc.node still holds the pre-branch bindings here.
+			if name, ok := allowlistMembershipVar(st.Cond); ok && sc.node[name] != "" {
 				loc := st.Loc
 				if loc == "" {
 					loc = "?:0"
 				}
-				sc.node[name] = l.node("AllowlistValue", loc, map[string]string{
+				sc.setNode(name, l.node("AllowlistValue", loc, map[string]string{
 					"name": name,
 					"kind": "literal_membership",
-				})
+				}))
 			}
 			l.block(st.Then, sc)
 		})
-		thenB := cloneStrMap(sc.node)
+		thenDelta, thenBefore := sc.nodeDelta(mark)
 		thenIter := sc.iter // already private to the then-branch
-		sc.node = cloneStrMap(before)
+		sc.undoNode(mark)
 		sc.iter = cloneIterationFacts(beforeIter)
 		l.inRegion("if"+b+".e", func() { l.block(st.Else, sc) })
-		elseB := cloneStrMap(sc.node)
+		elseDelta, elseBefore := sc.nodeDelta(mark)
 		elseIter := sc.iter
-		sc.node = before
+		sc.undoNode(mark)
+		sc.branchDepth--
 		sc.iter = stableIterationFacts(thenIter, elseIter)
-		l.mergeBindings(sc, before, []map[string]string{thenB, elseB})
-		if name, ok := zeroExitGuardName(st.Cond, st.Then, st.Else); ok {
-			if observed := before[name]; observed != "" {
-				sc.node[name] = l.guardObservation("analysis.guard.value_exclusion", "value_exclusion", observed, "", "value=0")
-				delete(sc.cnst, name)
+		befores := map[string]string{}
+		maps.Copy(befores, thenBefore)
+		maps.Copy(befores, elseBefore)
+		l.mergeDeltas(sc, befores, []map[string]branchEnd{thenDelta, elseDelta})
+		if zgOK {
+			if observed := zgBefore; observed != "" {
+				sc.setNode(zgName, l.guardObservation("analysis.guard.value_exclusion", "value_exclusion", observed, "", "value=0"))
+				delete(sc.cnst, zgName)
 			}
 		}
 	case nir.Loop:
 		l.eval(st.Cond, sc)
-		before := cloneStrMap(sc.node)
 		beforeIter := sc.iter
 		sc.iter = cloneIterationFacts(beforeIter)
+		mark := sc.markNode()
+		sc.branchDepth++
 		iterNode := l.eval(st.Iter, sc)
 		if iterNode != "" {
 			for _, name := range st.Vars {
 				if name == "" || name == "_" {
 					continue
 				}
-				sc.node[name] = iterNode
+				sc.setNode(name, iterNode)
 				delete(sc.cnst, name)
 			}
 		}
 		l.inRegion("loop"+l.nextBranch(), func() { l.block(st.Body, sc) })
-		bodyB := cloneStrMap(sc.node)
+		bodyDelta, bodyBefore := sc.nodeDelta(mark)
 		bodyIter := sc.iter
-		sc.node = before
+		sc.undoNode(mark)
+		sc.branchDepth--
 		sc.iter = stableIterationFacts(beforeIter, bodyIter)
-		l.mergeBindings(sc, before, []map[string]string{bodyB})
+		l.mergeDeltas(sc, bodyBefore, []map[string]branchEnd{bodyDelta})
 	case nir.Switch:
 		subject := l.eval(st.Subject, sc)
 		// constant subject → lower only the matching case (or default), like if/ternary
@@ -3156,26 +3246,31 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 		}
 		b := l.nextBranch()
-		before := cloneStrMap(sc.node)
 		beforeIter := sc.iter
-		var branches []map[string]string
+		mark := sc.markNode()
+		sc.branchDepth++
+		var deltas []map[string]branchEnd
+		befores := map[string]string{}
 		var iterBranches []map[string][]string
 		for i, c := range st.Cases {
-			sc.node = cloneStrMap(before)
 			sc.iter = cloneIterationFacts(beforeIter)
 			l.inRegion("sw"+b+".c"+strconv.Itoa(i), func() { l.block(c, sc) })
-			branches = append(branches, cloneStrMap(sc.node))
+			d, bf := sc.nodeDelta(mark)
+			sc.undoNode(mark) // each arm starts from the pre-switch bindings
+			deltas = append(deltas, d)
+			maps.Copy(befores, bf)
 			iterBranches = append(iterBranches, sc.iter) // private to this case
-
 		}
-		sc.node = cloneStrMap(before)
 		sc.iter = cloneIterationFacts(beforeIter)
 		l.inRegion("sw"+b+".d", func() { l.block(st.Default, sc) })
-		branches = append(branches, cloneStrMap(sc.node))
+		d, bf := sc.nodeDelta(mark)
+		sc.undoNode(mark)
+		deltas = append(deltas, d)
+		maps.Copy(befores, bf)
 		iterBranches = append(iterBranches, sc.iter) // private to the default arm
-		sc.node = before
+		sc.branchDepth--
 		sc.iter = stableIterationFacts(iterBranches...)
-		l.mergeBindings(sc, before, branches)
+		l.mergeDeltas(sc, befores, deltas)
 	case nir.Try:
 		b := l.nextBranch()
 		exn := l.nodeInline("Exception", st.Loc, nil, "exception", "analysis.exception", "", "")
@@ -3185,7 +3280,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		for i, h := range st.Handlers {
 			if i < len(st.HandlerParams) {
 				if name := strings.TrimSpace(st.HandlerParams[i]); name != "" {
-					sc.node[name] = exn
+					sc.setNode(name, exn)
 					delete(sc.cnst, name)
 				}
 			}
@@ -3444,7 +3539,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			}
 			pn := l.node("Param", ex.Loc, props)
 			paramByName[p] = pn
-			inner.node[p] = pn
+			inner.setNode(p, pn)
 			if typ := ex.ParamTypes[p]; typ != "" {
 				if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
 					inner.typ[p] = [2]string{cm, typ}
@@ -4000,7 +4095,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	if attr, ok := call.Callee.(nir.Attr); ok {
 		if mutatorMethods[call.Method] {
 			if nm, ok := attr.Base.(nir.Name); ok && sc.node[nm.ID] == "" {
-				sc.node[nm.ID] = l.nodeInline("Name", nm.Loc, nil, nm.ID, nm.ID, "", "")
+				sc.setNode(nm.ID, l.nodeInline("Name", nm.Loc, nil, nm.ID, nm.ID, "", ""))
 			}
 		}
 		recvNode = l.eval(attr.Base, sc)
@@ -4647,7 +4742,7 @@ func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result, recv
 			continue
 		}
 		if effect.SourceResult {
-			sc.node[dest] = result
+			sc.setNode(dest, result)
 			delete(sc.cnst, dest)
 			continue
 		}
@@ -4655,7 +4750,7 @@ func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result, recv
 			continue
 		}
 		if effect.Identity {
-			sc.node[dest] = argVals[effect.SourceArg]
+			sc.setNode(dest, argVals[effect.SourceArg])
 			delete(sc.cnst, dest)
 			continue
 		}
@@ -4666,7 +4761,7 @@ func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result, recv
 		for i := effect.SourceArg; i < len(argVals); i++ {
 			l.flow(argVals[i], n)
 		}
-		sc.node[dest] = n
+		sc.setNode(dest, n)
 		delete(sc.cnst, dest)
 	}
 }
