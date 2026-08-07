@@ -6,13 +6,13 @@
       "releases": {
         "v0.2.4": {
           "vyql_v0.2.4_darwin_amd64.tar.gz": 0,
-          "vyql_v0.2.4_darwin_amd64.tar.gz.sha256": 1,
-          "vyql_v0.2.4_darwin_arm64.tar.gz": 0,
-          "vyql_v0.2.4_darwin_arm64.tar.gz.sha256": 1,
+          "vyql_v0.2.4_darwin_amd64.tar.gz.sha256": 2,
+          "vyql_v0.2.4_darwin_arm64.tar.gz": 2,
+          "vyql_v0.2.4_darwin_arm64.tar.gz.sha256": 3,
           "vyql_v0.2.4_linux_amd64.tar.gz": 1,
-          "vyql_v0.2.4_linux_amd64.tar.gz.sha256": 2,
+          "vyql_v0.2.4_linux_amd64.tar.gz.sha256": 3,
           "vyql_v0.2.4_linux_arm64.tar.gz": 1,
-          "vyql_v0.2.4_linux_arm64.tar.gz.sha256": 2
+          "vyql_v0.2.4_linux_arm64.tar.gz.sha256": 3
         },
         "v0.2.3": {
           "vyql_v0.2.3_darwin_amd64.tar.gz": 0,
@@ -56,5 +56,6 @@
         }
       }
     }
-  ]
+  ],
+  "origin": "2026-08-05"
 }
