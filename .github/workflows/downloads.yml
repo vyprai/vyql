@@ -1,0 +1,55 @@
+name: downloads
+
+# Records release-asset download counts once a day. GitHub reports the total
+# now, not a history, so the series only exists because it is written down.
+#
+# It is written to the download-data branch, not to main. main requires seven
+# status checks before a push lands, and a counter tick has no business running
+# a build to record itself.
+
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: downloads
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the collector
+        uses: actions/checkout@v7
+
+      - name: Check out the series
+        uses: actions/checkout@v7
+        with:
+          ref: download-data
+          path: series
+
+      - name: Collect
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DOWNLOADS_JSON="$PWD/series/data/downloads.json" \
+            python3 scripts/collect-downloads.py
+
+      - name: Commit, only when something changed
+        working-directory: series
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- data/downloads.json; then
+            echo "no change; nothing to commit"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/downloads.json
+          git commit -m "chore(data): download counts for $(date -u +%Y-%m-%d)"
+          git push
