@@ -121,6 +121,26 @@ code,kbd,pre {
   font-size:var(--text-ui); line-height:var(--leading-ui);
 }
 .cta pre span { color:var(--muted-foreground); user-select:none; }
+
+.cmd { position:relative; }
+/* Room for the button, so a narrow viewport scrolls the command under empty
+   space rather than under the button itself. */
+.cmd pre { padding-right:5.5rem; }
+.copy {
+  position:absolute; top:var(--space-2); right:var(--space-2);
+  font-family:var(--font-sans); font-size:var(--text-meta); line-height:1;
+  color:var(--muted-foreground); background:var(--background);
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  padding:.4rem .65rem; cursor:pointer;
+  transition:color var(--duration-micro) var(--ease-out),
+             border-color var(--duration-micro) var(--ease-out);
+}
+.copy:hover { color:var(--foreground); border-color:var(--muted-foreground); }
+.copy:focus-visible { outline:1px solid var(--ring); outline-offset:2px; }
+.copy[data-state="done"] { color:var(--brand); border-color:var(--brand); }
+/* In the install table the button follows the command inline, and is smaller:
+   four of them down a column at hero size would outweigh the commands. */
+td .copy { position:static; font-size:var(--text-micro); padding:.2rem .4rem; margin-left:var(--space-2); vertical-align:middle; }
 .cta-note { font-size:var(--text-meta); color:var(--muted-foreground); margin-top:var(--space-2); }
 
 pre.sample {
@@ -144,6 +164,22 @@ td.num { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
 }
 .card h3 { margin-bottom:var(--space-2); }
 .card p { font-size:var(--text-ui); color:var(--muted-foreground); margin:0; }
+
+/* The download section is generated at deploy time from the recorded series,
+   so these rules style markup that does not appear in this file. */
+.dl-total { font-size:var(--text-page-title); margin:0 0 var(--space-4); letter-spacing:var(--tracking-title); }
+.dl-total strong { color:var(--brand); font-weight:600; }
+.dl-chart { width:100%; height:auto; display:block; margin:var(--space-4) 0; }
+.dl-grid { stroke:var(--border); stroke-width:1; vector-effect:non-scaling-stroke; }
+.dl-area { fill:var(--brand); opacity:.10; }
+.dl-line {
+  fill:none; stroke:var(--brand); stroke-width:2;
+  stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke;
+}
+.dl-dot { fill:var(--brand); }
+.dl-tick { fill:var(--muted-foreground); font-size:11px; font-family:var(--font-mono); }
+.dl-note { font-size:var(--text-ui); color:var(--muted-foreground); }
+.dl-note code { white-space:nowrap; }
 
 footer {
   border-top:1px solid var(--border); margin-top:var(--space-12);
@@ -244,7 +280,9 @@ header.site .inner {
   </p>
 
   <div class="cta">
-    <pre><span>$ </span>curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh</pre>
+    <div class="cmd">
+      <pre data-copy><span>$ </span>curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh</pre>
+    </div>
     <p class="cta-note">
       macOS and Linux, amd64 and arm64. Verifies its checksum, installs to
       <code>~/.local/bin</code>. No signup, no API key, nothing gets sent
@@ -256,11 +294,11 @@ header.site .inner {
     <h2>Other Ways to Install</h2>
     <table>
       <tbody>
-        <tr><td>Homebrew</td><td><code>brew install vyprai/tap/vyql</code></td></tr>
-        <tr><td>Container</td><td><code>docker run --rm -v "$PWD:/work" ghcr.io/vyprai/vyql scan .</code></td></tr>
-        <tr><td>Go</td><td><code>go install github.com/vyprai/vyql/cmd/vyql@latest</code></td></tr>
+        <tr><td>Homebrew</td><td><code data-copy>brew install vyprai/tap/vyql</code></td></tr>
+        <tr><td>Container</td><td><code data-copy>docker run --rm -v "$PWD:/work" ghcr.io/vyprai/vyql scan .</code></td></tr>
+        <tr><td>Go</td><td><code data-copy>go install github.com/vyprai/vyql/cmd/vyql@latest</code></td></tr>
         <tr><td>GitHub Actions</td><td><a href="https://github.com/marketplace/actions/vyql-security-scan">vyql-security-scan</a></td></tr>
-        <tr><td>Claude Code</td><td><code>/plugin marketplace add vyprai/claude-plugins</code></td></tr>
+        <tr><td>Claude Code</td><td><code data-copy>/plugin marketplace add vyprai/claude-plugins</code></td></tr>
       </tbody>
     </table>
     <p>
@@ -420,6 +458,9 @@ analysis profile: HTTP API server (api)
     </div>
   </section>
 
+  <!-- downloads:start -->
+  <!-- downloads:end -->
+
 </main>
 
 <footer>
@@ -443,6 +484,47 @@ document.getElementById("theme").addEventListener("click", function () {
   root.dataset.theme = next;
   try { localStorage.setItem("vyql-theme", next); } catch (e) {}
 });
+
+(function () {
+  // The clipboard API needs a secure context. Where there isn't one, no button
+  // is added at all: one that silently does nothing is worse than none.
+  if (!navigator.clipboard) return;
+
+  // The command is read out of the element it labels, never repeated in an
+  // attribute, so what gets copied cannot drift from what is displayed. The
+  // "$ " prompt is presentation and is dropped.
+  function command(el) {
+    var copy = el.cloneNode(true);
+    var prompt = copy.querySelector("span");
+    if (prompt) prompt.remove();
+    return copy.textContent.trim();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-copy]"), function (el) {
+    var text = command(el);
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "copy";
+    button.textContent = "Copy";
+    button.setAttribute("aria-label", "Copy: " + text);
+    button.setAttribute("aria-live", "polite");
+
+    button.addEventListener("click", function () {
+      navigator.clipboard.writeText(text).then(function () {
+        button.dataset.state = "done";
+        button.textContent = "Copied";
+        setTimeout(function () {
+          button.removeAttribute("data-state");
+          button.textContent = "Copy";
+        }, 1600);
+      });
+    });
+
+    // The hero command is positioned inside its own box; the table commands sit
+    // next to the code in their cell.
+    (el.closest(".cmd") || el.parentNode).appendChild(button);
+  });
+})();
 </script>
 </body>
 </html>

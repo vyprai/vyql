@@ -9,8 +9,14 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      - "scripts/render-downloads.py"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
+  # Called by the downloads workflow once it has recorded a new snapshot. The
+  # series lives on another branch, so a push there deploys nothing on its own
+  # and the published counter would sit at whatever it read on the last content
+  # edit.
+  workflow_call:
 
 permissions:
   contents: read
@@ -32,6 +38,20 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Check out the download series
+        uses: actions/checkout@v7
+        with:
+          ref: download-data
+          path: series
+
+      # Ahead of the completeness check on purpose, so the third-party-request
+      # check below reads the generated markup rather than the placeholder.
+      - name: Render the download section
+        run: |
+          set -euo pipefail
+          DOWNLOADS_JSON="$PWD/series/data/downloads.json" \
+            python3 scripts/render-downloads.py
+
       - name: Check the page is complete
         run: |
           set -euo pipefail
@@ -39,6 +59,10 @@ jobs:
           # The install command is the page's only call to action. A page that
           # loses it still looks fine and converts nobody.
           grep -q "dl.vyprsec.ai/vyql/install.sh" site/index.html
+          # Copy buttons are attached to these markers at runtime. Losing the
+          # attribute removes every button and leaves a page that still looks
+          # entirely correct.
+          test "$(grep -o 'data-copy>' site/index.html | wc -l)" -ge 5
           # The fonts are served from this origin on purpose. A missing file
           # falls back to system-ui and looks merely slightly off, so nothing
           # else would report it.

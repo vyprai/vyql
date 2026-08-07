@@ -50,6 +50,18 @@ def fetch_releases():
     return releases
 
 
+def origin(releases):
+    """The day the earliest release carrying assets was published.
+
+    On that day the count was zero, by definition: the assets did not exist
+    before it. Recording it gives the chart a real first point instead of
+    waiting a day for a second snapshot, and it is a fact about the repository
+    rather than a placeholder invented to make a line appear.
+    """
+    days = [r["published_at"][:10] for r in releases if r["assets"] and r.get("published_at")]
+    return min(days) if days else None
+
+
 def snapshot(releases):
     return {
         "date": os.environ.get("SNAPSHOT_DATE") or date.today().isoformat(),
@@ -88,16 +100,23 @@ def regressions(prev, cur):
 
 def main():
     data = load()
-    cur = snapshot(fetch_releases())
+    releases = fetch_releases()
+    cur = snapshot(releases)
 
     total = sum(c for a in cur["releases"].values() for c in a.values())
     print(f"total downloads across all releases: {total}")
+
+    # Checked against the stored value, so that a run whose counts are
+    # unchanged still writes an origin that is missing or has moved.
+    anchor = origin(releases)
+    anchor_moved = anchor is not None and data.get("origin") != anchor
+    data["origin"] = anchor
 
     if data["snapshots"]:
         prev = data["snapshots"][-1]
         for line in regressions(prev, cur):
             print(f"::warning::asset count fell, an asset was probably replaced: {line}")
-        if prev["releases"] == cur["releases"]:
+        if prev["releases"] == cur["releases"] and not anchor_moved:
             print("unchanged since the last snapshot; nothing written")
             return
         if prev["date"] == cur["date"]:
