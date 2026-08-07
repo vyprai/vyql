@@ -54,7 +54,7 @@ VyQL:
 
 ```sh
 # platforms: linux_amd64, linux_arm64, darwin_arm64, darwin_amd64
-V=v0.2.3; P=darwin_arm64
+V=v0.2.4; P=darwin_arm64
 curl -fsSLO https://github.com/vyprai/vyql/releases/download/$V/vyql_${V}_${P}.tar.gz
 curl -fsSLO https://github.com/vyprai/vyql/releases/download/$V/vyql_${V}_${P}.tar.gz.sha256
 shasum -a 256 -c vyql_${V}_${P}.tar.gz.sha256
@@ -121,9 +121,9 @@ vyql version
 ```
 
 ```
-vyql v0.2.3
-commit: 46b81d245502c975c3b4056eaae449ff33808fec
-built:  2026-08-06T14:47:54Z
+vyql v0.2.4
+commit: 6906231d71f36f0f7f93f6301870efff4ae333ad
+built:  2026-08-07T01:43:38Z
 go:     go1.26.4
 platform: darwin/arm64
 ```
