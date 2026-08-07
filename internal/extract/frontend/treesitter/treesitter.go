@@ -23,6 +23,20 @@ var scanHiddenDirs = map[string]bool{
 
 const largeTestResourceMaxBytes = 512 * 1024
 
+// maxFileBytes is the tree-walk source-size ceiling. A huge file that dodges
+// every other filter explodes into a single enormous graph — and, for
+// tree-sitter languages, a C parse tree several times the source size that
+// GOMEMLIMIT cannot see — so a size gate is the last line against one file
+// exhausting the machine. 0 disables. Files named directly on the command
+// line bypass the walk and are always scanned.
+var maxFileBytes int64 = 2 << 20
+
+// SetMaxFileBytes sets the tree-walk source-size ceiling (0 disables).
+func SetMaxFileBytes(n int64) { maxFileBytes = n }
+
+// MaxFileBytes reports the tree-walk source-size ceiling (0 = disabled).
+func MaxFileBytes() int64 { return maxFileBytes }
+
 // ListFiles walks root and returns files whose extension is in exts (e.g.
 // {".py": true}). Dependency/build/VCS directories are skipped.
 func ListFiles(root string, exts map[string]bool) ([]string, error) {

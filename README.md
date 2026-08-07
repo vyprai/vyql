@@ -341,12 +341,19 @@ vyql scan -coverage .
 coverage
   parsed    python 1 · textpattern 1
   excluded  5 file(s) dropped by -exclude
+  oversized 2 file(s) skipped over the -max-file-size ceiling;
+            raise it or pass 0 to scan them
   unread    15 file(s) matched no frontend: .zig 12, .cob 3
   depth     java, python, javascript are the reference frontends;
             other languages range down to call-and-concat coverage
   note      a parse that partially fails still counts as parsed;
             this does not yet report that
 ```
+
+Source files above 2 MiB are skipped during tree walks by default — a file that
+size is almost never hand-written, and parsing one costs far more than the rest
+of the tree combined. `-max-file-size 8MB` raises the ceiling, `0` disables it,
+and naming a file directly always scans it regardless of size.
 
 A clean report over a tree that was mostly skipped reads exactly like a clean
 report over a tree that was fully read. The warning is the difference, which is
