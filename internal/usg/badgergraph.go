@@ -39,6 +39,7 @@ type BadgerGraph struct {
 	// badger's cache, not the full payload.
 	idx        map[string]int32
 	ids        []string
+	typs       []string // node type by index; resident because AddNode consults it per call
 	out        [][]iedge
 	in         map[int32][]iedge
 	flowOut    [][]int32
@@ -113,6 +114,7 @@ func (g *BadgerGraph) intern(id string) int32 {
 	i := int32(len(g.ids))
 	g.idx[id] = i
 	g.ids = append(g.ids, id)
+	g.typs = append(g.typs, "")
 	g.out = append(g.out, nil)
 	g.flowOut = append(g.flowOut, nil)
 	g.flowIn = append(g.flowIn, nil)
@@ -120,13 +122,11 @@ func (g *BadgerGraph) intern(id string) int32 {
 	return i
 }
 
-// typeOf returns a node's type without decoding its full detail (type leads the detail blob).
+// typeOf returns a node's type from the resident core. AddNode consults it on
+// every call, so it must never cost a badger read once detail has spilled.
 func (g *BadgerGraph) typeOf(i int32) string {
-	if d, ok := g.det[i]; ok {
-		return d.typ
-	}
-	if b := g.rawDet(i); b != nil {
-		return (&detReader{b: b}).str()
+	if int(i) < len(g.typs) {
+		return g.typs[i]
 	}
 	return ""
 }
@@ -144,6 +144,7 @@ func (g *BadgerGraph) AddNode(n Node) error {
 		}
 		g.byType[n.Type] = append(g.byType[n.Type], i)
 	}
+	g.typs[i] = n.Type
 	d := nodeDetail{typ: n.Type, loc: n.Loc, region: n.Region, scope: n.Scope,
 		order: n.Order, hasOrder: n.HasOrder, props: n.Props}
 	if old, ok := g.det[i]; ok {
