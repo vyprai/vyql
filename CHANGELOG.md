@@ -36,8 +36,11 @@ behaviour change, even if no code moved.
   cache no longer receives 30% of the cache budget (it is only consulted for
   encrypted stores, so it was funded but never populated), and the memtable
   shrinks from 128 MiB to 32 MiB. Measured on a ~5,900-file Java repository:
-  `-max-ram 4GB` now peaks at 3.2 GB where the previous build peaked at 5.05 GB
-  under a 6 GB flag.
+  the previous build peaked at 5.05 GB under a `-max-ram 6GB` flag; this one
+  peaks at 4.06 GB under the same flag, and completes at 4.2 GB under a 4 GB
+  flag that previously bounded nothing. A ceiling below the working set is
+  slow — the spilled-detail read path is random point reads, and making that
+  path sequential is the next piece of this work.
 
 ### Performance
 - **The `--max-ram` store no longer decodes node detail it holds in RAM.**
@@ -46,9 +49,16 @@ behaviour change, even if no code moved.
   per read, for detail that had never left RAM: detail was encoded on write and
   decoded on every read, and the binding pass reads every node once per
   applicator. Detail now stays in struct form and is encoded once, at actual
-  spill time. Resident point reads drop from 7 allocations to 0, a resident
-  100-node type-range pass from 700 to 1. Store equivalence, flows and witness
-  paths are unchanged.
+  spill time; node types additionally live in the resident core, because
+  `AddNode` consults the type on every call and must never pay a disk read for
+  it. Resident point reads drop from 7 allocations to 0, a resident 100-node
+  type-range pass from 700 to 1.
+
+  Measured on the same Java repository: `-max-ram 6GB` goes from 115.8 s wall
+  at 5.05 GB peak to 40.2 s at 4.06 GB. The default (no-flag) path does not use
+  this store and is unchanged: 20.6 s. Findings are fingerprint-identical
+  across the default, 6 GB and 4 GB modes — 1,460 on this repository, the same
+  multiset in all three.
 
 ## [0.2.4] - 2026-08-07
 
