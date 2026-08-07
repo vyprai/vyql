@@ -304,13 +304,23 @@ func applyMaxRAM(v string) func() {
 		lowering.UseIntStore = true // fallback: lower-footprint in-RAM store
 		return noop
 	}
-	// Program-controlled budget: the graph lives on disk and RAM is bounded by badger's (off-heap)
-	// cache, sized here — NOT by a tight GOMEMLIMIT, which would make the GC thrash whenever the
-	// resident core approaches the limit. Most of the budget is the cache (the dominant, tunable
-	// consumer); the resident structural core sits on top.
-	lowering.DiskCacheBytes = n * 3 / 4
+	// Partition the budget ONCE across the pools that actually hold memory, and apply the
+	// heap ceiling here too. Half to badger's off-heap block cache, a quarter to the on-heap
+	// node-detail buffer, and the heap ceiling set to half — the detail buffer plus the
+	// resident structural core live inside it. A scan whose core fits comfortably never
+	// feels the limit; a tight limit sized to the whole flag would make the GC thrash
+	// whenever the resident core neared it.
+	lowering.DiskCacheBytes = n / 2
+	lowering.DiskDetailBuf = n / 4
 	lowering.DiskStorePath = dir
-	return func() { _ = os.RemoveAll(dir) } // best-effort temp cleanup
+	prev := debug.SetMemoryLimit(-1)
+	debug.SetMemoryLimit(n / 2)
+	return func() {
+		debug.SetMemoryLimit(prev)
+		lowering.DiskStorePath = ""
+		lowering.DiskCacheBytes, lowering.DiskDetailBuf = 0, 0
+		_ = os.RemoveAll(dir) // best-effort temp cleanup
+	}
 }
 
 // parseBytes parses a human size like "8GB", "512MiB", "2G", "1048576". Decimal (KB/MB/GB) and

@@ -6,7 +6,7 @@ import (
 )
 
 func TestBadgerGraphRangeNodesUsesStableIndexOrder(t *testing.T) {
-	g, err := OpenBadgerGraph(":memory:", 0)
+	g, err := OpenBadgerGraph(":memory:", 0, 0)
 	if err != nil {
 		t.Fatalf("OpenBadgerGraph: %v", err)
 	}
