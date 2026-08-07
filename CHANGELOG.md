@@ -10,6 +10,22 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-08-07
+
+**The scanner is unchanged from 0.2.3.** No engine, rule or binding differences —
+same findings, same fingerprints. This release exists to publish the container
+image, which is built from a release archive and so can only be produced by a
+tagged release.
+
+### Added
+- **The container image is published.** `docker run --rm -v "$PWD:/work"
+  ghcr.io/vyprai/vyql scan .` now works. The Dockerfile had been in the tree
+  since 0.2.1 and nothing ever pushed it, so four documents told people to run an
+  image that did not exist. Built for `linux/amd64` and `linux/arm64`, tagged with
+  the version and `latest`, and the release job proves the published image both
+  runs and detects before it finishes.
+- **A landing page** for the CLI at `vyql.vyprsec.ai`, served from `site/`.
+
 ## [0.2.3] - 2026-08-06
 
 ### Added
