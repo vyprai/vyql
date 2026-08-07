@@ -1,21 +1,20 @@
 # Contributing to VyQL
 
-Most useful contributions are **security knowledge, not Go**. If a scan misses
-something your framework does, or reports something that is actually safe, the
-fix is usually a binding or a rule in `vyql/` — no engine change.
+The most useful contributions are **security knowledge, not Go**. If a scan
+misses something your framework does, or flags something that is actually safe,
+the fix is usually a binding or a rule in `vyql/`. No engine change needed.
 
 ## Before your first change
 
-Two things bite everyone once.
+Two things catch everyone out once.
 
-**`go test` must always be `go test -count=1`.** The Go test cache keys on source
-files and does not track the `.vyql` data files. Without `-count=1` a cached pass
-will hide a change to the security knowledge base entirely — your edit looks like
-a no-op. `make test` does this for you.
+**Always use `go test -count=1`.** The Go test cache keys on source files and
+ignores the `.vyql` data files, so without it a cached pass hides your change
+completely and the edit looks like a no-op. `make test` handles this.
 
-**`CGO_ENABLED=1` is required.** The parsers are C. Without cgo the build
-constraints exclude them silently rather than failing, and you get a binary that
-cannot parse anything.
+**You need `CGO_ENABLED=1`.** The parsers are C. Without cgo the build
+constraints quietly exclude them and you end up with a binary that cannot parse
+anything.
 
 ```sh
 make build     # -> bin/
@@ -28,7 +27,7 @@ If `make ci` passes locally, CI should agree.
 
 ## Reporting a missed or wrong finding
 
-Open an issue with a **minimal reproducer** — the smallest file that shows the
+Open an issue with a **minimal reproducer**, the smallest file that shows the
 problem. Then include what these say, because they answer most of the question
 before anyone else has to guess:
 
@@ -73,7 +72,7 @@ test "flask request.json reaches a SQL sink"
   expect VYQL-INJ-001
 ```
 
-`reject` asserts the opposite — that a rule does *not* fire on safe code. A
+`reject` asserts the opposite: that a rule does *not* fire on safe code. A
 change that adds detection without a `reject` case for the safe form is usually
 incomplete, because precision is where this class of tool actually fails.
 
@@ -86,7 +85,7 @@ are typed.
 
 ## Changing the engine
 
-Read the design series first — [docs/README.md](docs/README.md) indexes it.
+Read the design series first. [docs/README.md](docs/README.md) indexes it.
 [docs/03](docs/03-architecture-overview.md) is the shape of the whole thing,
 [docs/08](docs/08-dataflow-and-taint.md) is the taint semantics, and
 [docs/20](docs/20-extraction-frontends.md) is how a language becomes a graph.
@@ -101,7 +100,7 @@ VYQL_BENCH=1 BENCH_DIR=/tmp/bench/BenchmarkPython go test -count=1 -v ./cmd/vyql
 ```
 
 A change that improves recall by trading away precision is not obviously an
-improvement — the numbers in [benchmarks/RESULTS.md](benchmarks/RESULTS.md) are
+improvement. The numbers in [benchmarks/RESULTS.md](benchmarks/RESULTS.md) are
 Youden (`TPR − FPR`) for that reason.
 
 ## Pull requests
@@ -113,7 +112,7 @@ guard was that the engine failed to see.
 Commits are squashed on merge, so the PR description is what lands in history.
 
 Adding a linter to `.golangci.yml` is welcome, but only together with the fixes
-it forces — a blanket exclusion hides the backlog instead of clearing it. The
+it forces. A blanket exclusion hides the backlog instead of clearing it. The
 currently-excluded checks are named and reasoned in that file.
 
 ## Security issues

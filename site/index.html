@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VyQL: no hidden gaps, no hand-waving</title>
+<meta name="description" content="Open source security scanner for 22 languages. Traces untrusted input to where it turns dangerous, and lists the safeguards that are missing.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2048%2048%22%3E%3Crect%20width%3D%2248%22%20height%3D%2248%22%20rx%3D%2210%22%20fill%3D%22%2318181b%22%2F%3E%3Cg%20fill%3D%22%23fafafa%22%3E%3Cpath%20d%3D%22M29.5412%2029.6729C30.6105%2028.7102%2031.4124%2028.9144%2032.7504%2028.7822C36.9842%2028.3639%2040.6943%2029.0429%2042.0693%2027.625C43.2355%2026.4226%2043.3017%2028.0989%2042.67%2029.1347C42.5417%2029.345%2042.116%2029.7155%2042.5172%2029.9224C42.9184%2030.1292%2045.646%2032.4975%2045.9959%2034.6758C46.0382%2034.9394%2045.7442%2035.0902%2045.5353%2034.9321C43.4457%2033.3502%2043.1056%2032.351%2037.9444%2031.0907C32.7833%2029.8304%2028.8549%2030.2909%2029.5412%2029.6729Z%22%2F%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M21.3937%209.1017C28.8707%208.80018%2030.2851%209.10171%2034.9043%2010.9272C39.5234%2012.7527%2042.0903%2014.9609%2041.0181%2017.9699L38.564%2023.7931C37.945%2025.4224%2035.6453%2024.9317%2036.1052%2023.2961C36.505%2022.45%2035.749%2021.5096%2034.9043%2021.8022L22.3444%2026.1524C21.9162%2026.3008%2021.7931%2026.8841%2022.1204%2027.2138L29.9869%2035.1384C30.3612%2035.5155%2030.97%2035.4039%2031.2049%2034.9151C31.8085%2033.6026%2033.955%2034.2568%2033.5046%2035.5693C33.5046%2035.5693%2033.495%2035.7288%2032.4218%2038.0186C32.4218%2038.0186%2031.9619%2039%2030.8886%2039C29.6313%2039%2026.9132%2037.3663%2026.9132%2037.3663L13.2612%2030.009C9.99125%2028.6006%203.18256%2024.5161%202.21136%2020.6275C0.156223%2012.3989%2013.5735%209.41707%2021.3937%209.1017ZM29.9794%2015.1894C27.5725%2014.1936%2024.3067%2014.084%2022.6202%2014.5352C22.0076%2014.6991%2021.7302%2015.1087%2022.0061%2015.843C22.0061%2015.843%2022.9236%2017.6028%2023.9998%2018.1332C25.4142%2018.8303%2026.9124%2018.6235%2028.1393%2017.9696C29.3661%2017.3157%2030.2851%2016.0066%2030.2851%2016.0066C30.4571%2015.7574%2030.488%2015.4483%2029.9794%2015.1894Z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<link rel="canonical" href="https://vyql.vyprsec.ai/">
+<meta property="og:title" content="VyQL: no hidden gaps, no hand-waving">
+<meta property="og:description" content="If a path exists, VyQL shows you every hop. If a control covers it, VyQL stays quiet. Open source, Apache-2.0.">
+<meta property="og:url" content="https://vyql.vyprsec.ai/">
+<meta property="og:type" content="website">
+<script>try{var t=localStorage.getItem("vyql-theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preload" href="fonts/geist-variable.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+/* Geist, served from this origin. vysual self-hosts for the same reason: a font
+   CDN is a third-party request on every page load, which a security tool's own
+   page should not be making. SIL OFL 1.1, see fonts/OFL.txt.
+   Variable upright only; the page uses 400/500/600 and no italics. */
+@font-face {
+  font-family:"Geist Variable";
+  src:url("fonts/geist-variable.woff2") format("woff2-variations");
+  font-weight:100 900; font-style:normal; font-display:swap;
+}
+@font-face {
+  font-family:"Geist Mono Variable";
+  src:url("fonts/geist-mono-variable.woff2") format("woff2-variations");
+  font-weight:100 900; font-style:normal; font-display:swap;
+}
+
+/* VYPR design system tokens (vyprai/vysual, docs/TOKENS.md).
+   Values are copied rather than imported: vysual is a private React package and
+   this page is served from a public repository. Copied values can drift, so the
+   set here is deliberately small -- surfaces, lines, brand, and the scales this
+   page actually uses. */
+:root {
+  --background:#ffffff; --foreground:#09090b;
+  --card:#ffffff; --card-foreground:#09090b;
+  --muted:#f4f4f5; --muted-foreground:#71717a;
+  --border:#e4e4e7; --code-bg:#fafafa;
+  --brand:oklch(50% .13 262); --ring:oklch(55% .13 262);
+  --primary:#18181b; --primary-foreground:#fafafa;
+  --destructive:#dc2626;
+
+  --radius-sm:6px; --radius:10px; --radius-card:12px;
+  --space-2:8px; --space-3:12px; --space-4:16px; --space-6:24px; --space-8:32px; --space-12:48px;
+  --text-page-title:30px; --text-section:20px; --text-card-title:16px;
+  --text-body:14.5px; --text-ui:13.5px; --text-meta:12.5px; --text-micro:11.5px;
+  --leading-body:1.65; --leading-ui:1.5; --leading-tight:1.4;
+  --tracking-title:-0.02em; --tracking-overline:0.08em;
+  --content-w:880px; --column-w:720px;
+  --ease-out:cubic-bezier(.2,0,0,1); --duration-micro:120ms;
+
+  /* Geist is the design system's typeface. vysual self-hosts it precisely so
+     nothing is fetched from a third party; this page keeps that property by
+     falling back to the system stack rather than adding a font CDN. */
+  --font-sans:"Geist Variable","Geist",ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --font-mono:"Geist Mono Variable","Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+/* The system preference is the default, and an explicit choice overrides it in
+   both directions -- :not([data-theme="light"]) is what lets someone on a dark
+   system pick light and have it stick. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background:#000000; --foreground:#fafafa;
+    --card:#101012; --card-foreground:#fafafa;
+    --muted:#1c1c1f; --muted-foreground:#a1a1aa;
+    --border:#26262a; --code-bg:#131316;
+    --brand:oklch(72% .11 262); --ring:oklch(70% .11 262);
+    --primary:#fafafa; --primary-foreground:#18181b;
+    --destructive:#ef4444;
+  }
+}
+:root[data-theme="dark"] {
+    --background:#000000; --foreground:#fafafa;
+    --card:#101012; --card-foreground:#fafafa;
+    --muted:#1c1c1f; --muted-foreground:#a1a1aa;
+    --border:#26262a; --code-bg:#131316;
+    --brand:oklch(72% .11 262); --ring:oklch(70% .11 262);
+    --primary:#fafafa; --primary-foreground:#18181b;
+    --destructive:#ef4444;
+}
+*,*::before,*::after { box-sizing:border-box; }
+body {
+  margin:0; background:var(--background); color:var(--foreground);
+  font-family:var(--font-sans); font-size:var(--text-body); line-height:var(--leading-body);
+  -webkit-font-smoothing:antialiased;
+}
+main { max-width:var(--content-w); margin:0 auto; padding:var(--space-8) var(--space-6); }
+section { margin-top:var(--space-12); }
+h1,h2,h3 { line-height:var(--leading-tight); letter-spacing:var(--tracking-title); font-weight:600; margin:0; }
+h1 { font-size:var(--text-page-title); max-width:var(--column-w); }
+h2 { font-size:var(--text-section); margin-bottom:var(--space-4); }
+h3 { font-size:var(--text-card-title); }
+section h3 { margin-top:var(--space-6); margin-bottom:var(--space-2); }
+.card h3 { margin-top:0; }
+p { margin:var(--space-3) 0; max-width:var(--column-w); }
+a { color:var(--brand); text-decoration:none; }
+a:hover { text-decoration:underline; }
+a:focus-visible { outline:1px solid var(--ring); outline-offset:2px; border-radius:var(--radius-sm); }
+/* Ligatures off. Geist Mono renders "--" as one long dash and "->" as an
+   arrow, which is decorative in prose and wrong here: every code block on this
+   page is a command someone is meant to read character by character and
+   retype. */
+code,kbd,pre {
+  font-family:var(--font-mono);
+  font-variant-ligatures:none; font-feature-settings:"liga" 0,"calt" 0;
+}
+.overline {
+  font-size:var(--text-micro); letter-spacing:var(--tracking-overline);
+  text-transform:uppercase; color:var(--muted-foreground); font-weight:500;
+}
+.lede { font-size:var(--text-section); color:var(--muted-foreground); max-width:var(--column-w); margin-top:var(--space-4); }
+
+/* The single call to action. One command, selectable in one gesture. */
+.cta { margin:var(--space-8) 0 var(--space-3); }
+.cta pre {
+  background:var(--code-bg); border:1px solid var(--border); border-radius:var(--radius);
+  padding:var(--space-4); overflow-x:auto; margin:0;
+  font-size:var(--text-ui); line-height:var(--leading-ui);
+}
+.cta pre span { color:var(--muted-foreground); user-select:none; }
+.cta-note { font-size:var(--text-meta); color:var(--muted-foreground); margin-top:var(--space-2); }
+
+pre.sample {
+  background:var(--code-bg); border:1px solid var(--border); border-radius:var(--radius-card);
+  padding:var(--space-4); overflow-x:auto;
+  font-size:var(--text-meta); line-height:var(--leading-ui); margin:var(--space-4) 0;
+}
+pre.sample b { font-weight:600; color:var(--destructive); }
+pre.sample b.who { color:var(--brand); }
+pre.sample i { font-style:normal; color:var(--muted-foreground); }
+
+table { border-collapse:collapse; width:100%; font-size:var(--text-ui); margin:var(--space-4) 0; }
+th,td { text-align:left; padding:var(--space-2) var(--space-3); border-bottom:1px solid var(--border); }
+th { font-weight:500; color:var(--muted-foreground); font-size:var(--text-meta); }
+td.num { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+
+.grid { display:grid; gap:var(--space-4); grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); }
+.card {
+  background:var(--card); border:1px solid var(--border); border-radius:var(--radius-card);
+  padding:var(--space-4); box-shadow:0 1px 2px rgba(0,0,0,.04);
+}
+.card h3 { margin-bottom:var(--space-2); }
+.card p { font-size:var(--text-ui); color:var(--muted-foreground); margin:0; }
+
+footer {
+  border-top:1px solid var(--border); margin-top:var(--space-12);
+  padding:var(--space-6); font-size:var(--text-meta); color:var(--muted-foreground);
+}
+footer .inner { max-width:var(--content-w); margin:0 auto; display:flex; flex-wrap:wrap; gap:var(--space-4); justify-content:space-between; }
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration:.01ms !important; transition-duration:.01ms !important; } }
+
+/* Header. Secondary routes only -- the install command in the hero stays the
+   one primary action. Sticky because the page is long enough that "how do I
+   get to the repo" should never require scrolling back. */
+header.site {
+  position:sticky; top:0; z-index:10;
+  background:color-mix(in srgb, var(--background) 88%, transparent);
+  backdrop-filter:saturate(180%) blur(12px);
+  border-bottom:1px solid var(--border);
+}
+header.site .inner {
+  max-width:var(--content-w); margin:0 auto;
+  padding:var(--space-3) var(--space-6);
+  display:flex; align-items:center; gap:var(--space-4);
+}
+.wordmark {
+  display:inline-flex; align-items:center; gap:var(--space-2);
+  font-weight:600; font-size:var(--text-card-title); letter-spacing:var(--tracking-title);
+  color:var(--foreground); margin-right:auto;
+}
+/* The company mark, from vypr-app's VyPrIcon. currentColor so it follows the
+   theme rather than needing a second asset for dark. */
+.mark { width:20px; height:20px; fill:currentColor; flex:0 0 auto; }
+.footmark { display:inline-flex; align-items:center; gap:4px; }
+.footmark .mark { width:14px; height:14px; }
+.wordmark:hover { text-decoration:none; }
+.navlink { color:var(--muted-foreground); font-size:var(--text-ui); }
+.navlink:hover { color:var(--foreground); text-decoration:none; }
+.ghstar {
+  display:inline-flex; align-items:center; gap:var(--space-2);
+  height:var(--control-h,32px); padding:0 var(--space-3);
+  background:var(--primary); color:var(--primary-foreground);
+  border-radius:7px; font-size:var(--text-ui); font-weight:500;
+  box-shadow:0 1px 2px rgba(0,0,0,.10);
+  transition:opacity var(--duration-micro) var(--ease-out);
+}
+.ghstar:hover { text-decoration:none; opacity:.9; }
+.ghstar svg { width:15px; height:15px; fill:currentColor; }
+.themetoggle {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:32px; height:32px; padding:0; border-radius:7px;
+  background:transparent; border:1px solid var(--border);
+  color:var(--muted-foreground); cursor:pointer;
+  transition:color var(--duration-micro) var(--ease-out);
+}
+.themetoggle:hover { color:var(--foreground); }
+.themetoggle:focus-visible { outline:1px solid var(--ring); outline-offset:2px; }
+.themetoggle svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.6; }
+/* The icon shows the theme the click switches TO, not the one in effect: a
+   control should say what it does, and the theme in effect is already visible
+   as the entire page. Light shows a moon, dark shows a sun. */
+.themetoggle .sun { display:none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .themetoggle .sun  { display:block; }
+  :root:not([data-theme="light"]) .themetoggle .moon { display:none; }
+}
+:root[data-theme="dark"]  .themetoggle .sun  { display:block; }
+:root[data-theme="dark"]  .themetoggle .moon { display:none; }
+:root[data-theme="light"] .themetoggle .sun  { display:none; }
+:root[data-theme="light"] .themetoggle .moon { display:block; }
+@media (max-width:560px) {
+  .navlink.optional { display:none; }
+  header.site .inner { padding-left:var(--space-4); padding-right:var(--space-4); }
+}
+</style>
+</head>
+<body>
+<header class="site">
+  <div class="inner">
+    <a class="wordmark" href="/"><svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><path d="M29.5412 29.6729C30.6105 28.7102 31.4124 28.9144 32.7504 28.7822C36.9842 28.3639 40.6943 29.0429 42.0693 27.625C43.2355 26.4226 43.3017 28.0989 42.67 29.1347C42.5417 29.345 42.116 29.7155 42.5172 29.9224C42.9184 30.1292 45.646 32.4975 45.9959 34.6758C46.0382 34.9394 45.7442 35.0902 45.5353 34.9321C43.4457 33.3502 43.1056 32.351 37.9444 31.0907C32.7833 29.8304 28.8549 30.2909 29.5412 29.6729Z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M21.3937 9.1017C28.8707 8.80018 30.2851 9.10171 34.9043 10.9272C39.5234 12.7527 42.0903 14.9609 41.0181 17.9699L38.564 23.7931C37.945 25.4224 35.6453 24.9317 36.1052 23.2961C36.505 22.45 35.749 21.5096 34.9043 21.8022L22.3444 26.1524C21.9162 26.3008 21.7931 26.8841 22.1204 27.2138L29.9869 35.1384C30.3612 35.5155 30.97 35.4039 31.2049 34.9151C31.8085 33.6026 33.955 34.2568 33.5046 35.5693C33.5046 35.5693 33.495 35.7288 32.4218 38.0186C32.4218 38.0186 31.9619 39 30.8886 39C29.6313 39 26.9132 37.3663 26.9132 37.3663L13.2612 30.009C9.99125 28.6006 3.18256 24.5161 2.21136 20.6275C0.156223 12.3989 13.5735 9.41707 21.3937 9.1017ZM29.9794 15.1894C27.5725 14.1936 24.3067 14.084 22.6202 14.5352C22.0076 14.6991 21.7302 15.1087 22.0061 15.843C22.0061 15.843 22.9236 17.6028 23.9998 18.1332C25.4142 18.8303 26.9124 18.6235 28.1393 17.9696C29.3661 17.3157 30.2851 16.0066 30.2851 16.0066C30.4571 15.7574 30.488 15.4483 29.9794 15.1894Z"/></svg>VyQL</a>
+    <a class="navlink optional" href="https://github.com/vyprai/vyql/blob/main/docs/README.md">Docs</a>
+    <a class="navlink optional" href="https://vyprsec.ai">Company</a>
+<button class="themetoggle" type="button" id="theme" aria-label="Switch between light and dark">
+      <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+    </button>
+    <a class="ghstar" href="https://github.com/vyprai/vyql" rel="noopener">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      Star on GitHub
+    </a>
+  </div>
+</header>
+<main>
+
+  <p class="overline">Open source · Apache-2.0</p>
+  <h1>No hidden gaps. No hand-waving.</h1>
+  <p class="lede">
+    VyQL follows untrusted input through your code to the point it turns
+    dangerous, and names the controls that would have stopped it. If a path
+    exists, it shows you every hop. If a control covers it, it stays quiet.
+  </p>
+
+  <div class="cta">
+    <pre><span>$ </span>curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh</pre>
+    <p class="cta-note">
+      macOS and Linux, amd64 and arm64. Verifies its checksum, installs to
+      <code>~/.local/bin</code>. No signup, no API key, nothing gets sent
+      anywhere.
+    </p>
+  </div>
+
+  <section>
+    <h2>Other Ways to Install</h2>
+    <table>
+      <tbody>
+        <tr><td>Homebrew</td><td><code>brew install vyprai/tap/vyql</code></td></tr>
+        <tr><td>Container</td><td><code>docker run --rm -v "$PWD:/work" ghcr.io/vyprai/vyql scan .</code></td></tr>
+        <tr><td>Go</td><td><code>go install github.com/vyprai/vyql/cmd/vyql@latest</code></td></tr>
+        <tr><td>GitHub Actions</td><td><a href="https://github.com/marketplace/actions/vyql-security-scan">vyql-security-scan</a></td></tr>
+        <tr><td>Claude Code</td><td><code>/plugin marketplace add vyprai/claude-plugins</code></td></tr>
+      </tbody>
+    </table>
+    <p>
+      Every one carries the security knowledge with it. No second setup step,
+      and nothing to point at a server.
+    </p>
+  </section>
+
+  <section>
+    <h2>Quickstart</h2>
+
+    <h3>From the Terminal</h3>
+    <p>Four commands cover almost everything:</p>
+<pre class="sample">vyql scan .                      <i># everything in this tree</i>
+vyql explain .                   <i># why each finding fired</i>
+vyql scan -fail-on none .        <i># report without failing the shell</i>
+vyql scan -baseline .vyql-baseline.json .   <i># only what is new</i></pre>
+    <p>
+      Reviewing a change rather than a repo is a different question. Scan both
+      sides and diff, which keys on a fingerprint so moving a function doesn't
+      read as a new finding:
+    </p>
+<pre class="sample">git worktree add -q /tmp/base $(git merge-base HEAD origin/main)
+vyql scan --format json /tmp/base &gt; before.json
+vyql scan --format json .        &gt; after.json
+vyql diff before.json after.json</pre>
+
+    <h3>Through an Agent</h3>
+    <p>
+      VyQL ships as an agent skill, so you can ask instead of remembering flags.
+      In Claude Code:
+    </p>
+<pre class="sample">/plugin marketplace add vyprai/claude-plugins
+/plugin install vyql@vypr</pre>
+    <p>
+      Then it is a conversation. Each turn builds on the last, so you never
+      re-state which finding you mean:
+    </p>
+<pre class="sample"><b class="who">you</b>  audit this repo for security problems
+
+     <i>scanned python:14 javascript:3, 2 files unread (.kt)</i>
+     <i>7 findings. 2 critical, 3 high, 2 medium.</i>
+     <i>1. VYQL-INJ-002  critical  api/users.py:88  request body reaches a shell</i>
+     <i>2. VYQL-PATH-001 high      api/files.py:23  query param reaches open()</i>
+     <i>...</i>
+
+<b class="who">you</b>  verify the high ones
+
+     <i>4 families: INJ (2), PATH (3), CRY (1), CFG (1). Verifying all four,</i>
+     <i>one agent each. Nothing deferred.</i>
+
+     <i>INJ   1 real, 1 false positive</i>
+     <i>PATH  3 false positives, all through the same startswith() guard</i>
+     <i>CRY   1 real</i>
+     <i>CFG   1 unresolved, needs to know whether debug mode ships</i>
+
+     <i>The three PATH findings share a cause. That guard is a containment</i>
+     <i>check VyQL does not model, so it is a binding gap, not three bugs.</i>
+
+<b class="who">you</b>  what about the INJ one
+
+     <i>Real. api/users.py:88 is a request handler and the path carries the</i>
+     <i>value with no escaping. Fix is core.ShellEscape: subprocess with a</i>
+     <i>list rather than shell=True.</i>
+
+<b class="who">you</b>  prove it
+
+     <i>Booting from a clean worktree at the scanned commit.</i>
+     <i>POST /users/import with a payload of "; id" returns uid=0(root).</i>
+     <i>Torn down.</i>
+
+<b class="who">you</b>  fix it then
+
+     <i>One file, api/users.py, introducing subprocess with an argument list.</i>
+     <i>Shall I?</i></pre>
+    <p>
+      A reproduction runs against your own machine and nothing else, and the
+      skill asks before executing one. Writing it is the deliverable; running it
+      is your call.
+    </p>
+    <p>
+      It runs the commands, reports what was read before what it found, and asks
+      before installing anything or writing a reproduction. The skill is a plain
+      <a href="https://agentskills.io">SKILL.md</a>, an open format, so any agent
+      that reads it can follow the same steps. Claude Code is just the one with
+      an installer.
+    </p>
+
+    <h3>Either Way, the Same Shape</h3>
+    <p>
+      Scope what you are looking at, scan, read the coverage line, look at the
+      list, verify the ones that matter, and reproduce if you need proof. Stop
+      wherever you have your answer. Most scans end at the list.
+    </p>
+  </section>
+
+  <section>
+    <h2>What a Finding Looks Like</h2>
+    <p>
+      An Express app that takes a filename from the query string and passes it
+      to the filesystem:
+    </p>
+<pre class="sample"><i>// app.js</i>
+const express = require("express");
+const fs = require("fs");
+const app = express();
+
+app.get("/download", (req, res) =&gt; {
+  const name = req.query.name;
+  res.send(fs.readFileSync("/var/data/" + name));
+});</pre>
+    <p>
+      No config file, no picking which rules to run:
+    </p>
+<pre class="sample">$ vyql scan .
+analysis profile: HTTP API server (api)
+
+2 finding(s):
+
+[P3] [<b>HIGH</b>] VYQL-PATH-001  <i>(conf=high, fp=c61843fd71a2284b)</i>
+    source: code.HttpInput @ app.js:6
+    sink: code.FilePathAccess @ app.js:7
+    taint path: app.jsAttr#80 -&gt; app.jsFormat#81 -&gt; app.jsArg#83
+    <i>unless path coveredBy core.PathCanonicalization: not satisfied, no neutralizing
+      control dominates the path; none found anywhere on flows</i>
+    <i>unless endpoint coveredBy core.PathAccessCheck: not satisfied, no guard on sink</i></pre>
+    <p>
+      Look at the last two lines. Most scanners tell you something is wrong and
+      leave the rest to you. VyQL names the control that would have fixed it. If
+      you already have that control, it tells you why it didn't apply.
+    </p>
+  </section>
+
+  <section>
+    <h2>What You Get</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Knowledge as Data</h3>
+        <p>A small Go engine plus 12,400 <code>.vyql</code> files you can open and edit.
+           Adding a framework usually means writing a binding, not patching Go.</p>
+      </div>
+      <div class="card">
+        <h3>One Graph, 22 Languages</h3>
+        <p>Java, Python and JavaScript are the most complete. Coverage thins out from
+           there, and the scan tells you what you actually got.</p>
+      </div>
+      <div class="card">
+        <h3>Built for CI</h3>
+        <p><code>scan</code> exits 1 on anything high or critical. SARIF and JSON output.
+           Baseline files if you're adopting it on a codebase that already has findings.</p>
+      </div>
+      <div class="card">
+        <h3>It Admits What It Missed</h3>
+        <p>Files it couldn't parse get reported whether you ask or not. Otherwise a
+           clean run over code nothing read looks the same as a genuinely clean run.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="inner">
+    <span>
+      <a href="https://github.com/vyprai/vyql">GitHub</a> ·
+      <a href="https://github.com/vyprai/vyql/blob/main/CHANGELOG.md">Changelog</a> ·
+      <a href="https://github.com/vyprai/vyql/blob/main/docs/README.md">Docs</a> ·
+      <a href="https://github.com/vyprai/vyql/blob/main/SECURITY.md">Security</a>
+    </span>
+    <span>Apache-2.0 · built by the team behind <a class="footmark" href="https://vyprsec.ai"><svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><path d="M29.5412 29.6729C30.6105 28.7102 31.4124 28.9144 32.7504 28.7822C36.9842 28.3639 40.6943 29.0429 42.0693 27.625C43.2355 26.4226 43.3017 28.0989 42.67 29.1347C42.5417 29.345 42.116 29.7155 42.5172 29.9224C42.9184 30.1292 45.646 32.4975 45.9959 34.6758C46.0382 34.9394 45.7442 35.0902 45.5353 34.9321C43.4457 33.3502 43.1056 32.351 37.9444 31.0907C32.7833 29.8304 28.8549 30.2909 29.5412 29.6729Z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M21.3937 9.1017C28.8707 8.80018 30.2851 9.10171 34.9043 10.9272C39.5234 12.7527 42.0903 14.9609 41.0181 17.9699L38.564 23.7931C37.945 25.4224 35.6453 24.9317 36.1052 23.2961C36.505 22.45 35.749 21.5096 34.9043 21.8022L22.3444 26.1524C21.9162 26.3008 21.7931 26.8841 22.1204 27.2138L29.9869 35.1384C30.3612 35.5155 30.97 35.4039 31.2049 34.9151C31.8085 33.6026 33.955 34.2568 33.5046 35.5693C33.5046 35.5693 33.495 35.7288 32.4218 38.0186C32.4218 38.0186 31.9619 39 30.8886 39C29.6313 39 26.9132 37.3663 26.9132 37.3663L13.2612 30.009C9.99125 28.6006 3.18256 24.5161 2.21136 20.6275C0.156223 12.3989 13.5735 9.41707 21.3937 9.1017ZM29.9794 15.1894C27.5725 14.1936 24.3067 14.084 22.6202 14.5352C22.0076 14.6991 21.7302 15.1087 22.0061 15.843C22.0061 15.843 22.9236 17.6028 23.9998 18.1332C25.4142 18.8303 26.9124 18.6235 28.1393 17.9696C29.3661 17.3157 30.2851 16.0066 30.2851 16.0066C30.4571 15.7574 30.488 15.4483 29.9794 15.1894Z"/></svg>VYPR</a></span>
+  </div>
+</footer>
+<script>
+document.getElementById("theme").addEventListener("click", function () {
+  var root = document.documentElement;
+  // No stored choice yet: flip away from whatever the system is showing.
+  var current = root.dataset.theme ||
+    (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  var next = current === "dark" ? "light" : "dark";
+  root.dataset.theme = next;
+  try { localStorage.setItem("vyql-theme", next); } catch (e) {}
+});
+</script>
+</body>
+</html>

@@ -6,7 +6,7 @@ code of conduct. The canonical text is at that link.
 
 In short: be respectful, assume good faith, and keep technical disagreement
 technical. Security work attracts strong opinions about severity and about what
-counts as a real finding — argue the evidence.
+counts as a real finding. Argue the evidence.
 
 ## Reporting
 
