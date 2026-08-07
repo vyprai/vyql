@@ -46,6 +46,7 @@ import (
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/engine"
 	"github.com/vyprai/vyql/internal/extract/frontend"
+	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/internal/extract/lowering"
 	"github.com/vyprai/vyql/internal/extract/parsecache"
 	"github.com/vyprai/vyql/internal/findings"
@@ -195,6 +196,7 @@ func cmdScan(args []string) error {
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
 	bindingOverlay := fs.String("binding-overlay", "", "optional repo-local binding overlay directory")
 	exclude := fs.String("exclude", "", "comma-separated path segments to skip, e.g. _vendor,node_modules,tests")
+	maxFileSize := fs.String("max-file-size", "", "skip source files larger than this during tree walks, e.g. 4MB (default 2MiB; 0 disables)")
 	cacheDir := fs.String("cache", "auto", "persistent scan cache: auto | off | <dir>")
 	incrementalCache := fs.Bool("incremental-cache", false, "also populate per-file parse/lower/binding caches for edit-loop scans")
 	failOn := fs.String("fail-on", defaultFailOn, "exit non-zero when a finding is at or above this severity: none | "+strings.Join(severityOrder, " | "))
@@ -237,6 +239,15 @@ func cmdScan(args []string) error {
 	oldExcludes := scanExcludes
 	scanExcludes = parseExcludes(*exclude)
 	defer func() { scanExcludes = oldExcludes }()
+	if v := strings.TrimSpace(*maxFileSize); v != "" {
+		ceiling, err := parseBytes(v)
+		if err != nil || ceiling < 0 {
+			return fmt.Errorf("invalid -max-file-size %q (use e.g. 4MB, 512KiB, or 0 to disable)", v)
+		}
+		oldCeiling := treesitter.MaxFileBytes()
+		treesitter.SetMaxFileBytes(ceiling)
+		defer treesitter.SetMaxFileBytes(oldCeiling)
+	}
 	return run(paths, *rulesPath, *format, *profileName, scanRunOptions{
 		ShowStats:     *stats,
 		IncludeFlags:  *allResults,
@@ -1067,6 +1078,10 @@ func printCoverage(stats scanStats) {
 	}
 	if stats.excluded > 0 {
 		fmt.Printf("  excluded  %d file(s) dropped by -exclude\n", stats.excluded)
+	}
+	if stats.oversized > 0 {
+		fmt.Printf("  oversized %d file(s) skipped over the -max-file-size ceiling;\n", stats.oversized)
+		fmt.Println("            raise it or pass 0 to scan them")
 	}
 	if n := stats.unmatchedTotal(); n > 0 {
 		fmt.Printf("  unread    %d file(s) matched no frontend: %s\n", n, topKinds(stats.unmatched, 12))
