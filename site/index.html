@@ -39,7 +39,7 @@
   --card:#ffffff; --card-foreground:#09090b;
   --muted:#f4f4f5; --muted-foreground:#71717a;
   --border:#e4e4e7; --code-bg:#fafafa;
-  --brand:oklch(50% .13 262); --ring:oklch(55% .13 262);
+  --brand:#18181b; --ring:#52525b;
   --primary:#18181b; --primary-foreground:#fafafa;
   --destructive:#dc2626;
 
@@ -67,7 +67,7 @@
     --card:#101012; --card-foreground:#fafafa;
     --muted:#1c1c1f; --muted-foreground:#a1a1aa;
     --border:#26262a; --code-bg:#131316;
-    --brand:oklch(72% .11 262); --ring:oklch(70% .11 262);
+    --brand:#fafafa; --ring:#a1a1aa;
     --primary:#fafafa; --primary-foreground:#18181b;
     --destructive:#ef4444;
   }
@@ -77,7 +77,7 @@
     --card:#101012; --card-foreground:#fafafa;
     --muted:#1c1c1f; --muted-foreground:#a1a1aa;
     --border:#26262a; --code-bg:#131316;
-    --brand:oklch(72% .11 262); --ring:oklch(70% .11 262);
+    --brand:#fafafa; --ring:#a1a1aa;
     --primary:#fafafa; --primary-foreground:#18181b;
     --destructive:#ef4444;
 }
@@ -96,8 +96,18 @@ h3 { font-size:var(--text-card-title); }
 section h3 { margin-top:var(--space-6); margin-bottom:var(--space-2); }
 .card h3 { margin-top:0; }
 p { margin:var(--space-3) 0; max-width:var(--column-w); }
-a { color:var(--brand); text-decoration:none; }
-a:hover { text-decoration:underline; }
+/* The palette is achromatic, so a link cannot be marked by colour. It is
+   carried by its underline, and the underline is always present: one that
+   appears on hover is invisible to anyone not already pointing at it. */
+a {
+  color:var(--brand); text-decoration:underline;
+  text-decoration-color:color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset:0.18em; text-decoration-thickness:1px;
+}
+a:hover { text-decoration-color:currentColor; }
+/* Navigation and marks are chrome rather than links in prose; they carry their
+   own colour and position, and an underline on each would be noise. */
+.wordmark, .navlink, .ghstar, .footmark { text-decoration:none; }
 a:focus-visible { outline:1px solid var(--ring); outline-offset:2px; border-radius:var(--radius-sm); }
 /* Ligatures off. Geist Mono renders "--" as one long dash and "->" as an
    arrow, which is decorative in prose and wrong here: every code block on this
