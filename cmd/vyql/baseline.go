@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -84,6 +85,41 @@ func loadBaseline(path string) (map[string]baselineEntry, error) {
 	return out, nil
 }
 
+// resolvePath is the strongest identity available for a path that may not exist
+// yet. A record target routinely does not, and EvalSymlinks fails on a missing
+// file, so an absolute cleaned path is the fallback.
+func resolvePath(p string) string {
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return filepath.Clean(p)
+	}
+	if real, err := filepath.EvalSymlinks(abs); err == nil {
+		return real
+	}
+	return abs
+}
+
+func sameFile(a, b string) bool { return resolvePath(a) == resolvePath(b) }
+
+// checkBaselineFlags rejects recording a baseline onto the one being applied.
+//
+// Recording writes every current finding as accepted with an empty reason. Onto
+// the file being applied, that replaces the false-positive verdicts someone
+// triaged and the reasoning behind them with a blank acceptance, and the run
+// that did it exits 0. Recording to a different path is how a baseline is rolled
+// forward, and stays allowed.
+func checkBaselineFlags(baseline, baselineWrite string) error {
+	if baseline == "" || baselineWrite == "" {
+		return nil
+	}
+	if !sameFile(baseline, baselineWrite) {
+		return nil
+	}
+	return fmt.Errorf("-baseline and -baseline-write both name %s: recording writes every finding as "+
+		"accepted with an empty reason, which would overwrite the verdicts in it; "+
+		"record to a different path and diff it", baseline)
+}
+
 func validVerdict(v string) bool {
 	for _, ok := range baselineVerdicts {
 		if v == ok {
@@ -151,24 +187,37 @@ func plural(n int, one, many string) string {
 	return many
 }
 
-// writeBaseline records every current finding as accepted, which is how a team
-// adopts the scanner on a codebase that already has findings: take the backlog
-// as given, and fail only on what comes next. Reasons are left empty on purpose
-// -- a reason nobody wrote is better left visibly blank than auto-filled with
-// something that reads like judgment.
-func writeBaseline(path string, all []*findings.Finding) error {
+// writeBaseline records the findings a run is prepared to carry forward, which
+// is how a team adopts the scanner on a codebase that already has findings: take
+// the backlog as given, and fail only on what comes next. Reasons are left empty
+// on purpose -- a reason nobody wrote is better left visibly blank than
+// auto-filled with something that reads like judgment.
+//
+// prior is the baseline this run applied, if any. Its entries keep their verdict
+// and reason, so a roll forward does not flatten someone's triaged
+// false-positive into a blank acceptance one push at a time. Entries in prior
+// that no current finding matches are simply absent from the result, which is
+// how a rolled baseline sheds suppressions whose code is gone.
+//
+// failOnRank is the gate, and 0 means record everything. A finding new to this
+// run that meets the gate is left out: recording what just failed the build
+// would leave the next run green with the finding absorbed and nobody told.
+// Findings already in prior are exempt, because the gate never saw them.
+func writeBaseline(path string, all []*findings.Finding, prior map[string]baselineEntry, failOnRank int) error {
 	bf := baselineFile{Version: baselineVersion}
 	for _, f := range all {
+		fp := resultpolicy.Fingerprint(f)
 		loc := ""
 		if len(f.Bindings) > 0 {
 			loc = f.Bindings[len(f.Bindings)-1].Loc
 		}
-		bf.Entries = append(bf.Entries, baselineEntry{
-			FP:      resultpolicy.Fingerprint(f),
-			Verdict: verdictAccepted,
-			Rule:    f.RuleID,
-			Loc:     loc,
-		})
+		e := baselineEntry{FP: fp, Verdict: verdictAccepted, Rule: f.RuleID, Loc: loc}
+		if p, ok := prior[fp]; ok {
+			e.Verdict, e.Reason = p.Verdict, p.Reason
+		} else if failOnRank > 0 && severityRank(f.Severity) >= failOnRank {
+			continue
+		}
+		bf.Entries = append(bf.Entries, e)
 	}
 	sort.Slice(bf.Entries, func(i, j int) bool { return bf.Entries[i].FP < bf.Entries[j].FP })
 	b, err := json.MarshalIndent(bf, "", "  ")
@@ -179,7 +228,11 @@ func writeBaseline(path string, all []*findings.Finding) error {
 	if err := os.WriteFile(path, b, 0o644); err != nil {
 		return fmt.Errorf("baseline: %w", err)
 	}
-	fmt.Fprintf(os.Stderr, "wrote %s: %d finding(s) recorded as %q\n", path, len(bf.Entries), verdictAccepted)
-	fmt.Fprintln(os.Stderr, "each entry has an empty reason; fill them in as they are triaged")
+	fmt.Fprintf(os.Stderr, "wrote %s: %d finding(s) recorded\n", path, len(bf.Entries))
+	if held := len(all) - len(bf.Entries); held > 0 {
+		fmt.Fprintf(os.Stderr, "%d new finding(s) at or above the gate were not recorded; "+
+			"fix them or triage them into the baseline by hand\n", held)
+	}
+	fmt.Fprintln(os.Stderr, "newly recorded entries have an empty reason; fill them in as they are triaged")
 	return nil
 }
