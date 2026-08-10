@@ -131,6 +131,34 @@ func v2MechanicStringSet(items []parser.V2BlockItem, key string) map[string]bool
 	return out
 }
 
+// checkSolverVerbsDispatchable walks a where-expression and rejects any solver call the evaluator
+// has no branch for. The parser's SolverVerbs set is wider than what evalSolverCall answers, and
+// an undispatched verb returns false rather than erroring — so the rule would compile, run, and
+// report nothing for the life of the pack. Failing here turns that into a startup error.
+func checkSolverVerbsDispatchable(x parser.Expr, rule string) error {
+	switch a := x.(type) {
+	case parser.Not:
+		return checkSolverVerbsDispatchable(a.Inner, rule)
+	case parser.And:
+		for _, part := range a.Parts {
+			if err := checkSolverVerbsDispatchable(part, rule); err != nil {
+				return err
+			}
+		}
+	case parser.Or:
+		for _, part := range a.Parts {
+			if err := checkSolverVerbsDispatchable(part, rule); err != nil {
+				return err
+			}
+		}
+	case parser.SolverCall:
+		if !DispatchableSolverVerbs[a.Verb] {
+			return fmt.Errorf("rule %s: solver verb %q has no evaluator; it would always be false", rule, a.Verb)
+		}
+	}
+	return nil
+}
+
 func compileOne(r *parser.Rule, onto *ontology.Ontology, ruleVerbs ruleVerbMechanicPolicy) (*CompiledRule, error) {
 	sev := "medium"
 	if s, ok := r.Meta["severity"].(string); ok {
@@ -138,6 +166,15 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology, ruleVerbs ruleVerbMecha
 	}
 	cr := &CompiledRule{Rule: r, Severity: sev,
 		KillControls: map[string]bool{}, NeutralizedThreats: map[string]bool{}}
+
+	for _, cl := range r.Clauses {
+		if cl.Kind != "where" || cl.Where == nil {
+			continue
+		}
+		if err := checkSolverVerbsDispatchable(cl.Where, r.QualifiedName()); err != nil {
+			return nil, err
+		}
+	}
 
 	switch body := r.Body.(type) {
 	case *parser.FlowStmt:
