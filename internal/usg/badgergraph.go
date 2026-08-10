@@ -34,6 +34,13 @@ type BadgerGraph struct {
 
 	mu sync.Mutex
 
+	// epoch stamps structural mutations so binding application can share one node index per
+	// pass. Omitting it did not fail loudly: bindings.storeIndexes type-asserts for the method
+	// and, not finding it, returned a FRESH empty index on every call -- so every applicator
+	// rebuilt its flag/flow/gram index from scratch, in the mode chosen precisely because
+	// resources were tight. See usg/epoch.go.
+	epoch uint64
+
 	// Resident structural core (int-indexed). Node DETAIL (loc/region/props/type) is NOT kept
 	// here — it is streamed to badger so peak RAM is bounded by the core + a small write buffer +
 	// badger's cache, not the full payload.
@@ -62,9 +69,13 @@ type BadgerGraph struct {
 
 type nodeDetail struct {
 	typ, loc, region, scope string
-	order                   int32
-	hasOrder                bool
-	props                   map[string]string
+	// The hottest match-path properties, carried inline on Node rather than in Props. They must
+	// round-trip: dropping them made Node.Prop("method") return "" here but not in IntStore, so
+	// --max-ram silently changed which bindings matched and therefore which findings appeared.
+	method, calleePath, strArgs, vkind string
+	order                              int32
+	hasOrder                           bool
+	props                              map[string]string
 }
 
 // OpenBadgerGraph opens a graph store at path (":memory:" for an in-memory Badger) with a cache
@@ -131,9 +142,17 @@ func (g *BadgerGraph) typeOf(i int32) string {
 	return ""
 }
 
+// StructEpoch reports the store's structural epoch. See usg/epoch.go.
+func (g *BadgerGraph) StructEpoch() uint64 {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.epoch
+}
+
 func (g *BadgerGraph) AddNode(n Node) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	g.epoch = nextStructEpoch()
 	i, existed := g.idx[n.ID]
 	if !existed {
 		i = g.intern(n.ID)
@@ -146,7 +165,24 @@ func (g *BadgerGraph) AddNode(n Node) error {
 	}
 	g.typs[i] = n.Type
 	d := nodeDetail{typ: n.Type, loc: n.Loc, region: n.Region, scope: n.Scope,
+		method: n.Method, calleePath: n.CalleePath, strArgs: n.StrArgs, vkind: n.Vkind,
 		order: n.Order, hasOrder: n.HasOrder, props: n.Props}
+	// Same normalization as IntStore.AddNode: an explicit props entry wins over the inline field,
+	// so a producer may set either and both stores agree.
+	if n.Props != nil {
+		if v, ok := n.Props["method"]; ok {
+			d.method = v
+		}
+		if v, ok := n.Props["callee_path"]; ok {
+			d.calleePath = v
+		}
+		if v, ok := n.Props["str_args"]; ok {
+			d.strArgs = v
+		}
+		if v, ok := n.Props["vkind"]; ok {
+			d.vkind = v
+		}
+	}
 	if old, ok := g.det[i]; ok {
 		g.detBytes -= estDetBytes(old)
 	}
@@ -161,6 +197,7 @@ func (g *BadgerGraph) AddNode(n Node) error {
 func (g *BadgerGraph) AddEdge(e Edge) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	g.epoch = nextStructEpoch()
 	si, di := g.intern(e.Src), g.intern(e.Dst)
 	typ := edgeTypeIDFor(e.Type)
 	if typ == edgeTypeFlows && len(e.Props) == 0 {
@@ -183,6 +220,7 @@ func (g *BadgerGraph) AddFlowEdgeIfPresent(src, dst string) bool {
 	if !ok {
 		return false
 	}
+	g.epoch = nextStructEpoch()
 	di, ok := g.idx[dst]
 	if !ok {
 		return false
@@ -228,7 +266,8 @@ func (g *BadgerGraph) idxOf(id string) (int32, bool) { i, ok := g.idx[id]; retur
 // map-slot overhead — so the spill threshold keeps meaning "about this many bytes
 // buffered" without encoding anything to find out.
 func estDetBytes(d nodeDetail) int {
-	n := len(d.typ) + len(d.loc) + len(d.region) + len(d.scope) + 96
+	n := len(d.typ) + len(d.loc) + len(d.region) + len(d.scope) +
+		len(d.method) + len(d.calleePath) + len(d.strArgs) + len(d.vkind) + 96
 	for k, v := range d.props {
 		n += len(k) + len(v) + 48
 	}
@@ -256,7 +295,8 @@ func (g *BadgerGraph) nodeAt(i int32) Node {
 		d = decDet(g.rawDet(i))
 	}
 	return Node{ID: g.ids[i], Type: d.typ, Loc: d.loc, Region: d.region, Order: d.order,
-		HasOrder: d.hasOrder, Scope: d.scope, Props: d.props}
+		HasOrder: d.hasOrder, Scope: d.scope, Props: d.props,
+		Method: d.method, CalleePath: d.calleePath, StrArgs: d.strArgs, Vkind: d.vkind}
 }
 
 // flushDet writes the buffered node details to badger in one transaction and clears the buffer,
@@ -453,6 +493,10 @@ func encDet(d nodeDetail) []byte {
 	w.str(d.loc)
 	w.str(d.region)
 	w.str(d.scope)
+	w.str(d.method)
+	w.str(d.calleePath)
+	w.str(d.strArgs)
+	w.str(d.vkind)
 	w.u(int(uint32(d.order)))
 	w.boolean(d.hasOrder)
 	w.u(len(d.props))
@@ -469,6 +513,7 @@ func decDet(b []byte) nodeDetail {
 	}
 	r := &detReader{b: b}
 	d := nodeDetail{typ: r.str(), loc: r.str(), region: r.str(), scope: r.str()}
+	d.method, d.calleePath, d.strArgs, d.vkind = r.str(), r.str(), r.str(), r.str()
 	d.order = int32(uint32(r.u()))
 	d.hasOrder = r.boolean()
 	if n := r.u(); n > 0 {
