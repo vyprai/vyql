@@ -44,6 +44,27 @@ func TestResidentRangeNodesOfTypeDoesNotDecode(t *testing.T) {
 	}
 }
 
+// typeOf runs inside every AddNode to detect type changes, so on a graph that
+// has started spilling it must be served from the resident core — a badger
+// point-read per added node turns the build quadratic-ish in disk traffic.
+func TestTypeOfSpilledNodeStaysResident(t *testing.T) {
+	g, err := OpenBadgerGraph(t.TempDir(), 64<<20, 1) // detCap 1 byte: spill after every add
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer func() { _ = g.Close() }()
+	if err := g.AddNode(Node{ID: "x", Type: "Call", Loc: "f.go:1"}); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if got := g.typeOf(0); got != "Call" {
+		t.Fatalf("typeOf = %q, want Call", got)
+	}
+	allocs := testing.AllocsPerRun(100, func() { _ = g.typeOf(0) })
+	if allocs > 0 {
+		t.Errorf("typeOf allocated %.1f objects per call on a spilled node, want 0 (badger-free)", allocs)
+	}
+}
+
 func TestSpilledDetailStillRoundTrips(t *testing.T) {
 	g, err := OpenBadgerGraph(t.TempDir(), 64<<20, 1) // detCap 1 byte: spill after every add
 	if err != nil {
