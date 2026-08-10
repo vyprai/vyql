@@ -16,6 +16,9 @@ const (
 	Schema  = "https://json.schemastore.org/sarif-2.1.0.json"
 )
 
+// levelOf is the ONE severity -> SARIF level mapping. A result and its rule descriptor must
+// agree; emitting a result at "note" whose rule defaults to "warning" makes one document
+// contradict itself, and a consumer filtering on either field then sees a different set.
 var levelOf = map[string]string{
 	"critical": "error", "high": "error", "medium": "warning", "low": "note", "info": "note",
 }
@@ -46,18 +49,19 @@ func nodeLoc(f *findings.Finding, nodeID string) string {
 }
 
 func findingToResult(f *findings.Finding) map[string]any {
-	var sink, source *findings.Binding
+	// The primary target comes from resultpolicy so the location a consumer sees is the same
+	// binding the fingerprint was built from. This used to be a local copy that picked the LAST
+	// matching sink where resultpolicy picks the first.
+	var sink *findings.Binding
+	if pt := resultpolicy.PrimaryTarget(f); pt.NodeID != "" || pt.Loc != "" {
+		pt := pt
+		sink = &pt
+	}
+	var source *findings.Binding
 	for i := range f.Bindings {
-		b := &f.Bindings[i]
-		switch b.Name {
-		case "sink", "target":
-			sink = b
-		case "source", "principal":
+		if b := &f.Bindings[i]; b.Name == "source" || b.Name == "principal" {
 			source = b
 		}
-	}
-	if sink == nil && len(f.Bindings) > 0 {
-		sink = &f.Bindings[len(f.Bindings)-1]
 	}
 
 	level := levelOf[f.Severity]
@@ -120,18 +124,6 @@ func withMessage(loc map[string]any, text string) map[string]any {
 	return loc
 }
 
-// sarifLevel maps a rule severity to the SARIF result level vocabulary.
-func sarifLevel(sev string) string {
-	switch strings.ToLower(sev) {
-	case "critical", "high":
-		return "error"
-	case "medium", "low":
-		return "warning"
-	default:
-		return "note"
-	}
-}
-
 // securitySeverity maps a rule severity to the numeric string consumers rank by.
 // The bands are the conventional CVSS-ish cutoffs SARIF consumers apply:
 // >=9.0 critical, >=7.0 high, >=4.0 medium, else low.
@@ -179,6 +171,10 @@ func ruleDescriptor(f *findings.Finding, meta map[string]any) map[string]any {
 		props["cwe"] = cwes // retained: the pre-existing shape
 		props["tags"] = cweTags(cwes)
 	}
+	// The rule's own metadata is the authority for a RULE descriptor, falling back to the
+	// finding's resolved severity. In practice these agree -- the engine derives f.Severity from
+	// this same metadata at compile time -- so the fallback matters only for a finding whose rule
+	// metadata was not supplied to the writer.
 	sev := f.Severity
 	if s, ok := meta["severity"].(string); ok && s != "" {
 		sev = s
@@ -188,7 +184,9 @@ func ruleDescriptor(f *findings.Finding, meta map[string]any) map[string]any {
 		if ss := securitySeverity(sev); ss != "" {
 			props["security-severity"] = ss
 		}
-		rule["defaultConfiguration"] = map[string]any{"level": sarifLevel(sev)}
+		if lvl, ok := levelOf[sev]; ok {
+			rule["defaultConfiguration"] = map[string]any{"level": lvl}
+		}
 	}
 	if d, ok := meta["description"].(string); ok && d != "" {
 		rule["shortDescription"] = map[string]any{"text": d}
