@@ -237,11 +237,13 @@ type FuncDef struct {
 	// function. Lowering emits generic result events; binding applicators decide which events are
 	// controls, sinks, or other domain concepts.
 	ResultEntries []ResultEntry
-	// Exported marks a function/method as part of the PUBLIC API surface (per the
-	// language's visibility rules: Go capitalization, `pub`, `public`, `export`, no
-	// leading underscore, …). The library/SDK archetype treats exported-function
-	// parameters as an external-entry taint source; internal helpers are reached by
-	// ordinary interprocedural propagation, so they must NOT be entry points.
+	// Exported marks a function/method as part of the PUBLIC API surface, per the language's own
+	// visibility rules: Go capitalization, `pub`, `public`, `export`, no leading underscore, and
+	// so on. This is an observation about visibility and nothing more -- what it MEANS is a
+	// question for the layers above, the same way Validation above records a postcondition and
+	// leaves bindings to say which security concept it is. (Today the library/SDK archetype is
+	// the consumer that treats exported parameters as an external entry point, but that is the
+	// archetype's decision to change, not a property of the IR.)
 	Exported bool
 }
 
