@@ -4982,9 +4982,6 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 			}
 		}
 		if typ, ok := sc.typ[obj]; ok { // instance/self method
-			if benchmarkThingIdentityMethod(typ[1], attr) {
-				return nil
-			}
 			var out []*funcInfo
 			if m := l.funcQual[typ[0]+"::"+typ[1]+"."+attr]; m != nil {
 				if m.abstract {
@@ -4993,7 +4990,7 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 					// unresolved: the conservative direct arg→result edge then carries taint
 					// through the call (over-approximate, recall-safe), while concrete callees
 					// still route through their real body so in-body sanitizers are honoured.
-					return l.resolveDerivedMethods(typ[1], attr)
+					return nil
 				}
 				out = append(out, m)
 			}
@@ -5015,18 +5012,6 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 		}
 	}
 	return nil
-}
-
-func benchmarkThingIdentityMethod(class, method string) bool {
-	if method != "doSomething" {
-		return false
-	}
-	switch class {
-	case "ThingInterface", "Thing1", "Thing2":
-		return true
-	default:
-		return false
-	}
 }
 
 func dedupeFuncInfos(in []*funcInfo) []*funcInfo {
