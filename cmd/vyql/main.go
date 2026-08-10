@@ -159,6 +159,8 @@ func vyqlMain() (code int) {
 		err = cmdValidateBinding(args)
 	case "diff":
 		err = cmdDiff(args)
+	case "cache":
+		err = cmdCache(args)
 	case "version", "--version", "-version":
 		cmdVersion()
 	default:
@@ -1174,5 +1176,6 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  definitions inspect loaded VyQL concepts/rules/bindings/reviews; explain <concept|binding> traces a label's source; check-v2 verifies v2 definitions")
 	fmt.Fprintln(os.Stderr, "  validate-binding parse and summarize a VyQL binding file   [-file binding.vyql]")
 	fmt.Fprintln(os.Stderr, "  diff       diff two `scan -format json` outputs by fingerprint")
+	fmt.Fprintln(os.Stderr, "  cache      inspect or clear the persistent scan cache   [clear | path]")
 	fmt.Fprintln(os.Stderr, "  version    print the version, revision and build information")
 }
