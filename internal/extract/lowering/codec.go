@@ -226,6 +226,14 @@ func decodeDelta(raw []byte) (d *moduleDelta, err error) {
 			d.Labels[i] = deltaLabel{NodeID: nodeID, Label: lbl}
 		}
 	}
+	// Unread trailing bytes mean the value is not what this decoder wrote: a short read cannot
+	// produce them (it overruns and the recover above catches it), so they indicate a stale
+	// format, a concatenated write, or corruption that happens to parse. Decoding would then
+	// yield a delta replay merges as if complete. Route it to the corrupt path, which already
+	// falls back to lowering the module fresh.
+	if r.i != len(r.b) {
+		return nil, errCorruptDelta
+	}
 	return d, nil
 }
 
@@ -313,5 +321,8 @@ func decodePass1(raw []byte) (d *pass1Delta, err error) {
 	}
 	d.Counter = r.uvar()
 	d.Order = r.uvar()
+	if r.i != len(r.b) {
+		return nil, errCorruptDelta
+	}
 	return d, nil
 }

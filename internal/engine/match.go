@@ -296,6 +296,16 @@ func (e *Engine) evalSolverCall(call parser.SolverCall, env map[string]string) (
 			}
 			return true, w
 		}
+	case "can_access":
+		bIDs := e.resolveArg(call.Args[1], env)
+		action := ""
+		if len(call.Args) > 2 {
+			action = call.Args[2].Ref.String()
+		}
+		paths, _ := solvers.FindCanAccess(e.Store, aIDs, bIDs, action)
+		if len(paths) > 0 {
+			return true, paths[0].Witness()
+		}
 	case "dominates":
 		bIDs := e.resolveArg(call.Args[1], env)
 		for _, a := range aIDs {
@@ -307,6 +317,16 @@ func (e *Engine) evalSolverCall(call parser.SolverCall, env map[string]string) (
 		}
 	}
 	return false, nil
+}
+
+// DispatchableSolverVerbs are the verbs evalSolverCall can actually answer. A verb the parser
+// accepts but this map omits would evaluate to a silent false — a rule that compiles, runs, and
+// reports nothing forever — so compileOne rejects it instead.
+var DispatchableSolverVerbs = map[string]bool{
+	"reach":      true,
+	"grant":      true,
+	"can_access": true,
+	"dominates":  true,
 }
 
 // resolveArg resolves a solver-call argument to node ids: a qualified concept
