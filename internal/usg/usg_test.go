@@ -119,7 +119,7 @@ func TestCompactFlowEdgesPreserveStoreAPI(t *testing.T) {
 	} {
 		t.Helper()
 		intStore := NewIntStore(0)
-		bdg, err := OpenBadgerGraph(":memory:", 0)
+		bdg, err := OpenBadgerGraph(":memory:", 0, 0)
 		if err != nil {
 			t.Fatalf("OpenBadgerGraph: %v", err)
 		}

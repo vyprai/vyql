@@ -66,7 +66,7 @@ type nodeDetail struct {
 
 // OpenBadgerGraph opens a graph store at path (":memory:" for an in-memory Badger) with a cache
 // budget in bytes (block + value cache; 0 = Badger defaults).
-func OpenBadgerGraph(path string, cacheBytes int64) (*BadgerGraph, error) {
+func OpenBadgerGraph(path string, cacheBytes, detailBufBytes int64) (*BadgerGraph, error) {
 	var opts badger.Options
 	if path == ":memory:" {
 		opts = badger.DefaultOptions("").WithInMemory(true)
@@ -74,20 +74,23 @@ func OpenBadgerGraph(path string, cacheBytes int64) (*BadgerGraph, error) {
 		opts = badger.DefaultOptions(path)
 	}
 	opts = opts.WithLogger(nil).
-		WithSyncWrites(false).       // a scan-scoped graph: durability not needed, speed is
-		WithCompression(0).          // skip per-block (de)compression CPU
-		WithNumVersionsToKeep(1).    // no MVCC history
-		WithMemTableSize(128 << 20). // fewer, larger flushes during the streaming build
+		WithSyncWrites(false).      // a scan-scoped graph: durability not needed, speed is
+		WithCompression(0).         // skip per-block (de)compression CPU
+		WithNumVersionsToKeep(1).   // no MVCC history
+		WithMemTableSize(32 << 20). // memtable arenas are eager Go-heap allocations inside a RAM-bounded mode
 		WithDetectConflicts(false)
 	if cacheBytes > 0 {
-		opts = opts.WithBlockCacheSize(cacheBytes * 7 / 10).WithIndexCacheSize(cacheBytes * 3 / 10)
+		// The whole cache budget goes to the block cache. The index cache is only
+		// consulted for encrypted DBs; funding it here spends budget on a cache
+		// that is never populated.
+		opts = opts.WithBlockCacheSize(cacheBytes).WithIndexCacheSize(0)
 	}
 	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, err
 	}
 	g := NewBadgerGraphDB(db, true)
-	g.detCapByte = cacheBytes // 0 = unbounded; else spill detail to badger past this many bytes
+	g.detCapByte = detailBufBytes // 0 = unbounded; else spill detail to badger past this many bytes
 	return g, nil
 }
 
