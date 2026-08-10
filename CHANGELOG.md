@@ -41,6 +41,18 @@ behaviour change, even if no code moved.
   flag that previously bounded nothing. A ceiling below the working set is
   slow — the spilled-detail read path is random point reads, and making that
   path sequential is the next piece of this work.
+- **`-baseline-write` reports the scan it recorded.** Writing a baseline ended
+  the run: no SARIF, no JSON, no text report, no coverage, no stats. A CI job
+  adopting the scanner had to choose between recording a baseline and publishing
+  results for that run, and nobody could see what had just been accepted on their
+  behalf. The recording run now prints its findings in the requested format. It
+  does not fail the build — everything it reported was accepted a moment earlier —
+  and it still fails outright, before printing, if the baseline cannot be written.
+- **`-baseline` with `-baseline-write` is rejected.** The combination was
+  accepted and the loaded baseline silently ignored. Recording writes every
+  finding as `accepted` with an empty reason, so aiming it at a file you had
+  triaged replaced those verdicts and their reasoning with a blank acceptance,
+  and the run exited 0. Re-record to a new path and diff it.
 
 ### Performance
 - **The `--max-ram` store no longer decodes node detail it holds in RAM.**

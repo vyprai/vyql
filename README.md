@@ -302,6 +302,25 @@ triage, and change the verdict to `false-positive` where the finding is wrong:
   "rule": "VYQL-INJ-002", "loc": "server.js:5" }
 ```
 
+A recording run still reports. `-baseline-write` writes the file and then prints
+the findings it recorded, in whatever `-format` you asked for, so the run that
+adopts the scanner can still publish its SARIF and you can see what was accepted
+on your behalf:
+
+```sh
+vyql scan -baseline-write .vyql-baseline.json -format sarif . > results.sarif
+```
+
+That run does not fail the build. Everything it reported was just accepted, and
+gating on the backlog the flag exists to absorb would leave you unable to adopt
+the scanner in the pipeline that needs it. It does fail, before printing
+anything, if the baseline cannot be written.
+
+Recording over a baseline you are also applying is refused: `-baseline` with
+`-baseline-write` is an error. Recording writes every finding as `accepted` with
+an empty reason, so it would overwrite the verdicts you triaged. Re-record to a
+new path and diff it.
+
 Baselined findings are kept out of both the report and the gate. Anything not in
 the file is new and reported normally.
 
