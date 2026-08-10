@@ -1110,7 +1110,7 @@ func jsRegexMayBacktrack(raw string) bool {
 	if pat == "" {
 		return false
 	}
-	return hasNestedBacktrackingQuantifier(pat) || hasAmbiguousAdjacentRegexQuantifiers(pat)
+	return regexambig.Ambiguous(pat) || hasAmbiguousAdjacentRegexQuantifiers(pat)
 }
 
 func jsRegexPattern(raw string) string {
@@ -3102,7 +3102,3 @@ func (c *jsConv) lastIdent(n *tree_sitter.Node) *tree_sitter.Node {
 	}
 	return nil
 }
-
-// hasNestedBacktrackingQuantifier defers to the shared analysis so JavaScript, Ruby
-// and the Python lowering all answer this the same way.
-func hasNestedBacktrackingQuantifier(pat string) bool { return regexambig.Ambiguous(pat) }

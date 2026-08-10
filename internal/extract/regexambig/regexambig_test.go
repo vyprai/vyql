@@ -2,7 +2,7 @@ package regexambig
 
 import "testing"
 
-func TestHasNestedBacktrackingQuantifier(t *testing.T) {
+func TestAmbiguous(t *testing.T) {
 	cases := []struct {
 		want bool
 		name string

@@ -304,11 +304,6 @@ func regexFirstSetOfAtoms(atoms []regexAtom) (regexCharSet, bool) {
 	return out, true
 }
 
-// HasNestedBacktrackingQuantifier is the exported entry point for callers outside this
-// package (the Python lowering path), so every language answers "is this regex
-// catastrophic?" with the same analysis rather than its own structural approximation.
-func HasNestedBacktrackingQuantifier(pat string) bool { return Ambiguous(pat) }
-
 // Ambiguous reports a quantifier nested inside a repeat,
 // unless the repeat's body is demonstrably unambiguous. The report stands on the
 // nesting alone, as it always has; the analysis below only withdraws it, so a

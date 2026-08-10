@@ -10,6 +10,7 @@ import (
 	tsruby "github.com/tree-sitter/tree-sitter-ruby/bindings/go"
 
 	"github.com/vyprai/vyql/internal/extract/nir"
+	"github.com/vyprai/vyql/internal/extract/regexambig"
 )
 
 // rbConv walks a tree-sitter Ruby CST into NIR. Ruby has no per-file module
@@ -1100,7 +1101,7 @@ func rubyRegexMayBacktrack(raw string) bool {
 	if pat == "" {
 		return false
 	}
-	if hasNestedBacktrackingQuantifier(pat) {
+	if regexambig.Ambiguous(pat) {
 		return true
 	}
 	alts := strings.Split(pat, "|")
@@ -1158,14 +1159,6 @@ func isRegexQuantifier(b byte) bool {
 
 func isPossessiveQuantifier(s string, i int) bool {
 	return i+1 < len(s) && s[i+1] == '+'
-}
-
-func isEscaped(s string, i int) bool {
-	esc := false
-	for j := i - 1; j >= 0 && s[j] == '\\'; j-- {
-		esc = !esc
-	}
-	return esc
 }
 
 func (c *rbConv) string(n *tree_sitter.Node, L string) nir.Expr {
