@@ -90,18 +90,32 @@ func ruleVerbMechanicsFromDecls(decls []parser.Decl) ruleVerbMechanicPolicy {
 	return out
 }
 
+// builtinRuleVerbMechanics derives the engine's view from the parser's table rather than
+// restating it. The two used to be maintained separately, in different shapes -- sets here,
+// slices there -- so a verb gaining a kind in one layer and not the other was a silent
+// divergence between what the language accepts and what the engine will type-check.
 func builtinRuleVerbMechanics() ruleVerbMechanicPolicy {
-	return ruleVerbMechanicPolicy{
-		present: true,
-		verbs: map[string]ruleVerbMechanic{
-			"taint": {FromKinds: map[string]bool{"source": true}, ToKinds: map[string]bool{"sink": true}},
-			"reach": {FromKinds: map[string]bool{"asset": true, "exposure": true}, ToKinds: map[string]bool{"asset": true, "exposure": true}},
-			"grant": {FromKinds: map[string]bool{"principal": true}, ToKinds: map[string]bool{"principal": true, "privilege": true}},
-			"issue": {FromKinds: map[string]bool{"issue": true}, ToKinds: nil},
-			"fact":  {FromKinds: map[string]bool{"fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true}, ToKinds: nil},
-			"query": {FromKinds: map[string]bool{"concept": true, "fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true}, ToKinds: nil},
-		},
+	out := ruleVerbMechanicPolicy{present: true, verbs: map[string]ruleVerbMechanic{}}
+	for verb, kinds := range parser.BuiltinRuleVerbKinds() {
+		out.verbs[verb] = ruleVerbMechanic{
+			FromKinds: kindSet(kinds.From),
+			ToKinds:   kindSet(kinds.To),
+		}
 	}
+	return out
+}
+
+// kindSet returns nil for an empty list: a verb with no target endpoint (issue, fact, query) is
+// distinguished from one whose target accepts nothing, and checkEndpointKinds relies on that.
+func kindSet(kinds []string) map[string]bool {
+	if len(kinds) == 0 {
+		return nil
+	}
+	set := make(map[string]bool, len(kinds))
+	for _, k := range kinds {
+		set[k] = true
+	}
+	return set
 }
 
 func v2MechanicStringSet(items []parser.V2BlockItem, key string) map[string]bool {
