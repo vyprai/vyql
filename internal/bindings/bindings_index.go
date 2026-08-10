@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/vyprai/vyql/internal/parser"
 	"github.com/vyprai/vyql/internal/usg"
 )
 
@@ -131,13 +130,13 @@ func sharedContentContains(s usg.Store, lowerNeedle string) bool {
 	return hit
 }
 
-func prewarmContentRequirements(s usg.Store, reqs ...*parser.BindingRequirement) {
+func prewarmContentRequirements(s usg.Store, reqs ...*Requirement) {
 	if storeNodeCount(s) < presenceGateMinNodes {
 		return
 	}
 	needles := map[string]bool{}
-	var walk func(*parser.BindingRequirement)
-	walk = func(req *parser.BindingRequirement) {
+	var walk func(*Requirement)
+	walk = func(req *Requirement) {
 		if req == nil {
 			return
 		}

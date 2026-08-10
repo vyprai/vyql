@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/vyprai/vyql/internal/bindings"
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/extract/nir"
 	"github.com/vyprai/vyql/internal/extract/parsecache"
@@ -226,15 +227,19 @@ func loadProfile() textPatternProfile {
 		for _, file := range files {
 			selected[file.Name] = true
 		}
-		decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForProfile(files), func(src parser.V2DefinitionSource) bool {
+		parsed, keep, err := parser.ParseV2Sources(v2DefinitionSourcesForProfile(files), func(src parser.V2DefinitionSource) bool {
 			return selected[src.Name]
 		})
 		if err != nil {
 			panic("textpattern: parse binding corpus: " + err.Error())
 		}
+		sets, err := bindings.CompileSources(parsed, keep)
+		if err != nil {
+			panic("textpattern: compile binding corpus: " + err.Error())
+		}
 		var meta map[string]any
-		for _, d := range decls {
-			if ad, ok := d.(*parser.BindingSet); ok && ad.Name == "textpattern" {
+		for _, ad := range sets {
+			if ad.Name == "textpattern" {
 				meta = ad.Meta
 				break
 			}

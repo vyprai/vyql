@@ -1,6 +1,9 @@
 package main
 
-import "github.com/vyprai/vyql/internal/parser"
+import (
+	"github.com/vyprai/vyql/internal/bindings"
+	"github.com/vyprai/vyql/internal/parser"
+)
 
 const v2CorePoliciesForCmdTest = `
 module policies.core;
@@ -21,7 +24,25 @@ policy confidence default {
 }
 `
 
+// compileV2BindingsForTest runs both passes over one source: the parser lowers the
+// declarations, the binding layer compiles the bindings.
+func compileV2BindingsForTest(src string) ([]*bindings.Set, error) {
+	parsed, err := parseV2SourcesForCmdTest(src)
+	if err != nil {
+		return nil, err
+	}
+	return bindings.CompileSources(parsed, nil)
+}
+
 func parseV2DefinitionsForTest(src string) ([]parser.Decl, error) {
+	parsed, err := parseV2SourcesForCmdTest(src)
+	if err != nil {
+		return nil, err
+	}
+	return parser.LowerV2DefinitionSources(parsed)
+}
+
+func parseV2SourcesForCmdTest(src string) ([]parser.V2Source, error) {
 	sources := []parser.V2DefinitionSource{{Name: "policies/core.vyql", Source: v2CorePoliciesForCmdTest}}
 	sources = append(sources, parser.V2DefinitionSourcesFromText("test.vyql", src)...)
 	parsed := make([]parser.V2Source, 0, len(sources))
@@ -32,5 +53,5 @@ func parseV2DefinitionsForTest(src string) ([]parser.Decl, error) {
 		}
 		parsed = append(parsed, parser.V2Source{Name: source.Name, Program: prog})
 	}
-	return parser.LowerV2DefinitionSources(parsed)
+	return parsed, nil
 }

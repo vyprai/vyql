@@ -439,7 +439,7 @@ var (
 	conceptDetails    map[string]map[string]string
 	conceptRoleOnce   sync.Once
 	conceptRoles      map[string]map[string]bool
-	bindingSetCache   sync.Map // map[bindingSetCacheKey]*parser.BindingSet
+	bindingSetCache   sync.Map // map[bindingSetCacheKey]*Set
 )
 
 func maxInt(a, b int) int {

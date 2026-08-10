@@ -14,7 +14,6 @@ import (
 
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/ontology"
-	"github.com/vyprai/vyql/internal/parser"
 	"github.com/vyprai/vyql/internal/resultpolicy"
 	"github.com/vyprai/vyql/internal/usg"
 )
@@ -66,18 +65,14 @@ func OverlayBindings(root string, techs []string) ([]Applicator, error) {
 		if err != nil {
 			return nil, err
 		}
-		decls, err := parseV2BindingSources([]datadir.Source{{
+		sets, err := compileV2BindingSources([]datadir.Source{{
 			Name: filepath.ToSlash(file),
 			Data: b,
 		}})
 		if err != nil {
 			return nil, err
 		}
-		for _, d := range decls {
-			ad, ok := d.(*parser.BindingSet)
-			if !ok {
-				continue
-			}
+		for _, ad := range sets {
 			if len(allowed) > 0 && !allowed[ad.Name] {
 				return nil, fmt.Errorf("overlay binding %s declares %q, which is not present in this scan", file, ad.Name)
 			}
@@ -844,7 +839,7 @@ func (spec bindingSpec) presenceApplicator() Applicator {
 		Apply: func(s usg.Store) []Mapping {
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
-			flagReqs := make([]*parser.BindingRequirement, 0, len(spec.Flags))
+			flagReqs := make([]*Requirement, 0, len(spec.Flags))
 			for i := range spec.Flags {
 				flagReqs = append(flagReqs, spec.Flags[i].Requirement)
 			}
@@ -1183,20 +1178,16 @@ func loadAutoBindingApplicators() ([]Applicator, error) {
 	if err != nil {
 		return nil, fmt.Errorf("frontend: read auto bindings: %w", err)
 	}
-	byName := map[string]*parser.BindingSet{}
+	byName := map[string]*Set{}
 	var order []string
-	decls, err := parseV2BindingSources(sources)
+	sets, err := compileV2BindingSources(sources)
 	if err != nil {
 		return nil, fmt.Errorf("frontend: parse auto binding corpus: %w", err)
 	}
-	for _, d := range decls {
-		ad, ok := d.(*parser.BindingSet)
-		if !ok {
-			continue
-		}
+	for _, ad := range sets {
 		merged := byName[ad.Name]
 		if merged == nil {
-			merged = &parser.BindingSet{Name: ad.Name, Meta: map[string]any{}}
+			merged = &Set{Name: ad.Name, Meta: map[string]any{}}
 			byName[ad.Name] = merged
 			order = append(order, ad.Name)
 		}

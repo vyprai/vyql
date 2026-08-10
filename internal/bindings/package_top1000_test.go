@@ -108,7 +108,7 @@ func TestGeneratedPackageBindingSourceRejectsLegacySyntax(t *testing.T) {
 		Data: []byte(`adapter javascript { source "req.body" -> code.HttpInput }`),
 	}
 
-	_, err := parseGeneratedPackageBindingSource(source)
+	_, err := compileGeneratedPackageBindingSource(source)
 	if err == nil {
 		t.Fatal("generated package binding accepted legacy syntax")
 	}

@@ -21,7 +21,25 @@ policy confidence default {
 }
 `
 
+// compileV2BindingsForTest runs the two steps production runs: the parser resolves the
+// language, the binding compiler turns the declarations into actions.
+func compileV2BindingsForTest(src string) ([]*Set, error) {
+	parsed, err := parseV2SourcesForTest(src)
+	if err != nil {
+		return nil, err
+	}
+	return CompileSources(parsed, nil)
+}
+
 func parseV2DefinitionsForTest(src string) ([]parser.Decl, error) {
+	parsed, err := parseV2SourcesForTest(src)
+	if err != nil {
+		return nil, err
+	}
+	return parser.LowerV2DefinitionSources(parsed)
+}
+
+func parseV2SourcesForTest(src string) ([]parser.V2Source, error) {
 	sources := []parser.V2DefinitionSource{{Name: "policies/core.vyql", Source: v2CorePoliciesForFrontendTest}}
 	sources = append(sources, parser.V2DefinitionSourcesFromText("test.vyql", src)...)
 	parsed := make([]parser.V2Source, 0, len(sources))
@@ -32,5 +50,5 @@ func parseV2DefinitionsForTest(src string) ([]parser.Decl, error) {
 		}
 		parsed = append(parsed, parser.V2Source{Name: source.Name, Program: prog})
 	}
-	return parser.LowerV2DefinitionSources(parsed)
+	return parsed, nil
 }

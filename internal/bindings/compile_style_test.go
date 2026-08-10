@@ -1,4 +1,4 @@
-package parser
+package bindings
 
 import (
 	"os"
@@ -12,11 +12,11 @@ import (
 	"github.com/vyprai/vyql/internal/datadir"
 )
 
-// testRepoRoot walks up from this file until it finds the directory holding the
+// bindingStyleRepoRoot walks up from this file until it finds the directory holding the
 // runtime data tree. Counting "../.." instead would pin the depth of this package
 // below the repository root, which differs between this repository (parser/ sits
 // under go/) and the published one (parser/ sits at the root).
-func testRepoRoot(t *testing.T) string {
+func bindingStyleRepoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
@@ -36,7 +36,7 @@ func testRepoRoot(t *testing.T) string {
 }
 
 func TestAdaptersAvoidLegacyStructuredTokenHasSyntax(t *testing.T) {
-	root := testRepoRoot(t)
+	root := bindingStyleRepoRoot(t)
 	bindingRoot := filepath.Join(root, "vyql", "bindings")
 	legacy := regexp.MustCompile(`\b(?:has|lacks)\s+"(?:call_path|literal|selector|identifier|function_name|class_name|class_base|class_bases|attr_path|decorator_path|decorator_method|param_name|param_type|param_index|var_name|return):`)
 
@@ -69,7 +69,7 @@ func TestAdaptersAvoidLegacyStructuredTokenHasSyntax(t *testing.T) {
 }
 
 func TestSecretComparisonReviewUsesStructuredFlagPredicates(t *testing.T) {
-	root := testRepoRoot(t)
+	root := bindingStyleRepoRoot(t)
 	bindingRoot := filepath.Join(root, "vyql", "bindings")
 
 	var hits []string
@@ -84,16 +84,12 @@ func TestSecretComparisonReviewUsesStructuredFlagPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := parseV2DefinitionsForTest(string(data))
+		decls, err := compileV2BindingsForTest(string(data))
 		if err != nil {
 			return err
 		}
 		rel, _ := filepath.Rel(root, path)
-		for _, decl := range decls {
-			ad, ok := decl.(*BindingSet)
-			if !ok {
-				continue
-			}
+		for _, ad := range decls {
 			for _, mapping := range ad.Mappings {
 				if mapping.Concept != "code.SecretComparisonReview" || mapping.Flag == nil {
 					continue
@@ -122,7 +118,7 @@ func TestSecretComparisonReviewUsesStructuredFlagPredicates(t *testing.T) {
 }
 
 func TestMultipleDropdownScalarFallbackUsesAstPredicates(t *testing.T) {
-	root := testRepoRoot(t)
+	root := bindingStyleRepoRoot(t)
 	bindingRoot := filepath.Join(root, "vyql", "bindings")
 
 	var hits []string
@@ -137,16 +133,12 @@ func TestMultipleDropdownScalarFallbackUsesAstPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := parseV2DefinitionsForTest(string(data))
+		decls, err := compileV2BindingsForTest(string(data))
 		if err != nil {
 			return err
 		}
 		rel, _ := filepath.Rel(root, path)
-		for _, decl := range decls {
-			ad, ok := decl.(*BindingSet)
-			if !ok {
-				continue
-			}
+		for _, ad := range decls {
 			for _, mapping := range ad.Mappings {
 				if mapping.Concept != "code.MultipleDropdownScalarFallbackMissing" || mapping.Flag == nil {
 					continue
@@ -178,13 +170,13 @@ func TestJavaScriptContextFlowFlagsUseAstPredicates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var decls []Decl
+	var sets []*Set
 	for _, source := range sources {
-		parsed, err := parseV2DefinitionsForTest(string(source.Data))
+		parsed, err := compileV2BindingsForTest(string(source.Data))
 		if err != nil {
 			t.Fatalf("parse %s: %v", source.Name, err)
 		}
-		decls = append(decls, parsed...)
+		sets = append(sets, parsed...)
 	}
 	structuralConcepts := map[string]bool{
 		"code.StoredHtmlWrite":                          true,
@@ -212,11 +204,7 @@ func TestJavaScriptContextFlowFlagsUseAstPredicates(t *testing.T) {
 	}
 
 	var hits []string
-	for _, decl := range decls {
-		ad, ok := decl.(*BindingSet)
-		if !ok {
-			continue
-		}
+	for _, ad := range sets {
 		for _, mapping := range ad.Mappings {
 			if !structuralConcepts[mapping.Concept] || mapping.Flag == nil {
 				continue
@@ -239,7 +227,7 @@ func TestJavaScriptContextFlowFlagsUseAstPredicates(t *testing.T) {
 }
 
 func TestFlowAwareFlagsUseAstPredicates(t *testing.T) {
-	root := testRepoRoot(t)
+	root := bindingStyleRepoRoot(t)
 	bindingRoot := filepath.Join(root, "vyql", "bindings")
 
 	var hits []string
@@ -254,16 +242,12 @@ func TestFlowAwareFlagsUseAstPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := parseV2DefinitionsForTest(string(data))
+		decls, err := compileV2BindingsForTest(string(data))
 		if err != nil {
 			return err
 		}
 		rel, _ := filepath.Rel(root, path)
-		for _, decl := range decls {
-			ad, ok := decl.(*BindingSet)
-			if !ok {
-				continue
-			}
+		for _, ad := range decls {
 			for _, mapping := range ad.Mappings {
 				if mapping.Flag == nil || !flagHasFlowPredicate(mapping.Flag) {
 					continue
@@ -303,7 +287,7 @@ func TestFlowAwareFlagsUseAstPredicates(t *testing.T) {
 }
 
 func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
-	root := testRepoRoot(t)
+	root := bindingStyleRepoRoot(t)
 	bindingRoot := filepath.Join(root, "vyql", "bindings")
 	structuralConcepts := map[string]bool{
 		"code.EnvFileVariableInjection":                       true,
@@ -333,16 +317,12 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := parseV2DefinitionsForTest(string(data))
+		decls, err := compileV2BindingsForTest(string(data))
 		if err != nil {
 			return err
 		}
 		rel, _ := filepath.Rel(root, path)
-		for _, decl := range decls {
-			ad, ok := decl.(*BindingSet)
-			if !ok {
-				continue
-			}
+		for _, ad := range decls {
 			for _, mapping := range ad.Mappings {
 				if !structuralConcepts[mapping.Concept] || mapping.Flag == nil {
 					continue
@@ -369,7 +349,7 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 	}
 }
 
-func flagHasFlowPredicate(flag *BindingPresence) bool {
+func flagHasFlowPredicate(flag *Presence) bool {
 	for _, pred := range flag.Predicates {
 		if pred.Subject == "flow_to" {
 			return true
