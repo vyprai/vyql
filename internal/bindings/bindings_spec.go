@@ -27,7 +27,7 @@ type inputSpec struct {
 	ArgCountMin int
 	ArgCountMax int
 	Packages    []string // derived from v2 dependency requirements; require matching import/SBOM package evidence
-	Requirement *parser.BindingRequirement
+	Requirement *Requirement
 	Fidelity    string
 	Confidence  string
 }
@@ -51,7 +51,7 @@ type sinkSpec struct {
 	Collection      bool     // also flag a Seq/collection-literal arg
 	CollectionFirst bool     // label a specific element of a Seq/collection arg when present
 	CollectionIndex int      // selected collection element index
-	Requirement     *parser.BindingRequirement
+	Requirement     *Requirement
 	Fidelity        string
 	Confidence      string
 }
@@ -76,7 +76,7 @@ type controlSpec struct {
 	ArgCountMax     int
 	Packages        []string // derived from v2 dependency requirements; require matching import/SBOM package evidence
 	Detail          map[string]string
-	Requirement     *parser.BindingRequirement
+	Requirement     *Requirement
 	Fidelity        string
 	Confidence      string
 }
@@ -95,7 +95,7 @@ type flagSpec struct {
 	Operands       []flagOperandSpec
 	Packages       []string
 	Detail         map[string]string
-	Requirement    *parser.BindingRequirement
+	Requirement    *Requirement
 	Fidelity       string
 	Confidence     string
 }
@@ -205,7 +205,7 @@ type filterSpec struct {
 	ArgCountMin int
 	ArgCountMax int
 	Packages    []string
-	Requirement *parser.BindingRequirement
+	Requirement *Requirement
 }
 
 // advisoryNeutralizerSpec is an UNSOUND neutralizer: a guard (dominance) or sanitizer (on-path) that
@@ -225,7 +225,7 @@ type advisoryNeutralizerSpec struct {
 	ArgCountMin int
 	ArgCountMax int
 	Packages    []string
-	Requirement *parser.BindingRequirement
+	Requirement *Requirement
 	Fidelity    string
 	Confidence  string
 }
@@ -233,7 +233,7 @@ type advisoryNeutralizerSpec struct {
 type paramSourceSpec struct {
 	Concept     string
 	Packages    []string
-	Requirement *parser.BindingRequirement
+	Requirement *Requirement
 	Fidelity    string
 	Confidence  string
 }
@@ -346,10 +346,10 @@ func filterBindingSpecForActiveConcepts(spec bindingSpec) bindingSpec {
 // proven sound) with a Go-owned internal concept that the engine can surface as
 // review context.
 
-func loadBindingSet(tech string) *parser.BindingSet {
+func loadBindingSet(tech string) *Set {
 	key := bindingSetCacheKey{tech: tech}
 	if cached, ok := bindingSetCache.Load(key); ok {
-		return cached.(*parser.BindingSet)
+		return cached.(*Set)
 	}
 	sources, err := datadir.ReadVYQLDir("bindings/" + tech)
 	if err != nil {
@@ -358,18 +358,17 @@ func loadBindingSet(tech string) *parser.BindingSet {
 	if extra, err := datadir.ReadVYQLDir("bindings/packages/" + tech); err == nil {
 		sources = append(sources, extra...)
 	}
-	decls, err := parseV2BindingSources(sources)
+	sets, err := compileV2BindingSources(sources)
 	if err != nil {
 		panic("frontend: invalid binding corpus for " + tech + ": " + err.Error())
 	}
-	var merged *parser.BindingSet
-	for _, d := range decls {
-		a, ok := d.(*parser.BindingSet)
-		if !ok || a.Name != tech {
+	var merged *Set
+	for _, a := range sets {
+		if a.Name != tech {
 			continue
 		}
 		if merged == nil {
-			merged = &parser.BindingSet{Name: a.Name, Meta: a.Meta}
+			merged = &Set{Name: a.Name, Meta: a.Meta}
 		} else {
 			for k, v := range a.Meta {
 				merged.Meta[k] = v
@@ -379,7 +378,7 @@ func loadBindingSet(tech string) *parser.BindingSet {
 	}
 	if merged != nil {
 		actual, _ := bindingSetCache.LoadOrStore(key, merged)
-		return actual.(*parser.BindingSet)
+		return actual.(*Set)
 	}
 	panic("frontend: no v2 binding set in bindings/" + tech)
 }
@@ -420,14 +419,39 @@ func v2DefinitionSourcesForBindings(sources []datadir.Source) []parser.V2Definit
 	return out
 }
 
+// parseV2BindingSources parses the binding corpus and lowers the selected sources to
+// declarations. Callers that want binding sets want compileV2BindingSources instead; this
+// one serves the callers reading concepts out of the same corpus.
 func parseV2BindingSources(sources []datadir.Source) ([]parser.Decl, error) {
+	parsed, keep, err := parseV2BindingCorpus(sources)
+	if err != nil {
+		return nil, err
+	}
+	return parser.LowerV2SourcesSelected(parsed, keep)
+}
+
+// parseV2BindingCorpus parses and validates the whole corpus and reports which sources the
+// caller selected. Unselected sources are still parsed -- a binding may reference a matcher
+// or pattern another module declares -- but contribute nothing to the output.
+func parseV2BindingCorpus(sources []datadir.Source) ([]parser.V2Source, []bool, error) {
 	selected := make(map[string]bool, len(sources))
 	for _, source := range sources {
 		selected[source.Name] = true
 	}
-	return parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForBindings(sources), func(src parser.V2DefinitionSource) bool {
+	return parser.ParseV2Sources(v2DefinitionSourcesForBindings(sources), func(src parser.V2DefinitionSource) bool {
 		return selected[src.Name]
 	})
+}
+
+// compileV2BindingSources parses the binding corpus and compiles the selected sources into
+// binding sets. The unselected sources are still parsed and validated -- a binding may
+// reference a matcher or pattern another module declares -- but contribute no actions.
+func compileV2BindingSources(sources []datadir.Source) ([]*Set, error) {
+	parsed, keep, err := parseV2BindingCorpus(sources)
+	if err != nil {
+		return nil, err
+	}
+	return CompileSources(parsed, keep)
 }
 
 func loadSpec(tech string) bindingSpec {
@@ -438,7 +462,7 @@ func loadSpec(tech string) bindingSpec {
 // set. Split out of loadSpec so the dynamic per-package binding loader
 // (packages.go) can reuse the exact same action-to-spec compilation.
 
-func specFromBindingSet(d *parser.BindingSet) bindingSpec {
+func specFromBindingSet(d *Set) bindingSpec {
 	s := bindingSpec{Name: d.Name, Technology: d.Name}
 	if m, _ := d.Meta["match"].(string); m == "contains" {
 		s.containsMatch = true
@@ -631,7 +655,7 @@ func bindingMetaBool(meta map[string]any, key string) bool {
 	}
 }
 
-func bindingMappingDetail(mp parser.BindingAction) map[string]string {
+func bindingMappingDetail(mp Action) map[string]string {
 	if !mp.Advisory && mp.About == "" && mp.Coverage == "" && len(mp.CoverageDetail) == 0 {
 		return nil
 	}

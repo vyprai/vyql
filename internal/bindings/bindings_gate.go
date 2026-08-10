@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/vyprai/vyql/internal/extract/sca"
-	"github.com/vyprai/vyql/internal/parser"
 	"github.com/vyprai/vyql/internal/usg"
 )
 
@@ -200,11 +199,11 @@ func (g *requirementGate) projectEvidence() map[string]bool {
 	return g.project
 }
 
-func (g *requirementGate) allowed(packages []string, req *parser.BindingRequirement) bool {
+func (g *requirementGate) allowed(packages []string, req *Requirement) bool {
 	return g.effect(packages, req).Allowed
 }
 
-func (g *requirementGate) effect(packages []string, req *parser.BindingRequirement) requirementEffect {
+func (g *requirementGate) effect(packages []string, req *Requirement) requirementEffect {
 	if req == nil {
 		if g.packages.allowed(packages) {
 			return requirementEffect{Allowed: true, State: requirementStateSatisfied}
@@ -214,7 +213,7 @@ func (g *requirementGate) effect(packages []string, req *parser.BindingRequireme
 	return g.evalEffect(*req)
 }
 
-func (g *requirementGate) evalEffect(req parser.BindingRequirement) requirementEffect {
+func (g *requirementGate) evalEffect(req Requirement) requirementEffect {
 	switch req.Op {
 	case "":
 		return requirementEffect{Allowed: true, State: requirementStateSatisfied}

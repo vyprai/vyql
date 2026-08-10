@@ -18,7 +18,7 @@ var (
 		"literal": true, "stringLiteral": true, "function": true, "class": true, "import": true,
 		"route": true, "config": true, "param": true,
 	}
-	v2SchemaGatedCodeFamilies = map[string]string{"route": "nir", "config": "nir"}
+	V2SchemaGatedCodeFamilies = map[string]string{"route": "nir", "config": "nir"}
 	v2SemanticFamilies        = map[string]bool{
 		"concept": true, "finding": true, "exposure": true, "asset": true,
 		"principal": true, "privilege": true, "state": true,
@@ -258,7 +258,7 @@ func ValidateV2Corpus(sources []V2Source) error {
 			continue
 		}
 		for _, d := range src.Program.Decls {
-			_, fq := v2DeclNames(src.Program.Module, d)
+			_, fq := V2DeclNames(src.Program.Module, d)
 			if fq == "" {
 				continue
 			}
@@ -375,7 +375,7 @@ func validateV2PackCycles(sources []V2Source) []error {
 			if !ok {
 				continue
 			}
-			local, fq := v2DeclNames(src.Program.Module, p)
+			local, fq := V2DeclNames(src.Program.Module, p)
 			if fq == "" {
 				continue
 			}
@@ -444,7 +444,7 @@ func v2CorpusModelScope(prog *V2Program, concepts v2ConceptScope, threats map[st
 		if _, ok := d.(*V2ThreatDecl); !ok {
 			continue
 		}
-		local, fq := v2DeclNames(prog.Module, d)
+		local, fq := V2DeclNames(prog.Module, d)
 		if local != "" {
 			localThreats[local] = true
 		}
@@ -628,7 +628,7 @@ func v2CorpusConceptScope(prog *V2Program, concepts map[string]v2ConceptMeta, de
 		if !ok {
 			continue
 		}
-		local, fq := v2DeclNames(prog.Module, c)
+		local, fq := V2DeclNames(prog.Module, c)
 		meta := v2ConceptMeta{Kind: c.Kind, Covers: v2ConceptCovers(c)}
 		v2StoreConceptMeta(scope.local, c.Name, meta)
 		v2StoreConceptMeta(scope.local, local, meta)
@@ -829,7 +829,7 @@ func v2LocalConceptKinds(prog *V2Program) map[string]string {
 		if !ok {
 			continue
 		}
-		local, fq := v2DeclNames(prog.Module, c)
+		local, fq := V2DeclNames(prog.Module, c)
 		for _, name := range []string{c.Name, local, fq} {
 			if name != "" {
 				out[name] = c.Kind
@@ -898,7 +898,7 @@ func validateV2ProgramNames(prog *V2Program) []error {
 	localDecls := map[string]string{}
 	fqDecls := map[string]bool{}
 	for _, d := range prog.Decls {
-		local, fq := v2DeclNames(prog.Module, d)
+		local, fq := V2DeclNames(prog.Module, d)
 		if local == "" {
 			continue
 		}
@@ -928,7 +928,10 @@ func validateV2ProgramNames(prog *V2Program) []error {
 	return errs
 }
 
-func v2DeclNames(module string, d V2Decl) (local, fq string) {
+// V2DeclNames returns a declaration's local and fully qualified names. Exported because
+// the binding compiler qualifies binding and pattern names the same way this package's
+// validation does, and two spellings of "what is this declaration called" would drift.
+func V2DeclNames(module string, d V2Decl) (local, fq string) {
 	switch x := d.(type) {
 	case *V2ConceptDecl:
 		local = x.Name
@@ -1672,22 +1675,22 @@ func validateV2Binding(b *V2BindingDecl, conceptKinds map[string]string) []error
 }
 
 func v2SupportedBindingQueryRelationStep(q V2QueryExpr, step V2QueryStep) bool {
-	if normalizedV2CodeFamily(q.Family) == "call" &&
+	if V2NormalizedCodeFamily(q.Family) == "call" &&
 		(step.Relation == "references" || step.Relation == "sameScope" || step.Relation == "declaredIn" ||
 			step.Relation == "contains" || step.Relation == "encloses") &&
-		normalizedV2CodeFamily(step.Family) == "call" &&
+		V2NormalizedCodeFamily(step.Family) == "call" &&
 		step.Alias != "" &&
 		step.Where != nil {
 		return true
 	}
-	return normalizedV2CodeFamily(q.Family) == "call" &&
+	return V2NormalizedCodeFamily(q.Family) == "call" &&
 		(step.Relation == "encloses" || step.Relation == "contains") &&
-		v2LiteralRelationFamily(step.Family) &&
+		V2LiteralRelationFamily(step.Family) &&
 		step.Alias != "" &&
 		step.Where != nil
 }
 
-func v2LiteralRelationFamily(family string) bool {
+func V2LiteralRelationFamily(family string) bool {
 	switch family {
 	case "literal", "stringLiteral":
 		return true
@@ -1874,7 +1877,7 @@ func validateV2ProfileDetectExpr(ctx string, expr V2Expr) []error {
 			errs = append(errs, fmt.Errorf("%s: requirement %s requires at least one string argument", ctx, call.Name))
 		}
 		for _, arg := range call.Args {
-			if _, ok := v2LiteralString(arg); !ok {
+			if _, ok := V2LiteralString(arg); !ok {
 				errs = append(errs, fmt.Errorf("%s: requirement %s expects string arguments", ctx, call.Name))
 			}
 		}
@@ -1905,7 +1908,7 @@ func validateV2SchemaGatedQueryFamilies(ctx string, q V2QueryExpr, hasNIRSchema 
 }
 
 func validateV2SchemaGatedFamily(ctx, family string, hasNIRSchema bool) []error {
-	schema, ok := v2SchemaGatedCodeFamilies[family]
+	schema, ok := V2SchemaGatedCodeFamilies[family]
 	if !ok || hasNIRSchema {
 		return nil
 	}

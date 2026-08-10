@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vyprai/vyql/internal/bindings"
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/findings"
 	"github.com/vyprai/vyql/internal/ontology"
@@ -56,19 +57,19 @@ binding bad {
 
 func TestBindingDisplayKindUsesV2AdvisoryVocabulary(t *testing.T) {
 	cases := []struct {
-		in   parser.BindingAction
+		in   bindings.Action
 		want string
 	}{
-		{parser.BindingAction{Kind: "advisory_guard_method"}, "advisory"},
-		{parser.BindingAction{Kind: "advisory_sanitizer_path"}, "advisory"},
-		{parser.BindingAction{Kind: "source_param"}, "source"},
-		{parser.BindingAction{Kind: "sink_call_arg"}, "sink"},
-		{parser.BindingAction{Kind: "check_authentication"}, "check"},
-		{parser.BindingAction{Kind: "issue_method"}, "issue"},
-		{parser.BindingAction{Kind: "presence_issue"}, "issue"},
-		{parser.BindingAction{Kind: "presence_check"}, "check"},
-		{parser.BindingAction{Kind: "flow_method"}, "propagate"},
-		{parser.BindingAction{Kind: "type"}, "type"},
+		{bindings.Action{Kind: "advisory_guard_method"}, "advisory"},
+		{bindings.Action{Kind: "advisory_sanitizer_path"}, "advisory"},
+		{bindings.Action{Kind: "source_param"}, "source"},
+		{bindings.Action{Kind: "sink_call_arg"}, "sink"},
+		{bindings.Action{Kind: "check_authentication"}, "check"},
+		{bindings.Action{Kind: "issue_method"}, "issue"},
+		{bindings.Action{Kind: "presence_issue"}, "issue"},
+		{bindings.Action{Kind: "presence_check"}, "check"},
+		{bindings.Action{Kind: "flow_method"}, "propagate"},
+		{bindings.Action{Kind: "type"}, "type"},
 	}
 	for _, tc := range cases {
 		if got := bindingDisplayKind(tc.in); got != tc.want {

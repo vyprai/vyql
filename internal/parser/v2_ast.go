@@ -37,6 +37,7 @@ type V2PatternDecl struct {
 }
 
 func (*V2PatternDecl) isV2Decl() {}
+func (*V2PatternDecl) isDecl()   {}
 
 type V2PatternItem struct {
 	Kind  string
@@ -52,6 +53,7 @@ type V2MatcherDecl struct {
 }
 
 func (*V2MatcherDecl) isV2Decl() {}
+func (*V2MatcherDecl) isDecl()   {}
 
 type V2MatcherItem struct {
 	Kind   string
@@ -69,6 +71,7 @@ type V2BindingDecl struct {
 }
 
 func (*V2BindingDecl) isV2Decl() {}
+func (*V2BindingDecl) isDecl()   {}
 
 type V2Requirement struct {
 	Name string

@@ -6,7 +6,6 @@ import (
 
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/extract/nir"
-	"github.com/vyprai/vyql/internal/parser"
 )
 
 type callFlowSpec struct {
@@ -54,15 +53,11 @@ func loadCallFlowProfiles() {
 	if err != nil {
 		panic("frontend: read bindings: " + err.Error())
 	}
-	decls, err := parseV2BindingSources(files)
+	sets, err := compileV2BindingSources(files)
 	if err != nil {
 		panic("frontend: parse binding call-flow corpus: " + err.Error())
 	}
-	for _, d := range decls {
-		ad, ok := d.(*parser.BindingSet)
-		if !ok {
-			continue
-		}
+	for _, ad := range sets {
 		for _, mp := range ad.Mappings {
 			if mp.Kind != "flow_path" && mp.Kind != "flow_method" && mp.Kind != "flow_prefix" {
 				continue

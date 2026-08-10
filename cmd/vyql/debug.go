@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/vyprai/vyql/internal/bindings"
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/extract"
 	"github.com/vyprai/vyql/internal/findings"
@@ -464,16 +465,12 @@ func cmdBindings(args []string) error {
 	if err != nil {
 		return fmt.Errorf("no binding set for %q (%v)", *lang, err)
 	}
-	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(sources), lowerNonCoreV2DefinitionSource)
+	sets, err := compileBindingSources(v2DefinitionSourcesForRules(sources))
 	if err != nil {
 		return fmt.Errorf("binding parse: %w", err)
 	}
 	byKind := map[string][]string{}
-	for _, d := range decls {
-		ad, ok := d.(*parser.BindingSet)
-		if !ok {
-			continue
-		}
+	for _, ad := range sets {
 		for _, m := range ad.Mappings {
 			kind := bindingDisplayKind(m)
 			arrow := ""
@@ -500,7 +497,7 @@ func cmdBindings(args []string) error {
 	return nil
 }
 
-func bindingDisplayKind(m parser.BindingAction) string {
+func bindingDisplayKind(m bindings.Action) string {
 	mappingKind := m.Kind
 	if strings.HasPrefix(mappingKind, "presence_") {
 		return strings.TrimPrefix(mappingKind, "presence_")
@@ -562,7 +559,7 @@ func cmdValidateBinding(args []string) error {
 	if err != nil {
 		return err
 	}
-	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(ruleSourcesFromText("binding.vyql", string(data))), lowerNonCoreV2DefinitionSource)
+	sets, err := compileBindingSources(v2DefinitionSourcesForRules(ruleSourcesFromText("binding.vyql", string(data))))
 	if err != nil {
 		return fmt.Errorf("binding parse: %w", err)
 	}
@@ -582,11 +579,7 @@ func cmdValidateBinding(args []string) error {
 		OK       bool             `json:"ok"`
 		Bindings []bindingSummary `json:"bindings"`
 	}{OK: true}
-	for _, d := range decls {
-		ad, ok := d.(*parser.BindingSet)
-		if !ok {
-			continue
-		}
+	for _, ad := range sets {
 		item := bindingSummary{Name: ad.Name, MappingCount: len(ad.Mappings)}
 		packageSeen := map[string]bool{}
 		for _, m := range ad.Mappings {
@@ -878,4 +871,15 @@ func printScanStats(g usg.Store, stats extract.Stats) {
 	if !shown {
 		fmt.Println("[stats] no taint hubs (max in-degree below 8) — graph is well-isolated")
 	}
+}
+
+// compileBindingSources parses a binding corpus and compiles it, the two steps `vyql
+// bindings` and `validate-binding` both need. The parser resolves the language; the
+// binding layer decides what the declarations label.
+func compileBindingSources(raw []parser.V2DefinitionSource) ([]*bindings.Set, error) {
+	parsed, keep, err := parser.ParseV2Sources(raw, lowerNonCoreV2DefinitionSource)
+	if err != nil {
+		return nil, err
+	}
+	return bindings.CompileSources(parsed, keep)
 }

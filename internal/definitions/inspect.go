@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/vyprai/vyql/internal/bindings"
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/parser"
 )
@@ -182,16 +183,51 @@ func inspectDeclDir(cat *Catalog, rel string) error {
 	for _, source := range sources {
 		selected[source.Name] = true
 	}
-	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesWithCore(sources), func(src parser.V2DefinitionSource) bool {
+	parsed, keep, err := parser.ParseV2Sources(v2DefinitionSourcesWithCore(sources), func(src parser.V2DefinitionSource) bool {
 		return selected[src.Name]
 	})
+	if err != nil {
+		return err
+	}
+	decls, err := parser.LowerV2SourcesSelected(parsed, keep)
 	if err != nil {
 		return err
 	}
 	for _, d := range decls {
 		addDecl(cat, "", d)
 	}
+	sets, err := bindings.CompileSources(parsed, keep)
+	if err != nil {
+		return err
+	}
+	for _, set := range sets {
+		addBindingSet(cat, "", set)
+	}
 	return nil
+}
+
+// addBindingSet records the compiled binding actions. Binding sets arrive from the binding
+// compiler rather than the declaration stream, so they are added separately.
+func addBindingSet(cat *Catalog, source string, x *bindings.Set) {
+	for _, m := range x.Mappings {
+		item := MappingSummary{
+			Language:   x.Name,
+			Kind:       m.Kind,
+			Pattern:    m.Pattern,
+			Concept:    m.Concept,
+			Packages:   append([]string(nil), m.Packages...),
+			ArgIndex:   m.ArgIndex,
+			ValMatches: append([]string(nil), m.ValMatches...),
+			ValAbsents: append([]string(nil), m.ValAbsents...),
+			Exact:      m.Exact,
+			Source:     source,
+		}
+		if m.Flag != nil {
+			item.Scope = m.Flag.Scope
+			item.NodeKind = m.Flag.NodeKind
+		}
+		cat.Bindings = append(cat.Bindings, item)
+	}
 }
 
 func v2DefinitionSourcesWithCore(sources []parser.V2DefinitionSource) []parser.V2DefinitionSource {
@@ -250,26 +286,6 @@ func addDecl(cat *Catalog, source string, d parser.Decl) {
 			Concepts: ruleConcepts(x),
 			Source:   source,
 		})
-	case *parser.BindingSet:
-		for _, m := range x.Mappings {
-			item := MappingSummary{
-				Language:   x.Name,
-				Kind:       m.Kind,
-				Pattern:    m.Pattern,
-				Concept:    m.Concept,
-				Packages:   append([]string(nil), m.Packages...),
-				ArgIndex:   m.ArgIndex,
-				ValMatches: append([]string(nil), m.ValMatches...),
-				ValAbsents: append([]string(nil), m.ValAbsents...),
-				Exact:      m.Exact,
-				Source:     source,
-			}
-			if m.Flag != nil {
-				item.Scope = m.Flag.Scope
-				item.NodeKind = m.Flag.NodeKind
-			}
-			cat.Bindings = append(cat.Bindings, item)
-		}
 	case *parser.ReviewDecl:
 		cat.Reviews = append(cat.Reviews, ReviewSummary{
 			Concept:  x.Concept,

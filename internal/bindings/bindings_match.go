@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/vyprai/vyql/internal/parser"
 	"github.com/vyprai/vyql/internal/usg"
 )
 
@@ -143,7 +142,7 @@ func structuredContextNeedlePrefix(lowerNeedle string) (string, bool) {
 	return "", false
 }
 
-func scopePredicatesFromMapping(mp parser.BindingAction) []flagPredicate {
+func scopePredicatesFromMapping(mp Action) []flagPredicate {
 	if len(mp.ScopePredicates) == 0 {
 		return nil
 	}

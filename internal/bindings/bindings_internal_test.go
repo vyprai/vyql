@@ -14,15 +14,12 @@ import (
 	"github.com/vyprai/vyql/internal/usg"
 )
 
-func firstBindingSet(t *testing.T, decls []parser.Decl) *parser.BindingSet {
+func firstBindingSet(t *testing.T, sets []*Set) *Set {
 	t.Helper()
-	for _, decl := range decls {
-		if ad, ok := decl.(*parser.BindingSet); ok {
-			return ad
-		}
+	if len(sets) == 0 {
+		t.Fatal("expected a compiled binding set, got none")
 	}
-	t.Fatalf("expected binding declaration, got %d decls", len(decls))
-	return nil
+	return sets[0]
 }
 
 func TestConstraintAllows(t *testing.T) {
@@ -474,15 +471,11 @@ func frontendSourceVarNeedles(t *testing.T) []string {
 	}
 	seen := map[string]bool{}
 	for _, source := range sources {
-		decls, err := parseV2DefinitionsForTest(string(source.Data))
+		sets, err := compileV2BindingsForTest(string(source.Data))
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, decl := range decls {
-			ad, ok := decl.(*parser.BindingSet)
-			if !ok {
-				continue
-			}
+		for _, ad := range sets {
 			for _, key := range []string{"source_var_exact", "source_var_prefix", "source_var_strip_prefix"} {
 				for _, value := range metaValues(ad.Meta, key) {
 					if len(value) < 3 && !strings.Contains(value, "_") {
@@ -653,31 +646,31 @@ func TestV2RequirementGateEvaluatesStructuredEvidence(t *testing.T) {
 
 	cases := []struct {
 		name string
-		req  parser.BindingRequirement
+		req  Requirement
 		want bool
 	}{
-		{name: "dependency uses sbom evidence", req: parser.BindingRequirement{Op: "dependency", Value: "koa"}, want: true},
-		{name: "dependency preserves package evidence from imports", req: parser.BindingRequirement{Op: "dependency", Value: "express"}, want: true},
-		{name: "dependency range accepts matching version", req: parser.BindingRequirement{Op: "dependency", Value: "express", Range: ">=4 <6"}, want: true},
-		{name: "dependency range rejects nonmatching version", req: parser.BindingRequirement{Op: "dependency", Value: "koa", Range: ">=4 <6"}, want: false},
-		{name: "import uses import evidence", req: parser.BindingRequirement{Op: "import", Value: "express"}, want: true},
-		{name: "language uses scan technology evidence", req: parser.BindingRequirement{Op: "language", Value: "javascript"}, want: true},
-		{name: "file uses lazy file evidence", req: parser.BindingRequirement{Op: "file", Value: "app.js"}, want: true},
-		{name: "project.has uses explicit project fact key", req: parser.BindingRequirement{Op: "project.has", Value: "npm:publishable"}, want: true},
-		{name: "project.has uses family value fact", req: parser.BindingRequirement{Op: "project.has", Value: "manifest:publishable"}, want: true},
-		{name: "project.has uses dependency evidence fallback", req: parser.BindingRequirement{Op: "project.has", Value: "dependency:express"}, want: true},
-		{name: "project.has uses import evidence fallback", req: parser.BindingRequirement{Op: "project.has", Value: "import:express"}, want: true},
-		{name: "project.has uses language evidence fallback", req: parser.BindingRequirement{Op: "project.has", Value: "language:javascript"}, want: true},
-		{name: "project.has uses file evidence fallback", req: parser.BindingRequirement{Op: "project.has", Value: "file:app.js"}, want: true},
-		{name: "project.has rejects absent fact", req: parser.BindingRequirement{Op: "project.has", Value: "repository:vendored"}, want: false},
-		{name: "all combines children", req: parser.BindingRequirement{Op: "all", Args: []parser.BindingRequirement{
+		{name: "dependency uses sbom evidence", req: Requirement{Op: "dependency", Value: "koa"}, want: true},
+		{name: "dependency preserves package evidence from imports", req: Requirement{Op: "dependency", Value: "express"}, want: true},
+		{name: "dependency range accepts matching version", req: Requirement{Op: "dependency", Value: "express", Range: ">=4 <6"}, want: true},
+		{name: "dependency range rejects nonmatching version", req: Requirement{Op: "dependency", Value: "koa", Range: ">=4 <6"}, want: false},
+		{name: "import uses import evidence", req: Requirement{Op: "import", Value: "express"}, want: true},
+		{name: "language uses scan technology evidence", req: Requirement{Op: "language", Value: "javascript"}, want: true},
+		{name: "file uses lazy file evidence", req: Requirement{Op: "file", Value: "app.js"}, want: true},
+		{name: "project.has uses explicit project fact key", req: Requirement{Op: "project.has", Value: "npm:publishable"}, want: true},
+		{name: "project.has uses family value fact", req: Requirement{Op: "project.has", Value: "manifest:publishable"}, want: true},
+		{name: "project.has uses dependency evidence fallback", req: Requirement{Op: "project.has", Value: "dependency:express"}, want: true},
+		{name: "project.has uses import evidence fallback", req: Requirement{Op: "project.has", Value: "import:express"}, want: true},
+		{name: "project.has uses language evidence fallback", req: Requirement{Op: "project.has", Value: "language:javascript"}, want: true},
+		{name: "project.has uses file evidence fallback", req: Requirement{Op: "project.has", Value: "file:app.js"}, want: true},
+		{name: "project.has rejects absent fact", req: Requirement{Op: "project.has", Value: "repository:vendored"}, want: false},
+		{name: "all combines children", req: Requirement{Op: "all", Args: []Requirement{
 			{Op: "dependency", Value: "koa"},
 			{Op: "import", Value: "express"},
 		}}, want: true},
-		{name: "not negates child", req: parser.BindingRequirement{Op: "not", Args: []parser.BindingRequirement{
+		{name: "not negates child", req: Requirement{Op: "not", Args: []Requirement{
 			{Op: "dependency", Value: "missing"},
 		}}, want: true},
-		{name: "soft never blocks", req: parser.BindingRequirement{Op: "soft", Args: []parser.BindingRequirement{
+		{name: "soft never blocks", req: Requirement{Op: "soft", Args: []Requirement{
 			{Op: "dependency", Value: "missing"},
 		}}, want: true},
 	}
@@ -702,7 +695,7 @@ func TestV2SoftRequirementDowngradesMappingConfidence(t *testing.T) {
 		Sinks: []sinkSpec{{
 			Concept: "custom.Target",
 			Pattern: "danger",
-			Requirement: &parser.BindingRequirement{Op: "soft", Args: []parser.BindingRequirement{
+			Requirement: &Requirement{Op: "soft", Args: []Requirement{
 				{Op: "dependency", Value: "missing"},
 			}},
 		}},
@@ -724,12 +717,12 @@ func TestV2SoftRequirementReportsEvidenceStates(t *testing.T) {
 	tests := []struct {
 		name  string
 		setup func(*usg.InMemStore)
-		req   parser.BindingRequirement
+		req   Requirement
 		want  string
 	}{
 		{
 			name: "missing",
-			req: parser.BindingRequirement{Op: "soft", Args: []parser.BindingRequirement{
+			req: Requirement{Op: "soft", Args: []Requirement{
 				{Op: "dependency", Value: "missing"},
 			}},
 			want: "missing",
@@ -741,7 +734,7 @@ func TestV2SoftRequirementReportsEvidenceStates(t *testing.T) {
 					"module": "express", "package": "express",
 				}})
 			},
-			req: parser.BindingRequirement{Op: "soft", Args: []parser.BindingRequirement{
+			req: Requirement{Op: "soft", Args: []Requirement{
 				{Op: "dependency", Value: "express", Range: ">=4 <6"},
 			}},
 			want: "unknown",
@@ -753,7 +746,7 @@ func TestV2SoftRequirementReportsEvidenceStates(t *testing.T) {
 					"name": "express", "version": "3.0.0",
 				}})
 			},
-			req: parser.BindingRequirement{Op: "soft", Args: []parser.BindingRequirement{
+			req: Requirement{Op: "soft", Args: []Requirement{
 				{Op: "dependency", Value: "express", Range: ">=4 <6"},
 			}},
 			want: "conflicting",
@@ -783,8 +776,8 @@ func TestV2AnyRequirementPrefersHardSatisfiedEvidence(t *testing.T) {
 		"name": "express", "version": "4.18.2",
 	}})
 	gate := newRequirementGate(g, "javascript", false, packageEvidence(g, "javascript", false))
-	req := parser.BindingRequirement{Op: "any", Args: []parser.BindingRequirement{
-		{Op: "soft", Args: []parser.BindingRequirement{{Op: "dependency", Value: "missing"}}},
+	req := Requirement{Op: "any", Args: []Requirement{
+		{Op: "soft", Args: []Requirement{{Op: "dependency", Value: "missing"}}},
 		{Op: "dependency", Value: "express"},
 	}}
 
@@ -808,7 +801,7 @@ func TestV2DependencyRequirementPreservesPackageHintRecall(t *testing.T) {
 			Concept:     "custom.Target",
 			Pattern:     "samplepkg.handle",
 			Packages:    []string{"samplepkg"},
-			Requirement: &parser.BindingRequirement{Op: "dependency", Value: "samplepkg"},
+			Requirement: &Requirement{Op: "dependency", Value: "samplepkg"},
 		}},
 	}
 	binding := spec.sinkApplicator()
@@ -1030,7 +1023,7 @@ func TestValueMatchedSinkUsesUpstreamTokensWhenCallHasNoDirectStrings(t *testing
 }
 
 func TestContextFlagSyntaxBuildsScopedFlag(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.test;
 
 binding secretComparison {
@@ -1041,7 +1034,7 @@ binding secretComparison {
 	if err != nil {
 		t.Fatalf("parse context flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	if len(spec.Flags) != 1 {
 		t.Fatalf("expected one flag spec, got %#v", spec.Flags)
 	}
@@ -1095,7 +1088,7 @@ binding secretComparison {
 }
 
 func TestContextFlagAstCallPredicatesPreferLexicalScope(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.java.test;
 
 binding worldAccess {
@@ -1106,7 +1099,7 @@ binding worldAccess {
 	if err != nil {
 		t.Fatalf("parse scoped context flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -1163,7 +1156,7 @@ binding worldAccess {
 }
 
 func TestContextFlagIndexesScopedContextAndMatchesOrderedSelectorScope(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.go.test;
 
 binding shareInfoLeak {
@@ -1174,7 +1167,7 @@ binding shareInfoLeak {
 	if err != nil {
 		t.Fatalf("parse scoped selector flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -1224,7 +1217,7 @@ binding shareInfoLeak {
 }
 
 func TestAstFlagMatchesUnorderedBinopOperands(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.test;
 
 binding secretComparison {
@@ -1235,7 +1228,7 @@ binding secretComparison {
 	if err != nil {
 		t.Fatalf("parse ast flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "cmp", Type: "code.BinOp", Props: map[string]string{
 		"loc": "sample.js:10", "op": "===", "callee_path": "__binop.eq", "method": "eq", "arg0": "a0", "arg1": "a1",
@@ -1265,7 +1258,7 @@ binding secretComparison {
 }
 
 func TestContextFlagAstScopedLiteralAndSubscriptPredicates(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.test;
 
 binding prototypeMerge {
@@ -1276,7 +1269,7 @@ binding prototypeMerge {
 	if err != nil {
 		t.Fatalf("parse context ast flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -1320,7 +1313,7 @@ binding prototypeMerge {
 }
 
 func TestContextFlagAstScopedSelectorContainsAny(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.python.test;
 
 binding lockOpen {
@@ -1331,7 +1324,7 @@ binding lockOpen {
 	if err != nil {
 		t.Fatalf("parse context ast selector flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -1375,7 +1368,7 @@ binding lockOpen {
 }
 
 func TestContextFlagAstScopedBinaryPredicate(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.go.test;
 
 binding emptyPayloadCheck {
@@ -1386,7 +1379,7 @@ binding emptyPayloadCheck {
 	if err != nil {
 		t.Fatalf("parse context binary flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -1435,7 +1428,7 @@ binding emptyPayloadCheck {
 }
 
 func TestCContextFlagMatchesICMPEchoLengthUnderflowTokens(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.c.test;
 
 binding icmpEchoPayloadLengthUnderflow {
@@ -1446,7 +1439,7 @@ binding icmpEchoPayloadLengthUnderflow {
 	if err != nil {
 		t.Fatalf("parse C context flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	tokens := strings.Join([]string{
 		"lang=c",
@@ -1483,7 +1476,7 @@ binding icmpEchoPayloadLengthUnderflow {
 }
 
 func TestContextFlagAstSoftLockNoFollowPredicateMix(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.python.test;
 
 binding lockNoFollow {
@@ -1494,7 +1487,7 @@ binding lockNoFollow {
 	if err != nil {
 		t.Fatalf("parse soft-lock context flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -1526,7 +1519,7 @@ binding lockNoFollow {
 }
 
 func TestContextFlagAstScopedCallArgPredicates(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.php.test;
 
 binding directJsonEncode {
@@ -1537,7 +1530,7 @@ binding directJsonEncode {
 	if err != nil {
 		t.Fatalf("parse context call-arg flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -1582,7 +1575,7 @@ binding directJsonEncode {
 }
 
 func TestContextFlagAstScopedCallArgPredicatesInspectArgumentNodes(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.test;
 
 binding gitCloneWrapper {
@@ -1593,7 +1586,7 @@ binding gitCloneWrapper {
 	if err != nil {
 		t.Fatalf("parse context call-arg flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Loc: "index.js:1", Scope: "index.js/fn1", Props: map[string]string{
 		"callee_path": "analysis.function.context",
@@ -1615,7 +1608,7 @@ binding gitCloneWrapper {
 }
 
 func TestContextFlagAstScopedCallArgPredicatesInspectNestedCallArguments(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.go.test;
 
 binding bulkMailRecipients {
@@ -1626,7 +1619,7 @@ binding bulkMailRecipients {
 	if err != nil {
 		t.Fatalf("parse context nested call-arg flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Loc: "mail.go:1", Scope: "mail.go/fn1", Props: map[string]string{
 		"callee_path": "analysis.function.context",
@@ -1649,7 +1642,7 @@ binding bulkMailRecipients {
 }
 
 func TestContextFlagAstScopedCallArgPredicatesInspectNamePath(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.go.test;
 
 binding bulkMailRecipients {
@@ -1660,7 +1653,7 @@ binding bulkMailRecipients {
 	if err != nil {
 		t.Fatalf("parse context call-arg flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Loc: "issue_mail.go:1", Scope: "issue_mail.go/fn1", Props: map[string]string{
 		"callee_path": "analysis.function.context",
@@ -1696,7 +1689,7 @@ binding bulkMailRecipients {
 }
 
 func TestDirectFlagCallArgPredicatesUseCallArguments(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.python.test;
 
 binding unhardenedXmlParser {
@@ -1707,7 +1700,7 @@ binding unhardenedXmlParser {
 	if err != nil {
 		t.Fatalf("parse direct call-arg flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:   "parser",
@@ -1737,7 +1730,7 @@ binding unhardenedXmlParser {
 }
 
 func TestContextFlagAstSubscriptPredicatesHonorKeys(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.php.test;
 
 binding passwordOnlySessionHash {
@@ -1748,7 +1741,7 @@ binding passwordOnlySessionHash {
 	if err != nil {
 		t.Fatalf("parse context subscript flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -1784,7 +1777,7 @@ binding passwordOnlySessionHash {
 }
 
 func TestContextFlagIgnoresUnscopedParamsFromOtherFunctions(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.test;
 
 binding remoteUrlDebugLog {
@@ -1795,7 +1788,7 @@ binding remoteUrlDebugLog {
 	if err != nil {
 		t.Fatalf("parse context identifier flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -1841,7 +1834,7 @@ binding remoteUrlDebugLog {
 }
 
 func TestContextFlagCallArgDoesNotUseCompactTokenFallback(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.php.test;
 
 binding directJsonEncode {
@@ -1852,7 +1845,7 @@ binding directJsonEncode {
 	if err != nil {
 		t.Fatalf("parse context call-arg flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Props: map[string]string{
 		"loc":         "fields.php:1",
@@ -1867,7 +1860,7 @@ binding directJsonEncode {
 }
 
 func TestContextFlagStructuredTokenEqualsUsesTokenBoundary(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.ruby.test;
 
 binding exactParse {
@@ -1878,7 +1871,7 @@ binding exactParse {
 	if err != nil {
 		t.Fatalf("parse context exact-token flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "parse", Type: "code.Call", Props: map[string]string{
 		"loc":         "nat.rb:10",
@@ -1905,7 +1898,7 @@ binding exactParse {
 }
 
 func TestContextFlagAstPredicatesUseRegionWhenScopeIsEmpty(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.php.test;
 
 binding scopedLiteral {
@@ -1916,7 +1909,7 @@ binding scopedLiteral {
 	if err != nil {
 		t.Fatalf("parse region-scoped context flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "target-ctx", Type: "code.Call", Props: map[string]string{
 		"loc":         "fields.php:10",
@@ -1950,7 +1943,7 @@ binding scopedLiteral {
 }
 
 func TestContextFlagStructuredTokenContainsSearchesTokenPayload(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.ruby.test;
 
 binding railsSecretToken {
@@ -1961,7 +1954,7 @@ binding railsSecretToken {
 	if err != nil {
 		t.Fatalf("parse context structured-token flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Props: map[string]string{
 		"loc":         "secret_token.rb:1",
@@ -1994,7 +1987,7 @@ binding railsSecretToken {
 }
 
 func TestModuleContextFlagStructuredPredicatesUseAstNodes(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.c.test;
 
 binding pathBasedSandboxExposeBindRace {
@@ -2005,7 +1998,7 @@ binding pathBasedSandboxExposeBindRace {
 	if err != nil {
 		t.Fatalf("parse module context ast flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -2066,7 +2059,7 @@ binding pathBasedSandboxExposeBindRace {
 }
 
 func TestAstFlagMatchesDownstreamFlowPredicate(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.cpp.test;
 
 binding pointerAddOverflow {
@@ -2077,7 +2070,7 @@ binding pointerAddOverflow {
 	if err != nil {
 		t.Fatalf("parse ast flow flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Props: map[string]string{
 		"loc":         "sample.h:1",
@@ -2116,7 +2109,7 @@ binding pointerAddOverflow {
 }
 
 func TestAstFlagCallOperandMatchesTransitiveFlow(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.test;
 
 binding remoteUrlDebugLog {
@@ -2127,7 +2120,7 @@ binding remoteUrlDebugLog {
 	if err != nil {
 		t.Fatalf("parse param flow flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "url-param", Type: "code.Param", Props: map[string]string{
 		"loc": "file.js:10", "name": "url",
@@ -2167,7 +2160,7 @@ binding remoteUrlDebugLog {
 }
 
 func TestAstFlagCallOperandFallsBackToIncomingArgFlow(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.test;
 
 binding zipCompressedSizeRead {
@@ -2178,7 +2171,7 @@ binding zipCompressedSizeRead {
 	if err != nil {
 		t.Fatalf("parse call operand flag: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "size", Type: "code.Attr", Props: map[string]string{
 		"loc": "file.js:20", "callee_path": "zipHeader.compressedSize",
@@ -2613,7 +2606,7 @@ binding cursorExecuteQuery {
 }
 
 func TestV2ArgsCountPredicateFiltersSinkMappings(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.python.db;
 concept custom.SqlExecution : sink {}
 binding executeParameterized {
@@ -2624,16 +2617,10 @@ binding executeParameterized {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	var ad *parser.BindingSet
-	for _, decl := range decls {
-		if got, ok := decl.(*parser.BindingSet); ok {
-			ad = got
-			break
-		}
+	if len(sets) == 0 {
+		t.Fatal("expected a compiled binding set, got none")
 	}
-	if ad == nil {
-		t.Fatalf("ParseV2Definitions decls = %#v, want binding decl", decls)
-	}
+	ad := sets[0]
 	spec := specFromBindingSet(ad)
 
 	store := usg.NewInMemStore()
@@ -2698,7 +2685,7 @@ func TestValueMatchedSourceUsesDirectStringTokensOnly(t *testing.T) {
 }
 
 func TestV2BindingQueryEnclosesLiteralLabelsMatchedCall(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.sql;
 concept SqlExecution : sink {}
 binding sqlLiteralQuery {
@@ -2710,7 +2697,7 @@ binding sqlLiteralQuery {
 	if err != nil {
 		t.Fatalf("parse v2 definitions: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "matchedArg", Type: "code.Arg", Props: map[string]string{
@@ -2739,7 +2726,7 @@ binding sqlLiteralQuery {
 }
 
 func TestV2BindingQueryReferencesCallRequiresScopedCall(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.composed;
 concept CommandExecution : sink {}
 binding guardedDanger {
@@ -2750,7 +2737,7 @@ binding guardedDanger {
 	if err != nil {
 		t.Fatalf("parse v2 definitions: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "matchedArg", Type: "code.Arg", Scope: "fn", Props: map[string]string{
@@ -2850,7 +2837,7 @@ func TestSourceApplicatorVisitsCallablePropertyNodeTypes(t *testing.T) {
 }
 
 func TestV2MemberAccessPatternOnlyLabelsAttrs(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.dom;
 pattern domValue as member {
   node: memberAccess
@@ -2864,7 +2851,7 @@ binding domValueSource {
 	if err != nil {
 		t.Fatalf("parse v2 definitions: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "attr", Type: "code.Attr", Props: map[string]string{
@@ -2881,7 +2868,7 @@ binding domValueSource {
 }
 
 func TestV2BinaryExprPatternOnlyLabelsBinOps(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.compare;
 pattern equalityComparison as cmp {
   node: binaryExpr
@@ -2895,7 +2882,7 @@ binding secretComparison {
 	if err != nil {
 		t.Fatalf("parse v2 definitions: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "cmp", Type: "code.BinOp", Props: map[string]string{
@@ -2912,7 +2899,7 @@ binding secretComparison {
 }
 
 func TestV2LiteralPatternLabelsLiteralNodesByValue(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.literal;
 pattern dangerousPath as lit {
   node: literal
@@ -2926,7 +2913,7 @@ binding dangerousPathLiteral {
 	if err != nil {
 		t.Fatalf("parse v2 definitions: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "lit", Type: "code.Literal", Props: map[string]string{
@@ -2943,7 +2930,7 @@ binding dangerousPathLiteral {
 }
 
 func TestV2FunctionInlineQueryLabelsFunctionNodesByName(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.functions;
 binding exportedHandler {
   query function as fn where fn.name contains "handler"
@@ -2953,7 +2940,7 @@ binding exportedHandler {
 	if err != nil {
 		t.Fatalf("parse v2 definitions: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "fn", Type: "code.Function", Props: map[string]string{
@@ -2970,7 +2957,7 @@ binding exportedHandler {
 }
 
 func TestV2ImportInlineQueryLabelsImportNodesByModule(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.imports;
 binding lodashImport {
   query import as imp where imp.module == "lodash"
@@ -2980,7 +2967,7 @@ binding lodashImport {
 	if err != nil {
 		t.Fatalf("parse v2 definitions: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "imp", Type: "code.Import", Props: map[string]string{
@@ -2997,7 +2984,7 @@ binding lodashImport {
 }
 
 func TestV2ClassInlineQueryLabelsClassNodesByName(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.classes;
 binding adminClass {
   query class as cls where cls.name contains "Admin"
@@ -3007,7 +2994,7 @@ binding adminClass {
 	if err != nil {
 		t.Fatalf("parse v2 definitions: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "class", Type: "code.Class", Props: map[string]string{
@@ -3024,7 +3011,7 @@ binding adminClass {
 }
 
 func TestV2AssignmentQueryLabelsAssignmentContextNodes(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.assignments;
 binding secretAssignment {
   query assignment as a where a.target contains "token" and a.value contains "secret"
@@ -3034,7 +3021,7 @@ binding secretAssignment {
 	if err != nil {
 		t.Fatalf("parse v2 definitions: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "assignment", Type: "code.Call", Props: map[string]string{
@@ -3054,7 +3041,7 @@ binding secretAssignment {
 }
 
 func TestV2FactEmitLabelsMatchedCall(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.facts;
 concept PublicEndpoint : fact {}
 binding expressRoute {
@@ -3067,7 +3054,7 @@ binding expressRoute {
 	if err != nil {
 		t.Fatalf("parse v2 definitions: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "route", Type: "code.Call", Props: map[string]string{
@@ -3114,7 +3101,7 @@ binding expressRoute {
 }
 
 func TestV2FactEmitLabelsArgumentLocation(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.facts;
 concept RoutePath : fact {}
 binding expressRoute {
@@ -3127,7 +3114,7 @@ binding expressRoute {
 	if err != nil {
 		t.Fatalf("parse v2 definitions: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "path", Type: "code.Literal", Props: map[string]string{
@@ -3144,7 +3131,7 @@ binding expressRoute {
 }
 
 func TestV2FactEmitLabelsAllArgumentLocations(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.facts;
 concept RoutePart : fact {}
 binding expressRoute {
@@ -3155,7 +3142,7 @@ binding expressRoute {
 	if err != nil {
 		t.Fatalf("parse v2 definitions: %v", err)
 	}
-	spec := specFromBindingSet(firstBindingSet(t, decls))
+	spec := specFromBindingSet(firstBindingSet(t, sets))
 
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "path", Type: "code.Literal", Props: map[string]string{
@@ -3292,7 +3279,7 @@ func TestBindingMetadataCrossLanguageAcceptsBoolAndString(t *testing.T) {
 		{"cross_language": true},
 		{"cross_language": "true"},
 	} {
-		spec := specFromBindingSet(&parser.BindingSet{Name: "sample", Meta: meta})
+		spec := specFromBindingSet(&Set{Name: "sample", Meta: meta})
 		if !spec.crossLang {
 			t.Fatalf("cross_language metadata not honored: %#v", meta)
 		}
@@ -3305,9 +3292,9 @@ func TestCheckApplicatorPreservesCoverageDetail(t *testing.T) {
 		"loc": "sample.x:2", "callee_path": "samplepkg.normalize", "method": "normalize",
 	}})
 
-	spec := specFromBindingSet(&parser.BindingSet{
+	spec := specFromBindingSet(&Set{
 		Name: "neutral",
-		Mappings: []parser.BindingAction{{
+		Mappings: []Action{{
 			Kind:           "check_method",
 			Concept:        "custom.Control",
 			Pattern:        "normalize",
@@ -3339,9 +3326,9 @@ func TestCheckApplicatorLabelsArgumentLocation(t *testing.T) {
 		"loc": "sample.x:2", "callee_path": "samplepkg.execute", "method": "execute", "arg0": "arg",
 	}})
 
-	spec := specFromBindingSet(&parser.BindingSet{
+	spec := specFromBindingSet(&Set{
 		Name: "neutral",
-		Mappings: []parser.BindingAction{{
+		Mappings: []Action{{
 			Kind:           "check_method_arg",
 			Concept:        "custom.Parameterized",
 			Pattern:        "execute",
@@ -3371,9 +3358,9 @@ func TestCheckApplicatorLabelsAdvisoryArgumentLocation(t *testing.T) {
 		"loc": "sample.x:2", "callee_path": "samplepkg.startswith", "method": "startswith", "arg0": "arg",
 	}})
 
-	spec := specFromBindingSet(&parser.BindingSet{
+	spec := specFromBindingSet(&Set{
 		Name: "neutral",
-		Mappings: []parser.BindingAction{{
+		Mappings: []Action{{
 			Kind:           "check_method_arg",
 			Concept:        "custom.PathCanonicalization",
 			Pattern:        "startswith",
@@ -3406,9 +3393,9 @@ func TestCheckApplicatorLabelsGlobalArgumentLocation(t *testing.T) {
 		"loc": "sample.x:2", "callee_path": "samplepkg.enableHardening", "method": "enableHardening", "arg0": "arg",
 	}})
 
-	spec := specFromBindingSet(&parser.BindingSet{
+	spec := specFromBindingSet(&Set{
 		Name: "neutral",
-		Mappings: []parser.BindingAction{{
+		Mappings: []Action{{
 			Kind:       "check_method_arg",
 			Concept:    "custom.GlobalHardening",
 			Pattern:    "enableHardening",
@@ -3437,9 +3424,9 @@ func TestSinkApplicatorUsesBindingEvidenceAttrs(t *testing.T) {
 		"loc": "app.js:2", "callee_path": "runner.exec", "method": "exec", "arg0": "arg",
 	}})
 
-	spec := specFromBindingSet(&parser.BindingSet{
+	spec := specFromBindingSet(&Set{
 		Name: "javascript",
-		Mappings: []parser.BindingAction{{
+		Mappings: []Action{{
 			Kind:       "sink_method",
 			Concept:    "custom.Command",
 			Pattern:    "exec",

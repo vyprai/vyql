@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/vyprai/vyql/internal/bindings"
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/internal/parser"
@@ -94,18 +95,19 @@ func loadSourceVarProfiles() {
 	for _, file := range files {
 		selected[file.Name] = true
 	}
-	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForProfile(files), func(src parser.V2DefinitionSource) bool {
+	parsed, keep, err := parser.ParseV2Sources(v2DefinitionSourcesForProfile(files), func(src parser.V2DefinitionSource) bool {
 		return selected[src.Name]
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "vyql: source-var profiles unavailable (parse binding corpus: %v)\n", err)
 		return
 	}
-	for _, d := range decls {
-		ad, ok := d.(*parser.BindingSet)
-		if !ok {
-			continue
-		}
+	sets, err := bindings.CompileSources(parsed, keep)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "vyql: source-var profiles unavailable (compile binding corpus: %v)\n", err)
+		return
+	}
+	for _, ad := range sets {
 		profile := sourceVarProfile{
 			Event:       sourceVarMetaString(ad.Meta, "source_var_event"),
 			Case:        sourceVarMetaString(ad.Meta, "source_var_case"),

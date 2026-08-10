@@ -23,7 +23,6 @@ import (
 
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/extract/sca"
-	"github.com/vyprai/vyql/internal/parser"
 	"github.com/vyprai/vyql/internal/usg"
 )
 
@@ -61,7 +60,7 @@ func GeneratedPackageBindingsFor(tech string, deps map[string]bool) []Applicator
 	if len(index) == 0 {
 		return nil
 	}
-	merged := &parser.BindingSet{Name: tech, Meta: map[string]any{}}
+	merged := &Set{Name: tech, Meta: map[string]any{}}
 	for _, stem := range generatedPackageCandidateStems(deps) {
 		actual, ok := index[strings.ToLower(stem)]
 		if !ok {
@@ -72,13 +71,12 @@ func GeneratedPackageBindingsFor(tech string, deps map[string]bool) []Applicator
 			panic(fmt.Sprintf("frontend: read generated package binding %s/%s: %v", tech, actual, err))
 		}
 		for _, source := range sources {
-			decls, err := parseGeneratedPackageBindingSource(source)
+			sets, err := compileGeneratedPackageBindingSource(source)
 			if err != nil {
 				panic(err.Error())
 			}
-			for _, d := range decls {
-				a, ok := d.(*parser.BindingSet)
-				if !ok || a.Name != tech {
+			for _, a := range sets {
+				if a.Name != tech {
 					continue
 				}
 				merged.Mappings = append(merged.Mappings, a.Mappings...)
@@ -101,12 +99,12 @@ func readGeneratedPackageBindingSources(tech, pkg string) ([]datadir.Source, err
 	return datadir.ReadVYQL(dirRel + ".vyql")
 }
 
-func parseGeneratedPackageBindingSource(source datadir.Source) ([]parser.Decl, error) {
-	decls, err := parseV2BindingSources([]datadir.Source{source})
+func compileGeneratedPackageBindingSource(source datadir.Source) ([]*Set, error) {
+	sets, err := compileV2BindingSources([]datadir.Source{source})
 	if err != nil {
 		return nil, fmt.Errorf("frontend: invalid generated package binding %s: %w", source.Name, err)
 	}
-	return decls, nil
+	return sets, nil
 }
 
 func generatedPackageFileIndex(tech string) map[string]string {

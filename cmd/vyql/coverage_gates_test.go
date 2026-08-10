@@ -46,6 +46,38 @@ func readDataFiles(t *testing.T, sub, suffix string) map[string]string {
 	return out
 }
 
+// parseDataBindingSets is parseDataDecls' companion: binding sets come from the binding
+// compiler, not the declaration stream, so the same files are read through both.
+func parseDataBindingSets(t *testing.T, sub, suffix string) map[string][]*bindings.Set {
+	t.Helper()
+	out := map[string][]*bindings.Set{}
+	if !strings.HasPrefix(suffix, ".") {
+		sources, err := datadir.ReadVYQLDir(filepath.ToSlash(filepath.Join(sub, strings.TrimSuffix(suffix, ".vyql"))))
+		if err != nil {
+			t.Fatalf("read %s/%s: %v", sub, suffix, err)
+		}
+		for _, source := range sources {
+			sets, err := compileV2BindingsForTest(string(source.Data))
+			if err != nil {
+				t.Fatalf("compile %s: %v", source.Name, err)
+			}
+			out[source.Name] = sets
+		}
+		return out
+	}
+	for f, c := range readDataFiles(t, sub, suffix) {
+		if sub == "mechanics" {
+			continue
+		}
+		sets, err := compileV2BindingsForTest(c)
+		if err != nil {
+			t.Fatalf("compile %s: %v", filepath.Base(f), err)
+		}
+		out[f] = sets
+	}
+	return out
+}
+
 func parseDataDecls(t *testing.T, sub, suffix string) map[string][]parser.Decl {
 	t.Helper()
 	out := map[string][]parser.Decl{}
@@ -212,21 +244,22 @@ func conceptRefsIn(t *testing.T, sub string) map[string]bool {
 func conceptRefsByFile(t *testing.T, sub, suffix string) map[string]map[string]bool {
 	t.Helper()
 	out := map[string]map[string]bool{}
+	sets := parseDataBindingSets(t, sub, suffix)
 	for f, decls := range parseDataDecls(t, sub, suffix) {
 		refs := map[string]bool{}
 		for _, decl := range decls {
-			switch d := decl.(type) {
-			case *parser.BindingSet:
-				for _, m := range d.Mappings {
-					if m.Concept != "" && m.Kind != "type" {
-						addCoverageConceptRef(refs, m.Concept)
-					}
-					if m.About != "" && m.About != "*" {
-						addCoverageConceptRef(refs, m.About)
-					}
-				}
-			case *parser.Rule:
+			if d, ok := decl.(*parser.Rule); ok {
 				collectRuleConceptRefs(d, refs)
+			}
+		}
+		for _, set := range sets[f] {
+			for _, m := range set.Mappings {
+				if m.Concept != "" && m.Kind != "type" {
+					addCoverageConceptRef(refs, m.Concept)
+				}
+				if m.About != "" && m.About != "*" {
+					addCoverageConceptRef(refs, m.About)
+				}
 			}
 		}
 		out[f] = refs
@@ -874,12 +907,8 @@ func TestEveryExhaustiveLanguageCoverageSpecIsBalanced(t *testing.T) {
 
 func TestCompiledV2BindingsDoNotUseLegacyActionFamilies(t *testing.T) {
 	var hits []string
-	for path, decls := range parseDataDecls(t, "bindings", ".vyql") {
-		for _, decl := range decls {
-			binding, ok := decl.(*parser.BindingSet)
-			if !ok {
-				continue
-			}
+	for path, sets := range parseDataBindingSets(t, "bindings", ".vyql") {
+		for _, binding := range sets {
 			for _, action := range binding.Mappings {
 				if strings.HasPrefix(action.Kind, "control") || strings.HasPrefix(action.Kind, "mark") || action.Kind == "flag" {
 					hits = append(hits, filepath.ToSlash(path)+": "+binding.Name+" emits legacy compiled action "+action.Kind)
@@ -1333,15 +1362,11 @@ func countV2TaintEndpointMappings(t *testing.T, subs ...string) (int, int, int) 
 	sourceCount, sinkCount, checkCount := 0, 0, 0
 	for _, sub := range subs {
 		for path, src := range readDataFiles(t, sub, ".vyql") {
-			decls, err := parseV2DefinitionsForTest(src)
+			sets, err := compileV2BindingsForTest(src)
 			if err != nil {
 				t.Fatalf("parse %s: %v", path, err)
 			}
-			for _, decl := range decls {
-				binding, ok := decl.(*parser.BindingSet)
-				if !ok {
-					continue
-				}
+			for _, binding := range sets {
 				for _, mapping := range binding.Mappings {
 					switch {
 					case strings.HasPrefix(mapping.Kind, "source"):
