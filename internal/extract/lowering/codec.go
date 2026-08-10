@@ -11,10 +11,11 @@ import (
 // the cache thousands of times per warm scan; gob's reflection + per-blob decoder setup made
 // decoding the dominant cost of incremental lowering. The structs are all strings, string maps,
 // bools, and small ints, so a length-prefixed encoding decodes several times faster and with far
-// fewer allocations. The bytes are a cache VALUE (never hashed — the key is content+sigFP), so
-// encoding order need not be deterministic, and a binary rebuild (execSalt) invalidates any
-// older format automatically. Round-trip fidelity is gated by the graph-snapshot equivalence
-// harness.
+// fewer allocations. The bytes are a cache VALUE (never hashed — the key is salt+content+sigFP),
+// so encoding order need not be deterministic, and a binary rebuild invalidates any older format
+// automatically because the salt is part of the key. That last claim was false until the salt was
+// added: the key was content+sigFP alone, so a rebuilt binary read back blobs written in a format
+// it no longer used. Round-trip fidelity is gated by the graph-snapshot equivalence harness.
 
 var errCorruptDelta = errors.New("lowering: corrupt cache delta")
 

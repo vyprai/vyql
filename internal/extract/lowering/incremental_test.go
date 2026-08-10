@@ -14,6 +14,7 @@ type memDelta map[string][]byte
 
 func (m memDelta) GetRaw(k string) ([]byte, bool) { v, ok := m[k]; return v, ok }
 func (m memDelta) PutRaw(k string, v []byte)      { m[k] = append([]byte(nil), v...) }
+func (memDelta) Salt() []byte                     { return []byte("test-salt") }
 
 // modA builds module "a": a helper getInput() that returns a read() result, plus an unrelated
 // constant function. hash distinguishes versions for the incremental cache.
@@ -178,5 +179,35 @@ func TestIncrementalReuses(t *testing.T) {
 	// second lower of the same program must equal a full lower (and use the cache).
 	if got, want := snapshot(t, lowerInc(t, p, cache)), snapshot(t, lowerFull(t, p)); got != want {
 		t.Errorf("second incremental lower != full\n%s\n---\n%s", got, want)
+	}
+}
+
+// A module's content hash says nothing about which build lowered it. Rebuild vyql with a change
+// to lowering and an unchanged file still hashes the same -- so a delta key that omits the salt
+// hits and replays the PREVIOUS binary's graph, and the new lowering code silently does not run
+// on unchanged files. Every delta namespace must therefore change when the salt does.
+func TestDeltaKeysChangeWithTheBinarySalt(t *testing.T) {
+	const hash, modKey, ns, sigFP = "deadbeef", "m", "mNS", "sig1"
+
+	a, b := []byte("build-A"), []byte("build-B")
+	if pass1Key(a, hash, modKey, ns) == pass1Key(b, hash, modKey, ns) {
+		t.Error("pass1Key is identical across builds; a rebuild would replay stale symbol tables")
+	}
+	if lowerKey(a, hash, modKey, sigFP) == lowerKey(b, hash, modKey, sigFP) {
+		t.Error("lowerKey is identical across builds; a rebuild would replay a stale sub-graph")
+	}
+	if sizeHintKey(a) == sizeHintKey(b) {
+		t.Error("sizeHintKey is identical across builds")
+	}
+
+	// Same salt must still hit, or the cache would never be useful. The repeated call IS the
+	// assertion: a key built from map iteration would differ between calls.
+	//nolint:staticcheck // SA4000: intentional
+	if pass1Key(a, hash, modKey, ns) != pass1Key(a, hash, modKey, ns) {
+		t.Error("pass1Key is unstable for one build")
+	}
+	//nolint:staticcheck // SA4000: intentional
+	if lowerKey(a, hash, modKey, sigFP) != lowerKey(a, hash, modKey, sigFP) {
+		t.Error("lowerKey is unstable for one build")
 	}
 }

@@ -23,6 +23,7 @@ type fakeDelta map[string][]byte
 
 func (f fakeDelta) GetRaw(k string) ([]byte, bool) { v, ok := f[k]; return v, ok }
 func (f fakeDelta) PutRaw(k string, v []byte)      { f[k] = append([]byte(nil), v...) }
+func (fakeDelta) Salt() []byte                     { return []byte("test-salt") }
 
 // scanFindingKeys runs the extract/lower/adapter/evaluate pipeline against an explicit
 // lowering cache and returns a canonical, sorted set of finding identities (rule + sink loc).
