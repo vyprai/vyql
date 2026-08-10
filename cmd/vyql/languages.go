@@ -67,6 +67,7 @@ type scanStats struct {
 	files     map[string]int // language -> files parsed
 	languages []string       // languages actually present
 	excluded  int            // files dropped by -exclude
+	oversized int            // files skipped over the -max-file-size ceiling
 	unmatched map[string]int // extension -> count, claimed by no frontend
 }
 
@@ -102,6 +103,19 @@ func extractAll(paths []string) (nir.Program, []bindings.Applicator, map[string]
 		root := p
 		if info.IsDir() {
 			entries = treesitter.ListAllFiles(p)
+			// Only filtered when walking a tree. Naming a file explicitly is an
+			// instruction to scan that file, whatever its size.
+			if ceiling := treesitter.MaxFileBytes(); ceiling > 0 {
+				kept := entries[:0]
+				for _, e := range entries {
+					if fi, err := os.Stat(e.Path); err == nil && fi.Size() > ceiling {
+						continue
+					}
+					kept = append(kept, e)
+				}
+				stats.oversized += len(entries) - len(kept)
+				entries = kept
+			}
 		} else {
 			root = filepath.Dir(p)
 			entries = []treesitter.Entry{{Path: p, Ext: strings.ToLower(filepath.Ext(p)), Base: strings.ToLower(filepath.Base(p))}}

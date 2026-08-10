@@ -35,11 +35,25 @@ var shared struct {
 	c  *Cache
 }
 
+// options sizes badger for a CLI cache, not a server. Badger's defaults hold a
+// 64MiB memtable arena — eagerly allocated the moment the DB opens, on every
+// scan — with up to five more queued behind it, plus a 256MiB block cache of
+// decompressed copies. This cache's workload is point reads that are each hit
+// at most once per scan, and its keys are content-addressed, so conflict
+// detection tracks writes that cannot conflict.
+func options(dir string) badger.Options {
+	return badger.DefaultOptions(dir).
+		WithLogger(nil).
+		WithMemTableSize(16 << 20).
+		WithNumMemtables(2).
+		WithBlockCacheSize(64 << 20).
+		WithDetectConflicts(false)
+}
+
 // Open creates a Badger-backed cache in dir. CLI callers should prefer explicit command
 // flags over environment-variable configuration.
 func Open(dir string) (*Cache, error) {
-	opts := badger.DefaultOptions(dir).WithLogger(nil)
-	db, err := badger.Open(opts)
+	db, err := badger.Open(options(dir))
 	if err != nil {
 		return nil, err
 	}

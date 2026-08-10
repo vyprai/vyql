@@ -10,6 +10,56 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
+### Changed
+- **Source files over 2 MiB are skipped by default.** A huge file that dodges
+  every other filter explodes into a single enormous graph — and, for
+  tree-sitter languages, a C parse tree several times the source size that the
+  Go heap limit cannot see, which is the one remaining way a single file could
+  exhaust a machine. `-max-file-size` raises the ceiling (`0` disables), the
+  skipped count appears under `-coverage`, and the ceiling is part of the scan
+  cache fingerprint so changing it never replays another ceiling's findings.
+  Naming an oversized file directly still scans it: the filter applies to
+  walking a tree, not to an explicit instruction.
+
+  This is a behaviour change: findings in oversized files disappear from the
+  report unless the ceiling is raised. Hand-written source files of that size
+  are vanishingly rare; generated artifacts of that size are common and were
+  already the dominant cost of the scans that hit them.
+
+### Fixed
+- **`--max-ram` could authorise several times what it named.** The flag's
+  budget was spent twice over — badger's caches and the on-heap node-detail
+  buffer were each sized from the same figure — while the heap ceiling was only
+  applied on an error path, leaving the normal path at 80% of physical RAM.
+  The budget is now partitioned once (half to badger's block cache, a quarter
+  to the detail buffer, heap ceiling at half, restored on exit), the index
+  cache no longer receives 30% of the cache budget (it is only consulted for
+  encrypted stores, so it was funded but never populated), and the memtable
+  shrinks from 128 MiB to 32 MiB. Measured on a ~5,900-file Java repository:
+  the previous build peaked at 5.05 GB under a `-max-ram 6GB` flag; this one
+  peaks at 4.06 GB under the same flag, and completes at 4.2 GB under a 4 GB
+  flag that previously bounded nothing. A ceiling below the working set is
+  slow — the spilled-detail read path is random point reads, and making that
+  path sequential is the next piece of this work.
+
+### Performance
+- **The `--max-ram` store no longer decodes node detail it holds in RAM.**
+  Profiling showed 74.7% of all allocation — 51 GB on a ~5,900-file Java scan —
+  in the graph's read path, decoding node-detail blobs and copying every string
+  per read, for detail that had never left RAM: detail was encoded on write and
+  decoded on every read, and the binding pass reads every node once per
+  applicator. Detail now stays in struct form and is encoded once, at actual
+  spill time; node types additionally live in the resident core, because
+  `AddNode` consults the type on every call and must never pay a disk read for
+  it. Resident point reads drop from 7 allocations to 0, a resident 100-node
+  type-range pass from 700 to 1.
+
+  Measured on the same Java repository: `-max-ram 6GB` goes from 115.8 s wall
+  at 5.05 GB peak to 40.2 s at 4.06 GB. The default (no-flag) path does not use
+  this store and is unchanged: 20.6 s. Findings are fingerprint-identical
+  across the default, 6 GB and 4 GB modes — 1,460 on this repository, the same
+  multiset in all three.
+
 ## [0.2.4] - 2026-08-07
 
 **The scanner is unchanged from 0.2.3.** No engine, rule or binding differences —
