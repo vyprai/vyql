@@ -106,13 +106,13 @@ rule WebOnly {
 		t.Fatalf("compiled rules = %d, want 1", len(compiled.compiled))
 	}
 	cr := compiled.compiled[0]
-	if !ruleActiveForProfile(cr, "") {
+	if !engine.RuleActiveForProfile(cr, "") {
 		t.Fatal("empty profile should preserve direct helper behavior")
 	}
-	if !ruleActiveForProfile(cr, "web") {
+	if !engine.RuleActiveForProfile(cr, "web") {
 		t.Fatal("web profile should activate web-required rule")
 	}
-	if ruleActiveForProfile(cr, "library") {
+	if engine.RuleActiveForProfile(cr, "library") {
 		t.Fatal("library profile should not activate web-required rule")
 	}
 }
