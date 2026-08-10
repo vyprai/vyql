@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/vyprai/vyql/internal/findings"
+	"github.com/vyprai/vyql/internal/resultpolicy"
 )
 
 // Triage is expensive and, without somewhere to record it, worthless the moment
@@ -41,7 +42,12 @@ type baselineFile struct {
 	Entries []baselineEntry `json:"entries"`
 }
 
-const baselineVersion = 1
+// Version 2 changed what a fingerprint is: entries are keyed on the identity policy declared in
+// vyql/policies (rule id + primary target location + concept) rather than on a hash of every
+// binding's name and location. A v1 file's keys cannot match, and silently matching nothing would
+// un-suppress a whole triaged backlog with no explanation -- so loadBaseline rejects it and says
+// how to migrate.
+const baselineVersion = 2
 
 // loadBaseline reads and validates a baseline. An unreadable or malformed
 // baseline is an error rather than an empty one: silently treating it as "no
@@ -57,6 +63,10 @@ func loadBaseline(path string) (map[string]baselineEntry, error) {
 		return nil, fmt.Errorf("baseline %s: %w", path, err)
 	}
 	if bf.Version != baselineVersion {
+		if bf.Version == 1 {
+			return nil, fmt.Errorf("baseline %s: version 1 is keyed on the old fingerprint and cannot match; "+
+				"re-record it with -baseline-write after reviewing the current findings", path)
+		}
 		return nil, fmt.Errorf("baseline %s: version %d, this build understands %d",
 			path, bf.Version, baselineVersion)
 	}
@@ -92,7 +102,7 @@ func validVerdict(v string) bool {
 func applyBaseline(all []*findings.Finding, base map[string]baselineEntry) (report []*findings.Finding, covered []*findings.Finding, stale []baselineEntry) {
 	seen := map[string]bool{}
 	for _, f := range all {
-		fp := f.Fingerprint()
+		fp := resultpolicy.Fingerprint(f)
 		if _, ok := base[fp]; ok {
 			seen[fp] = true
 			covered = append(covered, f)
@@ -154,7 +164,7 @@ func writeBaseline(path string, all []*findings.Finding) error {
 			loc = f.Bindings[len(f.Bindings)-1].Loc
 		}
 		bf.Entries = append(bf.Entries, baselineEntry{
-			FP:      f.Fingerprint(),
+			FP:      resultpolicy.Fingerprint(f),
 			Verdict: verdictAccepted,
 			Rule:    f.RuleID,
 			Loc:     loc,

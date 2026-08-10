@@ -5,8 +5,6 @@
 package findings
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"strings"
 )
@@ -52,24 +50,17 @@ type Finding struct {
 	ReviewConditions []ReviewCondition
 }
 
-// Fingerprint is content-anchored (rule + binding LOCATIONS), so equivalent
-// findings collapse and survive line drift within a location key.
-func (f *Finding) Fingerprint() string {
-	parts := make([]string, len(f.Bindings))
-	for i, b := range f.Bindings {
-		parts[i] = b.Name + "=" + b.Loc
-	}
-	sum := sha256.Sum256([]byte(f.RuleID + "::" + strings.Join(parts, "|")))
-	return hex.EncodeToString(sum[:])[:16]
-}
-
-func (f *Finding) RenderWithFingerprint(fp string) string {
-	return f.render(fp)
-}
-
 // Render produces a human-readable proof tree from the finding's fields.
-func (f *Finding) Render() string {
-	return f.render(f.Fingerprint())
+//
+// The fingerprint is a parameter rather than something this type computes. Finding identity is
+// policy -- which fields make two results "the same problem" is declared in vyql/policies as
+// `policy resultIdentity default` and owned by internal/resultpolicy. A second implementation
+// here would be a competing answer to that question, and was: it hashed every binding's name and
+// location, so the id printed in the text report disagreed with the one in SARIF for any finding
+// with more than one binding. resultpolicy cannot be imported here (it imports findings), and
+// that import direction is the reason the duplicate existed -- so callers pass the value in.
+func (f *Finding) Render(fp string) string {
+	return f.render(fp)
 }
 
 func (f *Finding) render(fp string) string {

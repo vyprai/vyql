@@ -231,6 +231,13 @@ func findingField(f *findings.Finding, field string) string {
 	}
 }
 
+// PrimaryTarget is the binding a finding is "about" -- the one whose location a report shows and
+// whose location and concept the fingerprint is built from. Exported because output formatters
+// need the SAME answer the fingerprint used: three separate copies of this rule existed, and they
+// did not agree on which binding wins when a finding has more than one named sink, so a result
+// could be filed under one location and identified by another.
+func PrimaryTarget(f *findings.Finding) findings.Binding { return primaryTarget(f) }
+
 func primaryTarget(f *findings.Finding) findings.Binding {
 	for _, b := range f.Bindings {
 		if b.Name == "sink" || b.Name == "target" {

@@ -151,3 +151,26 @@ func TestRuleDescriptorWithoutMetaStaysValid(t *testing.T) {
 		t.Fatalf("should validate, got: %v", problems)
 	}
 }
+
+// A result and its rule descriptor must file the same finding at the same level. Two mappings
+// used to exist and they disagreed on "low": the result came out "note" while the rule defaulted
+// to "warning", so one document contradicted itself and a consumer filtering on either field saw
+// a different set. Every severity is checked, not just the one that broke.
+func TestResultAndRuleDescriptorAgreeOnLevel(t *testing.T) {
+	for _, sev := range []string{"critical", "high", "medium", "low", "info"} {
+		f := sampleFinding()
+		f.Severity = sev
+		doc := ToSARIF([]*findings.Finding{f}, "0.1.0",
+			map[string]map[string]any{f.RuleID: {"severity": sev}})
+		run := doc["runs"].([]any)[0].(map[string]any)
+
+		result := run["results"].([]any)[0].(map[string]any)
+		rule := run["tool"].(map[string]any)["driver"].(map[string]any)["rules"].([]any)[0].(map[string]any)
+		ruleLevel := rule["defaultConfiguration"].(map[string]any)["level"]
+
+		if result["level"] != ruleLevel {
+			t.Errorf("severity %q: result level %v but rule defaultConfiguration level %v",
+				sev, result["level"], ruleLevel)
+		}
+	}
+}

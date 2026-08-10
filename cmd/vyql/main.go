@@ -943,7 +943,7 @@ func printReport(fs []*findings.Finding) {
 
 	fmt.Printf("%d finding(s):\n\n", len(fs))
 	for _, it := range items {
-		fmt.Printf("[%s] %s", it.s.Band, it.f.RenderWithFingerprint(resultpolicy.Fingerprint(it.f)))
+		fmt.Printf("[%s] %s", it.s.Band, it.f.Render(resultpolicy.Fingerprint(it.f)))
 		for _, fac := range it.s.Factors {
 			fmt.Printf("    · %s\n", fac.Witness)
 		}

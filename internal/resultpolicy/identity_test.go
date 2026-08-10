@@ -35,6 +35,13 @@ policy resultIdentity default {
 	if len(fp) != 16 {
 		t.Fatalf("fingerprint = %q, want 16 hex chars", fp)
 	}
+	// Calling it twice on ONE finding is the assertion: a fingerprint built from a map iteration
+	// or a seeded hash would differ between calls, and no other case here would catch it. This
+	// property moved from internal/findings when the duplicate implementation there was deleted.
+	//nolint:staticcheck // SA4000: the repeated call IS the assertion
+	if policy.FingerprintFinding(f) != fp {
+		t.Fatal("fingerprint is not deterministic across calls")
+	}
 	sameSource := &findings.Finding{
 		RuleID: "VYQL-INJ-001",
 		Bindings: []findings.Binding{
