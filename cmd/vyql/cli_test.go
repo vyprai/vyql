@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vyprai/vyql/internal/review"
 )
 
 func writeNeutralPy(t *testing.T) string {
@@ -83,7 +85,7 @@ func TestRunAllIncludesFlags(t *testing.T) {
 	}
 	var payload struct {
 		Findings []jsonFinding `json:"findings"`
-		Flags    []reviewItem  `json:"flags"`
+		Flags    []review.Item `json:"flags"`
 	}
 	if err := json.Unmarshal([]byte(allOut), &payload); err != nil {
 		t.Fatalf("scan --all json should be an object payload: %v\n%s", err, allOut)
@@ -117,7 +119,7 @@ func TestRunFlagsOnlyJSON(t *testing.T) {
 	}
 	var payload struct {
 		Findings []jsonFinding `json:"findings"`
-		Flags    []reviewItem  `json:"flags"`
+		Flags    []review.Item `json:"flags"`
 	}
 	if err := json.Unmarshal([]byte(out), &payload); err != nil {
 		t.Fatalf("scan --flags json should be an object payload: %v\n%s", err, out)

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/vyprai/vyql/internal/extract"
@@ -40,7 +39,7 @@ func printUSG(g usg.Store) error {
 	if err != nil {
 		return err
 	}
-	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
+	sort.Slice(nodes, func(i, j int) bool { return nodes[i].SortOrder() < nodes[j].SortOrder() })
 	fmt.Println("# NODES — id  type  loc  [region@order]  {concepts}  path=…")
 	for _, n := range nodes {
 		fmt.Println(nodeLine(g, n))
@@ -64,7 +63,7 @@ func printTaint(onto *ontology.Ontology, g usg.Store) error {
 	if err != nil {
 		return err
 	}
-	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
+	sort.Slice(nodes, func(i, j int) bool { return nodes[i].SortOrder() < nodes[j].SortOrder() })
 	for _, n := range nodes {
 		if !isSource(onto, g, n.ID) {
 			continue
@@ -139,12 +138,4 @@ func isSource(onto *ontology.Ontology, g usg.Store, id string) bool {
 		}
 	}
 	return false
-}
-
-func nodeOrder(n usg.Node) int {
-	o, err := strconv.Atoi(n.Prop("order"))
-	if err != nil {
-		return 1 << 30 // unordered nodes (no region) sort last
-	}
-	return o
 }

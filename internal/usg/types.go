@@ -221,3 +221,30 @@ func BFS(s Store, start, edgeType string, maxHops int) (map[string]bool, error) 
 	}
 	return seen, nil
 }
+
+// CalleeKey names what a node calls, for display and grouping: the resolved callee path
+// when there is one, else a bare `.method`, else the node type. Every reader of a call node
+// wants the same answer, so it is derived once here rather than in each of them.
+func (n Node) CalleeKey() string {
+	if p := n.Prop("callee_path"); p != "" {
+		return p
+	}
+	if m := n.Prop("method"); m != "" {
+		return "." + m
+	}
+	return n.Type
+}
+
+// SortOrder is the node's position within its region, as a sort key: nodes with no region
+// sort last, so a mixed slice orders the positioned nodes first and in sequence.
+//
+// Read through Prop rather than the inline Order field, because a store is allowed to keep
+// the value in Props instead (see Node's doc) and the inline field would report those as
+// unpositioned.
+func (n Node) SortOrder() int {
+	o, err := strconv.Atoi(n.Prop("order"))
+	if err != nil {
+		return 1 << 30
+	}
+	return o
+}

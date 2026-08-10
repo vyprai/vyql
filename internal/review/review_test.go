@@ -1,4 +1,4 @@
-package main
+package review
 
 import (
 	"strings"
@@ -18,7 +18,7 @@ func TestCollectReviewItemsDeduplicatesSameCallSite(t *testing.T) {
 		}})
 		store.AddLabel(id, usg.Label{Concept: "code.StructuredInputDecode"})
 	}
-	reviewConcepts := map[string]reviewConceptInfo{
+	reviewConcepts := map[string]ConceptInfo{
 		"code.StructuredInputDecode": {
 			category: "input_validation",
 			kind:     "attention",
@@ -26,7 +26,7 @@ func TestCollectReviewItemsDeduplicatesSameCallSite(t *testing.T) {
 		},
 	}
 
-	got := collectReviewItemsWithPolicy(store, reviewConcepts, reviewDisplayPolicy{flagSort: []string{"location"}}, resultpolicy.DefaultLifecycleContract())
+	got := CollectWithPolicy(store, reviewConcepts, DisplayPolicy{flagSort: []string{"location"}}, resultpolicy.DefaultLifecycleContract())
 	if len(got) != 1 {
 		t.Fatalf("review items = %d, want 1", len(got))
 	}
@@ -45,9 +45,9 @@ policy display default {
 	if err != nil {
 		t.Fatalf("ParseV2: %v", err)
 	}
-	policy, err := reviewDisplayPolicyFromDecl(prog.Decls[0].(*parser.V2PolicyDecl))
+	policy, err := DisplayPolicyFromDecl(prog.Decls[0].(*parser.V2PolicyDecl))
 	if err != nil {
-		t.Fatalf("reviewDisplayPolicyFromDecl: %v", err)
+		t.Fatalf("DisplayPolicyFromDecl: %v", err)
 	}
 	want := []string{"findings", "flags", "checks", "advisoryEvidence", "requirementDiagnostics"}
 	if !stringSlicesEqual(policy.scanAll, want) {
@@ -67,12 +67,12 @@ policy display default {
 	if err != nil {
 		t.Fatalf("ParseV2: %v", err)
 	}
-	_, err = reviewDisplayPolicyFromDecl(prog.Decls[0].(*parser.V2PolicyDecl))
+	_, err = DisplayPolicyFromDecl(prog.Decls[0].(*parser.V2PolicyDecl))
 	if err == nil {
-		t.Fatal("reviewDisplayPolicyFromDecl succeeded, want missing scanAll diagnostic")
+		t.Fatal("DisplayPolicyFromDecl succeeded, want missing scanAll diagnostic")
 	}
 	if !strings.Contains(err.Error(), "scanAll") {
-		t.Fatalf("reviewDisplayPolicyFromDecl error = %v, want scanAll diagnostic", err)
+		t.Fatalf("DisplayPolicyFromDecl error = %v, want scanAll diagnostic", err)
 	}
 }
 
@@ -89,7 +89,7 @@ func stringSlicesEqual(a, b []string) bool {
 }
 
 func TestCollectReviewItemsHandlesNilStore(t *testing.T) {
-	reviewConcepts := map[string]reviewConceptInfo{
+	reviewConcepts := map[string]ConceptInfo{
 		"code.StructuredInputDecode": {
 			category: "input_validation",
 			kind:     "attention",
@@ -97,7 +97,7 @@ func TestCollectReviewItemsHandlesNilStore(t *testing.T) {
 		},
 	}
 
-	if got := collectReviewItemsWithPolicy(nil, reviewConcepts, reviewDisplayPolicy{flagSort: []string{"location"}}, resultpolicy.DefaultLifecycleContract()); len(got) != 0 {
+	if got := CollectWithPolicy(nil, reviewConcepts, DisplayPolicy{flagSort: []string{"location"}}, resultpolicy.DefaultLifecycleContract()); len(got) != 0 {
 		t.Fatalf("review items = %d, want 0", len(got))
 	}
 }
@@ -108,12 +108,12 @@ func TestCollectReviewItemsUsesDisplayPolicyFlagSort(t *testing.T) {
 	store.AddNode(usg.Node{ID: "b", Type: "code.Call", Props: map[string]string{"loc": "a.go:1"}})
 	store.AddLabel("a", usg.Label{Concept: "code.ZetaReview"})
 	store.AddLabel("b", usg.Label{Concept: "code.AlphaReview"})
-	reviewConcepts := map[string]reviewConceptInfo{
+	reviewConcepts := map[string]ConceptInfo{
 		"code.ZetaReview":  {category: "review", kind: "attention"},
 		"code.AlphaReview": {category: "review", kind: "attention"},
 	}
 
-	got := collectReviewItemsWithPolicy(store, reviewConcepts, reviewDisplayPolicy{
+	got := CollectWithPolicy(store, reviewConcepts, DisplayPolicy{
 		flagSort: []string{"concept"},
 	}, resultpolicy.DefaultLifecycleContract())
 	if len(got) != 2 {
@@ -133,17 +133,17 @@ func TestCollectReviewItemsUsesDisplayPolicyNearbyCheckLimit(t *testing.T) {
 		store.AddLabel(id, usg.Label{Concept: "core.ExpectedCheck"})
 		store.AddEdge(usg.Edge{Type: "PROTECTS", Src: id, Dst: "target"})
 	}
-	reviewConcepts := map[string]reviewConceptInfo{
+	reviewConcepts := map[string]ConceptInfo{
 		"code.TargetReview":  {category: "review", kind: "target", expected: []string{"core.ExpectedCheck"}},
 		"core.ExpectedCheck": {category: "review", kind: "check"},
 	}
 
-	got := collectReviewItemsWithPolicy(store, reviewConcepts, reviewDisplayPolicy{
+	got := CollectWithPolicy(store, reviewConcepts, DisplayPolicy{
 		flagSort:            []string{"location"},
 		includeNearbyChecks: true,
 		nearbyCheckLimit:    2,
 	}, resultpolicy.DefaultLifecycleContract())
-	var target *reviewItem
+	var target *Item
 	for i := range got {
 		if got[i].Concept == "code.TargetReview" {
 			target = &got[i]
@@ -155,5 +155,42 @@ func TestCollectReviewItemsUsesDisplayPolicyNearbyCheckLimit(t *testing.T) {
 	}
 	if len(target.NearbyChecks) != 2 {
 		t.Fatalf("nearby checks = %d, want 2: %+v", len(target.NearbyChecks), target.NearbyChecks)
+	}
+}
+
+// Filter used to reuse the caller's backing array via rows[:0], so filtering a slice
+// rewrote the slice that was filtered. A caller holding both — the full set for a summary
+// count, the filtered set for display — would find the full set quietly replaced by the
+// filtered entries followed by stale tail elements.
+func TestFilterDoesNotRewriteTheCallersSlice(t *testing.T) {
+	all := []Item{
+		{Category: "crypto", Kind: "attention", Loc: "a.py:1"},
+		{Category: "injection", Kind: "attention", Loc: "b.py:2"},
+		{Category: "crypto", Kind: "check", Loc: "c.py:3"},
+	}
+	before := append([]Item(nil), all...)
+
+	got := Filter(all, "crypto", "all", "")
+	if len(got) != 2 {
+		t.Fatalf("Filter returned %d items, want 2", len(got))
+	}
+	for i := range all {
+		if all[i].Loc != before[i].Loc || all[i].Category != before[i].Category {
+			t.Fatalf("Filter rewrote the caller's slice at %d:\n  got  %+v\n  want %+v",
+				i, all[i], before[i])
+		}
+	}
+}
+
+// A filter that matches everything may return the input untouched, but it still must not be
+// the path that mutates it.
+func TestFilterLeavesAnUnfilteredSliceAlone(t *testing.T) {
+	all := []Item{{Category: "crypto", Kind: "attention", Loc: "a.py:1"}}
+	before := append([]Item(nil), all...)
+	if got := Filter(all, "all", "all", ""); len(got) != 1 || got[0].Loc != before[0].Loc {
+		t.Fatalf("Filter(all) = %+v, want the input unchanged", got)
+	}
+	if all[0].Loc != before[0].Loc {
+		t.Fatal("Filter rewrote the caller's slice on the pass-through path")
 	}
 }

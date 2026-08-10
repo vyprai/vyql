@@ -55,7 +55,7 @@ func cmdTrace(args []string) error {
 		return nil
 	}
 	nodes, _ := g.AllNodes()
-	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
+	sort.Slice(nodes, func(i, j int) bool { return nodes[i].SortOrder() < nodes[j].SortOrder() })
 
 	connected, dead := 0, 0
 	for _, n := range nodes {
@@ -309,7 +309,7 @@ func cmdMatch(args []string) error {
 	}
 	onto := ontology.Seed()
 	nodes, _ := g.AllNodes()
-	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
+	sort.Slice(nodes, func(i, j int) bool { return nodes[i].SortOrder() < nodes[j].SortOrder() })
 	type row struct{ role, line string }
 	var rows []row
 	for _, n := range nodes {
@@ -327,7 +327,7 @@ func cmdMatch(args []string) error {
 				prov = "?"
 			}
 			rows = append(rows, row{role, fmt.Sprintf("  %-14s %-26s %s  ← %s (%s)",
-				calleeKey(n), l.Concept, n.Prop("loc"), prov, l.Provenance.Fidelity)})
+				n.CalleeKey(), l.Concept, n.Prop("loc"), prov, l.Provenance.Fidelity)})
 		}
 	}
 	for _, role := range []string{"source", "sink", "control/other"} {
@@ -344,16 +344,6 @@ func cmdMatch(args []string) error {
 		}
 	}
 	return nil
-}
-
-func calleeKey(n usg.Node) string {
-	if p := n.Prop("callee_path"); p != "" {
-		return p
-	}
-	if m := n.Prop("method"); m != "" {
-		return "." + m
-	}
-	return n.Type
 }
 
 func isSourceConcept(onto *ontology.Ontology, c string) bool {
@@ -382,14 +372,14 @@ func cmdResolve(args []string) error {
 		return nil
 	}
 	nodes, _ := g.AllNodes()
-	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
+	sort.Slice(nodes, func(i, j int) bool { return nodes[i].SortOrder() < nodes[j].SortOrder() })
 	res, unres := 0, 0
 	var unresolved []string
 	for _, n := range nodes {
 		if n.Type != "code.Call" {
 			continue
 		}
-		key := calleeKey(n)
+		key := n.CalleeKey()
 		// a call is "resolved into a body" iff it has an outgoing FLOWS edge to a node OTHER
 		// than its own arg slots — i.e. the lowering wired a callee ret → result. Calls with no
 		// outgoing flow are library/external/cross-package (taint stops unless the engine treats
@@ -750,7 +740,7 @@ func cmdQuery(args []string) error {
 		return nil
 	}
 	nodes, _ := g.AllNodes()
-	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
+	sort.Slice(nodes, func(i, j int) bool { return nodes[i].SortOrder() < nodes[j].SortOrder() })
 
 	// reachability mode: every -from source that reaches a -to sink (path-aware, like trace
 	// but terse — one line per connected pair).
@@ -778,7 +768,7 @@ func cmdQuery(args []string) error {
 		if *typ != "" && !strings.Contains(n.Type, *typ) {
 			continue
 		}
-		if *call != "" && !strings.Contains(calleeKey(n), *call) {
+		if *call != "" && !strings.Contains(n.CalleeKey(), *call) {
 			continue
 		}
 		if *loc != "" && !strings.Contains(n.Prop("loc"), *loc) {
@@ -847,7 +837,7 @@ func printScanStats(g usg.Store, stats extract.Stats) {
 		if isSink(onto, g, n.ID) {
 			sinkCount++
 		}
-		nodeDeg = append(nodeDeg, deg{id: n.ID, out: out, loc: n.Prop("loc"), path: calleeKey(n)})
+		nodeDeg = append(nodeDeg, deg{id: n.ID, out: out, loc: n.Prop("loc"), path: n.CalleeKey()})
 	}
 	for i := range nodeDeg {
 		nodeDeg[i].in = indeg[nodeDeg[i].id]

@@ -59,6 +59,7 @@ import (
 	"github.com/vyprai/vyql/internal/profile"
 	"github.com/vyprai/vyql/internal/report"
 	"github.com/vyprai/vyql/internal/resultpolicy"
+	"github.com/vyprai/vyql/internal/review"
 	"github.com/vyprai/vyql/internal/risk"
 	"github.com/vyprai/vyql/internal/sarif"
 	"github.com/vyprai/vyql/internal/timing"
@@ -665,12 +666,12 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	}
 
 	// output
-	var flags []reviewItem
+	var flags []review.Item
 	if wantsFlags {
 		if format == "sarif" {
 			return fmt.Errorf("flags are supported with -format text or json")
 		}
-		flags = filterReviewItems(collectReviewItems(graph), opts.FlagCategory, opts.FlagKind, opts.FlagLoc)
+		flags = review.Filter(review.Collect(graph), opts.FlagCategory, opts.FlagKind, opts.FlagLoc)
 	}
 	switch format {
 	case "sarif":
@@ -878,14 +879,14 @@ func printReport(fs []*findings.Finding) {
 
 type scanAllJSON struct {
 	Findings []jsonFinding `json:"findings"`
-	Flags    []reviewItem  `json:"flags"`
+	Flags    []review.Item `json:"flags"`
 }
 
 type scanFlagsJSON struct {
-	Flags []reviewItem `json:"flags"`
+	Flags []review.Item `json:"flags"`
 }
 
-func printScanFlags(rows []reviewItem) {
+func printScanFlags(rows []review.Item) {
 	if len(rows) == 0 {
 		fmt.Println("No flags.")
 		return
