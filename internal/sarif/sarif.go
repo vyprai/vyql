@@ -69,9 +69,13 @@ func findingToResult(f *findings.Finding) map[string]any {
 	if level == "" {
 		level = "warning"
 	}
+	// Built from the NAMED source and target, not from bindings[0] and bindings[1]. Positional
+	// order is not guaranteed, so the sentence could describe a different pair than the location
+	// beneath it -- which comes from the primary target -- and read as a contradiction in one
+	// result. Falls back to the rule id when a finding has no recognisable pair.
 	msg := f.RuleID
-	if len(f.Bindings) >= 2 {
-		msg = f.Bindings[0].Concept + " reaches " + f.Bindings[1].Concept + " (" + f.RuleID + ")"
+	if source != nil && sink != nil {
+		msg = source.Concept + " reaches " + sink.Concept + " (" + f.RuleID + ")"
 	}
 
 	var negEv []any
