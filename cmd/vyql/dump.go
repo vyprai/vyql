@@ -144,7 +144,7 @@ func buildGraphWithOptions(paths []string, cache lowering.DeltaCache, opts graph
 	// Binding labeling: incremental (reuse unchanged modules' cached labels) when caching is
 	// on, else a full pass. Both produce identical labels — binding precedence is per-node.
 	if incremental {
-		relabel, err := applyBindingsIncremental(g, bindingApps, moduleHashes(prog), deps, cache)
+		relabel, err := bindings.ApplyIncremental(g, bindingApps, moduleHashes(prog), deps, cache)
 		if err != nil {
 			return nil, stats, err
 		}

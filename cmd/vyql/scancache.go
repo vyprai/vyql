@@ -9,7 +9,6 @@ import (
 	"hash"
 	"io"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -139,45 +138,6 @@ func vendorFingerprintDirShouldSkip(root, path string) bool {
 var vendoredFingerprintPrefixes = []string{
 	"assets",
 	"github.com/containerd/cri",
-}
-
-// statFile folds one file's path+size+mtime into h (skipped silently if it can't be stat'd).
-// The building block for fingerprinting a known, bounded file set without walking a tree.
-func statFile(h hash.Hash, path string) {
-	info, err := os.Stat(path)
-	if err != nil || info.IsDir() {
-		return
-	}
-	hashString(h, path)
-	fmt.Fprintf(h, "|%d|%d\x00", info.Size(), info.ModTime().UnixNano())
-}
-
-func statVYQLTreeExcept(h hash.Hash, root string, excludedRelDirs map[string]bool) {
-	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			rel, relErr := filepath.Rel(root, p)
-			if relErr == nil {
-				rel = filepath.ToSlash(rel)
-				if excludedRelDirs[rel] {
-					return filepath.SkipDir
-				}
-			}
-			return nil
-		}
-		if !strings.HasSuffix(p, ".vyql") {
-			return nil
-		}
-		info, e := d.Info()
-		if e != nil {
-			return nil
-		}
-		hashString(h, p)
-		fmt.Fprintf(h, "|%d|%d\x00", info.Size(), info.ModTime().UnixNano())
-		return nil
-	})
 }
 
 // loadCachedScan returns a previously cached scan result for key, if present.

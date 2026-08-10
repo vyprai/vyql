@@ -1,13 +1,17 @@
-package main
+package bindings
 
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"hash"
+	"io"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
-	"github.com/vyprai/vyql/internal/bindings"
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/extract/lowering"
 	"github.com/vyprai/vyql/internal/extract/parsecache"
@@ -116,10 +120,26 @@ func (r *lblReader) smap() map[string]string {
 }
 
 // applyBindingsIncremental runs the binding labeling phase reusing the cached concept labels of
-// modules whose content AND the global binding inputs are unchanged, re-running binding
-// applicators only on the rest. This is the binding analogue of incremental lowering.
+// DeltaCache is the byte cache the incremental binding pass needs. Declared here rather than
+// borrowed from the lowering package: this layer needs a place to put bytes, not a dependency on
+// the stage that happens to provide one. Satisfied by parsecache.Cache and by
+// lowering.DeltaCache, which has the same method set.
+// hashString mixes s into h. hash.Hash documents that Write never returns an error, so there is
+// nothing here to handle. A one-line copy of the CLI's helper: sharing it would couple these
+// packages for a stdlib wrapper.
+func hashString(h hash.Hash, s string) { _, _ = io.WriteString(h, s) }
+
+type DeltaCache interface {
+	GetRaw(key string) ([]byte, bool)
+	PutRaw(key string, val []byte)
+	Salt() []byte
+}
+
+// ApplyIncremental labels only the modules that need it: it replays cached labels for modules
+// whose content AND the global binding inputs are unchanged, re-running binding applicators only
+// on the rest. This is the binding analogue of incremental lowering.
 //
-// Soundness rests on bindings.Apply resolving precedence strictly per-(node, concept): a node's
+// Soundness rests on Apply resolving precedence strictly per-(node, concept): a node's
 // final labels depend only on proposals targeting that exact node (its own properties plus the
 // global package/import evidence), never on other code nodes. Since each node belongs to exactly
 // one module, restricting the binding pass to a subset of modules yields labels byte-identical
@@ -131,7 +151,7 @@ func (r *lblReader) smap() map[string]string {
 // binding input misses every module and re-labels the whole graph. modHash maps each module's
 // namespace (lowering.ModuleNS) to its content hash; a module absent from it (e.g. a native
 // frontend with no Hash) is always relabeled and never cached.
-func applyBindingsIncremental(g usg.Store, bindingApps []bindings.Applicator, modHash map[string]string, deps map[string]bool, cache lowering.DeltaCache) (map[string]bool, error) {
+func ApplyIncremental(g usg.Store, bindingApps []Applicator, modHash map[string]string, deps map[string]bool, cache DeltaCache) (map[string]bool, error) {
 	fp := bindingFingerprint(deps)
 
 	// decide which modules must be (re)labeled: those whose binding-cache key misses. Read all
@@ -172,7 +192,7 @@ func applyBindingsIncremental(g usg.Store, bindingApps []bindings.Applicator, mo
 	if err != nil {
 		return nil, err
 	}
-	if _, _, err := bindings.Apply(view, bindingApps, nil); err != nil {
+	if _, _, err := Apply(view, bindingApps, nil); err != nil {
 		return nil, err
 	}
 
@@ -213,7 +233,7 @@ type batchWriter interface {
 	PutManyRaw(kv map[string][]byte)
 }
 
-func batchGet(cache lowering.DeltaCache, keys []string) map[string][]byte {
+func batchGet(cache DeltaCache, keys []string) map[string][]byte {
 	if br, ok := cache.(batchReader); ok {
 		return br.GetManyRaw(keys)
 	}
@@ -226,7 +246,7 @@ func batchGet(cache lowering.DeltaCache, keys []string) map[string][]byte {
 	return out
 }
 
-func batchPut(cache lowering.DeltaCache, kv map[string][]byte) {
+func batchPut(cache DeltaCache, kv map[string][]byte) {
 	if bw, ok := cache.(batchWriter); ok {
 		bw.PutManyRaw(kv)
 		return
@@ -249,9 +269,9 @@ func bindingFingerprint(deps map[string]bool) string {
 		}
 	}
 	hashString(h, "\x00sources\x00")
-	hashString(h, bindings.ActiveSourcesKey())
+	hashString(h, ActiveSourcesKey())
 	hashString(h, "\x00concepts\x00")
-	hashString(h, bindings.ActiveBindingConceptsKey())
+	hashString(h, ActiveBindingConceptsKey())
 
 	hashString(h, "\x00deps\x00")
 	keys := make([]string, 0, len(deps))
@@ -280,7 +300,7 @@ func statBindingData(h hash.Hash, deps map[string]bool) {
 	if len(deps) == 0 {
 		return
 	}
-	gen := bindings.GeneratedRoot()
+	gen := GeneratedRoot()
 	pkgs := make([]string, 0, len(deps))
 	for p := range deps {
 		pkgs = append(pkgs, p)
@@ -304,5 +324,44 @@ func statGeneratedPackageBinding(h hash.Hash, langDir, pkg string) {
 func statStaticBindingData(h hash.Hash, root string) {
 	statVYQLTreeExcept(h, root, map[string]bool{
 		"packages/generated": true,
+	})
+}
+
+// statFile folds one file's path+size+mtime into h (skipped silently if it can't be stat'd).
+// The building block for fingerprinting a known, bounded file set without walking a tree.
+func statFile(h hash.Hash, path string) {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return
+	}
+	hashString(h, path)
+	fmt.Fprintf(h, "|%d|%d\x00", info.Size(), info.ModTime().UnixNano())
+}
+
+func statVYQLTreeExcept(h hash.Hash, root string, excludedRelDirs map[string]bool) {
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			rel, relErr := filepath.Rel(root, p)
+			if relErr == nil {
+				rel = filepath.ToSlash(rel)
+				if excludedRelDirs[rel] {
+					return filepath.SkipDir
+				}
+			}
+			return nil
+		}
+		if !strings.HasSuffix(p, ".vyql") {
+			return nil
+		}
+		info, e := d.Info()
+		if e != nil {
+			return nil
+		}
+		hashString(h, p)
+		fmt.Fprintf(h, "|%d|%d\x00", info.Size(), info.ModTime().UnixNano())
+		return nil
 	})
 }

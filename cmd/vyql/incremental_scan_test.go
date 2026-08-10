@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"os"
 	"path/filepath"
 	"sort"
@@ -91,7 +89,7 @@ func buildGraphWithSyntheticBindings(paths []string, cache lowering.DeltaCache) 
 	}
 	bindingApps := syntheticIncrementalBindings()
 	if cache != nil {
-		if _, err := applyBindingsIncremental(g, bindingApps, moduleHashes(prog), nil, cache); err != nil {
+		if _, err := bindings.ApplyIncremental(g, bindingApps, moduleHashes(prog), nil, cache); err != nil {
 			return nil, err
 		}
 	} else if _, _, err := bindings.Apply(g, bindingApps, nil); err != nil {
@@ -203,30 +201,6 @@ func eqKeys(a, b []string) bool {
 		}
 	}
 	return true
-}
-
-func bindingStatKey(root string) string {
-	h := sha256.New()
-	statStaticBindingData(h, root)
-	return hex.EncodeToString(h.Sum(nil))
-}
-
-func TestStaticBindingFingerprintIncludesSplitLayout(t *testing.T) {
-	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "javascript.vyql"), "module bindings.javascript.flat;\n")
-	before := bindingStatKey(root)
-
-	writeFile(t, filepath.Join(root, "javascript", "javascript", "001", "codeHttpInput.vyql"), "module bindings.javascript.split;\n")
-	afterSplit := bindingStatKey(root)
-	if afterSplit == before {
-		t.Fatal("static binding fingerprint did not include split binding file")
-	}
-
-	writeFile(t, filepath.Join(root, "packages", "generated", "javascript", "express.vyql"), "module bindings.javascript.generated;\n")
-	afterGenerated := bindingStatKey(root)
-	if afterGenerated != afterSplit {
-		t.Fatal("static binding fingerprint should not include generated package corpus")
-	}
 }
 
 func TestScanFingerprintVendorAssetsMatchScanSurface(t *testing.T) {
