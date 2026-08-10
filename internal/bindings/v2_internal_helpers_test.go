@@ -1,4 +1,4 @@
-package frontend
+package bindings
 
 import "github.com/vyprai/vyql/internal/parser"
 

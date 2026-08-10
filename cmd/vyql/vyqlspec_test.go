@@ -8,10 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	bindingapply "github.com/vyprai/vyql/internal/bindings"
+	"github.com/vyprai/vyql/internal/bindings"
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/engine"
-	"github.com/vyprai/vyql/internal/extract/frontend"
 	"github.com/vyprai/vyql/internal/ontology"
 	"github.com/vyprai/vyql/internal/parser"
 	"github.com/vyprai/vyql/internal/usg"
@@ -249,7 +248,7 @@ func TestVyqlSpecs(t *testing.T) {
 					// graph spec: build the asset/identity graph and evaluate the packs.
 					store := buildGraphStore(t, s)
 					if s.bindingsTech != "" {
-						if _, _, err := bindingapply.Apply(store, frontend.BindingsFor(s.bindingsTech), nil); err != nil {
+						if _, _, err := bindings.Apply(store, bindings.BindingsFor(s.bindingsTech), nil); err != nil {
 							t.Fatalf("apply %s bindings: %v", s.bindingsTech, err)
 						}
 					}
@@ -313,7 +312,7 @@ func TestVyqlSpecs(t *testing.T) {
 					// sources are active for this spec.
 					if s.profile != "" {
 						applyProfile([]string{dir}, s.profile)
-						defer frontend.SetActiveSources(nil)
+						defer bindings.SetActiveSources(nil)
 					}
 					found, _, scanGraph, err := scanPaths([]string{dir}, rules)
 					if err != nil {

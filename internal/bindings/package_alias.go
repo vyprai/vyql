@@ -1,4 +1,4 @@
-package frontend
+package bindings
 
 // packageImportAliases maps a distribution name to the import root it is used
 // under, for the cases where the two differ. A package absent here is imported

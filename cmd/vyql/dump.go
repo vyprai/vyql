@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/vyprai/vyql/internal/bindings"
-	"github.com/vyprai/vyql/internal/extract/frontend"
 	"github.com/vyprai/vyql/internal/extract/lowering"
 	"github.com/vyprai/vyql/internal/extract/nir"
 	"github.com/vyprai/vyql/internal/extract/parsecache"
@@ -73,7 +72,7 @@ func lowerCache() lowering.DeltaCache {
 }
 
 func buildGraphWithOptions(paths []string, cache lowering.DeltaCache, opts graphBuildOptions) (usg.Store, scanStats, error) {
-	restoreConcepts := frontend.SetActiveBindingConcepts(opts.BindingConcepts)
+	restoreConcepts := bindings.SetActiveBindingConcepts(opts.BindingConcepts)
 	defer restoreConcepts()
 
 	tk := newTimer()
@@ -102,7 +101,7 @@ func buildGraphWithOptions(paths []string, cache lowering.DeltaCache, opts graph
 			}
 			return nil, stats, nil
 		}
-		if _, _, err := bindings.Apply(g, frontend.AutoBindings(), nil); err != nil {
+		if _, _, err := bindings.Apply(g, bindings.AutoBindings(), nil); err != nil {
 			return nil, stats, err
 		}
 		tk.mark("sca+bindings")
@@ -130,12 +129,12 @@ func buildGraphWithOptions(paths []string, cache lowering.DeltaCache, opts graph
 	// Dynamic, dependency-gated package bindings: load the generated per-package catalog
 	// only for packages this project actually depends on, then apply alongside the static
 	// framework bindings.
-	deps := frontend.DependencyEvidence(g)
+	deps := bindings.DependencyEvidence(g)
 	for _, lang := range stats.languages {
-		bindingApps = append(bindingApps, frontend.GeneratedPackageBindingsFor(lang, deps)...)
+		bindingApps = append(bindingApps, bindings.GeneratedPackageBindingsFor(lang, deps)...)
 	}
 	if overlay := strings.TrimSpace(scanBindingOverlay); overlay != "" {
-		extra, err := frontend.OverlayBindings(overlay, stats.languages)
+		extra, err := bindings.OverlayBindings(overlay, stats.languages)
 		if err != nil {
 			return nil, stats, fmt.Errorf("binding overlay: %w", err)
 		}

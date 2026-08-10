@@ -1,4 +1,4 @@
-package frontend
+package bindings
 
 // Dynamic, dependency-gated package-binding loading.
 //
@@ -21,7 +21,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/vyprai/vyql/internal/bindings"
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/extract/sca"
 	"github.com/vyprai/vyql/internal/parser"
@@ -54,7 +53,7 @@ var generatedPackageIndex sync.Map // map[tech]map[lowercase stem]actual stem
 // Missing corpus remains non-fatal because the generated catalog augments a scan.
 // Present generated files must parse/lower successfully so SCA/CVE verification
 // cannot silently lose package coverage. Returns nil when nothing matches.
-func GeneratedPackageBindingsFor(tech string, deps map[string]bool) []bindings.Applicator {
+func GeneratedPackageBindingsFor(tech string, deps map[string]bool) []Applicator {
 	if len(deps) == 0 {
 		return nil
 	}

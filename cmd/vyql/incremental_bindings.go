@@ -9,7 +9,6 @@ import (
 
 	"github.com/vyprai/vyql/internal/bindings"
 	"github.com/vyprai/vyql/internal/datadir"
-	"github.com/vyprai/vyql/internal/extract/frontend"
 	"github.com/vyprai/vyql/internal/extract/lowering"
 	"github.com/vyprai/vyql/internal/extract/parsecache"
 	"github.com/vyprai/vyql/internal/usg"
@@ -250,9 +249,9 @@ func bindingFingerprint(deps map[string]bool) string {
 		}
 	}
 	hashString(h, "\x00sources\x00")
-	hashString(h, frontend.ActiveSourcesKey())
+	hashString(h, bindings.ActiveSourcesKey())
 	hashString(h, "\x00concepts\x00")
-	hashString(h, frontend.ActiveBindingConceptsKey())
+	hashString(h, bindings.ActiveBindingConceptsKey())
 
 	hashString(h, "\x00deps\x00")
 	keys := make([]string, 0, len(deps))
@@ -281,7 +280,7 @@ func statBindingData(h hash.Hash, deps map[string]bool) {
 	if len(deps) == 0 {
 		return
 	}
-	gen := frontend.GeneratedRoot()
+	gen := bindings.GeneratedRoot()
 	pkgs := make([]string, 0, len(deps))
 	for p := range deps {
 		pkgs = append(pkgs, p)

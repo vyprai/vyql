@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/internal/bindings"
-	"github.com/vyprai/vyql/internal/extract/frontend"
 	"github.com/vyprai/vyql/internal/extract/lowering"
 	"github.com/vyprai/vyql/internal/extract/nir"
 	"github.com/vyprai/vyql/internal/findings"
@@ -79,13 +78,13 @@ func TestCrossLanguageOneRule(t *testing.T) {
 	langs := []langSpec{
 		{"Python", "routes.py", "db.py",
 			func(loc string) nir.Expr { return httpRead("form", loc) },
-			"cursor", "execute", frontend.PythonBindings()},
+			"cursor", "execute", bindings.PythonBindings()},
 		{"JavaScript", "routes.js", "db.js",
 			func(loc string) nir.Expr { return attrRead("req", "body", loc) },
-			"conn", "query", frontend.JsBindings()},
+			"conn", "query", bindings.JsBindings()},
 		{"Ruby", "routes.rb", "db.rb",
 			func(loc string) nir.Expr { return subRead("params", loc) },
-			"connection", "execute", frontend.RubyBindings()},
+			"connection", "execute", bindings.RubyBindings()},
 	}
 	for _, l := range langs {
 		gBad, err := lowering.Lower(buildSQLiProgram(l, true), true)
@@ -127,7 +126,7 @@ func signature(t *testing.T, prog nir.Program) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := bindings.Apply(g, frontend.PythonBindings(), nil); err != nil {
+	if _, _, err := bindings.Apply(g, bindings.PythonBindings(), nil); err != nil {
 		t.Fatal(err)
 	}
 	fs := runRule(t, sqliRule, g)

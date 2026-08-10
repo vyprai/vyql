@@ -1,4 +1,4 @@
-package frontend
+package bindings
 
 import (
 	"os"
@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/internal/bindings"
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/extract/sca"
 	"github.com/vyprai/vyql/internal/ontology"
@@ -3093,7 +3092,7 @@ binding expressRoute {
 	applied.AddNode(usg.Node{ID: "post", Type: "code.Call", Props: map[string]string{
 		"loc": "app.js:8", "callee_path": "app.post", "method": "post", "tech": "javascript",
 	}})
-	if _, suppressed, err := bindings.Apply(applied, []bindings.Applicator{spec.matchPresenceApplicator()}, nil); err != nil {
+	if _, suppressed, err := Apply(applied, []Applicator{spec.matchPresenceApplicator()}, nil); err != nil {
 		t.Fatalf("apply fact binding: %v", err)
 	} else if len(suppressed) != 0 {
 		t.Fatalf("suppressed fact mappings: %+v", suppressed)

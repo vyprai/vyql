@@ -11,7 +11,6 @@ import (
 
 	"github.com/vyprai/vyql/internal/bindings"
 	"github.com/vyprai/vyql/internal/engine"
-	"github.com/vyprai/vyql/internal/extract/frontend"
 	"github.com/vyprai/vyql/internal/extract/lowering"
 	"github.com/vyprai/vyql/internal/findings"
 	"github.com/vyprai/vyql/internal/ontology"
@@ -172,7 +171,7 @@ func syntheticIncrementalBindings() []bindings.Applicator {
 }
 
 func syntheticSourceActive(concept string) bool {
-	key := frontend.ActiveSourcesKey()
+	key := bindings.ActiveSourcesKey()
 	if key == "*" {
 		return true
 	}
@@ -257,7 +256,7 @@ func TestScanFingerprintVendorAssetsMatchScanSurface(t *testing.T) {
 // under another must match a full scan under the new policy: cached labels from policy A must not
 // leak into a policy-B scan.
 func TestIncrementalFingerprintActiveSources(t *testing.T) {
-	defer frontend.SetActiveSources(nil)
+	defer bindings.SetActiveSources(nil)
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "app.py"), "def handler(value):\n    emit(value)\n")
 
@@ -268,9 +267,9 @@ func TestIncrementalFingerprintActiveSources(t *testing.T) {
 	for _, flip := range [][2]string{{"off", "on"}, {"on", "off"}} {
 		t.Run(flip[0]+"->"+flip[1], func(t *testing.T) {
 			cache := fakeDelta{}
-			frontend.SetActiveSources(policies[flip[0]])
+			bindings.SetActiveSources(policies[flip[0]])
 			_ = scanFindingKeys(t, []string{dir}, cache) // populate under source policy A
-			frontend.SetActiveSources(policies[flip[1]])
+			bindings.SetActiveSources(policies[flip[1]])
 			incr := scanFindingKeys(t, []string{dir}, cache) // reuse cache under source policy B
 			full := scanFindingKeys(t, []string{dir}, nil)   // full under source policy B
 			if !eqKeys(incr, full) {
@@ -288,8 +287,8 @@ func TestIncrementalScanFindings(t *testing.T) {
 	app := filepath.Join(dir, "app.py")
 	helper := filepath.Join(dir, "helper.py")
 
-	defer frontend.SetActiveSources(nil)
-	frontend.SetActiveSources(map[string]bool{"custom.Input": true})
+	defer bindings.SetActiveSources(nil)
+	bindings.SetActiveSources(map[string]bool{"custom.Input": true})
 
 	appSrc := "from helper import build_value\n" +
 		"def handler(value):\n" +
