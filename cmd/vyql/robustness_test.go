@@ -6,6 +6,7 @@ package main
 // a real repo. Drives every entry in the `languages` table (22 langs + config).
 
 import (
+	"github.com/vyprai/vyql/internal/extract/frontend"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,23 +34,23 @@ func robustnessInputs() map[string]string {
 
 func TestFrontendRobustness(t *testing.T) {
 	inputs := robustnessInputs()
-	for _, lg := range languages {
+	for _, lg := range frontend.Languages() {
 		lg := lg
 		// pick a deterministic extension for this language.
 		var ext string
-		for e := range lg.exts {
+		for e := range lg.Exts {
 			if ext == "" || e < ext {
 				ext = e
 			}
 		}
-		t.Run(lg.name, func(t *testing.T) {
+		t.Run(lg.Name, func(t *testing.T) {
 			for name, src := range inputs {
 				name, src := name, src
 				t.Run(name, func(t *testing.T) {
 					dir := t.TempDir()
 					// config frontend keys on filename — use a recognized manifest name.
 					fname := "snippet" + ext
-					if lg.name == "config" {
+					if lg.Name == "config" {
 						fname = "AndroidManifest.xml"
 					}
 					if err := os.WriteFile(filepath.Join(dir, fname), []byte(src), 0o644); err != nil {
@@ -58,11 +59,11 @@ func TestFrontendRobustness(t *testing.T) {
 					func() {
 						defer func() {
 							if r := recover(); r != nil {
-								t.Fatalf("frontend %q PANICKED on %q input: %v", lg.name, name, r)
+								t.Fatalf("frontend %q PANICKED on %q input: %v", lg.Name, name, r)
 							}
 						}()
-						if _, err := lg.extract([]string{filepath.Join(dir, fname)}, dir); err != nil {
-							t.Errorf("frontend %q errored on %q input (should degrade gracefully): %v", lg.name, name, err)
+						if _, err := lg.Extract([]string{filepath.Join(dir, fname)}, dir); err != nil {
+							t.Errorf("frontend %q errored on %q input (should degrade gracefully): %v", lg.Name, name, err)
 						}
 					}()
 				})
@@ -80,12 +81,12 @@ func FuzzFrontends(f *testing.F) {
 	}
 	f.Fuzz(func(t *testing.T, src string) {
 		dir := t.TempDir()
-		for _, lg := range languages {
-			if lg.name != "python" && lg.name != "javascript" {
+		for _, lg := range frontend.Languages() {
+			if lg.Name != "python" && lg.Name != "javascript" {
 				continue
 			}
 			ext := ".py"
-			if lg.name == "javascript" {
+			if lg.Name == "javascript" {
 				ext = ".js"
 			}
 			p := filepath.Join(dir, "f"+ext)
@@ -93,10 +94,10 @@ func FuzzFrontends(f *testing.F) {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						t.Fatalf("%s frontend panicked on fuzz input %q: %v", lg.name, src, r)
+						t.Fatalf("%s frontend panicked on fuzz input %q: %v", lg.Name, src, r)
 					}
 				}()
-				_, _ = lg.extract([]string{p}, dir)
+				_, _ = lg.Extract([]string{p}, dir)
 			}()
 		}
 	})

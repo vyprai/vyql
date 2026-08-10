@@ -480,16 +480,16 @@ func TestEveryLanguageHasATest(t *testing.T) {
 			}
 		}
 	}
-	for _, lg := range languages {
-		if specLangs[lg.name] {
+	for _, lg := range frontend.Languages() {
+		if specLangs[lg.Name] {
 			continue
 		}
-		if _, err := os.Stat(filepath.Join("testdata", "golden", lg.name+".golden")); err == nil {
+		if _, err := os.Stat(filepath.Join("testdata", "golden", lg.Name+".golden")); err == nil {
 			continue
 		}
-		t.Errorf("frontend %q has neither a .test.vyql spec nor a NIR golden — add a construct test", lg.name)
+		t.Errorf("frontend %q has neither a .test.vyql spec nor a NIR golden — add a construct test", lg.Name)
 	}
-	t.Logf("frontends: %d in table, %d covered by a spec", len(languages), len(specLangs))
+	t.Logf("frontends: %d in table, %d covered by a spec", len(frontend.Languages()), len(specLangs))
 }
 
 // T0.3 — every ontology threat reference resolves to a defined threat in the
@@ -1313,13 +1313,13 @@ func TestMigrationLedgerDoesNotCarryStaleV1BridgeSuggestions(t *testing.T) {
 }
 
 func sourceLanguagesForCoverage() []string {
-	out := make([]string, 0, len(languages))
-	for _, lg := range languages {
-		switch lg.name {
+	out := make([]string, 0, len(frontend.Languages()))
+	for _, lg := range frontend.Languages() {
+		switch lg.Name {
 		case "config", "textpattern":
 			continue
 		default:
-			out = append(out, lg.name)
+			out = append(out, lg.Name)
 		}
 	}
 	sort.Strings(out)
