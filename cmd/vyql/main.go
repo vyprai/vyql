@@ -599,7 +599,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	if cache != nil && syncCollector == nil && !needsGraph {
 		rkey = scanFingerprint(cache.Salt(), paths, ruleSources, prof.Name, opts.BindingOverlay, opts.Excludes)
 		if cs, ok := loadCachedScan(cache, rkey); ok {
-			all, stats, hit = cs.Findings, extract.Stats{Files: cs.Files, Languages: cs.Languages, Excluded: cs.Excluded, Unmatched: cs.Unmatched}, true
+			all, stats, hit = cs.Findings, statsFromCachedScan(cs), true
 		}
 	}
 	tk.Mark("fingerprint")

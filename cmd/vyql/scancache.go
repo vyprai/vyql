@@ -9,9 +9,13 @@ import (
 	"hash"
 	"io"
 	"io/fs"
+	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/extract"
@@ -86,7 +90,68 @@ func ruleSourcesKey(sources []parser.V2DefinitionSource) string {
 
 // statWalk folds each regular file's path, size, and mtime under root into h, in WalkDir's
 // deterministic lexical order. VCS/dependency dirs are skipped (they don't affect findings).
+//
+// The stats run concurrently and the fold stays sequential. This walk is on the warm path --
+// it runs before the lookup that is supposed to make a cached scan cheap -- and the data
+// directory alone holds thousands of files, most of them the generated package-binding
+// corpus. Measured on a warm scan of a small repository, the fingerprint phase was 31.8ms of
+// a 90ms run. Every file is still folded, in the same order, so the digest is unchanged; only
+// the waiting overlaps.
 func statWalk(h hash.Hash, root string) {
+	paths := walkFingerprintPaths(root)
+	type stamp struct {
+		size  int64
+		mtime int64
+		ok    bool
+	}
+	stamps := make([]stamp, len(paths))
+	workers := min(runtime.GOMAXPROCS(0), len(paths))
+	if workers > 1 {
+		var wg sync.WaitGroup
+		var next atomic.Int64
+		for range workers {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for {
+					i := int(next.Add(1)) - 1
+					if i >= len(paths) {
+						return
+					}
+					if info, err := os.Lstat(paths[i]); err == nil {
+						stamps[i] = stamp{info.Size(), info.ModTime().UnixNano(), true}
+					}
+				}
+			}()
+		}
+		wg.Wait()
+	} else {
+		for i, p := range paths {
+			if info, err := os.Lstat(p); err == nil {
+				stamps[i] = stamp{info.Size(), info.ModTime().UnixNano(), true}
+			}
+		}
+	}
+	// Folded in path order, so the digest does not depend on which worker finished first. A
+	// file that could not be stat'd is skipped, exactly as the sequential walk skipped it.
+	for i, p := range paths {
+		if !stamps[i].ok {
+			continue
+		}
+		hashString(h, p)
+		writeStamp(h, stamps[i].size, stamps[i].mtime)
+	}
+}
+
+// writeStamp folds one file's size and mtime, the conventional incremental-build change
+// signal: a stat rather than a read.
+func writeStamp(h hash.Hash, size, mtime int64) {
+	fmt.Fprintf(h, "|%d|%d\x00", size, mtime)
+}
+
+// walkFingerprintPaths lists the files statWalk folds, in WalkDir's lexical order.
+func walkFingerprintPaths(root string) []string {
+	var out []string
 	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -103,14 +168,10 @@ func statWalk(h hash.Hash, root string) {
 			}
 			return nil
 		}
-		info, e := d.Info()
-		if e != nil {
-			return nil
-		}
-		hashString(h, p)
-		fmt.Fprintf(h, "|%d|%d\x00", info.Size(), info.ModTime().UnixNano())
+		out = append(out, p)
 		return nil
 	})
+	return out
 }
 
 func vendorFingerprintDirShouldSkip(root, path string) bool {
@@ -158,8 +219,34 @@ func loadCachedScan(c *parsecache.Cache, key string) (cachedScan, bool) {
 // storeCachedScan persists a scan result under key.
 func storeCachedScan(c *parsecache.Cache, key string, all []*findings.Finding, stats extract.Stats) {
 	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(cachedScan{Findings: all, Files: stats.Files, Languages: stats.Languages, Excluded: stats.Excluded, Oversized: stats.Oversized, Unmatched: stats.Unmatched}); err != nil {
+	if err := gob.NewEncoder(&buf).Encode(cachedScanFrom(all, stats)); err != nil {
 		return
 	}
 	c.PutRaw("scan\x00"+key, buf.Bytes())
+}
+
+// cachedScanFrom and statsFromCachedScan are each other's inverse and sit next to each other
+// on purpose. They were a literal at the store site and a second literal at the replay site
+// in another file, and the two drifted: Oversized was added to one and not the other, so a
+// tree's first scan reported files skipped over the size ceiling and every cached scan after
+// it reported none.
+func cachedScanFrom(all []*findings.Finding, stats extract.Stats) cachedScan {
+	return cachedScan{
+		Findings:  all,
+		Files:     stats.Files,
+		Languages: stats.Languages,
+		Excluded:  stats.Excluded,
+		Oversized: stats.Oversized,
+		Unmatched: stats.Unmatched,
+	}
+}
+
+func statsFromCachedScan(cs cachedScan) extract.Stats {
+	return extract.Stats{
+		Files:     cs.Files,
+		Languages: cs.Languages,
+		Excluded:  cs.Excluded,
+		Oversized: cs.Oversized,
+		Unmatched: cs.Unmatched,
+	}
 }
