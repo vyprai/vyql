@@ -13,6 +13,7 @@ import (
 	"github.com/vyprai/vyql/internal/engine"
 	"github.com/vyprai/vyql/internal/ontology"
 	"github.com/vyprai/vyql/internal/parser"
+	"github.com/vyprai/vyql/internal/review"
 	"github.com/vyprai/vyql/internal/usg"
 )
 
@@ -271,7 +272,7 @@ func TestVyqlSpecs(t *testing.T) {
 							}
 						}
 					}
-					for _, row := range collectReviewItems(store) {
+					for _, row := range review.Collect(store) {
 						reviewed[row.Concept] = true
 					}
 					assertLabelSpecs(t, store, s.expectLabels, true)
@@ -331,7 +332,7 @@ func TestVyqlSpecs(t *testing.T) {
 						}
 					}
 					if len(s.expectReview) > 0 || len(s.rejectReview) > 0 {
-						for _, row := range collectReviewItems(scanGraph) {
+						for _, row := range review.Collect(scanGraph) {
 							reviewed[row.Concept] = true
 						}
 					}
