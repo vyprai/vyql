@@ -10,7 +10,40 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-08-10
+
+### Added
+
+- **`vyql cache clear` and `vyql cache path`.** The scan cache trusts size and
+  mtime like any build cache, so a content change preserving both is missed; the
+  source named `vyql cache clear` as the recovery path and the command did not
+  exist. `path` prints the directory this build would use, which is derived
+  rather than fixed, so "delete the cache" no longer requires guessing which one.
+
+- **Rolling a baseline forward.** `-baseline old.json -baseline-write next.json`
+  applies the old baseline and records the next one in a single scan, which is
+  what a default branch needs in order to gate on what is new while keeping its
+  suppression set current. The run reports and gates on what the old baseline
+  does not cover. The file it writes keeps the verdict and reason of every entry
+  carried over, records new findings below `-fail-on` as `accepted`, holds back
+  new findings that meet `-fail-on` so a failing build cannot silently absorb
+  them, and drops entries matching nothing in the current scan.
+
 ### Changed
+
+- **Interface dispatch no longer routes through every implementation.** The
+  abstract branch of call resolution documented that an interface method's
+  runtime target is unknown and the call must stay unresolved; the code
+  underneath routed through each concrete body instead. Because those bodies are
+  shared across call sites, that merged taint between unrelated callers. Making
+  the code match its documented behaviour removed the need for three OWASP
+  Benchmark class names that had been hardcoded into the shared resolver to work
+  around it.
+
+  Measured across 24 corpora: OWASP BenchmarkJava +1.00 and BenchmarkPython
+  +0.90 unchanged, 21 of 22 language ports at +1.00 unchanged, and on the 62-repo
+  RealVuln corpus **15 fewer false positives with recall unchanged**.
+
 - **Source files over 2 MiB are skipped by default.** A huge file that dodges
   every other filter explodes into a single enormous graph — and, for
   tree-sitter languages, a C parse tree several times the source size that the
@@ -26,7 +59,57 @@ behaviour change, even if no code moved.
   are vanishingly rare; generated artifacts of that size are common and were
   already the dominant cost of the scans that hit them.
 
+### Removed
+
+- **Baseline files are keyed differently and must be re-recorded.** A finding had
+  two identities: baseline files and `graph-json` hashed every binding's name and
+  location, while the text report, SARIF, Nexus and `vyql diff` used the identity
+  policy declared in `vyql/policies` — rule id, primary target location, primary
+  target concept. One scan therefore emitted two different ids for the same
+  finding, and the `fp=` you copied out of a report could never match a baseline
+  entry whenever a finding had more than one binding, which is most of them.
+
+  There is now one identity, the policy-declared one. Baseline files bump to
+  version 2; a version 1 file is rejected with instructions rather than silently
+  matching nothing, because failing open would un-suppress an entire triaged
+  backlog without saying so. **Re-record with `-baseline-write` after reviewing
+  the current findings** — a blind re-record accepts anything that appeared since
+  the file was written.
+
 ### Fixed
+
+- **A rebuild no longer replays the previous binary's analysis.** The incremental
+  lowering delta caches were keyed on file content and signature fingerprint, with
+  nothing identifying the build that wrote them, while every other cache namespace
+  folds in the executable's identity. After rebuilding with a change to lowering,
+  an unchanged file still hashed the same, both delta caches hit, and the replayed
+  graph was the one the previous binary produced — so new lowering code silently
+  did not run on unchanged files, which is every file on the scan right after a
+  rebuild. Only affects `-incremental-cache`.
+- **A rule using `can_access` no longer compiles into silence.** The parser
+  accepted the verb and the evaluator had no branch for it, so such a rule
+  compiled, ran, and reported nothing for the life of the pack. The verb is
+  wired up, and any solver verb the evaluator cannot answer is now a
+  rule-compile error rather than a permanent silent false. Same for `taint` in a
+  `where` clause.
+- **A SARIF document no longer contradicts itself.** Two severity-to-level
+  mappings disagreed on `low`: the result came out `note` while the rule's
+  default configuration came out `warning`, so a consumer filtering on either
+  field saw a different set. The location a consumer sees is also now the same
+  binding the fingerprint is built from; three copies of that selection rule
+  existed and did not agree.
+- **`--max-ram` stores a node faithfully.** The disk-backed graph dropped the
+  four inline hot properties (`method`, `callee_path`, `str_args`, `vkind`), so a
+  node put in did not come back out. Measured on 300 real files, findings were
+  identical either way because lowering compensates for stores that lack them —
+  but correctness should not depend on every producer remembering to. The store
+  also gained the structural epoch it was missing, without which every binding
+  applicator rebuilt its shared index from scratch, in the low-memory mode chosen
+  precisely because resources were tight.
+- **Cached deltas with trailing bytes are rejected** rather than merged as if
+  complete, and the graph size hint — gated on a store type that is never used,
+  so never written — now actually presizes the graph.
+
 - **`--max-ram` could authorise several times what it named.** The flag's
   budget was spent twice over — badger's caches and the on-heap node-detail
   buffer were each sized from the same figure — while the heap ceiling was only
@@ -56,17 +139,8 @@ behaviour change, even if no code moved.
   acceptance, and the run exited 0. The two flags are compared by resolved path,
   so an uncleaned spelling or a symlink is caught too.
 
-### Added
-- **Rolling a baseline forward.** `-baseline old.json -baseline-write next.json`
-  applies the old baseline and records the next one in a single scan, which is
-  what a default branch needs in order to gate on what is new while keeping its
-  suppression set current. The run reports and gates on what the old baseline
-  does not cover. The file it writes keeps the verdict and reason of every entry
-  carried over, records new findings below `-fail-on` as `accepted`, holds back
-  new findings that meet `-fail-on` so a failing build cannot silently absorb
-  them, and drops entries matching nothing in the current scan.
-
 ### Performance
+
 - **The `--max-ram` store no longer decodes node detail it holds in RAM.**
   Profiling showed 74.7% of all allocation — 51 GB on a ~5,900-file Java scan —
   in the graph's read path, decoding node-detail blobs and copying every string
