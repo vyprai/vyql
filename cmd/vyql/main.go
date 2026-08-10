@@ -758,22 +758,38 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 			syncPath, n, e, l, d)
 	}
 
+	// A run that only records is exempt from applying and from gating. What it
+	// just wrote covers every finding, so applying it would report an empty scan
+	// and leave the operator nothing to review, and failing on the backlog the
+	// flag exists to absorb would make adoption impossible in the pipeline that
+	// needs it. A run that also applies a baseline is not exempt: what it reports
+	// is exactly what that baseline did not already cover.
+	//
+	// The test is BaselinePath, not the entry count. A baseline file with no
+	// entries is still an applied baseline, and treating it as a recording run
+	// would silently disable the gate.
+	recordingOnly := opts.BaselineWrite != "" && opts.BaselinePath == ""
+
 	// Recording the current findings is how a team adopts the scanner on a
 	// codebase that already has a backlog. It happens before the report so a
 	// path that cannot be written fails the run outright: a report that implies
-	// the record was kept is worse than no report.
+	// the record was kept is worse than no report. The gate rank is withheld from
+	// an adoption run, whose whole purpose is to record the backlog including
+	// whatever meets the gate.
 	if opts.BaselineWrite != "" {
-		if err := writeBaseline(opts.BaselineWrite, all, opts.Baseline, 0); err != nil {
+		recordRank := opts.FailOnRank
+		if recordingOnly {
+			recordRank = 0
+		}
+		if err := writeBaseline(opts.BaselineWrite, all, opts.Baseline, recordRank); err != nil {
 			return err
 		}
 	}
 	// Applied before output and before the gate, so a run reports and fails on
-	// what is new rather than on what someone already looked at. A recording run
-	// skips this: what it just wrote covers every finding, so applying it would
-	// report an empty scan and leave the operator nothing to review.
+	// what is new rather than on what someone already looked at.
 	var covered []*findings.Finding
 	var staleBaseline []baselineEntry
-	if len(opts.Baseline) > 0 && opts.BaselineWrite == "" {
+	if opts.BaselinePath != "" {
 		all, covered, staleBaseline = applyBaseline(all, opts.Baseline)
 	}
 
@@ -841,10 +857,12 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	// Gating is the last thing that happens: the report is already on stdout, so
 	// a gated build still shows the operator what failed it.
 	//
-	// A recording run is exempt. Every finding it reported was just accepted into
+	// An adoption run is exempt. Every finding it reported was just accepted into
 	// the baseline, and failing the build on the backlog the flag exists to
-	// absorb would make adoption impossible in the pipeline that needs it.
-	if opts.FailOnRank > 0 && opts.BaselineWrite == "" {
+	// absorb would make adoption impossible in the pipeline that needs it. A run
+	// that also applies a baseline gates normally, because what it reported is
+	// what that baseline did not cover.
+	if opts.FailOnRank > 0 && !recordingOnly {
 		if n, highest := gateFindings(all, opts.FailOnRank); n > 0 {
 			return &thresholdMet{code: opts.ExitCode, count: n, highest: highest, failOn: opts.FailOnName}
 		}

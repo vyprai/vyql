@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -453,5 +454,144 @@ func TestWriteBaselineDropsPriorEntriesThatMatchNothing(t *testing.T) {
 	}
 	if len(got) != 1 {
 		t.Errorf("wrote %d entries, want 1", len(got))
+	}
+}
+
+// sarifFingerprints reads the fingerprints out of a SARIF report, which is how
+// these tests tell which findings a run actually reported.
+func sarifFingerprints(t *testing.T, out string) []string {
+	t.Helper()
+	var doc struct {
+		Runs []struct {
+			Results []struct {
+				PartialFingerprints map[string]string `json:"partialFingerprints"`
+			} `json:"results"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal([]byte(out), &doc); err != nil {
+		t.Fatalf("stdout is not SARIF: %v\n%s", err, out)
+	}
+	var fps []string
+	for _, r := range doc.Runs {
+		for _, res := range r.Results {
+			fps = append(fps, res.PartialFingerprints["vyqlFingerprint/v2"])
+		}
+	}
+	return fps
+}
+
+// Mode B, the whole point of the change: apply a baseline and record a new one in
+// the same run. Over an unchanged tree every finding is already covered, so the
+// run reports nothing, gates on nothing, and rolls the same set forward.
+func TestBaselineRollForwardReportsAndGatesOnWhatIsNew(t *testing.T) {
+	dir := writeVulnerablePy(t)
+	tmp := t.TempDir()
+	adopted := filepath.Join(tmp, "adopted.json")
+
+	if _, err := captureStdout(t, func() error {
+		return run([]string{dir}, "", "sarif", "auto", scanRunOptions{BaselineWrite: adopted})
+	}); err != nil {
+		t.Fatalf("adoption run errored: %v", err)
+	}
+	prior, err := loadBaseline(adopted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(prior) == 0 {
+		t.Fatal("adoption recorded nothing; the fixture produces no findings")
+	}
+
+	rank, err := parseFailOn("info")
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := filepath.Join(tmp, "next.json")
+	out, err := captureStdout(t, func() error {
+		return run([]string{dir}, "", "sarif", "auto", scanRunOptions{
+			Baseline:      prior,
+			BaselinePath:  adopted,
+			BaselineWrite: next,
+			FailOnRank:    rank,
+			FailOnName:    "info",
+			ExitCode:      1,
+		})
+	})
+	if err != nil {
+		t.Fatalf("roll forward gated on findings the baseline already covered: %v", err)
+	}
+	if fps := sarifFingerprints(t, out); len(fps) != 0 {
+		t.Errorf("reported %d finding(s); every one was covered by the baseline", len(fps))
+	}
+	rolled, err := loadBaseline(next)
+	if err != nil {
+		t.Fatalf("roll forward wrote no usable baseline: %v", err)
+	}
+	if len(rolled) != len(prior) {
+		t.Errorf("rolled %d entries forward from %d", len(rolled), len(prior))
+	}
+}
+
+// An applied baseline with no entries is still an applied baseline. Choosing the
+// mode on the entry count would call this a recording run, skip the gate, and
+// pass a build that should have failed. The action reaches this state on the
+// first roll forward after an adoption that found nothing.
+func TestBaselineRollForwardGatesWhenTheAppliedBaselineIsEmpty(t *testing.T) {
+	dir := writeVulnerablePy(t)
+	tmp := t.TempDir()
+	empty := filepath.Join(tmp, "empty.json")
+	if err := os.WriteFile(empty, []byte(`{"version":2,"entries":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := loadBaseline(empty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rank, err := parseFailOn("info")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = captureStdout(t, func() error {
+		return run([]string{dir}, "", "sarif", "auto", scanRunOptions{
+			Baseline:      loaded,
+			BaselinePath:  empty,
+			BaselineWrite: filepath.Join(tmp, "next.json"),
+			FailOnRank:    rank,
+			FailOnName:    "info",
+			ExitCode:      1,
+		})
+	})
+	var met *thresholdMet
+	if !errors.As(err, &met) {
+		t.Fatalf("an empty applied baseline disabled the gate; err = %v", err)
+	}
+}
+
+// Mode A is unchanged, and must stay so. Adoption exists to absorb a backlog
+// including its HIGHs, so the gate rank must not reach writeBaseline here.
+func TestBaselineAdoptionRecordsFindingsThatMeetTheGate(t *testing.T) {
+	dir := writeVulnerablePy(t)
+	p := filepath.Join(t.TempDir(), "adopted.json")
+	rank, err := parseFailOn("info")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := captureStdout(t, func() error {
+		return run([]string{dir}, "", "sarif", "auto", scanRunOptions{
+			BaselineWrite: p,
+			FailOnRank:    rank,
+			FailOnName:    "info",
+			ExitCode:      1,
+		})
+	})
+	if err != nil {
+		t.Fatalf("adoption gated on the backlog it exists to absorb: %v", err)
+	}
+	reported := sarifFingerprints(t, out)
+	adopted, err := loadBaseline(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(adopted) != len(reported) {
+		t.Errorf("adoption reported %d finding(s) but recorded %d", len(reported), len(adopted))
 	}
 }
