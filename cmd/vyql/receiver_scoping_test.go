@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vyprai/vyql/internal/extract"
 )
 
 // writeFixture materializes a throwaway project tree and returns its root.
@@ -31,7 +33,7 @@ func scanFixture(t *testing.T, dir string) []string {
 	if err != nil {
 		t.Fatalf("loadRules: %v", err)
 	}
-	fs, _, _, err := scanPathsWithProfileDemand([]string{dir}, allRules, "", true, graphBuildOptions{})
+	fs, _, _, err := scanPathsWithProfileDemand([]string{dir}, allRules, "", true, extract.Options{})
 	if err != nil {
 		t.Fatalf("scan: %v", err)
 	}

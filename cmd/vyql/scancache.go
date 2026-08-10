@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/vyprai/vyql/internal/datadir"
+	"github.com/vyprai/vyql/internal/extract"
 	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/internal/extract/parsecache"
 	"github.com/vyprai/vyql/internal/findings"
@@ -22,7 +23,8 @@ import (
 
 // cachedScan is the gob-serialized whole-scan result stored under a scan fingerprint, so an
 // unchanged repo (no source change AND no vyql/ data change) replays instantly instead of
-// re-running the pipeline. scanStats' fields are unexported, so its data is carried explicitly.
+// re-running the pipeline. The fields are spelled out rather than embedding extract.Stats so
+// the gob wire format is this file's to change.
 type cachedScan struct {
 	Findings  []*findings.Finding
 	Files     map[string]int
@@ -154,9 +156,9 @@ func loadCachedScan(c *parsecache.Cache, key string) (cachedScan, bool) {
 }
 
 // storeCachedScan persists a scan result under key.
-func storeCachedScan(c *parsecache.Cache, key string, all []*findings.Finding, stats scanStats) {
+func storeCachedScan(c *parsecache.Cache, key string, all []*findings.Finding, stats extract.Stats) {
 	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(cachedScan{Findings: all, Files: stats.files, Languages: stats.languages, Excluded: stats.excluded, Oversized: stats.oversized, Unmatched: stats.unmatched}); err != nil {
+	if err := gob.NewEncoder(&buf).Encode(cachedScan{Findings: all, Files: stats.Files, Languages: stats.Languages, Excluded: stats.Excluded, Oversized: stats.Oversized, Unmatched: stats.Unmatched}); err != nil {
 		return
 	}
 	c.PutRaw("scan\x00"+key, buf.Bytes())

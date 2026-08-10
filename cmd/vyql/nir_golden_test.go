@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vyprai/vyql/internal/extract"
 	"github.com/vyprai/vyql/internal/extract/lowering"
 )
 
@@ -37,7 +38,7 @@ func usgStructuralSummary(t *testing.T, ext, code string) string {
 	if err := os.WriteFile(filepath.Join(dir, "snippet"+ext), []byte(code), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	prog, _, ctorTypes, _, err := extractAll([]string{dir}, nil)
+	prog, _, ctorTypes, _, err := extract.All([]string{dir}, nil)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}

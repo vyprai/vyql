@@ -3,15 +3,17 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/vyprai/vyql/internal/extract"
 )
 
 func TestUnmatchedTotalSumsEveryKind(t *testing.T) {
-	s := scanStats{unmatched: map[string]int{".zig": 12, ".cob": 3}}
-	if got := s.unmatchedTotal(); got != 15 {
-		t.Errorf("unmatchedTotal = %d, want 15", got)
+	s := extract.Stats{Unmatched: map[string]int{".zig": 12, ".cob": 3}}
+	if got := s.UnmatchedTotal(); got != 15 {
+		t.Errorf("UnmatchedTotal = %d, want 15", got)
 	}
-	if got := (scanStats{}).unmatchedTotal(); got != 0 {
-		t.Errorf("empty unmatchedTotal = %d, want 0", got)
+	if got := (extract.Stats{}).UnmatchedTotal(); got != 0 {
+		t.Errorf("empty UnmatchedTotal = %d, want 0", got)
 	}
 }
 
@@ -39,30 +41,30 @@ func TestTopKindsSummarisesTheTail(t *testing.T) {
 // travel with them, the second scan of a tree would report the same findings
 // and quietly drop the warning that most of it was never read.
 func TestCachedScanCarriesCoverage(t *testing.T) {
-	stats := scanStats{
-		files:     map[string]int{"python": 1},
-		languages: []string{"python"},
-		excluded:  5,
-		unmatched: map[string]int{".zig": 12},
+	stats := extract.Stats{
+		Files:     map[string]int{"python": 1},
+		Languages: []string{"python"},
+		Excluded:  5,
+		Unmatched: map[string]int{".zig": 12},
 	}
 	cs := cachedScan{
 		Findings:  nil,
-		Files:     stats.files,
-		Languages: stats.languages,
-		Excluded:  stats.excluded,
-		Unmatched: stats.unmatched,
+		Files:     stats.Files,
+		Languages: stats.Languages,
+		Excluded:  stats.Excluded,
+		Unmatched: stats.Unmatched,
 	}
-	restored := scanStats{
-		files:     cs.Files,
-		languages: cs.Languages,
-		excluded:  cs.Excluded,
-		unmatched: cs.Unmatched,
+	restored := extract.Stats{
+		Files:     cs.Files,
+		Languages: cs.Languages,
+		Excluded:  cs.Excluded,
+		Unmatched: cs.Unmatched,
 	}
-	if restored.excluded != stats.excluded {
-		t.Errorf("excluded lost across the cache: %d != %d", restored.excluded, stats.excluded)
+	if restored.Excluded != stats.Excluded {
+		t.Errorf("excluded lost across the cache: %d != %d", restored.Excluded, stats.Excluded)
 	}
-	if restored.unmatchedTotal() != stats.unmatchedTotal() {
+	if restored.UnmatchedTotal() != stats.UnmatchedTotal() {
 		t.Errorf("unmatched lost across the cache: %d != %d",
-			restored.unmatchedTotal(), stats.unmatchedTotal())
+			restored.UnmatchedTotal(), stats.UnmatchedTotal())
 	}
 }

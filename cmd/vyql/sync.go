@@ -9,7 +9,7 @@ import (
 	"github.com/vyprai/vyql/internal/graphsync"
 )
 
-// syncCollector, when non-nil, makes buildGraphWithOptions assemble a graph-database change-feed
+// syncCollector, when non-nil, makes the scan pipeline assemble a graph-database change-feed
 // during the scan (per-module node/edge/label rows for the modules that changed).
 var syncCollector *graphsync.Collector
 
