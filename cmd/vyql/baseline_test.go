@@ -121,7 +121,7 @@ func TestWriteBaselineRoundTrips(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "b.json")
 	all := []*findings.Finding{fixture("VYQL-INJ-001", "a.py:1"), fixture("VYQL-INJ-002", "b.py:2")}
-	if err := writeBaseline(p, all); err != nil {
+	if err := writeBaseline(p, all, nil, 0); err != nil {
 		t.Fatalf("writeBaseline errored: %v", err)
 	}
 	loaded, err := loadBaseline(p)
@@ -280,12 +280,12 @@ func TestWriteBaselineIsDeterministic(t *testing.T) {
 	dir := t.TempDir()
 	all := []*findings.Finding{fixture("VYQL-B", "b.py:2"), fixture("VYQL-A", "a.py:1")}
 	p1, p2 := filepath.Join(dir, "1.json"), filepath.Join(dir, "2.json")
-	if err := writeBaseline(p1, all); err != nil {
+	if err := writeBaseline(p1, all, nil, 0); err != nil {
 		t.Fatal(err)
 	}
 	// Reversed input must produce the same file, or the baseline churns in git
 	// on every run and nobody can review a change to it.
-	if err := writeBaseline(p2, []*findings.Finding{all[1], all[0]}); err != nil {
+	if err := writeBaseline(p2, []*findings.Finding{all[1], all[0]}, nil, 0); err != nil {
 		t.Fatal(err)
 	}
 	a, _ := os.ReadFile(p1)
@@ -345,5 +345,113 @@ func TestSameFileHandlesAPathThatDoesNotExist(t *testing.T) {
 	}
 	if sameFile(absent, filepath.Join(dir, "other.json")) {
 		t.Error("two different missing paths were treated as the same file")
+	}
+}
+
+// A roll forward must not flatten triage. An entry someone marked
+// false-positive, and the reasoning that got it there, has to come out the other
+// side unchanged; otherwise every push erases a little more of the review that
+// made the baseline worth trusting.
+func TestWriteBaselineCarriesPriorVerdicts(t *testing.T) {
+	kept := fixture("VYQL-INJ-001", "a.py:1")
+	fp := resultpolicy.Fingerprint(kept)
+	prior := map[string]baselineEntry{
+		fp: {FP: fp, Verdict: verdictFalsePositive, Reason: "source is a constant"},
+	}
+	p := filepath.Join(t.TempDir(), "next.json")
+
+	if err := writeBaseline(p, []*findings.Finding{kept}, prior, 0); err != nil {
+		t.Fatalf("writeBaseline errored: %v", err)
+	}
+	got, err := loadBaseline(p)
+	if err != nil {
+		t.Fatalf("wrote a baseline that will not load: %v", err)
+	}
+	if got[fp].Verdict != verdictFalsePositive {
+		t.Errorf("verdict = %q, want %q", got[fp].Verdict, verdictFalsePositive)
+	}
+	if got[fp].Reason != "source is a constant" {
+		t.Errorf("reason = %q, want it carried over", got[fp].Reason)
+	}
+}
+
+// The rule that stops a failure healing itself. A finding new to this run that
+// meets the gate is failing the build; recording it would leave the next run
+// green with the finding absorbed and nobody told.
+func TestWriteBaselineOmitsNewFindingsThatMeetTheGate(t *testing.T) {
+	gating := fixture("VYQL-INJ-002", "b.py:2") // fixture() builds these at "high"
+	quiet := fixture("VYQL-INJ-003", "c.py:3")
+	quiet.Severity = "low"
+	high, err := parseFailOn("high")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(t.TempDir(), "next.json")
+
+	if err := writeBaseline(p, []*findings.Finding{gating, quiet}, nil, high); err != nil {
+		t.Fatalf("writeBaseline errored: %v", err)
+	}
+	got, err := loadBaseline(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got[resultpolicy.Fingerprint(gating)]; ok {
+		t.Error("a new HIGH that meets the gate was recorded")
+	}
+	if _, ok := got[resultpolicy.Fingerprint(quiet)]; !ok {
+		t.Error("a new LOW below the gate was not recorded")
+	}
+}
+
+// A finding the applied baseline already covers was filtered out before the gate
+// ever saw it, so it keeps rolling forward at any severity. Without this, an
+// accepted HIGH would drop out of the baseline and resurrect on the next run.
+func TestWriteBaselineCarriesAcceptedFindingsThatMeetTheGate(t *testing.T) {
+	acceptedHigh := fixture("VYQL-INJ-001", "a.py:1")
+	fp := resultpolicy.Fingerprint(acceptedHigh)
+	prior := map[string]baselineEntry{
+		fp: {FP: fp, Verdict: verdictAccepted, Reason: "tracked in the backlog"},
+	}
+	high, err := parseFailOn("high")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(t.TempDir(), "next.json")
+
+	if err := writeBaseline(p, []*findings.Finding{acceptedHigh}, prior, high); err != nil {
+		t.Fatalf("writeBaseline errored: %v", err)
+	}
+	got, err := loadBaseline(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got[fp]; !ok {
+		t.Error("an already-accepted HIGH was dropped from the roll")
+	}
+}
+
+// A suppression that outlives the code it excused is the hazard these files
+// carry. The roll drops it: only findings the scan actually produced are written.
+func TestWriteBaselineDropsPriorEntriesThatMatchNothing(t *testing.T) {
+	present := fixture("VYQL-INJ-001", "a.py:1")
+	fp := resultpolicy.Fingerprint(present)
+	prior := map[string]baselineEntry{
+		fp:                 {FP: fp, Verdict: verdictAccepted},
+		"deadbeefdeadbeef": {FP: "deadbeefdeadbeef", Verdict: verdictAccepted, Rule: "VYQL-OLD-001", Loc: "gone.py:9"},
+	}
+	p := filepath.Join(t.TempDir(), "next.json")
+
+	if err := writeBaseline(p, []*findings.Finding{present}, prior, 0); err != nil {
+		t.Fatal(err)
+	}
+	got, err := loadBaseline(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got["deadbeefdeadbeef"]; ok {
+		t.Error("an entry matching nothing in this scan was carried forward")
+	}
+	if len(got) != 1 {
+		t.Errorf("wrote %d entries, want 1", len(got))
 	}
 }

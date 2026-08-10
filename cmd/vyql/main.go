@@ -763,7 +763,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	// path that cannot be written fails the run outright: a report that implies
 	// the record was kept is worse than no report.
 	if opts.BaselineWrite != "" {
-		if err := writeBaseline(opts.BaselineWrite, all); err != nil {
+		if err := writeBaseline(opts.BaselineWrite, all, opts.Baseline, 0); err != nil {
 			return err
 		}
 	}
