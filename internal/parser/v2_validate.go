@@ -179,6 +179,29 @@ func (s v2ModelScope) lookupThreat(name string) bool {
 	return s.globalThreats[name]
 }
 
+// RuleVerbKinds is the concept-kind contract of one rule verb: which kinds may appear as its
+// source endpoint and which as its target. Exported because the engine type-checks the same
+// contract when it compiles a rule, and used to hold a second hand-maintained copy of this table
+// in a different shape -- two statements of one policy, free to drift apart silently.
+//
+// This being Go at all is a known deviation: the language has a `mechanic ruleVerb` declaration
+// for exactly this, but ruleVerbMechanicsFromDecls skips any authored decl whose name collides
+// with a builtin, so the authored surface cannot currently change the policy. Until that is
+// resolved, one Go table is strictly better than two.
+type RuleVerbKinds struct {
+	From []string
+	To   []string
+}
+
+// BuiltinRuleVerbKinds returns the kind contract for every builtin rule verb.
+func BuiltinRuleVerbKinds() map[string]RuleVerbKinds {
+	out := map[string]RuleVerbKinds{}
+	for verb, m := range builtinV2RuleVerbMechanics() {
+		out[verb] = RuleVerbKinds{From: m.FromKinds, To: m.ToKinds}
+	}
+	return out
+}
+
 func builtinV2RuleVerbMechanics() map[string]v2RuleVerbMechanic {
 	clauses := v2StringSet([]string{"where", "coveredBy", "confidence", "profile"})
 	return map[string]v2RuleVerbMechanic{
