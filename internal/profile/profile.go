@@ -39,12 +39,20 @@ func (p Profile) ActiveSources() map[string]bool {
 	}
 	out := map[string]bool{}
 	for _, e := range p.Entrypoints {
-		if strings.Contains(e, ".") {
-			// already qualified
-		} else if e == "UserControlledData" {
-			e = "core." + e
-		} else {
-			e = "code." + e
+		// Entrypoints are ontology concepts and must be written qualified. This used to guess a
+		// namespace for a bare name -- "code." for everything, with a hand-written exception for
+		// UserControlledData, which is "core.". That exception is the tell: the guess had already
+		// been wrong once, and the next concept authored bare in another namespace would have
+		// been misqualified the same silent way, resolving to nothing and switching off a source
+		// family without a word. Deciding what namespace a bare concept lives in is the
+		// ontology's business, not a profile's.
+		//
+		// Every one of the 100 entrypoints across the shipped profiles is already qualified, so
+		// this rejects nothing that exists today; it stops a future bare name from being guessed
+		// at.
+		if !strings.Contains(e, ".") {
+			fmt.Fprintf(os.Stderr, "vyql: profile %q: entrypoint %q is not a qualified concept (e.g. code.HttpInput); ignoring\n", p.Name, e)
+			continue
 		}
 		out[e] = true
 	}
