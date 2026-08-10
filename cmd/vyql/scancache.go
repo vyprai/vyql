@@ -43,7 +43,7 @@ type cachedScan struct {
 // error, so there is no failure here to handle.
 func hashString(h hash.Hash, s string) { _, _ = io.WriteString(h, s) }
 
-func scanFingerprint(salt []byte, paths []string, ruleSources []parser.V2DefinitionSource, profile string) string {
+func scanFingerprint(salt []byte, paths []string, ruleSources []parser.V2DefinitionSource, profile, overlay string, excludes []string) string {
 	h := sha256.New()
 	h.Write(salt)
 	hashString(h, "\x00rules\x00")
@@ -52,11 +52,11 @@ func scanFingerprint(salt []byte, paths []string, ruleSources []parser.V2Definit
 	hashString(h, profile)
 	hashString(h, "\x00data\x00")
 	statWalk(h, datadir.Root())
-	if overlay := scanBindingOverlay; overlay != "" {
+	if overlay != "" {
 		hashString(h, "\x00binding-overlay\x00")
 		statWalk(h, overlay)
 	}
-	for _, ex := range scanExcludes {
+	for _, ex := range excludes {
 		hashString(h, "\x00exclude\x00")
 		hashString(h, ex)
 	}

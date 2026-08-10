@@ -123,7 +123,7 @@ func TestExtractAllSupportsJavaScriptModules(t *testing.T) {
 		t.Fatalf("write source: %v", err)
 	}
 
-	_, _, _, stats, err := extractAll([]string{src})
+	_, _, _, stats, err := extractAll([]string{src}, nil)
 	if err != nil {
 		t.Fatalf("extractAll .mjs: %v", err)
 	}
@@ -157,7 +157,7 @@ class ChromePool:
 		t.Fatalf("write extensionless python source: %v", err)
 	}
 
-	prog, _, _, stats, err := extractAll([]string{dir})
+	prog, _, _, stats, err := extractAll([]string{dir}, nil)
 	if err != nil {
 		t.Fatalf("extractAll extensionless python: %v", err)
 	}
@@ -230,7 +230,7 @@ func TestExtractAllSupportsVueSingleFileComponents(t *testing.T) {
 		t.Fatalf("write source: %v", err)
 	}
 
-	prog, _, _, stats, err := extractAll([]string{src})
+	prog, _, _, stats, err := extractAll([]string{src}, nil)
 	if err != nil {
 		t.Fatalf("extractAll .vue: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestExtractAllSupportsHtmlInlineScripts(t *testing.T) {
 		t.Fatalf("write source: %v", err)
 	}
 
-	prog, _, _, stats, err := extractAll([]string{src})
+	prog, _, _, stats, err := extractAll([]string{src}, nil)
 	if err != nil {
 		t.Fatalf("extractAll .html: %v", err)
 	}
@@ -268,7 +268,7 @@ func TestExtractAllIgnoresHtmlScriptsInsideComments(t *testing.T) {
 		t.Fatalf("write source: %v", err)
 	}
 
-	prog, _, _, stats, err := extractAll([]string{src})
+	prog, _, _, stats, err := extractAll([]string{src}, nil)
 	if err != nil {
 		t.Fatalf("extractAll commented .html: %v", err)
 	}
@@ -287,7 +287,7 @@ func TestExtractAllSupportsERBRubyIslands(t *testing.T) {
 		t.Fatalf("write source: %v", err)
 	}
 
-	prog, _, _, stats, err := extractAll([]string{src})
+	prog, _, _, stats, err := extractAll([]string{src}, nil)
 	if err != nil {
 		t.Fatalf("extractAll .erb: %v", err)
 	}
@@ -309,7 +309,7 @@ func TestExtractAllSupportsPHPIncludes(t *testing.T) {
 		t.Fatalf("write source: %v", err)
 	}
 
-	prog, _, _, stats, err := extractAll([]string{src})
+	prog, _, _, stats, err := extractAll([]string{src}, nil)
 	if err != nil {
 		t.Fatalf("extractAll .inc: %v", err)
 	}
@@ -328,7 +328,7 @@ func TestExtractAllSupportsDrupalPHPExtensions(t *testing.T) {
 		if err := os.WriteFile(src, []byte("<?php function helper($p) { echo $p; }\n"), 0o600); err != nil {
 			t.Fatalf("write %s source: %v", ext, err)
 		}
-		prog, _, _, stats, err := extractAll([]string{src})
+		prog, _, _, stats, err := extractAll([]string{src}, nil)
 		if err != nil {
 			t.Fatalf("extractAll %s: %v", ext, err)
 		}
@@ -348,7 +348,7 @@ func TestExtractAllSupportsPerlXSAsC(t *testing.T) {
 		t.Fatalf("write source: %v", err)
 	}
 
-	prog, _, _, stats, err := extractAll([]string{src})
+	prog, _, _, stats, err := extractAll([]string{src}, nil)
 	if err != nil {
 		t.Fatalf("extractAll .xs: %v", err)
 	}
@@ -383,7 +383,7 @@ int c_header_helper(char *value);
 		t.Fatalf("write c header: %v", err)
 	}
 
-	_, _, _, stats, err := extractAll([]string{dir})
+	_, _, _, stats, err := extractAll([]string{dir}, nil)
 	if err != nil {
 		t.Fatalf("extractAll headers: %v", err)
 	}

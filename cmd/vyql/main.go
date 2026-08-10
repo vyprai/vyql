@@ -241,12 +241,6 @@ func cmdScan(args []string) error {
 	defer cleanup()
 	cacheCleanup := applyScanCache(*cacheDir)
 	defer cacheCleanup()
-	oldOverlay := scanBindingOverlay
-	scanBindingOverlay = strings.TrimSpace(*bindingOverlay)
-	defer func() { scanBindingOverlay = oldOverlay }()
-	oldExcludes := scanExcludes
-	scanExcludes = parseExcludes(*exclude)
-	defer func() { scanExcludes = oldExcludes }()
 	if v := strings.TrimSpace(*maxFileSize); v != "" {
 		ceiling, err := parseBytes(v)
 		if err != nil || ceiling < 0 {
@@ -257,20 +251,22 @@ func cmdScan(args []string) error {
 		defer treesitter.SetMaxFileBytes(oldCeiling)
 	}
 	return run(paths, *rulesPath, *format, *profileName, scanRunOptions{
-		ShowStats:     *stats,
-		IncludeFlags:  *allResults,
-		FlagsOnly:     *flagsOnly,
-		FlagCategory:  *flagCategory,
-		FlagKind:      *flagKind,
-		FlagLoc:       *flagLoc,
-		GraphCache:    *incrementalCache,
-		FailOnRank:    failOnRank,
-		FailOnName:    strings.ToLower(strings.TrimSpace(*failOn)),
-		ExitCode:      *exitCode,
-		ShowCoverage:  *coverage,
-		Baseline:      baselineEntries,
-		BaselinePath:  *baseline,
-		BaselineWrite: *baselineWrite,
+		BindingOverlay: strings.TrimSpace(*bindingOverlay),
+		Excludes:       parseExcludes(*exclude),
+		ShowStats:      *stats,
+		IncludeFlags:   *allResults,
+		FlagsOnly:      *flagsOnly,
+		FlagCategory:   *flagCategory,
+		FlagKind:       *flagKind,
+		FlagLoc:        *flagLoc,
+		GraphCache:     *incrementalCache,
+		FailOnRank:     failOnRank,
+		FailOnName:     strings.ToLower(strings.TrimSpace(*failOn)),
+		ExitCode:       *exitCode,
+		ShowCoverage:   *coverage,
+		Baseline:       baselineEntries,
+		BaselinePath:   *baseline,
+		BaselineWrite:  *baselineWrite,
 	})
 }
 
@@ -412,10 +408,10 @@ func scanPaths(paths []string, ruleSources []parser.V2DefinitionSource) ([]*find
 }
 
 func scanPathsWithProfile(paths []string, ruleSources []parser.V2DefinitionSource, profileName string) ([]*findings.Finding, scanStats, usg.Store, error) {
-	return scanPathsWithProfileDemand(paths, ruleSources, profileName, false)
+	return scanPathsWithProfileDemand(paths, ruleSources, profileName, false, graphBuildOptions{})
 }
 
-func scanPathsWithProfileDemand(paths []string, ruleSources []parser.V2DefinitionSource, profileName string, pruneBindings bool) ([]*findings.Finding, scanStats, usg.Store, error) {
+func scanPathsWithProfileDemand(paths []string, ruleSources []parser.V2DefinitionSource, profileName string, pruneBindings bool, build graphBuildOptions) ([]*findings.Finding, scanStats, usg.Store, error) {
 	rules, err := compiledRulesFor(ruleSources)
 	if err != nil {
 		return nil, scanStats{}, nil, err
@@ -424,7 +420,8 @@ func scanPathsWithProfileDemand(paths []string, ruleSources []parser.V2Definitio
 	if pruneBindings {
 		bindingConcepts = activeRuleBindingConcepts(rules, profileName)
 	}
-	g, stats, err := buildGraphWithOptions(paths, lowerCache(), graphBuildOptions{BindingConcepts: bindingConcepts})
+	build.BindingConcepts = bindingConcepts
+	g, stats, err := buildGraphWithOptions(paths, lowerCache(), build)
 	if err != nil {
 		return nil, stats, nil, err
 	}
@@ -669,6 +666,11 @@ type compiledRulesCacheKey struct {
 }
 
 type scanRunOptions struct {
+	// BindingOverlay and Excludes travel with the run rather than in package-level variables the
+	// pipeline reads behind the caller's back.
+	BindingOverlay string
+	Excludes       []string
+
 	ShowStats    bool
 	IncludeFlags bool
 	FlagsOnly    bool
@@ -729,7 +731,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	// only exist while the graph is retained.
 	needsGraph := wantsFlags || format == "graph-json" || opts.ShowStats
 	if cache != nil && syncCollector == nil && !needsGraph {
-		rkey = scanFingerprint(cache.Salt(), paths, ruleSources, prof.Name)
+		rkey = scanFingerprint(cache.Salt(), paths, ruleSources, prof.Name, opts.BindingOverlay, opts.Excludes)
 		if cs, ok := loadCachedScan(cache, rkey); ok {
 			all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages, excluded: cs.Excluded, unmatched: cs.Unmatched}, true
 		}
@@ -740,10 +742,10 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 			func() {
 				restore := parsecache.SetShared(nil)
 				defer restore()
-				all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !needsGraph)
+				all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !needsGraph, graphBuildOptions{BindingOverlay: opts.BindingOverlay, Excludes: opts.Excludes})
 			}()
 		} else {
-			all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !needsGraph)
+			all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !needsGraph, graphBuildOptions{BindingOverlay: opts.BindingOverlay, Excludes: opts.Excludes})
 		}
 		if err != nil {
 			return err

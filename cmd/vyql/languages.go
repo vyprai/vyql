@@ -38,7 +38,7 @@ func (s scanStats) unmatchedTotal() int {
 // extractAll routes every path to the right frontend(s), merges into one NIR
 // Program, and returns the union of binding applicators + constructor→type
 // tables for the languages present.
-func extractAll(paths []string) (nir.Program, []bindings.Applicator, map[string]string, scanStats, error) {
+func extractAll(paths []string, excludes []string) (nir.Program, []bindings.Applicator, map[string]string, scanStats, error) {
 	var prog nir.Program
 	present := map[string]bool{}
 	stats := scanStats{files: map[string]int{}, unmatched: map[string]int{}}
@@ -75,10 +75,10 @@ func extractAll(paths []string) (nir.Program, []bindings.Applicator, map[string]
 			root = filepath.Dir(p)
 			entries = []treesitter.Entry{{Path: p, Ext: strings.ToLower(filepath.Ext(p)), Base: strings.ToLower(filepath.Base(p))}}
 		}
-		if len(scanExcludes) > 0 {
+		if len(excludes) > 0 {
 			kept := entries[:0]
 			for _, e := range entries {
-				if !pathHasExcludedSegment(e.Path, scanExcludes) {
+				if !pathHasExcludedSegment(e.Path, excludes) {
 					kept = append(kept, e)
 				}
 			}
