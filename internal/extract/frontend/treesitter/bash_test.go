@@ -6,6 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	// Registers the source-variable lookup the shell frontends consult. Loading that
+	// data is binding-layer work and lives in the parent package, so a test of the
+	// extractor in isolation has to link it -- and doing so proves the wiring.
+	_ "github.com/vyprai/vyql/internal/extract/frontend"
 	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/internal/extract/nir"
 )
