@@ -316,10 +316,25 @@ gating on the backlog the flag exists to absorb would leave you unable to adopt
 the scanner in the pipeline that needs it. It does fail, before printing
 anything, if the baseline cannot be written.
 
-Recording over a baseline you are also applying is refused: `-baseline` with
-`-baseline-write` is an error. Recording writes every finding as `accepted` with
-an empty reason, so it would overwrite the verdicts you triaged. Re-record to a
-new path and diff it.
+**Rolling a baseline forward.** Give both flags, with different paths, and the
+run applies the old baseline and records the next one:
+
+```sh
+vyql scan -baseline .vyql-baseline.json -baseline-write next.json .
+```
+
+This run reports and gates on what the old baseline does not cover, because that
+is what is new. The file it writes carries three things: every finding the old
+baseline covered, keeping its verdict and reason, so triage survives the roll;
+every new finding below `-fail-on`, as `accepted`; and nothing else. A new
+finding that meets `-fail-on` is deliberately left out — recording what just
+failed the build would leave the next run green with the finding absorbed and
+nobody told. Entries in the old baseline that match no current finding are
+dropped, so a rolled baseline sheds suppressions whose code is gone.
+
+Pointing both flags at the same file is refused. Recording writes every finding
+as `accepted` with an empty reason, so it would overwrite the verdicts you
+triaged. Record to a different path and diff it.
 
 Baselined findings are kept out of both the report and the gate. Anything not in
 the file is new and reported normally.

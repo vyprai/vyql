@@ -45,14 +45,26 @@ behaviour change, even if no code moved.
   the run: no SARIF, no JSON, no text report, no coverage, no stats. A CI job
   adopting the scanner had to choose between recording a baseline and publishing
   results for that run, and nobody could see what had just been accepted on their
-  behalf. The recording run now prints its findings in the requested format. It
-  does not fail the build — everything it reported was accepted a moment earlier —
-  and it still fails outright, before printing, if the baseline cannot be written.
-- **`-baseline` with `-baseline-write` is rejected.** The combination was
-  accepted and the loaded baseline silently ignored. Recording writes every
-  finding as `accepted` with an empty reason, so aiming it at a file you had
-  triaged replaced those verdicts and their reasoning with a blank acceptance,
-  and the run exited 0. Re-record to a new path and diff it.
+  behalf. The recording run now prints its findings in the requested format. An
+  adoption run — `-baseline-write` with no `-baseline` — does not fail the build,
+  because everything it reported was accepted a moment earlier, and it still
+  fails outright, before printing, if the baseline cannot be written.
+- **`-baseline` pointed at the file `-baseline-write` records is rejected.** The
+  combination was accepted and the loaded baseline silently ignored. Recording
+  writes every finding as `accepted` with an empty reason, so aiming it at a file
+  you had triaged replaced those verdicts and their reasoning with a blank
+  acceptance, and the run exited 0. The two flags are compared by resolved path,
+  so an uncleaned spelling or a symlink is caught too.
+
+### Added
+- **Rolling a baseline forward.** `-baseline old.json -baseline-write next.json`
+  applies the old baseline and records the next one in a single scan, which is
+  what a default branch needs in order to gate on what is new while keeping its
+  suppression set current. The run reports and gates on what the old baseline
+  does not cover. The file it writes keeps the verdict and reason of every entry
+  carried over, records new findings below `-fail-on` as `accepted`, holds back
+  new findings that meet `-fail-on` so a failing build cannot silently absorb
+  them, and drops entries matching nothing in the current scan.
 
 ### Performance
 - **The `--max-ram` store no longer decodes node detail it holds in RAM.**
