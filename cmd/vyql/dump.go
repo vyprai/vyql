@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/vyprai/vyql/internal/extract/sca"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -86,7 +87,7 @@ func buildGraphWithOptions(paths []string, cache lowering.DeltaCache, opts graph
 	// unparseable — so run SCA before concluding there is nothing to report.
 	if len(prog.Modules) == 0 {
 		g := usg.NewInMemStore()
-		applySCA(g, paths)
+		sca.Apply(g, paths)
 		nodes, err := g.AllNodes()
 		if err != nil {
 			return nil, stats, err
@@ -124,7 +125,7 @@ func buildGraphWithOptions(paths []string, cache lowering.DeltaCache, opts graph
 	tk.mark("lower")
 	// SCA runs before binding apply so SBOM/manifest packages join the import evidence
 	// that gates package-aware bindings (the generated catalog included).
-	applySCA(g, paths)
+	sca.Apply(g, paths)
 	// Dynamic, dependency-gated package bindings: load the generated per-package catalog
 	// only for packages this project actually depends on, then apply alongside the static
 	// framework bindings.
