@@ -1,8 +1,9 @@
 package engine
 
 import (
-	"github.com/vyprai/vyql/internal/usg"
 	"testing"
+
+	"github.com/vyprai/vyql/internal/usg"
 )
 
 func nFlow(t *testing.T, labels map[string]string, edges [][2]string) int {

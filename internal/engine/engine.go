@@ -30,6 +30,7 @@ type Engine struct {
 	nodesByConcept         map[string][]string
 	reviewByNodeConcept    map[string][]findings.ReviewCondition
 	contextBySink          map[string][]string
+	factsBySink            map[string]findings.ContextFacts
 	contextConfirmByTarget map[string][]string
 	flowGuards             map[string][]string
 	dominanceGuards        map[string][]string
@@ -302,6 +303,12 @@ func mergeWhere(existing, next parser.Expr) parser.Expr {
 // crossDomainContext surfaces ontology-configured graph context around a finding.
 // Concepts define which sink properties point to related graph nodes and how
 // evidence should be rendered; the engine only follows those links.
+// crossDomainFacts is the typed form of crossDomainContext, populated by the same pass.
+func (e *Engine) crossDomainFacts(sinkID string) findings.ContextFacts {
+	e.crossDomainContext(sinkID)
+	return e.factsBySink[sinkID]
+}
+
 func (e *Engine) crossDomainContext(sinkID string) []string {
 	if ctx, ok := e.contextBySink[sinkID]; ok {
 		return append([]string(nil), ctx...)
@@ -311,6 +318,7 @@ func (e *Engine) crossDomainContext(sinkID string) []string {
 		return nil
 	}
 	var ctx []string
+	var facts findings.ContextFacts
 	for _, src := range e.contextReachSources() {
 		target := n.Prop(src.TargetProp)
 		if target == "" {
@@ -327,8 +335,12 @@ func (e *Engine) crossDomainContext(sinkID string) []string {
 				via = h[len(h)-1].Rule
 			}
 			line := target + " is " + src.Label + " (via " + via + ")"
+			facts.InternetReachable = true
+			facts.ReachWitness = line
 			for _, label := range e.contextConfirmations(target) {
 				line += " — " + label
+				facts.RuntimeConfirmed = true
+				facts.ConfirmWitness = line
 			}
 			ctx = append(ctx, line)
 		}
@@ -345,10 +357,17 @@ func (e *Engine) crossDomainContext(sinkID string) []string {
 			continue
 		}
 		if kinds := sortedSet(e.assetKinds(target)); len(kinds) > 0 {
-			ctx = append(ctx, renderContextLabel(ac.Label, target, kinds))
+			line := renderContextLabel(ac.Label, target, kinds)
+			facts.HoldsAsset = true
+			facts.AssetWitness = line
+			ctx = append(ctx, line)
 		}
 	}
 	e.contextBySink[sinkID] = append([]string(nil), ctx...)
+	if e.factsBySink == nil {
+		e.factsBySink = map[string]findings.ContextFacts{}
+	}
+	e.factsBySink[sinkID] = facts
 	return ctx
 }
 
@@ -791,6 +810,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			NegationEvidence: ne,
 			Confidence:       conf,
 			Context:          e.crossDomainContext(fl.SinkID),
+			Facts:            e.crossDomainFacts(fl.SinkID),
 			ReviewConditions: review,
 		}
 		if idx, seen := bySink[fl.SinkID]; seen {
