@@ -11,9 +11,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/vyprai/vyql/internal/datadir"
+	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/internal/extract/parsecache"
 	"github.com/vyprai/vyql/internal/findings"
 	"github.com/vyprai/vyql/internal/parser"
@@ -30,6 +32,7 @@ type cachedScan struct {
 	// drop the "not analysed" warning on exactly the second run of a tree, so
 	// the same command would report the same findings with less honesty.
 	Excluded  int
+	Oversized int
 	Unmatched map[string]int
 }
 
@@ -58,6 +61,10 @@ func scanFingerprint(salt []byte, paths []string, ruleSources []parser.V2Definit
 		hashString(h, "\x00exclude\x00")
 		hashString(h, ex)
 	}
+	// The size ceiling changes which files are read, so it must never replay
+	// another ceiling's cached findings.
+	hashString(h, "\x00max-file-size\x00")
+	hashString(h, strconv.FormatInt(treesitter.MaxFileBytes(), 10))
 	for _, p := range paths {
 		hashString(h, "\x00src\x00")
 		statWalk(h, p)
@@ -189,7 +196,7 @@ func loadCachedScan(c *parsecache.Cache, key string) (cachedScan, bool) {
 // storeCachedScan persists a scan result under key.
 func storeCachedScan(c *parsecache.Cache, key string, all []*findings.Finding, stats scanStats) {
 	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(cachedScan{Findings: all, Files: stats.files, Languages: stats.languages, Excluded: stats.excluded, Unmatched: stats.unmatched}); err != nil {
+	if err := gob.NewEncoder(&buf).Encode(cachedScan{Findings: all, Files: stats.files, Languages: stats.languages, Excluded: stats.excluded, Oversized: stats.oversized, Unmatched: stats.unmatched}); err != nil {
 		return
 	}
 	c.PutRaw("scan\x00"+key, buf.Bytes())
