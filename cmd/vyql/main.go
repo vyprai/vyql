@@ -753,16 +753,22 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 			syncPath, n, e, l, d)
 	}
 
-	// Recording the current findings is an alternative to reporting them: it is
-	// how a team adopts the scanner on a codebase that already has a backlog.
+	// Recording the current findings is how a team adopts the scanner on a
+	// codebase that already has a backlog. It happens before the report so a
+	// path that cannot be written fails the run outright: a report that implies
+	// the record was kept is worse than no report.
 	if opts.BaselineWrite != "" {
-		return writeBaseline(opts.BaselineWrite, all)
+		if err := writeBaseline(opts.BaselineWrite, all); err != nil {
+			return err
+		}
 	}
 	// Applied before output and before the gate, so a run reports and fails on
-	// what is new rather than on what someone already looked at.
+	// what is new rather than on what someone already looked at. A recording run
+	// skips this: what it just wrote covers every finding, so applying it would
+	// report an empty scan and leave the operator nothing to review.
 	var covered []*findings.Finding
 	var staleBaseline []baselineEntry
-	if len(opts.Baseline) > 0 {
+	if len(opts.Baseline) > 0 && opts.BaselineWrite == "" {
 		all, covered, staleBaseline = applyBaseline(all, opts.Baseline)
 	}
 
@@ -829,7 +835,11 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	}
 	// Gating is the last thing that happens: the report is already on stdout, so
 	// a gated build still shows the operator what failed it.
-	if opts.FailOnRank > 0 {
+	//
+	// A recording run is exempt. Every finding it reported was just accepted into
+	// the baseline, and failing the build on the backlog the flag exists to
+	// absorb would make adoption impossible in the pipeline that needs it.
+	if opts.FailOnRank > 0 && opts.BaselineWrite == "" {
 		if n, highest := gateFindings(all, opts.FailOnRank); n > 0 {
 			return &thresholdMet{code: opts.ExitCode, count: n, highest: highest, failOn: opts.FailOnName}
 		}
