@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -84,20 +85,39 @@ func loadBaseline(path string) (map[string]baselineEntry, error) {
 	return out, nil
 }
 
-// checkBaselineFlags rejects recording a baseline while applying one.
+// resolvePath is the strongest identity available for a path that may not exist
+// yet. A record target routinely does not, and EvalSymlinks fails on a missing
+// file, so an absolute cleaned path is the fallback.
+func resolvePath(p string) string {
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return filepath.Clean(p)
+	}
+	if real, err := filepath.EvalSymlinks(abs); err == nil {
+		return real
+	}
+	return abs
+}
+
+func sameFile(a, b string) bool { return resolvePath(a) == resolvePath(b) }
+
+// checkBaselineFlags rejects recording a baseline onto the one being applied.
 //
-// Recording writes every current finding as accepted with an empty reason. Over
-// a baseline someone has triaged, that replaces their false-positive verdicts
-// and the reasoning behind them with a blank acceptance -- and the run that did
-// it exits 0. Re-recording is a real thing to want; it is also a thing to do
-// deliberately, to a path you name.
+// Recording writes every current finding as accepted with an empty reason. Onto
+// the file being applied, that replaces the false-positive verdicts someone
+// triaged and the reasoning behind them with a blank acceptance, and the run
+// that did it exits 0. Recording to a different path is how a baseline is rolled
+// forward, and stays allowed.
 func checkBaselineFlags(baseline, baselineWrite string) error {
 	if baseline == "" || baselineWrite == "" {
 		return nil
 	}
-	return fmt.Errorf("-baseline and -baseline-write together: recording writes every finding as accepted "+
-		"with an empty reason, which would overwrite the verdicts in %s; "+
-		"re-record to a new path and diff it, or drop -baseline", baseline)
+	if !sameFile(baseline, baselineWrite) {
+		return nil
+	}
+	return fmt.Errorf("-baseline and -baseline-write both name %s: recording writes every finding as "+
+		"accepted with an empty reason, which would overwrite the verdicts in it; "+
+		"record to a different path and diff it", baseline)
 }
 
 func validVerdict(v string) bool {

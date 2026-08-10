@@ -301,3 +301,49 @@ func TestWriteBaselineIsDeterministic(t *testing.T) {
 		t.Errorf("version = %d, want %d", bf.Version, baselineVersion)
 	}
 }
+
+// Rolling a baseline forward records to a new file while applying the old one.
+// It is the supported way to keep a suppression set current, and the check that
+// guards a triaged file from being overwritten must not stand in its way.
+func TestBaselineFlagsAllowRecordingToADifferentPath(t *testing.T) {
+	dir := t.TempDir()
+	err := checkBaselineFlags(filepath.Join(dir, "old.json"), filepath.Join(dir, "new.json"))
+	if err != nil {
+		t.Fatalf("recording to a different path was rejected: %v", err)
+	}
+}
+
+// Identity, not string equality. The same file reached by an uncleaned path or
+// through a symlink is still the file whose verdicts would be destroyed.
+func TestBaselineFlagsRejectTheSameFileUnderAnotherName(t *testing.T) {
+	dir := t.TempDir()
+	real := filepath.Join(dir, "b.json")
+	if err := os.WriteFile(real, []byte(`{"version":2,"entries":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := checkBaselineFlags(real, dir+"/./b.json"); err == nil {
+		t.Error("an uncleaned path to the applied baseline was accepted as a record target")
+	}
+
+	link := filepath.Join(dir, "link.json")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skipf("symlinks unavailable on this platform: %v", err)
+	}
+	if err := checkBaselineFlags(real, link); err == nil {
+		t.Error("a symlink to the applied baseline was accepted as a record target")
+	}
+}
+
+// A record target routinely does not exist yet, and a path-identity check that
+// cannot cope with that would reject every first roll forward.
+func TestSameFileHandlesAPathThatDoesNotExist(t *testing.T) {
+	dir := t.TempDir()
+	absent := filepath.Join(dir, "not-created-yet.json")
+	if !sameFile(absent, dir+"/./not-created-yet.json") {
+		t.Error("two spellings of the same missing path were treated as different files")
+	}
+	if sameFile(absent, filepath.Join(dir, "other.json")) {
+		t.Error("two different missing paths were treated as the same file")
+	}
+}
