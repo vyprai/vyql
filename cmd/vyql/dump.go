@@ -15,13 +15,6 @@ import (
 	"github.com/vyprai/vyql/internal/usg"
 )
 
-var scanBindingOverlay string
-
-// scanExcludes holds path segments to skip during source discovery (e.g. "_vendor",
-// "node_modules"). Set from --exclude; matched against whole path segments so
-// "_vendor" skips src/pip/_vendor/... but not a file literally named my_vendor.py.
-var scanExcludes []string
-
 func parseExcludes(s string) []string {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -53,6 +46,12 @@ func pathHasExcludedSegment(p string, excludes []string) bool {
 
 type graphBuildOptions struct {
 	BindingConcepts map[string]bool
+	// BindingOverlay and Excludes were package-level variables that cmdScan set and restored
+	// around the call, and that extractAll and scanFingerprint read without either call site
+	// showing the dependency. As globals they also made two scans in one process unsafe: the
+	// save/restore dance was the only thing keeping tests from bleeding into each other.
+	BindingOverlay string
+	Excludes       []string
 }
 
 // buildGraph runs extract → lower → bindings → SCA and returns the analysis graph (the
@@ -76,7 +75,7 @@ func buildGraphWithOptions(paths []string, cache lowering.DeltaCache, opts graph
 	defer restoreConcepts()
 
 	tk := newTimer()
-	prog, bindingApps, ctorTypes, stats, err := extractAll(paths)
+	prog, bindingApps, ctorTypes, stats, err := extractAll(paths, opts.Excludes)
 	if err != nil {
 		return nil, stats, err
 	}
@@ -133,7 +132,7 @@ func buildGraphWithOptions(paths []string, cache lowering.DeltaCache, opts graph
 	for _, lang := range stats.languages {
 		bindingApps = append(bindingApps, bindings.GeneratedPackageBindingsFor(lang, deps)...)
 	}
-	if overlay := strings.TrimSpace(scanBindingOverlay); overlay != "" {
+	if overlay := strings.TrimSpace(opts.BindingOverlay); overlay != "" {
 		extra, err := bindings.OverlayBindings(overlay, stats.languages)
 		if err != nil {
 			return nil, stats, fmt.Errorf("binding overlay: %w", err)

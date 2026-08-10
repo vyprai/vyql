@@ -31,7 +31,7 @@ func setMaxFileBytesForTest(t *testing.T, n int64) {
 
 func TestExtractAllSkipsOversizedFilesByDefault(t *testing.T) {
 	dir := writeSizedGoFiles(t)
-	_, _, _, stats, err := extractAll([]string{dir})
+	_, _, _, stats, err := extractAll([]string{dir}, nil)
 	if err != nil {
 		t.Fatalf("extractAll: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestExtractAllSkipsOversizedFilesByDefault(t *testing.T) {
 
 func TestExtractAllScansAnOversizedFileNamedDirectly(t *testing.T) {
 	dir := writeSizedGoFiles(t)
-	_, _, _, stats, err := extractAll([]string{filepath.Join(dir, "big.go")})
+	_, _, _, stats, err := extractAll([]string{filepath.Join(dir, "big.go")}, nil)
 	if err != nil {
 		t.Fatalf("extractAll: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestExtractAllScansAnOversizedFileNamedDirectly(t *testing.T) {
 func TestExtractAllHonorsDisabledCeiling(t *testing.T) {
 	setMaxFileBytesForTest(t, 0) // 0 disables the guard
 	dir := writeSizedGoFiles(t)
-	_, _, _, stats, err := extractAll([]string{dir})
+	_, _, _, stats, err := extractAll([]string{dir}, nil)
 	if err != nil {
 		t.Fatalf("extractAll: %v", err)
 	}
@@ -75,9 +75,9 @@ func TestExtractAllHonorsDisabledCeiling(t *testing.T) {
 // be replayed across the change.
 func TestFingerprintTracksMaxFileSize(t *testing.T) {
 	dir := writeSizedGoFiles(t)
-	a := scanFingerprint(nil, []string{dir}, nil, "auto")
+	a := scanFingerprint(nil, []string{dir}, nil, "auto", "", nil)
 	setMaxFileBytesForTest(t, 8<<20)
-	b := scanFingerprint(nil, []string{dir}, nil, "auto")
+	b := scanFingerprint(nil, []string{dir}, nil, "auto", "", nil)
 	if a == b {
 		t.Error("scanFingerprint identical across different -max-file-size ceilings")
 	}

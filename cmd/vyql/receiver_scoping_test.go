@@ -31,7 +31,7 @@ func scanFixture(t *testing.T, dir string) []string {
 	if err != nil {
 		t.Fatalf("loadRules: %v", err)
 	}
-	fs, _, _, err := scanPathsWithProfileDemand([]string{dir}, allRules, "", true)
+	fs, _, _, err := scanPathsWithProfileDemand([]string{dir}, allRules, "", true, graphBuildOptions{})
 	if err != nil {
 		t.Fatalf("scan: %v", err)
 	}

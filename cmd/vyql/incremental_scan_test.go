@@ -69,7 +69,7 @@ func findingKey(f *findings.Finding) string {
 }
 
 func buildGraphWithSyntheticBindings(paths []string, cache lowering.DeltaCache) (usg.Store, error) {
-	prog, _, ctorTypes, stats, err := extractAll(paths)
+	prog, _, ctorTypes, stats, err := extractAll(paths, nil)
 	if err != nil {
 		return nil, err
 	}

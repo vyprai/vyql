@@ -92,7 +92,7 @@ func runOWASPBenchmarkDir(t *testing.T, dir string) benchmarkScore {
 	}
 	restoreFast := setEnvForTest("VYQL_OWASP_BENCH_FAST", "1")
 	defer restoreFast()
-	fs, _, _, err := scanPathsWithProfileDemand(roots, rules, "", true)
+	fs, _, _, err := scanPathsWithProfileDemand(roots, rules, "", true, graphBuildOptions{})
 	if err != nil {
 		t.Fatalf("scan: %v", err)
 	}
