@@ -34,8 +34,8 @@ var (
 	v2InternalConceptRoles     = map[string]bool{"attribute_sink": true, "char_filter": true, "dom_input": true, "path_access_check": true, "process_arg_vector": true, "same_receiver_guard": true, "same_receiver_guard_target": true}
 	v2MechanicKinds            = map[string]bool{"ruleVerb": true, "coverage": true, "context": true, "requirement": true}
 	v2ImplementedMechanicKinds = map[string]bool{"ruleVerb": true, "coverage": true}
-	v2PolicyKinds              = map[string]bool{"resultLifecycle": true, "resultIdentity": true, "confidence": true, "priority": true, "display": true, "diagnostic": true}
-	v2ImplementedPolicyKinds   = map[string]bool{"resultLifecycle": true, "resultIdentity": true, "confidence": true, "priority": true, "display": true, "diagnostic": true}
+	v2PolicyKinds              = map[string]bool{"resultLifecycle": true, "resultIdentity": true, "confidence": true, "priority": true, "display": true, "diagnostic": true, "projectFacts": true}
+	v2ImplementedPolicyKinds   = map[string]bool{"resultLifecycle": true, "resultIdentity": true, "confidence": true, "priority": true, "display": true, "diagnostic": true, "projectFacts": true}
 	v2MechanicCapabilities     = map[string]bool{"coverage.path": true, "coverage.endpoint": true, "coverage.sameReceiver": true, "coverage.sameScope": true, "coverage.dominates": true, "coverage.postDominates": true, "coverage.global": true, "dataflow.taint": true, "graph.reach": true, "graph.grant": true, "fact.exists": true, "query.semantic": true}
 	v2RuleClauseKinds          = map[string]bool{"where": true, "coveredBy": true, "confidence": true, "profile": true}
 	v2EmitKinds                = map[string]bool{"source": true, "sink": true, "check": true, "issue": true, "fact": true}
