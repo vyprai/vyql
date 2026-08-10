@@ -1,9 +1,10 @@
 package engine
 
 import (
-	"github.com/vyprai/vyql/internal/usg"
 	"strings"
 	"testing"
+
+	"github.com/vyprai/vyql/internal/usg"
 )
 
 func TestGuardedByEndpoint(t *testing.T) {

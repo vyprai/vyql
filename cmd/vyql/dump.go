@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/vyprai/vyql/internal/extract/sca"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/vyprai/vyql/internal/extract/sca"
 
 	"github.com/vyprai/vyql/internal/bindings"
 	"github.com/vyprai/vyql/internal/extract/lowering"

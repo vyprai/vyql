@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"github.com/vyprai/vyql/internal/report"
 	"strings"
 	"testing"
 
@@ -69,7 +70,7 @@ rule ComposedMatch {
 			if len(f.Witness) == 0 && len(f.Context) == 0 {
 				t.Fatalf("%s: finding has empty proof tree (no witness or context)", f.RuleID)
 			}
-			if f.Render("test-fp") == "" {
+			if report.Finding(f, "test-fp") == "" {
 				t.Fatalf("%s: empty render", f.RuleID)
 			}
 			for _, b := range f.Bindings {
@@ -105,7 +106,7 @@ rule ComposedMatch {
 	}
 
 	flowFindings, _ := eng.Evaluate(compiled[0])
-	render := flowFindings[0].Render("test-fp")
+	render := report.Finding(flowFindings[0], "test-fp")
 	if !strings.Contains(render, "taint path:") {
 		t.Fatalf("flow render should show the taint path:\n%s", render)
 	}
