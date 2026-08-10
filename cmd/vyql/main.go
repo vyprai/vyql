@@ -55,6 +55,7 @@ import (
 	"github.com/vyprai/vyql/internal/ontology"
 	"github.com/vyprai/vyql/internal/parser"
 	"github.com/vyprai/vyql/internal/profile"
+	"github.com/vyprai/vyql/internal/report"
 	"github.com/vyprai/vyql/internal/resultpolicy"
 	"github.com/vyprai/vyql/internal/risk"
 	"github.com/vyprai/vyql/internal/sarif"
@@ -1002,7 +1003,7 @@ func printReport(fs []*findings.Finding) {
 
 	fmt.Printf("%d finding(s):\n\n", len(fs))
 	for _, it := range items {
-		fmt.Printf("[%s] %s", it.s.Band, it.f.Render(resultpolicy.Fingerprint(it.f)))
+		fmt.Printf("[%s] %s", it.s.Band, report.Finding(it.f, resultpolicy.Fingerprint(it.f)))
 		for _, fac := range it.s.Factors {
 			fmt.Printf("    · %s\n", fac.Witness)
 		}

@@ -1,8 +1,9 @@
 package engine
 
 import (
-	"github.com/vyprai/vyql/internal/usg"
 	"testing"
+
+	"github.com/vyprai/vyql/internal/usg"
 )
 
 func TestContextSensitivityBoundary(t *testing.T) {

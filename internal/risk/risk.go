@@ -260,17 +260,18 @@ func priorityFactsForFinding(f *findings.Finding) priorityFactSet {
 		"finding.bindingCount": {Bool: len(f.Bindings) > 0, Number: len(f.Bindings), HasNum: true, Scalar: fmt.Sprint(len(f.Bindings)), Witness: fmt.Sprintf("bindings: %d", len(f.Bindings))},
 		"finding.contextCount": {Bool: len(f.Context) > 0, Number: len(f.Context), HasNum: true, Scalar: fmt.Sprint(len(f.Context)), Witness: fmt.Sprintf("context entries: %d", len(f.Context))},
 	}
-	for _, c := range f.Context {
-		lower := strings.ToLower(c)
-		if _, ok := out["context.internetReachable"]; !ok && strings.Contains(lower, "internet-reachable") {
-			out["context.internetReachable"] = priorityFact{Bool: true, Witness: "exposure: " + c}
-		}
-		if _, ok := out["context.runtimeConfirmed"]; !ok && strings.Contains(lower, "confirmed by runtime") {
-			out["context.runtimeConfirmed"] = priorityFact{Bool: true, Witness: "runtime: " + c}
-		}
-		if _, ok := out["context.holdsAsset"]; !ok && strings.Contains(lower, "holds [") {
-			out["context.holdsAsset"] = priorityFact{Bool: true, Witness: "asset: " + c}
-		}
+	// Read from the typed facts the engine recorded, not from the English it rendered. These
+	// were recovered by substring-matching Context for "internet-reachable", "confirmed by
+	// runtime" and "holds [" -- all of them label templates an ontology author can change, at
+	// which point findings silently stopped scoring the factor with nothing to show for it.
+	if f.Facts.InternetReachable {
+		out["context.internetReachable"] = priorityFact{Bool: true, Witness: "exposure: " + f.Facts.ReachWitness}
+	}
+	if f.Facts.RuntimeConfirmed {
+		out["context.runtimeConfirmed"] = priorityFact{Bool: true, Witness: "runtime: " + f.Facts.ConfirmWitness}
+	}
+	if f.Facts.HoldsAsset {
+		out["context.holdsAsset"] = priorityFact{Bool: true, Witness: "asset: " + f.Facts.AssetWitness}
 	}
 	for _, b := range f.Bindings {
 		lower := strings.ToLower(b.LabelProvenance)

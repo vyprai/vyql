@@ -174,3 +174,27 @@ func TestResultAndRuleDescriptorAgreeOnLevel(t *testing.T) {
 		}
 	}
 }
+
+// The result message names the source and the target. It used to be built from bindings[0] and
+// bindings[1] positionally, while the location beneath it comes from the named primary target --
+// so a finding whose bindings arrive in another order produced a sentence describing one pair and
+// a location pointing at another, in the same result.
+func TestResultMessageFollowsTheNamedBindings(t *testing.T) {
+	f := sampleFinding()
+	f.Bindings = []findings.Binding{
+		{Name: "sink", Concept: "code.SqlExecution", Loc: "app.go:9"},
+		{Name: "source", Concept: "code.HttpInput", Loc: "app.go:2"},
+	}
+	doc := ToSARIF([]*findings.Finding{f}, "0.1.0", nil)
+	res := doc["runs"].([]any)[0].(map[string]any)["results"].([]any)[0].(map[string]any)
+	got := res["message"].(map[string]any)["text"].(string)
+
+	if !strings.HasPrefix(got, "code.HttpInput reaches code.SqlExecution") {
+		t.Errorf("message = %q, want it to read source -> target regardless of binding order", got)
+	}
+	loc := res["locations"].([]any)[0].(map[string]any)["physicalLocation"].(map[string]any)
+	uri := loc["artifactLocation"].(map[string]any)["uri"].(string)
+	if !strings.Contains(uri, "app.go") {
+		t.Errorf("location uri = %q, want the primary target's file", uri)
+	}
+}
