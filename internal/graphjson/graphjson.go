@@ -1,4 +1,11 @@
-package main
+// Package graphjson renders a scan as the graph-json export document: the functions and
+// call edges the scan resolved, each finding's source, sink and witness path, and the
+// concept legend that explains the labels.
+//
+// It is graph-query work -- collapsing a witness path into the functions it crosses,
+// inferring a scope, extracting call edges -- and it lived in package main, where none of
+// it could be exercised without the command.
+package graphjson
 
 import (
 	"os"
@@ -21,33 +28,33 @@ import (
 // compute as text, in the shape VyPr's six CodeMapper tables ingest. Function/node ids
 // are RUN-LOCAL (unique within one document); only finding.fp is stable across runs.
 
-const gjSchemaVersion = "vyql.codemap/v1"
+const SchemaVersion = "vyql.codemap/v1"
 
-type gjDocument struct {
-	SchemaVersion string       `json:"schema_version"`
-	Tool          gjTool       `json:"tool"`
-	CodeMap       gjCodeMap    `json:"code_map"`
-	Functions     []gjFunction `json:"functions"`
-	CallEdges     []gjCallEdge `json:"call_edges"`
-	Findings      []gjFinding  `json:"findings"`
-	Concepts      []gjConcept  `json:"concepts"`
+type Document struct {
+	SchemaVersion string     `json:"schema_version"`
+	Tool          Tool       `json:"tool"`
+	CodeMap       CodeMap    `json:"code_map"`
+	Functions     []Function `json:"functions"`
+	CallEdges     []CallEdge `json:"call_edges"`
+	Findings      []Finding  `json:"findings"`
+	Concepts      []Concept  `json:"concepts"`
 }
 
-type gjTool struct {
+type Tool struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
 }
 
-type gjCodeMap struct {
+type CodeMap struct {
 	Root          string   `json:"root"`
 	Languages     []string `json:"languages"`
 	FunctionCount int      `json:"function_count"`
 	FindingCount  int      `json:"finding_count"`
 }
 
-// gjFunction is CodeFunction identity ONLY — no bodies (VyPr pulls source text from its
+// Function is CodeFunction identity ONLY — no bodies (VyPr pulls source text from its
 // own structural_functions after reconciling by file+line range).
-type gjFunction struct {
+type Function struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`
 	File        string  `json:"file"`
@@ -61,30 +68,30 @@ type gjFunction struct {
 	HTTPPath    *string `json:"http_path"`
 }
 
-// gjCallEdge is CodeCallEdge: resolved internal→internal only (both ends NOT NULL FKs).
-type gjCallEdge struct {
+// CallEdge is CodeCallEdge: resolved internal→internal only (both ends NOT NULL FKs).
+type CallEdge struct {
 	FromFunction string `json:"from_function"`
 	ToFunction   string `json:"to_function"`
 	CallLine     *int   `json:"call_line"`
 	CalleePath   string `json:"callee_path"`
 }
 
-type gjFinding struct {
-	Rule          string     `json:"rule"`
-	Kind          string     `json:"kind"`  // taint | reach | assume | presence
-	Scope         string     `json:"scope"` // function | module | unresolved
-	Severity      string     `json:"severity"`
-	CWE           []string   `json:"cwe"`
-	FP            string     `json:"fp"` // stable across runs — VyPr dedup + diff key
-	Source        *gjSource  `json:"source"`
-	Sink          *gjSink    `json:"sink"`
-	PathFunctions []gjPathFn `json:"path_functions"`
-	PathLength    int        `json:"path_length"`
-	Confidence    string     `json:"confidence"`
-	Witness       []gjHop    `json:"witness,omitempty"`
+type Finding struct {
+	Rule          string   `json:"rule"`
+	Kind          string   `json:"kind"`  // taint | reach | assume | presence
+	Scope         string   `json:"scope"` // function | module | unresolved
+	Severity      string   `json:"severity"`
+	CWE           []string `json:"cwe"`
+	FP            string   `json:"fp"` // stable across runs — VyPr dedup + diff key
+	Source        *Source  `json:"source"`
+	Sink          *Sink    `json:"sink"`
+	PathFunctions []PathFn `json:"path_functions"`
+	PathLength    int      `json:"path_length"`
+	Confidence    string   `json:"confidence"`
+	Witness       []Hop    `json:"witness,omitempty"`
 }
 
-type gjSource struct {
+type Source struct {
 	File            string  `json:"file"`
 	Line            int     `json:"line"`
 	FuncID          *string `json:"func_id"` // the entrypoint function
@@ -94,7 +101,7 @@ type gjSource struct {
 	SourcePattern   *string `json:"source_pattern"`
 }
 
-type gjSink struct {
+type Sink struct {
 	File            string  `json:"file"`
 	Line            int     `json:"line"`
 	FuncID          *string `json:"func_id"` // sink_function = ENCLOSING fn, not the callee
@@ -103,12 +110,12 @@ type gjSink struct {
 	SinkDescription *string `json:"sink_description"`
 }
 
-type gjPathFn struct {
+type PathFn struct {
 	FunctionID string `json:"function_id"`
 	Position   int    `json:"position"`
 }
 
-type gjHop struct {
+type Hop struct {
 	Node    string  `json:"node"`
 	File    string  `json:"file"`
 	Line    int     `json:"line"`
@@ -116,24 +123,24 @@ type gjHop struct {
 	Concept string  `json:"concept,omitempty"`
 }
 
-type gjConcept struct {
+type Concept struct {
 	Concept   string  `json:"concept"`
 	Operation *string `json:"operation"`
 	Role      string  `json:"role"` // sink | source | presence
 }
 
-// buildGraphJSON assembles the export document from the lowered graph, the findings,
+// Build assembles the export document from the lowered graph, the findings,
 // and the per-rule meta (for CWE).
-func buildGraphJSON(g usg.Store, all []*findings.Finding, ruleMeta map[string]map[string]any, root string) gjDocument {
-	doc := gjDocument{
-		SchemaVersion: gjSchemaVersion,
-		Tool:          gjTool{Name: "VyQL", Version: version},
-		Concepts:      conceptLegend(),
+func Build(g usg.Store, all []*findings.Finding, ruleMeta map[string]map[string]any, root, toolVersion string) Document {
+	doc := Document{
+		SchemaVersion: SchemaVersion,
+		Tool:          Tool{Name: "VyQL", Version: toolVersion},
+		Concepts:      ConceptLegend(),
 	}
 	doc.Functions = exportFunctions(g)
 	doc.CallEdges = exportCallEdges(g)
 	doc.Findings = exportFindings(g, all, ruleMeta)
-	doc.CodeMap = gjCodeMap{
+	doc.CodeMap = CodeMap{
 		Root:          root,
 		Languages:     exportLanguages(doc.Functions, all),
 		FunctionCount: len(doc.Functions),
@@ -142,16 +149,16 @@ func buildGraphJSON(g usg.Store, all []*findings.Finding, ruleMeta map[string]ma
 	return doc
 }
 
-func exportFunctions(g usg.Store) []gjFunction {
+func exportFunctions(g usg.Store) []Function {
 	ids, _ := g.NodesOfType("code.Function")
-	out := make([]gjFunction, 0, len(ids))
+	out := make([]Function, 0, len(ids))
 	for _, id := range ids {
 		n, ok, _ := g.GetNode(id)
 		if !ok {
 			continue
 		}
 		file, line := splitLoc(n.Prop("loc"))
-		fn := gjFunction{
+		fn := Function{
 			ID:          id,
 			Name:        n.Prop("name"),
 			File:        file,
@@ -179,10 +186,10 @@ func exportFunctions(g usg.Store) []gjFunction {
 // (internal) when its arguments flow into a callee's Param nodes, or the callee's Return
 // flows back into the call. External/unresolved calls (os.system, cur.execute) have
 // neither and become sink_description strings, never edges.
-func exportCallEdges(g usg.Store) []gjCallEdge {
+func exportCallEdges(g usg.Store) []CallEdge {
 	ids, _ := g.NodesOfType("code.Call")
 	seen := map[string]bool{}
-	out := []gjCallEdge{}
+	out := []CallEdge{}
 	for _, id := range ids {
 		c, ok, _ := g.GetNode(id)
 		if !ok {
@@ -222,7 +229,7 @@ func exportCallEdges(g usg.Store) []gjCallEdge {
 				continue
 			}
 			seen[key] = true
-			out = append(out, gjCallEdge{
+			out = append(out, CallEdge{
 				FromFunction: from,
 				ToFunction:   to,
 				CallLine:     intPtr(callLine),
@@ -239,10 +246,10 @@ func exportCallEdges(g usg.Store) []gjCallEdge {
 	return out
 }
 
-func exportFindings(g usg.Store, all []*findings.Finding, ruleMeta map[string]map[string]any) []gjFinding {
-	out := make([]gjFinding, 0, len(all))
+func exportFindings(g usg.Store, all []*findings.Finding, ruleMeta map[string]map[string]any) []Finding {
+	out := make([]Finding, 0, len(all))
 	for _, f := range all {
-		gf := gjFinding{
+		gf := Finding{
 			Rule:       f.RuleID,
 			Kind:       mapKind(f.WitnessKind),
 			Severity:   f.Severity,
@@ -253,7 +260,7 @@ func exportFindings(g usg.Store, all []*findings.Finding, ruleMeta map[string]ma
 		srcB, sinkB := sourceAndSink(f)
 		if srcB != nil {
 			file, line := splitLoc(srcB.Loc)
-			gf.Source = &gjSource{
+			gf.Source = &Source{
 				File:          file,
 				Line:          line,
 				FuncID:        funcOf(g, srcB.NodeID),
@@ -264,7 +271,7 @@ func exportFindings(g usg.Store, all []*findings.Finding, ruleMeta map[string]ma
 		}
 		if sinkB != nil {
 			file, line := splitLoc(sinkB.Loc)
-			gf.Sink = &gjSink{
+			gf.Sink = &Sink{
 				File:            file,
 				Line:            line,
 				FuncID:          funcOf(g, sinkB.NodeID),
@@ -275,7 +282,7 @@ func exportFindings(g usg.Store, all []*findings.Finding, ruleMeta map[string]ma
 		}
 		gf.Witness, gf.PathFunctions = buildPath(g, f, sinkB)
 		if gf.PathFunctions == nil {
-			gf.PathFunctions = []gjPathFn{} // never null — VyPr path_length = len(path_functions), NOT NULL
+			gf.PathFunctions = []PathFn{} // never null — VyPr path_length = len(path_functions), NOT NULL
 		}
 		gf.PathLength = len(gf.PathFunctions)
 		// scope: the routing anchor has an enclosing function?
@@ -302,9 +309,9 @@ func exportFindings(g usg.Store, all []*findings.Finding, ruleMeta map[string]ma
 // buildPath produces the NIR-granular witness (run-local, for PoC) and the collapsed
 // function-granular path (CodeDataflowFunction). For non-taint findings the witness
 // holds step descriptions, not node ids, so the path is just the sink's function.
-func buildPath(g usg.Store, f *findings.Finding, sinkB *findings.Binding) ([]gjHop, []gjPathFn) {
+func buildPath(g usg.Store, f *findings.Finding, sinkB *findings.Binding) ([]Hop, []PathFn) {
 	if f.WitnessKind == "taint" && len(f.Witness) > 0 {
-		var hops []gjHop
+		var hops []Hop
 		var fnSeq []string
 		for _, nid := range f.Witness {
 			n, ok, _ := g.GetNode(nid)
@@ -313,7 +320,7 @@ func buildPath(g usg.Store, f *findings.Finding, sinkB *findings.Binding) ([]gjH
 			}
 			file, line := splitLoc(n.Prop("loc"))
 			fid := funcOf(g, nid)
-			hops = append(hops, gjHop{
+			hops = append(hops, Hop{
 				Node:    nid,
 				File:    file,
 				Line:    line,
@@ -329,21 +336,21 @@ func buildPath(g usg.Store, f *findings.Finding, sinkB *findings.Binding) ([]gjH
 	// presence/reach/assume: function-granular path is just the sink's enclosing function
 	if sinkB != nil {
 		if fid := funcOf(g, sinkB.NodeID); fid != nil {
-			return nil, []gjPathFn{{FunctionID: *fid, Position: 0}}
+			return nil, []PathFn{{FunctionID: *fid, Position: 0}}
 		}
 	}
 	return nil, nil
 }
 
 // collapse drops consecutive-duplicate function ids and numbers the result from 0.
-func collapse(seq []string) []gjPathFn {
-	var out []gjPathFn
+func collapse(seq []string) []PathFn {
+	var out []PathFn
 	prev := ""
 	for _, fid := range seq {
 		if fid == prev {
 			continue
 		}
-		out = append(out, gjPathFn{FunctionID: fid, Position: len(out)})
+		out = append(out, PathFn{FunctionID: fid, Position: len(out)})
 		prev = fid
 	}
 	return out
@@ -484,7 +491,7 @@ func cweOf(m map[string]any) []string {
 	return nil
 }
 
-func exportLanguages(fns []gjFunction, all []*findings.Finding) []string {
+func exportLanguages(fns []Function, all []*findings.Finding) []string {
 	seen := map[string]bool{}
 	var out []string
 	add := func(file string) {
@@ -555,18 +562,18 @@ func sinkOps() map[string]string {
 	return sinkOpsData
 }
 
-// conceptLegend enumerates the operational (code.*) concepts with their export role and,
+// ConceptLegend enumerates the operational (code.*) concepts with their export role and,
 // for sinks, the VyPr SinkType operation. Built from the live ontology plus the sink-operation
 // data, so no concept names are hardcoded in the cmd runtime.
-func conceptLegend() []gjConcept {
+func ConceptLegend() []Concept {
 	ops := sinkOps()
 	concepts := ontology.Seed().AllConcepts()
-	out := make([]gjConcept, 0, len(concepts))
+	out := make([]Concept, 0, len(concepts))
 	for _, c := range concepts {
 		if c.Package != "code" {
 			continue
 		}
-		gc := gjConcept{Concept: c.QualifiedName(), Role: "presence"}
+		gc := Concept{Concept: c.QualifiedName(), Role: "presence"}
 		if op, ok := ops[c.Name]; ok && op != "" {
 			opCopy := op
 			gc.Role = "sink"
