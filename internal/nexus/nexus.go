@@ -6,6 +6,7 @@ package nexus
 import (
 	"github.com/vyprai/vyql/internal/findings"
 	"github.com/vyprai/vyql/internal/resultpolicy"
+	"strconv"
 )
 
 const SchemaVersion = "1.0"
@@ -72,28 +73,14 @@ func Validate(doc map[string]any) []string {
 	for i, raw := range fs {
 		f, _ := raw.(map[string]any)
 		if f["ruleId"] == nil {
-			errs = append(errs, "findings["+itoa(i)+"]: missing ruleId")
+			errs = append(errs, "findings["+strconv.Itoa(i)+"]: missing ruleId")
 		}
 		if f["fingerprint"] == nil {
-			errs = append(errs, "findings["+itoa(i)+"]: missing fingerprint")
+			errs = append(errs, "findings["+strconv.Itoa(i)+"]: missing fingerprint")
 		}
 		if _, ok := f["bindings"].([]any); !ok {
-			errs = append(errs, "findings["+itoa(i)+"]: bindings must be a list")
+			errs = append(errs, "findings["+strconv.Itoa(i)+"]: bindings must be a list")
 		}
 	}
 	return errs
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var b [20]byte
-	i := len(b)
-	for n > 0 {
-		i--
-		b[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(b[i:])
 }

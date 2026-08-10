@@ -9,6 +9,7 @@ import (
 
 	"github.com/vyprai/vyql/internal/findings"
 	"github.com/vyprai/vyql/internal/resultpolicy"
+	"github.com/vyprai/vyql/internal/taxonomy"
 )
 
 const (
@@ -148,8 +149,7 @@ func securitySeverity(sev string) string {
 func cweTags(cwes []string) []string {
 	var out []string
 	for _, c := range cwes {
-		n := strings.TrimSpace(c)
-		n = strings.TrimPrefix(strings.TrimPrefix(strings.ToUpper(n), "CWE_"), "CWE-")
+		n := taxonomy.NormalizeID(strings.ToUpper(strings.TrimSpace(c)))
 		if n == "" {
 			continue
 		}

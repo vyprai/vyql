@@ -13,6 +13,7 @@ package taxonomy
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -61,8 +62,13 @@ func Std() *Catalog {
 	return stdCat
 }
 
-// normalize strips an optional CWE/CAPEC prefix (either "-" or the VyQL "_"
-// form) and surrounding space, leaving the bare numeric id.
+// NormalizeID strips an optional CWE/CAPEC prefix (either "-" or the VyQL "_" form) and
+// surrounding space, leaving the bare numeric id. Exported because output formatters were each
+// reimplementing it: this package owns what a catalogue id looks like, and a second opinion about
+// that is how `CWE_79` and `CWE-79` end up tagged differently in the same document.
+func NormalizeID(id string) string { return normalize(id) }
+
+// normalize is the unexported form the rest of this package uses.
 func normalize(id string) string {
 	id = strings.TrimSpace(id)
 	for _, p := range []string{"CWE-", "CWE_", "CAPEC-", "CAPEC_"} {
@@ -104,7 +110,7 @@ func (c *Catalog) CWEAncestors(id string) []string {
 			continue
 		}
 		for _, p := range w.Parents {
-			ps := itoa(p)
+			ps := strconv.Itoa(p)
 			if !seen[ps] {
 				seen[ps] = true
 				out = append(out, ps)
@@ -113,26 +119,4 @@ func (c *Catalog) CWEAncestors(id string) []string {
 		}
 	}
 	return out
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	var b [20]byte
-	i := len(b)
-	for n > 0 {
-		i--
-		b[i] = byte('0' + n%10)
-		n /= 10
-	}
-	if neg {
-		i--
-		b[i] = '-'
-	}
-	return string(b[i:])
 }
