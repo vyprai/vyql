@@ -248,17 +248,12 @@ func (l *lowerer) containerInvalidate(call nir.Call, recv string, sc *scope) {
 	if ci == nil || ci.dirty {
 		return
 	}
-	ext := ""
-	if n, ok, _ := l.g.GetNode(recv); ok {
-		loc := n.Prop("loc")
-		if i := strings.LastIndexByte(loc, ':'); i >= 0 {
-			loc = loc[:i]
-		}
-		if i := strings.LastIndexByte(loc, '.'); i >= 0 {
-			ext = loc[i:]
-		}
-	}
-	pyRemoveByValue := ext == ".py" // Python list.remove(x) removes by VALUE, not index
+	// Python's list.remove(x) removes by VALUE, not index. The language of the CALL decides that,
+	// so read l.curFile -- which the lowerer keeps for exactly this ("language sniffs read THIS")
+	// -- through the shared tech mapping. This used to GetNode(recv) and parse an extension back
+	// out of the node's loc string: a graph read on every non-modelled container call, which on a
+	// disk-backed store is a real decode, for a fact already in hand.
+	pyRemoveByValue := moduleTech(l.curFile) == "python"
 	switch {
 	case call.Method == "clear":
 		ci.elems = map[string]string{}
