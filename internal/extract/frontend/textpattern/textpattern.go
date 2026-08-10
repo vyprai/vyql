@@ -28,7 +28,13 @@ type textPatternProfile struct {
 	ExcludedValues     map[string]bool
 	ExcludedPrefixes   []string
 	ExcludedSubstrings []string
-	MinValueClasses    int
+	// ExcludedPaths skips whole files by path substring. Value-level exclusion cannot express
+	// "this credential is a fixture": a test or seed script's password is a well-formed secret by
+	// every measure this scanner has -- the thing that makes it harmless is WHERE it is, not what
+	// it looks like. Declared in binding data alongside the value exclusions, so which paths
+	// count as fixtures stays a policy decision rather than a Go one.
+	ExcludedPaths   []string
+	MinValueClasses int
 }
 
 var (
@@ -69,6 +75,9 @@ func Extract(files []string, root string) (nir.Program, error) {
 	writes := map[string][]byte{}
 	for _, f := range files {
 		rel := relPath(root, f)
+		if cfg.pathExcluded(rel) {
+			continue
+		}
 		var lines []int
 		if k, ok := auxKeys[f]; ok {
 			if raw, hit := cached[k]; hit {
@@ -97,6 +106,29 @@ func Extract(files []string, root string) (nir.Program, error) {
 		cache.PutManyRaw(writes)
 	}
 	return prog, nil
+}
+
+// pathExcluded reports whether a file is a declared fixture location. Matched on the
+// forward-slash relative path so a data-authored substring behaves the same on every platform.
+func (cfg textPatternProfile) pathExcluded(rel string) bool {
+	if len(cfg.ExcludedPaths) == 0 {
+		return false
+	}
+	p := strings.ToLower(filepath.ToSlash(rel))
+	for _, sub := range cfg.ExcludedPaths {
+		if sub != "" && strings.Contains(p, sub) {
+			return true
+		}
+	}
+	return false
+}
+
+func lowerAll(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		out = append(out, strings.ToLower(s))
+	}
+	return out
 }
 
 // addEvents appends a module for rel if the profile matched any lines.
@@ -217,6 +249,7 @@ func loadProfile() textPatternProfile {
 			ExcludedValues:     stringSetLower(metaList(meta, "text_pattern_excluded_values")),
 			ExcludedPrefixes:   metaList(meta, "text_pattern_excluded_prefixes"),
 			ExcludedSubstrings: metaList(meta, "text_pattern_excluded_substrings"),
+			ExcludedPaths:      lowerAll(metaList(meta, "text_pattern_excluded_paths")),
 			MinValueClasses:    metaInt(meta, "text_pattern_min_value_classes"),
 		}
 		if profile.Event == "" || profile.CacheKey == "" {
