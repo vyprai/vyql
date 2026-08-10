@@ -31,6 +31,11 @@ func nowNano() int64 { return time.Now().UnixNano() }
 type DeltaCache interface {
 	GetRaw(key string) ([]byte, bool)
 	PutRaw(key string, val []byte)
+	// Salt identifies the binary that wrote the entries. Every delta key folds it in, because a
+	// module's content hash says nothing about which build lowered it: rebuild vyql with a change
+	// to lowering.go and an unchanged file still hashes the same, so an unsalted key would hit
+	// and replay the PREVIOUS binary's graph. The new lowering code would then silently not run.
+	Salt() []byte
 }
 
 // LowerIncremental lowers a program reusing the per-module body sub-graph of any module whose
@@ -50,7 +55,7 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 	l.parseCache = cache
 	// Preallocate the graph maps to the previous scan's node count (cached) — the whole graph is
 	// rebuilt from deltas every scan, and starting from an empty map costs repeated rehashing.
-	if raw, ok := cache.GetRaw(sizeHintKey); ok && len(raw) >= 1 {
+	if raw, ok := cache.GetRaw(sizeHintKey(cache.Salt())); ok && len(raw) >= 1 {
 		l.g = newGraphStore(decodeInt(raw))
 	}
 	base := l.g
@@ -65,7 +70,7 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 	p1keys := make([]string, len(l.prog.Modules))
 	for i, m := range l.prog.Modules {
 		if m.Hash != "" {
-			p1keys[i] = pass1Key(m.Hash, m.Key, ModuleNS(m))
+			p1keys[i] = pass1Key(cache.Salt(), m.Hash, m.Key, ModuleNS(m))
 		}
 	}
 	p1raws := batchGetRaw(cache, p1keys)
@@ -113,7 +118,7 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 	keys := make([]string, len(l.prog.Modules))
 	for i, m := range l.prog.Modules {
 		if m.Hash != "" {
-			keys[i] = lowerKey(m.Hash, ModuleNS(m), sigFP)
+			keys[i] = lowerKey(cache.Salt(), m.Hash, ModuleNS(m), sigFP)
 		}
 	}
 	raws := batchGetRaw(cache, keys)
@@ -155,8 +160,8 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 		sync.AddEdges(ns, rec.d.Edges)
 	}
 	batchPutRaw(cache, writes)
-	if s, ok := base.(*usg.InMemStore); ok {
-		cache.PutRaw(sizeHintKey, encodeInt(s.NodeCount()))
+	if s, ok := base.(interface{ NodeCount() int }); ok {
+		cache.PutRaw(sizeHintKey(cache.Salt()), encodeInt(s.NodeCount()))
 	}
 	t2 := nowNano()
 	if timingOn {
@@ -169,7 +174,10 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 	return base, fresh, nil
 }
 
-const sizeHintKey = "lower\x00graphsize"
+// sizeHintKey holds the previous run's node count, used to presize the graph. It was gated on a
+// store type newGraphStore never returns, so it was never written and every scan presized to
+// zero; the assertion is now on the NodeCount interface both production stores satisfy.
+func sizeHintKey(salt []byte) string { return "lower\x00graphsize\x00" + saltTag(salt) }
 
 func encodeInt(n int) []byte {
 	w := &bufWriter{}
@@ -202,16 +210,25 @@ func newGraphStore(hint int) usg.Store {
 	return usg.NewIntStore(hint)
 }
 
-func lowerKey(moduleHash, moduleKey, sigFP string) string {
-	return "lower\x00" + moduleHash + "\x00" + moduleKey + "\x00" + sigFP
+func lowerKey(salt []byte, moduleHash, moduleKey, sigFP string) string {
+	return "lower\x00" + saltTag(salt) + "\x00" + moduleHash + "\x00" + moduleKey + "\x00" + sigFP
 }
 
 // pass1Key identifies a module's signature/symbol-table contribution. It depends ONLY on the
 // module's own content (hash), resolution key, and node-id namespace — register is purely
 // per-module — so it is valid regardless of what other modules look like (unlike lowerKey,
 // which folds in the global sigFP because pass-2 body lowering resolves against all signatures).
-func pass1Key(moduleHash, moduleKey, ns string) string {
-	return "p1\x00" + moduleHash + "\x00" + moduleKey + "\x00" + ns
+func pass1Key(salt []byte, moduleHash, moduleKey, ns string) string {
+	return "p1\x00" + saltTag(salt) + "\x00" + moduleHash + "\x00" + moduleKey + "\x00" + ns
+}
+
+// saltTag renders a cache salt as a short stable hex tag for use inside a key.
+func saltTag(salt []byte) string {
+	if len(salt) == 0 {
+		return ""
+	}
+	sum := sha256.Sum256(salt)
+	return hex.EncodeToString(sum[:8])
 }
 
 // bodyOf returns a module's full NIR. For a normal (decoded) module it is the module itself;
