@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/internal/findings"
+	"github.com/vyprai/vyql/internal/resultpolicy"
 )
 
 func writeTemp(t *testing.T, name, body string) string {
@@ -20,7 +21,7 @@ func writeTemp(t *testing.T, name, body string) string {
 }
 
 func TestLoadBaselineAcceptsBothVerdicts(t *testing.T) {
-	p := writeTemp(t, "b.json", `{"version":1,"entries":[
+	p := writeTemp(t, "b.json", `{"version":2,"entries":[
 	  {"fp":"aaa","verdict":"false-positive","reason":"source is a constant"},
 	  {"fp":"bbb","verdict":"accepted","reason":"known, tracked elsewhere"}]}`)
 	got, err := loadBaseline(p)
@@ -45,8 +46,12 @@ func TestLoadBaselineRejectsBrokenFiles(t *testing.T) {
 	}{
 		{"malformed", `not json`, "invalid character"},
 		{"wrong version", `{"version":99,"entries":[]}`, "this build understands"},
-		{"unknown verdict", `{"version":1,"entries":[{"fp":"a","verdict":"probably-fine"}]}`, "false-positive"},
-		{"missing fp", `{"version":1,"entries":[{"verdict":"accepted"}]}`, "has no fp"},
+		// v1 keys are the old per-binding fingerprint. They cannot match, and silently
+		// matching nothing would un-suppress a whole triaged backlog, so the error has to
+		// say how to migrate rather than just report a version mismatch.
+		{"v1 needs re-recording", `{"version":1,"entries":[{"fp":"a","verdict":"accepted"}]}`, "re-record it with -baseline-write"},
+		{"unknown verdict", `{"version":2,"entries":[{"fp":"a","verdict":"probably-fine"}]}`, "false-positive"},
+		{"missing fp", `{"version":2,"entries":[{"verdict":"accepted"}]}`, "has no fp"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -71,7 +76,7 @@ func fixture(rule, loc string) *findings.Finding {
 func TestApplyBaselineSplitsReportedFromCovered(t *testing.T) {
 	old, fresh := fixture("VYQL-INJ-001", "a.py:1"), fixture("VYQL-INJ-002", "b.py:2")
 	base := map[string]baselineEntry{
-		old.Fingerprint(): {FP: old.Fingerprint(), Verdict: verdictAccepted},
+		resultpolicy.Fingerprint(old): {FP: resultpolicy.Fingerprint(old), Verdict: verdictAccepted},
 	}
 	report, covered, stale := applyBaseline([]*findings.Finding{old, fresh}, base)
 	if len(report) != 1 || report[0].RuleID != "VYQL-INJ-002" {
@@ -90,8 +95,8 @@ func TestApplyBaselineSplitsReportedFromCovered(t *testing.T) {
 func TestApplyBaselineReportsStaleEntries(t *testing.T) {
 	present := fixture("VYQL-INJ-001", "a.py:1")
 	base := map[string]baselineEntry{
-		present.Fingerprint(): {FP: present.Fingerprint(), Verdict: verdictAccepted},
-		"deadbeefdeadbeef":    {FP: "deadbeefdeadbeef", Verdict: verdictFalsePositive, Rule: "VYQL-OLD-001", Loc: "gone.py:9"},
+		resultpolicy.Fingerprint(present): {FP: resultpolicy.Fingerprint(present), Verdict: verdictAccepted},
+		"deadbeefdeadbeef":                {FP: "deadbeefdeadbeef", Verdict: verdictFalsePositive, Rule: "VYQL-OLD-001", Loc: "gone.py:9"},
 	}
 	_, _, stale := applyBaseline([]*findings.Finding{present}, base)
 	if len(stale) != 1 {
@@ -127,7 +132,7 @@ func TestWriteBaselineRoundTrips(t *testing.T) {
 		t.Fatalf("round-tripped %d entries, want 2", len(loaded))
 	}
 	for _, f := range all {
-		e, ok := loaded[f.Fingerprint()]
+		e, ok := loaded[resultpolicy.Fingerprint(f)]
 		if !ok {
 			t.Errorf("finding %s missing from the written baseline", f.RuleID)
 			continue

@@ -11,6 +11,7 @@ import (
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/findings"
 	"github.com/vyprai/vyql/internal/ontology"
+	"github.com/vyprai/vyql/internal/resultpolicy"
 	"github.com/vyprai/vyql/internal/usg"
 )
 
@@ -246,7 +247,7 @@ func exportFindings(g usg.Store, all []*findings.Finding, ruleMeta map[string]ma
 			Kind:       mapKind(f.WitnessKind),
 			Severity:   f.Severity,
 			CWE:        cweOf(ruleMeta[f.RuleID]),
-			FP:         f.Fingerprint(),
+			FP:         resultpolicy.Fingerprint(f),
 			Confidence: f.Confidence,
 		}
 		srcB, sinkB := sourceAndSink(f)
