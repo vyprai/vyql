@@ -151,6 +151,32 @@ func TestWriteBaselineRoundTrips(t *testing.T) {
 	}
 }
 
+// Recording overwrites: every finding goes in as accepted, with an empty
+// reason. Run over an existing baseline that someone triaged, it would replace
+// their false-positive verdicts and the reasoning behind them with a blank
+// acceptance, and the run that did it would look like a success.
+func TestBaselineFlagsRejectRecordingOverAnExistingBaseline(t *testing.T) {
+	err := checkBaselineFlags("b.json", "b.json")
+	if err == nil {
+		t.Fatal("-baseline with -baseline-write was accepted")
+	}
+	for _, want := range []string{"-baseline", "-baseline-write"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %q", err, want)
+		}
+	}
+	// Either alone is the normal case and must stay usable.
+	if err := checkBaselineFlags("b.json", ""); err != nil {
+		t.Errorf("-baseline alone was rejected: %v", err)
+	}
+	if err := checkBaselineFlags("", "b.json"); err != nil {
+		t.Errorf("-baseline-write alone was rejected: %v", err)
+	}
+	if err := checkBaselineFlags("", ""); err != nil {
+		t.Errorf("neither flag was rejected: %v", err)
+	}
+}
+
 // writeVulnerablePy lays down a tree the shipped policies find something in, so
 // the -baseline-write tests below are about what a recording run reports rather
 // than about an empty result set.

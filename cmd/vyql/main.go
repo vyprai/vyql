@@ -220,6 +220,11 @@ func cmdScan(args []string) error {
 	if err != nil {
 		return err
 	}
+	// Checked up front for the same reason: a combination that cannot mean what
+	// the user hoped should cost nothing to discover.
+	if err := checkBaselineFlags(*baseline, *baselineWrite); err != nil {
+		return err
+	}
 	// Loaded up front for the same reason: a bad path or a bad verdict should
 	// cost nothing, and finding out after the scan that the baseline never
 	// applied is the silent no-op these checks exist to prevent.

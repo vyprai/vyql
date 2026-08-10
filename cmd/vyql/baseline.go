@@ -84,6 +84,22 @@ func loadBaseline(path string) (map[string]baselineEntry, error) {
 	return out, nil
 }
 
+// checkBaselineFlags rejects recording a baseline while applying one.
+//
+// Recording writes every current finding as accepted with an empty reason. Over
+// a baseline someone has triaged, that replaces their false-positive verdicts
+// and the reasoning behind them with a blank acceptance -- and the run that did
+// it exits 0. Re-recording is a real thing to want; it is also a thing to do
+// deliberately, to a path you name.
+func checkBaselineFlags(baseline, baselineWrite string) error {
+	if baseline == "" || baselineWrite == "" {
+		return nil
+	}
+	return fmt.Errorf("-baseline and -baseline-write together: recording writes every finding as accepted "+
+		"with an empty reason, which would overwrite the verdicts in %s; "+
+		"re-record to a new path and diff it, or drop -baseline", baseline)
+}
+
 func validVerdict(v string) bool {
 	for _, ok := range baselineVerdicts {
 		if v == ok {
