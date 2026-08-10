@@ -52,6 +52,7 @@ import (
 	"github.com/vyprai/vyql/internal/extract/lowering"
 	"github.com/vyprai/vyql/internal/extract/parsecache"
 	"github.com/vyprai/vyql/internal/findings"
+	"github.com/vyprai/vyql/internal/graphjson"
 	"github.com/vyprai/vyql/internal/graphsync"
 	"github.com/vyprai/vyql/internal/ontology"
 	"github.com/vyprai/vyql/internal/parser"
@@ -820,14 +821,14 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 		if len(paths) > 0 {
 			root = paths[0]
 		}
-		doc := gjDocument{
-			SchemaVersion: gjSchemaVersion,
-			Tool:          gjTool{Name: "VyQL", Version: version},
-			Concepts:      conceptLegend(),
-			CodeMap:       gjCodeMap{Root: root},
+		doc := graphjson.Document{
+			SchemaVersion: graphjson.SchemaVersion,
+			Tool:          graphjson.Tool{Name: "VyQL", Version: version},
+			Concepts:      graphjson.ConceptLegend(),
+			CodeMap:       graphjson.CodeMap{Root: root},
 		}
 		if graph != nil {
-			doc = buildGraphJSON(graph, all, sarifRulesMeta(ruleSources), root)
+			doc = graphjson.Build(graph, all, sarifRulesMeta(ruleSources), root, version)
 		}
 		b, _ := json.MarshalIndent(doc, "", "  ")
 		fmt.Println(string(b))
