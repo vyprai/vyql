@@ -47,6 +47,7 @@ import (
 
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/engine"
+	"github.com/vyprai/vyql/internal/extract"
 	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/internal/extract/lowering"
 	"github.com/vyprai/vyql/internal/extract/parsecache"
@@ -59,6 +60,7 @@ import (
 	"github.com/vyprai/vyql/internal/resultpolicy"
 	"github.com/vyprai/vyql/internal/risk"
 	"github.com/vyprai/vyql/internal/sarif"
+	"github.com/vyprai/vyql/internal/timing"
 	"github.com/vyprai/vyql/internal/usg"
 )
 
@@ -404,25 +406,26 @@ func profileNames() string {
 // scanPaths runs the full pipeline (extract → lower → bindings → compile →
 // evaluate) and returns the findings + a scan summary. Multi-language: each file
 // is routed to its real frontend and the matching framework bindings.
-func scanPaths(paths []string, ruleSources []parser.V2DefinitionSource) ([]*findings.Finding, scanStats, usg.Store, error) {
+func scanPaths(paths []string, ruleSources []parser.V2DefinitionSource) ([]*findings.Finding, extract.Stats, usg.Store, error) {
 	return scanPathsWithProfile(paths, ruleSources, "")
 }
 
-func scanPathsWithProfile(paths []string, ruleSources []parser.V2DefinitionSource, profileName string) ([]*findings.Finding, scanStats, usg.Store, error) {
-	return scanPathsWithProfileDemand(paths, ruleSources, profileName, false, graphBuildOptions{})
+func scanPathsWithProfile(paths []string, ruleSources []parser.V2DefinitionSource, profileName string) ([]*findings.Finding, extract.Stats, usg.Store, error) {
+	return scanPathsWithProfileDemand(paths, ruleSources, profileName, false, extract.Options{})
 }
 
-func scanPathsWithProfileDemand(paths []string, ruleSources []parser.V2DefinitionSource, profileName string, pruneBindings bool, build graphBuildOptions) ([]*findings.Finding, scanStats, usg.Store, error) {
+func scanPathsWithProfileDemand(paths []string, ruleSources []parser.V2DefinitionSource, profileName string, pruneBindings bool, build extract.Options) ([]*findings.Finding, extract.Stats, usg.Store, error) {
 	rules, err := compiledRulesFor(ruleSources)
 	if err != nil {
-		return nil, scanStats{}, nil, err
+		return nil, extract.Stats{}, nil, err
 	}
 	var bindingConcepts map[string]bool
 	if pruneBindings {
 		bindingConcepts = activeRuleBindingConcepts(rules, profileName)
 	}
 	build.BindingConcepts = bindingConcepts
-	g, stats, err := buildGraphWithOptions(paths, lowerCache(), build)
+	build.Sync = syncCollector
+	g, stats, err := extract.BuildGraph(paths, extract.SharedDeltaCache(), build)
 	if err != nil {
 		return nil, stats, nil, err
 	}
@@ -431,7 +434,7 @@ func scanPathsWithProfileDemand(paths []string, ruleSources []parser.V2Definitio
 	}
 	eng := engine.New(rules.onto, g)
 	var all []*findings.Finding
-	tk := newTimer()
+	tk := timing.New()
 	ruleTimingOn := os.Getenv("VYQL_RULE_TIMING") != ""
 	var activeRules []*engine.CompiledRule
 	for _, cr := range rules.compiled {
@@ -455,7 +458,7 @@ func scanPathsWithProfileDemand(paths []string, ruleSources []parser.V2Definitio
 		}
 		all = append(all, got...)
 	}
-	tk.mark("evaluate")
+	tk.Mark("evaluate")
 	return all, stats, g, nil
 }
 
@@ -711,7 +714,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	// skip the pipeline entirely. On a miss, the per-file parse cache still makes the rebuild
 	// reparse only the files that actually changed.
 	cache := parsecache.Shared()
-	tk := newTimer()
+	tk := timing.New()
 	// Graph-DB change-feed: when requested, build the per-module delta during the scan. Force the
 	// full pipeline (skip the whole-scan findings cache) so the collector is populated.
 	syncPath := syncOutputPath()
@@ -720,7 +723,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	}
 	var rkey string
 	var all []*findings.Finding
-	var stats scanStats
+	var stats extract.Stats
 	var graph usg.Store
 	hit := false
 	wantsFlags := opts.wantsFlags()
@@ -734,19 +737,19 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	if cache != nil && syncCollector == nil && !needsGraph {
 		rkey = scanFingerprint(cache.Salt(), paths, ruleSources, prof.Name, opts.BindingOverlay, opts.Excludes)
 		if cs, ok := loadCachedScan(cache, rkey); ok {
-			all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages, excluded: cs.Excluded, unmatched: cs.Unmatched}, true
+			all, stats, hit = cs.Findings, extract.Stats{Files: cs.Files, Languages: cs.Languages, Excluded: cs.Excluded, Unmatched: cs.Unmatched}, true
 		}
 	}
-	tk.mark("fingerprint")
+	tk.Mark("fingerprint")
 	if !hit {
 		if cache != nil && !opts.GraphCache {
 			func() {
 				restore := parsecache.SetShared(nil)
 				defer restore()
-				all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !needsGraph, graphBuildOptions{BindingOverlay: opts.BindingOverlay, Excludes: opts.Excludes})
+				all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !needsGraph, extract.Options{BindingOverlay: opts.BindingOverlay, Excludes: opts.Excludes})
 			}()
 		} else {
-			all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !needsGraph, graphBuildOptions{BindingOverlay: opts.BindingOverlay, Excludes: opts.Excludes})
+			all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !needsGraph, extract.Options{BindingOverlay: opts.BindingOverlay, Excludes: opts.Excludes})
 		}
 		if err != nil {
 			return err
@@ -1044,10 +1047,10 @@ func printScanFlags(rows []reviewItem) {
 	}
 }
 
-func printSummaryWithFlags(stats scanStats, findingsN, flagsN int, includeFlags bool) {
+func printSummaryWithFlags(stats extract.Stats, findingsN, flagsN int, includeFlags bool) {
 	var parts []string
-	for _, lg := range stats.languages {
-		parts = append(parts, fmt.Sprintf("%s:%d", lg, stats.files[lg]))
+	for _, lg := range stats.Languages {
+		parts = append(parts, fmt.Sprintf("%s:%d", lg, stats.Files[lg]))
 	}
 	scanned := "no source"
 	if len(parts) > 0 {
@@ -1064,13 +1067,13 @@ func printSummaryWithFlags(stats scanStats, findingsN, flagsN int, includeFlags 
 // printCoverageWarning reports files no frontend read. It is unconditional: a
 // report of zero findings over a tree that was mostly skipped reads as a clean
 // bill of health, and the reader has no way to tell without this line.
-func printCoverageWarning(stats scanStats) {
-	n := stats.unmatchedTotal()
+func printCoverageWarning(stats extract.Stats) {
+	n := stats.UnmatchedTotal()
 	if n == 0 {
 		return
 	}
 	fmt.Fprintf(os.Stderr, "warning: %d file(s) matched no frontend and were not analysed (%s)\n",
-		n, topKinds(stats.unmatched, 4))
+		n, topKinds(stats.Unmatched, 4))
 	fmt.Fprintln(os.Stderr, "         run with -coverage for the breakdown")
 }
 
@@ -1104,26 +1107,26 @@ func topKinds(m map[string]int, limit int) string {
 
 // printCoverage is the full account: what was read, what -exclude dropped, and
 // what nothing claimed.
-func printCoverage(stats scanStats) {
+func printCoverage(stats extract.Stats) {
 	fmt.Println("\ncoverage")
-	if len(stats.languages) == 0 {
+	if len(stats.Languages) == 0 {
 		fmt.Println("  parsed    nothing")
 	} else {
 		var parts []string
-		for _, lg := range stats.languages {
-			parts = append(parts, fmt.Sprintf("%s %d", lg, stats.files[lg]))
+		for _, lg := range stats.Languages {
+			parts = append(parts, fmt.Sprintf("%s %d", lg, stats.Files[lg]))
 		}
 		fmt.Printf("  parsed    %s\n", strings.Join(parts, " · "))
 	}
-	if stats.excluded > 0 {
-		fmt.Printf("  excluded  %d file(s) dropped by -exclude\n", stats.excluded)
+	if stats.Excluded > 0 {
+		fmt.Printf("  excluded  %d file(s) dropped by -exclude\n", stats.Excluded)
 	}
-	if stats.oversized > 0 {
-		fmt.Printf("  oversized %d file(s) skipped over the -max-file-size ceiling;\n", stats.oversized)
+	if stats.Oversized > 0 {
+		fmt.Printf("  oversized %d file(s) skipped over the -max-file-size ceiling;\n", stats.Oversized)
 		fmt.Println("            raise it or pass 0 to scan them")
 	}
-	if n := stats.unmatchedTotal(); n > 0 {
-		fmt.Printf("  unread    %d file(s) matched no frontend: %s\n", n, topKinds(stats.unmatched, 12))
+	if n := stats.UnmatchedTotal(); n > 0 {
+		fmt.Printf("  unread    %d file(s) matched no frontend: %s\n", n, topKinds(stats.Unmatched, 12))
 	}
 	// Depth is not uniform, and a clean result means different things across it.
 	fmt.Println("  depth     java, python, javascript are the reference frontends;")

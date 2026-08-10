@@ -9,6 +9,7 @@ import (
 
 	"github.com/vyprai/vyql/internal/bindings"
 	"github.com/vyprai/vyql/internal/engine"
+	"github.com/vyprai/vyql/internal/extract"
 	"github.com/vyprai/vyql/internal/extract/lowering"
 	"github.com/vyprai/vyql/internal/findings"
 	"github.com/vyprai/vyql/internal/ontology"
@@ -69,11 +70,11 @@ func findingKey(f *findings.Finding) string {
 }
 
 func buildGraphWithSyntheticBindings(paths []string, cache lowering.DeltaCache) (usg.Store, error) {
-	prog, _, ctorTypes, stats, err := extractAll(paths, nil)
+	prog, _, ctorTypes, stats, err := extract.All(paths, nil)
 	if err != nil {
 		return nil, err
 	}
-	if len(stats.files) == 0 || len(prog.Modules) == 0 {
+	if len(stats.Files) == 0 || len(prog.Modules) == 0 {
 		return nil, nil
 	}
 	var g usg.Store
@@ -89,7 +90,7 @@ func buildGraphWithSyntheticBindings(paths []string, cache lowering.DeltaCache) 
 	}
 	bindingApps := syntheticIncrementalBindings()
 	if cache != nil {
-		if _, err := bindings.ApplyIncremental(g, bindingApps, moduleHashes(prog), nil, cache); err != nil {
+		if _, err := bindings.ApplyIncremental(g, bindingApps, extract.ModuleHashes(prog), nil, cache); err != nil {
 			return nil, err
 		}
 	} else if _, _, err := bindings.Apply(g, bindingApps, nil); err != nil {

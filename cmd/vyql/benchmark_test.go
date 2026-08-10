@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vyprai/vyql/internal/extract"
 	"github.com/vyprai/vyql/internal/findings"
 	"github.com/vyprai/vyql/internal/parser"
 )
@@ -92,7 +93,7 @@ func runOWASPBenchmarkDir(t *testing.T, dir string) benchmarkScore {
 	}
 	restoreFast := setEnvForTest("VYQL_OWASP_BENCH_FAST", "1")
 	defer restoreFast()
-	fs, _, _, err := scanPathsWithProfileDemand(roots, rules, "", true, graphBuildOptions{})
+	fs, _, _, err := scanPathsWithProfileDemand(roots, rules, "", true, extract.Options{})
 	if err != nil {
 		t.Fatalf("scan: %v", err)
 	}

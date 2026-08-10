@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/internal/engine"
+	"github.com/vyprai/vyql/internal/extract"
 	"github.com/vyprai/vyql/internal/extract/nir"
 	"github.com/vyprai/vyql/internal/ontology"
 	"github.com/vyprai/vyql/internal/parser"
@@ -123,12 +124,12 @@ func TestExtractAllSupportsJavaScriptModules(t *testing.T) {
 		t.Fatalf("write source: %v", err)
 	}
 
-	_, _, _, stats, err := extractAll([]string{src}, nil)
+	_, _, _, stats, err := extract.All([]string{src}, nil)
 	if err != nil {
-		t.Fatalf("extractAll .mjs: %v", err)
+		t.Fatalf("extract.All .mjs: %v", err)
 	}
-	if got := stats.files["javascript"]; got != 1 {
-		t.Fatalf(".mjs should route through javascript frontend, got count %d stats=%v", got, stats.files)
+	if got := stats.Files["javascript"]; got != 1 {
+		t.Fatalf(".mjs should route through javascript frontend, got count %d stats=%v", got, stats.Files)
 	}
 }
 
@@ -157,12 +158,12 @@ class ChromePool:
 		t.Fatalf("write extensionless python source: %v", err)
 	}
 
-	prog, _, _, stats, err := extractAll([]string{dir}, nil)
+	prog, _, _, stats, err := extract.All([]string{dir}, nil)
 	if err != nil {
-		t.Fatalf("extractAll extensionless python: %v", err)
+		t.Fatalf("extract.All extensionless python: %v", err)
 	}
-	if got := stats.files["python"]; got != 1 {
-		t.Fatalf("extensionless python shebang should route through python frontend, got count %d stats=%v", got, stats.files)
+	if got := stats.Files["python"]; got != 1 {
+		t.Fatalf("extensionless python shebang should route through python frontend, got count %d stats=%v", got, stats.Files)
 	}
 	if !programHasContextToken(prog, "python_review:cloakserve_fingerprint_seed_path_traversal") {
 		t.Fatalf("extensionless python shebang did not emit Cloakserve semantic context: %#v", prog.Modules)
@@ -230,12 +231,12 @@ func TestExtractAllSupportsVueSingleFileComponents(t *testing.T) {
 		t.Fatalf("write source: %v", err)
 	}
 
-	prog, _, _, stats, err := extractAll([]string{src}, nil)
+	prog, _, _, stats, err := extract.All([]string{src}, nil)
 	if err != nil {
-		t.Fatalf("extractAll .vue: %v", err)
+		t.Fatalf("extract.All .vue: %v", err)
 	}
-	if got := stats.files["javascript"]; got != 1 {
-		t.Fatalf(".vue should route through javascript frontend, got count %d stats=%v", got, stats.files)
+	if got := stats.Files["javascript"]; got != 1 {
+		t.Fatalf(".vue should route through javascript frontend, got count %d stats=%v", got, stats.Files)
 	}
 	if len(prog.Modules) != 1 || len(prog.Modules[0].Body) == 0 {
 		t.Fatalf(".vue should extract script statements, got modules=%d body=%d", len(prog.Modules), len(prog.Modules[0].Body))
@@ -249,12 +250,12 @@ func TestExtractAllSupportsHtmlInlineScripts(t *testing.T) {
 		t.Fatalf("write source: %v", err)
 	}
 
-	prog, _, _, stats, err := extractAll([]string{src}, nil)
+	prog, _, _, stats, err := extract.All([]string{src}, nil)
 	if err != nil {
-		t.Fatalf("extractAll .html: %v", err)
+		t.Fatalf("extract.All .html: %v", err)
 	}
-	if got := stats.files["javascript"]; got != 1 {
-		t.Fatalf(".html should route through javascript frontend, got count %d stats=%v", got, stats.files)
+	if got := stats.Files["javascript"]; got != 1 {
+		t.Fatalf(".html should route through javascript frontend, got count %d stats=%v", got, stats.Files)
 	}
 	if len(prog.Modules) != 1 || len(prog.Modules[0].Body) == 0 {
 		t.Fatalf(".html should extract inline script statements, got modules=%d body=%d", len(prog.Modules), len(prog.Modules[0].Body))
@@ -268,12 +269,12 @@ func TestExtractAllIgnoresHtmlScriptsInsideComments(t *testing.T) {
 		t.Fatalf("write source: %v", err)
 	}
 
-	prog, _, _, stats, err := extractAll([]string{src}, nil)
+	prog, _, _, stats, err := extract.All([]string{src}, nil)
 	if err != nil {
-		t.Fatalf("extractAll commented .html: %v", err)
+		t.Fatalf("extract.All commented .html: %v", err)
 	}
-	if got := stats.files["javascript"]; got != 1 {
-		t.Fatalf(".html should still be counted by javascript frontend, got count %d stats=%v", got, stats.files)
+	if got := stats.Files["javascript"]; got != 1 {
+		t.Fatalf(".html should still be counted by javascript frontend, got count %d stats=%v", got, stats.Files)
 	}
 	if len(prog.Modules) != 0 {
 		t.Fatalf("commented HTML script should not produce JavaScript modules, got %#v", prog.Modules)
@@ -287,12 +288,12 @@ func TestExtractAllSupportsERBRubyIslands(t *testing.T) {
 		t.Fatalf("write source: %v", err)
 	}
 
-	prog, _, _, stats, err := extractAll([]string{src}, nil)
+	prog, _, _, stats, err := extract.All([]string{src}, nil)
 	if err != nil {
-		t.Fatalf("extractAll .erb: %v", err)
+		t.Fatalf("extract.All .erb: %v", err)
 	}
-	if got := stats.files["ruby"]; got != 1 {
-		t.Fatalf(".erb should route through ruby frontend, got count %d stats=%v", got, stats.files)
+	if got := stats.Files["ruby"]; got != 1 {
+		t.Fatalf(".erb should route through ruby frontend, got count %d stats=%v", got, stats.Files)
 	}
 	if len(prog.Modules) == 0 || len(prog.Modules[0].Body) == 0 {
 		t.Fatalf(".erb should extract embedded Ruby statements, got modules=%d", len(prog.Modules))
@@ -309,12 +310,12 @@ func TestExtractAllSupportsPHPIncludes(t *testing.T) {
 		t.Fatalf("write source: %v", err)
 	}
 
-	prog, _, _, stats, err := extractAll([]string{src}, nil)
+	prog, _, _, stats, err := extract.All([]string{src}, nil)
 	if err != nil {
-		t.Fatalf("extractAll .inc: %v", err)
+		t.Fatalf("extract.All .inc: %v", err)
 	}
-	if got := stats.files["php"]; got != 1 {
-		t.Fatalf(".inc should route through php frontend, got count %d stats=%v", got, stats.files)
+	if got := stats.Files["php"]; got != 1 {
+		t.Fatalf(".inc should route through php frontend, got count %d stats=%v", got, stats.Files)
 	}
 	if len(prog.Modules) != 1 || len(prog.Modules[0].Body) == 0 {
 		t.Fatalf(".inc should extract php statements, got modules=%d body=%d", len(prog.Modules), len(prog.Modules[0].Body))
@@ -328,12 +329,12 @@ func TestExtractAllSupportsDrupalPHPExtensions(t *testing.T) {
 		if err := os.WriteFile(src, []byte("<?php function helper($p) { echo $p; }\n"), 0o600); err != nil {
 			t.Fatalf("write %s source: %v", ext, err)
 		}
-		prog, _, _, stats, err := extractAll([]string{src}, nil)
+		prog, _, _, stats, err := extract.All([]string{src}, nil)
 		if err != nil {
-			t.Fatalf("extractAll %s: %v", ext, err)
+			t.Fatalf("extract.All %s: %v", ext, err)
 		}
-		if got := stats.files["php"]; got != 1 {
-			t.Fatalf("%s should route through php frontend, got count %d stats=%v", ext, got, stats.files)
+		if got := stats.Files["php"]; got != 1 {
+			t.Fatalf("%s should route through php frontend, got count %d stats=%v", ext, got, stats.Files)
 		}
 		if len(prog.Modules) != 1 || len(prog.Modules[0].Body) == 0 {
 			t.Fatalf("%s should extract php statements, got modules=%d body=%d", ext, len(prog.Modules), len(prog.Modules[0].Body))
@@ -348,12 +349,12 @@ func TestExtractAllSupportsPerlXSAsC(t *testing.T) {
 		t.Fatalf("write source: %v", err)
 	}
 
-	prog, _, _, stats, err := extractAll([]string{src}, nil)
+	prog, _, _, stats, err := extract.All([]string{src}, nil)
 	if err != nil {
-		t.Fatalf("extractAll .xs: %v", err)
+		t.Fatalf("extract.All .xs: %v", err)
 	}
-	if got := stats.files["c"]; got != 1 {
-		t.Fatalf(".xs should route through c frontend, got count %d stats=%v", got, stats.files)
+	if got := stats.Files["c"]; got != 1 {
+		t.Fatalf(".xs should route through c frontend, got count %d stats=%v", got, stats.Files)
 	}
 	if len(prog.Modules) != 1 || len(prog.Modules[0].Body) == 0 {
 		t.Fatalf(".xs should extract C statements, got modules=%d body=%d", len(prog.Modules), len(prog.Modules[0].Body))
@@ -383,15 +384,15 @@ int c_header_helper(char *value);
 		t.Fatalf("write c header: %v", err)
 	}
 
-	_, _, _, stats, err := extractAll([]string{dir}, nil)
+	_, _, _, stats, err := extract.All([]string{dir}, nil)
 	if err != nil {
-		t.Fatalf("extractAll headers: %v", err)
+		t.Fatalf("extract.All headers: %v", err)
 	}
-	if got := stats.files["cpp"]; got != 1 {
-		t.Fatalf("C++-looking .h should route through cpp frontend, got %d stats=%v", got, stats.files)
+	if got := stats.Files["cpp"]; got != 1 {
+		t.Fatalf("C++-looking .h should route through cpp frontend, got %d stats=%v", got, stats.Files)
 	}
-	if got := stats.files["c"]; got != 1 {
-		t.Fatalf("plain .h should still route through c frontend, got %d stats=%v", got, stats.files)
+	if got := stats.Files["c"]; got != 1 {
+		t.Fatalf("plain .h should still route through c frontend, got %d stats=%v", got, stats.Files)
 	}
 }
 

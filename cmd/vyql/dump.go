@@ -2,17 +2,11 @@ package main
 
 import (
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/vyprai/vyql/internal/extract/sca"
-
-	"github.com/vyprai/vyql/internal/bindings"
-	"github.com/vyprai/vyql/internal/extract/lowering"
-	"github.com/vyprai/vyql/internal/extract/nir"
-	"github.com/vyprai/vyql/internal/extract/parsecache"
+	"github.com/vyprai/vyql/internal/extract"
 	"github.com/vyprai/vyql/internal/ontology"
 	"github.com/vyprai/vyql/internal/usg"
 )
@@ -31,161 +25,11 @@ func parseExcludes(s string) []string {
 	return out
 }
 
-// pathHasExcludedSegment reports whether any path segment of p equals an exclude.
-func pathHasExcludedSegment(p string, excludes []string) bool {
-	if len(excludes) == 0 {
-		return false
-	}
-	for _, seg := range strings.Split(filepath.ToSlash(p), "/") {
-		for _, ex := range excludes {
-			if seg == ex {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-type graphBuildOptions struct {
-	BindingConcepts map[string]bool
-	// BindingOverlay and Excludes were package-level variables that cmdScan set and restored
-	// around the call, and that extractAll and scanFingerprint read without either call site
-	// showing the dependency. As globals they also made two scans in one process unsafe: the
-	// save/restore dance was the only thing keeping tests from bleeding into each other.
-	BindingOverlay string
-	Excludes       []string
-}
-
-// buildGraph runs extract → lower → bindings → SCA and returns the analysis graph (the
-// USG the rule engine evaluates against). Shared by scanPaths and the -dump debug path.
-// Returns a nil store when recognized files produced nothing to analyze.
-func buildGraph(paths []string) (usg.Store, scanStats, error) {
-	return buildGraphWithOptions(paths, lowerCache(), graphBuildOptions{})
-}
-
-// lowerCache returns the process cache as a lowering.DeltaCache, or nil when caching is off.
-// (A nil *parsecache.Cache must become a nil interface, not a non-nil interface holding nil.)
-func lowerCache() lowering.DeltaCache {
-	if c := parsecache.Shared(); c != nil {
-		return c
-	}
-	return nil
-}
-
-func buildGraphWithOptions(paths []string, cache lowering.DeltaCache, opts graphBuildOptions) (usg.Store, scanStats, error) {
-	restoreConcepts := bindings.SetActiveBindingConcepts(opts.BindingConcepts)
-	defer restoreConcepts()
-
-	tk := newTimer()
-	prog, bindingApps, ctorTypes, stats, err := extractAll(paths, opts.Excludes)
-	if err != nil {
-		return nil, stats, err
-	}
-	tk.mark("extract")
-	// A tree with nothing parseable can still carry dependency evidence: applySCA does its own
-	// walk and reads manifests and vendored library banners without needing a parsed module. A
-	// project that vendors only minified bundles lands here, because the walker skips those as
-	// unparseable — so run SCA before concluding there is nothing to report.
-	if len(prog.Modules) == 0 {
-		g := usg.NewInMemStore()
-		sca.Apply(g, paths)
-		nodes, err := g.AllNodes()
-		if err != nil {
-			return nil, stats, err
-		}
-		if len(nodes) == 0 {
-			// Nothing parseable AND no dependency evidence. Distinguish "you pointed me at a
-			// tree I cannot read" from "I read it and it is clean", so the former stays a
-			// diagnosable error rather than a silent zero-finding pass.
-			if len(stats.files) == 0 {
-				return nil, stats, fmt.Errorf("no supported source found under %s", strings.Join(paths, ", "))
-			}
-			return nil, stats, nil
-		}
-		if _, _, err := bindings.Apply(g, bindings.AutoBindings(), nil); err != nil {
-			return nil, stats, err
-		}
-		tk.mark("sca+bindings")
-		return g, stats, nil
-	}
-	// Incremental lowering when a cache is provided: reuse the lowered sub-graph of unchanged
-	// modules, re-lowering only edited ones. Equivalent to LowerTyped (the merged graph is
-	// identical), so bindings/taint/rules below are untouched. Benefits every command that
-	// builds a graph (scan, trace, query, graph, …).
-	var g usg.Store
-	var fresh map[string]bool
-	incremental := cache != nil
-	if incremental {
-		g, fresh, err = lowering.LowerIncremental(prog, true, ctorTypes, cache, syncCollector)
-	} else {
-		g, err = lowering.LowerTyped(prog, true, ctorTypes)
-	}
-	if err != nil {
-		return nil, stats, err
-	}
-	tk.mark("lower")
-	// SCA runs before binding apply so SBOM/manifest packages join the import evidence
-	// that gates package-aware bindings (the generated catalog included).
-	sca.Apply(g, paths)
-	// Dynamic, dependency-gated package bindings: load the generated per-package catalog
-	// only for packages this project actually depends on, then apply alongside the static
-	// framework bindings.
-	deps := bindings.DependencyEvidence(g)
-	for _, lang := range stats.languages {
-		bindingApps = append(bindingApps, bindings.GeneratedPackageBindingsFor(lang, deps)...)
-	}
-	if overlay := strings.TrimSpace(opts.BindingOverlay); overlay != "" {
-		extra, err := bindings.OverlayBindings(overlay, stats.languages)
-		if err != nil {
-			return nil, stats, fmt.Errorf("binding overlay: %w", err)
-		}
-		bindingApps = append(bindingApps, extra...)
-	}
-	tk.mark("sca+pkg")
-	// Binding labeling: incremental (reuse unchanged modules' cached labels) when caching is
-	// on, else a full pass. Both produce identical labels — binding precedence is per-node.
-	if incremental {
-		relabel, err := bindings.ApplyIncremental(g, bindingApps, moduleHashes(prog), deps, cache)
-		if err != nil {
-			return nil, stats, err
-		}
-		// Graph DB change-feed: collect the label rows of every label-dirty module. Label-dirty
-		// is the binding relabel set plus the lowering fresh set (a fresh module's labels may also
-		// have changed; re-emitting unchanged ones is an idempotent upsert). Nodes come from the
-		// same pass (fresh set); edges were collected creator-attributed during lowering.
-		if syncCollector != nil {
-			labelDirty := map[string]bool{}
-			for ns := range fresh {
-				labelDirty[ns] = true
-			}
-			for ns := range relabel {
-				labelDirty[ns] = true
-			}
-			for ns := range labelDirty {
-				syncCollector.MarkRelabel(ns)
-			}
-			if err := syncCollector.CollectGraph(g, labelDirty); err != nil {
-				return nil, stats, err
-			}
-		}
-	} else if _, _, err := bindings.Apply(g, bindingApps, nil); err != nil {
-		return nil, stats, err
-	}
-	tk.mark("bindings")
-	return g, stats, nil
-}
-
-// moduleHashes maps each content-addressed module's namespace (lowering.ModuleNS) to its
-// content hash, the per-module identity the incremental binding-label cache keys on. Modules
-// without a Hash (native frontends) are omitted, so they are always relabeled.
-func moduleHashes(prog nir.Program) map[string]string {
-	m := map[string]string{}
-	for _, mod := range prog.Modules {
-		if mod.Hash != "" {
-			m[lowering.ModuleNS(mod)] = mod.Hash
-		}
-	}
-	return m
+// buildGraph builds the analysis graph with this process's defaults: the shared parse cache
+// and no per-scan options. Shared by the debug commands and the -dump path; `scan` goes
+// through scanPathsWithProfileDemand, which has options to pass.
+func buildGraph(paths []string) (usg.Store, extract.Stats, error) {
+	return extract.BuildGraph(paths, extract.SharedDeltaCache(), extract.Options{Sync: syncCollector})
 }
 
 // edgeTypes are the edge kinds dumped (data, control, guard, graph-domain).

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vyprai/vyql/internal/extract"
 	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 )
 
@@ -31,30 +32,30 @@ func setMaxFileBytesForTest(t *testing.T, n int64) {
 
 func TestExtractAllSkipsOversizedFilesByDefault(t *testing.T) {
 	dir := writeSizedGoFiles(t)
-	_, _, _, stats, err := extractAll([]string{dir}, nil)
+	_, _, _, stats, err := extract.All([]string{dir}, nil)
 	if err != nil {
-		t.Fatalf("extractAll: %v", err)
+		t.Fatalf("extract.All: %v", err)
 	}
-	if got := stats.files["go"]; got != 1 {
+	if got := stats.Files["go"]; got != 1 {
 		t.Errorf("parsed go files = %d, want 1 (3MB file above the 2MiB default)", got)
 	}
-	if stats.oversized != 1 {
-		t.Errorf("stats.oversized = %d, want 1", stats.oversized)
+	if stats.Oversized != 1 {
+		t.Errorf("stats.Oversized = %d, want 1", stats.Oversized)
 	}
 	// A skipped oversized file is accounted for as oversized, not as a file no
 	// frontend understood -- otherwise the report reads as a coverage hole.
-	if got := stats.unmatched[".go"]; got != 0 {
+	if got := stats.Unmatched[".go"]; got != 0 {
 		t.Errorf("oversized file counted as unmatched (%d), want 0", got)
 	}
 }
 
 func TestExtractAllScansAnOversizedFileNamedDirectly(t *testing.T) {
 	dir := writeSizedGoFiles(t)
-	_, _, _, stats, err := extractAll([]string{filepath.Join(dir, "big.go")}, nil)
+	_, _, _, stats, err := extract.All([]string{filepath.Join(dir, "big.go")}, nil)
 	if err != nil {
-		t.Fatalf("extractAll: %v", err)
+		t.Fatalf("extract.All: %v", err)
 	}
-	if got := stats.files["go"]; got != 1 {
+	if got := stats.Files["go"]; got != 1 {
 		t.Errorf("parsed go files = %d, want 1 for a directly named file", got)
 	}
 }
@@ -62,11 +63,11 @@ func TestExtractAllScansAnOversizedFileNamedDirectly(t *testing.T) {
 func TestExtractAllHonorsDisabledCeiling(t *testing.T) {
 	setMaxFileBytesForTest(t, 0) // 0 disables the guard
 	dir := writeSizedGoFiles(t)
-	_, _, _, stats, err := extractAll([]string{dir}, nil)
+	_, _, _, stats, err := extract.All([]string{dir}, nil)
 	if err != nil {
-		t.Fatalf("extractAll: %v", err)
+		t.Fatalf("extract.All: %v", err)
 	}
-	if got := stats.files["go"]; got != 2 {
+	if got := stats.Files["go"]; got != 2 {
 		t.Errorf("parsed go files = %d, want 2 with the ceiling disabled", got)
 	}
 }

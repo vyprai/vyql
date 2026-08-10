@@ -1,4 +1,14 @@
-package main
+// Package extract is the scan pipeline: source paths in, an analysis graph out.
+//
+// It runs extract → lower → SCA → bindings, in that order, and owns the ordering decisions
+// between those stages. The stages themselves live in the sub-packages — frontends under
+// frontend/, lowering under lowering/, dependency evidence under sca/ — and this package is
+// what composes them.
+//
+// It sat in package main, which put one pipeline stage outside the ownership boundaries every
+// other stage respects, and made the whole composition reachable only through a command's
+// globals and a real filesystem.
+package extract
 
 import (
 	"os"
@@ -11,37 +21,46 @@ import (
 	"github.com/vyprai/vyql/internal/extract/nir"
 )
 
-// scanStats reports per-language file counts for the run summary, and what the
+// Stats reports per-language file counts for the run summary, and what the
 // scan did NOT look at.
 //
 // The counts of untouched files are the point. "scanned python:1 — 0 findings"
 // is a clean bill of health for one file and says nothing about the other forty
 // in the tree; without the second number a reader cannot tell the difference
 // between code that is clean and code that was never read.
-type scanStats struct {
-	files     map[string]int // language -> files parsed
-	languages []string       // languages actually present
-	excluded  int            // files dropped by -exclude
-	oversized int            // files skipped over the -max-file-size ceiling
-	unmatched map[string]int // extension -> count, claimed by no frontend
+type Stats struct {
+	Files     map[string]int // language -> files parsed
+	Languages []string       // languages actually present
+	Excluded  int            // files dropped by -exclude
+	Oversized int            // files skipped over the -max-file-size ceiling
+	Unmatched map[string]int // extension -> count, claimed by no frontend
 }
 
-// unmatchedTotal is the number of files present that no frontend analysed.
-func (s scanStats) unmatchedTotal() int {
+// UnmatchedTotal is the number of files present that no frontend analysed.
+func (s Stats) UnmatchedTotal() int {
 	n := 0
-	for _, c := range s.unmatched {
+	for _, c := range s.Unmatched {
 		n += c
 	}
 	return n
 }
 
-// extractAll routes every path to the right frontend(s), merges into one NIR
+// TotalFiles is the number of files a frontend actually parsed, across all languages.
+func (s Stats) TotalFiles() int {
+	n := 0
+	for _, c := range s.Files {
+		n += c
+	}
+	return n
+}
+
+// All routes every path to the right frontend(s), merges into one NIR
 // Program, and returns the union of binding applicators + constructor→type
 // tables for the languages present.
-func extractAll(paths []string, excludes []string) (nir.Program, []bindings.Applicator, map[string]string, scanStats, error) {
+func All(paths []string, excludes []string) (nir.Program, []bindings.Applicator, map[string]string, Stats, error) {
 	var prog nir.Program
 	present := map[string]bool{}
-	stats := scanStats{files: map[string]int{}, unmatched: map[string]int{}}
+	stats := Stats{Files: map[string]int{}, Unmatched: map[string]int{}}
 	// Every path a frontend claimed, so what is left over can be counted rather
 	// than assumed to be nothing.
 	claimed := map[string]bool{}
@@ -68,7 +87,7 @@ func extractAll(paths []string, excludes []string) (nir.Program, []bindings.Appl
 					}
 					kept = append(kept, e)
 				}
-				stats.oversized += len(entries) - len(kept)
+				stats.Oversized += len(entries) - len(kept)
 				entries = kept
 			}
 		} else {
@@ -82,7 +101,7 @@ func extractAll(paths []string, excludes []string) (nir.Program, []bindings.Appl
 					kept = append(kept, e)
 				}
 			}
-			stats.excluded += len(entries) - len(kept)
+			stats.Excluded += len(entries) - len(kept)
 			entries = kept
 		}
 		for _, e := range entries {
@@ -115,7 +134,7 @@ func extractAll(paths []string, excludes []string) (nir.Program, []bindings.Appl
 			}
 			prog.Modules = append(prog.Modules, sub.Modules...)
 			present[lg.Name] = true
-			stats.files[lg.Name] += len(files)
+			stats.Files[lg.Name] += len(files)
 			for _, f := range files {
 				claimed[f] = true
 			}
@@ -123,7 +142,7 @@ func extractAll(paths []string, excludes []string) (nir.Program, []bindings.Appl
 	}
 	for path, kind := range kinds {
 		if !claimed[path] {
-			stats.unmatched[kind]++
+			stats.Unmatched[kind]++
 		}
 	}
 
@@ -135,13 +154,28 @@ func extractAll(paths []string, excludes []string) (nir.Program, []bindings.Appl
 			for k, v := range bindings.CtorTypesFor(lg.Name) {
 				ctorTypes[k] = v
 			}
-			stats.languages = append(stats.languages, lg.Name)
+			stats.Languages = append(stats.Languages, lg.Name)
 		}
 	}
 	if len(prog.Modules) > 0 {
 		bindingApps = append(bindingApps, bindings.AutoBindings()...)
 	}
 	return prog, bindingApps, ctorTypes, stats, nil
+}
+
+// pathHasExcludedSegment reports whether any path segment of p equals an exclude.
+func pathHasExcludedSegment(p string, excludes []string) bool {
+	if len(excludes) == 0 {
+		return false
+	}
+	for _, seg := range strings.Split(filepath.ToSlash(p), "/") {
+		for _, ex := range excludes {
+			if seg == ex {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // propertiesFromEntries parses `.properties` files from the already-built source inventory.

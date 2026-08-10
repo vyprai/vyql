@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/vyprai/vyql/internal/datadir"
+	"github.com/vyprai/vyql/internal/extract"
 	"github.com/vyprai/vyql/internal/findings"
 	"github.com/vyprai/vyql/internal/ontology"
 	"github.com/vyprai/vyql/internal/parser"
@@ -820,7 +821,7 @@ func cmdQuery(args []string) error {
 // printScanStats reports graph size plus taint-hub warnings (high FLOWS in/out-degree nodes —
 // the shared callees that cause super-linear blowup). It uses the graph already built for the
 // scan; rebuilding here would double the work for `scan --stats`.
-func printScanStats(g usg.Store, stats scanStats) {
+func printScanStats(g usg.Store, stats extract.Stats) {
 	if g == nil {
 		fmt.Println("\n[stats] no graph built")
 		return
@@ -859,7 +860,7 @@ func printScanStats(g usg.Store, stats scanStats) {
 		nodeDeg[i].in = indeg[nodeDeg[i].id]
 	}
 	fmt.Printf("[stats] files %d | nodes %d | edges %d | sources %d | sinks %d\n",
-		totalFiles(stats), len(nodes), edges, srcCount, sinkCount)
+		stats.TotalFiles(), len(nodes), edges, srcCount, sinkCount)
 
 	// taint hubs: high FLOWS in-degree = a callee shared by many call sites; the cross-product
 	// of in×out paths through such a node is what makes path-enumeration blow up.
@@ -877,12 +878,4 @@ func printScanStats(g usg.Store, stats scanStats) {
 	if !shown {
 		fmt.Println("[stats] no taint hubs (max in-degree below 8) — graph is well-isolated")
 	}
-}
-
-func totalFiles(s scanStats) int {
-	n := 0
-	for _, c := range s.files {
-		n += c
-	}
-	return n
 }
