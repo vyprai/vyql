@@ -43,9 +43,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vyprai/vyql/internal/bindings"
+
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/engine"
-	"github.com/vyprai/vyql/internal/extract/frontend"
 	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/internal/extract/lowering"
 	"github.com/vyprai/vyql/internal/extract/parsecache"
@@ -387,7 +388,7 @@ func applyProfile(paths []string, name string) profile.Profile {
 			p = profile.Profile{Name: "generic", Title: "Generic application"}
 		}
 	}
-	frontend.SetActiveSources(p.ActiveSources())
+	bindings.SetActiveSources(p.ActiveSources())
 	return p
 }
 

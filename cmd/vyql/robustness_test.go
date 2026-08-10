@@ -6,11 +6,12 @@ package main
 // a real repo. Drives every entry in the `languages` table (22 langs + config).
 
 import (
-	"github.com/vyprai/vyql/internal/extract/frontend"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vyprai/vyql/internal/extract/frontend"
 )
 
 func robustnessInputs() map[string]string {

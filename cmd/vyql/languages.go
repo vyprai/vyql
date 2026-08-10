@@ -102,7 +102,7 @@ func extractAll(paths []string) (nir.Program, []bindings.Applicator, map[string]
 		}
 		class := frontend.ClassifyEntries(entries)
 		for _, lg := range frontend.Languages() {
-			if lg.Name == "textpattern" && frontend.BindingConceptPruningActive() && len(lg.Bindings()) == 0 {
+			if lg.Name == "textpattern" && bindings.BindingConceptPruningActive() && len(lg.Bindings()) == 0 {
 				continue
 			}
 			files := lg.FilesFor(entries, class)
@@ -132,14 +132,14 @@ func extractAll(paths []string) (nir.Program, []bindings.Applicator, map[string]
 	for _, lg := range frontend.Languages() {
 		if present[lg.Name] {
 			bindingApps = append(bindingApps, lg.Bindings()...)
-			for k, v := range frontend.CtorTypesFor(lg.Name) {
+			for k, v := range bindings.CtorTypesFor(lg.Name) {
 				ctorTypes[k] = v
 			}
 			stats.languages = append(stats.languages, lg.Name)
 		}
 	}
 	if len(prog.Modules) > 0 {
-		bindingApps = append(bindingApps, frontend.AutoBindings()...)
+		bindingApps = append(bindingApps, bindings.AutoBindings()...)
 	}
 	return prog, bindingApps, ctorTypes, stats, nil
 }

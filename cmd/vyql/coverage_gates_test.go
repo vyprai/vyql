@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vyprai/vyql/internal/bindings"
+
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/extract/frontend"
 	"github.com/vyprai/vyql/internal/parser"
@@ -789,7 +791,7 @@ func TestAllBindingsLoadGate(t *testing.T) {
 					t.Fatalf("binding set %q failed to load: %v", tech, r)
 				}
 			}()
-			if n := len(frontend.BindingsFor(tech)); n == 0 {
+			if n := len(bindings.BindingsFor(tech)); n == 0 {
 				t.Errorf("binding set %q produced no graph-labeling applicators", tech)
 			}
 		})
@@ -815,7 +817,7 @@ func TestEverySourceLanguageHasV2TaintEndpointCoverage(t *testing.T) {
 			if checkCount == 0 {
 				t.Fatalf("%q has no v2 check coverage definitions", lang)
 			}
-			if n := len(frontend.BindingsFor(lang)); n == 0 {
+			if n := len(bindings.BindingsFor(lang)); n == 0 {
 				t.Fatalf("%q frontend produced no binding applicators", lang)
 			}
 		})
