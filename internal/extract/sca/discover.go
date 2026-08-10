@@ -1,4 +1,4 @@
-package main
+package sca
 
 import (
 	"os"
@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
-	"github.com/vyprai/vyql/internal/extract/sca"
 	"github.com/vyprai/vyql/internal/usg"
 )
 
@@ -15,22 +14,24 @@ import (
 var manifestParsers = []struct {
 	base  string
 	eco   string
-	parse func(string) []sca.Dep
+	parse func(string) []Dep
 }{
-	{"requirements.txt", "pypi", sca.ParseRequirements},
-	{"setup.py", "pypi", sca.ParseSetupPy},
-	{"setup.cfg", "pypi", sca.ParseSetupCfg},
-	{"package.json", "npm", sca.ParsePackageJSON},
-	{".npmrc", "npm", sca.ParseNpmrc},
-	{"composer.lock", "php", sca.ParseComposerLock},
-	{"go.mod", "go", sca.ParseGoMod},
-	{"cargo.lock", "git", sca.ParseCargoLockGit},
+	{"requirements.txt", "pypi", ParseRequirements},
+	{"setup.py", "pypi", ParseSetupPy},
+	{"setup.cfg", "pypi", ParseSetupCfg},
+	{"package.json", "npm", ParsePackageJSON},
+	{".npmrc", "npm", ParseNpmrc},
+	{"composer.lock", "php", ParseComposerLock},
+	{"go.mod", "go", ParseGoMod},
+	{"cargo.lock", "git", ParseCargoLockGit},
 }
 
-// applySCA discovers dependency manifests under the scanned paths, adds SBOM nodes to the
-// graph, then runs the package reputation pipeline per ecosystem and links reachability.
-// Manifest/IO errors are non-fatal: package analysis augments a scan, it never gates it.
-func applySCA(g usg.Store, paths []string) {
+// Apply discovers dependency manifests under the scanned paths, adds SBOM nodes to the graph,
+// then runs the package reputation pipeline per ecosystem and links reachability.
+//
+// This lived in package main while every manifest reader it dispatches to lived here, so adding
+// an ecosystem meant editing the CLI and the table could not be exercised without it.
+func Apply(g usg.Store, paths []string) {
 	ecos := map[string]bool{}
 	for _, p := range paths {
 		info, err := os.Stat(p)
@@ -49,7 +50,7 @@ func applySCA(g usg.Store, paths []string) {
 				if len(deps) == 0 {
 					continue
 				}
-				if sca.BuildSBOM(g, mp.eco, deps, relFrom(p, f)) == nil {
+				if BuildSBOM(g, mp.eco, deps, relFrom(p, f)) == nil {
 					ecos[mp.eco] = true
 				}
 			}
@@ -60,11 +61,11 @@ func applySCA(g usg.Store, paths []string) {
 			if err != nil {
 				continue
 			}
-			deps := sca.ParseGitmodules(string(b), gitSubmoduleCommits(root))
+			deps := ParseGitmodules(string(b), gitSubmoduleCommits(root))
 			if len(deps) == 0 {
 				continue
 			}
-			if sca.BuildSBOM(g, "git", deps, relFrom(root, gm)) == nil {
+			if BuildSBOM(g, "git", deps, relFrom(root, gm)) == nil {
 				ecos["git"] = true
 			}
 		}
@@ -74,11 +75,11 @@ func applySCA(g usg.Store, paths []string) {
 			if err != nil {
 				continue
 			}
-			deps := sca.ParseVendoredJS(f, string(b))
+			deps := ParseVendoredJS(f, string(b))
 			if len(deps) == 0 {
 				continue
 			}
-			if sca.BuildSBOM(g, "npm", deps, loc) == nil {
+			if BuildSBOM(g, "npm", deps, loc) == nil {
 				ecos["npm"] = true
 			}
 		}
@@ -86,9 +87,9 @@ func applySCA(g usg.Store, paths []string) {
 	if len(ecos) == 0 {
 		return
 	}
-	_ = sca.LinkReachability(g)
+	_ = LinkReachability(g)
 	for eco := range ecos {
-		_, _, _, _ = sca.Analyze(g, eco)
+		_, _, _, _ = Analyze(g, eco)
 	}
 }
 
