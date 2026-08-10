@@ -14,6 +14,23 @@ only its `entrypoints` source families produce taint, so a CLI scan never treats
 params as attacker input, a server scan never treats argv as attacker input, etc. The
 `generic` profile is a permissive union used when nothing is detected.
 
+## The detection vocabulary — `projectfacts.vyql`
+
+A profile says *which* facts identify its archetype. `policy projectFacts default` says
+*what each fact means*: which manifests `dependency()` searches, what a `language()` name
+is on disk, what makes a directory the project root, what a satisfied predicate is worth
+when profiles are ranked, and how each `project.has("…")` fact is decided.
+
+Adding an ecosystem is an edit there, not a Go change. Two things are worth knowing before
+you make one:
+
+- **The weights are relative.** A `fact:` is worth 2 and everything else 1, deliberately: a
+  repository can depend on express *and* ship as a library, and the library reading is
+  meant to win. Changing a weight re-ranks every profile against every other one.
+- **`project.has("x")` must name a declared fact** (or an extension, `ext:.tsx`). One that
+  names neither scores zero forever, so its profile silently stops competing — `vyql scan`
+  prints a warning, and `TestShippedProjectFactsAreComplete` fails.
+
 ## Archetypes
 
 | Profile | Trust boundary (entry points) | Detect |

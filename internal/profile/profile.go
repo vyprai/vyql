@@ -5,7 +5,6 @@
 package profile
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -204,13 +203,24 @@ func ByName(profiles []Profile, name string) (Profile, bool) {
 // profile priority, then the order profiles are listed.
 // Returns the generic profile when nothing matches.
 func Detect(paths []string, profiles []Profile) Profile {
-	ctx := detectContext{
-		paths:               paths,
-		manifests:           readManifests(paths),
-		exts:                collectExts(paths),
-		npmPublishable:      npmPublishable(paths),
-		manifestPublishable: manifestPublishable(paths),
+	facts, err := defaultProjectFacts()
+	if err != nil {
+		// Reported, not returned. Without the vocabulary every predicate scores zero and
+		// every project reads as generic -- a silent, total loss of archetype detection
+		// that looks exactly like a project with no fingerprints.
+		reportOnce("vyql: " + err.Error() + "; profile auto-detection is disabled")
 	}
+	// The roots are resolved once. Each one costs a stat per marker per ancestor
+	// directory, and every file() predicate and every fact walk needs the same answer.
+	roots := roots(facts, paths)
+	ctx := detectContext{
+		roots:     roots,
+		facts:     facts,
+		manifests: readManifests(facts, roots),
+		exts:      collectExts(paths),
+		has:       map[string]bool{},
+	}
+	warnUnknownDetectFacts(facts, profiles)
 	best := Profile{Name: "generic", Title: "Generic application (no archetype detected)"}
 	bestScore := 0
 	for _, p := range profiles {
@@ -234,11 +244,11 @@ func Detect(paths []string, profiles []Profile) Profile {
 }
 
 type detectContext struct {
-	paths               []string
-	manifests           string
-	exts                map[string]bool
-	npmPublishable      bool
-	manifestPublishable bool
+	roots     []string
+	facts     projectFacts
+	manifests string
+	exts      map[string]bool
+	has       map[string]bool // named project.has() fact -> satisfied, answered once
 }
 
 func (c detectContext) score(expr DetectExpr) int {
@@ -263,100 +273,45 @@ func (c detectContext) score(expr DetectExpr) int {
 		if len(expr.Args) != 1 || c.score(expr.Args[0]) != 0 {
 			return 0
 		}
-		return 1
+		return c.facts.weight("not")
 	case "dependency", "framework", "import":
 		if depMatch(c.manifests, expr.Value) {
-			return 1
+			return c.facts.weight(expr.Op)
 		}
 	case "language":
-		if languagePresent(c.exts, expr.Value) {
-			return 1
+		if languagePresent(c.facts, c.exts, expr.Value) {
+			return c.facts.weight("language")
 		}
 	case "file":
-		if fileExists(c.paths, expr.Value) {
-			return 1
+		if fileExists(c.roots, expr.Value) {
+			return c.facts.weight("file")
 		}
 	case "project.has":
-		switch {
-		case expr.Value == "npm:publishable":
-			if c.npmPublishable {
-				return 2
-			}
-		case expr.Value == "manifest:publishable":
-			if c.manifestPublishable {
-				return 2
-			}
-		case strings.HasPrefix(expr.Value, "ext:"):
-			ext := strings.TrimPrefix(expr.Value, "ext:")
+		// An extension is answered from the inventory already collected; every other
+		// value names a fact the data declares and a walk decides.
+		if ext, ok := strings.CutPrefix(expr.Value, "ext:"); ok {
 			if c.exts[strings.ToLower(ext)] {
-				return 1
+				return c.facts.weight("ext")
 			}
+			return 0
+		}
+		if c.satisfiesFact(expr.Value) {
+			return c.facts.weight("fact")
 		}
 	}
 	return 0
 }
 
-// manifestPublishable reports whether the project has a publishable package manifest:
-// a *.gemspec (Ruby gem), *.podspec (CocoaPods), Cargo.toml with a [lib] target
-// (Rust crate lib), or composer.json with "type":"library" (PHP).
-func manifestPublishable(paths []string) bool {
-	for _, root := range roots(paths) {
-		found := false
-		_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-			if err != nil || found {
-				return nil
-			}
-			if d.IsDir() {
-				if path != root && (d.Name() == "node_modules" || d.Name() == "vendor" || strings.HasPrefix(d.Name(), ".")) {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			name := d.Name()
-			switch {
-			case strings.HasSuffix(name, ".gemspec"), strings.HasSuffix(name, ".podspec"), strings.HasSuffix(name, ".nuspec"):
-				found = true
-			case strings.HasSuffix(name, ".csproj"):
-				// a .NET project that declares NuGet PACKAGE metadata is a publishable
-				// artifact; ignore Exe output projects.
-				if data, err := os.ReadFile(path); err == nil {
-					t := string(data)
-					if !strings.Contains(t, "<OutputType>Exe</OutputType>") && !strings.Contains(t, "<OutputType>WinExe</OutputType>") &&
-						(strings.Contains(t, "<PackageId>") || strings.Contains(t, "<PackageLicenseExpression>") ||
-							strings.Contains(t, "<PackageLicenseFile>") || strings.Contains(t, "<GeneratePackageOnBuild>")) {
-						found = true
-					}
-				}
-			case name == "pom.xml":
-				// A Maven artifact with hpi/maven-plugin packaging is a publishable plugin.
-				// Plain-jar poms are too ambiguous to use as a profile fingerprint.
-				if data, err := os.ReadFile(path); err == nil {
-					t := string(data)
-					if strings.Contains(t, "<packaging>hpi</packaging>") || strings.Contains(t, "<packaging>maven-plugin</packaging>") {
-						found = true
-					}
-				}
-			case name == "Cargo.toml":
-				if data, err := os.ReadFile(path); err == nil && strings.Contains(string(data), "[lib]") {
-					found = true
-				}
-			case name == "composer.json":
-				if data, err := os.ReadFile(path); err == nil {
-					var pkg struct {
-						Type string `json:"type"`
-					}
-					if json.Unmarshal(data, &pkg) == nil && pkg.Type == "library" {
-						found = true // explicit only — absent type is ambiguous (PHP apps omit it)
-					}
-				}
-			}
-			return nil
-		})
-		if found {
-			return true
-		}
+// satisfiesFact answers a named project.has() fact, memoised: a fact walks the whole
+// project, and several profiles ask for the same one.
+func (c detectContext) satisfiesFact(name string) bool {
+	if got, ok := c.has[name]; ok {
+		return got
 	}
-	return false
+	nf, ok := c.facts.fact(name)
+	got := ok && nf.satisfiedBy(c.roots)
+	c.has[name] = got
+	return got
 }
 
 func depMatch(manifests, dep string) bool {
@@ -369,63 +324,12 @@ func depMatch(manifests, dep string) bool {
 	return regexp.MustCompile(pat).FindStringIndex(manifests) != nil
 }
 
-func npmPublishable(paths []string) bool {
-	for _, root := range roots(paths) {
-		found := false
-		_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-			if err != nil || found {
-				return nil
-			}
-			if d.IsDir() {
-				if path != root && (d.Name() == "node_modules" || strings.HasPrefix(d.Name(), ".")) {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			if d.Name() != "package.json" {
-				return nil
-			}
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return nil
-			}
-			var pkg struct {
-				Private bool            `json:"private"`
-				Main    string          `json:"main"`
-				Module  string          `json:"module"`
-				Exports json.RawMessage `json:"exports"`
-				Files   json.RawMessage `json:"files"`
-				Types   string          `json:"types"`
-				Typings string          `json:"typings"`
-				Bin     json.RawMessage `json:"bin"`
-			}
-			if json.Unmarshal(data, &pkg) != nil || pkg.Private {
-				return nil
-			}
-			// A non-private package that declares any publish surface is publishable.
-			// `main` is often omitted (defaults to index.js); also accept files/types/bin.
-			if pkg.Main != "" || pkg.Module != "" || len(pkg.Exports) > 0 ||
-				len(pkg.Files) > 0 || pkg.Types != "" || pkg.Typings != "" || len(pkg.Bin) > 0 {
-				found = true
-			}
-			return nil
-		})
-		if found {
-			return true
-		}
-	}
-	return false
-}
-
-// readManifests concatenates the text of common dependency manifests under the
-// scanned roots, so "dep:x" fingerprints can substring-match a declared dep.
-func readManifests(paths []string) string {
-	names := []string{"package.json", "requirements.txt", "pyproject.toml", "go.mod",
-		"Pipfile", "Pipfile.lock", "poetry.lock", "Gemfile", "Gemfile.lock", "pom.xml",
-		"build.gradle", "Cargo.toml", "composer.json"}
+// readManifests concatenates the text of the declared dependency manifests under the
+// scanned roots, so a dependency() fingerprint can substring-match a declared dep.
+func readManifests(facts projectFacts, roots []string) string {
 	var b strings.Builder
-	for _, root := range roots(paths) {
-		for _, n := range names {
+	for _, root := range roots {
+		for _, n := range facts.manifests {
 			if data, err := os.ReadFile(filepath.Join(root, n)); err == nil {
 				b.Write(data)
 				b.WriteByte('\n')
@@ -448,8 +352,8 @@ func collectExts(paths []string) map[string]bool {
 	return out
 }
 
-func languagePresent(exts map[string]bool, language string) bool {
-	for _, ext := range languageExts[strings.ToLower(language)] {
+func languagePresent(facts projectFacts, exts map[string]bool, language string) bool {
+	for _, ext := range facts.languageExts[strings.ToLower(language)] {
 		if exts[ext] {
 			return true
 		}
@@ -457,29 +361,8 @@ func languagePresent(exts map[string]bool, language string) bool {
 	return false
 }
 
-var languageExts = map[string][]string{
-	"c":           {".c", ".h"},
-	"cpp":         {".cc", ".cpp", ".cxx", ".hpp", ".hh", ".hxx"},
-	"csharp":      {".cs"},
-	"dart":        {".dart"},
-	"elixir":      {".ex", ".exs"},
-	"go":          {".go"},
-	"groovy":      {".groovy"},
-	"java":        {".java"},
-	"javascript":  {".js", ".jsx", ".mjs", ".cjs"},
-	"kotlin":      {".kt", ".kts"},
-	"objective-c": {".m", ".mm"},
-	"php":         {".php"},
-	"python":      {".py"},
-	"ruby":        {".rb"},
-	"rust":        {".rs"},
-	"scala":       {".scala"},
-	"swift":       {".swift"},
-	"typescript":  {".ts", ".tsx", ".mts", ".cts"},
-}
-
-func fileExists(paths []string, rel string) bool {
-	for _, root := range roots(paths) {
+func fileExists(roots []string, rel string) bool {
+	for _, root := range roots {
 		if _, err := os.Stat(filepath.Join(root, rel)); err == nil {
 			return true
 		}
@@ -487,11 +370,11 @@ func fileExists(paths []string, rel string) bool {
 	return false
 }
 
-func roots(paths []string) []string {
+func roots(facts projectFacts, paths []string) []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, p := range paths {
-		root := projectRoot(p)
+		root := projectRoot(facts, p)
 		if seen[root] {
 			continue
 		}
@@ -501,7 +384,7 @@ func roots(paths []string) []string {
 	return out
 }
 
-func projectRoot(p string) string {
+func projectRoot(facts projectFacts, p string) string {
 	var base string
 	if info, err := os.Stat(p); err == nil && info.IsDir() {
 		base = p
@@ -510,7 +393,7 @@ func projectRoot(p string) string {
 	}
 	fallback := filepath.Clean(base)
 	for {
-		if hasProjectMarker(base) {
+		if hasProjectMarker(facts, base) {
 			return base
 		}
 		parent := filepath.Dir(base)
@@ -521,20 +404,17 @@ func projectRoot(p string) string {
 	}
 }
 
-func hasProjectMarker(dir string) bool {
-	markers := []string{
-		".git", "package.json", "setup.py", "setup.cfg", "pyproject.toml", "go.mod",
-		"Pipfile", "requirements.txt", "Gemfile", "pom.xml", "build.gradle",
-		"Cargo.toml", "composer.json", "AndroidManifest.xml", "Info.plist",
-		"Package.swift",
-	}
-	for _, marker := range markers {
+func hasProjectMarker(facts projectFacts, dir string) bool {
+	for _, marker := range facts.projectMarkers {
+		if strings.ContainsRune(marker, '*') {
+			if matches, _ := filepath.Glob(filepath.Join(dir, marker)); len(matches) > 0 {
+				return true
+			}
+			continue
+		}
 		if _, err := os.Stat(filepath.Join(dir, marker)); err == nil {
 			return true
 		}
-	}
-	if matches, _ := filepath.Glob(filepath.Join(dir, "*.xcodeproj")); len(matches) > 0 {
-		return true
 	}
 	return false
 }
