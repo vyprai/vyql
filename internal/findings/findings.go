@@ -4,6 +4,22 @@
 // checked). Explainability is produced by the engine, not rule authors.
 package findings
 
+// ContextFacts are the cross-domain facts the engine established while building a finding's
+// context lines. They are recorded as fields because the priority model needs to know THAT a sink
+// is internet-reachable, not how that was worded: risk used to recover these by substring-matching
+// the rendered English, so renaming a label in the ontology silently stopped findings scoring the
+// factor. The Context strings remain the human-readable form of the same facts.
+type ContextFacts struct {
+	InternetReachable bool
+	RuntimeConfirmed  bool
+	HoldsAsset        bool
+	// Witness lines, one per fact, so the priority model can cite what it scored without
+	// re-deriving it from Context.
+	ReachWitness   string
+	ConfirmWitness string
+	AssetWitness   string
+}
+
 // Binding is a bound variable in a finding (with the provenance of its concept
 // label).
 type Binding struct {
@@ -42,5 +58,7 @@ type Finding struct {
 	NegationEvidence []NegationEvidence
 	Confidence       string
 	Context          []string
+	// Facts is the typed form of what Context describes; see ContextFacts.
+	Facts            ContextFacts
 	ReviewConditions []ReviewCondition
 }

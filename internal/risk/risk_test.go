@@ -10,7 +10,24 @@ import (
 	"github.com/vyprai/vyql/internal/parser"
 )
 
+// mkFinding derives the typed facts from the context lines a case supplies, so the cases keep
+// reading as prose while exercising the fields the priority model now scores. The derivation
+// lives here, in the fixture: recognising a rendered label is a test concern, and having it in
+// the production path is exactly what this change removed.
 func mkFinding(severity, confidence string, context []string) *findings.Finding {
+	var facts findings.ContextFacts
+	for _, c := range context {
+		lower := strings.ToLower(c)
+		if strings.Contains(lower, "internet-reachable") {
+			facts.InternetReachable, facts.ReachWitness = true, c
+		}
+		if strings.Contains(lower, "confirmed by runtime") {
+			facts.RuntimeConfirmed, facts.ConfirmWitness = true, c
+		}
+		if strings.Contains(lower, "holds [") {
+			facts.HoldsAsset, facts.AssetWitness = true, c
+		}
+	}
 	return &findings.Finding{
 		RuleID: "VYQL-INJ-001", Severity: severity, Confidence: confidence, WitnessKind: "taint",
 		Bindings: []findings.Binding{
@@ -18,6 +35,7 @@ func mkFinding(severity, confidence string, context []string) *findings.Finding 
 			{Name: "sink", Concept: "code.SqlExecution", Loc: "h.py:2"},
 		},
 		Context: context,
+		Facts:   facts,
 	}
 }
 
