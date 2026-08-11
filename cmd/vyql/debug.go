@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -27,14 +26,16 @@ import (
 // tool; it works on the same graph the engine evaluates, no rules needed.
 
 func cmdTrace(args []string) error {
-	fs := flag.NewFlagSet("trace", flag.ExitOnError)
+	fs := newFlagSet("trace")
 	from := fs.String("from", "", "only trace sources whose concept contains this substring")
 	to := fs.String("to", "", "only count sinks whose concept contains this substring")
-	profileName := fs.String("profile", "auto", "analysis profile")
-	_ = fs.Parse(args)
-	paths := fs.Args()
-	if len(paths) == 0 {
-		return fmt.Errorf("usage: vyql trace [-from CONCEPT] [-to CONCEPT] <path> [<path>...]")
+	profileName := addProfile(fs)
+	if err := parseFlags(fs, args); err != nil {
+		return err
+	}
+	paths, err := requirePaths(fs, "vyql trace [-from CONCEPT] [-to CONCEPT] <path>...")
+	if err != nil {
+		return err
 	}
 	// Checked before the graph is built: a filter that can never match would
 	// otherwise print "0 source(s)" after a full scan, which reads as good news.
@@ -228,13 +229,15 @@ func ontologyConceptKind(onto *ontology.Ontology, c string) string {
 // advisory notes) — the "why did this fire, and what almost stopped it" view.
 
 func cmdExplain(args []string) error {
-	fs := flag.NewFlagSet("explain", flag.ExitOnError)
-	rulesPath := fs.String("rules", "", "rule file/dir (default: vyql/packs)")
-	profileName := fs.String("profile", "auto", "analysis profile")
-	_ = fs.Parse(args)
-	paths := fs.Args()
-	if len(paths) == 0 {
-		return fmt.Errorf("usage: vyql explain [-rules ...] <path> [<path>...]")
+	fs := newFlagSet("explain")
+	rulesPath := addRules(fs)
+	profileName := addProfile(fs)
+	if err := parseFlags(fs, args); err != nil {
+		return err
+	}
+	paths, err := requirePaths(fs, "vyql explain [-rules ...] <path>...")
+	if err != nil {
+		return err
 	}
 	prof := applyProfile(paths, *profileName)
 	ruleSources, err := loadRules(*rulesPath)
@@ -291,12 +294,14 @@ func cmdExplain(args []string) error {
 // as absent.
 
 func cmdMatch(args []string) error {
-	fs := flag.NewFlagSet("match", flag.ExitOnError)
-	profileName := fs.String("profile", "auto", "analysis profile")
-	_ = fs.Parse(args)
-	paths := fs.Args()
-	if len(paths) == 0 {
-		return fmt.Errorf("usage: vyql match <path> [<path>...]")
+	fs := newFlagSet("match")
+	profileName := addProfile(fs)
+	if err := parseFlags(fs, args); err != nil {
+		return err
+	}
+	paths, err := requirePaths(fs, "vyql match <path>...")
+	if err != nil {
+		return err
 	}
 	applyProfile(paths, *profileName)
 	g, _, err := buildGraph(paths)
@@ -355,12 +360,14 @@ func isSourceConcept(onto *ontology.Ontology, c string) bool {
 // it (so cross-package / unresolved calls — where taint silently dies — are explicit).
 
 func cmdResolve(args []string) error {
-	fs := flag.NewFlagSet("resolve", flag.ExitOnError)
-	profileName := fs.String("profile", "auto", "analysis profile")
-	_ = fs.Parse(args)
-	paths := fs.Args()
-	if len(paths) == 0 {
-		return fmt.Errorf("usage: vyql resolve <path> [<path>...]")
+	fs := newFlagSet("resolve")
+	profileName := addProfile(fs)
+	if err := parseFlags(fs, args); err != nil {
+		return err
+	}
+	paths, err := requirePaths(fs, "vyql resolve <path>...")
+	if err != nil {
+		return err
 	}
 	applyProfile(paths, *profileName)
 	g, _, err := buildGraph(paths)
@@ -412,13 +419,15 @@ func cmdResolve(args []string) error {
 // Dump the USG (nodes + edges), or the per-source taint reachability with -taint.
 
 func cmdGraph(args []string) error {
-	fs := flag.NewFlagSet("graph", flag.ExitOnError)
+	fs := newFlagSet("graph")
 	taint := fs.Bool("taint", false, "show per-source FLOWS reachability instead of the full graph")
-	profileName := fs.String("profile", "auto", "analysis profile")
-	_ = fs.Parse(args)
-	paths := fs.Args()
-	if len(paths) == 0 {
-		return fmt.Errorf("usage: vyql graph [-taint] <path> [<path>...]")
+	profileName := addProfile(fs)
+	if err := parseFlags(fs, args); err != nil {
+		return err
+	}
+	paths, err := requirePaths(fs, "vyql graph [-taint] <path>...")
+	if err != nil {
+		return err
 	}
 	applyProfile(paths, *profileName)
 	g, _, err := buildGraph(paths)
@@ -440,9 +449,11 @@ func cmdGraph(args []string) error {
 // don't have to grep the .vyql — and can see at a glance whether an API is modelled.
 
 func cmdBindings(args []string) error {
-	fs := flag.NewFlagSet("bindings", flag.ExitOnError)
+	fs := newFlagSet("bindings")
 	lang := fs.String("lang", "", "technology binding set to list (e.g. go, javascript, java, python)")
-	_ = fs.Parse(args)
+	if err := parseFlags(fs, args); err != nil {
+		return err
+	}
 	if *lang == "" {
 		fmt.Println("usage: vyql bindings -lang <go|javascript|java|python|...>")
 		fmt.Println("available bindings:")
@@ -536,9 +547,11 @@ func bindingDefinitionSources(lang string) ([]parser.V2DefinitionSource, error) 
 // Parse a binding file through the real VyQL parser and emit a compact public summary.
 
 func cmdValidateBinding(args []string) error {
-	fs := flag.NewFlagSet("validate-binding", flag.ExitOnError)
+	fs := newFlagSet("validate-binding")
 	file := fs.String("file", "", "binding .vyql file to parse; reads stdin when empty")
-	_ = fs.Parse(args)
+	if err := parseFlags(fs, args); err != nil {
+		return err
+	}
 	var data []byte
 	var err error
 	if *file != "" {
@@ -714,7 +727,7 @@ func readFindingsJSON(path string) ([]jsonFinding, error) {
 //	vyql query -from SourceConcept -to SinkConcept <path>...   # reachability
 
 func cmdQuery(args []string) error {
-	fs := flag.NewFlagSet("query", flag.ExitOnError)
+	fs := newFlagSet("query")
 	typ := fs.String("type", "", "match node type substring")
 	concept := fs.String("concept", "", "match concept label substring")
 	call := fs.String("call", "", "match callee_path/method (substring, e.g. db.Query)")
@@ -723,12 +736,13 @@ func cmdQuery(args []string) error {
 	to := fs.String("to", "", "reachability mode: sink concept (with -from)")
 	edges := fs.Bool("edges", false, "also print each matching node's outgoing edges")
 	count := fs.Bool("count", false, "print only the number of matches")
-	profileName := fs.String("profile", "auto", "analysis profile")
-	_ = fs.Parse(args)
-	paths := fs.Args()
-	if len(paths) == 0 {
-		return fmt.Errorf("usage: vyql query [-type T] [-concept C] [-call P] [-loc L] [-edges] [-count] <path>...\n" +
-			"          vyql query -from SRC -to SINK <path>...   (reachability)")
+	profileName := addProfile(fs)
+	if err := parseFlags(fs, args); err != nil {
+		return err
+	}
+	paths, err := requirePaths(fs, "vyql query [-type T] [-concept C] [-call P] [-loc L] [-edges] [-count] <path>...")
+	if err != nil {
+		return err
 	}
 	applyProfile(paths, *profileName)
 	g, _, err := buildGraph(paths)
@@ -804,9 +818,9 @@ func cmdQuery(args []string) error {
 // printScanStats reports graph size plus taint-hub warnings (high FLOWS in/out-degree nodes —
 // the shared callees that cause super-linear blowup). It uses the graph already built for the
 // scan; rebuilding here would double the work for `scan --stats`.
-func printScanStats(g usg.Store, stats extract.Stats) {
+func printScanStats(w io.Writer, g usg.Store, stats extract.Stats) {
 	if g == nil {
-		fmt.Println("\n[stats] no graph built")
+		fmt.Fprintln(w, "\n[stats] no graph built")
 		return
 	}
 	nodes, _ := g.AllNodes()
@@ -842,7 +856,7 @@ func printScanStats(g usg.Store, stats extract.Stats) {
 	for i := range nodeDeg {
 		nodeDeg[i].in = indeg[nodeDeg[i].id]
 	}
-	fmt.Printf("[stats] files %d | nodes %d | edges %d | sources %d | sinks %d\n",
+	fmt.Fprintf(w, "[stats] files %d | nodes %d | edges %d | sources %d | sinks %d\n",
 		stats.TotalFiles(), len(nodes), edges, srcCount, sinkCount)
 
 	// taint hubs: high FLOWS in-degree = a callee shared by many call sites; the cross-product
@@ -852,14 +866,14 @@ func printScanStats(g usg.Store, stats extract.Stats) {
 	for _, d := range nodeDeg {
 		if d.in >= 8 {
 			if !shown {
-				fmt.Println("[stats] taint hubs (FLOWS in-degree ≥ 8 — shared callees, blowup risk):")
+				fmt.Fprintln(w, "[stats] taint hubs (FLOWS in-degree ≥ 8 — shared callees, blowup risk):")
 				shown = true
 			}
-			fmt.Printf("  in=%-4d out=%-3d %-26s %s\n", d.in, d.out, d.path, d.loc)
+			fmt.Fprintf(w, "  in=%-4d out=%-3d %-26s %s\n", d.in, d.out, d.path, d.loc)
 		}
 	}
 	if !shown {
-		fmt.Println("[stats] no taint hubs (max in-degree below 8) — graph is well-isolated")
+		fmt.Fprintln(w, "[stats] no taint hubs (max in-degree below 8) — graph is well-isolated")
 	}
 }
 

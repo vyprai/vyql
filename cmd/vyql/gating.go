@@ -40,7 +40,8 @@ func parseFailOn(v string) (int, error) {
 	if r := severityRank(v); r > 0 {
 		return r, nil
 	}
-	return 0, fmt.Errorf("unknown -fail-on %q; use none | %s", v, strings.Join(severityOrder, " | "))
+	return 0, usageWith(fmt.Sprintf("unknown -fail-on %q", v),
+		"valid: none | "+strings.Join(severityOrder, " | "))
 }
 
 // gateFindings reports how many findings sit at or above the threshold, and the
@@ -62,16 +63,10 @@ func gateFindings(all []*findings.Finding, minRank int) (count int, highest stri
 	return count, highest
 }
 
-// thresholdMet reports a successful scan whose findings met -fail-on. It is not
-// a failure of the tool, so main prints it without the diagnostic prefix it
-// gives real errors, and exits with the status -exit-code asked for.
-type thresholdMet struct {
-	code    int
-	count   int
-	highest string
-	failOn  string
-}
-
-func (e *thresholdMet) Error() string {
-	return fmt.Sprintf("%d finding(s) at or above %s (highest: %s)", e.count, e.failOn, e.highest)
+// thresholdMet reports a successful scan whose findings met -fail-on. It is not a
+// failure of the tool, so it carries no diagnostic prefix and exits 3 -- the code
+// for a check that ran and did not pass, which a pipeline can tell apart from the
+// scanner having been unable to run.
+func thresholdMet(count int, failOn, highest string) error {
+	return checkFailedf("%d finding(s) at or above %s (highest: %s)", count, failOn, highest)
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -104,12 +105,16 @@ func TestGateFindingsIgnoresUnknownSeverity(t *testing.T) {
 	}
 }
 
-func TestThresholdMetCarriesExitCodeAndCounts(t *testing.T) {
-	e := &thresholdMet{code: 3, count: 2, highest: "critical", failOn: "high"}
-	if e.code != 3 {
-		t.Errorf("code = %d, want 3", e.code)
+func TestThresholdMetIsACheckFailureCarryingTheCounts(t *testing.T) {
+	err := thresholdMet(2, "high", "critical")
+	if _, ok := errors.AsType[*checkFailed](err); !ok {
+		t.Fatalf("a met threshold must be a check failure, so it exits %d rather than %d; got %T",
+			exitCheckFail, exitFailed, err)
 	}
-	msg := e.Error()
+	if code, _ := classify(err); code != exitCheckFail {
+		t.Errorf("exit code = %d, want %d", code, exitCheckFail)
+	}
+	msg := err.Error()
 	for _, want := range []string{"2 finding(s)", "high", "critical"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("message %q does not mention %q", msg, want)

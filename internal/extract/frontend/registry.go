@@ -6,6 +6,7 @@ package frontend
 import (
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/vyprai/vyql/internal/bindings"
 	cfgfront "github.com/vyprai/vyql/internal/extract/frontend/config"
@@ -32,7 +33,13 @@ type Language struct {
 	Bindings func() []bindings.Applicator
 }
 
-var languages = []Language{
+// languages is built on first use rather than at package initialization, because
+// the textpattern entry derives its extensions from the vyql/ data directory.
+// Reading that during init puts it before main, where a missing data directory
+// escapes as a goroutine dump instead of the diagnostic the CLI is written to
+// print -- and before any flag that says where the directory is has been parsed.
+var languages = sync.OnceValue(func() []Language {
+	return []Language{
 	{"go", map[string]bool{".go": true}, golang.Extract, bindings.GoBindings},
 	{"python", map[string]bool{".py": true}, treesitter.ExtractPython, bindings.PythonBindings},
 	{"javascript", map[string]bool{".js": true, ".jsx": true, ".ts": true, ".tsx": true, ".mjs": true, ".cjs": true, ".vue": true, ".html": true, ".htm": true},
@@ -61,11 +68,12 @@ var languages = []Language{
 	// yield no nodes so other repos are unaffected. "dockerfile" matches by basename.
 	{"config", map[string]bool{".xml": true, ".plist": true, ".yaml": true, ".yml": true,
 		".tf": true, ".cfg": true, ".json": true, ".jelly": true, ".jsp": true, ".tag": true, ".jst": true, ".def": true, ".svelte": true, ".html": true, ".erb": true, ".pest": true, ".sch": true, ".php": true, "dockerfile": true}, cfgfront.Extract, bindings.ConfigBindings},
-	{"textpattern", textpattern.Extensions(), textpattern.Extract, bindings.TextPatternBindings},
-}
+		{"textpattern", textpattern.Extensions(), textpattern.Extract, bindings.TextPatternBindings},
+	}
+})
 
 // Languages returns the registry in extraction order.
-func Languages() []Language { return languages }
+func Languages() []Language { return languages() }
 
 // EntryClass records the content-derived facts an extension alone cannot settle: whether a `.h` is
 // C++ rather than C, and whether an extension-less file is a Python script.
