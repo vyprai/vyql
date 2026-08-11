@@ -257,30 +257,36 @@ controls that would have stopped it**. If you already have one of those controls
 in place, `explain` will tell you why it didn't apply here.
 
 ```sh
-vyql scan --format sarif ./my-project > results.sarif
-vyql scan --format json  ./my-project | jq '.[].rule'
+vyql scan -format sarif ./my-project > results.sarif
+vyql scan -format json  ./my-project | jq '.[].rule'
 ```
 
 ### Failing a build
 
-**`scan` exits 1 when it finds anything HIGH or CRITICAL.** Dropping it into a
+**`scan` exits 3 when it finds anything HIGH or CRITICAL.** Dropping it into a
 pipeline gates that pipeline, with no extra configuration.
 
 ```sh
-vyql scan .                        # exit 1 on HIGH or CRITICAL  (the default)
-vyql scan -fail-on critical .      # exit 1 only on CRITICAL
+vyql scan .                        # exit 3 on HIGH or CRITICAL  (the default)
+vyql scan -fail-on critical .      # exit 3 only on CRITICAL
 vyql scan -fail-on none .          # report everything, always exit 0
 ```
 
 Severities, lowest to highest: `info low medium high critical`. `-fail-on`
 takes any of them, or `none`.
 
-A failed scan also exits 1, so if your pipeline needs to tell "found something"
-apart from "could not run", give `-exit-code` a distinct value:
+Every command reports the same four codes, so a pipeline can act on the status
+alone without parsing output:
 
-```sh
-vyql scan -exit-code 3 .   # 3 = findings, 1 = VyQL failed, 2 = bad usage
-```
+| code | meaning |
+| --- | --- |
+| `0` | the command did what you asked |
+| `1` | VyQL could not complete — bad path, unreadable file, rules that do not compile |
+| `2` | usage error — unknown command or flag, missing path, a value outside its set |
+| `3` | the check ran and did not pass — findings at or above `-fail-on`, a corpus that does not validate, a finding set that changed |
+
+"This code has findings" and "the scanner could not run" are different codes, so
+a broken pipeline step cannot be mistaken for a clean scan or the reverse.
 
 ### Adopting it on a codebase that already has findings
 
@@ -354,6 +360,32 @@ A malformed baseline, an unknown verdict or a missing file is an error, not an
 empty baseline. Failing loudly beats silently suppressing everything or
 nothing.
 
+### Skipping files
+
+`-exclude` takes one pattern and may be repeated. One rule decides what a
+pattern means:
+
+```sh
+vyql scan -exclude node_modules .              # that directory, at any depth
+vyql scan -exclude '*_templ.go' .              # that file, at any depth
+vyql scan -exclude 'src/gen/**' .              # rooted, because it has a slash
+vyql scan -exclude '**/*.{test,spec}.ts' .     # brace alternation
+vyql scan -exclude node_modules -exclude vendor .   # repeat for more
+```
+
+A value with no slash and no glob character names a directory. A value with no
+slash but a glob character names a file at any depth — `*` does not cross a
+slash, so a bare suffix pattern would otherwise match only at the scan root. A
+value containing a slash is anchored at the scan root and matches as written.
+
+Excluded directories are never descended, so their files are not read or even
+listed. A malformed pattern is rejected before the scan starts, and `-coverage`
+reports how much each pattern excluded — a pattern matching nothing is a filter
+you believe is working.
+
+One pattern per flag: a comma is rejected, because splitting on it would make
+`**/*.{test,spec}.ts` two patterns that match nothing.
+
 ### What was actually read
 
 "No findings" only means something if you know what was read. Anything left
@@ -374,7 +406,10 @@ vyql scan -coverage .
 ```
 coverage
   parsed    python 1 · textpattern 1
-  excluded  5 file(s) dropped by -exclude
+  excluded  5 file(s) and 1 director(ies) dropped by -exclude
+              node_modules   1 dir(s)
+              **/*_templ.go  5 file(s)
+              *.min.js       0 file(s)  ← matched nothing
   oversized 2 file(s) skipped over the -max-file-size ceiling;
             raise it or pass 0 to scan them
   unread    15 file(s) matched no frontend: .zig 12, .cob 3
@@ -442,7 +477,6 @@ vyql query -call db.Query .                  # by callee path or method
 vyql query -loc handlers.go .                # by location substring
 vyql query -concept SqlExecution -edges .    # include outgoing edges
 vyql query -concept HttpInput -count .       # just how many
-vyql query -from HttpInput -to SqlExecution .  # reachability between concepts
 ```
 
 **`graph`** dumps the whole graph, or taint reachability per source. Verbose, and
@@ -450,7 +484,6 @@ definitive when the others all look right.
 
 ```sh
 vyql graph .
-vyql graph -taint .
 ```
 
 Two more worth knowing:
@@ -458,7 +491,7 @@ Two more worth knowing:
 ```sh
 vyql definitions -kind all                   # what concepts, rules and bindings loaded
 vyql definitions explain code.SqlExecution   # which binding produced a label
-vyql bindings -lang python                   # one language's source/sink/check vocabulary
+vyql definitions -kind bindings -lang python  # one language's source/sink/check vocabulary
 ```
 
 A filter that matches no known concept is an error rather than an empty result,
@@ -474,14 +507,14 @@ vyql: -from "HttpInpt" matches no concept
 
 ### Comparing two scans
 
-**`diff`** compares two `--format json` runs by finding fingerprint. Fingerprints
+**`diff`** compares two `-format json` runs by finding fingerprint. Fingerprints
 are anchored to rule and location rather than line number, so the comparison
 survives edits elsewhere in the file:
 
 ```sh
-vyql scan --format json . > before.json
+vyql scan -format json . > before.json
 # ... change something ...
-vyql scan --format json . > after.json
+vyql scan -format json . > after.json
 vyql diff before.json after.json
 ```
 
@@ -545,7 +578,7 @@ Check a binding file parses, and what it emits, without running a scan. Bindings
 live under `vyql/bindings/<language>/`, one module per file:
 
 ```sh
-vyql validate-binding -file vyql/bindings/python/python/558.vyql
+vyql definitions validate-binding vyql/bindings/python/python/558.vyql
 ```
 
 ```json
@@ -574,7 +607,7 @@ changing the engine or the language.
 ## Stability
 
 **The CLI is stable.** Commands, flags and output formats follow semantic
-versioning: `scan`, its `--format` values, the JSON and SARIF shapes, and the
+versioning: `scan`, its `-format` values, the JSON and SARIF shapes, and the
 finding fingerprint will not change incompatibly within a major version. Build
 tooling against them.
 

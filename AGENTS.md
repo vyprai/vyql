@@ -110,10 +110,10 @@ by this repository's CI. Nothing here tells you when they fall out of step, so
 check them whenever you change what they describe:
 
 - **[vyprai/vyql-action](https://github.com/vyprai/vyql-action)** — `action.yml`
-  invokes the CLI. It passes `-fail-on`, `-exit-code`, `-format`, `-profile` and
-  `-exclude`, so renaming or removing any of those breaks every workflow using
-  the action while everything here stays green. Its README states a minimum VyQL
-  version for the flags it passes; that claim has to stay true.
+  invokes the CLI. It passes `-fail-on`, `-format`, `-profile` and `-exclude`,
+  so renaming or removing any of those breaks every workflow using the action
+  while everything here stays green. Its README states a minimum VyQL version
+  for the flags it passes; that claim has to stay true.
 - **[vyprai/homebrew-tap](https://github.com/vyprai/homebrew-tap)** —
   `Formula/vyql.rb` is generated from `packaging/homebrew/vyql.rb.tmpl` here.
   Edit the template, never the tap directly, or the next release overwrites it.
@@ -134,7 +134,10 @@ What actually drifts, in order of how often it has:
    the container image name and the `go install` path appear in all of them.
 3. **Flags and severity vocabulary.** `-fail-on` takes
    `none info low medium high critical`; the action's input description repeats
-   that list, and a change here does not update it there.
+   that list, and a change here does not update it there. The same goes for the
+   exit codes: 0 did what was asked, 1 vyql could not complete, 2 the invocation
+   cannot mean anything, 3 the check ran and did not pass. The action branches on
+   those values and the tap's test block asserts one of them.
 4. **The agent flow**, `scope → scan → coverage → list → verify → reproduce → fix`,
    is written out in four places: this README, `site/index.html`, the plugin
    repository's README, and the skill itself. The skill is the one that has to

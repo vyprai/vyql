@@ -10,15 +10,21 @@
 // Usage:
 //
 //	vyql scan [flags] [path...]      # no path scans the working directory
-//	  -fail-on   severity at or above which to exit non-zero (default: high)
+//	  -fail-on   severity at or above which to exit 3 (default: high)
 //	  -format    text | sarif | json | graph-json
+//	  -exclude   skip paths matching this pattern; repeatable
 //	  -baseline  triaged findings to exclude from the report and the gate
 //	  -coverage  report what was parsed, excluded and left unanalysed
 //
 //	vyql explain | trace | query | match | resolve | graph | diff | definitions
 //
-// Run vyql with no arguments for the full command list, or see
-// https://github.com/vyprai/vyql for the guide.
+// Exit codes are the same on every command: 0 did what was asked, 1 vyql could
+// not complete, 2 the invocation cannot mean anything, 3 the check ran and did
+// not pass. stdout carries exactly one document in the requested format;
+// diagnostics go to stderr.
+//
+// Run `vyql help` for the command list, `vyql help <command>` for one command's
+// flags, or see https://github.com/vyprai/vyql for the guide.
 //
 // All security knowledge -- concepts, bindings, rule packs -- is loaded at
 // startup from a vyql/ data directory rather than compiled in.

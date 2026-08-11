@@ -10,6 +10,48 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
+### Changed
+
+- **Exit codes are one contract across every command.** `0` did what was asked,
+  `1` VyQL could not complete, `2` the invocation cannot mean anything, `3` the
+  check ran and did not pass. `scan` gates at `3` rather than `1`, so "this code
+  has findings" and "the scanner could not run" are no longer the same status.
+  **A pipeline branching on exit 1 to mean "findings" needs updating.**
+- **`-exclude` takes glob patterns and is repeatable.** A bare name still means
+  that directory at any depth, so existing single-value invocations are
+  unchanged. `*_templ.go` and `**/*.{test,spec}.ts` now work, and excluded
+  directories are pruned during the walk rather than filtered afterwards.
+  **Comma-separated lists are rejected**; repeat the flag instead, because
+  splitting on comma would make a brace alternation match nothing.
+- **stdout carries exactly one document.** `-stats` and `-coverage` go to
+  stderr, so `scan -format sarif -coverage . > results.sarif` writes SARIF
+  rather than SARIF followed by text no parser accepts.
+- **`-h`, `--help` and `help` exit 0** and print on stdout. `-v` is `--version`.
+- `-all` becomes `-flags with`; `-binding-overlay` becomes `-bindings`;
+  `-incremental-cache` becomes `-cache-incremental`; `definitions -max` becomes
+  `-limit`. An unrecognised `-format` or `-profile` is a usage error rather than
+  a silent fallback.
+- `-data`, `-cpuprofile` and `-memprofile` are flags; their environment
+  variables remain as fallbacks. `-stats=rule,binding,sink` replaces the five
+  `VYQL_*_TIMING` variables.
+
+### Removed
+
+- **`-exit-code`.** It existed to work around the gate sharing code `1` with a
+  failed run, which code `3` settles.
+- **`query -from/-to` and `graph -taint`.** Both are `vyql trace`, which reports
+  where taint stops as well as where it arrives; `trace -brief` and `-count`
+  give the terse renderings. `query -from/-to` printed only the sources that
+  reached a sink, which reads exactly like a clean result.
+- **`vyql bindings`** is `vyql definitions -kind bindings -lang <lang>`, keeping
+  the role-grouped vocabulary and collapsing repeated rows to a count.
+- **`vyql validate-binding`** is `vyql definitions validate-binding <path>`.
+- **`definitions check-v2`** is `definitions validate`, whose output it
+  duplicated exactly. **`definitions lint`** is `definitions validate -unstable`.
+
+Every retired spelling names its replacement when used.
+
+
 ## [0.2.5] - 2026-08-10
 
 ### Added
