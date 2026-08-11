@@ -40,10 +40,6 @@ func (e *usageError) Error() string {
 	return e.msg + "\n  " + strings.Join(e.hints, "\n  ")
 }
 
-func usagef(format string, args ...any) error {
-	return &usageError{msg: fmt.Sprintf(format, args...)}
-}
-
 // usageWith attaches guidance lines printed under the message, indented two
 // spaces. A usage error that does not say what to do instead is half a message.
 func usageWith(msg string, hints ...string) error {

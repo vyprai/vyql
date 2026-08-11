@@ -10,20 +10,6 @@ import (
 	"github.com/vyprai/vyql/internal/usg"
 )
 
-func parseExcludes(s string) []string {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return nil
-	}
-	var out []string
-	for _, p := range strings.Split(s, ",") {
-		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
 // buildGraph builds the analysis graph with this process's defaults: the shared parse cache
 // and no per-scan options. Shared by the debug commands and the -dump path; `scan` goes
 // through scanPathsWithProfileDemand, which has options to pass.
