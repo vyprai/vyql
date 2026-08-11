@@ -528,6 +528,193 @@ A missed finding is nearly always one of three things, and `match`, `resolve` an
 `explain` distinguish them in that order: nothing was labelled, the call did not
 resolve, or an `unless` clause was satisfied.
 
+## Every command and flag
+
+`vyql help` lists the commands; `vyql help <command>` prints that command's
+flags. This section is the same information with the reason for each one.
+
+Four flags are on every command. `-data` points at the `vyql/` data directory
+when it is not where the binary would look, `-profile` picks the analysis
+profile, and `-cpuprofile` / `-memprofile` write pprof files:
+
+```sh
+vyql scan -data /opt/vyql .                  # data directory somewhere else
+vyql definitions -data /opt/vyql -kind concepts
+vyql scan -profile api .                     # skip auto-detection
+vyql scan -cpuprofile cpu.prof -memprofile heap.prof .
+```
+
+`$VYQL_HOME`, `$VYQL_CPUPROFILE` and `$VYQL_MEMPROFILE` do the same and are the
+fallback when the flag is not given.
+
+### `scan`
+
+| flag | default | what it does |
+| --- | --- | --- |
+| `-rules` | `vyql/packs` | load rules from a `.vyql` file or directory |
+| `-bindings` | | a repo-local binding overlay directory |
+| `-format` | `text` | `text`, `sarif`, `json` or `graph-json` |
+| `-fail-on` | `high` | exit `3` at or above this severity, or `none` |
+| `-exclude` | | skip paths matching this pattern; repeatable |
+| `-baseline` | | apply triaged findings, and report only what is new |
+| `-baseline-write` | | record the current findings to this path |
+| `-coverage` | off | what was parsed, excluded and left unread |
+| `-stats` | off | graph counts, taint hubs, per-phase timing |
+| `-flags` | `off` | review flags: `off`, `with` (findings and flags), `only` |
+| `-flag-category` | `all` | filter review flags by category |
+| `-flag-kind` | `all` | `all`, `attention`, `target` or `check` |
+| `-flag-loc` | | filter review flags by location substring |
+| `-cache` | `auto` | `auto`, `off`, or a directory |
+| `-cache-incremental` | off | also cache per-file parses, for an edit loop |
+| `-max-ram` | 80% of RAM | soft ceiling, e.g. `8GB` or `16GiB` |
+| `-max-file-size` | `2MiB` | skip larger source files; `0` disables |
+
+Combinations worth knowing:
+
+```sh
+# CI: machine output, gated, with the coverage account on stderr
+vyql scan -format sarif -fail-on high -coverage . > results.sarif
+
+# CI on a codebase with a backlog: fail only on what this branch added
+vyql scan -baseline .vyql-baseline.json -format sarif . > results.sarif
+
+# roll the baseline forward while still gating on what it does not cover
+vyql scan -baseline .vyql-baseline.json -baseline-write next.json .
+
+# adopt: record everything, gate on nothing
+vyql scan -fail-on none -baseline-write .vyql-baseline.json .
+
+# review flags instead of findings, narrowed to one category and location
+vyql scan -flags only -flag-kind attention -flag-loc handlers/ .
+
+# findings and flags together, as one JSON document
+vyql scan -flags with -format json .
+
+# a big or slow tree: bound the memory, skip generated files, keep the cache warm
+vyql scan -max-ram 8GB -exclude '**/*_templ.go' -exclude node_modules .
+vyql scan -cache-incremental .               # second run after an edit is faster
+
+# one pack, one profile, no cache — what you want when a rule misbehaves
+vyql scan -rules vyql/packs/injection -profile api -cache off -stats .
+```
+
+`-flags` selects the mode and the three `-flag-*` flags filter it. Setting a
+filter while `-flags` is `off` is a usage error, because the filter could not
+reach the output.
+
+### `trace`
+
+| flag | what it does |
+| --- | --- |
+| `-from` | only sources whose concept contains this substring |
+| `-to` | only sinks whose concept contains this substring |
+| `-brief` | one line per connected pair, with a hop count |
+| `-count` | the number of connected pairs, and nothing else |
+
+```sh
+vyql trace .                                     # every source
+vyql trace -from HttpInput -to SqlExecution .    # one question
+vyql trace -to FilePathAccess .                  # every path into file access
+vyql trace -from HttpInput -to SqlExecution -brief .
+vyql trace -from HttpInput -count .
+```
+
+`-from` and `-to` are checked against the ontology before the scan runs, so a
+typo is an error rather than a report of zero. Every mode reports how many
+sources dead-ended: a list of only the sources that reached a sink reads exactly
+like a clean result.
+
+### `query`
+
+| flag | what it does |
+| --- | --- |
+| `-type` | match node type substring |
+| `-concept` | match concept label substring |
+| `-call` | match callee path or method |
+| `-loc` | match location substring |
+| `-edges` | also print each match's outgoing edges |
+| `-count` | print only how many matched |
+
+```sh
+vyql query -type code.Call .
+vyql query -concept HttpInput .
+vyql query -call db.Query .
+vyql query -loc handlers.go .
+vyql query -concept SqlExecution -edges .        # with outgoing edges
+vyql query -concept HttpInput -count .           # just the number
+vyql query -type code.Call -loc handlers/ -call exec .   # filters combine
+```
+
+Filters combine with AND. Reachability is `trace`, not `query`.
+
+### `explain`, `match`, `resolve`, `graph`
+
+```sh
+vyql explain .
+vyql explain -rules vyql/packs/injection .   # narrow to one pack or file
+vyql match .
+vyql resolve .
+vyql graph .                                 # the whole USG, nodes and edges
+```
+
+### `definitions`
+
+| flag | default | what it does |
+| --- | --- | --- |
+| `-kind` | `all` | `all`, `concepts`, `rules`, `bindings`, `reviews`, `packs` |
+| `-lang` | | binding language filter |
+| `-query` | | case-insensitive substring across names, patterns, packages, CWE |
+| `-limit` | `80` | maximum rows per section |
+| `-format` | `text` | `text` or `json` |
+
+```sh
+vyql definitions                                  # everything that loaded
+vyql definitions -kind concepts                   # the concept vocabulary
+vyql definitions -kind rules -query injection     # rules mentioning injection
+vyql definitions -kind bindings -lang python      # one language's vocabulary
+vyql definitions -kind bindings -lang go -format json
+vyql definitions -kind concepts -limit 500        # raise the per-section cap
+```
+
+Subcommands:
+
+```sh
+vyql definitions search sql injection             # search every kind at once
+vyql definitions explain code.SqlExecution        # which binding produced a label
+vyql definitions refs core.SqlParameterization    # what references a definition
+vyql definitions show-policy resultIdentity.default
+vyql definitions show-mechanic ruleVerb.taint
+vyql definitions validate                         # validate the loaded corpus
+vyql definitions validate vyql/packs/injection    # or one path
+vyql definitions validate -unstable               # report quarantined uses
+vyql definitions validate-binding vyql/bindings/python/python/558.vyql
+```
+
+`validate` exits `3` when the corpus does not validate.
+
+`refs` and `explain` take the path as `-in <path>` rather than positionally,
+because their positional argument is the definition being asked about:
+
+```sh
+vyql definitions refs -in vyql/ontology/concepts core.SqlParameterization
+vyql definitions explain -in vyql/bindings/python code.SqlExecution
+```
+
+### `diff`, `cache`, `version`, `help`
+
+```sh
+vyql diff before.json after.json     # two `scan -format json` outputs
+vyql cache path                      # the directory this build would use
+vyql cache clear                     # drop every cached parse and result
+vyql cache clear -cache /tmp/mine    # a cache somewhere else
+vyql version
+vyql help
+vyql help scan
+```
+
+`diff` exits `3` when the finding set changed, so a pipeline can gate on "this
+branch changed the findings" without parsing the output.
+
 ## Languages
 
 Java, Python, JavaScript/TypeScript, C#, PHP, Ruby, Go, Rust, Kotlin, Scala,

@@ -45,9 +45,15 @@ func cmdDefinitions(args []string) error {
 	query := fs.String("query", "", "case-insensitive substring filter across names, concepts, patterns, packages, CWE, and text")
 	limit := fs.Int("limit", 80, "maximum rows per section")
 	format := addFormat(fs, "text", "json")
+	runOpts := addRunFlags(fs)
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
+	stopProfiling, err := runOpts.apply()
+	if err != nil {
+		return err
+	}
+	defer stopProfiling()
 
 	// A language-scoped binding listing is the vocabulary view: what patterns this
 	// technology recognises, grouped by the role each plays. Grouping by role is
@@ -56,14 +62,14 @@ func cmdDefinitions(args []string) error {
 		return printBindingVocabulary(strings.TrimSpace(*lang), format.value)
 	}
 
-	cat, err := definitions.Inspect(definitions.InspectOptions{
+	cat, inspectErr := definitions.Inspect(definitions.InspectOptions{
 		Kind:     kind.value,
 		Language: *lang,
 		Query:    *query,
 		Max:      *limit,
 	})
-	if err != nil {
-		return err
+	if inspectErr != nil {
+		return inspectErr
 	}
 	if format.value == "json" {
 		b, err := json.MarshalIndent(cat, "", "  ")

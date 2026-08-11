@@ -33,9 +33,15 @@ func cmdTrace(args []string) error {
 	brief := fs.Bool("brief", false, "one line per connected source→sink pair, with hop count")
 	count := fs.Bool("count", false, "print only the number of connected pairs")
 	profileName := addProfile(fs)
+	runOpts := addRunFlags(fs)
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
+	stopProfiling, err := runOpts.apply()
+	if err != nil {
+		return err
+	}
+	defer stopProfiling()
 	paths, err := requirePaths(fs, "vyql trace [-from CONCEPT] [-to CONCEPT] <path>...")
 	if err != nil {
 		return err
@@ -261,9 +267,15 @@ func cmdExplain(args []string) error {
 	fs := newFlagSet("explain")
 	rulesPath := addRules(fs)
 	profileName := addProfile(fs)
+	runOpts := addRunFlags(fs)
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
+	stopProfiling, err := runOpts.apply()
+	if err != nil {
+		return err
+	}
+	defer stopProfiling()
 	paths, err := requirePaths(fs, "vyql explain [-rules ...] <path>...")
 	if err != nil {
 		return err
@@ -325,9 +337,15 @@ func cmdExplain(args []string) error {
 func cmdMatch(args []string) error {
 	fs := newFlagSet("match")
 	profileName := addProfile(fs)
+	runOpts := addRunFlags(fs)
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
+	stopProfiling, err := runOpts.apply()
+	if err != nil {
+		return err
+	}
+	defer stopProfiling()
 	paths, err := requirePaths(fs, "vyql match <path>...")
 	if err != nil {
 		return err
@@ -395,9 +413,15 @@ func isSourceConcept(onto *ontology.Ontology, c string) bool {
 func cmdResolve(args []string) error {
 	fs := newFlagSet("resolve")
 	profileName := addProfile(fs)
+	runOpts := addRunFlags(fs)
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
+	stopProfiling, err := runOpts.apply()
+	if err != nil {
+		return err
+	}
+	defer stopProfiling()
 	paths, err := requirePaths(fs, "vyql resolve <path>...")
 	if err != nil {
 		return err
@@ -457,9 +481,15 @@ func cmdResolve(args []string) error {
 func cmdGraph(args []string) error {
 	fs := newFlagSet("graph")
 	profileName := addProfile(fs)
+	runOpts := addRunFlags(fs)
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
+	stopProfiling, err := runOpts.apply()
+	if err != nil {
+		return err
+	}
+	defer stopProfiling()
 	paths, err := requirePaths(fs, "vyql graph <path>...")
 	if err != nil {
 		return err
@@ -719,9 +749,15 @@ func cmdQuery(args []string) error {
 	edges := fs.Bool("edges", false, "also print each matching node's outgoing edges")
 	count := fs.Bool("count", false, "print only the number of matches")
 	profileName := addProfile(fs)
+	runOpts := addRunFlags(fs)
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
+	stopProfiling, err := runOpts.apply()
+	if err != nil {
+		return err
+	}
+	defer stopProfiling()
 	paths, err := requirePaths(fs, "vyql query [-type T] [-concept C] [-call P] [-loc L] [-edges] [-count] <path>...")
 	if err != nil {
 		return err
