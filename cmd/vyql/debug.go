@@ -7,6 +7,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/vyprai/vyql/internal/bindings"
 	"github.com/vyprai/vyql/internal/datadir"
@@ -69,14 +70,14 @@ func cmdTrace(args []string) error {
 			connected++
 			fmt.Printf("  reaches SINK %s @ %s {%s}\n", sink, locOf(g, sink), conceptsOf(g, sink))
 			for _, step := range path {
-				fmt.Printf("      → %s\n", traceNode(g, step))
+				fmt.Printf("    → %s\n", traceNode(g, step))
 			}
 			continue
 		}
 		dead++
 		fmt.Printf("  reaches no %ssink — taint stops at:\n", toLabel(*to))
 		for _, f := range frontier(onto, g, n.ID) {
-			fmt.Printf("      ⊣ %s\n", traceNode(g, f))
+			fmt.Printf("    ⊣ %s\n", traceNode(g, f))
 		}
 	}
 	fmt.Printf("\n%d source(s): %d reach a sink, %d dead-end\n", connected+dead, connected, dead)
@@ -331,19 +332,23 @@ func cmdMatch(args []string) error {
 			if prov == "" {
 				prov = "?"
 			}
-			rows = append(rows, row{role, fmt.Sprintf("  %-14s %-26s %s  ← %s (%s)",
+			rows = append(rows, row{role, fmt.Sprintf("  %s\t%s\t%s\t← %s (%s)",
 				n.CalleeKey(), l.Concept, n.Prop("loc"), prov, l.Provenance.Fidelity)})
 		}
 	}
 	for _, role := range []string{"source", "sink", "control/other"} {
 		fmt.Printf("\n== %s ==\n", role)
+		// One writer per section, so a column sizes to that section rather than
+		// to the widest row anywhere in the output.
+		tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		n := 0
 		for _, r := range rows {
 			if r.role == role {
-				fmt.Println(r.line)
+				fmt.Fprintln(tw, r.line)
 				n++
 			}
 		}
+		_ = tw.Flush()
 		if n == 0 {
 			fmt.Println("  (none)")
 		}
@@ -397,20 +402,22 @@ func cmdResolve(args []string) error {
 			res++
 		} else {
 			unres++
-			unresolved = append(unresolved, fmt.Sprintf("  %-30s %s", key, n.Prop("loc")))
+			unresolved = append(unresolved, fmt.Sprintf("  %s\t%s", key, n.Prop("loc")))
 		}
 	}
 	fmt.Printf("call sites: %d resolved/recognized, %d unresolved (taint terminates)\n", res, unres)
 	if len(unresolved) > 0 {
 		fmt.Println("\nUNRESOLVED (no callee body, not a known source/sink/control):")
 		sort.Strings(unresolved)
+		tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		for i, u := range unresolved {
 			if i >= 40 {
-				fmt.Printf("  … and %d more\n", len(unresolved)-40)
+				fmt.Fprintf(tw, "  … and %d more\n", len(unresolved)-40)
 				break
 			}
-			fmt.Println(u)
+			fmt.Fprintln(tw, u)
 		}
+		_ = tw.Flush()
 	}
 	return nil
 }
@@ -778,6 +785,8 @@ func cmdQuery(args []string) error {
 	}
 
 	matched := 0
+	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	defer func() { _ = tw.Flush() }()
 	for _, n := range nodes {
 		if *typ != "" && !strings.Contains(n.Type, *typ) {
 			continue
@@ -795,16 +804,17 @@ func cmdQuery(args []string) error {
 		if *count {
 			continue
 		}
-		fmt.Println(nodeLine(g, n))
+		fmt.Fprintln(tw, nodeCells(g, n))
 		if *edges {
 			for _, et := range edgeTypes {
 				es, _ := g.OutEdges(n.ID, et)
 				for _, e := range es {
-					fmt.Printf("      --%s--> %s @ %s\n", et, e.Dst, locOf(g, e.Dst))
+					fmt.Fprintf(tw, "  --%s-->\t%s\t%s\t\n", et, e.Dst, locOf(g, e.Dst))
 				}
 			}
 		}
 	}
+	_ = tw.Flush()
 	if *count {
 		fmt.Printf("%d\n", matched)
 	} else {

@@ -101,6 +101,37 @@ func printTaint(onto *ontology.Ontology, g usg.Store) error {
 	return nil
 }
 
+// nodeCells renders a node as tab-separated fields for a tabwriter, so a column
+// sizes to the longest value present rather than to a width guessed in advance.
+// Node IDs run well past any fixed width, which leaves a hand-tuned format
+// misaligned exactly when a listing mixes short and long ids.
+func nodeCells(g usg.Store, n usg.Node) string {
+	return strings.Join([]string{n.ID, n.Type, n.Prop("loc"), nodeDetail(g, n)}, "\t")
+}
+
+// nodeDetail is the trailing annotation: region, concepts, callee path, value kind.
+func nodeDetail(g usg.Store, n usg.Node) string {
+	var s string
+	if r := n.Prop("region"); r != "" {
+		s += fmt.Sprintf("[%s@%s]  ", r, n.Prop("order"))
+	}
+	if c := conceptsOf(g, n.ID); c != "" {
+		s += "{" + c + "}  "
+	}
+	if p := n.Prop("callee_path"); p != "" {
+		s += "path=" + p + "  "
+	} else if m := n.Prop("method"); m != "" {
+		s += "method=" + m + "  "
+	}
+	if v := n.Prop("vkind"); v != "" {
+		s += "vkind=" + v
+	}
+	return strings.TrimRight(s, " ")
+}
+
+// nodeLine is the fixed-width form, used by the full graph dump. That dump
+// streams: a tabwriter would hold every line to measure the columns, and the
+// dump is unbounded in the size of the scanned tree.
 func nodeLine(g usg.Store, n usg.Node) string {
 	s := fmt.Sprintf("%-8s %-16s %s", n.ID, n.Type, n.Prop("loc"))
 	if r := n.Prop("region"); r != "" {

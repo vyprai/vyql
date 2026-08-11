@@ -148,10 +148,10 @@ var commands = map[string]func([]string) error{
 	"graph":       cmdGraph,
 	"bindings":    cmdBindings,
 	"definitions": cmdDefinitions,
-
-	"validate-binding": cmdValidateBinding,
 	"diff":        cmdDiff,
 	"cache":       cmdCache,
+
+	"validate-binding": cmdValidateBinding,
 }
 
 func unknownCommand(cmd string) error {
@@ -882,7 +882,7 @@ func printReport(fs []*findings.Finding) {
 	for _, it := range items {
 		fmt.Printf("[%s] %s", it.s.Band, report.Finding(it.f, resultpolicy.Fingerprint(it.f)))
 		for _, fac := range it.s.Factors {
-			fmt.Printf("    · %s\n", fac.Witness)
+			fmt.Printf("  · %s\n", fac.Witness)
 		}
 		fmt.Println()
 	}
