@@ -52,6 +52,7 @@ file is build and test input; it is not loaded at scan time.
 
 | Module | License |
 |---|---|
+| github.com/bmatcuk/doublestar/v4 | MIT |
 | github.com/cespare/xxhash/v2 | MIT |
 | github.com/dgraph-io/badger/v4 | Apache-2.0 |
 | github.com/dgraph-io/ristretto/v2 | Apache-2.0 |

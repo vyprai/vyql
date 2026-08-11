@@ -11,7 +11,8 @@ Each shard directory holds exactly one file, so the tree carried roughly one
 directory per binding. The language name also repeated -- `python/python/...` --
 and the numeric level carried no meaning.
 
-`bindings/<lang>/` stays a directory, because `vyql bindings -lang python` reads
+`bindings/<lang>/` stays a directory, because `vyql definitions -kind bindings
+-lang python` reads
 it as one (`ReadVYQLDir("bindings/" + lang)`); only the doubled name and the
 shard level go.
 
