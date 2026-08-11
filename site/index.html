@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VyQL: no hidden gaps, no hand-waving</title>
-<meta name="description" content="Open source security scanner for 22 languages. Traces untrusted input to where it turns dangerous, and lists the safeguards that are missing.">
+<title>VyQL: it shows the whole path, and what is missing</title>
+<meta name="description" content="Open source security scanner for 22 languages. It follows untrusted input to the place where it becomes dangerous, and names the safeguards that are not there.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2048%2048%22%3E%3Crect%20width%3D%2248%22%20height%3D%2248%22%20rx%3D%2210%22%20fill%3D%22%2318181b%22%2F%3E%3Cg%20fill%3D%22%23fafafa%22%3E%3Cpath%20d%3D%22M29.5412%2029.6729C30.6105%2028.7102%2031.4124%2028.9144%2032.7504%2028.7822C36.9842%2028.3639%2040.6943%2029.0429%2042.0693%2027.625C43.2355%2026.4226%2043.3017%2028.0989%2042.67%2029.1347C42.5417%2029.345%2042.116%2029.7155%2042.5172%2029.9224C42.9184%2030.1292%2045.646%2032.4975%2045.9959%2034.6758C46.0382%2034.9394%2045.7442%2035.0902%2045.5353%2034.9321C43.4457%2033.3502%2043.1056%2032.351%2037.9444%2031.0907C32.7833%2029.8304%2028.8549%2030.2909%2029.5412%2029.6729Z%22%2F%3E%3Cpath%20fill-rule%3D%22evenodd%22%20clip-rule%3D%22evenodd%22%20d%3D%22M21.3937%209.1017C28.8707%208.80018%2030.2851%209.10171%2034.9043%2010.9272C39.5234%2012.7527%2042.0903%2014.9609%2041.0181%2017.9699L38.564%2023.7931C37.945%2025.4224%2035.6453%2024.9317%2036.1052%2023.2961C36.505%2022.45%2035.749%2021.5096%2034.9043%2021.8022L22.3444%2026.1524C21.9162%2026.3008%2021.7931%2026.8841%2022.1204%2027.2138L29.9869%2035.1384C30.3612%2035.5155%2030.97%2035.4039%2031.2049%2034.9151C31.8085%2033.6026%2033.955%2034.2568%2033.5046%2035.5693C33.5046%2035.5693%2033.495%2035.7288%2032.4218%2038.0186C32.4218%2038.0186%2031.9619%2039%2030.8886%2039C29.6313%2039%2026.9132%2037.3663%2026.9132%2037.3663L13.2612%2030.009C9.99125%2028.6006%203.18256%2024.5161%202.21136%2020.6275C0.156223%2012.3989%2013.5735%209.41707%2021.3937%209.1017ZM29.9794%2015.1894C27.5725%2014.1936%2024.3067%2014.084%2022.6202%2014.5352C22.0076%2014.6991%2021.7302%2015.1087%2022.0061%2015.843C22.0061%2015.843%2022.9236%2017.6028%2023.9998%2018.1332C25.4142%2018.8303%2026.9124%2018.6235%2028.1393%2017.9696C29.3661%2017.3157%2030.2851%2016.0066%2030.2851%2016.0066C30.4571%2015.7574%2030.488%2015.4483%2029.9794%2015.1894Z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
 <link rel="canonical" href="https://vyql.vyprsec.ai/">
 <meta property="og:title" content="VyQL: no hidden gaps, no hand-waving">
@@ -282,11 +282,12 @@ header.site .inner {
 <main>
 
   <p class="overline">Open source · Apache-2.0</p>
-  <h1>No hidden gaps. No hand-waving.</h1>
+  <h1>It shows the whole path, and what is missing.</h1>
   <p class="lede">
-    VyQL follows untrusted input through your code to the point it turns
-    dangerous, and names the controls that would have stopped it. If a path
-    exists, it shows you every hop. If a control covers it, it stays quiet.
+    VyQL follows untrusted input through your code, to the place where it
+    becomes dangerous. Then it names the controls that should have stopped it
+    there. If a path exists, you see every step of it. If a control already
+    covers the path, VyQL reports nothing.
   </p>
 
   <div class="cta">
@@ -294,9 +295,9 @@ header.site .inner {
       <pre data-copy><span>$ </span>curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh</pre>
     </div>
     <p class="cta-note">
-      macOS and Linux, amd64 and arm64. Verifies its checksum, installs to
-      <code>~/.local/bin</code>. No signup, no API key, nothing gets sent
-      anywhere.
+      macOS and Linux, amd64 and arm64. It checks the checksum and installs to
+      <code>~/.local/bin</code>. There is no signup and no API key, and nothing
+      leaves your machine.
     </p>
   </div>
 
@@ -312,8 +313,8 @@ header.site .inner {
       </tbody>
     </table>
     <p>
-      Every one carries the security knowledge with it. No second setup step,
-      and nothing to point at a server.
+      Each of them carries the security knowledge inside. There is no second
+      setup step, and there is no server to configure.
     </p>
   </section>
 
@@ -321,31 +322,33 @@ header.site .inner {
     <h2>Quickstart</h2>
 
     <h3>From the Terminal</h3>
-    <p>Four commands cover almost everything:</p>
+    <p>These commands cover almost everything you need:</p>
 <pre class="sample">vyql scan .                      <i># everything in this tree</i>
 vyql explain .                   <i># why each finding fired</i>
 vyql scan -fail-on none .        <i># report without failing the shell</i>
+vyql scan -exclude node_modules -exclude '**/*_templ.go' .   <i># skip these</i>
 vyql scan -baseline .vyql-baseline.json .   <i># only what is new</i></pre>
     <p>
-      Reviewing a change rather than a repo is a different question. Scan both
-      sides and diff, which keys on a fingerprint so moving a function doesn't
-      read as a new finding:
+      Reviewing one change is a different question than reviewing a whole
+      repository. For that, scan both sides and compare them. The comparison
+      uses a fingerprint, so if you move a function, it does not appear as a new
+      finding:
     </p>
 <pre class="sample">git worktree add -q /tmp/base $(git merge-base HEAD origin/main)
-vyql scan --format json /tmp/base &gt; before.json
-vyql scan --format json .        &gt; after.json
+vyql scan -format json /tmp/base &gt; before.json
+vyql scan -format json .        &gt; after.json
 vyql diff before.json after.json</pre>
 
     <h3>Through an Agent</h3>
     <p>
-      VyQL ships as an agent skill, so you can ask instead of remembering flags.
-      In Claude Code:
+      VyQL also ships as an agent skill. Then you can ask a question instead of
+      remembering the flags. In Claude Code:
     </p>
 <pre class="sample">/plugin marketplace add vyprai/claude-plugins
 /plugin install vyql@vypr</pre>
     <p>
-      Then it is a conversation. Each turn builds on the last, so you never
-      re-state which finding you mean:
+      After that it works as a conversation. Every answer keeps the context of
+      the previous one, so you do not need to repeat which finding you mean:
     </p>
 <pre class="sample"><b class="who">you</b>  audit this repo for security problems
 
@@ -385,23 +388,25 @@ vyql diff before.json after.json</pre>
      <i>One file, api/users.py, introducing subprocess with an argument list.</i>
      <i>Shall I?</i></pre>
     <p>
-      A reproduction runs against your own machine and nothing else, and the
-      skill asks before executing one. Writing it is the deliverable; running it
-      is your call.
+      A reproduction runs only against your own machine, and the skill asks you
+      first before it runs one. Writing the reproduction is the result. Whether
+      to run it is your decision.
     </p>
     <p>
-      It runs the commands, reports what was read before what it found, and asks
-      before installing anything or writing a reproduction. The skill is a plain
-      <a href="https://agentskills.io">SKILL.md</a>, an open format, so any agent
-      that reads it can follow the same steps. Claude Code is just the one with
-      an installer.
+      It runs the commands, and it tells you what was read before it tells you
+      what it found. It also asks first before it installs anything or writes a
+      reproduction. The skill itself is a plain
+      <a href="https://agentskills.io">SKILL.md</a> file in an open format, so
+      any agent that can read it can follow the same steps. Claude Code is only
+      the one that has an installer for it.
     </p>
 
     <h3>Either Way, the Same Shape</h3>
     <p>
-      Scope what you are looking at, scan, read the coverage line, look at the
-      list, verify the ones that matter, and reproduce if you need proof. Stop
-      wherever you have your answer. Most scans end at the list.
+      Decide what you are looking at, scan it, read the coverage line, then read
+      the list. Verify the findings that matter to you, and reproduce one if you
+      need proof. You can stop at any point where you already have your answer.
+      For most scans, the list is enough.
     </p>
   </section>
 
@@ -421,7 +426,7 @@ app.get("/download", (req, res) =&gt; {
   res.send(fs.readFileSync("/var/data/" + name));
 });</pre>
     <p>
-      No config file, no picking which rules to run:
+      There is no config file, and you do not choose which rules to run:
     </p>
 <pre class="sample">$ vyql scan .
 analysis profile: HTTP API server (api)
@@ -429,16 +434,17 @@ analysis profile: HTTP API server (api)
 2 finding(s):
 
 [P3] [<b>HIGH</b>] VYQL-PATH-001  <i>(conf=high, fp=c61843fd71a2284b)</i>
-    source: code.HttpInput @ app.js:6
-    sink: code.FilePathAccess @ app.js:7
-    taint path: app.jsAttr#80 -&gt; app.jsFormat#81 -&gt; app.jsArg#83
-    <i>unless path coveredBy core.PathCanonicalization: not satisfied, no neutralizing
-      control dominates the path; none found anywhere on flows</i>
-    <i>unless endpoint coveredBy core.PathAccessCheck: not satisfied, no guard on sink</i></pre>
+  source: code.HttpInput @ app.js:6
+  sink: code.FilePathAccess @ app.js:7
+  taint path: app.jsAttr#80 -&gt; app.jsFormat#81 -&gt; app.jsArg#83
+  <i>unless path coveredBy core.PathCanonicalization: not satisfied, no neutralizing
+    control dominates the path; none found anywhere on flows</i>
+  <i>unless endpoint coveredBy core.PathAccessCheck: not satisfied, no guard on sink</i></pre>
     <p>
-      Look at the last two lines. Most scanners tell you something is wrong and
-      leave the rest to you. VyQL names the control that would have fixed it. If
-      you already have that control, it tells you why it didn't apply.
+      Look at the last two lines. Most scanners tell you that something is
+      wrong, and the rest of the work stays with you. VyQL names the control
+      that would have fixed it. And if you already have that control in your
+      code, VyQL tells you why it did not apply here.
     </p>
   </section>
 
@@ -447,23 +453,25 @@ analysis profile: HTTP API server (api)
     <div class="grid">
       <div class="card">
         <h3>Knowledge as Data</h3>
-        <p>A small Go engine plus 12,400 <code>.vyql</code> files you can open and edit.
-           Adding a framework usually means writing a binding, not patching Go.</p>
+        <p>A small Go engine, plus 12,400 <code>.vyql</code> files that you can open and
+           edit. To add a framework you usually write a binding. You do not patch Go.</p>
       </div>
       <div class="card">
         <h3>One Graph, 22 Languages</h3>
-        <p>Java, Python and JavaScript are the most complete. Coverage thins out from
-           there, and the scan tells you what you actually got.</p>
+        <p>Java, Python and JavaScript are the most complete ones. The other languages
+           have less coverage, and every scan tells you what you really got.</p>
       </div>
       <div class="card">
         <h3>Built for CI</h3>
-        <p><code>scan</code> exits 1 on anything high or critical. SARIF and JSON output.
-           Baseline files if you're adopting it on a codebase that already has findings.</p>
+        <p><code>scan</code> exits 3 when it finds anything high or critical, and 1 only when
+           it could not run, so a broken step is never read as a clean scan. SARIF and JSON
+           output. Baseline files, for a codebase that already has findings.</p>
       </div>
       <div class="card">
-        <h3>It Admits What It Missed</h3>
-        <p>Files it couldn't parse get reported whether you ask or not. Otherwise a
-           clean run over code nothing read looks the same as a genuinely clean run.</p>
+        <h3>It Tells You What It Did Not Read</h3>
+        <p>Files that no frontend could read are reported, also when you do not ask for
+           it. Without that line, a clean result over code that nobody read looks the
+           same as a result that is really clean.</p>
       </div>
     </div>
   </section>
