@@ -204,7 +204,7 @@ func cmdScan(args []string) error {
 	flagLoc := fs.String("flag-loc", "", "review flag location substring filter")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
 	bindingsPath := fs.String("bindings", "", "optional repo-local binding overlay directory")
-	exclude := fs.String("exclude", "", "comma-separated path segments to skip, e.g. _vendor,node_modules,tests")
+	exclude := addExclude(fs)
 	maxFileSize := fs.String("max-file-size", "", "skip source files larger than this during tree walks, e.g. 4MB (default 2MiB; 0 disables)")
 	cacheDir := fs.String("cache", "auto", "persistent scan cache: auto | off | <dir>")
 	cacheIncremental := fs.Bool("cache-incremental", false, "also populate per-file parse/lower/binding caches for edit-loop scans")
@@ -274,7 +274,7 @@ func cmdScan(args []string) error {
 	}
 	return run(paths, *rulesPath, format.value, *profileName, scanRunOptions{
 		BindingOverlay: strings.TrimSpace(*bindingsPath),
-		Excludes:       parseExcludes(*exclude),
+		Excludes:       exclude.compiled,
 		ShowStats:      stats.on,
 		RuleTiming:     stats.rulePhase(),
 		IncludeFlags:   flagsMode.value == "with",
@@ -552,7 +552,7 @@ type scanRunOptions struct {
 	// BindingOverlay and Excludes travel with the run rather than in package-level variables the
 	// pipeline reads behind the caller's back.
 	BindingOverlay string
-	Excludes       []string
+	Excludes       extract.Excludes
 
 	ShowStats bool
 	// RuleTiming prints each rule's evaluation time, selected by -stats=rule.
@@ -618,6 +618,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 		rkey = scanFingerprint(cache.Salt(), paths, ruleSources, prof.Name, opts.BindingOverlay, opts.Excludes)
 		if cs, ok := loadCachedScan(cache, rkey); ok {
 			all, stats, hit = cs.Findings, statsFromCachedScan(cs), true
+			restoreExcludeCounts(cs, opts.Excludes)
 		}
 	}
 	tk.Mark("fingerprint")
@@ -635,7 +636,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 			return err
 		}
 		if cache != nil && syncCollector == nil && !needsGraph {
-			storeCachedScan(cache, rkey, all, stats)
+			storeCachedScan(cache, rkey, all, stats, opts.Excludes)
 		}
 	}
 	if syncPath != "" {
@@ -740,7 +741,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	// document, so `scan -format sarif -coverage . > results.sarif` writes SARIF
 	// rather than SARIF followed by a coverage report no parser accepts.
 	if opts.ShowCoverage {
-		printCoverage(os.Stderr, stats)
+		printCoverage(os.Stderr, stats, opts.Excludes)
 	}
 	if opts.ShowStats {
 		fmt.Fprintf(os.Stderr, "[stats] profile %s (%s)\n", prof.Name, prof.Title)
@@ -991,7 +992,7 @@ func topKinds(m map[string]int, limit int) string {
 // printCoverage is the full account: what was read, what -exclude dropped, and
 // what nothing claimed. It writes to the caller's stream, which is stderr: it
 // describes the run rather than being the document the run produced.
-func printCoverage(w io.Writer, stats extract.Stats) {
+func printCoverage(w io.Writer, stats extract.Stats, excludes extract.Excludes) {
 	fmt.Fprintln(w, "\ncoverage")
 	if len(stats.Languages) == 0 {
 		fmt.Fprintln(w, "  parsed    nothing")
@@ -1002,8 +1003,38 @@ func printCoverage(w io.Writer, stats extract.Stats) {
 		}
 		fmt.Fprintf(w, "  parsed    %s\n", strings.Join(parts, " · "))
 	}
-	if stats.Excluded > 0 {
-		fmt.Fprintf(w, "  excluded  %d file(s) dropped by -exclude\n", stats.Excluded)
+	if stats.Excluded > 0 || len(excludes) > 0 {
+		prunedDirs := 0
+		for _, e := range excludes {
+			prunedDirs += e.PrunedDirs
+		}
+		if prunedDirs > 0 {
+			// A pruned directory is never descended, so its files are never
+			// listed and cannot be counted. Reporting the directories is what
+			// the walk actually knows, and claiming a file count it does not
+			// have would be worse than naming the unit honestly.
+			fmt.Fprintf(w, "  excluded  %d file(s) and %d director(ies) dropped by -exclude\n",
+				stats.Excluded, prunedDirs)
+		} else {
+			fmt.Fprintf(w, "  excluded  %d file(s) dropped by -exclude\n", stats.Excluded)
+		}
+		// Per-pattern counts, because a pattern that excluded nothing is a filter
+		// the operator believes is working. Excluding a directory this repository
+		// happens not to have is legitimate in a shared config, so a zero is
+		// marked rather than treated as an error.
+		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+		for _, e := range excludes {
+			count := fmt.Sprintf("%d file(s)", e.Matched)
+			if e.PrunedDirs > 0 {
+				count = fmt.Sprintf("%d dir(s)", e.PrunedDirs)
+			}
+			note := ""
+			if e.Matched == 0 && e.PrunedDirs == 0 {
+				note = "\t← matched nothing"
+			}
+			fmt.Fprintf(tw, "              %s\t%s%s\n", e.Raw, count, note)
+		}
+		_ = tw.Flush()
 	}
 	if stats.Oversized > 0 {
 		fmt.Fprintf(w, "  oversized %d file(s) skipped over the -max-file-size ceiling;\n", stats.Oversized)

@@ -39,6 +39,16 @@ type cachedScan struct {
 	Excluded  int
 	Oversized int
 	Unmatched map[string]int
+	// ExcludeHits carries the per-pattern counts, keyed by the pattern as written.
+	// A replayed scan never walks, so without these the coverage report would
+	// mark every pattern as matching nothing -- which is the one thing that
+	// report exists to say truthfully.
+	ExcludeHits map[string]excludeHit
+}
+
+type excludeHit struct {
+	Files int
+	Dirs  int
 }
 
 // scanFingerprint hashes everything a scan's output depends on: the binary (cache salt — a
@@ -49,7 +59,7 @@ type cachedScan struct {
 // error, so there is no failure here to handle.
 func hashString(h hash.Hash, s string) { _, _ = io.WriteString(h, s) }
 
-func scanFingerprint(salt []byte, paths []string, ruleSources []parser.V2DefinitionSource, profile, overlay string, excludes []string) string {
+func scanFingerprint(salt []byte, paths []string, ruleSources []parser.V2DefinitionSource, profile, overlay string, excludes extract.Excludes) string {
 	h := sha256.New()
 	h.Write(salt)
 	hashString(h, "\x00rules\x00")
@@ -62,9 +72,11 @@ func scanFingerprint(salt []byte, paths []string, ruleSources []parser.V2Definit
 		hashString(h, "\x00binding-overlay\x00")
 		statWalk(h, overlay)
 	}
+	// The compiled pattern, not the value as typed: `gen/` and `gen` mean the same
+	// thing and must not fingerprint as two different scans.
 	for _, ex := range excludes {
 		hashString(h, "\x00exclude\x00")
-		hashString(h, ex)
+		hashString(h, ex.Pattern)
 	}
 	// The size ceiling changes which files are read, so it must never replay
 	// another ceiling's cached findings.
@@ -217,9 +229,9 @@ func loadCachedScan(c *parsecache.Cache, key string) (cachedScan, bool) {
 }
 
 // storeCachedScan persists a scan result under key.
-func storeCachedScan(c *parsecache.Cache, key string, all []*findings.Finding, stats extract.Stats) {
+func storeCachedScan(c *parsecache.Cache, key string, all []*findings.Finding, stats extract.Stats, excludes extract.Excludes) {
 	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(cachedScanFrom(all, stats)); err != nil {
+	if err := gob.NewEncoder(&buf).Encode(cachedScanFrom(all, stats, excludes)); err != nil {
 		return
 	}
 	c.PutRaw("scan\x00"+key, buf.Bytes())
@@ -230,15 +242,38 @@ func storeCachedScan(c *parsecache.Cache, key string, all []*findings.Finding, s
 // in another file, and the two drifted: Oversized was added to one and not the other, so a
 // tree's first scan reported files skipped over the size ceiling and every cached scan after
 // it reported none.
-func cachedScanFrom(all []*findings.Finding, stats extract.Stats) cachedScan {
+func cachedScanFrom(all []*findings.Finding, stats extract.Stats, excludes extract.Excludes) cachedScan {
 	return cachedScan{
-		Findings:  all,
-		Files:     stats.Files,
-		Languages: stats.Languages,
-		Excluded:  stats.Excluded,
-		Oversized: stats.Oversized,
-		Unmatched: stats.Unmatched,
+		ExcludeHits: excludeHits(excludes),
+		Findings:    all,
+		Files:       stats.Files,
+		Languages:   stats.Languages,
+		Excluded:    stats.Excluded,
+		Oversized:   stats.Oversized,
+		Unmatched:   stats.Unmatched,
 	}
+}
+
+// restoreExcludeCounts puts the cached per-pattern counts back on the compiled
+// patterns, so a replayed scan reports what it excluded rather than reporting
+// that every pattern matched nothing.
+func restoreExcludeCounts(cs cachedScan, excludes extract.Excludes) {
+	for _, e := range excludes {
+		if hit, ok := cs.ExcludeHits[e.Raw]; ok {
+			e.Matched, e.PrunedDirs = hit.Files, hit.Dirs
+		}
+	}
+}
+
+func excludeHits(excludes extract.Excludes) map[string]excludeHit {
+	if len(excludes) == 0 {
+		return nil
+	}
+	out := make(map[string]excludeHit, len(excludes))
+	for _, e := range excludes {
+		out[e.Raw] = excludeHit{Files: e.Matched, Dirs: e.PrunedDirs}
+	}
+	return out
 }
 
 func statsFromCachedScan(cs cachedScan) extract.Stats {

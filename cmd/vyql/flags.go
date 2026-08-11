@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/vyprai/vyql/internal/bindings"
+	"github.com/vyprai/vyql/internal/extract"
 	"github.com/vyprai/vyql/internal/timing"
 )
 
@@ -300,6 +301,42 @@ func writeHeapProfile(path string) {
 	if err := pprof.WriteHeapProfile(f); err != nil {
 		fmt.Fprintln(os.Stderr, "vyql: memprofile: "+err.Error())
 	}
+}
+
+// excludeValue is `-exclude`, which is repeatable and takes exactly one pattern
+// per occurrence. Splitting on comma would make a brace alternation
+// (`**/*.{test,spec}.ts`) parse as two patterns that match nothing.
+//
+// Each pattern is compiled on assignment, so a malformed glob is a usage error
+// before any file is read.
+type excludeValue struct {
+	raw      []string
+	compiled extract.Excludes
+}
+
+func (x *excludeValue) String() string {
+	if x == nil {
+		return ""
+	}
+	return strings.Join(x.raw, " ")
+}
+
+func (x *excludeValue) Set(v string) error {
+	e, err := extract.ParseExclusion(v)
+	if err != nil {
+		return err
+	}
+	x.raw = append(x.raw, v)
+	x.compiled = append(x.compiled, e)
+	return nil
+}
+
+func addExclude(fs *flag.FlagSet) *excludeValue {
+	v := &excludeValue{}
+	fs.Var(v, "exclude", "skip paths matching this pattern; repeat for more. "+
+		"A bare name means that directory at any depth (node_modules); "+
+		"anything else is a glob against the scan-relative path (**/*_templ.go, src/gen/**)")
+	return v
 }
 
 // checkFlagFilters rejects a review-flag filter that cannot reach the output. Accepting

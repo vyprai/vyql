@@ -57,7 +57,7 @@ func (s Stats) TotalFiles() int {
 // All routes every path to the right frontend(s), merges into one NIR
 // Program, and returns the union of binding applicators + constructor→type
 // tables for the languages present.
-func All(paths []string, excludes []string) (nir.Program, []bindings.Applicator, map[string]string, Stats, error) {
+func All(paths []string, excludes Excludes) (nir.Program, []bindings.Applicator, map[string]string, Stats, error) {
 	var prog nir.Program
 	present := map[string]bool{}
 	stats := Stats{Files: map[string]int{}, Unmatched: map[string]int{}}
@@ -76,7 +76,9 @@ func All(paths []string, excludes []string) (nir.Program, []bindings.Applicator,
 		var entries []treesitter.Entry
 		root := p
 		if info.IsDir() {
-			entries = treesitter.ListAllFiles(p)
+			var droppedByExclude int
+			entries, droppedByExclude = treesitter.ListAllFilesCounted(p, pruner(excludes))
+			stats.Excluded += droppedByExclude
 			// Only filtered when walking a tree. Naming a file explicitly is an
 			// instruction to scan that file, whatever its size.
 			if ceiling := treesitter.MaxFileBytes(); ceiling > 0 {
@@ -93,16 +95,6 @@ func All(paths []string, excludes []string) (nir.Program, []bindings.Applicator,
 		} else {
 			root = filepath.Dir(p)
 			entries = []treesitter.Entry{{Path: p, Ext: strings.ToLower(filepath.Ext(p)), Base: strings.ToLower(filepath.Base(p))}}
-		}
-		if len(excludes) > 0 {
-			kept := entries[:0]
-			for _, e := range entries {
-				if !pathHasExcludedSegment(e.Path, excludes) {
-					kept = append(kept, e)
-				}
-			}
-			stats.Excluded += len(entries) - len(kept)
-			entries = kept
 		}
 		for _, e := range entries {
 			kind := e.Ext
@@ -163,19 +155,13 @@ func All(paths []string, excludes []string) (nir.Program, []bindings.Applicator,
 	return prog, bindingApps, ctorTypes, stats, nil
 }
 
-// pathHasExcludedSegment reports whether any path segment of p equals an exclude.
-func pathHasExcludedSegment(p string, excludes []string) bool {
-	if len(excludes) == 0 {
-		return false
+// pruner adapts the compiled exclusions to the walk. A nil set becomes a nil
+// pruner, so an unfiltered walk pays nothing per entry.
+func pruner(es Excludes) treesitter.Pruner {
+	if len(es) == 0 {
+		return nil
 	}
-	for _, seg := range strings.Split(filepath.ToSlash(p), "/") {
-		for _, ex := range excludes {
-			if seg == ex {
-				return true
-			}
-		}
-	}
-	return false
+	return es
 }
 
 // propertiesFromEntries parses `.properties` files from the already-built source inventory.

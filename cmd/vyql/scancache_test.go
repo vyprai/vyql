@@ -28,7 +28,14 @@ func TestEveryCoverageFieldSurvivesTheCacheReplay(t *testing.T) {
 		Oversized: 7,
 		Unmatched: map[string]int{".zig": 11},
 	}
-	replayed := statsFromCachedScan(cachedScanFrom(nil, stats))
+	excludes, err := extract.ParseExcludes([]string{"node_modules", "**/*_templ.go", "*.min.js"})
+	if err != nil {
+		t.Fatalf("ParseExcludes: %v", err)
+	}
+	excludes[0].PrunedDirs = 2
+	excludes[1].Matched = 4
+	cached := cachedScanFrom(nil, stats, excludes)
+	replayed := statsFromCachedScan(cached)
 
 	if got, want := len(replayed.Files), len(stats.Files); got != want {
 		t.Errorf("Files lost across the cache: %d entries, want %d", got, want)
@@ -42,6 +49,24 @@ func TestEveryCoverageFieldSurvivesTheCacheReplay(t *testing.T) {
 	if replayed.Oversized != stats.Oversized {
 		t.Errorf("Oversized lost across the cache: %d, want %d — a cached scan would stop "+
 			"reporting files skipped over the size ceiling", replayed.Oversized, stats.Oversized)
+	}
+
+	// The per-pattern counts belong to the walk, and a replayed scan never walks.
+	// Without them every pattern reports as matching nothing, which is the one
+	// thing the coverage report exists to say truthfully.
+	fresh, err := extract.ParseExcludes([]string{"node_modules", "**/*_templ.go", "*.min.js"})
+	if err != nil {
+		t.Fatalf("ParseExcludes: %v", err)
+	}
+	restoreExcludeCounts(cached, fresh)
+	if fresh[0].PrunedDirs != 2 {
+		t.Errorf("pruned directory count lost across the cache: %d, want 2", fresh[0].PrunedDirs)
+	}
+	if fresh[1].Matched != 4 {
+		t.Errorf("excluded file count lost across the cache: %d, want 4", fresh[1].Matched)
+	}
+	if got := fresh.Unmatched(); len(got) != 1 || got[0] != "*.min.js" {
+		t.Errorf("Unmatched() after replay = %v, want only the pattern that excluded nothing", got)
 	}
 	if replayed.UnmatchedTotal() != stats.UnmatchedTotal() {
 		t.Errorf("Unmatched lost across the cache: %d, want %d",
