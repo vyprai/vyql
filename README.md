@@ -280,13 +280,10 @@ alone without parsing output:
 
 | code | meaning |
 | --- | --- |
-| `0` | the command did what you asked |
+| `0` | the command run successfully |
 | `1` | VyQL could not complete — bad path, unreadable file, rules that do not compile |
 | `2` | usage error — unknown command or flag, missing path, a value outside its set |
 | `3` | the check ran and did not pass — findings at or above `-fail-on`, a corpus that does not validate, a finding set that changed |
-
-"This code has findings" and "the scanner could not run" are different codes, so
-a broken pipeline step cannot be mistaken for a clean scan or the reverse.
 
 ### Adopting it on a codebase that already has findings
 
@@ -380,11 +377,10 @@ value containing a slash is anchored at the scan root and matches as written.
 
 Excluded directories are never descended, so their files are not read or even
 listed. A malformed pattern is rejected before the scan starts, and `-coverage`
-reports how much each pattern excluded — a pattern matching nothing is a filter
-you believe is working.
+reports how much each pattern excluded.
 
-One pattern per flag: a comma is rejected, because splitting on it would make
-`**/*.{test,spec}.ts` two patterns that match nothing.
+One pattern per flag: a comma is rejected, because it would be ambiguous with a
+valid glob pattern.
 
 ### What was actually read
 

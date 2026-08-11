@@ -18,7 +18,7 @@
 //
 //	vyql explain | trace | query | match | resolve | graph | diff | definitions
 //
-// Exit codes are the same on every command: 0 did what was asked, 1 vyql could
+// Exit codes are the same on every command: 0 the command run successfully, 1 vyql could
 // not complete, 2 the invocation cannot mean anything, 3 the check ran and did
 // not pass. stdout carries exactly one document in the requested format;
 // diagnostics go to stderr.

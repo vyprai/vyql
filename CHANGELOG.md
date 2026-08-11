@@ -12,7 +12,7 @@ behaviour change, even if no code moved.
 
 ### Changed
 
-- **Exit codes are one contract across every command.** `0` did what was asked,
+- **Exit codes are one contract across every command.** `0` the command run successfully,
   `1` VyQL could not complete, `2` the invocation cannot mean anything, `3` the
   check ran and did not pass. `scan` gates at `3` rather than `1`, so "this code
   has findings" and "the scanner could not run" are no longer the same status.
@@ -21,8 +21,8 @@ behaviour change, even if no code moved.
   that directory at any depth, so existing single-value invocations are
   unchanged. `*_templ.go` and `**/*.{test,spec}.ts` now work, and excluded
   directories are pruned during the walk rather than filtered afterwards.
-  **Comma-separated lists are rejected**; repeat the flag instead, because
-  splitting on comma would make a brace alternation match nothing.
+  **Comma-separated lists are rejected**; repeat the flag instead, because a
+  comma would be ambiguous with a valid glob pattern.
 - **stdout carries exactly one document.** `-stats` and `-coverage` go to
   stderr, so `scan -format sarif -coverage . > results.sarif` writes SARIF
   rather than SARIF followed by text no parser accepts.

@@ -135,7 +135,7 @@ What actually drifts, in order of how often it has:
 3. **Flags and severity vocabulary.** `-fail-on` takes
    `none info low medium high critical`; the action's input description repeats
    that list, and a change here does not update it there. The same goes for the
-   exit codes: 0 did what was asked, 1 vyql could not complete, 2 the invocation
+   exit codes: 0 the command run successfully, 1 vyql could not complete, 2 the invocation
    cannot mean anything, 3 the check ran and did not pass. The action branches on
    those values and the tap's test block asserts one of them.
 4. **The agent flow**, `scope → scan → coverage → list → verify → reproduce → fix`,

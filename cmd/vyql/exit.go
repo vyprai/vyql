@@ -10,7 +10,7 @@ import (
 // The exit-code contract. Every command reports the same four codes, so a
 // pipeline can act on the status alone.
 //
-//	0  the command did what was asked
+//	0  the command run successfully
 //	1  vyql could not complete
 //	2  usage error -- the invocation cannot mean anything
 //	3  the check ran, and did not pass
