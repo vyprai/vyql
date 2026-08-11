@@ -146,12 +146,18 @@ var commands = map[string]func([]string) error{
 	"resolve":     cmdResolve,
 	"query":       cmdQuery,
 	"graph":       cmdGraph,
-	"bindings":    cmdBindings,
 	"definitions": cmdDefinitions,
 	"diff":        cmdDiff,
 	"cache":       cmdCache,
+}
 
-	"validate-binding": cmdValidateBinding,
+// movedCommands names where a retired command's job is done now. Each was retired
+// because another surface answers the same question at least as well, so the message
+// says which one rather than only that this name is gone.
+var movedCommands = map[string]string{
+	"bindings":         "a language's vocabulary is `vyql definitions -kind bindings -lang <lang>`",
+	"validate-binding": "binding validation is `vyql definitions validate <path>`",
+	"review":           "review flags are `vyql scan -flags only`",
 }
 
 func unknownCommand(cmd string) error {
@@ -164,6 +170,9 @@ func unknownCommand(cmd string) error {
 	hints := []string{}
 	if s := suggest(names, cmd); len(s) > 0 {
 		hints = append(hints, "did you mean: "+strings.Join(s, ", ")+"?")
+	}
+	if to, ok := movedCommands[cmd]; ok {
+		hints = []string{to}
 	}
 	hints = append(hints, "run `vyql help` for the command list")
 	return usageWith(fmt.Sprintf("unknown command %q", cmd), hints...)
@@ -1046,8 +1055,8 @@ func cmdVersion() {
 // command's own flagset, so this list cannot drift from what the flags are.
 var commandHelp = []struct{ name, summary string }{
 	{"scan", "run rules and report findings"},
-	{"trace", "trace taint source→sink; show the path or where it dead-ends"},
-	{"query", "query the analysis graph by predicate"},
+	{"trace", "trace taint source→sink: the path, or where it dead-ends"},
+	{"query", "list graph nodes by type, concept, callee or location"},
 	{"explain", "print each finding's full proof tree and negation evidence"},
 	{"match", "list every node a binding labelled, and which binding did it"},
 	{"resolve", "report interprocedural call resolution"},

@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -72,10 +71,12 @@ type explainReviewView struct {
 }
 
 func cmdDefinitionsExplain(args []string) error {
-	fs := flag.NewFlagSet("definitions explain", flag.ExitOnError)
+	fs := newFlagSet("definitions explain")
 	in := fs.String("in", datadirRoot(), "v2 .vyql file or directory to inspect")
-	format := fs.String("format", "text", "output format: text | json")
-	_ = fs.Parse(args)
+	format := addFormat(fs, "text", "json")
+	if err := parseFlags(fs, args); err != nil {
+		return err
+	}
 	if fs.NArg() != 1 {
 		return fmt.Errorf("definitions explain requires <concept-or-binding>, e.g. core.SqlParameterization or cursorExecute")
 	}
@@ -88,7 +89,7 @@ func cmdDefinitionsExplain(args []string) error {
 	if err != nil {
 		return err
 	}
-	switch *format {
+	switch format.value {
 	case "json":
 		b, err := json.MarshalIndent(view, "", "  ")
 		if err != nil {

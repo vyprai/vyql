@@ -56,51 +56,6 @@ func printUSG(g usg.Store) error {
 	return nil
 }
 
-// printTaint shows, for each source node, the set of FLOWS-reachable labelled nodes — so a
-// broken taint chain (source not reaching its sink) is visible at a glance.
-func printTaint(onto *ontology.Ontology, g usg.Store) error {
-	nodes, err := g.AllNodes()
-	if err != nil {
-		return err
-	}
-	sort.Slice(nodes, func(i, j int) bool { return nodes[i].SortOrder() < nodes[j].SortOrder() })
-	for _, n := range nodes {
-		if !isSource(onto, g, n.ID) {
-			continue
-		}
-		fmt.Printf("\nSOURCE %s @ %s {%s}\n", n.ID, n.Prop("loc"), conceptsOf(g, n.ID))
-		seen := map[string]bool{n.ID: true}
-		queue := []string{n.ID}
-		for len(queue) > 0 {
-			cur := queue[0]
-			queue = queue[1:]
-			es, _ := g.OutEdges(cur, "FLOWS")
-			for _, e := range es {
-				if !seen[e.Dst] {
-					seen[e.Dst] = true
-					queue = append(queue, e.Dst)
-				}
-			}
-		}
-		hits := 0
-		for _, m := range nodes {
-			if !seen[m.ID] || m.ID == n.ID {
-				continue
-			}
-			if c := conceptsOf(g, m.ID); c != "" {
-				kind := "·"
-				if !isSource(onto, g, m.ID) {
-					kind = "SINK?"
-				}
-				fmt.Printf("  %-5s reaches %s @ %s {%s}\n", kind, m.ID, m.Prop("loc"), c)
-				hits++
-			}
-		}
-		fmt.Printf("  (%d nodes reachable via FLOWS, %d labelled)\n", len(seen), hits)
-	}
-	return nil
-}
-
 // nodeCells renders a node as tab-separated fields for a tabwriter, so a column
 // sizes to the longest value present rather than to a width guessed in advance.
 // Node IDs run well past any fixed width, which leaves a hand-tuned format

@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/vyprai/vyql/internal/bindings"
@@ -43,7 +44,36 @@ func parseFlags(fs *flag.FlagSet, args []string) error {
 			printCommandHelp(fs)
 			return errHelpRequested
 		}
-		return &usageError{msg: err.Error()}
+		return &usageError{msg: err.Error(), hints: movedFlagHint(fs.Name(), err)}
+	}
+	return nil
+}
+
+// movedFlags names where a flag's job is done now, keyed by "command -flag". A
+// flag that answers the same question somewhere else should say so: the
+// invocation exists in scripts, and "flag provided but not defined" leaves the
+// reader to guess whether the capability is gone or merely spelled differently.
+var movedFlags = map[string]string{
+	"query -from":  "reachability is `vyql trace -from X -to Y`; add -brief for one line per pair",
+	"query -to":    "reachability is `vyql trace -from X -to Y`; add -brief for one line per pair",
+	"graph -taint": "reachability is `vyql trace`, which also reports where taint stops",
+	"scan -all":    "use -flags with (findings and flags) or -flags only",
+	"scan -exit-code": "the gate exits " + strconv.Itoa(exitCheckFail) +
+		"; 1 means vyql could not run and 2 means the invocation was wrong",
+	"scan -binding-overlay":   "the flag is -bindings, matching -rules",
+	"scan -incremental-cache": "the flag is -cache-incremental",
+	"definitions -max":        "the flag is -limit; it counts rows, not bytes",
+	"definitions -in":         "the path is positional: `vyql definitions validate <path>`",
+}
+
+func movedFlagHint(command string, err error) []string {
+	const prefix = "flag provided but not defined: "
+	msg := err.Error()
+	if !strings.HasPrefix(msg, prefix) {
+		return nil
+	}
+	if to, ok := movedFlags[command+" "+strings.TrimSpace(strings.TrimPrefix(msg, prefix))]; ok {
+		return []string{to}
 	}
 	return nil
 }

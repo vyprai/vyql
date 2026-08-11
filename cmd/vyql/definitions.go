@@ -2,13 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/definitions"
@@ -16,15 +16,14 @@ import (
 )
 
 func cmdDefinitions(args []string) error {
-	if len(args) > 0 && args[0] == "check-v2" {
-		return cmdDefinitionsCheckV2(args[1:])
-	}
+
 	if len(args) > 0 && args[0] == "validate" {
 		return cmdDefinitionsValidate(args[1:])
 	}
-	if len(args) > 0 && args[0] == "lint" {
-		return cmdDefinitionsLint(args[1:])
+	if len(args) > 0 && args[0] == "validate-binding" {
+		return cmdValidateBinding(args[1:])
 	}
+
 	if len(args) > 0 && args[0] == "search" {
 		return cmdDefinitionsSearch(args[1:])
 	}
@@ -40,42 +39,41 @@ func cmdDefinitions(args []string) error {
 	if len(args) > 0 && args[0] == "show-mechanic" {
 		return cmdDefinitionsShowMechanic(args[1:])
 	}
-	fs := flag.NewFlagSet("definitions", flag.ExitOnError)
-	kind := fs.String("kind", "all", "definition kind: all | concepts | rules | bindings | reviews")
+	fs := newFlagSet("definitions")
+	kind := addEnum(fs, "kind", "all", "definition kind", definitionKinds)
 	lang := fs.String("lang", "", "binding language filter, e.g. python, javascript, go")
 	query := fs.String("query", "", "case-insensitive substring filter across names, concepts, patterns, packages, CWE, and text")
-	max := fs.Int("max", 80, "maximum rows per section")
-	format := fs.String("format", "text", "output format: text | json")
-	_ = fs.Parse(args)
-
-	// An unrecognised kind selects nothing, and the report then states that zero
-	// concepts, rules and bindings are loaded -- which describes a broken
-	// installation, not a typo.
-	if err := validateDefinitionKind(*kind); err != nil {
+	limit := fs.Int("limit", 80, "maximum rows per section")
+	format := addFormat(fs, "text", "json")
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 
+	// A language-scoped binding listing is the vocabulary view: what patterns this
+	// technology recognises, grouped by the role each plays. Grouping by role is
+	// what answers "is this API modelled", which a flat declaration list does not.
+	if kind.value == "bindings" && strings.TrimSpace(*lang) != "" {
+		return printBindingVocabulary(strings.TrimSpace(*lang), format.value)
+	}
+
 	cat, err := definitions.Inspect(definitions.InspectOptions{
-		Kind:     *kind,
+		Kind:     kind.value,
 		Language: *lang,
 		Query:    *query,
-		Max:      *max,
+		Max:      *limit,
 	})
 	if err != nil {
 		return err
 	}
-	switch *format {
-	case "json":
+	if format.value == "json" {
 		b, err := json.MarshalIndent(cat, "", "  ")
 		if err != nil {
 			return err
 		}
 		fmt.Println(string(b))
-	case "text":
-		printDefinitions(cat)
-	default:
-		return fmt.Errorf("unknown -format %q (use text or json)", *format)
+		return nil
 	}
+	printDefinitions(cat)
 	return nil
 }
 
@@ -112,45 +110,47 @@ type v2RefView struct {
 }
 
 func cmdDefinitionsSearch(args []string) error {
-	fs := flag.NewFlagSet("definitions search", flag.ExitOnError)
-	kind := fs.String("kind", "all", "definition kind: all | concepts | rules | bindings | reviews | packs")
+	fs := newFlagSet("definitions search")
+	kind := addEnum(fs, "kind", "all", "definition kind", definitionKinds)
 	lang := fs.String("lang", "", "binding language filter, e.g. python, javascript, go")
-	max := fs.Int("max", 80, "maximum rows per section")
-	format := fs.String("format", "text", "output format: text | json")
-	_ = fs.Parse(args)
+	limit := fs.Int("limit", 80, "maximum rows per section")
+	format := addFormat(fs, "text", "json")
+	if err := parseFlags(fs, args); err != nil {
+		return err
+	}
 	query := strings.Join(fs.Args(), " ")
 	if strings.TrimSpace(query) == "" {
-		return fmt.Errorf("definitions search requires query text")
+		return usageWith("definitions search requires query text",
+			"usage: vyql definitions search [flags] <text>...")
 	}
 	cat, err := definitions.Inspect(definitions.InspectOptions{
-		Kind:     *kind,
+		Kind:     kind.value,
 		Language: *lang,
 		Query:    query,
-		Max:      *max,
+		Max:      *limit,
 	})
 	if err != nil {
 		return err
 	}
-	switch *format {
-	case "json":
+	if format.value == "json" {
 		b, err := json.MarshalIndent(cat, "", "  ")
 		if err != nil {
 			return err
 		}
 		fmt.Println(string(b))
-	case "text":
-		printDefinitions(cat)
-	default:
-		return fmt.Errorf("unknown -format %q (use text or json)", *format)
+		return nil
 	}
+	printDefinitions(cat)
 	return nil
 }
 
 func cmdDefinitionsRefs(args []string) error {
-	fs := flag.NewFlagSet("definitions refs", flag.ExitOnError)
+	fs := newFlagSet("definitions refs")
 	in := fs.String("in", datadirRoot(), "v2 .vyql file or directory to inspect")
-	format := fs.String("format", "text", "output format: text | json")
-	_ = fs.Parse(args)
+	format := addFormat(fs, "text", "json")
+	if err := parseFlags(fs, args); err != nil {
+		return err
+	}
 	if fs.NArg() != 1 {
 		return fmt.Errorf("definitions refs requires <definition-or-concept>, e.g. core.SqlParameterization")
 	}
@@ -163,25 +163,25 @@ func cmdDefinitionsRefs(args []string) error {
 	if err != nil {
 		return err
 	}
-	switch *format {
+	switch format.value {
 	case "json":
 		b, err := json.MarshalIndent(refs, "", "  ")
 		if err != nil {
 			return err
 		}
 		fmt.Println(string(b))
-	case "text":
-		printV2Refs(target, refs)
 	default:
-		return fmt.Errorf("unknown -format %q (use text or json)", *format)
+		printV2Refs(target, refs)
 	}
 	return nil
 }
 
 func cmdDefinitionsShowPolicy(args []string) error {
-	fs := flag.NewFlagSet("definitions show-policy", flag.ExitOnError)
-	format := fs.String("format", "text", "output format: text | json")
-	_ = fs.Parse(args)
+	fs := newFlagSet("definitions show-policy")
+	format := addFormat(fs, "text", "json")
+	if err := parseFlags(fs, args); err != nil {
+		return err
+	}
 	if fs.NArg() != 1 {
 		return fmt.Errorf("definitions show-policy requires <kind.name>, e.g. resultIdentity.default")
 	}
@@ -193,25 +193,25 @@ func cmdDefinitionsShowPolicy(args []string) error {
 	if err != nil {
 		return err
 	}
-	switch *format {
+	switch format.value {
 	case "json":
 		b, err := json.MarshalIndent(policy, "", "  ")
 		if err != nil {
 			return err
 		}
 		fmt.Println(string(b))
-	case "text":
-		printV2PolicyView(policy)
 	default:
-		return fmt.Errorf("unknown -format %q (use text or json)", *format)
+		printV2PolicyView(policy)
 	}
 	return nil
 }
 
 func cmdDefinitionsShowMechanic(args []string) error {
-	fs := flag.NewFlagSet("definitions show-mechanic", flag.ExitOnError)
-	format := fs.String("format", "text", "output format: text | json")
-	_ = fs.Parse(args)
+	fs := newFlagSet("definitions show-mechanic")
+	format := addFormat(fs, "text", "json")
+	if err := parseFlags(fs, args); err != nil {
+		return err
+	}
 	if fs.NArg() != 1 {
 		return fmt.Errorf("definitions show-mechanic requires <kind.name>, e.g. ruleVerb.taint")
 	}
@@ -223,17 +223,15 @@ func cmdDefinitionsShowMechanic(args []string) error {
 	if err != nil {
 		return err
 	}
-	switch *format {
+	switch format.value {
 	case "json":
 		b, err := json.MarshalIndent(mechanic, "", "  ")
 		if err != nil {
 			return err
 		}
 		fmt.Println(string(b))
-	case "text":
-		printV2MechanicView(mechanic)
 	default:
-		return fmt.Errorf("unknown -format %q (use text or json)", *format)
+		printV2MechanicView(mechanic)
 	}
 	return nil
 }
@@ -688,18 +686,11 @@ type v2UnstableUse struct {
 	Reason string
 }
 
-func cmdDefinitionsLint(args []string) error {
-	fs := flag.NewFlagSet("definitions lint", flag.ExitOnError)
-	in := fs.String("in", "", "v2 .vyql file or directory to lint")
-	unstable := fs.Bool("unstable", false, "report quarantined unstable.* v2 uses")
-	_ = fs.Parse(args)
-	if !*unstable {
-		return fmt.Errorf("definitions lint currently requires --unstable")
-	}
-	if *in == "" {
-		return fmt.Errorf("definitions lint --unstable requires -in <file|dir>")
-	}
-	files, err := vyqlFilesUnder(*in)
+// lintUnstableUnder reports quarantined unstable.* v2 uses, which `definitions validate
+// -unstable` selects. It is a report rather than a gate: an unstable use is a thing to
+// know about, not a corpus that fails to validate.
+func lintUnstableUnder(in string) error {
+	files, err := vyqlFilesUnder(in)
 	if err != nil {
 		return err
 	}
@@ -708,13 +699,16 @@ func cmdDefinitionsLint(args []string) error {
 		return err
 	}
 	if len(uses) == 0 {
-		fmt.Printf("no unstable v2 uses under %s\n", *in)
+		fmt.Printf("no unstable v2 uses under %s\n", in)
 		return nil
 	}
+	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	for _, use := range uses {
-		fmt.Printf("%s: %s %s %s: %s owner=%q reason=%q\n", use.Source, use.Module, use.Kind, use.Name, use.Target, use.Owner, use.Reason)
+		fmt.Fprintf(tw, "%s\t%s %s %s\t%s\towner=%q\treason=%q\n",
+			use.Source, use.Module, use.Kind, use.Name, use.Target, use.Owner, use.Reason)
 	}
-	fmt.Printf("found %d unstable v2 use(s) under %s\n", len(uses), *in)
+	_ = tw.Flush()
+	fmt.Printf("found %d unstable v2 use(s) under %s\n", len(uses), in)
 	return nil
 }
 
@@ -810,38 +804,28 @@ func v2UnstableMetaStrings(meta map[string]any) (owner, reason string) {
 	return strings.TrimSpace(owner), strings.TrimSpace(reason)
 }
 
-func cmdDefinitionsCheckV2(args []string) error {
-	fs := flag.NewFlagSet("definitions check-v2", flag.ExitOnError)
-	in := fs.String("in", "", "v2 .vyql file or directory to verify")
-	_ = fs.Parse(args)
-	if *in == "" {
-		return fmt.Errorf("definitions check-v2 requires -in <file|dir>")
-	}
-	files, err := vyqlFilesUnder(*in)
-	if err != nil {
-		return err
-	}
-	checked, err := checkV2DefinitionFiles(files)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("checked %d v2 definition file(s) under %s\n", checked, *in)
-	return nil
-}
-
 func cmdDefinitionsValidate(args []string) error {
-	fs := flag.NewFlagSet("definitions validate", flag.ExitOnError)
-	in := fs.String("in", datadirRoot(), "v2 .vyql file or directory to verify")
-	_ = fs.Parse(args)
-	files, err := vyqlFilesUnder(*in)
+	fs := newFlagSet("definitions validate")
+	unstable := fs.Bool("unstable", false, "also report quarantined unstable.* v2 uses")
+	if err := parseFlags(fs, args); err != nil {
+		return err
+	}
+	in := datadirRoot()
+	if rest := fs.Args(); len(rest) > 0 {
+		in = rest[0]
+	}
+	if *unstable {
+		return lintUnstableUnder(in)
+	}
+	files, err := vyqlFilesUnder(in)
 	if err != nil {
 		return err
 	}
 	checked, err := checkV2DefinitionFiles(files)
 	if err != nil {
-		return err
+		return checkFailedf("%s", err.Error())
 	}
-	fmt.Printf("validated %d v2 definition file(s) under %s\n", checked, *in)
+	fmt.Printf("validated %d v2 definition file(s) under %s\n", checked, in)
 	return nil
 }
 
@@ -989,4 +973,86 @@ func compactLine(s string, max int) string {
 		return s[:max-1] + "..."
 	}
 	return s
+}
+
+// printBindingVocabulary lists what a technology's binding set recognises, grouped by the
+// role each pattern plays -- source, sink, check, issue, advisory. Grouping by role is what
+// answers "is this API modelled, and as what", which reading the .vyql files does not.
+//
+// Identical pattern-to-concept rows collapse to one row carrying a count. A pattern is
+// declared once per rule that uses it, so the raw list repeats the common entries enough
+// to bury the rest.
+func printBindingVocabulary(lang, format string) error {
+	sources, err := bindingDefinitionSources(lang)
+	if err != nil {
+		return usageWith(fmt.Sprintf("no binding set for %q", lang),
+			"available: "+strings.Join(bindingNames(), ", "))
+	}
+	sets, err := compileBindingSources(v2DefinitionSourcesForRules(sources))
+	if err != nil {
+		return fmt.Errorf("binding parse: %w", err)
+	}
+	type entry struct {
+		Kind    string `json:"kind"`
+		Pattern string `json:"pattern"`
+		Concept string `json:"concept,omitempty"`
+		About   string `json:"about,omitempty"`
+		Count   int    `json:"count"`
+	}
+	seen := map[string]*entry{}
+	var order []*entry
+	for _, ad := range sets {
+		for _, m := range ad.Mappings {
+			e := &entry{Kind: bindingDisplayKind(m), Pattern: m.Pattern, Concept: m.Concept, About: m.About, Count: 1}
+			key := e.Kind + "\x00" + e.Pattern + "\x00" + e.Concept + "\x00" + e.About
+			if prev, ok := seen[key]; ok {
+				prev.Count++
+				continue
+			}
+			seen[key] = e
+			order = append(order, e)
+		}
+	}
+	sort.Slice(order, func(i, j int) bool {
+		if order[i].Kind != order[j].Kind {
+			return order[i].Kind < order[j].Kind
+		}
+		if order[i].Pattern != order[j].Pattern {
+			return order[i].Pattern < order[j].Pattern
+		}
+		return order[i].Concept < order[j].Concept
+	})
+	if format == "json" {
+		b, err := json.MarshalIndent(order, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(b))
+		return nil
+	}
+	byKind := map[string][]*entry{}
+	for _, e := range order {
+		byKind[e.Kind] = append(byKind[e.Kind], e)
+	}
+	for _, kind := range []string{"source", "sink", "check", "issue", "fact", "propagate", "filter", "advisory", "type"} {
+		rows := byKind[kind]
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Printf("\n== %s (%d) ==\n", kind, len(rows))
+		tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		for _, e := range rows {
+			target := e.Concept
+			if e.About != "" {
+				target += " (about " + e.About + ")"
+			}
+			times := ""
+			if e.Count > 1 {
+				times = fmt.Sprintf("x%d", e.Count)
+			}
+			fmt.Fprintf(tw, "  %q\t%s\t%s\n", e.Pattern, target, times)
+		}
+		_ = tw.Flush()
+	}
+	return nil
 }

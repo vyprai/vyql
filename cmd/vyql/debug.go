@@ -30,6 +30,8 @@ func cmdTrace(args []string) error {
 	fs := newFlagSet("trace")
 	from := fs.String("from", "", "only trace sources whose concept contains this substring")
 	to := fs.String("to", "", "only count sinks whose concept contains this substring")
+	brief := fs.Bool("brief", false, "one line per connected source→sink pair, with hop count")
+	count := fs.Bool("count", false, "print only the number of connected pairs")
 	profileName := addProfile(fs)
 	if err := parseFlags(fs, args); err != nil {
 		return err
@@ -60,11 +62,25 @@ func cmdTrace(args []string) error {
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].SortOrder() < nodes[j].SortOrder() })
 
 	connected, dead := 0, 0
+	terse := *brief || *count
+	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	for _, n := range nodes {
 		if !isSource(onto, g, n.ID) || (*from != "" && !conceptMatch(g, n.ID, *from)) {
 			continue
 		}
 		path, sink := shortestToSink(onto, g, n.ID, *to)
+		if terse {
+			if sink == "" {
+				dead++
+				continue
+			}
+			connected++
+			if !*count {
+				fmt.Fprintf(tw, "%s @ %s\t→[%d hops]→\t%s @ %s\t{%s}\n",
+					n.ID, n.Prop("loc"), len(path), sink, locOf(g, sink), conceptsOf(g, sink))
+			}
+			continue
+		}
 		fmt.Printf("\nSOURCE %s @ %s {%s}\n", n.ID, n.Prop("loc"), conceptsOf(g, n.ID))
 		if sink != "" {
 			connected++
@@ -79,6 +95,18 @@ func cmdTrace(args []string) error {
 		for _, f := range frontier(onto, g, n.ID) {
 			fmt.Printf("    ⊣ %s\n", traceNode(g, f))
 		}
+	}
+	_ = tw.Flush()
+	if *count {
+		fmt.Println(connected)
+		return nil
+	}
+	// The dead-end count is reported in every mode. A terse listing of only the
+	// sources that reach a sink reads identically to a clean result, and that is
+	// the reading this command exists to prevent.
+	if terse {
+		fmt.Printf("\n%d reachable source→sink pair(s), %d source(s) dead-end\n", connected, dead)
+		return nil
 	}
 	fmt.Printf("\n%d source(s): %d reach a sink, %d dead-end\n", connected+dead, connected, dead)
 	return nil
@@ -423,16 +451,16 @@ func cmdResolve(args []string) error {
 }
 
 // ── vyql graph ──────────────────────────────────────────────────────────────────────
-// Dump the USG (nodes + edges), or the per-source taint reachability with -taint.
+// Dump the USG (nodes + edges). Reachability is `vyql trace`, which reports where taint
+// stops as well as where it arrives.
 
 func cmdGraph(args []string) error {
 	fs := newFlagSet("graph")
-	taint := fs.Bool("taint", false, "show per-source FLOWS reachability instead of the full graph")
 	profileName := addProfile(fs)
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
-	paths, err := requirePaths(fs, "vyql graph [-taint] <path>...")
+	paths, err := requirePaths(fs, "vyql graph <path>...")
 	if err != nil {
 		return err
 	}
@@ -445,64 +473,7 @@ func cmdGraph(args []string) error {
 		fmt.Println("(no analyzable source)")
 		return nil
 	}
-	if *taint {
-		return printTaint(ontology.Seed(), g)
-	}
 	return printUSG(g)
-}
-
-// ── vyql bindings ───────────────────────────────────────────────────────────────────
-// List the source/sink/check/issue/filter/advisory vocabulary a binding set recognizes, so you
-// don't have to grep the .vyql — and can see at a glance whether an API is modelled.
-
-func cmdBindings(args []string) error {
-	fs := newFlagSet("bindings")
-	lang := fs.String("lang", "", "technology binding set to list (e.g. go, javascript, java, python)")
-	if err := parseFlags(fs, args); err != nil {
-		return err
-	}
-	if *lang == "" {
-		fmt.Println("usage: vyql bindings -lang <go|javascript|java|python|...>")
-		fmt.Println("available bindings:")
-		for _, n := range bindingNames() {
-			fmt.Println("  " + n)
-		}
-		return nil
-	}
-	sources, err := bindingDefinitionSources(*lang)
-	if err != nil {
-		return fmt.Errorf("no binding set for %q (%v)", *lang, err)
-	}
-	sets, err := compileBindingSources(v2DefinitionSourcesForRules(sources))
-	if err != nil {
-		return fmt.Errorf("binding parse: %w", err)
-	}
-	byKind := map[string][]string{}
-	for _, ad := range sets {
-		for _, m := range ad.Mappings {
-			kind := bindingDisplayKind(m)
-			arrow := ""
-			if m.Concept != "" {
-				arrow = " → " + m.Concept
-			}
-			if m.About != "" {
-				arrow += " (about " + m.About + ")"
-			}
-			byKind[kind] = append(byKind[kind], fmt.Sprintf("    %q%s", m.Pattern, arrow))
-		}
-	}
-	for _, kind := range []string{"source", "sink", "check", "issue", "fact", "propagate", "filter", "advisory", "type"} {
-		rows := byKind[kind]
-		if len(rows) == 0 {
-			continue
-		}
-		fmt.Printf("\n== %s (%d) ==\n", kind, len(rows))
-		sort.Strings(rows)
-		for _, r := range rows {
-			fmt.Println(r)
-		}
-	}
-	return nil
 }
 
 func bindingDisplayKind(m bindings.Action) string {
@@ -554,11 +525,17 @@ func bindingDefinitionSources(lang string) ([]parser.V2DefinitionSource, error) 
 // Parse a binding file through the real VyQL parser and emit a compact public summary.
 
 func cmdValidateBinding(args []string) error {
-	fs := newFlagSet("validate-binding")
-	file := fs.String("file", "", "binding .vyql file to parse; reads stdin when empty")
+	fs := newFlagSet("definitions validate-binding")
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
+	// The path is positional, as it is elsewhere. With none given it reads stdin,
+	// which is what makes this usable on a binding being edited.
+	path := ""
+	if rest := fs.Args(); len(rest) > 0 {
+		path = rest[0]
+	}
+	file := &path
 	var data []byte
 	var err error
 	if *file != "" {
@@ -739,8 +716,6 @@ func cmdQuery(args []string) error {
 	concept := fs.String("concept", "", "match concept label substring")
 	call := fs.String("call", "", "match callee_path/method (substring, e.g. db.Query)")
 	loc := fs.String("loc", "", "match location (substring, e.g. .go or a filename)")
-	from := fs.String("from", "", "reachability mode: source concept (with -to)")
-	to := fs.String("to", "", "reachability mode: sink concept (with -from)")
 	edges := fs.Bool("edges", false, "also print each matching node's outgoing edges")
 	count := fs.Bool("count", false, "print only the number of matches")
 	profileName := addProfile(fs)
@@ -762,27 +737,6 @@ func cmdQuery(args []string) error {
 	}
 	nodes, _ := g.AllNodes()
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].SortOrder() < nodes[j].SortOrder() })
-
-	// reachability mode: every -from source that reaches a -to sink (path-aware, like trace
-	// but terse — one line per connected pair).
-	if *from != "" || *to != "" {
-		onto := ontology.Seed()
-		pairs := 0
-		for _, n := range nodes {
-			if !isSource(onto, g, n.ID) || (*from != "" && !conceptMatch(g, n.ID, *from)) {
-				continue
-			}
-			if path, sink := shortestToSink(onto, g, n.ID, *to); sink != "" {
-				pairs++
-				if !*count {
-					fmt.Printf("%s @ %s  →[%d hops]→  %s @ %s {%s}\n",
-						n.ID, n.Prop("loc"), len(path), sink, locOf(g, sink), conceptsOf(g, sink))
-				}
-			}
-		}
-		fmt.Printf("%d reachable source→sink pair(s)\n", pairs)
-		return nil
-	}
 
 	matched := 0
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
