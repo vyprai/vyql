@@ -136,6 +136,8 @@ func vyqlMain() (code int) {
 	if !ok {
 		return exitCodeFor(unknownCommand(cmd))
 	}
+	// Installed for the commands that do work, not for help or version.
+	watchForInterrupt()
 	err := run(args)
 	if errors.Is(err, errHelpRequested) {
 		return exitOK
@@ -274,9 +276,9 @@ func cmdScan(args []string) error {
 		}
 		failOnRank, failOnName = gateForBaseline(failOnRank, failOnName, explicitFailOn)
 	}
-	cleanup := applyMaxRAM(*maxRAM)
+	cleanup := onExit(applyMaxRAM(*maxRAM))
 	defer cleanup()
-	cacheCleanup := applyScanCache(*cacheDir)
+	cacheCleanup := onExit(applyScanCache(*cacheDir))
 	defer cacheCleanup()
 	if v := strings.TrimSpace(*maxFileSize); v != "" {
 		ceiling, err := parseBytes(v)

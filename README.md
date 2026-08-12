@@ -727,7 +727,7 @@ vyql definitions explain -in vyql/bindings/python code.SqlExecution
 ```sh
 vyql diff before.json after.json     # two `scan -format json` outputs
 vyql cache path                      # the directory this build would use
-vyql cache clear                     # drop every cached parse and result
+vyql cache clear                     # remove it, reporting the space freed
 vyql cache clear -cache /tmp/mine    # a cache somewhere else
 vyql version
 vyql help
@@ -736,6 +736,14 @@ vyql help scan
 
 `diff` exits `3` when the finding set changed, so a pipeline can gate on "this
 branch changed the findings" without parsing the output.
+
+`cache clear` removes the directory rather than emptying it, and says how much it
+freed. The next scan recreates it.
+
+`scan -max-ram` puts the graph in a store under the system temporary directory,
+removed when the scan ends — including when you interrupt it. A `kill -9` cannot
+be caught, so that one case leaves the directory behind; remove it with
+`rm -rf $TMPDIR/vyql-graph-*`.
 
 ## Languages
 
