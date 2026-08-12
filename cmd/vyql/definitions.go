@@ -71,6 +71,9 @@ func cmdDefinitions(args []string) error {
 	if inspectErr != nil {
 		return inspectErr
 	}
+	if err := checkCatalogLoaded(cat); err != nil {
+		return err
+	}
 	if format.value == "json" {
 		b, err := json.MarshalIndent(cat, "", "  ")
 		if err != nil {
@@ -117,6 +120,7 @@ type v2RefView struct {
 
 func cmdDefinitionsSearch(args []string) error {
 	fs := newFlagSet("definitions search")
+	addDataFlag(fs)
 	kind := addEnum(fs, "kind", "all", "definition kind", definitionKinds)
 	lang := fs.String("lang", "", "binding language filter, e.g. python, javascript, go")
 	limit := fs.Int("limit", 80, "maximum rows per section")
@@ -152,6 +156,7 @@ func cmdDefinitionsSearch(args []string) error {
 
 func cmdDefinitionsRefs(args []string) error {
 	fs := newFlagSet("definitions refs")
+	addDataFlag(fs)
 	in := fs.String("in", datadirRoot(), "v2 .vyql file or directory to inspect")
 	format := addFormat(fs, "text", "json")
 	if err := parseFlags(fs, args); err != nil {
@@ -184,6 +189,7 @@ func cmdDefinitionsRefs(args []string) error {
 
 func cmdDefinitionsShowPolicy(args []string) error {
 	fs := newFlagSet("definitions show-policy")
+	addDataFlag(fs)
 	format := addFormat(fs, "text", "json")
 	if err := parseFlags(fs, args); err != nil {
 		return err
@@ -214,6 +220,7 @@ func cmdDefinitionsShowPolicy(args []string) error {
 
 func cmdDefinitionsShowMechanic(args []string) error {
 	fs := newFlagSet("definitions show-mechanic")
+	addDataFlag(fs)
 	format := addFormat(fs, "text", "json")
 	if err := parseFlags(fs, args); err != nil {
 		return err
@@ -357,8 +364,15 @@ func parseV2File(path string) (*parser.V2Program, error) {
 	return prog, nil
 }
 
+// datadirRoot is used as a flag default, which is built before any flag is parsed.
+// An absent data directory is reported when the command tries to read it, not while
+// it is describing its own flags.
 func datadirRoot() string {
-	return filepath.Clean(datadir.Root())
+	root, ok := datadir.Lookup()
+	if !ok {
+		return ""
+	}
+	return filepath.Clean(root)
 }
 
 func relPathFromDataRoot(path string) string {
@@ -812,6 +826,7 @@ func v2UnstableMetaStrings(meta map[string]any) (owner, reason string) {
 
 func cmdDefinitionsValidate(args []string) error {
 	fs := newFlagSet("definitions validate")
+	addDataFlag(fs)
 	unstable := fs.Bool("unstable", false, "also report quarantined unstable.* v2 uses")
 	if err := parseFlags(fs, args); err != nil {
 		return err
@@ -896,6 +911,28 @@ func vyqlFilesUnder(root string) ([]string, error) {
 	}
 	sort.Strings(files)
 	return files, nil
+}
+
+// checkCatalogLoaded rejects a data directory that holds no definitions at all.
+//
+// Counts of zero across every kind mean the directory is not a knowledge base,
+// and reporting that as a successful load is indistinguishable from a knowledge
+// base that happens to be empty. A scan against the same directory would then
+// find nothing and pass its gate, which reads as a clean codebase.
+//
+// A single kind coming back empty is left alone: `-kind packs` on a data
+// directory with no packs is a fair question with a fair answer.
+func checkCatalogLoaded(cat definitions.Catalog) error {
+	s := cat.Stats
+	if s.Concepts+s.Rules+s.Bindings+s.Reviews+s.Packs > 0 {
+		return nil
+	}
+	// Not a failed check: a check that ran and said no is a result, and this is the
+	// scanner having nothing to reason with. Same condition, and same exit code, as
+	// a data directory that cannot be found at all.
+	return fmt.Errorf("no definitions found under %s\n"+
+		"  the data directory holds no concepts, rules, bindings or reviews\n"+
+		"  point -data or $VYQL_HOME at the vyql/ directory that ships with the scanner", cat.Root)
 }
 
 func printDefinitions(cat definitions.Catalog) {

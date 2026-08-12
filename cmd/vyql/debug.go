@@ -556,6 +556,7 @@ func bindingDefinitionSources(lang string) ([]parser.V2DefinitionSource, error) 
 
 func cmdValidateBinding(args []string) error {
 	fs := newFlagSet("definitions validate-binding")
+	addDataFlag(fs)
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
@@ -674,14 +675,23 @@ func findingsJSON(all []*findings.Finding) []jsonFinding {
 }
 
 func cmdDiff(args []string) error {
-	if len(args) != 2 {
-		return fmt.Errorf("usage: vyql diff <before.json> <after.json>  (each from `vyql scan -format json`)")
+	// A flagset with no flags of its own, so -h prints the usage on stdout and exits
+	// 0 like every other command. Reading the arguments directly made -h a filename,
+	// and asking for help exit non-zero.
+	fs := newFlagSet("diff")
+	if err := parseFlags(fs, args); err != nil {
+		return err
 	}
-	a, err := readFindingsJSON(args[0])
+	rest := fs.Args()
+	if len(rest) != 2 {
+		return usageWith("diff takes two scan reports",
+			"usage: vyql diff <before.json> <after.json>  (each from `vyql scan -format json`)")
+	}
+	a, err := readFindingsJSON(rest[0])
 	if err != nil {
 		return err
 	}
-	b, err := readFindingsJSON(args[1])
+	b, err := readFindingsJSON(rest[1])
 	if err != nil {
 		return err
 	}

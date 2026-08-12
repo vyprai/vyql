@@ -28,19 +28,56 @@ import (
 )
 
 var (
-	once            sync.Once
+	mu              sync.Mutex
+	resolved        bool
 	cached          string
 	vyqlSourceCache sync.Map // map[root+kind+rel][]Source
 )
 
 // Root returns the absolute path to the VyQL data directory, resolved once.
 func Root() string {
-	once.Do(func() { cached = resolve() })
-	if cached == "" {
+	root, ok := Lookup()
+	if !ok {
 		panic("could not locate the data directory; set $VYQL_HOME to the path of your `vyql/` dir " +
 			"(containing ontology/concepts/, plus taxonomy/ and packs/)")
 	}
-	return cached
+	return root
+}
+
+// Lookup resolves the data directory and reports whether one was found, without
+// panicking when none was.
+//
+// Printing a command's help is the case that needs it: the help text names the
+// available profiles, which means loading them, and a user asking how to run the
+// tool should get an answer whether or not the data is in place. Anything that
+// needs the data to do its work calls Root instead and fails loudly.
+func Lookup() (string, bool) {
+	mu.Lock()
+	if !resolved {
+		cached, resolved = resolve(), true
+	}
+	root := cached
+	mu.Unlock()
+	return root, root != ""
+}
+
+// Reset drops the resolved root and everything read from it, so the next Root
+// resolves again.
+//
+// A command applies -data by setting $VYQL_HOME, which only has an effect while
+// the root is still unresolved. Building a flag's help text can read the data
+// directory — naming the available profiles requires loading them — and that
+// happens while the flags are being registered, before any of them are parsed. So
+// by the time -data is read, the root is already fixed. Resetting after the change
+// is what makes the flag take effect.
+func Reset() {
+	mu.Lock()
+	cached, resolved = "", false
+	mu.Unlock()
+	vyqlSourceCache.Range(func(key, _ any) bool {
+		vyqlSourceCache.Delete(key)
+		return true
+	})
 }
 
 // Read returns the bytes of a file relative to the data root.

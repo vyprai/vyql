@@ -53,6 +53,14 @@ linters:
       # store can actually fail.
       - path: _test\.go
         linters: [errcheck]
+      # SA5011 reads `if x == nil { t.Fatalf(...) }` followed by a dereference as a
+      # possible nil dereference, because it does not know Fatalf ends the test. The
+      # guard is the standard way to assert a pointer in a test, and the alternative
+      # is a redundant `return` after every one of them. Scoped to tests: in
+      # production code the same report is a real defect.
+      - path: _test\.go
+        text: SA5011
+        linters: [staticcheck]
 
 issues:
   max-issues-per-linter: 0
