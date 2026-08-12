@@ -1,10 +1,30 @@
 module bindings.go.generated.mde2a4ee5;
 
+// Upgrade returns a connection handle, not request data. Labelling the handle
+// spreads the label to every value derived from the connection, none of which
+// carries anything the client sent. What an attacker controls is what a read
+// returns, so the source is the read.
 binding httpInput0 {
   requires {
     dependency("github.com/gorilla/websocket")
   }
-  query pattern callExpr where callee.method == "Upgrade"
+  query pattern callExpr where callee.method == "ReadMessage"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput0a {
+  requires {
+    dependency("github.com/gorilla/websocket")
+  }
+  query pattern callExpr where callee.method == "ReadJSON"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput0b {
+  requires {
+    dependency("github.com/gorilla/websocket")
+  }
+  query pattern callExpr where callee.method == "NextReader"
   emit source code.HttpInput at call.result
 }
 
