@@ -13,8 +13,13 @@ import (
 )
 
 // on enables the log. Read once, at init: the phases are hot enough that re-reading the
-// environment per mark would show up in what it is measuring.
+// environment per mark would show up in what it is measuring. The environment is the
+// fallback; SetEnabled is what `vyql scan -stats` calls.
 var on = os.Getenv("VYQL_TIMING") != ""
+
+// SetEnabled turns the log on or off. The command calls it once, after parsing its flags
+// and before the pipeline runs, so a mark is never taken with the switch half-applied.
+func SetEnabled(v bool) { on = v }
 
 // Timer accumulates elapsed time since the previous mark and since its own start.
 type Timer struct {

@@ -10,15 +10,22 @@
 // Usage:
 //
 //	vyql scan [flags] [path...]      # no path scans the working directory
-//	  -fail-on   severity at or above which to exit non-zero (default: high)
+//	  -fail-on   severity at or above which to exit 3 (default: high; any new
+//	             finding when -baseline is applied)
 //	  -format    text | sarif | json | graph-json
+//	  -exclude   skip paths matching this pattern; repeatable
 //	  -baseline  triaged findings to exclude from the report and the gate
 //	  -coverage  report what was parsed, excluded and left unanalysed
 //
 //	vyql explain | trace | query | match | resolve | graph | diff | definitions
 //
-// Run vyql with no arguments for the full command list, or see
-// https://github.com/vyprai/vyql for the guide.
+// Exit codes are the same on every command: 0 the command run successfully, 1 vyql could
+// not complete, 2 the invocation cannot mean anything, 3 the check ran and did
+// not pass. stdout carries exactly one document in the requested format;
+// diagnostics go to stderr.
+//
+// Run `vyql help` for the command list, `vyql help <command>` for one command's
+// flags, or see https://github.com/vyprai/vyql for the guide.
 //
 // All security knowledge -- concepts, bindings, rule packs -- is loaded at
 // startup from a vyql/ data directory rather than compiled in.
@@ -32,15 +39,15 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"runtime/debug"
-	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"text/tabwriter"
 	"time"
 
 	"github.com/vyprai/vyql/internal/bindings"
@@ -91,135 +98,149 @@ func main() { os.Exit(vyqlMain()) }
 // -fail-on threshold, which is to say on any codebase worth profiling.
 func vyqlMain() (code int) {
 	if len(os.Args) < 2 {
-		usage()
-		return 2
+		// Failing to name a command is a usage error, unlike asking for help.
+		usageTo(os.Stderr)
+		return exitUsage
 	}
-	// Opt-in CPU profile for local performance work (explicit env, no behavior change):
-	// VYQL_CPUPROFILE=/path/to/cpu.prof vyql scan ...
-	if p := os.Getenv("VYQL_CPUPROFILE"); p != "" {
-		f, err := os.Create(p)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "vyql: cpuprofile: "+err.Error())
-			return 1
-		}
-		if err := pprof.StartCPUProfile(f); err != nil {
-			fmt.Fprintln(os.Stderr, "vyql: cpuprofile: "+err.Error())
-			return 1
-		}
-		defer pprof.StopCPUProfile()
-	}
-	// Opt-in heap profile for local memory work (explicit env, no behavior change):
-	// VYQL_MEMPROFILE=/path/to/heap.prof vyql scan ...
-	if p := os.Getenv("VYQL_MEMPROFILE"); p != "" {
-		defer func() {
-			f, err := os.Create(p)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, "vyql: memprofile: "+err.Error())
-				return
-			}
-			// The profile is written below, so a close failure can mean it was not
-			// flushed -- say so rather than exiting quietly with a truncated file.
-			defer func() {
-				if cerr := f.Close(); cerr != nil {
-					fmt.Fprintln(os.Stderr, "vyql: memprofile: "+cerr.Error())
-				}
-			}()
-			runtime.GC()
-			if err := pprof.WriteHeapProfile(f); err != nil {
-				fmt.Fprintln(os.Stderr, "vyql: memprofile: "+err.Error())
-			}
-		}()
-	}
-	// the data dir (ontology/taxonomy/packs) is required; a missing one panics
-	// deep in loading — recover into a clean message rather than a stack trace.
-	// Registered last so it runs FIRST: the profile flushes above still happen.
+	// The data directory (ontology/taxonomy/packs) is required, and a missing one
+	// panics deep in loading. Recover into a clean message rather than a stack
+	// trace. The frontend registry builds itself on first use rather than at
+	// package initialization, so this recover is reached for that case too.
+	//
+	// Profiles are flushed by the deferred cleanup each command installs from its
+	// own -cpuprofile / -memprofile flags, which runs before this.
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintln(os.Stderr, "vyql: "+fmt.Sprint(r))
-			code = 1
+			code = exitFailed
 		}
 	}()
 
 	cmd, args := os.Args[1], os.Args[2:]
-	var err error
+
+	// Asking for help is not an error, so it prints on stdout and exits 0. Some
+	// CI wrappers treat a non-zero help as a broken tool.
 	switch cmd {
-	case "scan":
-		err = cmdScan(args)
-	case "trace":
-		err = cmdTrace(args)
-	case "explain":
-		err = cmdExplain(args)
-	case "match":
-		err = cmdMatch(args)
-	case "resolve":
-		err = cmdResolve(args)
-	case "query":
-		err = cmdQuery(args)
-	case "graph":
-		err = cmdGraph(args)
-	case "bindings":
-		err = cmdBindings(args)
-	case "definitions":
-		err = cmdDefinitions(args)
-	case "validate-binding":
-		err = cmdValidateBinding(args)
-	case "diff":
-		err = cmdDiff(args)
-	case "cache":
-		err = cmdCache(args)
-	case "version", "--version", "-version":
-		cmdVersion()
-	default:
-		usage()
-		return 2
-	}
-	if err != nil {
-		// A met -fail-on threshold is a successful scan with a non-zero status,
-		// not a fault. It gets no "vyql:" diagnostic prefix and its own exit
-		// code, so a pipeline can tell "this code has findings" apart from "the
-		// scanner could not run".
-		var gated *thresholdMet
-		if errors.As(err, &gated) {
-			fmt.Fprintln(os.Stderr, gated.Error())
-			return gated.code
+	case "help", "-h", "--help":
+		if len(args) > 0 {
+			return exitCodeFor(helpForCommand(args[0]))
 		}
-		fmt.Fprintln(os.Stderr, "vyql: "+err.Error())
-		return 1
+		usageTo(os.Stdout)
+		return exitOK
+	case "version", "--version", "-version", "-v":
+		cmdVersion()
+		return exitOK
 	}
-	return 0
+
+	run, ok := commands[cmd]
+	if !ok {
+		return exitCodeFor(unknownCommand(cmd))
+	}
+	err := run(args)
+	if errors.Is(err, errHelpRequested) {
+		return exitOK
+	}
+	return exitCodeFor(err)
+}
+
+// commands is the dispatch table. It doubles as the set `help` lists and the
+// candidate set an unknown command is matched against, so a command cannot be
+// reachable without being discoverable.
+var commands = map[string]func([]string) error{
+	"scan":        cmdScan,
+	"trace":       cmdTrace,
+	"explain":     cmdExplain,
+	"match":       cmdMatch,
+	"resolve":     cmdResolve,
+	"query":       cmdQuery,
+	"graph":       cmdGraph,
+	"definitions": cmdDefinitions,
+	"diff":        cmdDiff,
+	"cache":       cmdCache,
+}
+
+// movedCommands names where a retired command's job is done now. Each was retired
+// because another surface answers the same question at least as well, so the message
+// says which one rather than only that this name is gone.
+var movedCommands = map[string]string{
+	"bindings":         "a language's vocabulary is `vyql definitions -kind bindings -lang <lang>`",
+	"validate-binding": "binding validation is `vyql definitions validate <path>`",
+	"review":           "review flags are `vyql scan -flags only`",
+}
+
+func unknownCommand(cmd string) error {
+	names := make([]string, 0, len(commands)+2)
+	for name := range commands {
+		names = append(names, name)
+	}
+	names = append(names, "help", "version")
+	sort.Strings(names)
+	hints := []string{}
+	if s := suggest(names, cmd); len(s) > 0 {
+		hints = append(hints, "did you mean: "+strings.Join(s, ", ")+"?")
+	}
+	if to, ok := movedCommands[cmd]; ok {
+		hints = []string{to}
+	}
+	hints = append(hints, "run `vyql help` for the command list")
+	return usageWith(fmt.Sprintf("unknown command %q", cmd), hints...)
+}
+
+// helpForCommand runs a command with -h so its own flagset renders the help,
+// keeping one source for a command's flags rather than a second listing here.
+func helpForCommand(name string) error {
+	run, ok := commands[name]
+	if !ok {
+		return unknownCommand(name)
+	}
+	if err := run([]string{"-h"}); err != nil && !errors.Is(err, errHelpRequested) {
+		return err
+	}
+	return nil
 }
 
 // cmdScan is the primary `vyql scan` command: full pipeline → findings report.
 func cmdScan(args []string) error {
-	fs := flag.NewFlagSet("scan", flag.ExitOnError)
-	rulesPath := fs.String("rules", "", "load rule(s) from a .vyql file or directory (default: vyql/packs)")
-	format := fs.String("format", "text", "output format: text | sarif | json | graph-json")
-	profileName := fs.String("profile", "auto", "analysis profile: auto | "+profileNames())
-	stats := fs.Bool("stats", false, "print scan profile: per-phase timing, node/edge counts, taint-hub warnings")
-	allResults := fs.Bool("all", false, "include all result sections: findings and flags (json output becomes {findings, flags})")
-	flagsOnly := fs.Bool("flags", false, "print flags only; replaces the old review command")
-	flagCategory := fs.String("flag-category", "all", "flag category filter when flags are enabled")
-	flagKind := fs.String("flag-kind", "all", "flag kind filter when flags are enabled: all | attention | target | check")
-	flagLoc := fs.String("flag-loc", "", "flag location substring filter when flags are enabled")
+	fs := newFlagSet("scan")
+	rulesPath := addRules(fs)
+	format := addFormat(fs, "text", "sarif", "json", "graph-json")
+	profileName := addProfile(fs)
+	stats := addStats(fs)
+	flagsMode := addEnum(fs, "flags", "off", "review flags in the report", []string{"off", "with", "only"})
+	flagCategory := fs.String("flag-category", "all", "review flag category filter")
+	flagKind := addEnum(fs, "flag-kind", "all", "review flag kind filter", []string{"all", "attention", "target", "check"})
+	flagLoc := fs.String("flag-loc", "", "review flag location substring filter")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
-	bindingOverlay := fs.String("binding-overlay", "", "optional repo-local binding overlay directory")
-	exclude := fs.String("exclude", "", "comma-separated path segments to skip, e.g. _vendor,node_modules,tests")
+	bindingsPath := fs.String("bindings", "", "optional repo-local binding overlay directory")
+	exclude := addExclude(fs)
 	maxFileSize := fs.String("max-file-size", "", "skip source files larger than this during tree walks, e.g. 4MB (default 2MiB; 0 disables)")
 	cacheDir := fs.String("cache", "auto", "persistent scan cache: auto | off | <dir>")
-	incrementalCache := fs.Bool("incremental-cache", false, "also populate per-file parse/lower/binding caches for edit-loop scans")
-	failOn := fs.String("fail-on", defaultFailOn, "exit non-zero when a finding is at or above this severity: none | "+strings.Join(severityOrder, " | "))
-	exitCode := fs.Int("exit-code", 1, "exit status to use when -fail-on is met")
+	cacheIncremental := fs.Bool("cache-incremental", false, "also populate per-file parse/lower/binding caches for edit-loop scans")
+	failOn := fs.String("fail-on", defaultFailOn, "exit "+strconv.Itoa(exitCheckFail)+" when a finding is at or above this severity: none | "+strings.Join(severityOrder, " | "))
 	coverage := fs.Bool("coverage", false, "report what was parsed, excluded and left unanalysed")
 	baseline := fs.String("baseline", "", "triaged findings to exclude from the report and the gate")
 	baselineWrite := fs.String("baseline-write", "", "record every current finding as accepted, to adopt on an existing codebase")
-	_ = fs.Parse(args)
+	runOpts := addRunFlags(fs)
+	if err := parseFlags(fs, args); err != nil {
+		return err
+	}
+	stopProfiling, err := runOpts.apply()
+	if err != nil {
+		return err
+	}
+	defer stopProfiling()
 	paths := fs.Args()
 	if len(paths) == 0 {
 		// Scanning the working directory is what a bare `vyql scan` almost always
 		// means. Announced rather than assumed, so the report is never read as
 		// covering somewhere else.
-		fmt.Fprintln(os.Stderr, "path not specified, default to CWD")
+		warnf("no path given; scanning the working directory")
 		paths = []string{"."}
+	}
+	// A filter that cannot reach the output is a filter the operator expected to
+	// work. Rejected here rather than accepted and ignored.
+	if err := checkFlagFilters(flagsMode.value, *flagCategory, flagKind.value, *flagLoc); err != nil {
+		return err
 	}
 	// Resolved before the scan runs. A typo here should cost nothing; finding
 	// out after a multi-minute scan that the gate was never armed is the kind of
@@ -228,6 +249,15 @@ func cmdScan(args []string) error {
 	if err != nil {
 		return err
 	}
+	// Whether the operator asked for a threshold, as opposed to inheriting one.
+	// A baseline run reads the two differently, and the flag's value alone cannot
+	// tell them apart.
+	explicitFailOn := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "fail-on" {
+			explicitFailOn = true
+		}
+	})
 	// Checked up front for the same reason: a combination that cannot mean what
 	// the user hoped should cost nothing to discover.
 	if err := checkBaselineFlags(*baseline, *baselineWrite); err != nil {
@@ -237,10 +267,12 @@ func cmdScan(args []string) error {
 	// cost nothing, and finding out after the scan that the baseline never
 	// applied is the silent no-op these checks exist to prevent.
 	var baselineEntries map[string]baselineEntry
+	failOnName := strings.ToLower(strings.TrimSpace(*failOn))
 	if *baseline != "" {
 		if baselineEntries, err = loadBaseline(*baseline); err != nil {
 			return err
 		}
+		failOnRank, failOnName = gateForBaseline(failOnRank, failOnName, explicitFailOn)
 	}
 	cleanup := applyMaxRAM(*maxRAM)
 	defer cleanup()
@@ -255,19 +287,23 @@ func cmdScan(args []string) error {
 		treesitter.SetMaxFileBytes(ceiling)
 		defer treesitter.SetMaxFileBytes(oldCeiling)
 	}
-	return run(paths, *rulesPath, *format, *profileName, scanRunOptions{
-		BindingOverlay: strings.TrimSpace(*bindingOverlay),
-		Excludes:       parseExcludes(*exclude),
-		ShowStats:      *stats,
-		IncludeFlags:   *allResults,
-		FlagsOnly:      *flagsOnly,
+	stats.apply()
+	if stats.rulePhase() {
+		ruleTimingOn = true
+	}
+	return run(paths, *rulesPath, format.value, *profileName, scanRunOptions{
+		BindingOverlay: strings.TrimSpace(*bindingsPath),
+		Excludes:       exclude.compiled,
+		ShowStats:      stats.on,
+		RuleTiming:     stats.rulePhase(),
+		IncludeFlags:   flagsMode.value == "with",
+		FlagsOnly:      flagsMode.value == "only",
 		FlagCategory:   *flagCategory,
-		FlagKind:       *flagKind,
+		FlagKind:       flagKind.value,
 		FlagLoc:        *flagLoc,
-		GraphCache:     *incrementalCache,
+		GraphCache:     *cacheIncremental,
 		FailOnRank:     failOnRank,
-		FailOnName:     strings.ToLower(strings.TrimSpace(*failOn)),
-		ExitCode:       *exitCode,
+		FailOnName:     failOnName,
 		ShowCoverage:   *coverage,
 		Baseline:       baselineEntries,
 		BaselinePath:   *baseline,
@@ -437,7 +473,6 @@ func scanPathsWithProfileDemand(paths []string, ruleSources []parser.V2Definitio
 	eng := engine.New(rules.onto, g)
 	var all []*findings.Finding
 	tk := timing.New()
-	ruleTimingOn := os.Getenv("VYQL_RULE_TIMING") != ""
 	var activeRules []*engine.CompiledRule
 	for _, cr := range rules.compiled {
 		if !engine.RuleActiveForProfile(cr, profileName) {
@@ -536,9 +571,11 @@ type scanRunOptions struct {
 	// BindingOverlay and Excludes travel with the run rather than in package-level variables the
 	// pipeline reads behind the caller's back.
 	BindingOverlay string
-	Excludes       []string
+	Excludes       extract.Excludes
 
-	ShowStats    bool
+	ShowStats bool
+	// RuleTiming prints each rule's evaluation time, selected by -stats=rule.
+	RuleTiming   bool
 	IncludeFlags bool
 	FlagsOnly    bool
 	FlagCategory string
@@ -549,7 +586,6 @@ type scanRunOptions struct {
 	// reports and exits 0 exactly as it always has.
 	FailOnRank int
 	FailOnName string
-	ExitCode   int
 	// ShowCoverage prints the full parsed/excluded/unanalysed breakdown. The
 	// warning about unanalysed files prints either way -- that one is not
 	// something a reader should have to ask for.
@@ -601,6 +637,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 		rkey = scanFingerprint(cache.Salt(), paths, ruleSources, prof.Name, opts.BindingOverlay, opts.Excludes)
 		if cs, ok := loadCachedScan(cache, rkey); ok {
 			all, stats, hit = cs.Findings, statsFromCachedScan(cs), true
+			restoreExcludeCounts(cs, opts.Excludes)
 		}
 	}
 	tk.Mark("fingerprint")
@@ -618,7 +655,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 			return err
 		}
 		if cache != nil && syncCollector == nil && !needsGraph {
-			storeCachedScan(cache, rkey, all, stats)
+			storeCachedScan(cache, rkey, all, stats, opts.Excludes)
 		}
 	}
 	if syncPath != "" {
@@ -719,12 +756,15 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 			printBaselineSummary(opts.BaselinePath, covered, staleBaseline)
 		}
 	}
+	// Diagnostics go to stderr in every format. stdout carries exactly one
+	// document, so `scan -format sarif -coverage . > results.sarif` writes SARIF
+	// rather than SARIF followed by a coverage report no parser accepts.
 	if opts.ShowCoverage {
-		printCoverage(stats)
+		printCoverage(os.Stderr, stats, opts.Excludes)
 	}
 	if opts.ShowStats {
-		fmt.Printf("[stats] profile %s (%s)\n", prof.Name, prof.Title)
-		printScanStats(graph, stats)
+		fmt.Fprintf(os.Stderr, "[stats] profile %s (%s)\n", prof.Name, prof.Title)
+		printScanStats(os.Stderr, graph, stats)
 	}
 	// Gating is the last thing that happens: the report is already on stdout, so
 	// a gated build still shows the operator what failed it.
@@ -736,7 +776,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	// what that baseline did not cover.
 	if opts.FailOnRank > 0 && !recordingOnly {
 		if n, highest := gateFindings(all, opts.FailOnRank); n > 0 {
-			return &thresholdMet{code: opts.ExitCode, count: n, highest: highest, failOn: opts.FailOnName}
+			return thresholdMet(n, opts.FailOnName, highest)
 		}
 	}
 	return nil
@@ -871,7 +911,7 @@ func printReport(fs []*findings.Finding) {
 	for _, it := range items {
 		fmt.Printf("[%s] %s", it.s.Band, report.Finding(it.f, resultpolicy.Fingerprint(it.f)))
 		for _, fac := range it.s.Factors {
-			fmt.Printf("    · %s\n", fac.Witness)
+			fmt.Printf("  · %s\n", fac.Witness)
 		}
 		fmt.Println()
 	}
@@ -969,33 +1009,64 @@ func topKinds(m map[string]int, limit int) string {
 }
 
 // printCoverage is the full account: what was read, what -exclude dropped, and
-// what nothing claimed.
-func printCoverage(stats extract.Stats) {
-	fmt.Println("\ncoverage")
+// what nothing claimed. It writes to the caller's stream, which is stderr: it
+// describes the run rather than being the document the run produced.
+func printCoverage(w io.Writer, stats extract.Stats, excludes extract.Excludes) {
+	fmt.Fprintln(w, "\ncoverage")
 	if len(stats.Languages) == 0 {
-		fmt.Println("  parsed    nothing")
+		fmt.Fprintln(w, "  parsed    nothing")
 	} else {
 		var parts []string
 		for _, lg := range stats.Languages {
 			parts = append(parts, fmt.Sprintf("%s %d", lg, stats.Files[lg]))
 		}
-		fmt.Printf("  parsed    %s\n", strings.Join(parts, " · "))
+		fmt.Fprintf(w, "  parsed    %s\n", strings.Join(parts, " · "))
 	}
-	if stats.Excluded > 0 {
-		fmt.Printf("  excluded  %d file(s) dropped by -exclude\n", stats.Excluded)
+	if stats.Excluded > 0 || len(excludes) > 0 {
+		prunedDirs := 0
+		for _, e := range excludes {
+			prunedDirs += e.PrunedDirs
+		}
+		if prunedDirs > 0 {
+			// A pruned directory is never descended, so its files are never
+			// listed and cannot be counted. Reporting the directories is what
+			// the walk actually knows, and claiming a file count it does not
+			// have would be worse than naming the unit honestly.
+			fmt.Fprintf(w, "  excluded  %d file(s) and %d director(ies) dropped by -exclude\n",
+				stats.Excluded, prunedDirs)
+		} else {
+			fmt.Fprintf(w, "  excluded  %d file(s) dropped by -exclude\n", stats.Excluded)
+		}
+		// Per-pattern counts, because a pattern that excluded nothing is a filter
+		// the operator believes is working. Excluding a directory this repository
+		// happens not to have is legitimate in a shared config, so a zero is
+		// marked rather than treated as an error.
+		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+		for _, e := range excludes {
+			count := fmt.Sprintf("%d file(s)", e.Matched)
+			if e.PrunedDirs > 0 {
+				count = fmt.Sprintf("%d dir(s)", e.PrunedDirs)
+			}
+			note := ""
+			if e.Matched == 0 && e.PrunedDirs == 0 {
+				note = "\t← matched nothing"
+			}
+			fmt.Fprintf(tw, "              %s\t%s%s\n", e.Raw, count, note)
+		}
+		_ = tw.Flush()
 	}
 	if stats.Oversized > 0 {
-		fmt.Printf("  oversized %d file(s) skipped over the -max-file-size ceiling;\n", stats.Oversized)
-		fmt.Println("            raise it or pass 0 to scan them")
+		fmt.Fprintf(w, "  oversized %d file(s) skipped over the -max-file-size ceiling;\n", stats.Oversized)
+		fmt.Fprintln(w, "            raise it or pass 0 to scan them")
 	}
 	if n := stats.UnmatchedTotal(); n > 0 {
-		fmt.Printf("  unread    %d file(s) matched no frontend: %s\n", n, topKinds(stats.Unmatched, 12))
+		fmt.Fprintf(w, "  unread    %d file(s) matched no frontend: %s\n", n, topKinds(stats.Unmatched, 12))
 	}
 	// Depth is not uniform, and a clean result means different things across it.
-	fmt.Println("  depth     java, python, javascript are the reference frontends;")
-	fmt.Println("            other languages range down to call-and-concat coverage")
-	fmt.Println("  note      a parse that partially fails still counts as parsed;")
-	fmt.Println("            this does not yet report that")
+	fmt.Fprintln(w, "  depth     java, python, javascript are the reference frontends;")
+	fmt.Fprintln(w, "            other languages range down to call-and-concat coverage")
+	fmt.Fprintln(w, "  note      a parse that partially fails still counts as parsed;")
+	fmt.Fprintln(w, "            this does not yet report that")
 }
 
 // cmdVersion reports the version and everything needed to identify the exact
@@ -1029,23 +1100,34 @@ func cmdVersion() {
 	}
 }
 
-func usage() {
-	fmt.Fprintln(os.Stderr, "vyql "+version+" — Vypr Query Language scanner")
-	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "usage: vyql <command> [flags] <path>...")
-	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "commands:")
-	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings/flags   [-rules -format text|sarif|json -profile -stats -all -flags -exclude _vendor,…]")
-	fmt.Fprintln(os.Stderr, "  trace      trace taint source→sink; show the path or where it dead-ends   [-from -to]")
-	fmt.Fprintln(os.Stderr, "  query      query the analysis graph by predicate   [-type -concept -call -loc -edges -count | -from -to]")
-	fmt.Fprintln(os.Stderr, "  explain    run rules and print each finding's full proof tree + negation evidence")
-	fmt.Fprintln(os.Stderr, "  match      list every node a binding labelled (what matched which concept)")
-	fmt.Fprintln(os.Stderr, "  resolve    report interprocedural call resolution (which calls are unresolved)")
-	fmt.Fprintln(os.Stderr, "  graph      dump the USG (nodes+edges), or -taint reachability")
-	fmt.Fprintln(os.Stderr, "  bindings   list a binding set's source/sink/check/issue/advisory vocabulary   [-lang go]")
-	fmt.Fprintln(os.Stderr, "  definitions inspect loaded VyQL concepts/rules/bindings/reviews; explain <concept|binding> traces a label's source; check-v2 verifies v2 definitions")
-	fmt.Fprintln(os.Stderr, "  validate-binding parse and summarize a VyQL binding file   [-file binding.vyql]")
-	fmt.Fprintln(os.Stderr, "  diff       diff two `scan -format json` outputs by fingerprint")
-	fmt.Fprintln(os.Stderr, "  cache      inspect or clear the persistent scan cache   [clear | path]")
-	fmt.Fprintln(os.Stderr, "  version    print the version, revision and build information")
+// commandHelp is the one-line summary each command shows in the command list.
+// Flags are not repeated here: `vyql help <command>` renders them from the
+// command's own flagset, so this list cannot drift from what the flags are.
+var commandHelp = []struct{ name, summary string }{
+	{"scan", "run rules and report findings"},
+	{"trace", "trace taint source→sink: the path, or where it dead-ends"},
+	{"query", "list graph nodes by type, concept, callee or location"},
+	{"explain", "print each finding's full proof tree and negation evidence"},
+	{"match", "list every node a binding labelled, and which binding did it"},
+	{"resolve", "report interprocedural call resolution"},
+	{"graph", "dump the USG (nodes and edges)"},
+	{"definitions", "inspect, search and validate the loaded VyQL definitions"},
+	{"diff", "diff two `scan -format json` outputs by fingerprint"},
+	{"cache", "inspect or clear the persistent scan cache"},
+	{"version", "print the version, revision and build information"},
+	{"help", "print this list, or `help <command>` for one command's flags"},
+}
+
+// usageTo writes the command list. The destination is the caller's: a requested
+// help goes to stdout, a usage error to stderr.
+func usageTo(w io.Writer) {
+	fmt.Fprintf(w, "vyql %s — Vypr Query Language scanner\n\n", version)
+	fmt.Fprintln(w, "usage: vyql <command> [flags] <path>...")
+	fmt.Fprintln(w, "\ncommands:")
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	for _, c := range commandHelp {
+		fmt.Fprintf(tw, "  %s\t%s\n", c.name, c.summary)
+	}
+	_ = tw.Flush()
+	fmt.Fprintln(w, "\nrun `vyql help <command>` for a command's flags.")
 }

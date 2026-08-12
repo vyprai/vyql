@@ -22,12 +22,33 @@ var activeSources map[string]bool
 
 var activeBindingConcepts map[string]bool
 
+// The per-phase timing switches. Read once at init because the phases they guard are hot
+// enough that re-reading the environment per call would show up in the measurement. The
+// environment is the fallback; SetTimingPhases is what `vyql scan -stats=<phases>` calls.
 var (
 	autoBindingsCache sync.Map // map[string]cachedAutoBindings
 	flagTimingOn      = os.Getenv("VYQL_FLAG_TIMING") != ""
 	indexTimingOn     = os.Getenv("VYQL_INDEX_TIMING") != ""
 	sinkTimingOn      = os.Getenv("VYQL_SINK_TIMING") != ""
 )
+
+// SetTimingPhases enables the per-phase logs by name. The command calls it once, after
+// parsing its flags and before the pipeline runs. An unnamed phase is left as the
+// environment set it, so a variable already exported stays in effect.
+func SetTimingPhases(phases map[string]bool) {
+	if phases["binding"] {
+		bindingTimingOn = true
+	}
+	if phases["flag"] {
+		flagTimingOn = true
+	}
+	if phases["index"] {
+		indexTimingOn = true
+	}
+	if phases["sink"] {
+		sinkTimingOn = true
+	}
+}
 
 type cachedAutoBindings struct {
 	data []Applicator

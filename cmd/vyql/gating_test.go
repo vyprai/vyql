@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -104,15 +105,58 @@ func TestGateFindingsIgnoresUnknownSeverity(t *testing.T) {
 	}
 }
 
-func TestThresholdMetCarriesExitCodeAndCounts(t *testing.T) {
-	e := &thresholdMet{code: 3, count: 2, highest: "critical", failOn: "high"}
-	if e.code != 3 {
-		t.Errorf("code = %d, want 3", e.code)
+func TestThresholdMetIsACheckFailureCarryingTheCounts(t *testing.T) {
+	err := thresholdMet(2, "high", "critical")
+	if _, ok := errors.AsType[*checkFailed](err); !ok {
+		t.Fatalf("a met threshold must be a check failure, so it exits %d rather than %d; got %T",
+			exitCheckFail, exitFailed, err)
 	}
-	msg := e.Error()
+	if code, _ := classify(err); code != exitCheckFail {
+		t.Errorf("exit code = %d, want %d", code, exitCheckFail)
+	}
+	msg := err.Error()
 	for _, want := range []string{"2 finding(s)", "high", "critical"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("message %q does not mention %q", msg, want)
 		}
+	}
+}
+
+// A baseline changes the question from "is anything wrong" to "did this change
+// add anything". Keeping the plain default there passed the build on every new
+// finding below high, while the report above it listed them.
+func TestBaselineGatesOnAnyNewFindingUnlessAskedOtherwise(t *testing.T) {
+	high := severityRank("high")
+
+	rank, name := gateForBaseline(high, "high", false)
+	if rank != severityRank(baselineFailOn) || name != baselineFailOn {
+		t.Errorf("an unset -fail-on under a baseline gave %d/%q, want %d/%q — a new "+
+			"finding below high would pass the build",
+			rank, name, severityRank(baselineFailOn), baselineFailOn)
+	}
+
+	// An operator who names a threshold gets it, baseline or not.
+	rank, name = gateForBaseline(high, "high", true)
+	if rank != high || name != "high" {
+		t.Errorf("an explicit -fail-on high gave %d/%q, want %d/%q", rank, name, high, "high")
+	}
+
+	// "none" is explicit too: reporting without gating stays available.
+	rank, _ = gateForBaseline(0, "none", true)
+	if rank != 0 {
+		t.Errorf("an explicit -fail-on none gave rank %d, want 0", rank)
+	}
+}
+
+// The baseline threshold has to sit at the bottom of the order, or it is itself a
+// floor that hides new findings.
+func TestBaselineFailOnIsTheLowestSeverity(t *testing.T) {
+	if severityRank(baselineFailOn) != 1 {
+		t.Fatalf("baselineFailOn %q has rank %d, want 1 (the lowest); anything above it "+
+			"silently accepts new findings underneath",
+			baselineFailOn, severityRank(baselineFailOn))
+	}
+	if baselineFailOn != severityOrder[0] {
+		t.Errorf("baselineFailOn = %q, want %q", baselineFailOn, severityOrder[0])
 	}
 }

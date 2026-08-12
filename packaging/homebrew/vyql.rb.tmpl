@@ -50,10 +50,13 @@ class Vyql < Formula
           cur.execute("SELECT * FROM t WHERE a = '" + req.args.get("a") + "'")
     PYTHON
 
-    output = shell_output("#{bin}/vyql scan #{testpath}", 1)
+    # A met -fail-on threshold exits 3: the check ran and did not pass. 1 means
+    # vyql could not run and 2 means the invocation was wrong, so a packaging
+    # fault cannot be mistaken here for the finding this fixture plants.
+    output = shell_output("#{bin}/vyql scan #{testpath}", 3)
     assert_match "finding(s)", output
 
-    # Findings at or above HIGH exit 1; the same scan gated off exits 0.
-    system bin/"vyql", "scan", "--fail-on", "none", testpath
+    # The same scan with the gate off exits 0.
+    system bin/"vyql", "scan", "-fail-on", "none", testpath
   end
 end

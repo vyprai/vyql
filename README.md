@@ -257,30 +257,33 @@ controls that would have stopped it**. If you already have one of those controls
 in place, `explain` will tell you why it didn't apply here.
 
 ```sh
-vyql scan --format sarif ./my-project > results.sarif
-vyql scan --format json  ./my-project | jq '.[].rule'
+vyql scan -format sarif ./my-project > results.sarif
+vyql scan -format json  ./my-project | jq '.[].rule'
 ```
 
 ### Failing a build
 
-**`scan` exits 1 when it finds anything HIGH or CRITICAL.** Dropping it into a
+**`scan` exits 3 when it finds anything HIGH or CRITICAL.** Dropping it into a
 pipeline gates that pipeline, with no extra configuration.
 
 ```sh
-vyql scan .                        # exit 1 on HIGH or CRITICAL  (the default)
-vyql scan -fail-on critical .      # exit 1 only on CRITICAL
+vyql scan .                        # exit 3 on HIGH or CRITICAL  (the default)
+vyql scan -fail-on critical .      # exit 3 only on CRITICAL
 vyql scan -fail-on none .          # report everything, always exit 0
 ```
 
 Severities, lowest to highest: `info low medium high critical`. `-fail-on`
 takes any of them, or `none`.
 
-A failed scan also exits 1, so if your pipeline needs to tell "found something"
-apart from "could not run", give `-exit-code` a distinct value:
+Every command reports the same four codes, so a pipeline can act on the status
+alone without parsing output:
 
-```sh
-vyql scan -exit-code 3 .   # 3 = findings, 1 = VyQL failed, 2 = bad usage
-```
+| code | meaning |
+| --- | --- |
+| `0` | the command run successfully |
+| `1` | VyQL could not complete — bad path, unreadable file, rules that do not compile |
+| `2` | usage error — unknown command or flag, missing path, a value outside its set |
+| `3` | the check ran and did not pass — findings at or above `-fail-on`, a corpus that does not validate, a finding set that changed |
 
 ### Adopting it on a codebase that already has findings
 
@@ -291,6 +294,28 @@ number, so your verdict survives edits elsewhere in the file.
 ```sh
 vyql scan -baseline-write .vyql-baseline.json .   # take the backlog as given
 vyql scan -baseline .vyql-baseline.json .         # fail only on what is new
+```
+
+**Applying a baseline lowers the gate to any new finding.** Without one, `scan`
+asks "is anything in this code wrong", and `-fail-on high` is how a team declines
+to fix the long tail. With one it asks "did this change add anything", and every
+addition counts — a new medium is a regression this branch introduced, not part
+of a backlog somebody accepted. Keeping the plain default there would pass the
+build on exactly those findings while the report above it listed them.
+
+The run says so on stderr rather than leaving you to infer it, and names the way
+back:
+
+```
+vyql: warning: baseline applied; gating on any new finding
+         pass -fail-on high to keep the usual threshold, or -fail-on none to report only
+```
+
+Naming a threshold still wins, so a pipeline that only wants new criticals says
+so:
+
+```sh
+vyql scan -baseline .vyql-baseline.json -fail-on critical .
 ```
 
 Entries are written as `accepted` with an empty reason; fill them in as you
@@ -354,6 +379,31 @@ A malformed baseline, an unknown verdict or a missing file is an error, not an
 empty baseline. Failing loudly beats silently suppressing everything or
 nothing.
 
+### Skipping files
+
+`-exclude` takes one pattern and may be repeated. One rule decides what a
+pattern means:
+
+```sh
+vyql scan -exclude node_modules .              # that directory, at any depth
+vyql scan -exclude '*_templ.go' .              # that file, at any depth
+vyql scan -exclude 'src/gen/**' .              # rooted, because it has a slash
+vyql scan -exclude '**/*.{test,spec}.ts' .     # brace alternation
+vyql scan -exclude node_modules -exclude vendor .   # repeat for more
+```
+
+A value with no slash and no glob character names a directory. A value with no
+slash but a glob character names a file at any depth — `*` does not cross a
+slash, so a bare suffix pattern would otherwise match only at the scan root. A
+value containing a slash is anchored at the scan root and matches as written.
+
+Excluded directories are never descended, so their files are not read or even
+listed. A malformed pattern is rejected before the scan starts, and `-coverage`
+reports how much each pattern excluded.
+
+One pattern per flag: a comma is rejected, because it would be ambiguous with a
+valid glob pattern.
+
 ### What was actually read
 
 "No findings" only means something if you know what was read. Anything left
@@ -374,7 +424,10 @@ vyql scan -coverage .
 ```
 coverage
   parsed    python 1 · textpattern 1
-  excluded  5 file(s) dropped by -exclude
+  excluded  5 file(s) and 1 director(ies) dropped by -exclude
+              node_modules   1 dir(s)
+              **/*_templ.go  5 file(s)
+              *.min.js       0 file(s)  ← matched nothing
   oversized 2 file(s) skipped over the -max-file-size ceiling;
             raise it or pass 0 to scan them
   unread    15 file(s) matched no frontend: .zig 12, .cob 3
@@ -442,7 +495,6 @@ vyql query -call db.Query .                  # by callee path or method
 vyql query -loc handlers.go .                # by location substring
 vyql query -concept SqlExecution -edges .    # include outgoing edges
 vyql query -concept HttpInput -count .       # just how many
-vyql query -from HttpInput -to SqlExecution .  # reachability between concepts
 ```
 
 **`graph`** dumps the whole graph, or taint reachability per source. Verbose, and
@@ -450,7 +502,6 @@ definitive when the others all look right.
 
 ```sh
 vyql graph .
-vyql graph -taint .
 ```
 
 Two more worth knowing:
@@ -458,7 +509,7 @@ Two more worth knowing:
 ```sh
 vyql definitions -kind all                   # what concepts, rules and bindings loaded
 vyql definitions explain code.SqlExecution   # which binding produced a label
-vyql bindings -lang python                   # one language's source/sink/check vocabulary
+vyql definitions -kind bindings -lang python  # one language's source/sink/check vocabulary
 ```
 
 A filter that matches no known concept is an error rather than an empty result,
@@ -474,14 +525,14 @@ vyql: -from "HttpInpt" matches no concept
 
 ### Comparing two scans
 
-**`diff`** compares two `--format json` runs by finding fingerprint. Fingerprints
+**`diff`** compares two `-format json` runs by finding fingerprint. Fingerprints
 are anchored to rule and location rather than line number, so the comparison
 survives edits elsewhere in the file:
 
 ```sh
-vyql scan --format json . > before.json
+vyql scan -format json . > before.json
 # ... change something ...
-vyql scan --format json . > after.json
+vyql scan -format json . > after.json
 vyql diff before.json after.json
 ```
 
@@ -498,6 +549,193 @@ backlog that was already there.
 A missed finding is nearly always one of three things, and `match`, `resolve` and
 `explain` distinguish them in that order: nothing was labelled, the call did not
 resolve, or an `unless` clause was satisfied.
+
+## Every command and flag
+
+`vyql help` lists the commands; `vyql help <command>` prints that command's
+flags. This section is the same information with the reason for each one.
+
+Four flags are on every command. `-data` points at the `vyql/` data directory
+when it is not where the binary would look, `-profile` picks the analysis
+profile, and `-cpuprofile` / `-memprofile` write pprof files:
+
+```sh
+vyql scan -data /opt/vyql .                  # data directory somewhere else
+vyql definitions -data /opt/vyql -kind concepts
+vyql scan -profile api .                     # skip auto-detection
+vyql scan -cpuprofile cpu.prof -memprofile heap.prof .
+```
+
+`$VYQL_HOME`, `$VYQL_CPUPROFILE` and `$VYQL_MEMPROFILE` do the same and are the
+fallback when the flag is not given.
+
+### `scan`
+
+| flag | default | what it does |
+| --- | --- | --- |
+| `-rules` | `vyql/packs` | load rules from a `.vyql` file or directory |
+| `-bindings` | | a repo-local binding overlay directory |
+| `-format` | `text` | `text`, `sarif`, `json` or `graph-json` |
+| `-fail-on` | `high`, or any new finding with `-baseline` | exit `3` at or above this severity, or `none` |
+| `-exclude` | | skip paths matching this pattern; repeatable |
+| `-baseline` | | apply triaged findings, and report only what is new |
+| `-baseline-write` | | record the current findings to this path |
+| `-coverage` | off | what was parsed, excluded and left unread |
+| `-stats` | off | graph counts, taint hubs, per-phase timing |
+| `-flags` | `off` | review flags: `off`, `with` (findings and flags), `only` |
+| `-flag-category` | `all` | filter review flags by category |
+| `-flag-kind` | `all` | `all`, `attention`, `target` or `check` |
+| `-flag-loc` | | filter review flags by location substring |
+| `-cache` | `auto` | `auto`, `off`, or a directory |
+| `-cache-incremental` | off | also cache per-file parses, for an edit loop |
+| `-max-ram` | 80% of RAM | soft ceiling, e.g. `8GB` or `16GiB` |
+| `-max-file-size` | `2MiB` | skip larger source files; `0` disables |
+
+Combinations worth knowing:
+
+```sh
+# CI: machine output, gated, with the coverage account on stderr
+vyql scan -format sarif -fail-on high -coverage . > results.sarif
+
+# CI on a codebase with a backlog: fail only on what this branch added
+vyql scan -baseline .vyql-baseline.json -format sarif . > results.sarif
+
+# roll the baseline forward while still gating on what it does not cover
+vyql scan -baseline .vyql-baseline.json -baseline-write next.json .
+
+# adopt: record everything, gate on nothing
+vyql scan -fail-on none -baseline-write .vyql-baseline.json .
+
+# review flags instead of findings, narrowed to one category and location
+vyql scan -flags only -flag-kind attention -flag-loc handlers/ .
+
+# findings and flags together, as one JSON document
+vyql scan -flags with -format json .
+
+# a big or slow tree: bound the memory, skip generated files, keep the cache warm
+vyql scan -max-ram 8GB -exclude '**/*_templ.go' -exclude node_modules .
+vyql scan -cache-incremental .               # second run after an edit is faster
+
+# one pack, one profile, no cache — what you want when a rule misbehaves
+vyql scan -rules vyql/packs/injection -profile api -cache off -stats .
+```
+
+`-flags` selects the mode and the three `-flag-*` flags filter it. Setting a
+filter while `-flags` is `off` is a usage error, because the filter could not
+reach the output.
+
+### `trace`
+
+| flag | what it does |
+| --- | --- |
+| `-from` | only sources whose concept contains this substring |
+| `-to` | only sinks whose concept contains this substring |
+| `-brief` | one line per connected pair, with a hop count |
+| `-count` | the number of connected pairs, and nothing else |
+
+```sh
+vyql trace .                                     # every source
+vyql trace -from HttpInput -to SqlExecution .    # one question
+vyql trace -to FilePathAccess .                  # every path into file access
+vyql trace -from HttpInput -to SqlExecution -brief .
+vyql trace -from HttpInput -count .
+```
+
+`-from` and `-to` are checked against the ontology before the scan runs, so a
+typo is an error rather than a report of zero. Every mode reports how many
+sources dead-ended: a list of only the sources that reached a sink reads exactly
+like a clean result.
+
+### `query`
+
+| flag | what it does |
+| --- | --- |
+| `-type` | match node type substring |
+| `-concept` | match concept label substring |
+| `-call` | match callee path or method |
+| `-loc` | match location substring |
+| `-edges` | also print each match's outgoing edges |
+| `-count` | print only how many matched |
+
+```sh
+vyql query -type code.Call .
+vyql query -concept HttpInput .
+vyql query -call db.Query .
+vyql query -loc handlers.go .
+vyql query -concept SqlExecution -edges .        # with outgoing edges
+vyql query -concept HttpInput -count .           # just the number
+vyql query -type code.Call -loc handlers/ -call exec .   # filters combine
+```
+
+Filters combine with AND. Reachability is `trace`, not `query`.
+
+### `explain`, `match`, `resolve`, `graph`
+
+```sh
+vyql explain .
+vyql explain -rules vyql/packs/injection .   # narrow to one pack or file
+vyql match .
+vyql resolve .
+vyql graph .                                 # the whole USG, nodes and edges
+```
+
+### `definitions`
+
+| flag | default | what it does |
+| --- | --- | --- |
+| `-kind` | `all` | `all`, `concepts`, `rules`, `bindings`, `reviews`, `packs` |
+| `-lang` | | binding language filter |
+| `-query` | | case-insensitive substring across names, patterns, packages, CWE |
+| `-limit` | `80` | maximum rows per section |
+| `-format` | `text` | `text` or `json` |
+
+```sh
+vyql definitions                                  # everything that loaded
+vyql definitions -kind concepts                   # the concept vocabulary
+vyql definitions -kind rules -query injection     # rules mentioning injection
+vyql definitions -kind bindings -lang python      # one language's vocabulary
+vyql definitions -kind bindings -lang go -format json
+vyql definitions -kind concepts -limit 500        # raise the per-section cap
+```
+
+Subcommands:
+
+```sh
+vyql definitions search sql injection             # search every kind at once
+vyql definitions explain code.SqlExecution        # which binding produced a label
+vyql definitions refs core.SqlParameterization    # what references a definition
+vyql definitions show-policy resultIdentity.default
+vyql definitions show-mechanic ruleVerb.taint
+vyql definitions validate                         # validate the loaded corpus
+vyql definitions validate vyql/packs/injection    # or one path
+vyql definitions validate -unstable               # report quarantined uses
+vyql definitions validate-binding vyql/bindings/python/python/558.vyql
+```
+
+`validate` exits `3` when the corpus does not validate.
+
+`refs` and `explain` take the path as `-in <path>` rather than positionally,
+because their positional argument is the definition being asked about:
+
+```sh
+vyql definitions refs -in vyql/ontology/concepts core.SqlParameterization
+vyql definitions explain -in vyql/bindings/python code.SqlExecution
+```
+
+### `diff`, `cache`, `version`, `help`
+
+```sh
+vyql diff before.json after.json     # two `scan -format json` outputs
+vyql cache path                      # the directory this build would use
+vyql cache clear                     # drop every cached parse and result
+vyql cache clear -cache /tmp/mine    # a cache somewhere else
+vyql version
+vyql help
+vyql help scan
+```
+
+`diff` exits `3` when the finding set changed, so a pipeline can gate on "this
+branch changed the findings" without parsing the output.
 
 ## Languages
 
@@ -545,7 +783,7 @@ Check a binding file parses, and what it emits, without running a scan. Bindings
 live under `vyql/bindings/<language>/`, one module per file:
 
 ```sh
-vyql validate-binding -file vyql/bindings/python/python/558.vyql
+vyql definitions validate-binding vyql/bindings/python/python/558.vyql
 ```
 
 ```json
@@ -574,7 +812,7 @@ changing the engine or the language.
 ## Stability
 
 **The CLI is stable.** Commands, flags and output formats follow semantic
-versioning: `scan`, its `--format` values, the JSON and SARIF shapes, and the
+versioning: `scan`, its `-format` values, the JSON and SARIF shapes, and the
 finding fingerprint will not change incompatibly within a major version. Build
 tooling against them.
 
