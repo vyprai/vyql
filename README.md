@@ -181,6 +181,16 @@ Then it is a conversation, and each turn builds on the last:
 ```
 you  audit this repo for security problems
 
+     Scanning the whole tree. vendor/, node_modules/ and testdata/ are
+     skipped already. On top of those I would skip:
+
+       **/*_templ.go    generated templates, one huge function each
+       examples/        sample code, not shipped
+
+     Anything else to leave out, or shall I go?
+
+you  go
+
      scanned python:14 javascript:3, 2 files unread (.kt)
      7 findings. 2 critical, 3 high, 2 medium.
      1. VYQL-INJ-002  critical  api/users.py:88  request body reaches a shell
@@ -225,8 +235,14 @@ A reproduction runs against your own machine and nothing else, and the skill ask
 before executing one. Writing it is the deliverable; running it is your call.
 
 The skill runs the right commands, reports coverage before findings, and holds
-the line on what a verdict means. It asks before installing anything and before
-writing a reproduction.
+the line on what a verdict means. It asks before installing anything, before
+scanning, and before writing a reproduction.
+
+It asks about scope because scope decides what the scan cannot find: a directory
+skipped there is one the report calls clean without having read it. And it never
+shortens a list of findings without saying so — past about 25 it shows the
+critical and high ones, states how many of each severity are held back, and
+offers the rest.
 
 `skills/vyql-security-scan/` in that repository is a plain
 [SKILL.md](https://agentskills.io), which is an open format. Any agent that reads

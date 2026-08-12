@@ -352,6 +352,16 @@ vyql diff before.json after.json</pre>
     </p>
 <pre class="sample"><b class="who">you</b>  audit this repo for security problems
 
+     <i>Scanning the whole tree. vendor/, node_modules/ and testdata/ are</i>
+     <i>skipped already. On top of those I would skip:</i>
+
+       <i>**/*_templ.go    generated templates, one huge function each</i>
+       <i>examples/        sample code, not shipped</i>
+
+     <i>Anything else to leave out, or shall I go?</i>
+
+<b class="who">you</b>  go
+
      <i>scanned python:14 javascript:3, 2 files unread (.kt)</i>
      <i>7 findings. 2 critical, 3 high, 2 medium.</i>
      <i>1. VYQL-INJ-002  critical  api/users.py:88  request body reaches a shell</i>
@@ -394,8 +404,11 @@ vyql diff before.json after.json</pre>
     </p>
     <p>
       It runs the commands, and it tells you what was read before it tells you
-      what it found. It also asks first before it installs anything or writes a
-      reproduction. The skill itself is a plain
+      what it found. It asks first before it installs anything, before it scans,
+      and before it writes a reproduction. It asks about scope because scope
+      decides what the scan cannot find — a directory skipped there is one the
+      report calls clean without having read it. And it never shortens a list of
+      findings without saying so. The skill itself is a plain
       <a href="https://agentskills.io">SKILL.md</a> file in an open format, so
       any agent that can read it can follow the same steps. Claude Code is only
       the one that has an installer for it.
@@ -403,7 +416,7 @@ vyql diff before.json after.json</pre>
 
     <h3>Either Way, the Same Shape</h3>
     <p>
-      Decide what you are looking at, scan it, read the coverage line, then read
+      Agree what you are looking at, scan it, read the coverage line, then read
       the list. Verify the findings that matter to you, and reproduce one if you
       need proof. You can stop at any point where you already have your answer.
       For most scans, the list is enough.
