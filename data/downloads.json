@@ -247,10 +247,10 @@
         "v0.3.0": {
           "vyql_v0.3.0_darwin_amd64.tar.gz": 0,
           "vyql_v0.3.0_darwin_amd64.tar.gz.sha256": 1,
-          "vyql_v0.3.0_darwin_arm64.tar.gz": 6,
-          "vyql_v0.3.0_darwin_arm64.tar.gz.sha256": 7,
-          "vyql_v0.3.0_linux_amd64.tar.gz": 11,
-          "vyql_v0.3.0_linux_amd64.tar.gz.sha256": 12,
+          "vyql_v0.3.0_darwin_arm64.tar.gz": 11,
+          "vyql_v0.3.0_darwin_arm64.tar.gz.sha256": 12,
+          "vyql_v0.3.0_linux_amd64.tar.gz": 16,
+          "vyql_v0.3.0_linux_amd64.tar.gz.sha256": 17,
           "vyql_v0.3.0_linux_arm64.tar.gz": 1,
           "vyql_v0.3.0_linux_arm64.tar.gz.sha256": 2
         },
