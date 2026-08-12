@@ -165,22 +165,6 @@ binding codeEval19 {
   emit sink code.CodeEval at args[0]
 }
 
-binding deserialization20 {
-  requires {
-    dependency("gopkg.in/yaml.v3")
-  }
-  query pattern callExpr where callee.path ~= "yaml.Unmarshal"
-  emit sink code.Deserialization at args[0]
-}
-
-binding deserialization21 {
-  requires {
-    dependency("encoding/json")
-  }
-  query pattern callExpr where callee.path ~= "json.Unmarshal"
-  emit sink code.Deserialization at args[0]
-}
-
 binding archiveEntryWrite22 {
   requires {
     dependency("archive/zip")
