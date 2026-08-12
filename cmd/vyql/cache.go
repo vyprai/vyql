@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/vyprai/vyql/internal/extract/parsecache"
 )
 
 // cmdCache implements `vyql cache`, the lifecycle the scan cache otherwise has none of.
@@ -68,21 +66,49 @@ func clearCache(path string) error {
 		fmt.Printf("cache %s: nothing to clear\n", path)
 		return nil
 	}
-	cache, err := parsecache.Open(path)
-	if err != nil {
-		// An unopenable cache is exactly the case a user most needs cleared -- a half-written or
-		// format-incompatible directory. Removing it is the honest fallback, and safe: every
-		// entry is reproducible from source.
-		if rmErr := os.RemoveAll(path); rmErr != nil {
-			return fmt.Errorf("cache %s: cannot open (%v) and cannot remove: %w", path, err, rmErr)
-		}
-		fmt.Printf("cache %s: could not be opened, so removed instead\n", path)
-		return nil
-	}
-	defer func() { _ = cache.Close() }()
-	if err := cache.Clear(); err != nil {
+	// The directory is removed rather than emptied. Dropping the keys leaves
+	// badger's own files -- a preallocated 1 MB DISCARD, the manifest, the key
+	// registry -- so a cache reported as cleared still occupies megabytes, which
+	// is not what someone reclaiming disk asked for.
+	//
+	// Removing it also covers the case that most needs clearing: a half-written or
+	// format-incompatible directory that cannot be opened at all. It is safe
+	// either way, because every entry is reproducible from source and the next
+	// scan recreates the directory.
+	freed := dirBytes(path)
+	if err := os.RemoveAll(path); err != nil {
 		return fmt.Errorf("cache %s: %w", path, err)
 	}
-	fmt.Printf("cache %s: cleared\n", path)
+	fmt.Printf("cache %s: cleared, %s freed\n", path, humanBytes(freed))
 	return nil
+}
+
+// dirBytes totals the files under path. A cache that cannot be walked reports
+// zero rather than failing: the number is for the operator, and refusing to clear
+// because the size could not be measured would be the wrong trade.
+func dirBytes(path string) int64 {
+	var total int64
+	_ = filepath.WalkDir(path, func(_ string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil //nolint:nilerr // an unreadable entry is skipped, not fatal
+		}
+		if info, err := d.Info(); err == nil {
+			total += info.Size()
+		}
+		return nil
+	})
+	return total
+}
+
+func humanBytes(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%d B", n)
+	}
+	div, exp := int64(unit), 0
+	for x := n / unit; x >= unit; x /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB", float64(n)/float64(div), "KMGT"[exp])
 }
