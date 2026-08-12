@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 A security scanner for 22 languages. It follows untrusted input through your
-code and tells you why it thinks each finding is real.
+code, and for every finding it explains why it thinks the finding is real.
 
 There are two parts. A small Go engine builds one graph of your program and
 answers questions about it. Everything the engine knows about frameworks, sinks,
@@ -38,11 +38,11 @@ Release assets come from the GitHub release, which is where the checksums and
 build provenance live. `VYQL_INSTALL_BASE_URL` points the download at a mirror
 serving the same `<base>/<version>/<asset>` layout.
 
-The checksum is served from the same host as the archive, so it catches a
-corrupted download rather than a compromised release. Pin `VYQL_VERSION` and
-check the sum against a second source if you need more than that.
+The checksum comes from the same host as the archive. This catches a corrupted
+download, but it does not catch a compromised release. If you need more than
+that, pin `VYQL_VERSION` and compare the checksum with a second source.
 
-Linux and macOS, amd64 and arm64. On Windows it says so rather than failing
+Linux and macOS, amd64 and arm64. On Windows it tells you so, instead of failing
 obscurely. Use WSL, or the [GitHub
 Action](https://github.com/marketplace/actions/vyql-security-scan).
 
@@ -80,9 +80,10 @@ The binary finds its data in the module cache, so no further setup is needed.
 docker run --rm -v "$PWD:/work" ghcr.io/vyprai/vyql scan .
 ```
 
-About 270 MB, most of it the security knowledge base. Runs as a non-root user,
-so it will not leave root-owned files in a mounted tree. `debian:stable-slim`
-rather than Alpine: the parsers are C linked against glibc.
+About 270 MB, and most of that is the security knowledge base. It runs as a
+non-root user, so it does not leave root-owned files in a mounted tree. The base
+is `debian:stable-slim` and not Alpine, because the parsers are C linked against
+glibc.
 
 ### From source
 
@@ -102,13 +103,13 @@ triage what comes back:
 /plugin install vyql@vypr
 ```
 
-Then ask for a security scan in the ordinary way. The skill installs the `vyql`
-binary if it is missing, but asks first. A security tool that downloads and
-runs binaries unprompted has the wrong instincts.
+Then ask for a security scan in the normal way. If the `vyql` binary is missing,
+the skill installs it, but it asks you first. A security tool should not download
+and run binaries without asking.
 
 It lives in [vyprai/claude-plugins](https://github.com/vyprai/claude-plugins)
-rather than here, so installing it copies 32 KB instead of cloning a repository
-whose knowledge base is several hundred megabytes.
+and not here, so installing it copies 32 KB. Cloning this repository would copy
+a knowledge base of several hundred megabytes.
 
 `skills/vyql-security-scan/` there follows the [Agent
 Skills](https://agentskills.io) format, which is not Claude-specific: any tool
@@ -128,7 +129,7 @@ go:     go1.26.4
 platform: darwin/arm64
 ```
 
-Worth quoting in a bug report: findings depend on the version of the security
+Quote this in a bug report, because findings depend on the version of the security
 knowledge as much as on the engine.
 
 ## How you use it
@@ -140,22 +141,22 @@ scope  →  scan  →  coverage  →  list  →  verify  →  reproduce  →  fi
 ```
 
 **Scope.** Whole repo, or just what a change introduced. These are different
-questions: on a codebase with a backlog, scanning everything at review time
-buries the two findings your branch added under two hundred it did not. For a
-diff, scan both sides and use `vyql diff`.
+questions. On a codebase that already has a backlog, scanning everything at
+review time mixes the two findings your branch added into the two hundred that
+were there before. For a diff, scan both sides and use `vyql diff`.
 
 **Scan.** `vyql scan .` with no configuration. There is nothing to pick.
 
 **Coverage.** Read the `scanned` line before the findings. A clean report over a
-tree that was mostly skipped looks exactly like a clean report over a tree that
-was fully read, and only that line tells them apart.
+tree that was mostly skipped looks the same as a clean report over a tree that
+was fully read. That line is the only way to tell them apart.
 
 **List.** Everything it found, by severity, each with a location.
 
 **Verify.** Pick one, or all the high ones. Findings are grouped by rule family
-and verified an agent at a time, four families at most, because a systematic
-false positive arrives as a whole family. This is static verification: it
-establishes the path holds up, not that the bug is exploitable.
+and verified one agent at a time, four families at most, because a systematic
+false positive usually appears as a whole family. This is static verification: it
+shows that the path holds up, not that the bug can be exploited.
 
 **Reproduce.** Optionally, boot the app from a clean worktree and exploit that.
 If it will not boot cold, a failing test instead. Local only, never the instance
@@ -164,7 +165,7 @@ you are already running.
 **Fix.** Optionally, and only if you ask. The default is to name the control and
 leave the edit to you.
 
-Stop wherever you have your answer. A list is a complete answer to "what is wrong
+You can stop at any point where you have your answer. A list is a complete answer to "what is wrong
 here", and most scans end there.
 
 ### Driving it with an agent
@@ -228,25 +229,28 @@ you  fix it then
      Shall I?
 ```
 
-You never restate which finding you mean, because the list is still in the
-conversation. A single question works too, but the flow is what it is built for.
+You do not need to repeat which finding you mean, because the list is still in
+the conversation. A single question also works, but the flow above is what the
+skill is built for.
 
-A reproduction runs against your own machine and nothing else, and the skill asks
-before executing one. Writing it is the deliverable; running it is your call.
+A reproduction runs only against your own machine, and the skill asks you before
+it runs one. Writing the reproduction is the result. Whether to run it is your
+decision.
 
-The skill runs the right commands, reports coverage before findings, and holds
-the line on what a verdict means. It asks before installing anything, before
-scanning, and before writing a reproduction.
+The skill runs the right commands and reports coverage before findings. It also
+keeps a strict meaning for a verdict. It asks you before it installs anything,
+before it scans, and before it writes a reproduction.
 
-It asks about scope because scope decides what the scan cannot find: a directory
-skipped there is one the report calls clean without having read it. And it never
-shortens a list of findings without saying so — past about 25 it shows the
-critical and high ones, states how many of each severity are held back, and
-offers the rest.
+It asks about scope because scope decides what the scan cannot find. A directory
+skipped there is one that the report calls clean without having read it. It also
+never shortens a list of findings without telling you. Past about 25 findings it
+shows the critical and high ones, states how many of each severity it is holding
+back, and offers you the rest.
 
 `skills/vyql-security-scan/` in that repository is a plain
 [SKILL.md](https://agentskills.io), which is an open format. Any agent that reads
-it can follow the same flow; Claude Code is just the one with an installer.
+it can follow the same flow. Claude Code is only the one that has an installer
+for it.
 
 ## Scan something
 
@@ -270,7 +274,7 @@ analysis profile: HTTP API server (api)
 
 Every finding shows the source, the sink, the path between them, and **the
 controls that would have stopped it**. If you already have one of those controls
-in place, `explain` will tell you why it didn't apply here.
+in place, `explain` tells you why it did not apply here.
 
 ```sh
 vyql scan -format sarif ./my-project > results.sarif
@@ -279,8 +283,8 @@ vyql scan -format json  ./my-project | jq '.[].rule'
 
 ### Failing a build
 
-**`scan` exits 3 when it finds anything HIGH or CRITICAL.** Dropping it into a
-pipeline gates that pipeline, with no extra configuration.
+**`scan` exits 3 when it finds anything HIGH or CRITICAL.** If you put it in a
+pipeline, it gates that pipeline, and you do not have to configure anything.
 
 ```sh
 vyql scan .                        # exit 3 on HIGH or CRITICAL  (the default)
@@ -297,9 +301,9 @@ alone without parsing output:
 | code | meaning |
 | --- | --- |
 | `0` | the command run successfully |
-| `1` | VyQL could not complete — bad path, unreadable file, rules that do not compile |
-| `2` | usage error — unknown command or flag, missing path, a value outside its set |
-| `3` | the check ran and did not pass — findings at or above `-fail-on`, a corpus that does not validate, a finding set that changed |
+| `1` | VyQL could not complete: bad path, unreadable file, rules that do not compile |
+| `2` | usage error: unknown command or flag, missing path, a value outside its set |
+| `3` | the check ran and did not pass: findings at or above `-fail-on`, a corpus that does not validate, a finding set that changed |
 
 ### Adopting it on a codebase that already has findings
 
@@ -313,22 +317,23 @@ vyql scan -baseline .vyql-baseline.json .         # fail only on what is new
 ```
 
 **Applying a baseline lowers the gate to any new finding.** Without one, `scan`
-asks "is anything in this code wrong", and `-fail-on high` is how a team declines
-to fix the long tail. With one it asks "did this change add anything", and every
-addition counts — a new medium is a regression this branch introduced, not part
-of a backlog somebody accepted. Keeping the plain default there would pass the
-build on exactly those findings while the report above it listed them.
+asks "is anything in this code wrong". A severity floor is how a team decides not
+to fix everything at once. With a baseline it asks "did this change add
+anything", and then every addition counts: a new medium is something this branch
+introduced, and not part of a backlog someone already accepted. With the normal
+default, the build would pass on exactly those findings, while the report above
+it listed them.
 
-The run says so on stderr rather than leaving you to infer it, and names the way
-back:
+The run states this on stderr, so you do not have to work it out yourself, and it
+names how to get the normal threshold back:
 
 ```
 vyql: warning: baseline applied; gating on any new finding
          pass -fail-on high to keep the usual threshold, or -fail-on none to report only
 ```
 
-Naming a threshold still wins, so a pipeline that only wants new criticals says
-so:
+A threshold you name always wins, so a pipeline that only wants new criticals
+can ask for that:
 
 ```sh
 vyql scan -baseline .vyql-baseline.json -fail-on critical .
@@ -352,10 +357,10 @@ on your behalf:
 vyql scan -baseline-write .vyql-baseline.json -format sarif . > results.sarif
 ```
 
-That run does not fail the build. Everything it reported was just accepted, and
-gating on the backlog the flag exists to absorb would leave you unable to adopt
-the scanner in the pipeline that needs it. It does fail, before printing
-anything, if the baseline cannot be written.
+That run does not fail the build. Everything it reported was accepted at the same
+time, and failing on the backlog would make it impossible to adopt the scanner in
+the pipeline that needs it. It does fail, before it prints anything, if the
+baseline cannot be written.
 
 **Rolling a baseline forward.** Give both flags, with different paths, and the
 run applies the old baseline and records the next one:
@@ -368,10 +373,10 @@ This run reports and gates on what the old baseline does not cover, because that
 is what is new. The file it writes carries three things: every finding the old
 baseline covered, keeping its verdict and reason, so triage survives the roll;
 every new finding below `-fail-on`, as `accepted`; and nothing else. A new
-finding that meets `-fail-on` is deliberately left out — recording what just
-failed the build would leave the next run green with the finding absorbed and
-nobody told. Entries in the old baseline that match no current finding are
-dropped, so a rolled baseline sheds suppressions whose code is gone.
+finding that meets `-fail-on` is left out on purpose. If it were recorded, the
+next run would be green, the finding would be absorbed, and nobody would be told.
+Entries in the old baseline that match no current finding are dropped, so a
+rolled baseline does not keep suppressions for code that is gone.
 
 Pointing both flags at the same file is refused. Recording writes every finding
 as `accepted` with an empty reason, so it would overwrite the verdicts you
@@ -388,12 +393,13 @@ warning: 4 baseline entries match nothing in this scan
            27d5f6e6503511f5  VYQL-INJ-004  app.py:12
 ```
 
-Otherwise a suppression outlives the code it excused: the code moves, the
+Without this, a suppression lives longer than the code it was written for: the
+code moves, the
 excuse stays, and nobody looks again.
 
-A malformed baseline, an unknown verdict or a missing file is an error, not an
-empty baseline. Failing loudly beats silently suppressing everything or
-nothing.
+A malformed baseline, an unknown verdict or a missing file is an error, and not
+an empty baseline. It is better to fail with a message than to silently suppress
+everything, or nothing.
 
 ### Skipping files
 
@@ -409,11 +415,12 @@ vyql scan -exclude node_modules -exclude vendor .   # repeat for more
 ```
 
 A value with no slash and no glob character names a directory. A value with no
-slash but a glob character names a file at any depth — `*` does not cross a
-slash, so a bare suffix pattern would otherwise match only at the scan root. A
-value containing a slash is anchored at the scan root and matches as written.
+slash but with a glob character names a file at any depth, because `*` does not
+cross a slash: written literally, a bare suffix pattern would match only at the
+scan root. A value that contains a slash is anchored at the scan root and matches
+as written.
 
-Excluded directories are never descended, so their files are not read or even
+An excluded directory is never entered, so its files are not read and not even
 listed. A malformed pattern is rejected before the scan starts, and `-coverage`
 reports how much each pattern excluded.
 
@@ -453,20 +460,21 @@ coverage
             this does not yet report that
 ```
 
-Source files above 2 MiB are skipped during tree walks by default — a file that
-size is almost never hand-written, and parsing one costs far more than the rest
-of the tree combined. `-max-file-size 8MB` raises the ceiling, `0` disables it,
-and naming a file directly always scans it regardless of size.
+Source files above 2 MiB are skipped during tree walks by default. A file that
+large is almost never written by hand, and parsing one costs more than the whole
+rest of the tree. `-max-file-size 8MB` raises the ceiling and `0` turns it off.
+Naming a file directly always scans it, whatever its size.
 
-A clean report over a tree that was mostly skipped reads exactly like a clean
-report over a tree that was fully read. The warning is the difference, which is
-why it is not optional. The `note` is there because the gap is real: tree-sitter
-recovers from syntax errors, so a file that parsed badly still counts as parsed.
+A clean report over a tree that was mostly skipped looks the same as a clean
+report over a tree that was fully read. The warning is what separates them, and
+that is why you cannot turn it off. The `note` is there because the gap is real:
+tree-sitter recovers from syntax errors, so a file that parsed badly still counts
+as parsed.
 
 ## Understand a finding
 
-The diagnostic commands are the point of the design: you interrogate the analysis
-instead of guessing at it. Every one takes paths just as `scan` does, so `.` scans
+The diagnostic commands are why the design works this way: you ask the analysis
+questions instead of guessing. Each one takes paths in the same way as `scan`, so `.` scans
 the current directory.
 
 **`explain`** prints each finding's full proof tree, including the negation evidence:
@@ -520,7 +528,7 @@ definitive when the others all look right.
 vyql graph .
 ```
 
-Two more worth knowing:
+Two more that are useful to know:
 
 ```sh
 vyql definitions -kind all                   # what concepts, rules and bindings loaded
@@ -528,8 +536,8 @@ vyql definitions explain code.SqlExecution   # which binding produced a label
 vyql definitions -kind bindings -lang python  # one language's source/sink/check vocabulary
 ```
 
-A filter that matches no known concept is an error rather than an empty result,
-because "0 sources reach a sink" and "you typed the name wrong" should not look
+A filter that matches no known concept is an error, and not an empty result,
+because "0 sources reach a sink" and "you typed the name wrong" must not look
 the same:
 
 ```
@@ -562,8 +570,8 @@ before: 9 findings   after: 7 findings
 This is how to ask "did this branch introduce anything new" without failing on a
 backlog that was already there.
 
-A missed finding is nearly always one of three things, and `match`, `resolve` and
-`explain` distinguish them in that order: nothing was labelled, the call did not
+A missed finding is almost always one of three things, and `match`, `resolve` and
+`explain` separate them in that order: nothing was labelled, the call did not
 resolve, or an `unless` clause was satisfied.
 
 ## Every command and flag
@@ -607,7 +615,7 @@ fallback when the flag is not given.
 | `-max-ram` | 80% of RAM | soft ceiling, e.g. `8GB` or `16GiB` |
 | `-max-file-size` | `2MiB` | skip larger source files; `0` disables |
 
-Combinations worth knowing:
+Combinations that are useful to know:
 
 ```sh
 # CI: machine output, gated, with the coverage account on stderr
@@ -632,7 +640,7 @@ vyql scan -flags with -format json .
 vyql scan -max-ram 8GB -exclude '**/*_templ.go' -exclude node_modules .
 vyql scan -cache-incremental .               # second run after an edit is faster
 
-# one pack, one profile, no cache — what you want when a rule misbehaves
+# one pack, one profile, no cache: use this when a rule misbehaves
 vyql scan -rules vyql/packs/injection -profile api -cache off -stats .
 ```
 
@@ -659,8 +667,8 @@ vyql trace -from HttpInput -count .
 
 `-from` and `-to` are checked against the ontology before the scan runs, so a
 typo is an error rather than a report of zero. Every mode reports how many
-sources dead-ended: a list of only the sources that reached a sink reads exactly
-like a clean result.
+sources dead-ended, because a list of only the sources that reached a sink looks
+the same as a clean result.
 
 ### `query`
 
@@ -730,8 +738,9 @@ vyql definitions validate-binding vyql/bindings/python/python/558.vyql
 
 `validate` exits `3` when the corpus does not validate.
 
-`refs` and `explain` take the path as `-in <path>` rather than positionally,
-because their positional argument is the definition being asked about:
+`refs` and `explain` take the path as `-in <path>` and not as a positional
+argument, because their positional argument is the definition you are asking
+about:
 
 ```sh
 vyql definitions refs -in vyql/ontology/concepts core.SqlParameterization
@@ -753,12 +762,12 @@ vyql help scan
 `diff` exits `3` when the finding set changed, so a pipeline can gate on "this
 branch changed the findings" without parsing the output.
 
-`cache clear` removes the directory rather than emptying it, and says how much it
-freed. The next scan recreates it.
+`cache clear` removes the directory instead of emptying it, and reports how much
+space it freed. The next scan creates it again.
 
 `scan -max-ram` puts the graph in a store under the system temporary directory,
-removed when the scan ends — including when you interrupt it. A `kill -9` cannot
-be caught, so that one case leaves the directory behind; remove it with
+removed when the scan ends, and also when you interrupt it. A `kill -9` cannot be
+caught, so only that case leaves the directory behind. Remove it with
 `rm -rf $TMPDIR/vyql-graph-*`.
 
 ## Languages
@@ -767,9 +776,10 @@ Java, Python, JavaScript/TypeScript, C#, PHP, Ruby, Go, Rust, Kotlin, Scala,
 Swift, Dart, Groovy, Elixir, Lua, Perl, C, C++, Objective-C, Solidity, Bash,
 PowerShell.
 
-Depth is not uniform. Java, Python and JavaScript are the reference frontends and
-carry the most complete modelling; the rest range from full taint tracking to
-call-and-concat coverage. `vyql definitions -kind all` reports what is actually
+The depth is not the same everywhere. Java, Python and JavaScript are the
+reference frontends and have the most complete modelling. The others range from
+full taint tracking down to call-and-concat coverage. `vyql definitions -kind all`
+reports what is actually
 loaded.
 
 ## Where the knowledge lives
@@ -783,9 +793,10 @@ vyql/
   tests/      executable specs, one per rule
 ```
 
-None of this is compiled in. The binary loads it at startup from the directory
-`VYQL_HOME` names, or by finding `vyql/` above the working directory. Point
-`VYQL_HOME` at your own copy and your edits take effect on the next run.
+None of this is compiled into the binary. It is loaded at startup from the
+directory that `VYQL_HOME` names, or from a `vyql/` directory found above the
+working directory. Point `VYQL_HOME` at your own copy, and your edits apply on
+the next run.
 
 ## Adding coverage
 
@@ -819,8 +830,8 @@ vyql definitions validate-binding vyql/bindings/python/python/558.vyql
 }
 ```
 
-Then confirm it attaches what you expect on real code. `match` lists what was
-labelled, and `definitions explain` names the binding responsible:
+Then check that it attaches what you expect on real code. `match` lists what was
+labelled, and `definitions explain` names the binding that did it:
 
 ```sh
 vyql match ./some-project
@@ -841,27 +852,27 @@ finding fingerprint will not change incompatibly within a major version. Build
 tooling against them.
 
 **The rule and binding language is not.** It is still moving, and a future
-version changes parts of the syntax. Concepts get renamed and clauses get added,
-so a rule pack written today may need edits to keep working. The specs in
+version changes parts of the syntax. Concepts are renamed and clauses are added,
+so a rule pack you write today may need edits later to keep working. The specs in
 `vyql/tests/` are what tell you when something breaks.
 
-**The knowledge base evolves.** A newer release can report findings an older one
-did not -- that is the point of it -- but it means pinning a version is the only
-way to get identical output twice.
+**The knowledge base keeps changing.** A newer release can report findings that
+an older one did not. That is the purpose of it, but it also means that pinning a
+version is the only way to get identical output twice.
 
 **Some documents describe design rather than behaviour.** The reference series in
-[docs/](docs/README.md) includes work that is not implemented; those documents say
-so at the top, and the index lists them separately. What a scan actually does is
-whatever `vyql definitions -kind all` reports as loaded.
+[docs/](docs/README.md) also includes work that is not implemented. Those
+documents say so at the top, and the index lists them separately. What a scan
+actually does is what `vyql definitions -kind all` reports as loaded.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Two things worth knowing before your
+See [CONTRIBUTING.md](CONTRIBUTING.md). Two things to know before your
 first change:
 
 - **`go test` must always be `go test -count=1`.** The Go test cache keys on
   source and does not track the `.vyql` data files, so a cached pass can hide a
-  change to the security knowledge base entirely.
+  change to the security knowledge base completely.
 - **`CGO_ENABLED=1` is required.** The parsers are C; without cgo the build
   constraints exclude them silently rather than failing.
 
