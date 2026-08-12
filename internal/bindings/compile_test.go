@@ -332,7 +332,10 @@ rule SqlInjectionAlias {
 		t.Fatalf("alias in binding did not lower to canonical concept: %+v", adapter)
 	}
 	if rule == nil {
+		// The return is redundant after Fatalf and is there for the analyzer: without
+		// it, every dereference below reads as a possible nil dereference.
 		t.Fatalf("rule did not lower")
+		return
 	}
 	flow := rule.Body.(*parser.FlowStmt)
 	if flow.Src.Concept != "code.HttpInput" || flow.Dst.Concept != "code.SqlExecution" {
