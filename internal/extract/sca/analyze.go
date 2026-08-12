@@ -44,6 +44,9 @@ func Analyze(g usg.Store, eco string) (vuln, malicious, suspicious int, err erro
 		// 1. known-vulnerable version (CVE feed)
 		if adv, ok := matchAdvisory(d, eco, name, version, specifier); ok {
 			updates = append(updates, tokenUpdate{nd.ID, []string{"status=vulnerable", "advisory=" + adv.ID}})
+			if reason := advisoryReason(adv, name, version, specifier); reason != "" {
+				updates = append(updates, tokenUpdate{nd.ID, []string{"advisory_reason=" + reason}})
+			}
 			for _, cwe := range adv.CWE {
 				updates = append(updates, tokenUpdate{nd.ID, []string{"advisory_cwe=" + cwe}})
 			}
@@ -86,6 +89,31 @@ func Analyze(g usg.Store, eco string) (vuln, malicious, suspicious int, err erro
 		}
 	}
 	return vuln, malicious, suspicious, nil
+}
+
+// advisoryReason states why this dependency matched, in the terms the advisory is
+// written in. The three entry shapes ask three different questions, and a reader
+// who is not told which one applies cannot act on the answer -- a report that a
+// current release is vulnerable reads as a mistake when the real subject is the
+// range a manifest permits.
+func advisoryReason(a advisoryEntry, name, version, specifier string) string {
+	switch {
+	case a.MinSafe != "":
+		if version == "*" || version == "" {
+			return name + " is not pinned, so it can resolve below " + a.MinSafe + ", the first fixed version"
+		}
+		return name + " " + version + " is below " + a.MinSafe + ", the first fixed version"
+	case a.MaxSafe != "":
+		declared := specifier
+		if declared == "" {
+			declared = version
+		}
+		return "the declared range " + declared + " permits versions above " + a.MaxSafe +
+			", which is the highest release vetted against this advisory"
+	case a.Version != "" && a.Version != "*":
+		return name + " " + a.Version + " is a release this advisory names"
+	}
+	return ""
 }
 
 // matchAdvisory returns the advisory id if (name, version) is a known-vulnerable
