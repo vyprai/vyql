@@ -29,10 +29,17 @@ const baselineFailOn = "info"
 
 // gateForBaseline resolves the threshold for a run that applies a baseline. It is
 // the caller's rank unless -fail-on was left unset.
+//
+// The change is announced rather than left to be inferred: adding -baseline
+// makes the gate stricter, and a threshold nobody chose should say so and say
+// how to choose another.
 func gateForBaseline(rank int, name string, explicit bool) (int, string) {
 	if explicit {
 		return rank, name
 	}
+	warnf("baseline applied; gating on any new finding\n"+
+		"         pass -fail-on %s to keep the usual threshold, or -fail-on none to report only",
+		defaultFailOn)
 	return severityRank(baselineFailOn), baselineFailOn
 }
 

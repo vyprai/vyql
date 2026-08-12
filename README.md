@@ -303,6 +303,14 @@ addition counts — a new medium is a regression this branch introduced, not par
 of a backlog somebody accepted. Keeping the plain default there would pass the
 build on exactly those findings while the report above it listed them.
 
+The run says so on stderr rather than leaving you to infer it, and names the way
+back:
+
+```
+vyql: warning: baseline applied; gating on any new finding
+         pass -fail-on high to keep the usual threshold, or -fail-on none to report only
+```
+
 Naming a threshold still wins, so a pipeline that only wants new criticals says
 so:
 
