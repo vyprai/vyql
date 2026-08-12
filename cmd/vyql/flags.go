@@ -13,7 +13,9 @@ import (
 	"strings"
 
 	"github.com/vyprai/vyql/internal/bindings"
+	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/extract"
+	"github.com/vyprai/vyql/internal/review"
 	"github.com/vyprai/vyql/internal/timing"
 )
 
@@ -141,22 +143,81 @@ func addRules(fs *flag.FlagSet) *string {
 	return fs.String("rules", "", "load rule(s) from a .vyql file or directory (default: vyql/packs)")
 }
 
+// applyDataFlagEarly applies -data before any command builds its flagset.
+//
+// Registering a command's flags reads the data directory: naming the available
+// profiles means loading them. That fixes the resolved root, and where there is no
+// data directory to find it fails outright — both before the flag that says where
+// to look has been parsed. So -data has to be applied ahead of registration to
+// have any effect at all.
+//
+// The value is still declared per command by addRunFlags, so it parses like any
+// other flag and appears in that command's help.
+func applyDataFlagEarly(args []string) error {
+	dir, given := dataFlagValue(args)
+	if !given {
+		return nil
+	}
+	if strings.TrimSpace(dir) == "" {
+		return usageWith("-data needs a directory",
+			"usage: -data <path to the vyql/ data directory>")
+	}
+	if err := os.Setenv("VYQL_HOME", strings.TrimSpace(dir)); err != nil {
+		return fmt.Errorf("-data: %w", err)
+	}
+	datadir.Reset()
+	return nil
+}
+
+// dataFlagValue finds -data in a raw argument list, in every spelling the flag
+// package accepts. It reports whether the flag was given at all, so an empty value
+// is a usage error rather than a silent fallback to the default directory.
+func dataFlagValue(args []string) (value string, given bool) {
+	for i, arg := range args {
+		if arg == "--" {
+			return "", false
+		}
+		if arg == "-data" || arg == "--data" {
+			if i+1 < len(args) {
+				return args[i+1], true
+			}
+			return "", true
+		}
+		for _, prefix := range []string{"-data=", "--data="} {
+			if strings.HasPrefix(arg, prefix) {
+				return strings.TrimPrefix(arg, prefix), true
+			}
+		}
+	}
+	return "", false
+}
+
 // addRunFlags registers the settings that reach an ordinary run and otherwise
 // have only an environment variable. They are per-command rather than global
 // because dispatch reads os.Args[1] directly, and a global flag would have to be
 // parsed before the command is known.
 type runFlags struct {
-	data       *string
 	cpuProfile *string
 	memProfile *string
 }
 
 func addRunFlags(fs *flag.FlagSet) runFlags {
+	addDataFlag(fs)
 	return runFlags{
-		data:       fs.String("data", "", "the vyql/ data directory (default: $VYQL_HOME, then the search path)"),
 		cpuProfile: fs.String("cpuprofile", "", "write a CPU profile to this path"),
 		memProfile: fs.String("memprofile", "", "write a heap profile to this path"),
 	}
+}
+
+// addDataFlag declares -data on a command that reads the data directory but takes
+// none of the other run flags.
+//
+// Nothing reads the value it registers. applyDataFlagEarly has already taken it
+// from the raw arguments, because a flagset cannot be built without reading the
+// data directory first. Declaring it here is what makes the flag parse rather than
+// be rejected, and what puts it in the command's help.
+func addDataFlag(fs *flag.FlagSet) {
+	fs.String("data", "", "the vyql/ data directory (default: $VYQL_HOME, then the search path)")
 }
 
 // statsValue is `-stats`, which reports what the run did: graph counts, taint-hub
@@ -249,11 +310,8 @@ var ruleTimingOn = os.Getenv("VYQL_RULE_TIMING") != ""
 // surface as a goroutine dump from package initialization rather than as the diagnostic
 // this reports.
 func (r runFlags) apply() (func(), error) {
-	if dir := strings.TrimSpace(*r.data); dir != "" {
-		if err := os.Setenv("VYQL_HOME", dir); err != nil {
-			return func() {}, fmt.Errorf("-data: %w", err)
-		}
-	}
+	// -data is applied by applyDataFlagEarly, before any flagset is built. Setting
+	// it again here would be too late to matter and is left out for that reason.
 	var stops []func()
 	if p := firstNonEmpty(*r.cpuProfile, os.Getenv("VYQL_CPUPROFILE")); p != "" {
 		f, err := os.Create(p)
@@ -343,6 +401,11 @@ func addExclude(fs *flag.FlagSet) *excludeValue {
 // it would silently drop the operator's intent, which is the failure this file exists to
 // prevent -- so the message names the flag that turns the output on.
 func checkFlagFilters(mode, category, kind, loc string) error {
+	// Checked whatever the mode is: a category that names nothing is wrong when the
+	// flags are on, and wrong in the same way when they are not.
+	if err := checkFlagCategory(category); err != nil {
+		return err
+	}
 	if mode != "off" {
 		return nil
 	}
@@ -361,6 +424,28 @@ func checkFlagFilters(mode, category, kind, loc string) error {
 	}
 	return usageWith(strings.Join(set, ", ")+" set while -flags is off",
 		"add -flags only (flags alone) or -flags with (findings and flags)")
+}
+
+// checkFlagCategory rejects a -flag-category naming a category no review declares.
+//
+// The categories come from the data rather than a fixed list, so this cannot be an
+// enum on the flag itself: the valid set is not known until the data directory is
+// resolved. Checking it here keeps a mistyped category from reporting an empty
+// result, which is what -flag-kind already gets from its enum.
+func checkFlagCategory(category string) error {
+	category = strings.ToLower(strings.TrimSpace(category))
+	if category == "" || category == "all" {
+		return nil
+	}
+	known := review.Categories()
+	if len(known) == 0 || slices.Contains(known, category) {
+		return nil
+	}
+	msg := fmt.Sprintf("unknown -flag-category %q", category)
+	if s := suggest(known, category); len(s) > 0 {
+		msg += "\n  did you mean: " + strings.Join(s, ", ") + "?"
+	}
+	return usageWith(msg, "valid: all | "+strings.Join(known, " | "))
 }
 
 // requirePaths returns the positional paths, or a usage error naming the command.

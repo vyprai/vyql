@@ -525,3 +525,26 @@ func itemOrder(r Item, fields []string) string {
 func relatedOrder(r RelatedCheck) string {
 	return r.Loc + "\x00" + r.Concept + "\x00" + r.Call + "\x00" + r.Evidence
 }
+
+// Categories returns every category the shipped review declarations use, sorted.
+//
+// It is the valid set for the -flag-category filter. A filter naming a category
+// nothing declares can only ever match nothing, and a security scanner reporting
+// nothing is read as a clean result rather than as a mistyped argument.
+func Categories() []string {
+	concepts, _, _, err := loadConfig()
+	if err != nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(concepts))
+	for _, info := range concepts {
+		if info.category == "" || seen[info.category] {
+			continue
+		}
+		seen[info.category] = true
+		out = append(out, info.category)
+	}
+	sort.Strings(out)
+	return out
+}

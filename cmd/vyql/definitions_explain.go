@@ -72,6 +72,7 @@ type explainReviewView struct {
 
 func cmdDefinitionsExplain(args []string) error {
 	fs := newFlagSet("definitions explain")
+	addDataFlag(fs)
 	in := fs.String("in", datadirRoot(), "v2 .vyql file or directory to inspect")
 	format := addFormat(fs, "text", "json")
 	if err := parseFlags(fs, args); err != nil {

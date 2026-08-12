@@ -579,9 +579,14 @@ resolve, or an `unless` clause was satisfied.
 `vyql help` lists the commands; `vyql help <command>` prints that command's
 flags. This section is the same information with the reason for each one.
 
-Four flags are on every command. `-data` points at the `vyql/` data directory
-when it is not where the binary would look, `-profile` picks the analysis
-profile, and `-cpuprofile` / `-memprofile` write pprof files:
+Four flags are shared. `-data` points at the `vyql/` data directory when it is
+not where the binary would look, `-profile` picks the analysis profile, and
+`-cpuprofile` / `-memprofile` write pprof files.
+
+Every command that reads the data directory takes `-data`, including each
+subcommand of `definitions`. `-profile` is on the commands that analyse source.
+`diff` compares two reports and `cache` manages files on disk, so neither takes
+any of the four:
 
 ```sh
 vyql scan -data /opt/vyql .                  # data directory somewhere else

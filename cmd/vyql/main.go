@@ -136,6 +136,11 @@ func vyqlMain() (code int) {
 	if !ok {
 		return exitCodeFor(unknownCommand(cmd))
 	}
+	// Before the command builds its flagset, because building one reads the data
+	// directory and that decides which one the whole run loads.
+	if err := applyDataFlagEarly(args); err != nil {
+		return exitCodeFor(err)
+	}
 	// Installed for the commands that do work, not for help or version.
 	watchForInterrupt()
 	err := run(args)
@@ -432,6 +437,11 @@ func applyProfile(paths []string, name string) profile.Profile {
 }
 
 func profileNames() string {
+	// Registering a flag must not require the data directory: -data is the flag that
+	// says where it is, and -h has to answer whether or not any of it is in place.
+	if _, ok := datadir.Lookup(); !ok {
+		return "generic"
+	}
 	profiles, err := profile.Load()
 	if err != nil {
 		return "generic"
