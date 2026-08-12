@@ -121,3 +121,42 @@ func TestThresholdMetIsACheckFailureCarryingTheCounts(t *testing.T) {
 		}
 	}
 }
+
+// A baseline changes the question from "is anything wrong" to "did this change
+// add anything". Keeping the plain default there passed the build on every new
+// finding below high, while the report above it listed them.
+func TestBaselineGatesOnAnyNewFindingUnlessAskedOtherwise(t *testing.T) {
+	high := severityRank("high")
+
+	rank, name := gateForBaseline(high, "high", false)
+	if rank != severityRank(baselineFailOn) || name != baselineFailOn {
+		t.Errorf("an unset -fail-on under a baseline gave %d/%q, want %d/%q — a new "+
+			"finding below high would pass the build",
+			rank, name, severityRank(baselineFailOn), baselineFailOn)
+	}
+
+	// An operator who names a threshold gets it, baseline or not.
+	rank, name = gateForBaseline(high, "high", true)
+	if rank != high || name != "high" {
+		t.Errorf("an explicit -fail-on high gave %d/%q, want %d/%q", rank, name, high, "high")
+	}
+
+	// "none" is explicit too: reporting without gating stays available.
+	rank, _ = gateForBaseline(0, "none", true)
+	if rank != 0 {
+		t.Errorf("an explicit -fail-on none gave rank %d, want 0", rank)
+	}
+}
+
+// The baseline threshold has to sit at the bottom of the order, or it is itself a
+// floor that hides new findings.
+func TestBaselineFailOnIsTheLowestSeverity(t *testing.T) {
+	if severityRank(baselineFailOn) != 1 {
+		t.Fatalf("baselineFailOn %q has rank %d, want 1 (the lowest); anything above it "+
+			"silently accepts new findings underneath",
+			baselineFailOn, severityRank(baselineFailOn))
+	}
+	if baselineFailOn != severityOrder[0] {
+		t.Errorf("baselineFailOn = %q, want %q", baselineFailOn, severityOrder[0])
+	}
+}

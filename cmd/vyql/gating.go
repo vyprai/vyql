@@ -13,6 +13,29 @@ import (
 // than not gating at all.
 var severityOrder = []string{"info", "low", "medium", "high", "critical"}
 
+// baselineFailOn is the threshold a run gates on when it applies a baseline and
+// -fail-on was not given.
+//
+// A baseline changes the question. Without one the scan asks "is anything in this
+// code wrong", and a severity floor is how a team declines to fix the long tail.
+// With one it asks "did this change add anything", and every addition counts: a
+// new medium is a regression this branch introduced, not part of the backlog
+// somebody already accepted.
+//
+// Keeping the plain default there passes the build on exactly those findings,
+// while the report above it lists them. An explicit -fail-on still wins, so a
+// pipeline that wants only new criticals asks for that.
+const baselineFailOn = "info"
+
+// gateForBaseline resolves the threshold for a run that applies a baseline. It is
+// the caller's rank unless -fail-on was left unset.
+func gateForBaseline(rank int, name string, explicit bool) (int, string) {
+	if explicit {
+		return rank, name
+	}
+	return severityRank(baselineFailOn), baselineFailOn
+}
+
 // defaultFailOn is the threshold a plain `vyql scan` gates on. Dropping the
 // scanner into a pipeline should gate that pipeline without further
 // configuration; `-fail-on none` opts back out.

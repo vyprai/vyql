@@ -23,6 +23,10 @@ behaviour change, even if no code moved.
   directories are pruned during the walk rather than filtered afterwards.
   **Comma-separated lists are rejected**; repeat the flag instead, because a
   comma would be ambiguous with a valid glob pattern.
+- **Applying `-baseline` gates on any new finding** unless `-fail-on` is given.
+  A baseline asks "did this change add anything", where every addition counts;
+  the plain `high` default passed the build on every new finding below it while
+  the report listed them. An explicit `-fail-on` still wins.
 - **stdout carries exactly one document.** `-stats` and `-coverage` go to
   stderr, so `scan -format sarif -coverage . > results.sarif` writes SARIF
   rather than SARIF followed by text no parser accepts.

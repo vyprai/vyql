@@ -10,7 +10,8 @@
 // Usage:
 //
 //	vyql scan [flags] [path...]      # no path scans the working directory
-//	  -fail-on   severity at or above which to exit 3 (default: high)
+//	  -fail-on   severity at or above which to exit 3 (default: high; any new
+//	             finding when -baseline is applied)
 //	  -format    text | sarif | json | graph-json
 //	  -exclude   skip paths matching this pattern; repeatable
 //	  -baseline  triaged findings to exclude from the report and the gate
@@ -36,6 +37,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -247,6 +249,15 @@ func cmdScan(args []string) error {
 	if err != nil {
 		return err
 	}
+	// Whether the operator asked for a threshold, as opposed to inheriting one.
+	// A baseline run reads the two differently, and the flag's value alone cannot
+	// tell them apart.
+	explicitFailOn := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "fail-on" {
+			explicitFailOn = true
+		}
+	})
 	// Checked up front for the same reason: a combination that cannot mean what
 	// the user hoped should cost nothing to discover.
 	if err := checkBaselineFlags(*baseline, *baselineWrite); err != nil {
@@ -256,10 +267,12 @@ func cmdScan(args []string) error {
 	// cost nothing, and finding out after the scan that the baseline never
 	// applied is the silent no-op these checks exist to prevent.
 	var baselineEntries map[string]baselineEntry
+	failOnName := strings.ToLower(strings.TrimSpace(*failOn))
 	if *baseline != "" {
 		if baselineEntries, err = loadBaseline(*baseline); err != nil {
 			return err
 		}
+		failOnRank, failOnName = gateForBaseline(failOnRank, failOnName, explicitFailOn)
 	}
 	cleanup := applyMaxRAM(*maxRAM)
 	defer cleanup()
@@ -290,7 +303,7 @@ func cmdScan(args []string) error {
 		FlagLoc:        *flagLoc,
 		GraphCache:     *cacheIncremental,
 		FailOnRank:     failOnRank,
-		FailOnName:     strings.ToLower(strings.TrimSpace(*failOn)),
+		FailOnName:     failOnName,
 		ShowCoverage:   *coverage,
 		Baseline:       baselineEntries,
 		BaselinePath:   *baseline,

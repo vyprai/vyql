@@ -296,6 +296,20 @@ vyql scan -baseline-write .vyql-baseline.json .   # take the backlog as given
 vyql scan -baseline .vyql-baseline.json .         # fail only on what is new
 ```
 
+**Applying a baseline lowers the gate to any new finding.** Without one, `scan`
+asks "is anything in this code wrong", and `-fail-on high` is how a team declines
+to fix the long tail. With one it asks "did this change add anything", and every
+addition counts — a new medium is a regression this branch introduced, not part
+of a backlog somebody accepted. Keeping the plain default there would pass the
+build on exactly those findings while the report above it listed them.
+
+Naming a threshold still wins, so a pipeline that only wants new criticals says
+so:
+
+```sh
+vyql scan -baseline .vyql-baseline.json -fail-on critical .
+```
+
 Entries are written as `accepted` with an empty reason; fill them in as you
 triage, and change the verdict to `false-positive` where the finding is wrong:
 
@@ -554,7 +568,7 @@ fallback when the flag is not given.
 | `-rules` | `vyql/packs` | load rules from a `.vyql` file or directory |
 | `-bindings` | | a repo-local binding overlay directory |
 | `-format` | `text` | `text`, `sarif`, `json` or `graph-json` |
-| `-fail-on` | `high` | exit `3` at or above this severity, or `none` |
+| `-fail-on` | `high`, or any new finding with `-baseline` | exit `3` at or above this severity, or `none` |
 | `-exclude` | | skip paths matching this pattern; repeatable |
 | `-baseline` | | apply triaged findings, and report only what is new |
 | `-baseline-write` | | record the current findings to this path |
