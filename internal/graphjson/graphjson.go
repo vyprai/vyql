@@ -149,37 +149,197 @@ func Build(g usg.Store, all []*findings.Finding, ruleMeta map[string]map[string]
 	return doc
 }
 
+// boundary is what lowering records about a function beyond its region: the
+// declaration line and the authored name.
+//
+// A function's entry and exit are nodes whose ids encode the name --
+// "<module><name>#ret#" and "<module><name>#param#<arg>" -- and whose loc is the
+// declaration line. They carry no region themselves, so each is attributed to the
+// function through a neighbour that does: a Return is fed from inside the
+// function, and a Param feeds into it.
+type boundary struct {
+	name string
+	line int
+}
+
+// functionBoundaries returns what each function's boundary nodes say about it,
+// and which function each boundary node belongs to. Both come from the same walk:
+// the second is what lets a call edge name a region at both ends.
+func functionBoundaries(g usg.Store, nodes []usg.Node) (map[string]boundary, map[string]string) {
+	out := map[string]boundary{}
+	ownerOf := map[string]string{}
+	note := func(region, id, loc string) {
+		if region == "" {
+			return
+		}
+		name := boundaryName(region, id)
+		if name == "" {
+			return
+		}
+		ownerOf[id] = region
+		_, line := splitLoc(loc)
+		// A Return names the function and sits on its declaration line. Prefer it
+		// over a Param, which names the same function but may be one of several.
+		if prev, ok := out[region]; ok && prev.line != 0 && line == 0 {
+			return
+		}
+		out[region] = boundary{name: name, line: line}
+	}
+	for _, n := range nodes {
+		if n.Prop("region") != "" {
+			continue // inside a function, not one of its boundaries
+		}
+		switch n.Type {
+		case "code.Return":
+			for _, e := range inEdges(g, n.ID) {
+				if src, ok, _ := g.GetNode(e.Src); ok {
+					note(src.Prop("region"), n.ID, n.Prop("loc"))
+				}
+			}
+		case "code.Param":
+			for _, e := range outEdges(g, n.ID) {
+				if dst, ok, _ := g.GetNode(e.Dst); ok {
+					note(dst.Prop("region"), n.ID, n.Prop("loc"))
+				}
+			}
+		}
+	}
+	return out, ownerOf
+}
+
+// boundaryName recovers the authored name from a boundary node id. The id is the
+// module, a unit separator, the name, then a "#ret#" or "#param#<arg>" marker; the
+// module is the half of the region before the slash.
+func boundaryName(region, id string) string {
+	module, _, ok := strings.Cut(region, "/")
+	if !ok {
+		return ""
+	}
+	rest, ok := strings.CutPrefix(id, module)
+	if !ok {
+		return ""
+	}
+	rest = strings.TrimPrefix(rest, idSeparator)
+	if i := strings.Index(rest, "#"); i >= 0 {
+		return rest[:i]
+	}
+	return ""
+}
+
+// idSeparator divides the module from the rest of a node id.
+const idSeparator = "\x1f"
+
+// exportFunctions derives the function inventory from the region every node
+// carries, because lowering does not emit a function node.
+//
+// A region is "<module>/<function>" and is the only representation of a function
+// that every frontend produces: Python emits no function node at all, and the
+// JavaScript frontend emits code.Func only for a function expression. Asking for a
+// node type reported no functions for any scan, in every language.
+//
+// The line span runs from the declaration, which a boundary node carries, to the
+// last line of the body. Lowering records no end line.
 func exportFunctions(g usg.Store) []Function {
-	ids, _ := g.NodesOfType("code.Function")
-	out := make([]Function, 0, len(ids))
-	for _, id := range ids {
-		n, ok, _ := g.GetNode(id)
-		if !ok {
-			continue
+	nodes, err := g.AllNodes()
+	if err != nil {
+		return []Function{}
+	}
+	bounds, _ := functionBoundaries(g, nodes)
+	type span struct {
+		file, module, class string
+		first, last         int
+		haveFirst           bool
+	}
+	spans := map[string]*span{}
+	for _, n := range nodes {
+		region := n.Prop("region")
+		if region == "" {
+			continue // module level, not inside a function
+		}
+		sp := spans[region]
+		if sp == nil {
+			sp = &span{}
+			spans[region] = sp
+		}
+		if m := n.Prop("module"); m != "" && sp.module == "" {
+			sp.module = m
+		}
+		if c := n.Prop("class"); c != "" && sp.class == "" {
+			sp.class = c
 		}
 		file, line := splitLoc(n.Prop("loc"))
-		fn := Function{
-			ID:          id,
-			Name:        n.Prop("name"),
-			File:        file,
-			LineStart:   line,
-			LineEnd:     endLine(n.Prop("end_loc")),
-			Module:      n.Prop("module"),
-			Class:       nilIfEmpty(n.Prop("class")),
-			IsRoute:     n.Prop("is_route") == "true",
-			IsValidator: n.Prop("is_validator") == "true",
-			HTTPMethod:  nilIfEmpty(n.Prop("http_method")),
-			HTTPPath:    nilIfEmpty(n.Prop("http_path")),
+		if file != "" && sp.file == "" {
+			sp.file = file
 		}
-		out = append(out, fn)
+		if line == 0 {
+			continue
+		}
+		if !sp.haveFirst || line < sp.first {
+			sp.first, sp.haveFirst = line, true
+		}
+		if line > sp.last {
+			sp.last = line
+		}
+	}
+	out := make([]Function, 0, len(spans))
+	for region, sp := range spans {
+		name, start := functionName(region), sp.first
+		if b, ok := bounds[region]; ok {
+			// The authored name, and the declaration line rather than the first
+			// line of the body.
+			name = b.name
+			if b.line != 0 && b.line < start {
+				start = b.line
+			}
+		}
+		// Without a boundary node the name falls back to the region's own segment,
+		// which is an ordinal rather than what the source calls it. A function
+		// listed under a synthetic name is still located correctly by file and
+		// line; one left out of the list is invisible.
+		module := sp.module
+		if module == "" {
+			// Nodes carry no module property, so it is the half of the region
+			// before the slash -- which is where the region gets it.
+			module, _, _ = strings.Cut(region, "/")
+		}
+		out = append(out, Function{
+			ID:        region,
+			Name:      name,
+			File:      sp.file,
+			LineStart: start,
+			LineEnd:   spanEnd(start, sp.last),
+			Module:    module,
+			Class:     nilIfEmpty(sp.class),
+		})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].File != out[j].File {
 			return out[i].File < out[j].File
 		}
-		return out[i].LineStart < out[j].LineStart
+		if out[i].LineStart != out[j].LineStart {
+			return out[i].LineStart < out[j].LineStart
+		}
+		return out[i].ID < out[j].ID
 	})
 	return out
+}
+
+// functionName is the last segment of a region. A region is "<module>/<function>",
+// and the module half travels in its own field.
+func functionName(region string) string {
+	if i := strings.LastIndex(region, "/"); i >= 0 {
+		return region[i+1:]
+	}
+	return region
+}
+
+// spanEnd omits the end of a single-line span, which says nothing the start does
+// not.
+func spanEnd(first, last int) *int {
+	if last <= first {
+		return nil
+	}
+	return intPtr(last)
 }
 
 // exportCallEdges emits one edge per resolved caller→callee pair. A call is resolved
@@ -190,12 +350,28 @@ func exportCallEdges(g usg.Store) []CallEdge {
 	ids, _ := g.NodesOfType("code.Call")
 	seen := map[string]bool{}
 	out := []CallEdge{}
+	// A boundary node carries no region of its own, so the function it belongs to
+	// is found the same way exportFunctions finds it. Both ends of an edge are
+	// then regions, which is what the function list is keyed by -- an edge naming
+	// anything else would point at a function the document does not contain.
+	regionOf := map[string]string{}
+	if nodes, err := g.AllNodes(); err == nil {
+		_, regionOf = functionBoundaries(g, nodes)
+	}
+	owner := func(n usg.Node) string {
+		if r := n.Prop("region"); r != "" {
+			return r
+		}
+		return regionOf[n.ID]
+	}
 	for _, id := range ids {
 		c, ok, _ := g.GetNode(id)
 		if !ok {
 			continue
 		}
-		from := c.Prop("func_id")
+		// The caller is the region the call sits in. Nothing sets a func_id
+		// property, so reading one skipped every call and emitted no edges at all.
+		from := c.Prop("region")
 		if from == "" {
 			continue // caller is module-level, not an internal function
 		}
@@ -203,7 +379,7 @@ func exportCallEdges(g usg.Store) []CallEdge {
 		// callee Return flows back into this call
 		for _, e := range inEdges(g, id) {
 			if src, ok, _ := g.GetNode(e.Src); ok && src.Type == "code.Return" {
-				if f := src.Prop("func_id"); f != "" {
+				if f := owner(src); f != "" && f != from {
 					callees[f] = true
 				}
 			}
@@ -216,7 +392,7 @@ func exportCallEdges(g usg.Store) []CallEdge {
 			}
 			for _, e := range outEdges(g, argID) {
 				if dst, ok, _ := g.GetNode(e.Dst); ok && dst.Type == "code.Param" {
-					if f := dst.Prop("func_id"); f != "" {
+					if f := owner(dst); f != "" && f != from {
 						callees[f] = true
 					}
 				}
@@ -442,14 +618,6 @@ func splitLoc(loc string) (string, int) {
 	}
 	line, _ := strconv.Atoi(loc[i+1:])
 	return loc[:i], line
-}
-
-func endLine(endLoc string) *int {
-	if endLoc == "" {
-		return nil
-	}
-	_, line := splitLoc(endLoc)
-	return intPtr(line)
 }
 
 // conceptSnake turns a "code.PascalName" concept into "pascal_name" snake_case for the
