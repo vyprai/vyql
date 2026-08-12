@@ -1,0 +1,31 @@
+# Threats that no concept anywhere in the ontology claims to neutralise.
+#
+# A sink carrying one of these cannot be cleared by any control, in any language,
+# so the orphan check skips it. Closing one means deciding what a neutralising
+# control for it is, writing the check concept, and binding it per language. Until
+# then, a rule over such a sink can only report and never clear.
+#
+# One threat per line. Removing a line turns that threat into a build gate, so
+# remove it only once a check concept for it exists.
+
+concurrency.Toctou
+crypto.IncompleteSecurityIdentifier
+deserialization.UnsafeReflection
+iac.PublicNetworkExposure
+injection.ArgumentInjection
+injection.CrlfInjection
+injection.ExpressionLanguageInjection
+injection.FormatString
+injection.HttpResponseSplitting
+injection.LogInjection
+injection.MassAssignment
+injection.ProtocolStateConfusion
+injection.TemplateInjection
+injection.UnrestrictedUpload
+injection.UnsafeDynamicLoading
+mobile.WebViewInjection
+numeric.DivideByZero
+path.LinkFollowing
+session.SessionFixation
+smartcontract.ExternalCallInjection
+smartcontract.PrivilegedDestruct
