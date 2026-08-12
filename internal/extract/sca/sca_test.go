@@ -186,11 +186,14 @@ func TestMinSafeAdvisoryMatch(t *testing.T) {
 	}
 }
 
+// max_safe asks what a declaration permits rather than which version is installed:
+// a range with no upper bound can resolve to a release nobody checked. The entry is
+// synthetic because no shipped advisory uses this shape.
 func TestMaxSafeAdvisoryMatchPreservesOpenRanges(t *testing.T) {
 	d := &scaData{advisories: map[string]map[string][]advisoryEntry{"pypi": {
-		"requests": {{Version: "*", ID: "CVE-2023-48052", MaxSafe: "2.31.0"}},
+		"requests": {{Version: "*", ID: "CVE-0000-0", MaxSafe: "2.31.0"}},
 	}}}
-	if adv, ok := matchAdvisory(d, "pypi", "requests", "2.22.0", ">=2.22.0"); !ok || adv.ID != "CVE-2023-48052" {
+	if adv, ok := matchAdvisory(d, "pypi", "requests", "2.22.0", ">=2.22.0"); !ok || adv.ID != "CVE-0000-0" {
 		t.Fatalf("open requests range should match max_safe advisory, got ok=%v adv=%+v", ok, adv)
 	}
 	if _, ok := matchAdvisory(d, "pypi", "requests", "2.31.0", "==2.31.0"); ok {
@@ -432,4 +435,50 @@ func packageIDsWithToken(t *testing.T, g usg.Store, token string) []string {
 		}
 	}
 	return out
+}
+
+// The three advisory shapes ask three different questions, and the sentence a
+// finding carries is how a reader tells them apart. Reported without it, a current
+// release flagged for an unbounded range reads as the comparison running
+// backwards. Synthetic entries, so this holds whatever the shipped data contains.
+func TestAdvisoryReasonNamesTheBoundThatMatched(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		entry    advisoryEntry
+		version  string
+		specfier string
+		want     string
+	}{
+		{
+			name:    "a pin below the first fixed version",
+			entry:   advisoryEntry{Version: "*", ID: "CVE-0000-1", MinSafe: "2.31.0"},
+			version: "2.20.0", specfier: "==2.20.0",
+			want: "below 2.31.0, the first fixed version",
+		},
+		{
+			name:    "an unpinned dependency under a lower bound",
+			entry:   advisoryEntry{Version: "*", ID: "CVE-0000-1", MinSafe: "2.31.0"},
+			version: "*", specfier: "*",
+			want: "is not pinned",
+		},
+		{
+			name:    "a range permitting versions above the vetted cap",
+			entry:   advisoryEntry{Version: "*", ID: "CVE-0000-2", MaxSafe: "2.31.0"},
+			version: "2.34.2", specfier: ">=2.22.0",
+			want: "permits versions above 2.31.0",
+		},
+		{
+			name:    "a release the advisory names outright",
+			entry:   advisoryEntry{Version: "0.12.2", ID: "CVE-0000-3"},
+			version: "0.12.2", specfier: "==0.12.2",
+			want: "0.12.2 is a release this advisory names",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := advisoryReason(tc.entry, "pkg", tc.version, tc.specfier)
+			if !strings.Contains(got, tc.want) {
+				t.Fatalf("reason = %q, want it to contain %q", got, tc.want)
+			}
+		})
+	}
 }
