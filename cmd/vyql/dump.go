@@ -10,20 +10,6 @@ import (
 	"github.com/vyprai/vyql/internal/usg"
 )
 
-func parseExcludes(s string) []string {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return nil
-	}
-	var out []string
-	for _, p := range strings.Split(s, ",") {
-		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
 // buildGraph builds the analysis graph with this process's defaults: the shared parse cache
 // and no per-scan options. Shared by the debug commands and the -dump path; `scan` goes
 // through scanPathsWithProfileDemand, which has options to pass.
@@ -56,51 +42,37 @@ func printUSG(g usg.Store) error {
 	return nil
 }
 
-// printTaint shows, for each source node, the set of FLOWS-reachable labelled nodes — so a
-// broken taint chain (source not reaching its sink) is visible at a glance.
-func printTaint(onto *ontology.Ontology, g usg.Store) error {
-	nodes, err := g.AllNodes()
-	if err != nil {
-		return err
-	}
-	sort.Slice(nodes, func(i, j int) bool { return nodes[i].SortOrder() < nodes[j].SortOrder() })
-	for _, n := range nodes {
-		if !isSource(onto, g, n.ID) {
-			continue
-		}
-		fmt.Printf("\nSOURCE %s @ %s {%s}\n", n.ID, n.Prop("loc"), conceptsOf(g, n.ID))
-		seen := map[string]bool{n.ID: true}
-		queue := []string{n.ID}
-		for len(queue) > 0 {
-			cur := queue[0]
-			queue = queue[1:]
-			es, _ := g.OutEdges(cur, "FLOWS")
-			for _, e := range es {
-				if !seen[e.Dst] {
-					seen[e.Dst] = true
-					queue = append(queue, e.Dst)
-				}
-			}
-		}
-		hits := 0
-		for _, m := range nodes {
-			if !seen[m.ID] || m.ID == n.ID {
-				continue
-			}
-			if c := conceptsOf(g, m.ID); c != "" {
-				kind := "·"
-				if !isSource(onto, g, m.ID) {
-					kind = "SINK?"
-				}
-				fmt.Printf("  %-5s reaches %s @ %s {%s}\n", kind, m.ID, m.Prop("loc"), c)
-				hits++
-			}
-		}
-		fmt.Printf("  (%d nodes reachable via FLOWS, %d labelled)\n", len(seen), hits)
-	}
-	return nil
+// nodeCells renders a node as tab-separated fields for a tabwriter, so a column
+// sizes to the longest value present rather than to a width guessed in advance.
+// Node IDs run well past any fixed width, which leaves a hand-tuned format
+// misaligned exactly when a listing mixes short and long ids.
+func nodeCells(g usg.Store, n usg.Node) string {
+	return strings.Join([]string{n.ID, n.Type, n.Prop("loc"), nodeDetail(g, n)}, "\t")
 }
 
+// nodeDetail is the trailing annotation: region, concepts, callee path, value kind.
+func nodeDetail(g usg.Store, n usg.Node) string {
+	var s string
+	if r := n.Prop("region"); r != "" {
+		s += fmt.Sprintf("[%s@%s]  ", r, n.Prop("order"))
+	}
+	if c := conceptsOf(g, n.ID); c != "" {
+		s += "{" + c + "}  "
+	}
+	if p := n.Prop("callee_path"); p != "" {
+		s += "path=" + p + "  "
+	} else if m := n.Prop("method"); m != "" {
+		s += "method=" + m + "  "
+	}
+	if v := n.Prop("vkind"); v != "" {
+		s += "vkind=" + v
+	}
+	return strings.TrimRight(s, " ")
+}
+
+// nodeLine is the fixed-width form, used by the full graph dump. That dump
+// streams: a tabwriter would hold every line to measure the columns, and the
+// dump is unbounded in the size of the scanned tree.
 func nodeLine(g usg.Store, n usg.Node) string {
 	s := fmt.Sprintf("%-8s %-16s %s", n.ID, n.Type, n.Prop("loc"))
 	if r := n.Prop("region"); r != "" {

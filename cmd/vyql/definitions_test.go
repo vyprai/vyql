@@ -68,7 +68,7 @@ func TestDefinitionsShowPolicyJSON(t *testing.T) {
 
 func TestDefinitionsSearch(t *testing.T) {
 	out, err := captureStdout(t, func() error {
-		return cmdDefinitions([]string{"search", "-kind", "concepts", "-max", "5", "SqlParameterization"})
+		return cmdDefinitions([]string{"search", "-kind", "concepts", "-limit", "5", "SqlParameterization"})
 	})
 	if err != nil {
 		t.Fatalf("definitions search: %v", err)
@@ -116,7 +116,7 @@ module core;
 concept HttpInput : source {}
 `)
 	out, err := captureStdout(t, func() error {
-		return cmdDefinitions([]string{"validate", "-in", dir})
+		return cmdDefinitions([]string{"validate", dir})
 	})
 	if err != nil {
 		t.Fatalf("definitions validate: %v", err)
@@ -128,7 +128,7 @@ concept HttpInput : source {}
 
 func TestDefinitionsInspectV2(t *testing.T) {
 	out, err := captureStdout(t, func() error {
-		return cmdDefinitions([]string{"-kind", "concepts", "-query", "SqlParameterization", "-max", "5"})
+		return cmdDefinitions([]string{"-kind", "concepts", "-query", "SqlParameterization", "-limit", "5"})
 	})
 	if err != nil {
 		t.Fatalf("definitions inspect: %v", err)

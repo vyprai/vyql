@@ -6,6 +6,7 @@ package frontend
 import (
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/vyprai/vyql/internal/bindings"
 	cfgfront "github.com/vyprai/vyql/internal/extract/frontend/config"
@@ -32,40 +33,47 @@ type Language struct {
 	Bindings func() []bindings.Applicator
 }
 
-var languages = []Language{
-	{"go", map[string]bool{".go": true}, golang.Extract, bindings.GoBindings},
-	{"python", map[string]bool{".py": true}, treesitter.ExtractPython, bindings.PythonBindings},
-	{"javascript", map[string]bool{".js": true, ".jsx": true, ".ts": true, ".tsx": true, ".mjs": true, ".cjs": true, ".vue": true, ".html": true, ".htm": true},
-		treesitter.ExtractJavaScript, bindings.JsBindings},
-	{"ruby", map[string]bool{".rb": true, ".erb": true}, treesitter.ExtractRuby, bindings.RubyBindings},
-	{"java", map[string]bool{".java": true}, treesitter.ExtractJava, bindings.JavaBindings},
-	{"php", map[string]bool{".php": true, ".phtml": true, ".inc": true, ".module": true, ".install": true, ".profile": true, ".theme": true, ".engine": true, ".test": true}, treesitter.ExtractPHP, bindings.PHPBindings},
-	{"csharp", map[string]bool{".cs": true}, treesitter.ExtractCSharp, bindings.CSharpBindings},
-	{"c", map[string]bool{".c": true, ".h": true, ".xs": true}, treesitter.ExtractC, bindings.CBindings},
-	{"cpp", map[string]bool{".cpp": true, ".cc": true, ".cxx": true, ".c++": true, ".hpp": true}, treesitter.ExtractCPP, bindings.CPPBindings},
-	{"rust", map[string]bool{".rs": true}, treesitter.ExtractRust, bindings.RustBindings},
-	{"bash", map[string]bool{".sh": true, ".bash": true}, treesitter.ExtractBash, bindings.BashBindings},
-	{"scala", map[string]bool{".scala": true, ".sc": true}, treesitter.ExtractScala, bindings.ScalaBindings},
-	{"lua", map[string]bool{".lua": true}, treesitter.ExtractLua, bindings.LuaBindings},
-	{"kotlin", map[string]bool{".kt": true, ".kts": true}, treesitter.ExtractKotlin, bindings.KotlinBindings},
-	{"powershell", map[string]bool{".ps1": true, ".psm1": true}, treesitter.ExtractPowerShell, bindings.PowerShellBindings},
-	{"swift", map[string]bool{".swift": true}, treesitter.ExtractSwift, bindings.SwiftBindings},
-	{"perl", map[string]bool{".pl": true, ".pm": true, ".cgi": true}, treesitter.ExtractPerl, bindings.PerlBindings},
-	{"solidity", map[string]bool{".sol": true}, treesitter.ExtractSolidity, bindings.SolidityBindings},
-	{"objc", map[string]bool{".m": true}, treesitter.ExtractObjC, bindings.ObjCBindings},
-	{"elixir", map[string]bool{".ex": true, ".exs": true}, treesitter.ExtractElixir, bindings.ElixirBindings},
-	{"dart", map[string]bool{".dart": true}, treesitter.ExtractDart, bindings.DartBindings},
-	{"groovy", map[string]bool{".groovy": true, ".gradle": true}, treesitter.ExtractGroovy, bindings.GroovyBindings},
-	// config / IaC files (AndroidManifest.xml, Info.plist, Dockerfile, K8s YAML, Terraform,
-	// Python setup.cfg, JSP/Jelly templates) — a non-tree-sitter frontend; non-matching files
-	// yield no nodes so other repos are unaffected. "dockerfile" matches by basename.
-	{"config", map[string]bool{".xml": true, ".plist": true, ".yaml": true, ".yml": true,
-		".tf": true, ".cfg": true, ".json": true, ".jelly": true, ".jsp": true, ".tag": true, ".jst": true, ".def": true, ".svelte": true, ".html": true, ".erb": true, ".pest": true, ".sch": true, ".php": true, "dockerfile": true}, cfgfront.Extract, bindings.ConfigBindings},
-	{"textpattern", textpattern.Extensions(), textpattern.Extract, bindings.TextPatternBindings},
-}
+// languages is built on first use rather than at package initialization, because
+// the textpattern entry derives its extensions from the vyql/ data directory.
+// Reading that during init puts it before main, where a missing data directory
+// escapes as a goroutine dump instead of the diagnostic the CLI is written to
+// print -- and before any flag that says where the directory is has been parsed.
+var languages = sync.OnceValue(func() []Language {
+	return []Language{
+		{"go", map[string]bool{".go": true}, golang.Extract, bindings.GoBindings},
+		{"python", map[string]bool{".py": true}, treesitter.ExtractPython, bindings.PythonBindings},
+		{"javascript", map[string]bool{".js": true, ".jsx": true, ".ts": true, ".tsx": true, ".mjs": true, ".cjs": true, ".vue": true, ".html": true, ".htm": true},
+			treesitter.ExtractJavaScript, bindings.JsBindings},
+		{"ruby", map[string]bool{".rb": true, ".erb": true}, treesitter.ExtractRuby, bindings.RubyBindings},
+		{"java", map[string]bool{".java": true}, treesitter.ExtractJava, bindings.JavaBindings},
+		{"php", map[string]bool{".php": true, ".phtml": true, ".inc": true, ".module": true, ".install": true, ".profile": true, ".theme": true, ".engine": true, ".test": true}, treesitter.ExtractPHP, bindings.PHPBindings},
+		{"csharp", map[string]bool{".cs": true}, treesitter.ExtractCSharp, bindings.CSharpBindings},
+		{"c", map[string]bool{".c": true, ".h": true, ".xs": true}, treesitter.ExtractC, bindings.CBindings},
+		{"cpp", map[string]bool{".cpp": true, ".cc": true, ".cxx": true, ".c++": true, ".hpp": true}, treesitter.ExtractCPP, bindings.CPPBindings},
+		{"rust", map[string]bool{".rs": true}, treesitter.ExtractRust, bindings.RustBindings},
+		{"bash", map[string]bool{".sh": true, ".bash": true}, treesitter.ExtractBash, bindings.BashBindings},
+		{"scala", map[string]bool{".scala": true, ".sc": true}, treesitter.ExtractScala, bindings.ScalaBindings},
+		{"lua", map[string]bool{".lua": true}, treesitter.ExtractLua, bindings.LuaBindings},
+		{"kotlin", map[string]bool{".kt": true, ".kts": true}, treesitter.ExtractKotlin, bindings.KotlinBindings},
+		{"powershell", map[string]bool{".ps1": true, ".psm1": true}, treesitter.ExtractPowerShell, bindings.PowerShellBindings},
+		{"swift", map[string]bool{".swift": true}, treesitter.ExtractSwift, bindings.SwiftBindings},
+		{"perl", map[string]bool{".pl": true, ".pm": true, ".cgi": true}, treesitter.ExtractPerl, bindings.PerlBindings},
+		{"solidity", map[string]bool{".sol": true}, treesitter.ExtractSolidity, bindings.SolidityBindings},
+		{"objc", map[string]bool{".m": true}, treesitter.ExtractObjC, bindings.ObjCBindings},
+		{"elixir", map[string]bool{".ex": true, ".exs": true}, treesitter.ExtractElixir, bindings.ElixirBindings},
+		{"dart", map[string]bool{".dart": true}, treesitter.ExtractDart, bindings.DartBindings},
+		{"groovy", map[string]bool{".groovy": true, ".gradle": true}, treesitter.ExtractGroovy, bindings.GroovyBindings},
+		// config / IaC files (AndroidManifest.xml, Info.plist, Dockerfile, K8s YAML, Terraform,
+		// Python setup.cfg, JSP/Jelly templates) — a non-tree-sitter frontend; non-matching files
+		// yield no nodes so other repos are unaffected. "dockerfile" matches by basename.
+		{"config", map[string]bool{".xml": true, ".plist": true, ".yaml": true, ".yml": true,
+			".tf": true, ".cfg": true, ".json": true, ".jelly": true, ".jsp": true, ".tag": true, ".jst": true, ".def": true, ".svelte": true, ".html": true, ".erb": true, ".pest": true, ".sch": true, ".php": true, "dockerfile": true}, cfgfront.Extract, bindings.ConfigBindings},
+		{"textpattern", textpattern.Extensions(), textpattern.Extract, bindings.TextPatternBindings},
+	}
+})
 
 // Languages returns the registry in extraction order.
-func Languages() []Language { return languages }
+func Languages() []Language { return languages() }
 
 // EntryClass records the content-derived facts an extension alone cannot settle: whether a `.h` is
 // C++ rather than C, and whether an extension-less file is a Python script.

@@ -256,7 +256,6 @@ func TestBaselineWriteDoesNotGateOnWhatItRecorded(t *testing.T) {
 			BaselineWrite: p,
 			FailOnRank:    rank,
 			FailOnName:    "info",
-			ExitCode:      1,
 		})
 	})
 	if err != nil {
@@ -513,7 +512,6 @@ func TestBaselineRollForwardReportsAndGatesOnWhatIsNew(t *testing.T) {
 			BaselineWrite: next,
 			FailOnRank:    rank,
 			FailOnName:    "info",
-			ExitCode:      1,
 		})
 	})
 	if err != nil {
@@ -557,11 +555,9 @@ func TestBaselineRollForwardGatesWhenTheAppliedBaselineIsEmpty(t *testing.T) {
 			BaselineWrite: filepath.Join(tmp, "next.json"),
 			FailOnRank:    rank,
 			FailOnName:    "info",
-			ExitCode:      1,
 		})
 	})
-	var met *thresholdMet
-	if !errors.As(err, &met) {
+	if _, ok := errors.AsType[*checkFailed](err); !ok {
 		t.Fatalf("an empty applied baseline disabled the gate; err = %v", err)
 	}
 }
@@ -580,7 +576,6 @@ func TestBaselineAdoptionRecordsFindingsThatMeetTheGate(t *testing.T) {
 			BaselineWrite: p,
 			FailOnRank:    rank,
 			FailOnName:    "info",
-			ExitCode:      1,
 		})
 	})
 	if err != nil {

@@ -14,6 +14,9 @@ import (
 
 // Finding renders a human-readable proof tree.
 //
+// One nesting level, indented two spaces. Every command indents two spaces per
+// level, so the same depth reads as the same depth wherever it is printed.
+//
 // The fingerprint is a parameter rather than something this type computes. Finding identity is
 // policy -- which fields make two results "the same problem" is declared in vyql/policies as
 // `policy resultIdentity default` and owned by internal/resultpolicy. A second implementation
@@ -30,16 +33,16 @@ func Finding(f *findings.Finding, fp string) string {
 		if bd.LabelProvenance != "" {
 			prov = "  <- " + bd.LabelProvenance
 		}
-		fmt.Fprintf(&b, "    %s: %s @ %s%s\n", bd.Name, bd.Concept, bd.Loc, prov)
+		fmt.Fprintf(&b, "  %s: %s @ %s%s\n", bd.Name, bd.Concept, bd.Loc, prov)
 	}
 	switch f.WitnessKind {
 	case "taint":
 		if len(f.Witness) > 0 {
-			fmt.Fprintf(&b, "    taint path: %s\n", strings.Join(f.Witness, " -> "))
+			fmt.Fprintf(&b, "  taint path: %s\n", strings.Join(f.Witness, " -> "))
 		}
 	case "reach", "grant":
 		for _, w := range f.Witness {
-			fmt.Fprintf(&b, "    %s: %s\n", f.WitnessKind, w)
+			fmt.Fprintf(&b, "  %s: %s\n", f.WitnessKind, w)
 		}
 	}
 	for _, ne := range f.NegationEvidence {
@@ -47,17 +50,17 @@ func Finding(f *findings.Finding, fp string) string {
 		if ne.Satisfied {
 			mark = "satisfied (suppressed)"
 		}
-		fmt.Fprintf(&b, "    unless %s: %s", ne.Clause, mark)
+		fmt.Fprintf(&b, "  unless %s: %s", ne.Clause, mark)
 		if ne.Detail != "" {
 			fmt.Fprintf(&b, " — %s", ne.Detail)
 		}
 		b.WriteString("\n")
 	}
 	for _, c := range f.Context {
-		fmt.Fprintf(&b, "    context: %s\n", c)
+		fmt.Fprintf(&b, "  context: %s\n", c)
 	}
 	for _, ec := range f.ReviewConditions {
-		fmt.Fprintf(&b, "    review condition: %s", ec.Condition)
+		fmt.Fprintf(&b, "  review condition: %s", ec.Condition)
 		if ec.Category != "" {
 			fmt.Fprintf(&b, " [%s]", ec.Category)
 		}

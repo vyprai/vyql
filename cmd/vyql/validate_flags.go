@@ -85,11 +85,12 @@ func validateConceptFilter(onto *ontology.Ontology, flagName, sub string) error 
 		}
 		names = append(names, qualified)
 	}
-	msg := fmt.Sprintf("-%s %q matches no concept", flagName, sub)
+	hints := []string{}
 	if s := suggest(names, sub); len(s) > 0 {
-		msg += "\n  did you mean: " + strings.Join(s, ", ") + "?"
+		hints = append(hints, "did you mean: "+strings.Join(s, ", ")+"?")
 	}
-	return fmt.Errorf("%s\n  list them with: vyql definitions -kind concepts", msg)
+	hints = append(hints, "list them with: vyql definitions -kind concepts")
+	return usageWith(fmt.Sprintf("-%s %q matches no concept", flagName, sub), hints...)
 }
 
 // definitionKinds is the set -kind accepts. Anything outside it selects nothing,
@@ -107,9 +108,10 @@ func validateDefinitionKind(kind string) error {
 			return nil
 		}
 	}
-	msg := fmt.Sprintf("unknown -kind %q", kind)
+	hints := []string{}
 	if s := suggest(definitionKinds, k); len(s) > 0 {
-		msg += "\n  did you mean: " + strings.Join(s, ", ") + "?"
+		hints = append(hints, "did you mean: "+strings.Join(s, ", ")+"?")
 	}
-	return fmt.Errorf("%s\n  valid kinds: %s", msg, strings.Join(definitionKinds, " | "))
+	hints = append(hints, "valid kinds: "+strings.Join(definitionKinds, " | "))
+	return usageWith(fmt.Sprintf("unknown -kind %q", kind), hints...)
 }

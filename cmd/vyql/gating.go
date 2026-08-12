@@ -13,6 +13,36 @@ import (
 // than not gating at all.
 var severityOrder = []string{"info", "low", "medium", "high", "critical"}
 
+// baselineFailOn is the threshold a run gates on when it applies a baseline and
+// -fail-on was not given.
+//
+// A baseline changes the question. Without one the scan asks "is anything in this
+// code wrong", and a severity floor is how a team declines to fix the long tail.
+// With one it asks "did this change add anything", and every addition counts: a
+// new medium is a regression this branch introduced, not part of the backlog
+// somebody already accepted.
+//
+// Keeping the plain default there passes the build on exactly those findings,
+// while the report above it lists them. An explicit -fail-on still wins, so a
+// pipeline that wants only new criticals asks for that.
+const baselineFailOn = "info"
+
+// gateForBaseline resolves the threshold for a run that applies a baseline. It is
+// the caller's rank unless -fail-on was left unset.
+//
+// The change is announced rather than left to be inferred: adding -baseline
+// makes the gate stricter, and a threshold nobody chose should say so and say
+// how to choose another.
+func gateForBaseline(rank int, name string, explicit bool) (int, string) {
+	if explicit {
+		return rank, name
+	}
+	warnf("baseline applied; gating on any new finding\n"+
+		"         pass -fail-on %s to keep the usual threshold, or -fail-on none to report only",
+		defaultFailOn)
+	return severityRank(baselineFailOn), baselineFailOn
+}
+
 // defaultFailOn is the threshold a plain `vyql scan` gates on. Dropping the
 // scanner into a pipeline should gate that pipeline without further
 // configuration; `-fail-on none` opts back out.
@@ -40,7 +70,8 @@ func parseFailOn(v string) (int, error) {
 	if r := severityRank(v); r > 0 {
 		return r, nil
 	}
-	return 0, fmt.Errorf("unknown -fail-on %q; use none | %s", v, strings.Join(severityOrder, " | "))
+	return 0, usageWith(fmt.Sprintf("unknown -fail-on %q", v),
+		"valid: none | "+strings.Join(severityOrder, " | "))
 }
 
 // gateFindings reports how many findings sit at or above the threshold, and the
@@ -62,16 +93,10 @@ func gateFindings(all []*findings.Finding, minRank int) (count int, highest stri
 	return count, highest
 }
 
-// thresholdMet reports a successful scan whose findings met -fail-on. It is not
-// a failure of the tool, so main prints it without the diagnostic prefix it
-// gives real errors, and exits with the status -exit-code asked for.
-type thresholdMet struct {
-	code    int
-	count   int
-	highest string
-	failOn  string
-}
-
-func (e *thresholdMet) Error() string {
-	return fmt.Sprintf("%d finding(s) at or above %s (highest: %s)", e.count, e.failOn, e.highest)
+// thresholdMet reports a successful scan whose findings met -fail-on. It is not a
+// failure of the tool, so it carries no diagnostic prefix and exits 3 -- the code
+// for a check that ran and did not pass, which a pipeline can tell apart from the
+// scanner having been unable to run.
+func thresholdMet(count int, failOn, highest string) error {
+	return checkFailedf("%d finding(s) at or above %s (highest: %s)", count, failOn, highest)
 }

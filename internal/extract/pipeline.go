@@ -23,8 +23,9 @@ type Options struct {
 	BindingConcepts map[string]bool
 	// BindingOverlay is a directory of extra binding data layered over the built-in set.
 	BindingOverlay string
-	// Excludes are path segments dropped before extraction.
-	Excludes []string
+	// Excludes are the compiled -exclude patterns. A directory pattern prunes the
+	// walk; a file glob drops entries as they are listed.
+	Excludes Excludes
 	// Sync, when non-nil, collects a graph-database change-feed during the build.
 	Sync *graphsync.Collector
 }

@@ -75,8 +75,38 @@ type Entry struct {
 // dirs skipped), each tagged with its lowercased extension and basename. Callers with
 // many language filters bucket from this single result instead of walking the tree once
 // per language -- on a large tree the redundant walks dominated extraction.
-func ListAllFiles(root string) []Entry {
+func ListAllFiles(root string) []Entry { return ListAllFilesPruned(root, nil) }
+
+// Pruner decides what the walk skips. It is an interface rather than the
+// exclusion type itself because that type lives in the parent package, which
+// imports this one.
+type Pruner interface {
+	// SkipDir reports whether a directory of this name should not be descended.
+	SkipDir(name string) bool
+	// Match reports whether a file is excluded, given the walk root.
+	Match(root, path string) bool
+}
+
+// ListAllFilesPruned walks a tree once, skipping what the pruner excludes.
+//
+// An excluded directory is not descended, so its files are neither listed nor
+// stat'd. Filtering the finished entry list instead still pays the walk over
+// every excluded tree, which is the cost -exclude is usually reached for.
+// Returns the entries kept and how many files the pruner dropped.
+func ListAllFilesPruned(root string, p Pruner) []Entry {
+	entries, _ := listAllFiles(root, p)
+	return entries
+}
+
+// ListAllFilesCounted is ListAllFilesPruned with the number of excluded files,
+// which the coverage report names.
+func ListAllFilesCounted(root string, p Pruner) ([]Entry, int) {
+	return listAllFiles(root, p)
+}
+
+func listAllFiles(root string, p Pruner) ([]Entry, int) {
 	var out []Entry
+	excluded := 0
 	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -85,15 +115,22 @@ func ListAllFiles(root string) []Entry {
 			if shouldSkipDir(root, path, d.Name()) {
 				return filepath.SkipDir
 			}
+			if p != nil && p.SkipDir(d.Name()) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if shouldSkipFile(root, path, d) {
 			return nil
 		}
+		if p != nil && p.Match(root, path) {
+			excluded++
+			return nil
+		}
 		out = append(out, Entry{Path: path, Ext: strings.ToLower(filepath.Ext(path)), Base: strings.ToLower(filepath.Base(path))})
 		return nil
 	})
-	return out
+	return out, excluded
 }
 
 // FilterEntries returns the paths from entries whose extension or basename is in exts.

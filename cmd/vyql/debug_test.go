@@ -49,7 +49,7 @@ binding bad {
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	err := cmdValidateBinding([]string{"-file", path})
+	err := cmdValidateBinding([]string{path})
 	if err == nil || !strings.Contains(err.Error(), "unknown concept custom.MissingSink") {
 		t.Fatalf("cmdValidateBinding error = %v, want corpus validation", err)
 	}
@@ -94,7 +94,7 @@ binding presenceIssue {
 		t.Fatal(err)
 	}
 	out, err := captureStdout(t, func() error {
-		return cmdValidateBinding([]string{"-file", path})
+		return cmdValidateBinding([]string{path})
 	})
 	if err != nil {
 		t.Fatalf("cmdValidateBinding: %v", err)
