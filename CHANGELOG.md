@@ -10,6 +10,8 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-12
+
 ### Changed
 
 - **Exit codes are one contract across every command.** `0` the command run successfully,
