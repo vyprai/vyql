@@ -244,13 +244,23 @@
     {
       "date": "2026-08-12",
       "releases": {
+        "v0.3.0": {
+          "vyql_v0.3.0_darwin_amd64.tar.gz": 0,
+          "vyql_v0.3.0_darwin_amd64.tar.gz.sha256": 1,
+          "vyql_v0.3.0_darwin_arm64.tar.gz": 6,
+          "vyql_v0.3.0_darwin_arm64.tar.gz.sha256": 7,
+          "vyql_v0.3.0_linux_amd64.tar.gz": 11,
+          "vyql_v0.3.0_linux_amd64.tar.gz.sha256": 12,
+          "vyql_v0.3.0_linux_arm64.tar.gz": 1,
+          "vyql_v0.3.0_linux_arm64.tar.gz.sha256": 2
+        },
         "v0.2.5": {
           "vyql_v0.2.5_darwin_amd64.tar.gz": 1,
           "vyql_v0.2.5_darwin_amd64.tar.gz.sha256": 2,
-          "vyql_v0.2.5_darwin_arm64.tar.gz": 9,
-          "vyql_v0.2.5_darwin_arm64.tar.gz.sha256": 10,
-          "vyql_v0.2.5_linux_amd64.tar.gz": 15,
-          "vyql_v0.2.5_linux_amd64.tar.gz.sha256": 16,
+          "vyql_v0.2.5_darwin_arm64.tar.gz": 10,
+          "vyql_v0.2.5_darwin_arm64.tar.gz.sha256": 11,
+          "vyql_v0.2.5_linux_amd64.tar.gz": 18,
+          "vyql_v0.2.5_linux_amd64.tar.gz.sha256": 19,
           "vyql_v0.2.5_linux_arm64.tar.gz": 1,
           "vyql_v0.2.5_linux_arm64.tar.gz.sha256": 2
         },
