@@ -151,10 +151,7 @@ func TestCollectReviewItemsUsesDisplayPolicyNearbyCheckLimit(t *testing.T) {
 		}
 	}
 	if target == nil {
-		// The return is redundant after Fatalf and is there for the analyzer: without
-		// it, the dereference below reads as a possible nil dereference.
 		t.Fatalf("missing target review item: %+v", got)
-		return
 	}
 	if len(target.NearbyChecks) != 2 {
 		t.Fatalf("nearby checks = %d, want 2: %+v", len(target.NearbyChecks), target.NearbyChecks)
