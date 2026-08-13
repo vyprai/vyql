@@ -62,32 +62,56 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 		var ne []findings.NegationEvidence
 		for _, g := range guards {
 			ok := e.endpointGuarded(node, g)
-			ne = append(ne, findings.NegationEvidence{Clause: "endpoint coveredBy " + g, Satisfied: ok})
+			detail := ""
+			if !ok {
+				detail = e.explainUnsatisfiedControl(node, body.Concept, g)
+			}
+			ne = append(ne, findings.NegationEvidence{Clause: "endpoint coveredBy " + g, Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
 		}
 		for _, g := range dominanceGuards {
 			ok := e.dominatesGuarded(node, g)
-			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("dominates", g), Satisfied: ok})
+			detail := ""
+			if !ok {
+				detail = e.explainUnsatisfiedControl(node, body.Concept, g)
+			}
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("dominates", g), Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
 		}
 		for _, g := range postDominanceGuards {
 			ok := e.postDominatesCovered(node, g)
-			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("postDominates", g), Satisfied: ok})
+			detail := ""
+			if !ok {
+				detail = e.explainUnsatisfiedControl(node, body.Concept, g)
+			}
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("postDominates", g), Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
 		}
 		for _, g := range sameReceiverGuards {
 			ok := e.sameReceiverGuarded(node, g)
-			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("sameReceiver", g), Satisfied: ok})
+			detail := ""
+			if !ok {
+				detail = e.explainUnsatisfiedControl(node, body.Concept, g)
+			}
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("sameReceiver", g), Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
 		}
 		for _, g := range sameScopeGuards {
 			ok := e.sameScopeGuarded(node, g)
-			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("sameScope", g), Satisfied: ok})
+			detail := ""
+			if !ok {
+				detail = e.explainUnsatisfiedControl(node, body.Concept, g)
+			}
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("sameScope", g), Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
 		}
 		for _, g := range globalGuards {
 			ok := e.globalGuarded(g)
-			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("global", g), Satisfied: ok})
+			detail := ""
+			if !ok {
+				detail = e.explainUnsatisfiedControl(node, body.Concept, g)
+			}
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("global", g), Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
 		}
 		if suppressed {

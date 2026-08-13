@@ -2,10 +2,12 @@ package engine
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/vyprai/vyql/internal/definitions"
 	"github.com/vyprai/vyql/internal/findings"
 	"github.com/vyprai/vyql/internal/ontology"
 	"github.com/vyprai/vyql/internal/parser"
@@ -689,7 +691,9 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 	bySink := map[string]int{}
 	for _, fl := range flows {
 		var ne []findings.NegationEvidence
+		snkC := e.conceptIn(fl.SinkID, sinkConcepts)
 		if sanitizer != "" {
+			explainMsg := e.explainUnsatisfiedControl(fl.SinkID, snkC, sanitizer)
 			detail := "no neutralizing control dominates the path; "
 			if len(fl.NearMiss) > 0 {
 				var nm []string
@@ -700,6 +704,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			} else {
 				detail += "none found anywhere on flows"
 			}
+			detail += " — " + explainMsg
 			ne = append(ne, findings.NegationEvidence{Clause: "path coveredBy " + sanitizer, Satisfied: false, Detail: detail})
 		}
 		// A character-filter on a still-LIVE path is, by definition, not provably sound
@@ -717,6 +722,8 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			detail := "no guard on sink"
 			if ok {
 				detail = "guard covers sink"
+			} else {
+				detail += " — " + e.explainUnsatisfiedControl(fl.SinkID, snkC, g)
 			}
 			ne = append(ne, findings.NegationEvidence{Clause: "endpoint coveredBy " + g, Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
@@ -726,6 +733,8 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			detail := "no dominating guard on sink"
 			if ok {
 				detail = "guard dominates sink"
+			} else {
+				detail += " — " + e.explainUnsatisfiedControl(fl.SinkID, snkC, g)
 			}
 			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("dominates", g), Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
@@ -735,6 +744,8 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			detail := "no post-dominating check on sink"
 			if ok {
 				detail = "check post-dominates sink"
+			} else {
+				detail += " — " + e.explainUnsatisfiedControl(fl.SinkID, snkC, g)
 			}
 			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("postDominates", g), Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
@@ -744,6 +755,8 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			detail := "no same-receiver guard on sink"
 			if ok {
 				detail = "same-receiver guard covers sink"
+			} else {
+				detail += " — " + e.explainUnsatisfiedControl(fl.SinkID, snkC, g)
 			}
 			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("sameReceiver", g), Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
@@ -753,6 +766,8 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			detail := "no same-scope guard on sink"
 			if ok {
 				detail = "same-scope guard covers sink"
+			} else {
+				detail += " — " + e.explainUnsatisfiedControl(fl.SinkID, snkC, g)
 			}
 			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("sameScope", g), Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
@@ -762,6 +777,8 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			detail := "no global guard"
 			if ok {
 				detail = "global guard exists"
+			} else {
+				detail += " — " + e.explainUnsatisfiedControl(fl.SinkID, snkC, g)
 			}
 			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("global", g), Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
@@ -770,7 +787,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			continue
 		}
 		srcC := e.conceptIn(fl.SourceID, srcConcepts)
-		snkC := e.conceptIn(fl.SinkID, sinkConcepts)
+		snkC = e.conceptIn(fl.SinkID, sinkConcepts)
 		conf := e.confBindings(bindingRef{nodeID: fl.SourceID, concept: srcC}, bindingRef{nodeID: fl.SinkID, concept: snkC})
 		if srcMeta := e.sourceConcept(srcC); srcMeta != nil && srcMeta.SourceCondition != "" {
 			ceil := firstNonEmpty(srcMeta.SourceConfidence, "medium")
@@ -952,6 +969,9 @@ func (e *Engine) pathLocs(path []string) []string {
 
 func (e *Engine) loc(nodeID string) string {
 	if n, ok, _ := e.Store.GetNode(nodeID); ok {
+		if n.Loc != "" {
+			return n.Loc
+		}
 		if l := n.Prop("loc"); l != "" {
 			return l
 		}
@@ -976,6 +996,82 @@ func (e *Engine) nodesWithConcept(concept string) []string {
 	e.nodesByConcept[concept] = ids
 	return ids
 }
+
+func languageFromExt(ext string) string {
+	ext = strings.ToLower(ext)
+	switch ext {
+	case ".go":
+		return "go"
+	case ".py":
+		return "python"
+	case ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".vue":
+		return "javascript"
+	case ".java":
+		return "java"
+	case ".rb", ".erb":
+		return "ruby"
+	case ".php", ".phtml":
+		return "php"
+	case ".cs":
+		return "csharp"
+	case ".c", ".h":
+		return "c"
+	case ".cpp", ".cc", ".cxx", ".hpp":
+		return "cpp"
+	case ".rs":
+		return "rust"
+	case ".sh", ".bash":
+		return "bash"
+	case ".scala", ".sc":
+		return "scala"
+	case ".lua":
+		return "lua"
+	case ".kt", ".kts":
+		return "kotlin"
+	case ".ps1", ".psm1":
+		return "powershell"
+	case ".swift":
+		return "swift"
+	case ".pl", ".pm":
+		return "perl"
+	case ".sol":
+		return "solidity"
+	case ".m":
+		return "objc"
+	case ".ex", ".exs":
+		return "elixir"
+	case ".dart":
+		return "dart"
+	case ".groovy", ".gradle":
+		return "groovy"
+	default:
+		return ""
+	}
+}
+
+func (e *Engine) languageOfNode(nodeID string) string {
+	loc := e.loc(nodeID)
+	if idx := strings.IndexByte(loc, ':'); idx >= 0 {
+		loc = loc[:idx]
+	}
+	if ext := filepath.Ext(loc); ext != "" {
+		if lang := languageFromExt(ext); lang != "" {
+			return lang
+		}
+	}
+	return "go"
+}
+
+func (e *Engine) explainUnsatisfiedControl(nodeID, snkConcept, controlConcept string) string {
+	snkThreat := ""
+	if threats := e.Onto.SinkThreats(snkConcept); len(threats) > 0 {
+		snkThreat = threats[0]
+	}
+	lang := e.languageOfNode(nodeID)
+	class := definitions.ClassifyControlDefault(lang, snkThreat, controlConcept)
+	return class.Message
+}
+
 
 func (e *Engine) conceptsWithInternalConceptRole(role string) map[string]bool {
 	if e == nil || e.Onto == nil || role == "" {

@@ -204,3 +204,44 @@ func missingFrom(a, b []string) []string {
 	}
 	return out
 }
+
+func TestClassifyControlBoundInLanguage(t *testing.T) {
+	cat := sinkAndGuard("go", "go")
+	got := ClassifyControl(cat, "go", "threat.Bad", "core.Guard")
+	if got.Scenario != ScenarioControlBoundInLanguage {
+		t.Fatalf("want bound_in_language, got %+v", got)
+	}
+	if !strings.Contains(got.Message, "user should fix code") {
+		t.Fatalf("unexpected message: %s", got.Message)
+	}
+}
+
+func TestClassifyControlUnboundInLanguage(t *testing.T) {
+	cat := sinkAndGuard("go", "python")
+	got := ClassifyControl(cat, "go", "threat.Bad", "core.Guard")
+	if got.Scenario != ScenarioControlUnboundInLanguage {
+		t.Fatalf("want unbound_in_language, got %+v", got)
+	}
+	if !strings.Contains(got.Message, "no action required") {
+		t.Fatalf("unexpected message: %s", got.Message)
+	}
+}
+
+func TestClassifyControlMissingFromOntology(t *testing.T) {
+	cat := Catalog{
+		Concepts: []ConceptSummary{
+			{Name: "code.Sink", Kind: "sink", VulnerableTo: []string{"threat.NoControl"}},
+		},
+		Bindings: []MappingSummary{
+			{Language: "go", Kind: "sink_method", Concept: "code.Sink"},
+		},
+	}
+	got := ClassifyControl(cat, "go", "threat.NoControl", "")
+	if got.Scenario != ScenarioControlMissingFromOntology {
+		t.Fatalf("want missing_from_ontology, got %+v", got)
+	}
+	if !strings.Contains(got.Message, "no action required") {
+		t.Fatalf("unexpected message: %s", got.Message)
+	}
+}
+
