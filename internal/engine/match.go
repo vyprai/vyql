@@ -2,6 +2,7 @@ package engine
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/vyprai/vyql/internal/findings"
 	"github.com/vyprai/vyql/internal/parser"
@@ -56,6 +57,7 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 			}
 			ctx = witnesses
 		}
+		ctx = append(ctx, e.advisoryContext(node)...)
 		suppressed := false
 		var ne []findings.NegationEvidence
 		for _, g := range guards {
@@ -393,4 +395,37 @@ func (e *Engine) nodeHasConcept(nodeID, concept string) bool {
 		}
 	}
 	return false
+}
+
+// advisoryContext reports what a dependency node matched and why, so a finding
+// about a package names the advisory instead of only the package.
+//
+// The text is written where the advisory data is read; the engine only carries it
+// through, so the wording stays with the layer that knows which bound applied.
+func (e *Engine) advisoryContext(nodeID string) []string {
+	n, ok, err := e.Store.GetNode(nodeID)
+	if err != nil || !ok {
+		return nil
+	}
+	raw := n.Prop("str_args")
+	if raw == "" {
+		return nil
+	}
+	var id, reason string
+	for _, tok := range strings.Split(raw, "\x00") {
+		switch {
+		case strings.HasPrefix(tok, "advisory_reason="):
+			reason = strings.TrimPrefix(tok, "advisory_reason=")
+		case strings.HasPrefix(tok, "advisory="):
+			id = strings.TrimPrefix(tok, "advisory=")
+		}
+	}
+	var out []string
+	if id != "" {
+		out = append(out, "advisory "+id)
+	}
+	if reason != "" {
+		out = append(out, reason)
+	}
+	return out
 }

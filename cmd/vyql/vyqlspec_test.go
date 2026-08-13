@@ -330,6 +330,10 @@ func TestVyqlSpecs(t *testing.T) {
 								ec.Category, ec.Condition, ec.Evidence, ec.Assumption, ec.Confidence,
 							}, " "))
 						}
+						// Context carries what a finding reports beyond its bindings --
+						// the advisory a dependency matched, and why. A spec has to be
+						// able to assert on it, or that text can go missing unnoticed.
+						evidence[fnd.RuleID] = append(evidence[fnd.RuleID], fnd.Context...)
 					}
 					if len(s.expectReview) > 0 || len(s.rejectReview) > 0 {
 						for _, row := range review.Collect(scanGraph) {
