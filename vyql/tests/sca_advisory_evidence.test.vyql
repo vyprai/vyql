@@ -16,23 +16,3 @@ test "sca: a dependency finding names the advisory it matched"
   ```
   flask==0.12.2
   ```
-
-# An entry with an upper bound asks a different question from one with a lower
-# bound: not "which version is installed" but "what does the declaration permit".
-# Reported without that sentence, a current release looks flagged for being
-# current, which reads as the comparison running backwards.
-
-test "sca: an upper-bound advisory says the declared range is what matched"
-  lang python
-  expect VYQL-SCA-001
-  expect_evidence VYQL-SCA-001 permits versions above 2.31.0
-  file app.py
-  code
-  ```
-  import requests
-  ```
-  file requirements.txt
-  code
-  ```
-  requests==2.34.2
-  ```

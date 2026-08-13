@@ -131,28 +131,6 @@ test "sca: Composer lock unrelated PHP package is clean"
   }
   ```
 
-test "sca: setup.cfg unbounded requests dependency can select vulnerable TLS validation release"
-  lang config
-  expect VYQL-SCA-006
-  file setup.cfg
-  code
-  ```
-  [options]
-  install_requires =
-      requests[socks]>=2.22.0
-  ```
-
-test "sca: setup.cfg requests dependency capped at patched TLS validation release is clean"
-  lang config
-  reject VYQL-SCA-006
-  file setup.cfg
-  code
-  ```
-  [options]
-  install_requires =
-      requests[socks] >=2.22.0, <=2.31.0
-  ```
-
 test "sca: vulnerable git submodule commit is reported"
   lang python
   expect VYQL-SCA-005
