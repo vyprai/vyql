@@ -41,7 +41,11 @@ LEVEL_SEV = {"error": "high", "warning": "medium", "note": "low"}
 
 def scan(repo_path):
     env = dict(os.environ, VYQL_HOME=VYQL_HOME)
-    p = subprocess.run([VYQL, "scan", "--format", "sarif", repo_path],
+    # -fail-on none because this is a scorer, not a gate: every repo here is meant
+    # to have findings, and the default threshold exits 3 on them. Without it the
+    # exit code reports the corpus rather than whether vyql ran, and every repo is
+    # discarded as a failed scan.
+    p = subprocess.run([VYQL, "scan", "--format", "sarif", "-fail-on", "none", repo_path],
                        capture_output=True, text=True, env=env, timeout=1800)
     if p.returncode not in (0, 1) or not p.stdout.strip():
         return None
