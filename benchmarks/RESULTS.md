@@ -4,7 +4,7 @@ What VyQL currently scores on `main`, and on which corpus. Every number here cam
 out of `TestOWASPBenchmark`. Older figures live in git history rather than on this
 page, so you never have to read past a stale number to find the current one.
 
-Machine: MBP M3 Pro, 11 cores, 18 GB. Last updated 2026-08-06.
+Machine: MBP M3 Pro, 11 cores, 18 GB. Last updated 2026-08-13.
 
 > **Check the corpus column before comparing anything.** Scores from our synthetic
 > ports get mistaken for scores from the public OWASP suites more than any other
@@ -70,7 +70,9 @@ VYQL_BENCH=1 BENCH_DIR=/tmp/bench/ports/owasp-js   go test -count=1 -v ./cmd/vyq
 
 ### 3.1 Full corpora
 
-Every fetched corpus, measured 2026-08-06 on `main` (`54cd1809a`) in one sweep:
+Every fetched corpus, measured 2026-08-13 on `fe529827d` in one sweep. Every
+figure below, including the per-category tables in 3.1.1 and 3.1.2, reproduced
+unchanged against the 2026-08-06 sweep:
 
 | Corpus | Youden macro |
 |---|---|
@@ -131,10 +133,18 @@ fires on them either way; that work is covered by
 
 ### 3.2 Runtime
 
-| Corpus | Time |
-|---|---|
-| Python subset (112 files) | 3.1 s |
-| Full BenchmarkPython (1,230) | 17 s |
+Wall time of `TestOWASPBenchmark` itself, excluding the Go build:
+
+| Corpus | Cases | Time |
+|---|---|---|
+| BenchmarkJava | 2,740 | 2.0 s |
+| BenchmarkPython | 1,230 | 2.9 s |
+| owasp-js | 2,740 | 1.3 s |
+| owasp-go | 2,740 | 0.6 s |
+
+The stratified subsets described in the appendix are not kept in
+`~/workspace/vypr/benchmark-corpora`, so they are not timed here. Time the full
+corpora instead: they are fast enough that a subset saves nothing.
 
 ## 4. Known corpus defects
 
