@@ -10,6 +10,58 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-13
+
+### Fixed
+
+- **`-data` selects the data directory.** It parsed and set `$VYQL_HOME`, but
+  every command that also takes `-profile` had already resolved the directory by
+  then: naming the available profiles means loading them, and that happens while
+  the flags are being registered. `scan`, `trace`, `explain`, `match`, `resolve`,
+  `query` and `graph` were all affected, so pointing any of them at a different
+  `vyql/` had no effect. `$VYQL_HOME` was the only way to select one.
+- **`-h` works with no data directory.** The same ordering made a command fail
+  before it read `-data`, which is the flag that says where the data is. Asking
+  a fresh install how to run it now answers.
+- **Each `definitions` subcommand takes `-data`.** `search`, `refs`,
+  `show-policy`, `show-mechanic`, `validate`, `validate-binding` and `explain`
+  all read the data directory and all rejected the flag as unknown.
+- **`definitions` fails on a data directory holding nothing.** It reported
+  `concepts=0 rules=0 bindings=0 reviews=0` and exited 0, which is the shape of a
+  successful load of an empty knowledge base. A scan against the same directory
+  finds nothing and passes its gate.
+- **`-flag-category` rejects a category no review declares.** A mistyped
+  category reported no flags and exited 0, which reads as a clean result.
+  `-flag-kind` beside it has always rejected unknown values.
+- **`vyql diff -h` exits 0** and prints on stdout, like every other command. It
+  read its arguments directly, so `-h` was treated as a filename.
+
+### Changed
+
+- **Go decoding into a typed struct is no longer unsafe deserialization.**
+  `json.Unmarshal` and `yaml.Unmarshal` are not sinks for `code.Deserialization`.
+  CWE-502 describes decoding that can instantiate attacker-chosen types or run
+  code while decoding; Go decodes into a caller-declared type, so no input makes
+  it that. **`VYQL-DESER-001` will report far less on Go.**
+- **Go recognises safe deserialization.** Nothing in the language emitted
+  `core.SafeDeserialization`, so the `unless` clause of `VYQL-DESER-001` could
+  not be satisfied by any code a user writes, and the remaining package sinks
+  were unclearable rather than merely noisy.
+- **A websocket connection is no longer attacker-controlled input.** The source
+  is `ReadMessage`, `ReadJSON` and `NextReader` rather than `Upgrade`. Labelling
+  the handle spread the label to every value derived from the connection.
+- **A dependency finding names its advisory and why it matched.** It reported
+  the package alone, so three different questions — is this release named, is the
+  pin below the first fixed version, does the declared range permit versions
+  nobody vetted — all read the same.
+
+### Removed
+
+- **The `requests` advisory describing HTTPie's pin.** It recorded that HTTPie
+  had to cap requests at 2.31.0, but was filed under `requests`, so it fired on
+  any project permitting a later release. No advisory of ours now covers
+  `requests`.
+
 ## [0.3.0] - 2026-08-12
 
 ### Changed
