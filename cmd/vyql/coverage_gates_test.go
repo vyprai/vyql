@@ -1418,7 +1418,7 @@ func readCVELedgerDigest(t *testing.T) map[int]cveDigestRow {
 			t.Fatalf("%s:%d: rank %d appears more than once (first %s)", path, i+1, rank, prev.cve)
 		}
 		switch fields[2] {
-		case "CAUGHT", "FIXED", "ATTENTION", "SKIP":
+		case "CAUGHT", "FIXED", "ATTENTION", "SKIP", "PENDING":
 		default:
 			t.Fatalf("%s:%d: rank %d has unknown status %q", path, i+1, rank, fields[2])
 		}
@@ -1435,16 +1435,43 @@ func readCVELedgerDigest(t *testing.T) map[int]cveDigestRow {
 // recorded that the rank now rests on the ledger alone.
 func TestCVELedgerCoverageGate(t *testing.T) {
 	digest := readCVELedgerDigest(t)
-	if len(digest) != 1000 {
-		t.Fatalf("CVE ledger digest rows = %d, want 1000", len(digest))
+	if len(digest) < 1000 {
+		t.Fatalf("CVE ledger digest rows = %d, want at least 1000", len(digest))
 	}
 	statuses := map[string]int{}
 	for _, row := range digest {
 		statuses[row.status]++
 	}
-	wantStatuses := map[string]int{"ATTENTION": 110, "CAUGHT": 107, "FIXED": 781, "SKIP": 2}
-	if !intMapsEqual(statuses, wantStatuses) {
-		t.Fatalf("CVE ledger digest statuses = %v, want %v", statuses, wantStatuses)
+	// Floors, not exact counts. The pool is extended a block at a time and
+	// reviewed a rank at a time, so exact counts cannot hold during a campaign.
+	// A floor still catches a status being lost: a review conclusion may only be
+	// revised into another conclusion, never deleted.
+	minStatuses := map[string]int{"ATTENTION": 110, "CAUGHT": 107, "FIXED": 781, "SKIP": 2}
+	for status, min := range minStatuses {
+		if statuses[status] < min {
+			t.Fatalf("CVE ledger digest %s = %d, want at least %d (statuses = %v)",
+				status, statuses[status], min, statuses)
+		}
+	}
+
+	// Review runs in rank order. A PENDING rank below a reviewed one was passed
+	// over rather than not yet reached, and would otherwise never be noticed.
+	watermark := -1
+	for rank, row := range digest {
+		if row.status != "PENDING" && rank > watermark {
+			watermark = rank
+		}
+	}
+	var skipped []string
+	for rank, row := range digest {
+		if row.status == "PENDING" && rank < watermark {
+			skipped = append(skipped, strconv.Itoa(rank))
+		}
+	}
+	if len(skipped) > 0 {
+		sort.Strings(skipped)
+		t.Fatalf("CVE ranks below the reviewed watermark %d are still PENDING; review skipped them: %s",
+			watermark, strings.Join(skipped, ", "))
 	}
 
 	cveSpecs := readCVERankSpecFiles(t)
@@ -1476,13 +1503,17 @@ func TestCVELedgerCoverageGate(t *testing.T) {
 		t.Fatalf("CVE runnable rank specs regressed: files=%d unique_ranks=%d, want at least files=786 unique_ranks=780", len(cveSpecs), len(uniqueSpecRanks))
 	}
 
-	var missingRunnable, staleNoSpecExceptions, skipWithSpecs []string
+	var missingRunnable, staleNoSpecExceptions, skipWithSpecs, pendingWithSpecs []string
 	for rank, row := range digest {
 		hasSpec := uniqueSpecRanks[rank]
 		switch {
 		case row.status == "SKIP" && hasSpec:
 			skipWithSpecs = append(skipWithSpecs, strconv.Itoa(rank))
-		case row.status != "SKIP" && !hasSpec && !cve1000AcceptedNoSpecRanks[rank]:
+		// A spec for a rank with no ledger row means the review happened and its
+		// conclusion was never recorded, so the corpus understates the work done.
+		case row.status == "PENDING" && hasSpec:
+			pendingWithSpecs = append(pendingWithSpecs, strconv.Itoa(rank))
+		case row.status != "SKIP" && row.status != "PENDING" && !hasSpec && !cve1000AcceptedNoSpecRanks[rank]:
 			missingRunnable = append(missingRunnable, fmt.Sprintf("%d:%s", rank, row.status))
 		}
 	}
@@ -1492,8 +1523,8 @@ func TestCVELedgerCoverageGate(t *testing.T) {
 			staleNoSpecExceptions = append(staleNoSpecExceptions, fmt.Sprintf("%d:missing-ledger", rank))
 			continue
 		}
-		if row.status == "SKIP" {
-			staleNoSpecExceptions = append(staleNoSpecExceptions, fmt.Sprintf("%d:skip-status", rank))
+		if row.status == "SKIP" || row.status == "PENDING" {
+			staleNoSpecExceptions = append(staleNoSpecExceptions, fmt.Sprintf("%d:%s-status", rank, strings.ToLower(row.status)))
 			continue
 		}
 		if uniqueSpecRanks[rank] {
@@ -1503,6 +1534,10 @@ func TestCVELedgerCoverageGate(t *testing.T) {
 	if len(skipWithSpecs) > 0 {
 		sort.Strings(skipWithSpecs)
 		t.Fatalf("CVE SKIP ranks must not have runnable specs; remove skip or spec: %s", strings.Join(skipWithSpecs, ", "))
+	}
+	if len(pendingWithSpecs) > 0 {
+		sort.Strings(pendingWithSpecs)
+		t.Fatalf("CVE ranks have runnable specs but no ledger row; record the review: %s", strings.Join(pendingWithSpecs, ", "))
 	}
 	if len(missingRunnable) > 0 {
 		sort.Strings(missingRunnable)
@@ -1536,12 +1571,15 @@ func TestCVECorpusMatchesLedgerDigest(t *testing.T) {
 	}
 
 	poolRows := nonemptyTSVRows(string(poolRaw))
-	if len(poolRows) != 1000 {
-		t.Fatalf("cve-1000 pool rows = %d, want 1000", len(poolRows))
+	if len(poolRows) < 1000 {
+		t.Fatalf("cve pool rows = %d, want at least 1000", len(poolRows))
 	}
+	// The pool grows a block at a time and is reviewed a rank at a time, so the
+	// ledger trails it for the length of a campaign. It may never lead: a ledger
+	// row for a rank the pool does not hold is a review of nothing.
 	ledgerRows := nonemptyTSVRows(string(ledgerRaw))
-	if len(ledgerRows) != len(poolRows) {
-		t.Fatalf("cve-1000 ledger rows = %d, want exactly %d pool rows", len(ledgerRows), len(poolRows))
+	if len(ledgerRows) > len(poolRows) {
+		t.Fatalf("cve ledger rows = %d, more than the %d pool rows", len(ledgerRows), len(poolRows))
 	}
 	poolFieldsByRank := make([][]string, len(poolRows))
 	for rank, row := range poolRows {
@@ -1603,24 +1641,41 @@ func TestCVECorpusMatchesLedgerDigest(t *testing.T) {
 				rank, want.cve, want.status, fields[3], fields[4])
 		}
 	}
-	var missing []string
+	// A pool rank with no ledger row is PENDING, and the digest must say so with
+	// the pool's own CVE -- otherwise a spec written for a pending rank could be
+	// checked against the wrong advisory.
+	var wrongPending []string
 	for rank := range poolRows {
-		if _, ok := seen[rank]; !ok {
-			missing = append(missing, strconv.Itoa(rank))
+		if _, reviewed := seen[rank]; reviewed {
+			continue
+		}
+		row, ok := digest[rank]
+		if !ok {
+			wrongPending = append(wrongPending, fmt.Sprintf("%d:absent", rank))
+			continue
+		}
+		if row.status != "PENDING" {
+			wrongPending = append(wrongPending, fmt.Sprintf("%d:%s", rank, row.status))
+			continue
+		}
+		if row.cve != poolFieldsByRank[rank][3] {
+			wrongPending = append(wrongPending, fmt.Sprintf("%d:cve=%s want %s", rank, row.cve, poolFieldsByRank[rank][3]))
 		}
 	}
-	if len(missing) > 0 {
-		t.Fatalf("cve-1000 ledger missing %d pool rank(s): %s", len(missing), strings.Join(missing, ", "))
+	if len(wrongPending) > 0 {
+		sort.Strings(wrongPending)
+		t.Fatalf("unreviewed pool ranks must be PENDING in the digest with the pool's CVE; regenerate cve_ledger_digest.tsv: %s",
+			strings.Join(wrongPending, ", "))
 	}
-	if len(digest) != len(ledgerRows) {
-		t.Fatalf("digest has %d ranks, ledger has %d; regenerate cve_ledger_digest.tsv", len(digest), len(ledgerRows))
+	if len(digest) != len(poolRows) {
+		t.Fatalf("digest has %d ranks, pool has %d; regenerate cve_ledger_digest.tsv", len(digest), len(poolRows))
 	}
 	for rank, cve := range cve1000AcceptedLedgerCVEMetadataOverrides {
 		if !usedCVEOverrides[rank] {
 			t.Fatalf("CVE ledger metadata override rank %d (%s) is stale; remove it or fix the ledger/pool pair", rank, cve)
 		}
 	}
-	t.Logf("cve-1000 corpus: pool=%d ledger_rows=%d digest_ranks=%d", len(poolRows), len(ledgerRows), len(digest))
+	t.Logf("cve corpus: pool=%d ledger_rows=%d digest_ranks=%d", len(poolRows), len(ledgerRows), len(digest))
 }
 
 var cve1000AllowedDuplicateSpecRanks = map[int]bool{
@@ -1654,18 +1709,6 @@ var cve1000AcceptedNoSpecRanks = map[int]bool{
 	// its spec are withdrawn, so the ledger row is all that verifies this rank.
 	406: true,
 	574: true, 588: true,
-}
-
-func intMapsEqual(a, b map[string]int) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for key, av := range a {
-		if b[key] != av {
-			return false
-		}
-	}
-	return true
 }
 
 func nonemptyTSVRows(src string) []string {
