@@ -1,0 +1,105 @@
+# Rank 1029 / CVE-2021-4119: BookStack's user-select search endpoint let any
+# caller harvest account details. It matched the supplied term against the email
+# column with a LIKE wildcard and returned the matching users, and it required no
+# permission at all, so email addresses could be extracted a fragment at a time
+# (CWE-284). The fix e765e61854 gates the endpoint behind signedInUser() plus one
+# of users-manage, restrictions-manage-own or restrictions-manage-all, and drops
+# email from the search so only the name is matched.
+#
+# ATTENTION. Nothing fires on either revision, and neither half of the fix
+# yields a rule.
+#
+# The permission half is the shape this batch has now measured three times and
+# rejected each time: rank 1011 on a Go service at 4.1 per cent package-scoped
+# and 19.5 per cent file-scoped, rank 1027 on a Jenkins plugin where 19 form
+# methods shared one annotation after its own security fix, and rank 1028 on
+# another Jenkins plugin with 46 endpoint methods against 16 files checking any
+# permission. Endpoints legitimately differ in whether they need a guard.
+#
+# The email half looks more promising, since matching a sensitive column with a
+# leading wildcard is what makes harvesting possible, but it is legitimate
+# whenever the caller is trusted. The fix says so itself, in a comment kept on
+# the repository method: the email search "should only be used when user is
+# assumed to be trusted. (Admin users)". So the weakness is not the LIKE query,
+# it is the LIKE query without the trust gate, which collapses back into the
+# permission problem above. The nearest concept does not apply either:
+# code.UserEnumSmell covers an authentication response that varies by account
+# existence, a login oracle rather than a search endpoint.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1029: user search matches the email column for any caller"
+  lang php
+  file app/Http/Controllers/UserSearchController.php
+  reject VYQL-SMELL-ENUM
+  code
+  ```
+  <?php
+
+  namespace BookStack\Http\Controllers;
+
+  use BookStack\Auth\User;
+  use Illuminate\Database\Eloquent\Builder;
+  use Illuminate\Http\Request;
+
+  class UserSearchController extends Controller
+  {
+      public function forSelect(Request $request)
+      {
+          $search = $request->get('search', '');
+          $query = User::query()->orderBy('name', 'desc')->take(20);
+
+          if (!empty($search)) {
+              $query->where(function (Builder $query) use ($search) {
+                  $query->where('email', 'like', '%' . $search . '%')
+                      ->orWhere('name', 'like', '%' . $search . '%');
+              });
+          }
+
+          $users = $query->get();
+
+          return view('form.user-select-list', compact('users'));
+      }
+  }
+  ```
+
+test "rank1029: fix requires a management permission and searches only the name"
+  lang php
+  file app/Http/Controllers/UserSearchController.php
+  reject VYQL-SMELL-ENUM
+  code
+  ```
+  <?php
+
+  namespace BookStack\Http\Controllers;
+
+  use BookStack\Auth\User;
+  use Illuminate\Http\Request;
+
+  class UserSearchController extends Controller
+  {
+      public function forSelect(Request $request)
+      {
+          $hasPermission = signedInUser() && (
+                     userCan('users-manage')
+                  || userCan('restrictions-manage-own')
+                  || userCan('restrictions-manage-all')
+          );
+
+          if (!$hasPermission) {
+              $this->showPermissionError();
+          }
+
+          $search = $request->get('search', '');
+          $query = User::query()->orderBy('name', 'asc')->take(20);
+
+          if (!empty($search)) {
+              $query->where('name', 'like', '%' . $search . '%');
+          }
+
+          return view('form.user-select-list', [
+              'users' => $query->get(),
+          ]);
+      }
+  }
+  ```
