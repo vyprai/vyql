@@ -1,0 +1,99 @@
+# Rank 1150 / CVE-2026-25083: GROWI's OpenAI thread and message routes looked
+# up a ThreadRelation by threadId alone, so a logged-in user who learned a
+# shared AI assistant's thread id could read or post into another user's
+# thread (CWE-862). postMessageHandlersFactory and its siblings
+# (get-messages, get-threads, delete-thread, edit) called
+#
+#   const threadRelation = await ThreadRelationModel.findOne({ threadId });
+#
+# with threadId taken straight from req.body/req.params and no filter tying
+# the row to req.user. Commit 236549a47e273afe23846e425bcc93918c67ee17 is the
+# real fix, found from GHSA-c69x-9x9c-p9v7 and the growi.co.jp advisory
+# naming v7.4.6: it adds userId: user._id to every ThreadRelationModel query
+# and to getThreadsByAiAssistantId's and deleteThread's signatures. The pool
+# row named 042c50f01f8f6c1d0c4e5140d4079fa0bf8603a2, a same-day commit
+# titled "delete changes to openai.ts from master" that only reverts an
+# unrelated refactor in a helper method never called; replaced in place with
+# 236549a47e273afe23846e425bcc93918c67ee17, the commit "fix: openai thread
+# idor" whose diff matches the advisory exactly.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports the same seven
+# VYQL-CFG-014 rows plus one VYQL-RF-003 row, all in unrelated login and
+# page-listing code; vyql match confirms req.body is labelled code.HttpInput
+# at the threadId destructure but ThreadRelationModel.findOne itself carries
+# no sink or check label in either revision. code.IdorPolicyReview (VYQL-AUTH-
+# 081) is the right concept and already has JavaScript bindings, but every one
+# of them keys on a presence match naming one project's identifiers (a Prisma
+# accounts.update call missing "currentUserId", a phpReview marker string),
+# not on the general shape "a query object literal missing an ownership key".
+# Stating that shape as a binding without naming this project's userId/
+# ThreadRelationModel would need the engine to reason about which fields an
+# object literal omits relative to a schema it has never seen, which is the
+# same flat-bag negation already declined at ranks 1074 and 1081 for the same
+# reason: a collection lookup that legitimately owns every row it returns has
+# an identical shape. No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1150: thread lookup keyed only by threadId, no owner filter"
+  lang javascript
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  export const postMessageHandlersFactory = (crowi) => {
+    return [
+      loginRequiredStrictly,
+      certifyAiService,
+      async (req, res) => {
+        const { user } = req;
+        const { aiAssistantId, threadId } = req.body;
+
+        const aiAssistant = await AiAssistantModel.findById(aiAssistantId);
+        if (aiAssistant == null) {
+          return res.apiv3Err(new ErrorV3('AI assistant not found'), 404);
+        }
+
+        const threadRelation = await ThreadRelationModel.findOne({ threadId });
+        if (threadRelation == null) {
+          return res.apiv3Err(new ErrorV3('ThreadRelation not found'), 404);
+        }
+
+        return streamMessageToThread(threadRelation, user);
+      },
+    ];
+  };
+  ```
+
+test "rank1150: thread lookup scoped to the requesting user's id"
+  lang javascript
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  export const postMessageHandlersFactory = (crowi) => {
+    return [
+      loginRequiredStrictly,
+      certifyAiService,
+      async (req, res) => {
+        const { user } = req;
+        const { aiAssistantId, threadId } = req.body;
+
+        const aiAssistant = await AiAssistantModel.findById(aiAssistantId);
+        if (aiAssistant == null) {
+          return res.apiv3Err(new ErrorV3('AI assistant not found'), 404);
+        }
+
+        const threadRelation = await ThreadRelationModel.findOne({
+          threadId,
+          userId: user._id,
+        });
+        if (threadRelation == null) {
+          return res.apiv3Err(new ErrorV3('ThreadRelation not found'), 404);
+        }
+
+        return streamMessageToThread(threadRelation, user);
+      },
+    ];
+  };
+  ```
