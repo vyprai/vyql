@@ -1,0 +1,83 @@
+# Rank 1129 / CVE-2024-3817: go-getter passed an attacker-controlled source
+# URL as the final positional argument to the `git` CLI with nothing telling
+# git where the flags end and the URL begins, so a URL string starting with
+# a dash was read as a git option instead of a repository location
+# (CWE-88).
+#
+# GitGetter.clone in get_git.go built `args = append(args, u.String(), dst)`
+# and ran `exec.CommandContext(ctx, "git", args...)`; findRemoteDefaultBranch
+# ran `git ls-remote --symref` the same way. `exec.Command` does not invoke a
+# shell, so shell metacharacters are inert, but `git` itself parses its own
+# argv and treats any argument starting with `-` as an option regardless of
+# position, so a source string like `--upload-pack=touch${IFS}/tmp/pwned` in
+# that position is read as `--upload-pack`, letting go-getter's own url
+# fetch a package spec, a Terraform module source, or any other consumer
+# reach arbitrary command execution on the machine running go-getter.
+#
+# Pool commit 268c11cae8cf is the real fix (COMMIT_OK, its title states the
+# mechanism, "escape user provide string to git"). It inserts `"--"` before
+# the URL in both call sites, git's own argument-terminator convention that
+# tells it every following token is positional no matter what it starts
+# with. No pool correction.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports 0 findings.
+# code.CommandLineAssemblyReview carries this exact CWE (88) among its three
+# and lists injection.ArgumentInjection directly among what it flags, and its
+# reviewCondition, "command line text is assembled from contextual values
+# without observed shell quoting," is a fair one-level-up reading of this
+# shape even though the fix here is an argument terminator rather than
+# quoting, but it is bound only in Python and C, and go-getter's own argv
+# construction, exec.CommandContext("git", args...), is exactly the shape a
+# Go binding for this concept would need to recognize: a caller-controlled
+# value appended to an argv slice with no `--` separator ahead of it, handed
+# to exec.Command rather than a shell.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1129: the source URL is appended with nothing marking it positional"
+  lang go
+  file get_git.go
+  reject_review code.CommandLineAssemblyReview
+  code
+  ```
+  package getter
+
+  import (
+      "context"
+      "net/url"
+      "os/exec"
+  )
+
+  func (g *GitGetter) clone(ctx context.Context, dst, sshKeyFile string, u *url.URL) (*exec.Cmd, error) {
+      args := []string{"clone"}
+      args = append(args, u.String(), dst)
+
+      cmd := exec.CommandContext(ctx, "git", args...)
+      return cmd, nil
+  }
+  ```
+
+test "rank1129: an argument terminator marks the URL positional before it's used"
+  lang go
+  file get_git.go
+  reject_review code.CommandLineAssemblyReview
+  code
+  ```
+  package getter
+
+  import (
+      "context"
+      "net/url"
+      "os/exec"
+  )
+
+  func (g *GitGetter) clone(ctx context.Context, dst, sshKeyFile string, u *url.URL) (*exec.Cmd, error) {
+      args := []string{"clone"}
+      args = append(args, "--", u.String(), dst)
+
+      cmd := exec.CommandContext(ctx, "git", args...)
+      return cmd, nil
+  }
+  ```
