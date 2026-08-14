@@ -1,0 +1,28 @@
+# Rank 1925 / CVE-2025-58047: Security review for CVE-2025-58047 in plone/volto.
+# Fix commit 2789a287ac in plone/volto.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1925: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1925: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

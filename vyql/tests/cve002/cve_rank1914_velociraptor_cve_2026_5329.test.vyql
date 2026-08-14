@@ -1,0 +1,32 @@
+# Rank 1914 / CVE-2026-5329: Security review for CVE-2026-5329 in velocidex/velociraptor.
+# Fix commit 1ef6ede803 in velocidex/velociraptor.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1914: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1914: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

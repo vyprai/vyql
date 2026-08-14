@@ -1,0 +1,32 @@
+# Rank 1921 / CVE-2026-27965: Security review for CVE-2026-27965 in vitessio/vitess.
+# Fix commit 4c01732939 in vitessio/vitess.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1921: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1921: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

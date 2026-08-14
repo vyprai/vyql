@@ -1,0 +1,28 @@
+# Rank 1956 / CVE-2022-24799: Security review for CVE-2022-24799 in wireapp/wire-webapp.
+# Fix commit d14455252a in wireapp/wire-webapp.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1956: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1956: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

@@ -1,0 +1,32 @@
+# Rank 1998 / CVE-2026-42275: Security review for CVE-2026-42275 in openziti/zrok.
+# Fix commit 459bcfc1e1 in openziti/zrok.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1998: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1998: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

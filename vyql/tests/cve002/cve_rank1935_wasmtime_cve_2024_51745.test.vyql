@@ -1,0 +1,26 @@
+# Rank 1935 / CVE-2024-51745: Security review for CVE-2024-51745 in bytecodealliance/wasmtime.
+# Fix commit 94c223fa69 in bytecodealliance/wasmtime.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1935: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1935: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

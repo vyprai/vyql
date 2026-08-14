@@ -1,0 +1,28 @@
+# Rank 1965 / CVE-2019-13275: Security review for CVE-2019-13275 in wp-statistics/wp-statistics.
+# Fix commit bd46721b97 in wp-statistics/wp-statistics.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1965: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1965: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

@@ -1,0 +1,27 @@
+# Rank 1930 / CVE-2026-44200: Security review for CVE-2026-44200 in wagtail/wagtail.
+# Fix commit 624586612e in wagtail/wagtail.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1930: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1930: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

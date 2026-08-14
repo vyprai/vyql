@@ -1,0 +1,27 @@
+# Rank 1999 / CVE-2019-18933: Security review for CVE-2019-18933 in zulip/zulip.
+# Fix commit 1bf0a92eb6 in zulip/zulip.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1999: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1999: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

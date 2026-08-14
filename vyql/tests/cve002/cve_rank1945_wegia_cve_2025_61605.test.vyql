@@ -1,0 +1,28 @@
+# Rank 1945 / CVE-2025-61605: Security review for CVE-2025-61605 in LabRedesCefetRJ/WeGIA.
+# Fix commit 176733543c in LabRedesCefetRJ/WeGIA.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1945: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1945: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

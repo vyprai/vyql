@@ -1,0 +1,28 @@
+# Rank 1900 / CVE-2025-13327: Security review for CVE-2025-13327 in astral-sh/uv.
+# Fix commit da659fee48 in astral-sh/uv.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1900: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1900: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

@@ -1,0 +1,32 @@
+# Rank 1952 / CVE-2024-27102: Security review for CVE-2024-27102 in pterodactyl/wings.
+# Fix commit d1c0ca5260 in pterodactyl/wings.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1952: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1952: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

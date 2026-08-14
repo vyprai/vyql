@@ -1,0 +1,26 @@
+# Rank 1967 / CVE-2023-30207: Security review for CVE-2023-30207 in xbmc/xbmc.
+# Fix commit dbc00c500f in xbmc/xbmc.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1967: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1967: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

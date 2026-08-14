@@ -1,0 +1,30 @@
+# Rank 1963 / CVE-2022-25174: Security review for CVE-2022-25174 in jenkinsci/workflow-cps-global-lib-plugin.
+# Fix commit ace0de3c2d in jenkinsci/workflow-cps-global-lib-plugin.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1963: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1963: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

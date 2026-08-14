@@ -1,0 +1,28 @@
+# Rank 1903 / CVE-2026-44377: Security review for CVE-2026-44377 in cubecart/v6.
+# Fix commit 76d783c8c4 in cubecart/v6.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1903: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1903: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

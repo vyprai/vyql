@@ -1,0 +1,28 @@
+# Rank 1912 / CVE-2021-32855: Security review for CVE-2021-32855 in vanessa219/vditor.
+# Fix commit 1b2382d7f8 in vanessa219/vditor.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1912: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1912: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

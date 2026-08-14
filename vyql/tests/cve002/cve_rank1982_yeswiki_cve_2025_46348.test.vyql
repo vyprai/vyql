@@ -1,0 +1,28 @@
+# Rank 1982 / CVE-2025-46348: Security review for CVE-2025-46348 in yeswiki/yeswiki.
+# Fix commit 0d4efc880a in yeswiki/yeswiki.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1982: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1982: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

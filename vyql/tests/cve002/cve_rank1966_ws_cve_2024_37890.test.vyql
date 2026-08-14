@@ -1,0 +1,28 @@
+# Rank 1966 / CVE-2024-37890: Security review for CVE-2024-37890 in websockets/ws.
+# Fix commit 22c2876323 in websockets/ws.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1966: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1966: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

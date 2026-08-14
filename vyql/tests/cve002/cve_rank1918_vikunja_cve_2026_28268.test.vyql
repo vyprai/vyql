@@ -1,0 +1,32 @@
+# Rank 1918 / CVE-2026-28268: Security review for CVE-2026-28268 in go-vikunja/vikunja.
+# Fix commit 5c2195f9fc in go-vikunja/vikunja.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1918: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1918: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

@@ -1,0 +1,27 @@
+# Rank 1949 / CVE-2024-22203: Security review for CVE-2024-22203 in benbusby/whoogle-search.
+# Fix commit 3a2e0b262e in benbusby/whoogle-search.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1949: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1949: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

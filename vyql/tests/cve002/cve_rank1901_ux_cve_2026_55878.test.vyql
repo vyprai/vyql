@@ -1,0 +1,28 @@
+# Rank 1901 / CVE-2026-55878: Security review for CVE-2026-55878 in symfony/ux.
+# Fix commit d9996ebeb5 in symfony/ux.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1901: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1901: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

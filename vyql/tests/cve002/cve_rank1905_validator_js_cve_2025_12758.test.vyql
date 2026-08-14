@@ -1,0 +1,28 @@
+# Rank 1905 / CVE-2025-12758: Security review for CVE-2025-12758 in validatorjs/validator.js.
+# Fix commit d457ecaf55 in validatorjs/validator.js.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1905: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1905: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

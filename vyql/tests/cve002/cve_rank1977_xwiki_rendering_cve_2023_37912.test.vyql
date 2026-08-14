@@ -1,0 +1,30 @@
+# Rank 1977 / CVE-2023-37912: Security review for CVE-2023-37912 in xwiki/xwiki-rendering.
+# Fix commit 5f558b8fac in xwiki/xwiki-rendering.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1977: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1977: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

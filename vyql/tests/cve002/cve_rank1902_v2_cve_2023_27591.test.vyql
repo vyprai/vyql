@@ -1,0 +1,32 @@
+# Rank 1902 / CVE-2023-27591: Security review for CVE-2023-27591 in miniflux/v2.
+# Fix commit b46b5dfb2a in miniflux/v2.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1902: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1902: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

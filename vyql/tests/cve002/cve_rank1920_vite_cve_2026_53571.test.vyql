@@ -1,0 +1,28 @@
+# Rank 1920 / CVE-2026-53571: Security review for CVE-2026-53571 in vitejs/vite.
+# Fix commit 96b0c10162 in vitejs/vite.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1920: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1920: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

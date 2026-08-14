@@ -1,0 +1,28 @@
+# Rank 1989 / CVE-2024-34461: Security review for CVE-2024-34461 in TribalSystems/Zenario.
+# Fix commit 72afb59da3 in TribalSystems/Zenario.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1989: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1989: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

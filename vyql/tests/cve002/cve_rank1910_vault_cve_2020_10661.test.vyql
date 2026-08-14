@@ -1,0 +1,32 @@
+# Rank 1910 / CVE-2020-10661: Security review for CVE-2020-10661 in hashicorp/vault.
+# Fix commit 18485ee9d4 in hashicorp/vault.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1910: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1910: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

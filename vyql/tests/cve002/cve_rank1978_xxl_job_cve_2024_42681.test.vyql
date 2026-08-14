@@ -1,0 +1,30 @@
+# Rank 1978 / CVE-2024-42681: Security review for CVE-2024-42681 in xuxueli/xxl-job.
+# Fix commit a2dc901131 in xuxueli/xxl-job.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1978: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1978: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

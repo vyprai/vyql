@@ -1,0 +1,30 @@
+# Rank 1992 / CVE-2024-31864: Security review for CVE-2024-31864 in apache/zeppelin.
+# Fix commit e65b5430e4 in apache/zeppelin.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1992: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1992: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

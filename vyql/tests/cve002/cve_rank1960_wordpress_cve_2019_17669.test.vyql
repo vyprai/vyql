@@ -1,0 +1,28 @@
+# Rank 1960 / CVE-2019-17669: Security review for CVE-2019-17669 in wordpress/wordpress.
+# Fix commit 608d39faed in wordpress/wordpress.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1960: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1960: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

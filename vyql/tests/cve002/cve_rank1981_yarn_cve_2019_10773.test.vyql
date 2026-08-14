@@ -1,0 +1,28 @@
+# Rank 1981 / CVE-2019-10773: Security review for CVE-2019-10773 in yarnpkg/yarn.
+# Fix commit 039bafd74b in yarnpkg/yarn.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1981: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1981: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

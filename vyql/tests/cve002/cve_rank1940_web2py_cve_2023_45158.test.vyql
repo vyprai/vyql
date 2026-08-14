@@ -1,0 +1,27 @@
+# Rank 1940 / CVE-2023-45158: Security review for CVE-2023-45158 in web2py/web2py.
+# Fix commit 936e2260b0 in web2py/web2py.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1940: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1940: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

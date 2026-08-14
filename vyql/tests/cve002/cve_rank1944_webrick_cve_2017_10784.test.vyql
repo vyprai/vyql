@@ -1,0 +1,26 @@
+# Rank 1944 / CVE-2017-10784: Security review for CVE-2017-10784 in ruby/webrick.
+# Fix commit 4ac0f3843a in ruby/webrick.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1944: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1944: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

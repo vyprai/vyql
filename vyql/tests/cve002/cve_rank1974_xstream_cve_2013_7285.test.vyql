@@ -1,0 +1,30 @@
+# Rank 1974 / CVE-2013-7285: Security review for CVE-2013-7285 in x-stream/xstream.
+# Fix commit 6344867dce in x-stream/xstream.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1974: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1974: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

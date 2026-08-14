@@ -1,0 +1,28 @@
+# Rank 1971 / CVE-2022-37616: Security review for CVE-2022-37616 in xmldom/xmldom.
+# Fix commit 6956ec406f in xmldom/xmldom.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1971: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1971: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

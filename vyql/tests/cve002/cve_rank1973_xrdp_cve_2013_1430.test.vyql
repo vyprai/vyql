@@ -1,0 +1,26 @@
+# Rank 1973 / CVE-2013-1430: Security review for CVE-2013-1430 in neutrinolabs/xrdp.
+# Fix commit 93c55e58a8 in neutrinolabs/xrdp.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1973: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1973: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

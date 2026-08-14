@@ -1,0 +1,26 @@
+# Rank 1987 / CVE-2026-34723: Security review for CVE-2026-34723 in zammad/zammad.
+# Fix commit 9587452de1 in zammad/zammad.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1987: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1987: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

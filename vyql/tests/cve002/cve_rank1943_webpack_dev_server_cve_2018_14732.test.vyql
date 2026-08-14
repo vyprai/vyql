@@ -1,0 +1,28 @@
+# Rank 1943 / CVE-2018-14732: Security review for CVE-2018-14732 in webpack/webpack-dev-server.
+# Fix commit f18e5adf12 in webpack/webpack-dev-server.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1943: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1943: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

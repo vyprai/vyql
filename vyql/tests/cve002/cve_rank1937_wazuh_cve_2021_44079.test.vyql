@@ -1,0 +1,26 @@
+# Rank 1937 / CVE-2021-44079: Security review for CVE-2021-44079 in wazuh/wazuh.
+# Fix commit a121e732cd in wazuh/wazuh.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1937: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1937: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

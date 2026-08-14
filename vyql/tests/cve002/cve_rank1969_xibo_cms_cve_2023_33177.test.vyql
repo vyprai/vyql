@@ -1,0 +1,28 @@
+# Rank 1969 / CVE-2023-33177: Security review for CVE-2023-33177 in xibosignage/xibo-cms.
+# Fix commit 45c6b53c39 in xibosignage/xibo-cms.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1969: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1969: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

@@ -1,0 +1,28 @@
+# Rank 1993 / CVE-2026-32232: Security review for CVE-2026-32232 in qhkm/zeptoclaw.
+# Fix commit bf004a20d3 in qhkm/zeptoclaw.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1993: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1993: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

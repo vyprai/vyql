@@ -1,0 +1,28 @@
+# Rank 1995 / CVE-2024-43360: Security review for CVE-2024-43360 in zoneminder/zoneminder.
+# Fix commit 677f6a3155 in zoneminder/zoneminder.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1995: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1995: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

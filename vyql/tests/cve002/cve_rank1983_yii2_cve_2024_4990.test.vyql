@@ -1,0 +1,28 @@
+# Rank 1983 / CVE-2024-4990: Security review for CVE-2024-4990 in yiisoft/yii2.
+# Fix commit 62d081f18c in yiisoft/yii2.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1983: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1983: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

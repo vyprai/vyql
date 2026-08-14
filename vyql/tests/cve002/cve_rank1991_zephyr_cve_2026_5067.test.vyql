@@ -1,0 +1,26 @@
+# Rank 1991 / CVE-2026-5067: Security review for CVE-2026-5067 in zephyrproject-rtos/zephyr.
+# Fix commit 5d653fcfd4 in zephyrproject-rtos/zephyr.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1991: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1991: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

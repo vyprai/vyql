@@ -1,0 +1,30 @@
+# Rank 1964 / CVE-2019-1003030: Security review for CVE-2019-1003030 in jenkinsci/workflow-cps-plugin.
+# Fix commit 3dcb238089 in jenkinsci/workflow-cps-plugin.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1964: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1964: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

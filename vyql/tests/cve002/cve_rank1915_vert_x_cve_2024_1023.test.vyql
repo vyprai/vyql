@@ -1,0 +1,30 @@
+# Rank 1915 / CVE-2024-1023: Security review for CVE-2024-1023 in eclipse-vertx/vert.x.
+# Fix commit dd6f64302b in eclipse-vertx/vert.x.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1915: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1915: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

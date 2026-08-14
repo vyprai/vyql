@@ -1,0 +1,30 @@
+# Rank 1916 / CVE-2019-17640: Security review for CVE-2019-17640 in vert-x3/vertx-web.
+# Fix commit b12f7c4c65 in vert-x3/vertx-web.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1916: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1916: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

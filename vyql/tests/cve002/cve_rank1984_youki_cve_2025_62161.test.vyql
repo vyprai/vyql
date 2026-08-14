@@ -1,0 +1,28 @@
+# Rank 1984 / CVE-2025-62161: Security review for CVE-2025-62161 in youki-dev/youki.
+# Fix commit 5886c91073 in youki-dev/youki.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1984: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1984: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

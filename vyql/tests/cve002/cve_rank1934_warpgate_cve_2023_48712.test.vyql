@@ -1,0 +1,28 @@
+# Rank 1934 / CVE-2023-48712: Security review for CVE-2023-48712 in warp-tech/warpgate.
+# Fix commit e3b26b2699 in warp-tech/warpgate.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1934: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1934: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

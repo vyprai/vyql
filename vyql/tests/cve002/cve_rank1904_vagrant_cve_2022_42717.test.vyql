@@ -1,0 +1,26 @@
+# Rank 1904 / CVE-2022-42717: Security review for CVE-2022-42717 in hashicorp/vagrant.
+# Fix commit 716694e7b8 in hashicorp/vagrant.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1904: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1904: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

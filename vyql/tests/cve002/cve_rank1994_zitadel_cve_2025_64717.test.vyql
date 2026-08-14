@@ -1,0 +1,28 @@
+# Rank 1994 / CVE-2025-64717: Security review for CVE-2025-64717 in zitadel/zitadel.
+# Fix commit 33c51deb20 in zitadel/zitadel.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1994: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1994: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

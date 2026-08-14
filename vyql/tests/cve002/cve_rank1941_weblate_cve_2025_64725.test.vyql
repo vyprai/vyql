@@ -1,0 +1,27 @@
+# Rank 1941 / CVE-2025-64725: Security review for CVE-2025-64725 in weblateorg/weblate.
+# Fix commit 02e904675f in weblateorg/weblate.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1941: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1941: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

@@ -1,0 +1,28 @@
+# Rank 1962 / CVE-2026-0933: Security review for CVE-2026-0933 in cloudflare/workers-sdk.
+# Fix commit 99b1f328a9 in cloudflare/workers-sdk.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1962: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1962: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

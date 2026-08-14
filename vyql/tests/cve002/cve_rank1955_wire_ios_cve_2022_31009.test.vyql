@@ -1,0 +1,26 @@
+# Rank 1955 / CVE-2022-31009: Security review for CVE-2022-31009 in wireapp/wire-ios.
+# Fix commit caa0e27dbe in wireapp/wire-ios.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1955: vulnerable code pattern before fix"
+  lang swift
+  file main.swift
+  reject VYQL-PATH-001
+  code
+  ```
+  func handleRequest(input: String) -> String {
+    return input
+}
+  ```
+
+test "rank1955: validated or patched form"
+  lang swift
+  file main.swift
+  reject VYQL-PATH-001
+  code
+  ```
+  func handleRequest(input: String) -> String {
+    if input.isEmpty { return "" }
+    return input
+}
+  ```

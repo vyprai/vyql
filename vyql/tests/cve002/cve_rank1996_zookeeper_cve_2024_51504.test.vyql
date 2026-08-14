@@ -1,0 +1,30 @@
+# Rank 1996 / CVE-2024-51504: Security review for CVE-2024-51504 in apache/zookeeper.
+# Fix commit 2c2b74c1c1 in apache/zookeeper.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1996: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1996: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

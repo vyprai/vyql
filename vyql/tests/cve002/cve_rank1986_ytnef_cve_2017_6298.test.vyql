@@ -1,0 +1,26 @@
+# Rank 1986 / CVE-2017-6298: Security review for CVE-2017-6298 in yeraze/ytnef.
+# Fix commit b36d6b25b7 in yeraze/ytnef.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1986: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1986: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

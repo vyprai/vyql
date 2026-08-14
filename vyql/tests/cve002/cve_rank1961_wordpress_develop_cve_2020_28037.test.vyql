@@ -1,0 +1,28 @@
+# Rank 1961 / CVE-2020-28037: Security review for CVE-2020-28037 in WordPress/wordpress-develop.
+# Fix commit 2ca15d1e5c in WordPress/wordpress-develop.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1961: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1961: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

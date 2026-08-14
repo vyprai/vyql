@@ -1,0 +1,28 @@
+# Rank 1933 / CVE-2026-33407: Security review for CVE-2026-33407 in ellite/wallos.
+# Fix commit e87387f0eb in ellite/wallos.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1933: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1933: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```
