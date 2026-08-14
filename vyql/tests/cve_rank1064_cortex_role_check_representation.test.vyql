@@ -1,0 +1,96 @@
+# Rank 1064 / CVE-2018-20226: Cortex let an organisation administrator create a
+# user holding the superadmin role, because the guard that was supposed to stop
+# it compared two different spellings of the same role (CWE-178, CWE-863).
+# UserCtrl.create held
+#
+#   if organization.status() == OrganizationStatus.Active &&
+#     (request.roles.contains(Roles.superAdmin) ||
+#       (userOrganizationId == organizationId &&
+#         !request.body.getStrings("roles").getOrElse(Nil).contains(Roles.superAdmin.toString)))
+#
+# where `object superAdmin extends Role("superadmin")` inherits toString from
+# Object, so it yields the source name `superAdmin` while the submitted role
+# arrives as the wire name `superadmin`. The contains never matches, the
+# negation is always true, and the request creates the user. Pool commit
+# 1aaf2182a6 is the real fix (COMMIT_OK, one file, one line): it compares
+# against Roles.superAdmin.name. No pool correction.
+#
+# ATTENTION, analysis gap, and the guard is the problem rather than its absence.
+# Nothing is labelled in the controller at either revision: vyql match reports
+# one row in the file, code.AuthenticationRequiredOp on authSrv.changePassword
+# a hundred lines below, and the create guard is invisible. Even with the
+# plumbing an authorization rule would need -- the submitted roles as
+# code.HttpInput reaching user creation as a privileged operation, with the
+# guard as the control -- the two revisions would still be indistinguishable,
+# because both call contains on the same list with the same shape and differ
+# only in which member of Roles.superAdmin the argument reads. The discriminator
+# is that the two sides of one comparison denote the same role in different
+# representations, which no presence pattern over the expression can state.
+#
+# The vocabulary for the weakness class exists and cannot reach it.
+# code.CaseInsensitiveLocalIdentityAuthorizationBypass carries CWE-178 and
+# CWE-863 and is the same defect seen from the other side, a comparison that
+# over-matches rather than one that under-matches; its three bindings are C
+# presences keyed on _cups_strcasecmp. This is the third rank in this block
+# whose cause is a comparison that silently fails to match what it names,
+# after rank 1042's rack-attack throttle keyed on exact request-path equality.
+#
+# The two snippets differ only in whether the guard reads toString or name.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1064: the role guard compares the object's source name"
+  lang scala
+  file app/org/thp/cortex/controllers/UserCtrl.scala
+  reject VYQL-AUTH-032
+  code
+  ```
+  package org.thp.cortex.controllers
+
+  import scala.concurrent.Future
+
+  import org.thp.cortex.models.{ OrganizationStatus, Roles }
+
+  class UserCtrl(userSrv: UserSrv, organizationSrv: OrganizationSrv, authenticated: Authenticated) {
+    def create: Action[Fields] = authenticated(Roles.orgAdmin, Roles.superAdmin).async(fieldsBodyParser) { implicit request ⇒
+      (for {
+        userOrganizationId ← userSrv.getOrganizationId(request.userId)
+        organizationId = request.body.getString("organization").getOrElse(userOrganizationId)
+        organization ← organizationSrv.get(organizationId)
+        if organization.status() == OrganizationStatus.Active &&
+          (request.roles.contains(Roles.superAdmin) ||
+            (userOrganizationId == organizationId &&
+              !request.body.getStrings("roles").getOrElse(Nil).contains(Roles.superAdmin.toString)))
+        user ← userSrv.create(request.body.set("organization", organizationId))
+      } yield renderer.toOutput(CREATED, user))
+    }
+  }
+  ```
+
+test "rank1064: the same guard comparing the role's own name"
+  lang scala
+  file app/org/thp/cortex/controllers/UserCtrl.scala
+  reject VYQL-AUTH-032
+  code
+  ```
+  package org.thp.cortex.controllers
+
+  import scala.concurrent.Future
+
+  import org.thp.cortex.models.{ OrganizationStatus, Roles }
+
+  class UserCtrl(userSrv: UserSrv, organizationSrv: OrganizationSrv, authenticated: Authenticated) {
+    def create: Action[Fields] = authenticated(Roles.orgAdmin, Roles.superAdmin).async(fieldsBodyParser) { implicit request ⇒
+      (for {
+        userOrganizationId ← userSrv.getOrganizationId(request.userId)
+        organizationId = request.body.getString("organization").getOrElse(userOrganizationId)
+        organization ← organizationSrv.get(organizationId)
+        if organization.status() == OrganizationStatus.Active &&
+          (request.roles.contains(Roles.superAdmin) ||
+            (userOrganizationId == organizationId &&
+              !request.body.getStrings("roles").getOrElse(Nil).contains(Roles.superAdmin.name)))
+        user ← userSrv.create(request.body.set("organization", organizationId))
+      } yield renderer.toOutput(CREATED, user))
+    }
+  }
+  ```
