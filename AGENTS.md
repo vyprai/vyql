@@ -119,14 +119,16 @@ VYQL_BENCH=1 BENCH_DIR=/tmp/bench/BenchmarkPython go test -count=1 -v ./cmd/vyql
 Both are gated in CI and must not regress. Current: **+1.00** and **+0.90**,
 Youden (`TPR − FPR`) macro-averaged. `benchmarks/RESULTS.md` has the method.
 
-**`benchmarks/RESULTS.md` records numbers, not narrative.** It is the page people
-check before trusting a score, and it only does that job while it stays short
-enough to read. Every run adds the temptation to explain itself there; a few
-rounds of that and nobody reads any of it. A run that moves nothing needs one
-line saying so, not a section explaining the change — reasoning belongs in
-`CHANGELOG.md` and the pull request. Replace stale numbers rather than appending
-new ones beside them, and cut a caveat back to a line once it stops reproducing.
-Git history holds whatever the page drops.
+**After a benchmark run, change the numbers and nothing else.** This governs
+`benchmarks/RESULTS.md` and `README.md` alike. Replace the stale figures in
+place and stop: no sentence explaining the run, no fresh caveat about the
+corpus, no extra table breaking the score down. These are the pages people check
+before trusting a score, and they only do that job while they stay short enough
+to read. Every run brings the temptation to explain itself there, and after a
+few rounds of that nobody reads any of it. A run that moves nothing needs one
+line saying so. Reasoning belongs in `CHANGELOG.md` and the pull request, and
+git history holds whatever the page drops. Never write a local directory layout
+into either page; name the environment variable instead.
 
 ## Traps
 
