@@ -1,0 +1,30 @@
+# Rank 1746 / CVE-2024-36042: Security review for CVE-2024-36042 in silverpeas/silverpeas-core.
+# Fix commit 11fb5e21c2 in silverpeas/silverpeas-core.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1746: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1746: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

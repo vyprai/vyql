@@ -1,0 +1,28 @@
+# Rank 1722 / CVE-2023-46729: Security review for CVE-2023-46729 in getsentry/sentry-javascript.
+# Fix commit ddbda3c02c in getsentry/sentry-javascript.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1722: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1722: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

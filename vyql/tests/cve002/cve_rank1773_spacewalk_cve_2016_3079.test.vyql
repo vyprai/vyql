@@ -1,0 +1,28 @@
+# Rank 1773 / CVE-2016-3079: Security review for CVE-2016-3079 in spacewalkproject/spacewalk.
+# Fix commit b6491eba7f in spacewalkproject/spacewalk.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1773: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1773: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

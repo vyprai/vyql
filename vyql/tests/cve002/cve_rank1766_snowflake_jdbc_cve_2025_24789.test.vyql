@@ -1,0 +1,30 @@
+# Rank 1766 / CVE-2025-24789: Security review for CVE-2025-24789 in snowflakedb/snowflake-jdbc.
+# Fix commit 4f01bb8f9b in snowflakedb/snowflake-jdbc.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1766: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1766: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

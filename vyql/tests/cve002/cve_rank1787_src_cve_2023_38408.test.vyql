@@ -1,0 +1,26 @@
+# Rank 1787 / CVE-2023-38408: Security review for CVE-2023-38408 in openbsd/src.
+# Fix commit f8f5a6b003 in openbsd/src.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1787: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1787: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

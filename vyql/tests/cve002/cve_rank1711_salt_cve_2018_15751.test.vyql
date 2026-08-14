@@ -1,0 +1,27 @@
+# Rank 1711 / CVE-2018-15751: Security review for CVE-2018-15751 in saltstack/salt.
+# Fix commit ad0d83c6a8 in saltstack/salt.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1711: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1711: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

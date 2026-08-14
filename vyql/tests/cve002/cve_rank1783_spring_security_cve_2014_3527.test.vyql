@@ -1,0 +1,30 @@
+# Rank 1783 / CVE-2014-3527: Security review for CVE-2014-3527 in spring-projects/spring-security.
+# Fix commit 934937d9c1 in spring-projects/spring-security.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1783: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1783: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

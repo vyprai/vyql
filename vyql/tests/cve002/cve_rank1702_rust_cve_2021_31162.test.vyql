@@ -1,0 +1,28 @@
+# Rank 1702 / CVE-2021-31162: Security review for CVE-2021-31162 in rust-lang/rust.
+# Fix commit f97769a2b7 in rust-lang/rust.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1702: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1702: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

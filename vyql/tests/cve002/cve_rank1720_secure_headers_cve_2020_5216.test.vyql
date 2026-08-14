@@ -1,0 +1,26 @@
+# Rank 1720 / CVE-2020-5216: Security review for CVE-2020-5216 in twitter/secure_headers.
+# Fix commit 301695706f in twitter/secure_headers.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1720: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1720: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

@@ -1,0 +1,27 @@
+# Rank 1721 / CVE-2026-42354: Security review for CVE-2026-42354 in getsentry/sentry.
+# Fix commit 0c67558ae7 in getsentry/sentry.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1721: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1721: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

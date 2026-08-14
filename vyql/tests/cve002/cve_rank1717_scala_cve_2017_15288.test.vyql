@@ -1,0 +1,29 @@
+# Rank 1717 / CVE-2017-15288: Security review for CVE-2017-15288 in scala/scala.
+# Fix commit 0f624c5e5b in scala/scala.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1717: vulnerable code pattern before fix"
+  lang scala
+  file Main.scala
+  reject VYQL-PATH-001
+  code
+  ```
+  object App {
+  def handleRequest(input: String): String = {
+    input
+  }
+}
+  ```
+
+test "rank1717: validated or patched form"
+  lang scala
+  file Main.scala
+  reject VYQL-PATH-001
+  code
+  ```
+  object App {
+  def handleRequest(input: String): String = {
+    if (input == null) "" else input
+  }
+}
+  ```

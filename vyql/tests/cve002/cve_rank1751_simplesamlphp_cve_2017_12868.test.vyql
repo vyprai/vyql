@@ -1,0 +1,28 @@
+# Rank 1751 / CVE-2017-12868: Security review for CVE-2017-12868 in simplesamlphp/simplesamlphp.
+# Fix commit 4bc629658e in simplesamlphp/simplesamlphp.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1751: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1751: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

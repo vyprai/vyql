@@ -1,0 +1,32 @@
+# Rank 1757 / CVE-2023-34758: Security review for CVE-2023-34758 in bishopfox/sliver.
+# Fix commit 2d1ea6192c in bishopfox/sliver.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1757: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1757: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

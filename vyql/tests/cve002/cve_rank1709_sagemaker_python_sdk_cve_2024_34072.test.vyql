@@ -1,0 +1,27 @@
+# Rank 1709 / CVE-2024-34072: Security review for CVE-2024-34072 in aws/sagemaker-python-sdk.
+# Fix commit 72e0c9712a in aws/sagemaker-python-sdk.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1709: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1709: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

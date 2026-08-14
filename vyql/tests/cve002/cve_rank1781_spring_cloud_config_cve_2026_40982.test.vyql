@@ -1,0 +1,30 @@
+# Rank 1781 / CVE-2026-40982: Security review for CVE-2026-40982 in spring-cloud/spring-cloud-config.
+# Fix commit cc71e5c307 in spring-cloud/spring-cloud-config.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1781: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1781: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

@@ -1,0 +1,26 @@
+# Rank 1752 / CVE-2022-45442: Security review for CVE-2022-45442 in sinatra/sinatra.
+# Fix commit ea8fc9495a in sinatra/sinatra.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1752: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1752: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

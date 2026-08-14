@@ -1,0 +1,32 @@
+# Rank 1775 / CVE-2023-29193: Security review for CVE-2023-29193 in authzed/spicedb.
+# Fix commit 9bbd7d76b6 in authzed/spicedb.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1775: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1775: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

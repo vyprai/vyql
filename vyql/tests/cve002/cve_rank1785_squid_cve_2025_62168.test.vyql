@@ -1,0 +1,26 @@
+# Rank 1785 / CVE-2025-62168: Security review for CVE-2025-62168 in squid-cache/squid.
+# Fix commit 0951a06810 in squid-cache/squid.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1785: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1785: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

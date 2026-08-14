@@ -1,0 +1,26 @@
+# Rank 1740 / CVE-2022-23837: Security review for CVE-2022-23837 in mperham/sidekiq.
+# Fix commit 7785ac1399 in mperham/sidekiq.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1740: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1740: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

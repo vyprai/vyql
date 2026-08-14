@@ -1,0 +1,28 @@
+# Rank 1734 / CVE-2022-31180: Security review for CVE-2022-31180 in ericcornelissen/shescape.
+# Fix commit 8b6a0eefe0 in ericcornelissen/shescape.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1734: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1734: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

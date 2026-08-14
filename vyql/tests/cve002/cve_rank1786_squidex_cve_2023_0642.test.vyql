@@ -1,0 +1,30 @@
+# Rank 1786 / CVE-2023-0642: Security review for CVE-2023-0642 in squidex/squidex.
+# Fix commit 2da3c41da8 in squidex/squidex.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1786: vulnerable code pattern before fix"
+  lang csharp
+  file Main.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  class Handler {
+    public static string HandleRequest(string input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1786: validated or patched form"
+  lang csharp
+  file Main.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  class Handler {
+    public static string HandleRequest(string input) {
+        if (input == null) return string.Empty;
+        return input;
+    }
+}
+  ```

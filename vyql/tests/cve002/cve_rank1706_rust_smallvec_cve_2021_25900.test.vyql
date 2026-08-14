@@ -1,0 +1,28 @@
+# Rank 1706 / CVE-2021-25900: Security review for CVE-2021-25900 in servo/rust-smallvec.
+# Fix commit 5757ac500d in servo/rust-smallvec.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1706: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1706: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

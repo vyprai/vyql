@@ -1,0 +1,26 @@
+# Rank 1712 / CVE-2026-4408: Security review for CVE-2026-4408 in samba-team/samba.
+# Fix commit e6c532fbd5 in samba-team/samba.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1712: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1712: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

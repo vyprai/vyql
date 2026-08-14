@@ -1,0 +1,28 @@
+# Rank 1744 / CVE-2026-22705: Security review for CVE-2026-22705 in RustCrypto/signatures.
+# Fix commit 035d9eef98 in RustCrypto/signatures.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1744: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1744: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

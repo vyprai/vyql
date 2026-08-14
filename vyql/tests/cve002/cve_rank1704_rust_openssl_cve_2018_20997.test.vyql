@@ -1,0 +1,28 @@
+# Rank 1704 / CVE-2018-20997: Security review for CVE-2018-20997 in sfackler/rust-openssl.
+# Fix commit 63afe3016c in sfackler/rust-openssl.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1704: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1704: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

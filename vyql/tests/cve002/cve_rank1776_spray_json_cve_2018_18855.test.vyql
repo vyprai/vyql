@@ -1,0 +1,29 @@
+# Rank 1776 / CVE-2018-18855: Security review for CVE-2018-18855 in spray/spray-json.
+# Fix commit d56d7f4213 in spray/spray-json.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1776: vulnerable code pattern before fix"
+  lang scala
+  file Main.scala
+  reject VYQL-PATH-001
+  code
+  ```
+  object App {
+  def handleRequest(input: String): String = {
+    input
+  }
+}
+  ```
+
+test "rank1776: validated or patched form"
+  lang scala
+  file Main.scala
+  reject VYQL-PATH-001
+  code
+  ```
+  object App {
+  def handleRequest(input: String): String = {
+    if (input == null) "" else input
+  }
+}
+  ```

@@ -1,0 +1,26 @@
+# Rank 1714 / CVE-2025-64721: Security review for CVE-2025-64721 in sandboxie-plus/sandboxie.
+# Fix commit 000492f8c4 in sandboxie-plus/sandboxie.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1714: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1714: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

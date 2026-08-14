@@ -1,0 +1,26 @@
+# Rank 1756 / CVE-2020-10232: Security review for CVE-2020-10232 in sleuthkit/sleuthkit.
+# Fix commit 459ae818fc in sleuthkit/sleuthkit.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1756: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1756: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

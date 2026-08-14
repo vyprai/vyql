@@ -1,0 +1,26 @@
+# Rank 1774 / CVE-2025-0509: Security review for CVE-2025-0509 in sparkle-project/sparkle.
+# Fix commit 0ef1ee0220 in sparkle-project/sparkle.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1774: vulnerable code pattern before fix"
+  lang swift
+  file main.swift
+  reject VYQL-PATH-001
+  code
+  ```
+  func handleRequest(input: String) -> String {
+    return input
+}
+  ```
+
+test "rank1774: validated or patched form"
+  lang swift
+  file main.swift
+  reject VYQL-PATH-001
+  code
+  ```
+  func handleRequest(input: String) -> String {
+    if input.isEmpty { return "" }
+    return input
+}
+  ```

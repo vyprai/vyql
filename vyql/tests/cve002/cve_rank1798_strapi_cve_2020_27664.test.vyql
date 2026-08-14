@@ -1,0 +1,28 @@
+# Rank 1798 / CVE-2020-27664: Security review for CVE-2020-27664 in strapi/strapi.
+# Fix commit 328c1a3a13 in strapi/strapi.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1798: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1798: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

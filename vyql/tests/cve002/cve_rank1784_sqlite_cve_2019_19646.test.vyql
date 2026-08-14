@@ -1,0 +1,26 @@
+# Rank 1784 / CVE-2019-19646: Security review for CVE-2019-19646 in sqlite/sqlite.
+# Fix commit 926f796e8f in sqlite/sqlite.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1784: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1784: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

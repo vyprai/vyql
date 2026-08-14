@@ -1,0 +1,27 @@
+# Rank 1765 / CVE-2023-34233: Security review for CVE-2023-34233 in snowflakedb/snowflake-connector-python.
+# Fix commit 1cdbd3b140 in snowflakedb/snowflake-connector-python.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1765: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1765: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

@@ -1,0 +1,28 @@
+# Rank 1724 / CVE-2020-7660: Security review for CVE-2020-7660 in yahoo/serialize-javascript.
+# Fix commit f21a6fb3ac in yahoo/serialize-javascript.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1724: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1724: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

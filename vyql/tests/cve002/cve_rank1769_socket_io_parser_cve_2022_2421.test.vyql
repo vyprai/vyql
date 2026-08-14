@@ -1,0 +1,28 @@
+# Rank 1769 / CVE-2022-2421: Security review for CVE-2022-2421 in socketio/socket.io-parser.
+# Fix commit fb21e422fc in socketio/socket.io-parser.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1769: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1769: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

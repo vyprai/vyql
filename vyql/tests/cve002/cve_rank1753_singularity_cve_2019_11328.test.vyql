@@ -1,0 +1,32 @@
+# Rank 1753 / CVE-2019-11328: Security review for CVE-2019-11328 in sylabs/singularity.
+# Fix commit 618c9d5680 in sylabs/singularity.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1753: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1753: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

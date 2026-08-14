@@ -1,0 +1,26 @@
+# Rank 1742 / CVE-2024-25122: Security review for CVE-2024-25122 in mhenrixon/sidekiq-unique-jobs.
+# Fix commit cd09ba6108 in mhenrixon/sidekiq-unique-jobs.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1742: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1742: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

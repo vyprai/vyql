@@ -1,0 +1,28 @@
+# Rank 1743 / CVE-2025-66398: Security review for CVE-2025-66398 in SignalK/signalk-server.
+# Fix commit 5c211eaf33 in SignalK/signalk-server.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1743: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1743: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

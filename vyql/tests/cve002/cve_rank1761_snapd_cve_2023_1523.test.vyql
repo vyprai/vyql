@@ -1,0 +1,32 @@
+# Rank 1761 / CVE-2023-1523: Security review for CVE-2023-1523 in snapcore/snapd.
+# Fix commit d7b49dd6f5 in snapcore/snapd.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1761: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1761: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

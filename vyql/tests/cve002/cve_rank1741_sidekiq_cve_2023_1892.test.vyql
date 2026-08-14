@@ -1,0 +1,26 @@
+# Rank 1741 / CVE-2023-1892: Security review for CVE-2023-1892 in sidekiq/sidekiq.
+# Fix commit 458fdf7417 in sidekiq/sidekiq.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1741: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1741: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

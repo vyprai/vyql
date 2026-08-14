@@ -1,0 +1,28 @@
+# Rank 1793 / CVE-2025-67487: Security review for CVE-2025-67487 in static-web-server/static-web-server.
+# Fix commit 308f0d26ce in static-web-server/static-web-server.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1793: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1793: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

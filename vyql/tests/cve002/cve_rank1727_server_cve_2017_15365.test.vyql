@@ -1,0 +1,26 @@
+# Rank 1727 / CVE-2017-15365: Security review for CVE-2017-15365 in mariadb/server.
+# Fix commit 0b5a5258ab in mariadb/server.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1727: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1727: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

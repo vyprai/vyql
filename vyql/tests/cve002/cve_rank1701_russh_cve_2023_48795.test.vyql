@@ -1,0 +1,28 @@
+# Rank 1701 / CVE-2023-48795: Security review for CVE-2023-48795 in warp-tech/russh.
+# Fix commit 1aa340a7df in warp-tech/russh.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1701: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1701: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

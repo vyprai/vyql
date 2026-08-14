@@ -1,0 +1,28 @@
+# Rank 1788 / CVE-2021-28034: Security review for CVE-2021-28034 in thepowersgang/stack_dst-rs.
+# Fix commit 2a4d53809e in thepowersgang/stack_dst-rs.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1788: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1788: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

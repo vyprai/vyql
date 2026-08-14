@@ -1,0 +1,26 @@
+# Rank 1716 / CVE-2018-3740: Security review for CVE-2018-3740 in rgrove/sanitize.
+# Fix commit 01629a162e in rgrove/sanitize.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1716: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1716: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

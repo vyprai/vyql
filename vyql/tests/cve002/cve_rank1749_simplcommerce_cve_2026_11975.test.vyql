@@ -1,0 +1,30 @@
+# Rank 1749 / CVE-2026-11975: Security review for CVE-2026-11975 in simplcommerce/simplcommerce.
+# Fix commit 6142d3b514 in simplcommerce/simplcommerce.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1749: vulnerable code pattern before fix"
+  lang csharp
+  file Main.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  class Handler {
+    public static string HandleRequest(string input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1749: validated or patched form"
+  lang csharp
+  file Main.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  class Handler {
+    public static string HandleRequest(string input) {
+        if (input == null) return string.Empty;
+        return input;
+    }
+}
+  ```

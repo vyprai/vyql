@@ -1,0 +1,32 @@
+# Rank 1760 / CVE-2026-44329: Security review for CVE-2026-44329 in free5gc/smf.
+# Fix commit e23ce97565 in free5gc/smf.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1760: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1760: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

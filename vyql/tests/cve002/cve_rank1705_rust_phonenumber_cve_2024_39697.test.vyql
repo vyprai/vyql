@@ -1,0 +1,28 @@
+# Rank 1705 / CVE-2024-39697: Security review for CVE-2024-39697 in whisperfish/rust-phonenumber.
+# Fix commit b792151b17 in whisperfish/rust-phonenumber.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1705: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1705: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

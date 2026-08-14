@@ -1,0 +1,26 @@
+# Rank 1735 / CVE-2024-46898: Security review for CVE-2024-46898 in shirasagi/shirasagi.
+# Fix commit 5ac4685d7e in shirasagi/shirasagi.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1735: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1735: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

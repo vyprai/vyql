@@ -1,0 +1,28 @@
+# Rank 1747 / CVE-2020-6164: Security review for CVE-2020-6164 in silverstripe/silverstripe-framework.
+# Fix commit 91d30db88f in silverstripe/silverstripe-framework.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1747: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1747: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

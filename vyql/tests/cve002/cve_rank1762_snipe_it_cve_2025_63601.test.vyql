@@ -1,0 +1,28 @@
+# Rank 1762 / CVE-2025-63601: Security review for CVE-2025-63601 in grokability/snipe-it.
+# Fix commit a6ded20ede in grokability/snipe-it.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1762: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1762: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

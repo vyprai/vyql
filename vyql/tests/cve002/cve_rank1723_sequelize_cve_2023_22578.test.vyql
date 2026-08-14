@@ -1,0 +1,28 @@
+# Rank 1723 / CVE-2023-22578: Security review for CVE-2023-22578 in sequelize/sequelize.
+# Fix commit d3f5b5a65e in sequelize/sequelize.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1723: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1723: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

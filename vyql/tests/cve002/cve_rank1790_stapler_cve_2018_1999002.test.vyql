@@ -1,0 +1,30 @@
+# Rank 1790 / CVE-2018-1999002: Security review for CVE-2018-1999002 in jenkinsci/stapler.
+# Fix commit 8e9679b08c in jenkinsci/stapler.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1790: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1790: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

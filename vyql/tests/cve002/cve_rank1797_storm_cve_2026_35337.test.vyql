@@ -1,0 +1,30 @@
+# Rank 1797 / CVE-2026-35337: Security review for CVE-2026-35337 in apache/storm.
+# Fix commit 586ce74c26 in apache/storm.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1797: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1797: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

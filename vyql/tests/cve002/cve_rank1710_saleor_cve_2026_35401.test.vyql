@@ -1,0 +1,27 @@
+# Rank 1710 / CVE-2026-35401: Security review for CVE-2026-35401 in saleor/saleor.
+# Fix commit e11a5557ef in saleor/saleor.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1710: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1710: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

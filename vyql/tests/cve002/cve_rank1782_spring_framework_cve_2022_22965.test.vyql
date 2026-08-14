@@ -1,0 +1,30 @@
+# Rank 1782 / CVE-2022-22965: Security review for CVE-2022-22965 in spring-projects/spring-framework.
+# Fix commit 002546b3e4 in spring-projects/spring-framework.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1782: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1782: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

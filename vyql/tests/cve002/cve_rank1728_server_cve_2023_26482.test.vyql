@@ -1,0 +1,28 @@
+# Rank 1728 / CVE-2023-26482: Security review for CVE-2023-26482 in nextcloud/server.
+# Fix commit 5a06b50b10 in nextcloud/server.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1728: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1728: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

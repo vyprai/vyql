@@ -1,0 +1,32 @@
+# Rank 1730 / CVE-2026-30914: Security review for CVE-2026-30914 in drakkan/sftpgo.
+# Fix commit 2f092d1289 in drakkan/sftpgo.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1730: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1730: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

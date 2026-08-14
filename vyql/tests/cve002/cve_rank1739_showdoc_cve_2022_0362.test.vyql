@@ -1,0 +1,28 @@
+# Rank 1739 / CVE-2022-0362: Security review for CVE-2022-0362 in star7th/showdoc.
+# Fix commit 2b34e267e4 in star7th/showdoc.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1739: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1739: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

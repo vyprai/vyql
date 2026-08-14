@@ -1,0 +1,32 @@
+# Rank 1754 / CVE-2026-32938: Security review for CVE-2026-32938 in siyuan-note/siyuan.
+# Fix commit fe4523fff2 in siyuan-note/siyuan.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1754: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1754: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

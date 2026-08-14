@@ -1,0 +1,30 @@
+# Rank 1796 / CVE-2025-55150: Security review for CVE-2025-55150 in stirling-tools/stirling-pdf.
+# Fix commit 7d6b70871b in stirling-tools/stirling-pdf.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1796: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1796: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

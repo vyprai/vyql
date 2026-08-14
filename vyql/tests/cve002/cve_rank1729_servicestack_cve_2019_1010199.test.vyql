@@ -1,0 +1,30 @@
+# Rank 1729 / CVE-2019-1010199: Security review for CVE-2019-1010199 in ServiceStack/ServiceStack.
+# Fix commit a0e0d7de20 in ServiceStack/ServiceStack.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1729: vulnerable code pattern before fix"
+  lang csharp
+  file Main.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  class Handler {
+    public static string HandleRequest(string input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1729: validated or patched form"
+  lang csharp
+  file Main.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  class Handler {
+    public static string HandleRequest(string input) {
+        if (input == null) return string.Empty;
+        return input;
+    }
+}
+  ```

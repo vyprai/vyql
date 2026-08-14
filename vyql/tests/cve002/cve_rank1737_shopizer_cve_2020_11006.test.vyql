@@ -1,0 +1,30 @@
+# Rank 1737 / CVE-2020-11006: Security review for CVE-2020-11006 in shopizer-ecommerce/shopizer.
+# Fix commit 929ca0839a in shopizer-ecommerce/shopizer.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1737: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1737: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

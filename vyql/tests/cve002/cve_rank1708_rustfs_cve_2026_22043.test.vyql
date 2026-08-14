@@ -1,0 +1,28 @@
+# Rank 1708 / CVE-2026-22043: Security review for CVE-2026-22043 in rustfs/rustfs.
+# Fix commit a95e549430 in rustfs/rustfs.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1708: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1708: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```
