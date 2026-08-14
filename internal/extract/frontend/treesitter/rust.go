@@ -141,6 +141,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, ParamEntries: c.rsParamEntries(c.text(field(n, "name")), params, attrs), Body: body, Loc: L, Exported: exported}}
 	case "impl_item":
 		out := c.rsUnsafeImplMetadata(n)
+		out = append(out, c.rsUnpinImplMetadata(n)...)
 		out = append(out, c.rsRunTestsAutoApprovalMetadata(n)...)
 		out = append(out, c.decls(field(n, "body"))...)
 		return out
@@ -471,6 +472,37 @@ func (c *rsConv) rsUnsafeImplMetadata(n *tree_sitter.Node) []nir.Stmt {
 	return out
 }
 
+// rsUnpinImplMetadata reports an unconditional Unpin impl for a generic type
+// in a file that also pins with Pin::new_unchecked. Unpin is a safe trait, so
+// the impl alone proves nothing -- a wrapper whose field is a Box is Unpin
+// whatever its parameter is. The unsoundness needs both halves: the blanket
+// impl lets safe code move the value out of a Pin, and new_unchecked is the
+// promise that it never moves. Together they let a caller free a buffer the
+// pinned I/O object still references (RUSTSEC's Framed shape). A bound on the
+// parameter (T: Unpin) makes the impl conditional and drops the fact.
+func (c *rsConv) rsUnpinImplMetadata(n *tree_sitter.Node) []nir.Stmt {
+	compact := rustCompactText(c.text(n))
+	if strings.HasPrefix(compact, "unsafeimpl") || !strings.HasPrefix(compact, "impl") {
+		return nil
+	}
+	if !strings.Contains(compact, "Unpinfor") {
+		return nil
+	}
+	// Only a generic impl can promise Unpin for parameters it does not know.
+	if !strings.HasPrefix(compact, "impl<") {
+		return nil
+	}
+	if strings.Contains(compact, ":Unpin") || strings.Contains(compact, "+Unpin") {
+		return nil
+	}
+	if !strings.Contains(string(c.src), "new_unchecked") {
+		return nil
+	}
+	loc := c.loc(n)
+	return []nir.Stmt{c.rsAnalysisCall("analysis.rust.unpin_impl_missing_bound", "unpin_impl_missing_bound", loc,
+		"lang=rust", "trait:Unpin", "missing_bound:Unpin")}
+}
+
 func (c *rsConv) rsAnalysisCall(path, method, loc string, tokens ...string) nir.Stmt {
 	args := make([]nir.Expr, 0, len(tokens))
 	for _, tok := range tokens {
@@ -522,6 +554,9 @@ func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		nir.Const{Loc: loc, Value: rustCompactText(text)},
 	}
 	for _, tok := range c.rsStructuredContextTokens(body) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	if tok := c.rustClosureUnwindStaleLength(fn, body); tok != "" {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
@@ -594,6 +629,64 @@ func (c *rsConv) rsStructuredContextTokens(root *tree_sitter.Node) []string {
 		add(tok)
 	}
 	return out
+}
+
+// rustClosureUnwindStaleLength reports the shape of the retain family of
+// memory-safety bugs (rust-lang/rust#60977, #78498): a function takes a
+// caller-supplied closure, calls it between a raw buffer copy and the final
+// set_len, and carries no unwind protection. A panic inside the closure then
+// leaves the collection with its stale pre-compaction length, and the drop
+// that follows frees moved elements twice or observes holes. Both guarded
+// forms suppress the fact: zeroing the length before the loop (set_len(0)),
+// or restoring it from an inline Drop guard. The check is keyed on this
+// shape, never on any one crate's identifiers.
+func (c *rsConv) rustClosureUnwindStaleLength(fn, body *tree_sitter.Node) string {
+	bodyText := rustCompactText(c.text(body))
+	if !strings.Contains(bodyText, "ptr::copy") || !strings.Contains(bodyText, "set_len(") {
+		return ""
+	}
+	if strings.Contains(bodyText, "set_len(0)") || strings.Contains(bodyText, "Dropfor") {
+		return ""
+	}
+	// The closure bound lives in the signature or the where clause, not in the
+	// parameter list, so read everything before the body.
+	fnText := rustCompactText(c.text(fn))
+	sig := strings.TrimSuffix(fnText, bodyText)
+	if !strings.Contains(sig, "FnMut") && !strings.Contains(sig, "FnOnce") && !strings.Contains(sig, "Fn(") {
+		return ""
+	}
+	for _, p := range c.params(field(fn, "parameters")) {
+		name := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(p), "mut "))
+		if name == "" || name == "self" || !rustCompactCallsIdent(bodyText, name) {
+			continue
+		}
+		return "rust_review:closure_unwind_stale_length"
+	}
+	return ""
+}
+
+// rustCompactCallsIdent reports whether compact holds a call to the bare
+// identifier: name immediately followed by an open parenthesis, with no
+// path or field character in front, so a parameter named len does not match
+// every .len() in the body.
+func rustCompactCallsIdent(compact, name string) bool {
+	needle := name + "("
+	for at := strings.Index(compact, needle); at >= 0; {
+		if at == 0 {
+			return true
+		}
+		prev := compact[at-1]
+		if !(prev >= 'a' && prev <= 'z') && !(prev >= 'A' && prev <= 'Z') &&
+			!(prev >= '0' && prev <= '9') && prev != '_' && prev != '.' && prev != ':' {
+			return true
+		}
+		next := strings.Index(compact[at+1:], needle)
+		if next < 0 {
+			break
+		}
+		at += 1 + next
+	}
+	return false
 }
 
 func rustSemanticReviewTokens(raw string) []string {

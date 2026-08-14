@@ -1,0 +1,103 @@
+# Rank 1031 / CVE-2021-45884: Brave's CNAME-based adblocking resolves the
+# canonical name of a request host itself, outside whatever proxy the user
+# configured. ProxySettingsAllowUncloaking decides whether that extra lookup is
+# safe, and it concluded "safe" from an incomplete enumeration of proxy modes:
+#
+#   bool can_uncloak = true;
+#   if (availability == ConfigAvailability::CONFIG_VALID) {
+#     if (config.value().proxy_rules().type ==
+#         net::ProxyConfig::ProxyRules::Type::PROXY_LIST) {
+#       can_uncloak = false;
+#     }
+#   }
+#
+# net::ProxyConfig::ProxyRules::Type has three values, and PROXY_LIST is only
+# the single-proxy one. A per-scheme configuration with a non-empty
+# fallback_proxies routes every request as well, which is exactly what a
+# proxying extension with a SOCKS fallback installs, so the DNS query for the
+# CNAME went out over the system resolver and disclosed the browsing target
+# (CWE-200). The fix 0c2580eb78 adds the second arm, PROXY_LIST_PER_SCHEME with
+# a non-empty fallback_proxies.
+#
+# ATTENTION, precision cost, because the only available discriminator is the
+# patch itself. Nothing in either revision is labelled: there is no taint path,
+# since the leak is the DNS query the network stack issues in another process,
+# and the predicate's return value gates the same call in both revisions. What
+# is left is naming the enum. Both revisions compare against
+# ProxyRules::Type::PROXY_LIST, so a presence binding reports the fixed code
+# too; the only separation is "PROXY_LIST is compared and PROXY_LIST_PER_SCHEME
+# is not mentioned", which detects the absence of this commit rather than the
+# weakness. Measured against Chromium, where the enum lives: 20 files name
+# ProxyRules::Type::PROXY_LIST and 16 of them also name PROXY_LIST_PER_SCHEME,
+# so that condition reports 4 more files, three unit tests plus
+# chrome/enterprise_companion/proxy_config_service.cc, which assigns the mode
+# when building a config rather than gating anything on it. A codebase that
+# gets the same policy wrong through a different predicate, on single_proxies
+# or on an emptiness test, walks past it in the other direction.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1031: uncloaking is allowed because only the single-proxy mode is checked"
+  lang cpp
+  file browser/net/brave_ad_block_tp_network_delegate_helper.cc
+  reject VYQL-SMELL-DATA
+  code
+  ```
+  #include "net/proxy_resolution/proxy_config.h"
+
+  bool ProxySettingsAllowUncloaking(content::BrowserContext* browser_context) {
+    bool can_uncloak = true;
+
+    Profile* profile = Profile::FromBrowserContext(browser_context);
+    std::unique_ptr<net::ProxyConfigService> proxy_config_service =
+        ProxyServiceFactory::CreateProxyConfigService(nullptr);
+
+    net::ProxyConfigWithAnnotation config;
+    net::ProxyConfigService::ConfigAvailability availability =
+        proxy_config_service->GetLatestProxyConfig(&config);
+
+    if (availability ==
+        net::ProxyConfigService::ConfigAvailability::CONFIG_VALID) {
+      if (config.value().proxy_rules().type ==
+          net::ProxyConfig::ProxyRules::Type::PROXY_LIST) {
+        can_uncloak = false;
+      }
+    }
+
+    return can_uncloak;
+  }
+  ```
+
+test "rank1031: fix also refuses uncloaking for a per-scheme config with a fallback"
+  lang cpp
+  file browser/net/brave_ad_block_tp_network_delegate_helper.cc
+  reject VYQL-SMELL-DATA
+  code
+  ```
+  #include "net/proxy_resolution/proxy_config.h"
+
+  bool ProxySettingsAllowUncloaking(content::BrowserContext* browser_context) {
+    bool can_uncloak = true;
+
+    Profile* profile = Profile::FromBrowserContext(browser_context);
+    std::unique_ptr<net::ProxyConfigService> proxy_config_service =
+        ProxyServiceFactory::CreateProxyConfigService(nullptr);
+
+    net::ProxyConfigWithAnnotation config;
+    net::ProxyConfigService::ConfigAvailability availability =
+        proxy_config_service->GetLatestProxyConfig(&config);
+
+    if (availability ==
+        net::ProxyConfigService::ConfigAvailability::CONFIG_VALID) {
+      if (config.value().proxy_rules().type ==
+              net::ProxyConfig::ProxyRules::Type::PROXY_LIST ||
+          (config.value().proxy_rules().type ==
+               net::ProxyConfig::ProxyRules::Type::PROXY_LIST_PER_SCHEME &&
+           !config.value().proxy_rules().fallback_proxies.IsEmpty())) {
+        can_uncloak = false;
+      }
+    }
+
+    return can_uncloak;
+  }
+  ```

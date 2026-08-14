@@ -1,0 +1,80 @@
+# Rank 1020 / CVE-2026-26020: AutoGPT remote code execution through a disabled
+# block. BlockInstallationBlock writes caller-supplied Python into a file under
+# the backend's own package directory and imports it, and it is marked
+# disabled=True for that reason. The direct block-execution endpoint honoured
+# that flag, but graph validation did not, so an authenticated user embedded the
+# block as a node in a graph and reached the import anyway (CWE-285). The fix
+# 062fe1aa70 adds two guards, one in GraphModel validation and one in
+# execute_node, each raising when block.disabled is set.
+#
+# ATTENTION, on both faces of this CVE.
+#  - The fix enforces a boolean flag on a path that skipped it. Detecting that
+#    generically means flagging any flag consulted on one path and not another,
+#    which describes ordinary feature flags everywhere, and nothing marks
+#    block.disabled as security-relevant rather than a normal capability switch.
+#  - The dangerous primitive is already half modelled and still does not fire.
+#    In blocks/block.py the file write is labelled code.FilePathAccess and the
+#    dynamic import is labelled code.DynamicCodeLoad, but no source labels the
+#    block input, so the path from input_data.code to __import__ never
+#    completes and VYQL-INJ-023 stays silent. Closing that would mean labelling
+#    a parameter typed as the framework's own block input schema as untrusted,
+#    which is answerable to this project rather than to any library
+#    documentation. Neither the api nor the library profile produces a finding.
+#  - Even a completed path would not discriminate this fix, which changes
+#    graph.py and manager.py while blocks/block.py is untouched.
+#
+# verify_current_expected: attention-no-discrimination
+
+test "rank1020: block writes caller-supplied code into the package and imports it"
+  lang python
+  file autogpt_platform/backend/backend/blocks/block.py
+  reject VYQL-INJ-023
+  code
+  ```
+  import os
+  import re
+
+
+  class BlockInstallationBlock(Block):
+      async def run(self, input_data: Input, **kwargs) -> BlockOutput:
+          code = input_data.code
+
+          if search := re.search(r"class (\w+)\(Block\):", code):
+              class_name = search.group(1)
+          else:
+              raise RuntimeError("No class found in the code.")
+
+          if search := re.search(r"id=\"(\w+-\w+-\w+-\w+-\w+)\"", code):
+              file_name = search.group(1)
+          else:
+              raise RuntimeError("No UUID found in the code.")
+
+          block_dir = os.path.dirname(__file__)
+          file_path = f"{block_dir}/{file_name}.py"
+          module_name = f"backend.blocks.{file_name}"
+          with open(file_path, "w") as f:
+              f.write(code)
+
+          module = __import__(module_name, fromlist=[class_name])
+          block_class = getattr(module, class_name)
+          return block_class()
+  ```
+
+test "rank1020: fix refuses a disabled block during graph validation"
+  lang python
+  file autogpt_platform/backend/backend/data/graph.py
+  reject VYQL-INJ-023
+  code
+  ```
+  class GraphModel(Graph, GraphMeta):
+      def validate_graph(self, for_run: bool = False):
+          for node in self.nodes:
+              block = get_block(node.block_id)
+              if block is None:
+                  raise ValueError(f"Invalid block {node.block_id} for node #{node.id}")
+
+              if block.disabled:
+                  raise ValueError(
+                      f"Block {node.block_id} is disabled and cannot be used in graphs"
+                  )
+  ```

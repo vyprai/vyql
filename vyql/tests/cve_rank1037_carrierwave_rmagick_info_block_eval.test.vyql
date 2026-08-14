@@ -1,0 +1,87 @@
+# Rank 1037 / CVE-2021-21305: CarrierWave::RMagick built a lambda by string
+# interpolation from the :read and :write mutation options of #manipulate! and
+# ran it through eval (CWE-94, CWE-74):
+#
+#   assignments = options.map { |k, v| "img.#{k} = #{v}" }
+#   code = "lambda { |img| " + assignments.join(";") + "}"
+#   eval code
+#
+# An option value such as `density: "1 }; p 'Hacked'; {"` closes the lambda body
+# and runs whatever follows. The fix 387116f5c7 drops the generated source
+# entirely and builds a proc that assigns through img.public_send(:"#{k}=", v).
+#
+# CAUGHT by VYQL-INJ-003. The public-API parameter is the source through
+# library.param-source, the interpolated string carries the taint, and eval is
+# code.CodeEval, with no core.CodeExecutionValidation on the sink. The patched
+# form has no eval at all, so nothing is reported.
+#
+# Measured on the real checkout, lib/ only: 19 findings at the vulnerable
+# revision, one of them this row at rmagick.rb:379 -> rmagick.rb:383, and 18 at
+# the fix with no rmagick row.
+#
+# Both tests declare `profile library` because the source is the public-API
+# parameter. Under the generic profile a method parameter is not a trust
+# boundary and the same snippet reports nothing, which is why the real scan
+# needs the repository root that makes the archetype detectable.
+
+test "rank1037: mutation options are interpolated into a lambda and eval'd"
+  lang ruby
+  file lib/carrierwave/processing/rmagick.rb
+  profile library
+  expect VYQL-INJ-003
+  code
+  ```
+  module CarrierWave
+    module RMagick
+      def manipulate!(options={}, &block)
+        image = ::Magick::Image.read(current_path) do
+          self.format = options[:format].to_s.upcase if options[:format]
+          instance_eval(&create_info_block(options[:read])) if options[:read]
+        end
+        image
+      end
+
+      def create_info_block(options)
+        return nil unless options
+
+        assignments = options.map { |k, v| "img.#{k} = #{v}" }
+        code = "lambda { |img| " + assignments.join(";") + "}"
+        eval code
+      end
+    end
+  end
+  ```
+
+test "rank1037: fix assigns through public_send instead of generating source"
+  lang ruby
+  file lib/carrierwave/processing/rmagick.rb
+  profile library
+  reject VYQL-INJ-003
+  code
+  ```
+  module CarrierWave
+    module RMagick
+      def manipulate!(options={}, &block)
+        image = ::Magick::Image.read(current_path) do
+          self.format = options[:format].to_s.upcase if options[:format]
+          instance_eval(&create_info_block(options[:read])) if options[:read]
+        end
+        image
+      end
+
+      def create_info_block(options)
+        return nil unless options
+
+        proc do |img|
+          options.each do |k, v|
+            if v.is_a?(String) && (matches = v.match(/^["'](.+)["']/))
+              ActiveSupport::Deprecation.warn "Passing quoted strings like #{v} to #manipulate! is deprecated, pass them without quoting."
+              v = matches[1]
+            end
+            img.public_send(:"#{k}=", v)
+          end
+        end
+      end
+    end
+  end
+  ```

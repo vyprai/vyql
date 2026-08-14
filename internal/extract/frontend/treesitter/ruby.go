@@ -679,6 +679,19 @@ func rbSemanticReviewTokens(raw, scope string) []string {
 	if scope == "function" && (strings.Contains(compact, "find_by(params[") || strings.Contains(compact, "find_by(params)")) {
 		add("active_record_find_by_request_hash")
 	}
+	// A CSV row assembled by mapping over collection data, with no formula
+	// guard anywhere in the function, is the OWASP CSV-injection shape: a cell
+	// beginning with = + - @ executes when the export is opened in a
+	// spreadsheet. The guard signals are the conventional ones -- a sanitizer
+	// or escaper call, or the prefix-quote idiom itself.
+	if scope == "function" &&
+		(strings.Contains(compact, "CSV.generate_line(") || strings.Contains(compact, "CSV.generate(")) &&
+		strings.Contains(compact, ".map") &&
+		!strings.Contains(compact, "sanitize") && !strings.Contains(compact, "Sanitiz") &&
+		!strings.Contains(compact, "escape") && !strings.Contains(compact, "csv_safe") &&
+		!strings.Contains(compact, "\"'#{") && !strings.Contains(compact, "'\\''#{") {
+		add("csv_formula_prone_export_row")
+	}
 	if scope == "class" &&
 		strings.Contains(compact, "Chef::WebUIUser.cdb_load") &&
 		strings.Contains(compact, "cdb_save") &&

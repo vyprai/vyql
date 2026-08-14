@@ -1,0 +1,71 @@
+# Rank 1007 / CVE-2026-32317: Cryptomator for Android Hub host trust bypass.
+# The vault.cryptomator config file is attacker-tamperable (it is synced from
+# the cloud). When the key loading strategy is HUB, UnlockVaultPresenter loaded
+# the Hub key using the apiBaseUrl, authEndpoint and tokenEndpoint taken from
+# that config with no host authenticity check, so an attacker could mix a
+# legitimate auth endpoint with a malicious API endpoint and exfiltrate the
+# access token (MITM on Hub key loading; CWE-346 origin validation, CWE-923).
+# The pool commit was the release/1.12.3 merge, not the fix; corrected to the
+# real fix e4903a2 (PR #626, "Implement Hub Host trust validation"), which gates
+# unlock behind isConsistentHubConfig (token and auth authorities match), an
+# allowed-hosts set, a trusted .cryptomator.cloud https check, an HTTP refusal,
+# and an explicit user host-trust confirmation dialog.
+#
+# ATTENTION, no precise generic detection. The trust boundary is domain
+# knowledge the scanner cannot infer: endpoints taken from a persisted config
+# are normally trusted, and only here is the config an attacker-controlled
+# synced file. A generic rule for "a network endpoint from config is used
+# without a host authenticity check" would fire on ordinary code everywhere,
+# since reading an endpoint from configuration and calling it is how most
+# applications work. The specific safe control (auth and token authorities must
+# match, plus an allow-list of trusted hosts) is particular to Hub key loading
+# and does not generalize to a documentation-derivable binding or rule.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1007: Hub unlock uses config endpoints with no host authenticity check"
+  lang kotlin
+  file UnlockVaultPresenter.kt
+  reject VYQL-RF-001
+  code
+  ```
+  class UnlockVaultPresenter {
+    fun onUnverifiedVaultConfigRetrieved(unverifiedHubVaultConfig: UnverifiedHubVaultConfig, vault: Vault) {
+      when (intent.vaultAction()) {
+        UnlockVaultIntent.VaultAction.UNLOCK -> {
+          if (hubAuthService == null) {
+            hubAuthService = AuthorizationService(context())
+          }
+          view?.showProgress(ProgressModel.GENERIC)
+          unlockHubVault(unverifiedHubVaultConfig, vault)
+        }
+        else -> {}
+      }
+    }
+  }
+  ```
+
+test "rank1007: fix gates Hub unlock behind host consistency and trust checks"
+  lang kotlin
+  file UnlockVaultPresenter.kt
+  reject VYQL-RF-001
+  code
+  ```
+  class UnlockVaultPresenter {
+    fun onUnverifiedVaultConfigRetrieved(unverifiedHubVaultConfig: UnverifiedHubVaultConfig, vault: Vault) {
+      if (!isConsistentHubConfig(unverifiedHubVaultConfig)) {
+        Toast.makeText(context(), R.string.error_hub_not_trustworthy, Toast.LENGTH_LONG).show()
+      } else if (configContainsAllowedHosts(unverifiedHubVaultConfig)) {
+        allowedHubHosts(unverifiedHubVaultConfig, vault)
+      } else if (isCryptomatorCloud(unverifiedHubVaultConfig) && !isHttpHost(unverifiedHubVaultConfig)) {
+        allowedHubHosts(unverifiedHubVaultConfig, vault)
+      } else {
+        Toast.makeText(context(), R.string.error_hub_not_trustworthy, Toast.LENGTH_LONG).show()
+      }
+    }
+
+    private fun isConsistentHubConfig(c: UnverifiedHubVaultConfig): Boolean {
+      return getAuthority(c.tokenEndpoint) == getAuthority(c.authEndpoint)
+    }
+  }
+  ```

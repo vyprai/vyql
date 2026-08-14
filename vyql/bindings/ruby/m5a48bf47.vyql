@@ -1456,3 +1456,8 @@ binding benchmarkSessionSetTrustBoundary {
   query pattern callExpr where callee.path ~= "session.set"
   emit sink code.TrustBoundary at args[1]
 }
+
+binding csvFormulaProneExportRow {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.rubyReview == "csv_formula_prone_export_row"
+  emit issue code.CsvFormulaProneExportRow at node
+}

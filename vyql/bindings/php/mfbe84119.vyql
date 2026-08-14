@@ -2684,3 +2684,48 @@ binding unsanitizedSvgUpload472 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.subscript contains "$_FILES" and node.context.callPath contains "Filesystem.extension" and node.context.callPath contains "Filesystem.mimeType" and node.context.callPath contains "Filesystem.mv" and node.context.callPath contains "in_array" and not (containsAny(node.context.scopeCall, [sanitizeSvg, svgSanitize, Sanitizer]))
   emit issue code.UnsanitizedSvgUpload at node
 }
+
+binding httpInput49 {
+  query pattern callExpr where callee.method == "apache_request_headers"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput50 {
+  query pattern callExpr where callee.method == "getallheaders"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput51 {
+  query pattern callExpr where callee.path ~= "request.getVar"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput52 {
+  query pattern callExpr where callee.path ~= "request.getGet"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput53 {
+  query pattern callExpr where callee.path ~= "request.getPost"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput54 {
+  query pattern callExpr where callee.path ~= "request.getPostGet"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput55 {
+  query pattern callExpr where callee.path ~= "request.getGetPost"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput56 {
+  query pattern callExpr where callee.path ~= "request.getJSON"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput57 {
+  query pattern callExpr where callee.path ~= "request.getRawInput"
+  emit source code.HttpInput at call.result
+}

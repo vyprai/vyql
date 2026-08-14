@@ -1,0 +1,80 @@
+# Rank 1033 / CVE-2023-0748: BTCPay Server wallet and store wizards render a
+# caller-supplied return address straight into markup, so a crafted link sends
+# the user off site after the wizard step (CWE-601). The views read it off the
+# model, which binds it from the query string:
+#
+#   var cancelUrl = Model.ReturnUrl ?? Url.Action(...);
+#   var backUrl = Model.BackUrl != null ? $"{Model.BackUrl}?returnUrl={Model.ReturnUrl}" : null;
+#   <a href="@backUrl" id="GoBack">
+#   <a href="@cancelUrl" id="CancelWizard" class="cancel">
+#
+# and PostRedirect.cshtml does the same with a form action. The fix f2ced20c42
+# adds IUrlHelper.EnsureLocal, which returns the address only when IsLocalUrl
+# accepts it or its host equals the request host, and wraps every one of those
+# attributes in it.
+#
+# ATTENTION, coverage gap, and the gap is the file type rather than the
+# weakness. Razor markup has no frontend: scanning BTCPayServer/Views/UIWallets
+# parses 1 C# file and leaves 18 .cshtml files unread, and the whole repository
+# holds 282 .cshtml files, 65 of them interpolating a value into an href, action
+# or src attribute. Every sink this CVE fixed is one of those attributes, so
+# there is nothing for a binding to label.
+#
+# The weakness class itself is covered wherever a frontend exists, which is what
+# the two cases below pin. The same model value reaching a C# redirect sink is
+# reported as VYQL-RF-002, and routing it through the fix's own EnsureLocal
+# helper suppresses it interprocedurally, so core.RedirectAllowlist already
+# recognises the control the maintainers wrote. Adding a Razor frontend is
+# design work, not a localised change, and it is the only thing that would close
+# this rank.
+#
+# verify_current_expected: attention-coverage-gap
+
+test "rank1033: a bound return address reaching a redirect sink is an open redirect"
+  lang csharp
+  file BTCPayServer/Controllers/UIWalletsController.cs
+  expect VYQL-RF-002
+  code
+  ```
+  using Microsoft.AspNetCore.Mvc;
+
+  public class UIWalletsController : Controller
+  {
+      public IActionResult WalletSend(WalletSendModel model)
+      {
+          return Redirect(model.ReturnUrl);
+      }
+  }
+  ```
+
+test "rank1033: the fix's EnsureLocal helper neutralises the same value"
+  lang csharp
+  file BTCPayServer/Extensions/UrlHelperExtensions.cs
+  reject VYQL-RF-002
+  code
+  ```
+  using System;
+  using Microsoft.AspNetCore.Mvc;
+
+  public static class UrlHelperExtensions
+  {
+      public static string EnsureLocal(this IUrlHelper helper, string url, HttpRequest httpRequest = null)
+      {
+          if (url is null || helper.IsLocalUrl(url))
+              return url;
+          if (httpRequest is null)
+              return null;
+          if (Uri.TryCreate(url, UriKind.Absolute, out var r) && r.Host.Equals(httpRequest.Host.Host))
+              return url;
+          return null;
+      }
+  }
+
+  public class UIWalletsController : Controller
+  {
+      public IActionResult WalletSend(WalletSendModel model)
+      {
+          return Redirect(Url.EnsureLocal(model.ReturnUrl));
+      }
+  }
+  ```

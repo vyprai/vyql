@@ -1,0 +1,106 @@
+# Rank 1018 / CVE-2023-0040: Swift AsyncHTTPClient sent outbound header field
+# values without validating them, so an application that puts untrusted data
+# into a request header (a username read from a database, for example) lets an
+# attacker inject CR and LF and thereby add header fields or whole requests to
+# the stream (CWE-74, CWE-93). The fix 7f05a8da46 adds validateFieldValues()
+# beside the existing validateFieldNames() in RequestValidation.swift, rejecting
+# CR, LF, NUL and other ASCII control characters per RFC 9110, with HTAB allowed.
+#
+# ATTENTION, on three counts.
+#  - The fix is library-internal hardening. The vulnerable code validates header
+#    field names and simply has no field-value check; a binding for "a validator
+#    that checks names but not values" would be answerable to this commit rather
+#    than to any documentation, which is the repro-shaped patch the layering
+#    rules reject.
+#  - The generic detection for this class is consumer-side: untrusted data
+#    reaching an outbound request header is CRLF injection unless the value is
+#    sanitised. By construction that cannot fire on the library's own
+#    repository, which defines the header API rather than calling it with
+#    untrusted input, and it would not discriminate this fix either, since the
+#    consumer code is identical either side of the commit.
+#  - Swift has no header-write sink at all. Its 89 bindings cover command
+#    execution, SQL, file paths, URL fetch, web view loads and others, but
+#    nothing emits a header-write sink, so even a consumer passing untrusted
+#    data into a request header is invisible today. The nearest concept,
+#    code.ResponseHeaderWrite (CWE-113, VYQL-INJ-010), is response-oriented, so
+#    covering the request side needs either a generalised concept or a sibling
+#    for outbound request headers.
+# No Swift corpus is available here beyond this library itself, so a new sink
+# binding could not be measured for precision and none was shipped.
+#
+# verify_current_expected: attention-coverage-gap
+
+test "rank1018: request framing validates header field names but not their values"
+  lang swift
+  file Sources/AsyncHTTPClient/RequestValidation.swift
+  reject VYQL-INJ-010
+  code
+  ```
+  extension HTTPHeaders {
+      func validateAndSetTransportFraming(
+          method: HTTPMethod,
+          bodyLength: RequestBodyLength
+      ) throws -> RequestFramingMetadata {
+          try self.validateFieldNames()
+
+          if case .TRACE = method {
+              switch bodyLength {
+              case .known(0):
+                  break
+              default:
+                  throw HTTPClientError.traceRequestWithBody
+              }
+          }
+
+          return RequestFramingMetadata(connectionClose: false, body: .fixedSize(0))
+      }
+  }
+  ```
+
+test "rank1018: fix rejects control characters in header field values"
+  lang swift
+  file Sources/AsyncHTTPClient/RequestValidation.swift
+  reject VYQL-INJ-010
+  code
+  ```
+  extension HTTPHeaders {
+      func validateAndSetTransportFraming(
+          method: HTTPMethod,
+          bodyLength: RequestBodyLength
+      ) throws -> RequestFramingMetadata {
+          try self.validateFieldNames()
+          try self.validateFieldValues()
+
+          if case .TRACE = method {
+              switch bodyLength {
+              case .known(0):
+                  break
+              default:
+                  throw HTTPClientError.traceRequestWithBody
+              }
+          }
+
+          return RequestFramingMetadata(connectionClose: false, body: .fixedSize(0))
+      }
+
+      private func validateFieldValues() throws {
+          let invalidValues = self.compactMap { _, value -> String? in
+              let satisfy = value.utf8.allSatisfy { char -> Bool in
+                  switch char {
+                  case UInt8(ascii: "\t"):
+                      return true
+                  case 0...0x1f, 0x7F:
+                      return false
+                  default:
+                      return true
+                  }
+              }
+              return satisfy ? nil : value
+          }
+
+          guard invalidValues.isEmpty else {
+              throw HTTPClientError.invalidHeaderFieldValues(invalidValues)
+          }
+      }
+  }
+  ```
