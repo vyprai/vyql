@@ -1,0 +1,103 @@
+# Rank 1113 / CVE-2019-10449: the Fortify on Demand Uploader Jenkins plugin
+# accepted a personal access token as a plain String in its @DataBoundConstructor,
+# so Jenkins persisted it in cleartext in each job's config.xml, readable by
+# anyone with Extended Read or filesystem access to the controller (CWE-312).
+#
+# StaticAssessmentBuildStep's @DataBoundConstructor took
+# `String personalAccessToken` and passed it straight to SharedUploadBuildStep;
+# PollingBuildStep took the same shape. Jenkins serializes every
+# @DataBoundConstructor parameter for job persistence, and a plain String field
+# is written out as-is, unlike `hudson.util.Secret`, which Jenkins encrypts at
+# rest with the controller's own key.
+#
+# Pool commit 83b23662dc0c is the real fix (COMMIT_OK, GHSA-hhhh-69qp-5p2v).
+# It retypes both constructors' `personalAccessToken` parameter from `String`
+# to `hudson.util.Secret`, stores `personalAccessToken.getEncryptedValue()`
+# internally, and reconstructs a `Secret` on the getter side with
+# `Secret.fromString(...)`. No pool correction.
+#
+# FIXED. code.JenkinsPlaintextDataboundCredential already exists for exactly
+# this weakness, carries CWE_312, and vyql/bindings/java/m420f6b67.vyql
+# already binds it for four other credential-parameter names on the same
+# `@DataBoundConstructor` + `paramType contains "String"` +
+# `not paramType contains "Secret"` shape: apilogin, apitoken, repoPassword,
+# password. "personalAccessToken" (and "accessToken" plainly, since API and
+# personal access tokens are the same Jenkins-plugin credential idiom under
+# GitHub, GitLab, Azure DevOps and Fortify's own naming) was simply not one of
+# the four. Added jenkinsPlaintextDataboundCredential249, keyed on
+# `paramName contains "accesstoken"`, the same generic term any of those
+# platforms' own plugin-development documentation would use, wide enough to
+# also cover apiAccessToken and userAccessToken without naming a project.
+#
+# Diagnosis: scanning the real checkout at the vulnerable revision reports
+# VYQL-SEC-015 at StaticAssessmentBuildStep.java:43 on the personalAccessToken
+# parameter, and reports nothing at the fixed revision. Both revisions also
+# carry two unrelated VYQL-RF-043 state-changing-op findings, unchanged by
+# this addition.
+#
+# verify_current_expected: current-behavior
+
+test "rank1113: the personal access token is databound as a plain String"
+  lang java
+  file src/main/java/org/jenkinsci/plugins/fodupload/StaticAssessmentBuildStep.java
+  expect_review code.JenkinsPlaintextDataboundCredential
+  code
+  ```
+  package org.jenkinsci.plugins.fodupload;
+
+  import org.kohsuke.stapler.DataBoundConstructor;
+
+  public class StaticAssessmentBuildStep {
+
+      private final SharedUploadBuildStep sharedBuildStep;
+
+      @DataBoundConstructor
+      public StaticAssessmentBuildStep(String bsiToken,
+                                       boolean overrideGlobalConfig,
+                                       String username,
+                                       String personalAccessToken,
+                                       String tenantId) {
+
+          sharedBuildStep = new SharedUploadBuildStep(bsiToken,
+                  overrideGlobalConfig,
+                  username,
+                  personalAccessToken,
+                  tenantId);
+      }
+  }
+  ```
+
+test "rank1113: the token is databound as a Secret and stored encrypted"
+  lang java
+  file src/main/java/org/jenkinsci/plugins/fodupload/StaticAssessmentBuildStep.java
+  reject_review code.JenkinsPlaintextDataboundCredential
+  code
+  ```
+  package org.jenkinsci.plugins.fodupload;
+
+  import hudson.util.Secret;
+  import org.kohsuke.stapler.DataBoundConstructor;
+
+  public class StaticAssessmentBuildStep {
+
+      private final SharedUploadBuildStep sharedBuildStep;
+
+      @DataBoundConstructor
+      public StaticAssessmentBuildStep(String bsiToken,
+                                       boolean overrideGlobalConfig,
+                                       String username,
+                                       Secret personalAccessToken,
+                                       String tenantId) {
+
+          sharedBuildStep = new SharedUploadBuildStep(bsiToken,
+                  overrideGlobalConfig,
+                  username,
+                  personalAccessToken.getEncryptedValue(),
+                  tenantId);
+      }
+
+      public Secret getPersonalAccessToken() {
+          return Secret.fromString(sharedBuildStep.getAuthModel().getPersonalAccessToken());
+      }
+  }
+  ```

@@ -1347,6 +1347,11 @@ binding jenkinsPlaintextDataboundCredential248 {
   emit issue code.JenkinsPlaintextDataboundCredential at node
 }
 
+binding jenkinsPlaintextDataboundCredential249 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "parameter.entry" and node.context.annotation contains "DataBoundConstructor" and node.context.paramName contains "accesstoken" and node.context.paramType contains "String" and not (node.context.paramType contains "Secret")
+  emit issue code.JenkinsPlaintextDataboundCredential at node
+}
+
 binding jenkinsCredentialsStartupLoadContextExposure249 {
   query pattern presenceNode where node.scope == "class" and node.context.className contains "SystemCredentialsProvider" and node.context.functionName contains "SystemCredentialsProvider" and node.context.callPath contains "xml.unmarshal" and node.context.callPath contains "DomainCredentials.migrateListToMap" and node.context.functionName contains "getInstance" and not (node.context.annotation contains "Initializer") and not (node.context.functionName contains "forceLoadDuringStartup")
   emit issue code.JenkinsCredentialsStartupLoadContextExposure at node
