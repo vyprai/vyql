@@ -1,0 +1,89 @@
+# Rank 1133 / CVE-2025-43971: gobgp's BGP OPEN message SoftwareVersion
+# capability parser checked the declared length against the buffer's upper
+# bound but never rejected a declared length of zero, so
+# `data[1:c.SoftwareVersionLen]` became `data[1:0]`, a slice expression whose
+# low bound (1) exceeds its high bound (0), which Go rejects at runtime with
+# a panic, crashing the BGP speaker on one attacker-crafted OPEN message
+# (CWE-193).
+#
+# CapSoftwareVersion.DecodeFromBytes in pkg/packet/bgp/bgp.go read
+# `softwareVersionLen := uint8(data[0])` and guarded only
+# `if len(data[1:]) < int(softwareVersionLen) || softwareVersionLen > 64`,
+# an upper-bound check against both the remaining buffer length and a
+# fixed cap. Nothing excluded zero, and slicing with a low bound of 1 and a
+# high bound taken from an unchecked zero value is invalid Go regardless of
+# how much buffer remains.
+#
+# Pool commit 08a001e06d90 is the real fix (COMMIT_OK, its own message states
+# the crash line and reason precisely). It adds
+# `|| softwareVersionLen == 0` to the same guard, one clause, no restructuring.
+# No pool correction.
+#
+# ATTENTION, engine gap, and a distinct one from the C/C++ index-guard family
+# already on record at ranks 1026, 1032, 1038, 1096 and 1102: those are all
+# raw-pointer index expressions in C or C++, checked by an analysis that
+# exists only for those languages and is already known to be upper-bound-only
+# in the sense of never catching a negative (underflowed) index. This bug is
+# a Go slice expression, `data[1:N]`, where the failure mode is not an index
+# going negative but the slice's own low bound (a literal, 1) exceeding its
+# high bound (a variable, N, that can be 0) -- a relation between the two
+# operands of one slice expression, not a value going out of a single
+# variable's valid range. Go has no index or slice-bound analysis at all in
+# this engine; the closest existing issue by theme,
+# code.PotentialUnboundedCopy (VYQL-MEM-002), states a copy or write that can
+# exceed its destination's capacity, the inverse direction from a slice whose
+# own bounds are internally inconsistent, and its condition does not reach
+# this shape in any language. Scanning either revision of bgp.go reports 0
+# findings.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1133: a declared length of zero produces an invalid slice expression"
+  lang go
+  file bgp.go
+  reject VYQL-MEM-002
+  code
+  ```
+  package bgp
+
+  func (c *CapSoftwareVersion) DecodeFromBytes(data []byte) error {
+      c.DefaultParameterCapability.DecodeFromBytes(data)
+      data = data[2:]
+      if len(data) < 2 {
+          return NewMessageError(BGP_ERROR_OPEN_MESSAGE_ERROR, BGP_ERROR_SUB_UNSUPPORTED_CAPABILITY, nil, "Not all CapabilitySoftwareVersion bytes allowed")
+      }
+      softwareVersionLen := uint8(data[0])
+      if len(data[1:]) < int(softwareVersionLen) || softwareVersionLen > 64 {
+          return NewMessageError(BGP_ERROR_OPEN_MESSAGE_ERROR, BGP_ERROR_SUB_UNSUPPORTED_CAPABILITY, nil, "invalid length of software version capablity")
+      }
+      c.SoftwareVersionLen = softwareVersionLen
+      c.SoftwareVersion = string(data[1:c.SoftwareVersionLen])
+      return nil
+  }
+  ```
+
+test "rank1133: a declared length of zero is rejected before the slice expression runs"
+  lang go
+  file bgp.go
+  reject VYQL-MEM-002
+  code
+  ```
+  package bgp
+
+  func (c *CapSoftwareVersion) DecodeFromBytes(data []byte) error {
+      c.DefaultParameterCapability.DecodeFromBytes(data)
+      data = data[2:]
+      if len(data) < 2 {
+          return NewMessageError(BGP_ERROR_OPEN_MESSAGE_ERROR, BGP_ERROR_SUB_UNSUPPORTED_CAPABILITY, nil, "Not all CapabilitySoftwareVersion bytes allowed")
+      }
+      softwareVersionLen := uint8(data[0])
+      if len(data[1:]) < int(softwareVersionLen) || softwareVersionLen > 64 || softwareVersionLen == 0 {
+          return NewMessageError(BGP_ERROR_OPEN_MESSAGE_ERROR, BGP_ERROR_SUB_UNSUPPORTED_CAPABILITY, nil, "invalid length of software version capablity")
+      }
+      c.SoftwareVersionLen = softwareVersionLen
+      c.SoftwareVersion = string(data[1:c.SoftwareVersionLen])
+      return nil
+  }
+  ```
