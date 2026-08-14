@@ -1,0 +1,92 @@
+# Rank 1070 / CVE-2022-23639: crossbeam-utils' AtomicCell did its arithmetic by
+# casting the cell's own storage to an atomic of the matching width and calling
+# fetch_add on it, whether or not the type could be held in that atomic
+# (CWE-362). impl_arithmetic held
+#
+#   let a = unsafe { &*(self.value.get() as *const $atomic) };
+#   a.fetch_add(val, Ordering::AcqRel)
+#
+# and on a target where the type does not transmute to that atomic -- a 64-bit
+# value on a platform whose 64-bit atomic is wider or differently aligned -- the
+# reference is not to a valid atomic, so concurrent AtomicCell users race and the
+# read-modify-write is not atomic at all. Pool commit 924436cc71 is the real fix,
+# the merge of crossbeam#781, and its own diff is the fix: every arithmetic
+# operation now asks can_transmute::<$t, $atomic>() first and falls back to
+# taking the sharded write lock and doing the update by hand. The metadata check
+# reported COMMIT_NONE because the advisory names a released version rather than
+# a commit. No pool correction.
+#
+# ATTENTION, and this one is not a plumbing gap. The vulnerable and the fixed
+# code perform the same cast on the same expression; what separates them is
+# whether the target's layout lets the value live in that atomic, which is a
+# question about type layout on a platform rather than about any expression in
+# the file. No source, sink or control concept can carry it, and no presence
+# pattern over the function can state it, because both revisions contain the cast
+# and the fixed one merely reaches it under a condition. Neither is it a case
+# where a language-level fact would settle it, as at rank 1066: the fact needed
+# here is per-target and the code is inside a macro_rules body expanded once per
+# integer width, so even the two sides of the condition are not distinct
+# functions.
+#
+# What the scanner does report on this file is unrelated and worth stating so the
+# row is not mistaken for coverage: three VYQL-MEM-006 at low confidence on the
+# raw dereferences at atomic_cell.rs:598, 619 and 640, whose review condition is
+# that a pointer-like value is dereferenced with no null exclusion. That fires on
+# both revisions and describes neither the race nor the layout assumption; the
+# only label in the file otherwise is code.IndexAccessSink on the lock table.
+#
+# The two snippets differ only in whether the transmute is checked, and both
+# assert that unrelated row, which is the point: it is what the scanner has to
+# say about this file either way.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1070: the cell's storage is cast to an atomic unconditionally"
+  lang rust
+  file crossbeam-utils/src/atomic/atomic_cell.rs
+  expect VYQL-MEM-006
+  code
+  ```
+  use std::sync::atomic::{AtomicU64, Ordering};
+  use std::cell::UnsafeCell;
+
+  pub struct AtomicCell<T> {
+      value: UnsafeCell<T>,
+  }
+
+  impl AtomicCell<u64> {
+      pub fn fetch_add(&self, val: u64) -> u64 {
+          let a = unsafe { &*(self.value.get() as *const AtomicU64) };
+          a.fetch_add(val, Ordering::AcqRel)
+      }
+  }
+  ```
+
+test "rank1070: the same cast taken only when the type transmutes"
+  lang rust
+  file crossbeam-utils/src/atomic/atomic_cell.rs
+  expect VYQL-MEM-006
+  code
+  ```
+  use std::sync::atomic::{AtomicU64, Ordering};
+  use std::cell::UnsafeCell;
+
+  pub struct AtomicCell<T> {
+      value: UnsafeCell<T>,
+  }
+
+  impl AtomicCell<u64> {
+      pub fn fetch_add(&self, val: u64) -> u64 {
+          if can_transmute::<u64, AtomicU64>() {
+              let a = unsafe { &*(self.value.get() as *const AtomicU64) };
+              a.fetch_add(val, Ordering::AcqRel)
+          } else {
+              let _guard = lock(self.value.get() as usize).write();
+              let value = unsafe { &mut *(self.value.get()) };
+              let old = *value;
+              *value = value.wrapping_add(val);
+              old
+          }
+      }
+  }
+  ```
