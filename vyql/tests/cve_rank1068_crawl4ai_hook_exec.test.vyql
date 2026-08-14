@@ -1,0 +1,123 @@
+# Rank 1068 / CVE-2026-26216: crawl4ai's Docker API ran Python that the request
+# carried. The /crawl body took a hooks object, and UserHookManager.compile_hook
+# built a namespace whose builtins included __import__ and then called
+# exec(hook_code, namespace), so __import__('os').system(...) in a hook ran on
+# the server (CWE-94). Pool corrected: the row named a5354f267a, the
+# develop-into-release/v0.8.0 merge, whose own diff is extraction_strategy.py and
+# utils.py; the advisory names a version rather than a commit, and the fix is
+# f24396c23e120a9eaa67323e9f83fa3b900d6466, "Fix critical RCE and LFI
+# vulnerabilities in Docker API deployment", which drops '__import__' from
+# allowed_builtins and puts hooks behind HOOKS_ENABLED.
+#
+# CAUGHT by VYQL-INJ-003 at critical and high confidence, interprocedurally
+# across three files: source code.HttpInput on the crawl request body at
+# server.py:591, sink code.CodeEval at hook_manager.py:150, and a path running
+# crawl#param#crawl_request -> Attr -> Attr -> CollectionElement -> Seq -> Phi ->
+# Arg -> handle_crawl_request#param#hooks_config -> Call -> Arg ->
+# attach_user_hooks_to_crawler#param#user_hooks -> Arg ->
+# process_user_hooks_with_manager#param#hooks_input -> Call -> Arg ->
+# UserHookManager.compile_hook#param#hook_code -> Arg, with unless endpoint
+# coveredBy core.CodeExecutionValidation unsatisfied.
+#
+# Two limits, and the row is only worth recording with them stated. It does not
+# separate the revisions: exec(hook_code, namespace) survives the fix, which
+# narrows what the namespace holds, and no concept describes the builtins handed
+# to an exec, so a sandboxed interpreter and an open one look alike. And the file
+# set matters more than it should: scanning server.py and hook_manager.py alone
+# reports nothing at this sink, because the two are joined only through api.py,
+# so a scan of the deployment directory finds it and a scan of the two obvious
+# files does not.
+#
+# The snippets collapse that chain into one file, since a spec snippet is one
+# file while the real path spans three.
+#
+# verify_current_expected: skip-fresh-target
+
+test "rank1068: hook code from the request body is executed"
+  lang python
+  file deploy/docker/hook_manager.py
+  profile api
+  expect VYQL-INJ-003
+  code
+  ```
+  from fastapi import FastAPI
+  from pydantic import BaseModel
+
+  app = FastAPI()
+
+
+  class CrawlRequest(BaseModel):
+      urls: list
+      hooks: dict
+
+
+  class UserHookManager:
+      def compile_hook(self, hook_code: str, hook_point: str):
+          namespace = {}
+          namespace["__builtins__"] = {
+              "print": print,
+              "len": len,
+              "__import__": __import__,
+          }
+          exec(hook_code, namespace)
+          return namespace.get(hook_point)
+
+
+  def process_user_hooks_with_manager(hooks_input: dict, manager: UserHookManager):
+      compiled = {}
+      for hook_point, hook_code in hooks_input.items():
+          compiled[hook_point] = manager.compile_hook(hook_code, hook_point)
+      return compiled
+
+
+  @app.post("/crawl")
+  async def crawl(crawl_request: CrawlRequest):
+      manager = UserHookManager()
+      return process_user_hooks_with_manager(crawl_request.hooks, manager)
+  ```
+
+test "rank1068: the same manager compiling hooks it ships with"
+  lang python
+  file deploy/docker/hook_manager.py
+  profile api
+  reject VYQL-INJ-003
+  code
+  ```
+  from fastapi import FastAPI
+  from pydantic import BaseModel
+
+  app = FastAPI()
+
+  BUILTIN_HOOKS = {
+      "before_goto": "async def before_goto(page, context, url):\n    return page\n",
+  }
+
+
+  class CrawlRequest(BaseModel):
+      urls: list
+      hooks: dict
+
+
+  class UserHookManager:
+      def compile_hook(self, hook_code: str, hook_point: str):
+          namespace = {}
+          namespace["__builtins__"] = {
+              "print": print,
+              "len": len,
+          }
+          exec(hook_code, namespace)
+          return namespace.get(hook_point)
+
+
+  def process_builtin_hooks(manager: UserHookManager):
+      compiled = {}
+      for hook_point, hook_code in BUILTIN_HOOKS.items():
+          compiled[hook_point] = manager.compile_hook(hook_code, hook_point)
+      return compiled
+
+
+  @app.post("/crawl")
+  async def crawl(crawl_request: CrawlRequest):
+      manager = UserHookManager()
+      return process_builtin_hooks(manager)
+  ```
