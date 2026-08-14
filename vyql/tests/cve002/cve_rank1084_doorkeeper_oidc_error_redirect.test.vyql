@@ -1,0 +1,160 @@
+# Rank 1084 / CVE-2019-9837: doorkeeper-openid_connect built its error response
+# from the request's own redirect_uri and then redirected to it, so an attacker
+# who could trigger the error chose where the browser went (CWE-601).
+# lib/doorkeeper/openid_connect/helpers/controller.rb had
+#
+#   error = ::Doorkeeper::OAuth::ErrorResponse.new(name: exception.error_name, state: params[:state], redirect_uri: params[:redirect_uri])
+#   ...
+#   render json: error.body, status: :found, location: error.redirect_uri
+#
+# The fix 0267515452 uses params[:redirect_uri] only when pre_auth.valid?, which
+# is where Doorkeeper checks the URI against the registered client, and otherwise
+# takes pre_auth.error_response, which does not redirect anywhere the request
+# asked for.
+#
+# ATTENTION, and the diagnosis separates cleanly into two findings.
+#
+#  - A sink anchored at args[N] does not see a value passed as a keyword
+#    argument. The shipped Ruby binding for redirect_to emits
+#    code.RedirectTargetSink at args[0], so redirect_to params[:redirect_uri]
+#    reports VYQL-RF-002 and redirect_to location: params[:redirect_uri] reports
+#    nothing, though the callee pattern matches both. Re-anchoring the same
+#    binding at call makes the keyword form report. Keyword arguments are how
+#    most Rails calls are written, so this is not specific to redirects.
+#  - Rails render with a location: keyword is a redirect and is a sink nowhere.
+#    Ruby binds redirect_to and redirect, both at args[0], and this code redirects
+#    through render, which no binding names.
+#
+# Binding render location: would be generic -- Rails documents :location as
+# setting the Location header -- and would still not make this rank CAUGHT,
+# because the patched code makes the same call with the same tainted value in
+# its valid? branch. The discriminator is pre_auth.valid?, Doorkeeper's own
+# check of the URI against the registered client, and no concept describes a
+# redirect target validated against a registered client, so both revisions would
+# report. That is why nothing shipped here.
+#
+# Scanning the vulnerable helper reports 2 findings, both VYQL-INJ-003 on
+# instance_exec at lines 58 and 73 with params[:max_age] and params[:prompt] as
+# sources; neither is this CVE and neither survives reading, since the max_age
+# value has .to_i applied and the block being executed is a configuration proc.
+# The redirect at line 27 is not reported.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1084: the error response redirects to the request's own uri"
+  lang ruby
+  file lib/doorkeeper/openid_connect/helpers/controller.rb
+  reject VYQL-RF-002
+  code
+  ```
+  module Doorkeeper
+    module OpenidConnect
+      module Helpers
+        module Controller
+          def authenticate_resource_owner!
+            super
+          rescue Errors::OpenidConnectError => exception
+            self.response_body = nil
+            @_response_body = nil
+
+            error = ::Doorkeeper::OAuth::ErrorResponse.new(name: exception.error_name, state: params[:state], redirect_uri: params[:redirect_uri])
+            response.headers.merge!(error.headers)
+
+            if error.redirectable?
+              render json: error.body, status: :found, location: error.redirect_uri
+            else
+              render json: error.body, status: error.status
+            end
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1084: the request uri is used only once the pre-auth validated it"
+  lang ruby
+  file lib/doorkeeper/openid_connect/helpers/controller.rb
+  reject VYQL-RF-002
+  code
+  ```
+  module Doorkeeper
+    module OpenidConnect
+      module Helpers
+        module Controller
+          def authenticate_resource_owner!
+            super
+          rescue Errors::OpenidConnectError => exception
+            self.response_body = nil
+            @_response_body = nil
+
+            error_response = if pre_auth.valid?
+              ::Doorkeeper::OAuth::ErrorResponse.new(
+                name: exception.error_name,
+                state: params[:state],
+                redirect_uri: params[:redirect_uri]
+              )
+            else
+              pre_auth.error_response
+            end
+
+            response.headers.merge!(error_response.headers)
+
+            if error_response.redirectable?
+              render json: error_response.body, status: :found, location: error_response.redirect_uri
+            else
+              render json: error_response.body, status: error_response.status
+            end
+          end
+        end
+      end
+    end
+  end
+  ```
+
+# The keyword-argument pair. Same callee, same tainted value, same shipped
+# binding; only whether the argument is positional or keyed differs, and that
+# is the difference between a report and silence.
+
+test "rank1084: a redirect target passed as a positional argument"
+  lang ruby
+  file positional.rb
+  expect VYQL-RF-002
+  code
+  ```
+  class AuthorizationsController < ApplicationController
+    def create
+      redirect_to params[:redirect_uri]
+    end
+  end
+  ```
+
+test "rank1084: the same redirect target passed as a keyword argument"
+  lang ruby
+  file keyword.rb
+  reject VYQL-RF-002
+  code
+  ```
+  class AuthorizationsController < ApplicationController
+    def create
+      redirect_to location: params[:redirect_uri]
+    end
+  end
+  ```
+
+# Taint reaches a redirect through object construction and an attribute read,
+# so the object hop in the real code is not what stops it.
+
+test "rank1084: taint reaches a redirect through a constructed error object"
+  lang ruby
+  file object_hop.rb
+  expect VYQL-RF-002
+  code
+  ```
+  class AuthorizationsController < ApplicationController
+    def create
+      error = ErrorResponse.new(name: :invalid_request, redirect_uri: params[:redirect_uri])
+      redirect_to error.redirect_uri
+    end
+  end
+  ```
