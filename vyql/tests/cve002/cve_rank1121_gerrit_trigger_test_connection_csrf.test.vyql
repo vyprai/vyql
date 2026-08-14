@@ -1,0 +1,111 @@
+# Rank 1121 / CVE-2019-16551: the Gerrit Trigger Jenkins plugin's
+# doTestConnection descriptor action opened an SSH connection to any host,
+# port and proxy the caller supplied, with no CSRF protection and no
+# permission check, so a request forged against a logged-in administrator's
+# browser, or any authenticated low-privilege user, could make the controller
+# connect wherever it named (CWE-352).
+#
+# GerritServer.DescriptorImpl.doTestConnection took gerritHostName,
+# gerritSshPort, gerritProxy and gerritAuthKeyFile straight from
+# @QueryParameter and called SshConnectionFactory.getConnection(...) with
+# them, with no @RequirePOST annotation and no Jenkins.get().checkPermission
+# call anywhere in the method.
+#
+# Pool commit bdc94d3e23df is the real fix (COMMIT_OK, SECURITY-1527). It adds
+# @RequirePOST and Jenkins.get().checkPermission(Jenkins.ADMINISTER) to
+# doTestConnection, and the same pair to the sibling doTestRestConnection.
+# No pool correction.
+#
+# FIXED (partial). code.JenkinsRemoteValidationMissingPostPermission already
+# exists for exactly this weakness, carries CWE_352 first among its three, and
+# is already bound for two other plugins' own doTest*/doCheck* connection-test
+# methods (Crowd's CrowdConfigurationService.testConnection, CodeDx's
+# buildClient/getProjects) on the same doTest*/doCheck* + a connection call +
+# missing @POST + missing checkPermission shape. Added
+# jenkinsRemoteValidationMissingPostPermission760, the same shape keyed on
+# gerrit-trigger's own SshConnectionFactory.getConnection call, following the
+# established convention: each existing binding in this family already names
+# one plugin's own connection API, matching Jenkins's own plugin-security
+# guidance that any doXxx() performing a network connection needs @POST and a
+# permission check, regardless of which library makes the connection.
+#
+# Deliberately not covered: doTestRestConnection, the sibling method the same
+# fix commit also protects, builds its connection with
+# HttpClients.custom()....build() and httpclient.execute(...), Apache
+# HttpComponents' own generic client-construction idiom used across countless
+# unrelated Jenkins plugins and ordinary Java code with no connection to this
+# weakness. Binding on that call shape would report far beyond doTest*/doCheck*
+# validation endpoints; the precision cost was not worth the second call site.
+#
+# Diagnosis: scanning the real checkout at the vulnerable revision reports
+# VYQL-RF-023 at GerritServer.java:714, and nothing at the fixed revision.
+#
+# verify_current_expected: current-behavior
+
+test "rank1121: doTestConnection opens an SSH connection with no POST or permission check"
+  lang java
+  file GerritServer.java
+  expect_review code.JenkinsRemoteValidationMissingPostPermission
+  code
+  ```
+  public class GerritServer {
+      public static final class DescriptorImpl extends Descriptor<GerritServer> {
+
+          public FormValidation doTestConnection(
+                  @QueryParameter("gerritHostName") final String gerritHostName,
+                  @QueryParameter("gerritSshPort") final int gerritSshPort,
+                  @QueryParameter("gerritProxy") final String gerritProxy,
+                  @QueryParameter("gerritUserName") final String gerritUserName,
+                  @QueryParameter("gerritAuthKeyFile") final String gerritAuthKeyFile,
+                  @QueryParameter("gerritAuthKeyFilePassword") final String gerritAuthKeyFilePassword) {
+
+              File file = new File(gerritAuthKeyFile);
+              String password = null;
+              if (gerritAuthKeyFilePassword != null && gerritAuthKeyFilePassword.length() > 0) {
+                  password = Secret.fromString(gerritAuthKeyFilePassword).getPlainText();
+              }
+              final SshConnection sshConnection = SshConnectionFactory.getConnection(
+                      gerritHostName,
+                      gerritSshPort,
+                      gerritProxy,
+                      new Authentication(file, gerritUserName, password));
+              return FormValidation.ok();
+          }
+      }
+  }
+  ```
+
+test "rank1121: doTestConnection requires POST and an administrator permission"
+  lang java
+  file GerritServer.java
+  reject_review code.JenkinsRemoteValidationMissingPostPermission
+  code
+  ```
+  public class GerritServer {
+      public static final class DescriptorImpl extends Descriptor<GerritServer> {
+
+          @RequirePOST
+          public FormValidation doTestConnection(
+                  @QueryParameter("gerritHostName") final String gerritHostName,
+                  @QueryParameter("gerritSshPort") final int gerritSshPort,
+                  @QueryParameter("gerritProxy") final String gerritProxy,
+                  @QueryParameter("gerritUserName") final String gerritUserName,
+                  @QueryParameter("gerritAuthKeyFile") final String gerritAuthKeyFile,
+                  @QueryParameter("gerritAuthKeyFilePassword") final String gerritAuthKeyFilePassword) {
+              Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+
+              File file = new File(gerritAuthKeyFile);
+              String password = null;
+              if (gerritAuthKeyFilePassword != null && gerritAuthKeyFilePassword.length() > 0) {
+                  password = Secret.fromString(gerritAuthKeyFilePassword).getPlainText();
+              }
+              final SshConnection sshConnection = SshConnectionFactory.getConnection(
+                      gerritHostName,
+                      gerritSshPort,
+                      gerritProxy,
+                      new Authentication(file, gerritUserName, password));
+              return FormValidation.ok();
+          }
+      }
+  }
+  ```
