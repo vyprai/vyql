@@ -1,0 +1,62 @@
+# Rank 1016 / CVE-2025-48957: AstrBot path traversal in /api/chat/get_file. The
+# handler read the filename query parameter and joined it onto the image
+# directory before opening it, so a traversal sequence reads any file the
+# process can reach, including configuration holding LLM provider API keys
+# (CWE-23). The fix cceadf222c reduces the name with os.path.basename, resolves
+# it with os.path.realpath, and rejects the request unless the resolved path
+# stays under the resolved image directory.
+#
+# Already covered: VYQL-PATH-001 reports the vulnerable form, taking
+# request.args.get as code.HttpInput into the open() call as
+# code.FilePathAccess, with neither core.PathCanonicalization nor
+# core.PathAccessCheck satisfied. On the patched form the canonicalisation and
+# containment check are recognised and the finding is gone.
+
+test "rank1016: chat file endpoint joins a request filename onto the image directory"
+  lang python
+  file astrbot/dashboard/routes/chat.py
+  expect VYQL-PATH-001
+  code
+  ```
+  import os
+
+  from quart import request
+
+
+  class ChatRoute:
+      async def get_file(self):
+          filename = request.args.get("filename")
+          if not filename:
+              return {"error": "Missing key: filename"}
+
+          with open(os.path.join(self.imgs_dir, filename), "rb") as f:
+              return f.read()
+  ```
+
+test "rank1016: fix reduces the name and requires the resolved path to stay in the directory"
+  lang python
+  file astrbot/dashboard/routes/chat.py
+  reject VYQL-PATH-001
+  code
+  ```
+  import os
+
+  from quart import request
+
+
+  class ChatRoute:
+      async def get_file(self):
+          filename = request.args.get("filename")
+          if not filename:
+              return {"error": "Missing key: filename"}
+
+          file_path = os.path.join(self.imgs_dir, os.path.basename(filename))
+          real_file_path = os.path.realpath(file_path)
+          real_imgs_dir = os.path.realpath(self.imgs_dir)
+
+          if not real_file_path.startswith(real_imgs_dir):
+              return {"error": "Invalid file path"}
+
+          with open(real_file_path, "rb") as f:
+              return f.read()
+  ```
