@@ -1,0 +1,107 @@
+# Rank 1134 / CVE-2024-56731: Gogs' file-delete/update/upload web editor
+# checked a caller-supplied tree path against a ".git" string blocklist, but
+# never checked whether the filesystem entry the resolved path actually
+# pointed to was a symlink, so a symlink placed inside the working tree and
+# pointing at the repository's own `.git` directory let a low-privileged user
+# delete or overwrite files under `.git` and reach remote code execution
+# (CWE-552).
+#
+# The prior fix, still present here, added
+# `if isRepositoryGitPath(opts.TreePath) { return err }` ahead of
+# `os.Remove(path.Join(localPath, opts.TreePath))` in DeleteRepoFile, and the
+# equivalent string check in UpdateRepoFile, GetDiffPreview and
+# UploadRepoFiles. `isRepositoryGitPath` only inspects the TEXT of the
+# request's tree path; the actual file operation resolves through whatever
+# the working tree currently holds at that path, and nothing re-checked that
+# after path resolution. A user who committed a symlink named, for example,
+# `foo` pointing at `../.git/hooks/pre-receive` could then request deletion
+# of `foo`, a path that passes the string check cleanly while the real
+# filesystem entry `os.Remove` acts on is the linked `.git` file.
+#
+# Pool commit named `77a4a945ae9a87f77e392e9066b560edb71b5de9`, the fix for a
+# prior CVE (2024-39931) that this advisory names as still insufficient; that
+# commit is the code being described as broken, not this CVE's fix. Corpus
+# correction, in place: pool.tsv now names
+# 591810e405ddc02fe38023cea1fd28b29ed5b4e6 (COMMIT_OK once corrected), whose
+# own commit message states "Fixes GHSA-wj44-9vcg-wjq7" directly. It adds
+# `osutil.IsSymlink(filePath)` checks immediately before every file-touching
+# operation, delete, update, diff-preview write, and upload overwrite,
+# testing the resolved filesystem entry rather than the request string. No
+# further pool correction.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports the same one
+# unrelated ResourceHandle finding. Nothing in the ontology states "a
+# filesystem-modifying operation is guarded by a check on the request path's
+# text, and nothing separately checks that the resolved filesystem entry is
+# not a symlink before the operation runs"; the closest concepts by name,
+# ArchiveMarkerSymlinkOverwrite and ArchiveSymlinkFilterBypass, are both
+# scoped to archive-extraction contexts (a symlink entry inside a tar/zip
+# escaping the extraction root), a different call shape than a web editor's
+# delete/update/upload endpoints operating on a working tree that already
+# exists on disk.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1134: the delete path is checked as a string, never as a resolved filesystem entry"
+  lang go
+  file repo_editor.go
+  reject VYQL-PATH-012
+  code
+  ```
+  package database
+
+  import (
+      "fmt"
+      "os"
+      "path"
+  )
+
+  func (r *Repository) DeleteRepoFile(doer *User, opts DeleteRepoFileOptions) (err error) {
+      if isRepositoryGitPath(opts.TreePath) {
+          return fmt.Errorf("bad tree path %q", opts.TreePath)
+      }
+
+      localPath := r.LocalCopyPath()
+      if err = os.Remove(path.Join(localPath, opts.TreePath)); err != nil {
+          return fmt.Errorf("remove file %q: %v", opts.TreePath, err)
+      }
+      return nil
+  }
+  ```
+
+test "rank1134: the resolved filesystem entry is checked for a symlink before removal"
+  lang go
+  file repo_editor.go
+  reject VYQL-PATH-012
+  code
+  ```
+  package database
+
+  import (
+      "fmt"
+      "os"
+      "path"
+
+      "gogs.io/gogs/internal/osutil"
+  )
+
+  func (r *Repository) DeleteRepoFile(doer *User, opts DeleteRepoFileOptions) (err error) {
+      if isRepositoryGitPath(opts.TreePath) {
+          return fmt.Errorf("bad tree path %q", opts.TreePath)
+      }
+
+      localPath := r.LocalCopyPath()
+      filePath := path.Join(localPath, opts.TreePath)
+
+      if osutil.IsSymlink(filePath) {
+          return fmt.Errorf("cannot delete symbolic link: %s", opts.TreePath)
+      }
+
+      if err = os.Remove(filePath); err != nil {
+          return fmt.Errorf("remove file %q: %v", opts.TreePath, err)
+      }
+      return nil
+  }
+  ```
