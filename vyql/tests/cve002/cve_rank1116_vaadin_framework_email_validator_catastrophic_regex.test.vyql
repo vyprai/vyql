@@ -1,0 +1,70 @@
+# Rank 1116 / CVE-2021-31409: Vaadin Framework's legacy EmailValidator carried
+# a different catastrophic-backtracking email regex than the flow-components
+# one at rank 1111 -- same weakness, same fix shape, a separate project (CWE-400).
+#
+# EmailValidator's pattern was
+# `^([a-zA-Z0-9_\.\-+])+@(([a-zA-Z0-9-])+\.)+([a-zA-Z0-9]{2,4})+$`. The domain
+# group `(([a-zA-Z0-9-])+\.)+` nests an unbounded inner group inside an
+# unbounded outer group with only a literal dot between them, and the tld
+# group `([a-zA-Z0-9]{2,4})+` wraps an already-bounded group in an outer `+`,
+# a second, milder instance of the same ambiguity. A run of alphanumerics and
+# dots can be partitioned between the inner and outer repetitions in
+# exponentially many ways before the match fails.
+#
+# Pool commit 754ca011d79a is the real fix despite the COMMIT_NONE flag,
+# checked against the issue it closes (vaadin/framework#12240) and against the
+# identical replacement pattern shipped for the same bug class at rank 1111:
+# it replaces the whole pattern with
+# `^([a-zA-Z0-9_\.\-+])+@[a-zA-Z0-9-.]+\.[a-zA-Z0-9-]{2,}$`, the same
+# structure rank 1111's fix uses, one dot literal and one bounded tail class,
+# no nested unbounded groups. No pool correction.
+#
+# ATTENTION, the same engine gap already on record at rank 1111 for
+# code.CatastrophicRegex / VYQL-DOS-003: every existing binding across Python,
+# JavaScript and Ruby matches a literal substring of one specific known-
+# vulnerable regex, not the regex's actual structure, so no binding for this
+# pattern would transfer to any other catastrophic regex, in this or any other
+# language. Scanning either revision reports 0 findings, confirming nothing
+# labels the pattern. No new definition change attempted here either, for the
+# reason already recorded in ENGINE-GAPS.md: the fix is regex-AST or
+# backtracking-complexity analysis, not a fifth literal match.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1116: the domain group nests an unbounded repetition inside another"
+  lang java
+  file EmailValidator.java
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  package com.vaadin.v7.data.validator;
+
+  public class EmailValidator {
+      private static final String PATTERN =
+          "^([a-zA-Z0-9_\\.\\-+])+@(([a-zA-Z0-9-])+\\.)+([a-zA-Z0-9]{2,4})+$";
+
+      public boolean isValid(String value) {
+          return value.matches(PATTERN);
+      }
+  }
+  ```
+
+test "rank1116: the domain suffix is one dot literal and a bounded tail class"
+  lang java
+  file EmailValidator.java
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  package com.vaadin.v7.data.validator;
+
+  public class EmailValidator {
+      private static final String PATTERN = "^" + "([a-zA-Z0-9_\\.\\-+])+" // local
+              + "@" + "[a-zA-Z0-9-.]+" // domain
+              + "\\." + "[a-zA-Z0-9-]{2,}" // tld
+              + "$";
+
+      public boolean isValid(String value) {
+          return value.matches(PATTERN);
+      }
+  }
+  ```
