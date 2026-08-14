@@ -1,0 +1,223 @@
+# Rank 1079 / CVE-2025-50334: Technitium DNS Server rate limits queries per
+# client subnet rather than per client, so an attacker who spoofs source
+# addresses inside a /24 gets every legitimate client in that /24 blocked
+# (CWE-770). DnsServerCore/Dns/DnsServer.cs computes
+#
+#   remoteSubnet = remoteIP.GetNetworkAddress(_qpmLimitIPv4PrefixLength);   // 24
+#
+# in IsQpmLimitCrossed and looks the counter up under that key, and the four
+# listeners call IsQpmLimitCrossed(remoteEP.Address) before answering. UDP
+# source addresses are not verified, so the counter an attacker drives is shared
+# with everyone else in the subnet. The advisory reports the same for IPv6 at a
+# /56 prefix.
+#
+# The fix 7229b21723 replaces the single prefix length with a configurable set
+# of prefix limits per address family and splits the limit by transport:
+#
+#   foreach (KeyValuePair<int, (int, int)> qpmPrefixLimit in _qpmPrefixLimitsIPv4)
+#       if (HasQpmLimitExceeded(new NetworkAddress(remoteIP, (byte)qpmPrefixLimit.Key), protocol, ...))
+#           return true;
+#
+# ATTENTION, and two separate things block a rule, either of which is enough.
+#
+#  - No vocabulary describes what a rate limit is keyed on. Four concepts touch
+#    throttling and all four state only that one is present or absent:
+#    core.RateLimit and code.RateLimitCheck are controls, code.RateLimitRequiredOp
+#    is the missing-throttle issue, and code.AuthAttemptLimitReview with
+#    VYQL-AUTH-088 carries one binding, in Go, matching one project's
+#    SolveChallenge. Nothing can say the key is an aggregate that an attacker
+#    shares with the principals it is meant to protect, which is the whole
+#    weakness here; a control that merely records "a throttle runs" marks this
+#    vulnerable revision safe, because it does throttle.
+#  - Even with that vocabulary the revisions would not separate. Both key on a
+#    masked subnet: the fix still calls the masking constructor, it just iterates
+#    several prefix lengths and adds a per-protocol limit. What changed is which
+#    aggregation levels are configurable, not the shape of the lookup, so any
+#    rule keyed on "throttle counter looked up under a masked network address"
+#    reports the patched code as well. The third snippet below is the form that
+#    would have to be the negative, keying on the address itself, and no shipped
+#    binding tells it apart from the first.
+#
+# A third observation belongs to the source side rather than this weakness:
+# ReceiveFrom appears in zero bindings across every language, so a raw socket
+# read is not network input anywhere and a taint framing of this flow would have
+# no source to start from.
+#
+# Scanning DnsServer.cs reports 31 findings at each revision, 25 VYQL-CFG-014,
+# 4 VYQL-INJ-001, 1 VYQL-RF-002 and 1 VYQL-NUM-005, none of them in the rate
+# limiter. vyql match over the extracted limiter labels no source, no sink and
+# no control.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1079: the query rate limit is keyed on the client's masked subnet"
+  lang csharp
+  file DnsServerCore/Dns/DnsServer.cs
+  reject VYQL-AUTH-088
+  code
+  ```
+  using System.Net;
+  using System.Net.Sockets;
+
+  namespace DnsServerCore.Dns
+  {
+      public class DnsServer
+      {
+          int _qpmLimitRequests = 6000;
+          int _qpmLimitSampleMinutes = 5;
+          int _qpmLimitIPv4PrefixLength = 24;
+          int _qpmLimitIPv6PrefixLength = 56;
+          IReadOnlyDictionary<IPAddress, long> _qpmLimitClientSubnetStats;
+
+          internal bool IsQpmLimitCrossed(IPAddress remoteIP)
+          {
+              if (_qpmLimitRequests < 1)
+                  return false;
+
+              IPAddress remoteSubnet;
+
+              switch (remoteIP.AddressFamily)
+              {
+                  case AddressFamily.InterNetwork:
+                      remoteSubnet = remoteIP.GetNetworkAddress(_qpmLimitIPv4PrefixLength);
+                      break;
+
+                  case AddressFamily.InterNetworkV6:
+                      remoteSubnet = remoteIP.GetNetworkAddress(_qpmLimitIPv6PrefixLength);
+                      break;
+
+                  default:
+                      throw new NotSupportedException("AddressFamily not supported.");
+              }
+
+              if (_qpmLimitClientSubnetStats.TryGetValue(remoteSubnet, out long countPerSample))
+              {
+                  long averageCountPerMinute = countPerSample / _qpmLimitSampleMinutes;
+                  if (averageCountPerMinute >= _qpmLimitRequests)
+                      return true;
+              }
+
+              return false;
+          }
+
+          private async Task ReadUdpRequestAsync(Socket udpListener)
+          {
+              SocketReceiveFromResult result = await udpListener.ReceiveFromAsync(_buffer, SocketFlags.None, _anyEP);
+              IPEndPoint remoteEP = result.RemoteEndPoint as IPEndPoint;
+
+              if (IsQpmLimitCrossed(remoteEP.Address))
+                  return;
+
+              await ProcessRequestAsync(remoteEP);
+          }
+      }
+  }
+  ```
+
+test "rank1079: the limit is configured per prefix length and per transport"
+  lang csharp
+  file DnsServerCore/Dns/DnsServer.cs
+  reject VYQL-AUTH-088
+  code
+  ```
+  using System.Net;
+  using System.Net.Sockets;
+
+  namespace DnsServerCore.Dns
+  {
+      public class DnsServer
+      {
+          int _qpmLimitSampleMinutes = 5;
+          IReadOnlyDictionary<int, (int, int)> _qpmPrefixLimitsIPv4;
+          IReadOnlyDictionary<int, (int, int)> _qpmPrefixLimitsIPv6;
+          IReadOnlyDictionary<NetworkAddress, (long, long)> _qpmLimitClientSubnetStats;
+
+          private bool HasQpmLimitExceeded(NetworkAddress clientSubnet, DnsTransportProtocol protocol, (int, int) qpmLimits, IReadOnlyDictionary<NetworkAddress, (long, long)> qpmLimitClientSubnetStats, out int qpmLimit, out int currentQpm)
+          {
+              qpmLimit = protocol == DnsTransportProtocol.Udp ? qpmLimits.Item1 : qpmLimits.Item2;
+
+              if ((qpmLimit > 0) && qpmLimitClientSubnetStats.TryGetValue(clientSubnet, out (long, long) countPerSampleTuple))
+              {
+                  long countPerSample = protocol == DnsTransportProtocol.Udp ? countPerSampleTuple.Item1 : countPerSampleTuple.Item2;
+
+                  long averageCountPerMinute = countPerSample / _qpmLimitSampleMinutes;
+                  if (averageCountPerMinute >= qpmLimit)
+                  {
+                      currentQpm = (int)averageCountPerMinute;
+                      return true;
+                  }
+              }
+
+              currentQpm = 0;
+              return false;
+          }
+
+          internal bool HasQpmLimitExceeded(IPAddress remoteIP, DnsTransportProtocol protocol)
+          {
+              if (_qpmLimitClientSubnetStats is null)
+                  return false;
+
+              switch (remoteIP.AddressFamily)
+              {
+                  case AddressFamily.InterNetwork:
+                      foreach (KeyValuePair<int, (int, int)> qpmPrefixLimit in _qpmPrefixLimitsIPv4)
+                      {
+                          if (HasQpmLimitExceeded(new NetworkAddress(remoteIP, (byte)qpmPrefixLimit.Key), protocol, qpmPrefixLimit.Value, _qpmLimitClientSubnetStats, out _, out _))
+                              return true;
+                      }
+
+                      break;
+
+                  case AddressFamily.InterNetworkV6:
+                      foreach (KeyValuePair<int, (int, int)> qpmPrefixLimit in _qpmPrefixLimitsIPv6)
+                      {
+                          if (HasQpmLimitExceeded(new NetworkAddress(remoteIP, (byte)qpmPrefixLimit.Key), protocol, qpmPrefixLimit.Value, _qpmLimitClientSubnetStats, out _, out _))
+                              return true;
+                      }
+
+                      break;
+
+                  default:
+                      throw new NotSupportedException("AddressFamily not supported.");
+              }
+
+              return false;
+          }
+      }
+  }
+  ```
+
+test "rank1079: the same limit keyed on the client address rather than a subnet"
+  lang csharp
+  file DnsServerCore/Dns/DnsServer.cs
+  reject VYQL-AUTH-088
+  code
+  ```
+  using System.Net;
+  using System.Net.Sockets;
+
+  namespace DnsServerCore.Dns
+  {
+      public class DnsServer
+      {
+          int _qpmLimitRequests = 6000;
+          int _qpmLimitSampleMinutes = 5;
+          IReadOnlyDictionary<IPAddress, long> _qpmLimitClientStats;
+
+          internal bool IsQpmLimitCrossed(IPAddress remoteIP)
+          {
+              if (_qpmLimitRequests < 1)
+                  return false;
+
+              if (_qpmLimitClientStats.TryGetValue(remoteIP, out long countPerSample))
+              {
+                  long averageCountPerMinute = countPerSample / _qpmLimitSampleMinutes;
+                  if (averageCountPerMinute >= _qpmLimitRequests)
+                      return true;
+              }
+
+              return false;
+          }
+      }
+  }
+  ```
