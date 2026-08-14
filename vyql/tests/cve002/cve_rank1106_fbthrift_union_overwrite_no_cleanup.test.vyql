@@ -1,0 +1,106 @@
+# Rank 1106 / CVE-2021-24028: fbthrift's table-based deserializer placement-new'd
+# a new active member into a Thrift union without destructing whichever member
+# was already active, so wire data carrying two fields for the same union
+# leaked the first member and, if the second field was truncated, unwound the
+# stack through a destructor for the wrong type (CWE-763).
+#
+# read() in thrift/lib/cpp2/protocol/TableBasedSerializer.cpp found the field
+# for each union member the wire data named and called
+# structInfo.unionExt->initMember[...](unionVal) unconditionally, placement-new
+# construction over the same storage the previous member's constructor already
+# ran on, then updated the stored active-field id to the new one with no call
+# to release or destruct the old member first.
+#
+# Pool commit bfda1efa547d is the real fix (COMMIT_OK, its own message states
+# the mechanism). Before constructing the new member it reads the currently
+# active id and, if one is set, calls structInfo.unionExt->clear(object) to
+# destruct the live member first; it also corrects the active-id accessor's
+# return type from FieldID to int, since the field id storage is a plain int
+# and the old reinterpret_cast read past it under the wrong width. No pool
+# correction.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports the same
+# forty-five findings, one identical NullableDeref row apiece and the rest
+# unrelated syntactic sink noise; nothing distinguishes the revisions.
+# code.ThreadLocalScopeOverwriteWithoutCleanup states the one-level-up shape
+# most plainly, "state that already holds something live gets overwritten
+# with something new before that something live is released", but it carries
+# CWE_362 for a request-scope race condition and its only binding is Java's
+# ThreadLocal idiom, with nothing about a tagged union or a wire deserializer.
+# No concept in the ontology carries CWE_763 at all.
+#
+# Detecting the general shape needs recognizing "this storage already holds a
+# constructed value, and this write constructs a new one over it without an
+# intervening destructor or release call" for a raw union member behind a
+# reinterpret_cast and a function-pointer table, which is memory-layout
+# reasoning past what a presence or taint pattern expresses; it is also the
+# kind of condition where fbthrift's own accessor names (unionExt, initMember,
+# activeUnionMemberId) are the only concrete surface, so a binding narrow
+# enough to fire only stops working for these exact identifiers.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1106: the new union member is constructed without releasing the old one"
+  lang cpp
+  file thrift/lib/cpp2/protocol/TableBasedSerializer.cpp
+  reject_review code.ThreadLocalScopeOverwriteWithoutCleanup
+  code
+  ```
+  const FieldID& activeUnionMemberId(const void* object, ptrdiff_t offset) {
+      return *reinterpret_cast<const FieldID*>(
+          offset + static_cast<const char*>(object));
+  }
+
+  template <typename Protocol_>
+  void readUnionField(
+          Protocol_* iprot,
+          const StructInfo& structInfo,
+          void* object,
+          ReadState& readState) {
+      const auto* fieldInfo = findFieldInfo(iprot, readState, structInfo);
+      if (fieldInfo) {
+          void* unionVal = getMember(*fieldInfo, object);
+          structInfo.unionExt->initMember[fieldInfo - structInfo.fieldInfos](
+              unionVal);
+          read(iprot, *fieldInfo->typeInfo, readState, unionVal);
+          const_cast<FieldID&>(activeUnionMemberId(
+              object, structInfo.unionExt->unionTypeOffset)) = fieldInfo->id;
+      } else {
+          skip(iprot, readState);
+      }
+  }
+  ```
+
+test "rank1106: the old member is cleared before the new one is constructed"
+  lang cpp
+  file thrift/lib/cpp2/protocol/TableBasedSerializer.cpp
+  reject_review code.ThreadLocalScopeOverwriteWithoutCleanup
+  code
+  ```
+  const int& getActiveId(const void* object, const StructInfo& info) {
+      return *reinterpret_cast<const int*>(
+          static_cast<const char*>(object) + info.unionExt->unionTypeOffset);
+  }
+
+  template <typename Protocol_>
+  void readUnionField(
+          Protocol_* iprot,
+          const StructInfo& structInfo,
+          void* object,
+          ReadState& readState) {
+      if (const auto* fieldInfo = findFieldInfo(iprot, readState, structInfo)) {
+          auto& activeId = const_cast<int&>(getActiveId(object, structInfo));
+          if (activeId != 0) {
+              structInfo.unionExt->clear(object);
+          }
+          void* value = getMember(*fieldInfo, object);
+          structInfo.unionExt->initMember[fieldInfo - structInfo.fieldInfos](value);
+          read(iprot, *fieldInfo->typeInfo, readState, value);
+          activeId = fieldInfo->id;
+      } else {
+          skip(iprot, readState);
+      }
+  }
+  ```
