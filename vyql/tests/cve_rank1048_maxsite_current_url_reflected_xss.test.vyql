@@ -1,0 +1,111 @@
+# Rank 1048 / CVE-2021-35265: MaxSite CMS built the current URL from the raw
+# request line and rendered it (CWE-79). mso_current_url in
+# application/maxsite/common/core/url.php did
+#
+#   $url = getinfo('site_protocol') . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+#
+# and the result reaches markup, so a crafted request path is reflected. The fix
+# 6b0ab1de9f wraps the request URI in mso_clean_str, whose default rules run
+# trim, the framework's xss_clean and strip_tags, in mso_current_url,
+# mso_url_get, mso_segment_array and two plugins.
+#
+# CAUGHT by VYQL-INJ-004 at high severity and high confidence: source
+# code.HttpInput at url.php:224, sink code.HtmlRender at url.php:125,
+# interprocedurally through mso_current_url#ret#, with unless path coveredBy
+# core.HtmlEscape unsatisfied and no escape found anywhere on the flows.
+#
+# The row survives the fix, and that is the tool being right rather than blind.
+# The fix cleans $_SERVER['REQUEST_URI'] and leaves $_SERVER['HTTP_HOST'] beside
+# it in the same concatenation, and the Host header is attacker-influenced too,
+# so what remains reported is a true positive upstream did not close. Measured
+# four ways on minimal snippets: cleaning neither reports, cleaning only the
+# request URI reports, cleaning both inline reports nothing, and cleaning both
+# through a helper function reports nothing. The last of those also rules out an
+# interprocedural gap, since the control propagates out of the helper correctly.
+#
+# On the real files, scanning url.php, format.php and security.php together gives
+# 3 findings at each revision, 1 VYQL-INJ-004 and 2 unrelated VYQL-CRY-001, and
+# the INJ-004 fingerprint is identical across the two, which is the same row
+# surviving for the reason above.
+
+test "rank1048: the current URL is built from the raw request line and rendered"
+  lang php
+  file application/maxsite/common/core/url.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  function mso_current_url()
+  {
+      $url = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+
+      return $url;
+  }
+
+  echo mso_current_url();
+  ```
+
+test "rank1048: cleaning only the request URI leaves the host reflected"
+  lang php
+  file application/maxsite/common/core/url.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  function mso_clean_str($str)
+  {
+      return strip_tags($str);
+  }
+
+  function mso_current_url()
+  {
+      $url = 'https://' . $_SERVER['HTTP_HOST'] . mso_clean_str($_SERVER['REQUEST_URI']);
+
+      return $url;
+  }
+
+  echo mso_current_url();
+  ```
+
+test "rank1048: cleaning both parts inline is not reported"
+  lang php
+  file application/maxsite/common/core/url.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  function mso_current_url()
+  {
+      $url = 'https://' . strip_tags($_SERVER['HTTP_HOST']) . strip_tags($_SERVER['REQUEST_URI']);
+
+      return $url;
+  }
+
+  echo mso_current_url();
+  ```
+
+test "rank1048: cleaning both parts through a helper is not reported either"
+  lang php
+  file application/maxsite/common/core/url.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  function mso_clean_str($str)
+  {
+      return strip_tags($str);
+  }
+
+  function mso_current_url()
+  {
+      $url = 'https://' . mso_clean_str($_SERVER['HTTP_HOST']) . mso_clean_str($_SERVER['REQUEST_URI']);
+
+      return $url;
+  }
+
+  echo mso_current_url();
+  ```
