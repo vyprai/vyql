@@ -1,0 +1,111 @@
+# Rank 1122 / CVE-2026-6951: simple-git's "unsafe operation" plugin blocked
+# only six known-dangerous git config keys and no CLI flags at all, so a
+# config key or flag outside that list, capable of the same arbitrary-command
+# execution when cloning or interacting with an attacker-controlled
+# repository, passed through unblocked (CWE-94).
+#
+# detect-config-writes.ts's preventUnsafeConfig array held six entries
+# (core.sshCommand, core.fsmonitor, core.gitProxy, core.hooksPath,
+# diff.external, protocol.*.allow), each gated behind its own
+# allowUnsafe*-named option, and nothing in the library inspected CLI flags
+# at all. diff.textconv, filter.clean, filter.smudge, --template,
+# --upload-pack, --receive-pack, clone's -u and push's --exec all run an
+# attacker-named external program the same way the six already-blocked keys
+# do, and none of them were checked.
+#
+# Pool commit 89a2294febed is the real fix (COMMIT_OK, its message lists what
+# it adds). It replaces detect-config-writes.ts with
+# detect-vulnerable-config-writes.ts (the six original keys plus
+# diff.textconv, filter.clean, filter.smudge and more) and adds
+# detect-vulnerable-flags.ts, a parallel denylist over CLI flags rather than
+# config keys, covering --upload-pack/--receive-pack, clone's -u, push's
+# --exec and --template. No pool correction.
+#
+# ATTENTION, and the same dependency-only shape already recorded at ranks
+# 1083, 1097, 1101, 1103, 1105 and 1112: every application calling
+# simpleGit().clone(...) or passing config through simple-git's API looks
+# identical before and after this fix, since the entire defect is which
+# strings the library's own denylists happen to contain. Scanning the touched
+# files at either revision reports 0 findings, and simple-git is not bound as
+# either a sink or a control anywhere in the corpus, so there is no existing
+# suppression this fix risks breaking the way DOMPurify's HtmlEscape binding
+# did at rank 1083 -- there is also no existing detection of "constructing a
+# git config key or CLI flag from untrusted input and passing it to
+# simple-git" to begin with. The right place for the CVE itself is SCA,
+# where simple-git is not in vyql/sca/advisories.json; the source-side gap,
+# an application controlling which config keys or flags reach a git CLI
+# wrapper having no sink binding at all, is a different, standing question
+# nothing in this rank's fix resolves either way.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1122: the config denylist has six entries and no flag denylist exists"
+  lang javascript
+  file detect-config-writes.ts
+  reject VYQL-INJ-004
+  code
+  ```
+  function preventConfigBuilder(config, category, message) {
+    const regex = typeof config === 'string' ? new RegExp('\\s*' + config, 'i') : config;
+    return function preventCommand(key) {
+      if (regex.test(key)) {
+        return { category, message: 'Configuring ' + (message || config) + ' is not permitted without enabling ' + category };
+      }
+    };
+  }
+
+  const preventUnsafeConfig = [
+    preventConfigBuilder('core.sshCommand', 'allowUnsafeSshCommand'),
+    preventConfigBuilder('core.fsmonitor', 'allowUnsafeFsMonitor'),
+    preventConfigBuilder('core.gitProxy', 'allowUnsafeGitProxy'),
+    preventConfigBuilder('core.hooksPath', 'allowUnsafeHooksPath'),
+    preventConfigBuilder('diff.external', 'allowUnsafeDiffExternal'),
+  ];
+
+  function* detectConfigWrites({ write }) {
+    for (const config of write) {
+      for (const helper of preventUnsafeConfig) {
+        const vulnerability = helper(config.key);
+        if (vulnerability) yield vulnerability;
+      }
+    }
+  }
+  ```
+
+test "rank1122: the denylist covers textconv, filter hooks and CLI flags too"
+  lang javascript
+  file detect-vulnerable-config-writes.ts
+  reject VYQL-INJ-004
+  code
+  ```
+  function preventConfigBuilder(config, category, message) {
+    const regex = typeof config === 'string' ? new RegExp('\\s*' + config, 'i') : config;
+    return function preventCommand(key) {
+      if (regex.test(key)) {
+        return { category, message: 'Configuring ' + (message || config) + ' is not permitted without enabling ' + category };
+      }
+    };
+  }
+
+  const preventUnsafeConfig = [
+    preventConfigBuilder('core.sshCommand', 'allowUnsafeSshCommand'),
+    preventConfigBuilder('core.fsmonitor', 'allowUnsafeFsMonitor'),
+    preventConfigBuilder('core.gitProxy', 'allowUnsafeGitProxy'),
+    preventConfigBuilder('core.hooksPath', 'allowUnsafeHooksPath'),
+    preventConfigBuilder('diff.external', 'allowUnsafeDiffExternal'),
+    preventConfigBuilder('diff.textconv', 'allowUnsafeDiffTextconv'),
+    preventConfigBuilder('filter.*.clean', 'allowUnsafeFilterClean'),
+    preventConfigBuilder('filter.*.smudge', 'allowUnsafeFilterSmudge'),
+  ];
+
+  function* detectConfigWrites({ write }) {
+    for (const config of write) {
+      for (const helper of preventUnsafeConfig) {
+        const vulnerability = helper(config.key);
+        if (vulnerability) yield vulnerability;
+      }
+    }
+  }
+  ```
