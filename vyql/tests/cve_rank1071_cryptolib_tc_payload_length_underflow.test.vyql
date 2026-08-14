@@ -1,0 +1,119 @@
+# Rank 1071 / CVE-2025-30356: CryptoLib computed a telecommand frame's payload
+# length by subtracting the header sizes from the length the frame itself
+# declares, in unsigned arithmetic, so a small declared length wrapped to a huge
+# one (CWE-191, CWE-787). Crypto_TC_ApplySecurity_Cam held
+#
+#   if (temp_tc_header.fl <= TC_FRAME_HEADER_SIZE - segment_hdr_len - fecf_len + 1)
+#       ...
+#   tf_payload_len = temp_tc_header.fl - TC_FRAME_HEADER_SIZE - segment_hdr_len - fecf_len + 1;
+#
+# where the guard's right-hand side is itself an unsigned expression, so it does
+# not bound the subtraction that follows, and tf_payload_len then sizes the copy
+# out of the frame. Pool commit 59d1bce760 is the real fix (COMMIT_OK); it
+# computes the subtraction into a signed int16_t, rejects it when negative,
+# requires the declared length to equal the received length exactly, and drops
+# the two comparisons that were standing in for those checks.
+#
+# CAUGHT by VYQL-MEM-016, and worth recording only with what it does not do.
+# The rule reports the copy this length sizes: crypto_tc.c:1162 is
+# memcpy((p_new_enc_frame + index), (p_in_frame + TC_FRAME_HEADER_SIZE +
+# segment_hdr_len), tf_payload_len), and it carries the review condition that a
+# raw memory copy size expression needs bounds review, which is the question the
+# fix answers. Ten more copies in the file are reported the same way.
+#
+# It does not separate the revisions. The fixed form computes the same length,
+# through a signed intermediate it rejects when negative, and copies with it, so
+# the same row appears afterwards. Nothing lands on the subtraction itself, which
+# is where the defect is, and the guard that was supposed to bound it --
+# `fl <= TC_FRAME_HEADER_SIZE - segment_hdr_len - fecf_len + 1`, whose right-hand
+# side wraps in the same direction as the expression it is guarding -- is not
+# examined at all. That is the gap already recorded for ranks 1026, 1032 and
+# 1038: the guard analysis knows upper bounds, so an expression that can go below
+# zero counts as guarded once any comparison mentions it.
+#
+# One number worth stating plainly: the file reports 114 times, and 98 of those
+# are VYQL-MEM-006 at low confidence, the pointer-dereference review. A row that
+# matters is not made findable by a hundred that do not.
+#
+# The two snippets differ only in whether the subtraction is done signed and
+# rejected when negative, and both assert the same row.
+#
+# verify_current_expected: caught-partial
+
+test "rank1071: the declared frame length is subtracted unsigned"
+  lang c
+  file src/core/crypto_tc.c
+  expect VYQL-MEM-016
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  #define TC_FRAME_HEADER_SIZE 5
+
+  typedef struct
+  {
+      uint16_t fl;
+  } TC_FramePrimaryHeader_t;
+
+  int32_t Crypto_TC_ApplySecurity_Cam(const uint8_t *p_in_frame, uint16_t in_frame_length, uint8_t *p_out,
+                                      uint8_t segment_hdr_len, uint8_t fecf_len)
+  {
+      TC_FramePrimaryHeader_t temp_tc_header;
+      uint16_t tf_payload_len = 0x0000;
+
+      temp_tc_header.fl = ((uint16_t)p_in_frame[2] << 8) | p_in_frame[3];
+
+      if (temp_tc_header.fl <= TC_FRAME_HEADER_SIZE - segment_hdr_len - fecf_len + 1)
+      {
+          return -1;
+      }
+
+      tf_payload_len = temp_tc_header.fl - TC_FRAME_HEADER_SIZE - segment_hdr_len - fecf_len + 1;
+
+      memcpy(p_out, &p_in_frame[TC_FRAME_HEADER_SIZE + segment_hdr_len], tf_payload_len);
+      return 0;
+  }
+  ```
+
+test "rank1071: the same subtraction taken signed and rejected when negative"
+  lang c
+  file src/core/crypto_tc.c
+  expect VYQL-MEM-016
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  #define TC_FRAME_HEADER_SIZE 5
+
+  typedef struct
+  {
+      uint16_t fl;
+  } TC_FramePrimaryHeader_t;
+
+  int32_t Crypto_TC_ApplySecurity_Cam(const uint8_t *p_in_frame, uint16_t in_frame_length, uint8_t *p_out,
+                                      uint8_t segment_hdr_len, uint8_t fecf_len)
+  {
+      TC_FramePrimaryHeader_t temp_tc_header;
+      uint16_t tf_payload_len = 0x0000;
+
+      temp_tc_header.fl = ((uint16_t)p_in_frame[2] << 8) | p_in_frame[3];
+
+      if (temp_tc_header.fl + 1 != in_frame_length)
+      {
+          return -1;
+      }
+
+      int16_t payload_calc = temp_tc_header.fl - TC_FRAME_HEADER_SIZE - segment_hdr_len - fecf_len + 1;
+      if (payload_calc < 0)
+      {
+          return -1;
+      }
+
+      tf_payload_len = (uint16_t)payload_calc;
+
+      memcpy(p_out, &p_in_frame[TC_FRAME_HEADER_SIZE + segment_hdr_len], tf_payload_len);
+      return 0;
+  }
+  ```
