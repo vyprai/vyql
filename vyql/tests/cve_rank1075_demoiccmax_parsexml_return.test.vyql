@@ -1,0 +1,91 @@
+# Rank 1075 / CVE-2024-38427: DemoIccMAX's ProfileSequenceId tag parser returned
+# false from every path, so a well-formed tag was reported as a parse failure
+# (CWE-252 as NVD classifies it). CIccTagXmlProfileSequenceId::ParseXml walked
+# the ProfileIdDesc children, built each entry, and then fell off the end into
+#
+#   return false;
+#
+# with no `return true` anywhere in the function. Pool commit f891074a0f is the
+# fix: the merge of pull request #66, whose IccTagXml.cpp hunk is the one
+# character the advisory names, and whose other half fixes an unrelated compile
+# error in IccUtil.cpp. The advisory cites the individual commit 85ce74e inside
+# that pull request, which is why the metadata check reported COMMIT_MISMATCH
+# against the merge; the row names the merge that carries it, so it stands.
+# No pool correction.
+#
+# ATTENTION, and the honest reason is that the shape is checkable while the
+# security reading of it is not. "A function declared to return bool with no
+# path returning true" is a property any pass over the return statements can
+# state, and it is what separates these two revisions exactly. What it is not is
+# a weakness: a predicate stuck at false fails closed, and code that fails closed
+# is the safe direction. The dangerous form is the mirror image, a validator or
+# verifier stuck at true, and that is what the ontology already reaches for --
+# code.EmptyVerifierAcceptance with VYQL-AUTH-006 is a verifier that accepts when
+# it should not. Minting for the always-false direction would report every
+# fail-closed helper in every codebase, which is the precision cost this campaign
+# has already declined three times.
+#
+# So this rank is not evidence that a rule is missing. It is a functional
+# regression that received a security identifier, and the useful record is that
+# the class it would belong to points the other way. Scanning the file reports
+# 170 findings, four at or above high, none of them on this function.
+#
+# The two snippets differ only in the value the last statement returns.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1075: the tag parser cannot report success"
+  lang cpp
+  file IccXML/IccLibXML/IccTagXml.cpp
+  reject VYQL-AUTH-006
+  code
+  ```
+  #include <string>
+
+  bool CIccTagXmlProfileSequenceId::ParseXml(xmlNode *pNode, std::string &parseStr)
+  {
+      if (!pNode)
+          return false;
+
+      for (pNode = icXmlFindNode(pNode->children, "ProfileIdDesc"); pNode;
+           pNode = icXmlFindNode(pNode->next, "ProfileIdDesc")) {
+          CIccProfileIdDesc entry;
+
+          const char *szDesc = icXmlAttrValue(pNode, "profileID");
+          if (szDesc && *szDesc)
+              entry.m_profileID = szDesc;
+
+          m_list->push_back(entry);
+      }
+
+      return false;
+  }
+  ```
+
+test "rank1075: the same parser returning success"
+  lang cpp
+  file IccXML/IccLibXML/IccTagXml.cpp
+  reject VYQL-AUTH-006
+  code
+  ```
+  #include <string>
+
+  bool CIccTagXmlProfileSequenceId::ParseXml(xmlNode *pNode, std::string &parseStr)
+  {
+      if (!pNode)
+          return false;
+
+      for (pNode = icXmlFindNode(pNode->children, "ProfileIdDesc"); pNode;
+           pNode = icXmlFindNode(pNode->next, "ProfileIdDesc")) {
+          CIccProfileIdDesc entry;
+
+          const char *szDesc = icXmlAttrValue(pNode, "profileID");
+          if (szDesc && *szDesc)
+              entry.m_profileID = szDesc;
+
+          m_list->push_back(entry);
+      }
+
+      return true;
+  }
+  ```
