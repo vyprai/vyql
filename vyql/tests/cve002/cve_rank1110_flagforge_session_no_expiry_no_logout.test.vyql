@@ -1,0 +1,146 @@
+# Rank 1110 / CVE-2025-59841: FlagForge's NextAuth configuration never set a
+# session lifetime, so a JWT session token lived for NextAuth's implicit
+# thirty-day default with no active revocation, and no server-side endpoint
+# existed to invalidate one on logout — a client that captured a token stayed
+# authenticated for a month regardless of what the legitimate user did
+# afterward (CWE-384, CWE-613).
+#
+# lib/authOptions.ts's exported AuthOptions carried a providers array and
+# jwt/session callbacks with no top-level `session` or `jwt` block at all, so
+# NextAuth's built-in defaults applied: a JWT-strategy session with no
+# explicit maxAge, and no code path anywhere in the application that cleared
+# the signed token server-side. The only "logout" was the client calling
+# next-auth/react's signOut(), which deletes the browser's cookie but cannot
+# invalidate a JWT already copied elsewhere, since a JWT-strategy session
+# carries no server-side record to revoke.
+#
+# Pool commit 304b6c82a4f7 is the real fix (COMMIT_OK). It adds an explicit
+# `session: { strategy: "jwt", maxAge: 3600, updateAge: 900 }` and a matching
+# `jwt: { maxAge: 3600 }`, so a token issued at login is only ever honored for
+# an hour and is refreshed at most every fifteen minutes; it also adds
+# app/api/auth/logout/route.ts, a server-side endpoint that expires the
+# NextAuth cookies with `expires: new Date(0)`, and utlis/auth.ts, which calls
+# that endpoint and clears local/session storage before NextAuth's own
+# signOut(). No pool correction.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports 0 findings.
+# code.MissingSessionRotationAfterAuthentication carries the primary CWE
+# (384) and its review text, "successful authentication flows that reuse the
+# pre-login HTTP session instead of rotating it", is the closest existing
+# judgement, but its only binding is Java's session.regenerateId() idiom for a
+# server-side session store; NextAuth's JWT strategy has no server-side
+# session to rotate at all; the missing piece here is an absent maxAge
+# configuration key and an absent invalidation endpoint, not a reused
+# identifier. Detecting "this authentication library's config object omits a
+# lifetime field, and defaults to one that never meaningfully expires" is a
+# configuration-completeness check specific to NextAuth's own option schema,
+# not a taint or presence pattern that generalizes past this one library.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1110: the auth config sets no session lifetime and no logout route exists"
+  lang javascript
+  file lib/authOptions.ts
+  reject_review code.MissingSessionRotationAfterAuthentication
+  code
+  ```
+  import { AuthOptions } from "next-auth";
+  import GoogleProvider from "next-auth/providers/google";
+  import connect from "@/utlis/db";
+  import UserModel from "@/models/userSchema";
+
+  export const authOptions: AuthOptions = {
+    providers: [
+      GoogleProvider({
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        authorization: { params: { scope: 'email profile' } },
+      }),
+    ],
+    callbacks: {
+      async signIn({ user, account }) {
+        if (account?.provider === "google") {
+          await connect();
+          const existingUser = await UserModel.findOne({ email: user.email });
+          if (!existingUser) {
+            await new UserModel({ email: user.email, name: user.name }).save();
+          }
+          return true;
+        }
+        return false;
+      },
+      async jwt({ token, user }) {
+        if (user) {
+          token.id = user.id;
+          token.email = user.email;
+        }
+        return token;
+      },
+      async session({ session, token }) {
+        if (token) {
+          session.user = { ...session.user, email: token.email };
+        }
+        return session;
+      },
+    },
+  };
+  ```
+
+test "rank1110: the auth config bounds the session and a logout route revokes the cookie"
+  lang javascript
+  file lib/authOptions.ts
+  reject_review code.MissingSessionRotationAfterAuthentication
+  code
+  ```
+  import { AuthOptions } from "next-auth";
+  import GoogleProvider from "next-auth/providers/google";
+  import connect from "@/utlis/db";
+  import UserModel from "@/models/userSchema";
+
+  export const authOptions: AuthOptions = {
+    providers: [
+      GoogleProvider({
+        clientId: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        authorization: { params: { scope: "email profile" } },
+      }),
+    ],
+    session: {
+      strategy: "jwt",
+      maxAge: 60 * 60,
+      updateAge: 15 * 60,
+    },
+    jwt: {
+      secret: process.env.NEXTAUTH_SECRET,
+      maxAge: 60 * 60,
+    },
+    callbacks: {
+      async signIn({ user, account }) {
+        if (account?.provider === "google") {
+          await connect();
+          const existingUser = await UserModel.findOne({ email: user.email });
+          if (!existingUser) {
+            await new UserModel({ email: user.email, name: user.name }).save();
+          }
+          return true;
+        }
+        return false;
+      },
+      async jwt({ token, user }) {
+        if (user) {
+          token.id = user.id;
+          token.email = user.email;
+        }
+        return token;
+      },
+      async session({ session, token }) {
+        if (token) {
+          session.user = { ...session.user, id: token.id as string, email: token.email as string };
+        }
+        return session;
+      },
+    },
+  };
+  ```
