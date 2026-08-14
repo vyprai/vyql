@@ -1,0 +1,102 @@
+# Rank 1148 / CVE-2019-9195: Grin's txhashset archive extractor joined a ZIP
+# entry's raw name directly onto the extraction directory with no
+# sanitization, so a malicious peer serving a crafted state-sync archive
+# could write files anywhere the process could reach via an entry named with
+# `../` traversal sequences, the "Zip Slip" pattern (CWE-22).
+#
+# decompress in util/src/zip.rs computed `let file_path = dest.join(file.name())`
+# directly from `zip_rs::ZipArchive`'s per-entry name, which the archive's
+# own bytes control entirely, before creating the file or directory at that
+# path.
+#
+# Pool commit 391e311f4c05 is the real fix despite the COMMIT_NONE flag,
+# checked against its own message and diff: it switches to
+# `file.sanitized_name()` (the zip crate's own traversal-stripping helper),
+# rejects any entry outright if sanitizing its name changed it at all
+# (`san_name.to_str().unwrap_or("") != file.name()`), and adds an `expected`
+# allowlist callback so only anticipated filenames are extracted. No pool
+# correction.
+#
+# ATTENTION, engine gap, and the third instance of the exact shape already
+# on record at ranks 1079 and 1147: the sink is correctly bound and
+# correctly labelled (`code.FilePathAccess` at zip.rs:84, confirmed with
+# `vyql match`, at both revisions identically), and nothing fires because
+# `== source ==` is empty. A ZIP archive entry's own name, `file.name()`
+# from `zip_rs::ZipArchive`, is attacker-controlled whenever the archive
+# itself comes from an untrusted party, exactly the same shape as a raw
+# socket read (1079) or a Windows inter-process message (1147); nothing
+# marks it as a taint source. Scanning either revision reports the same one
+# unrelated NullableDeref finding.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-engine-gap, no source labelled in either revision
+
+test "rank1148: the archive entry's raw name is joined onto the extraction path unsanitized"
+  lang rust
+  file zip.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  use std::fs;
+  use std::io;
+  use std::path::Path;
+
+  pub fn decompress<R>(src_file: R, dest: &Path) -> zip_rs::result::ZipResult<()>
+  where
+      R: io::Read + io::Seek,
+  {
+      let mut archive = zip_rs::ZipArchive::new(src_file)?;
+
+      for i in 0..archive.len() {
+          let mut file = archive.by_index(i)?;
+          let file_path = dest.join(file.name());
+
+          if (&*file.name()).ends_with('/') {
+              fs::create_dir_all(&file_path)?;
+          } else {
+              let mut outfile = fs::File::create(&file_path)?;
+              io::copy(&mut file, &mut outfile)?;
+          }
+      }
+      Ok(())
+  }
+  ```
+
+test "rank1148: a sanitized, allowlisted name is required before extraction"
+  lang rust
+  file zip.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  use std::fs;
+  use std::io;
+  use std::path::Path;
+
+  pub fn decompress<R, F>(src_file: R, dest: &Path, expected: F) -> zip_rs::result::ZipResult<usize>
+  where
+      R: io::Read + io::Seek,
+      F: Fn(&Path) -> bool,
+  {
+      let mut decompressed = 0;
+      let mut archive = zip_rs::ZipArchive::new(src_file)?;
+
+      for i in 0..archive.len() {
+          let mut file = archive.by_index(i)?;
+          let san_name = file.sanitized_name();
+          if san_name.to_str().unwrap_or("") != file.name() || !expected(&san_name) {
+              continue;
+          }
+          let file_path = dest.join(san_name);
+
+          if (&*file.name()).ends_with('/') {
+              fs::create_dir_all(&file_path)?;
+          } else {
+              let mut outfile = fs::File::create(&file_path)?;
+              io::copy(&mut file, &mut outfile)?;
+              decompressed += 1;
+          }
+      }
+      Ok(decompressed)
+  }
+  ```
