@@ -1,0 +1,102 @@
+# Rank 1107 / CVE-2026-27192: Feathers' OAuth strategy validated the Referer
+# header against its configured allowed origins with a plain string prefix
+# check, so a referer whose string happens to start with an allowed origin
+# passed even when its actual origin was different (CWE-346).
+#
+# OAuthStrategy's getRedirectUrl in
+# packages/authentication-oauth/src/strategy.ts compared
+# `referer.toLowerCase().startsWith(current.toLowerCase())` against each
+# configured origin. A referer of https://trusted.example.com.attacker.com/
+# starts with the string https://trusted.example.com, so it satisfies the
+# check while its real origin, https://trusted.example.com.attacker.com, is
+# not one the operator ever allowed.
+#
+# Pool commit ee19a0ae9bc2eb is the real fix (COMMIT_OK, GHSA-mp4x-c34x-wv3x).
+# It parses the referer with `new URL(referer).origin` and compares that
+# parsed origin for exact equality against each configured origin, throwing on
+# an unparseable referer instead of falling through to the string check. The
+# same commit also rejects `@`, backslash and a leading or embedded `//` in
+# the separate `redirect` query parameter, closing an open-redirect path via
+# URL-authority injection, but the CVE's own CWE names only the origin check.
+# No pool correction.
+#
+# ATTENTION, vocabulary gap, though a close one. Scanning either revision
+# reports the same single unrelated SQL-injection finding; nothing labels the
+# comparison itself. code.CorsWildcardPrefixTruncation carries this exact CWE
+# and the same root mechanism, an origin allowlist matched by string prefix
+# rather than a parsed, exact comparison, but its stated condition is a
+# CORS wildcard parser that slices a trusted prefix off a `*.host` pattern
+# before matching; Feathers does not parse a wildcard at all, it prefix-matches
+# the raw referer against a raw allowed-origin string directly, and the only
+# binding is Go's `parseWildcardRules`. The two are siblings under the same
+# CWE, not the same shape: one truncates a pattern before matching, the other
+# never parses the compared value into a URL at all. Widening the existing
+# condition to also cover "compares an unparsed header value by string prefix
+# against an allowed origin, in any language" is a real generalization worth
+# doing, but risks matching ordinary prefix-based routing or feature-flag
+# checks unrelated to origin validation without a way to scope it to an
+# authentication or CORS context, which is judgement rather than a port.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1107: the referer is compared to allowed origins by string prefix"
+  lang javascript
+  file packages/authentication-oauth/src/strategy.ts
+  reject VYQL-CFG-018
+  code
+  ```
+  export class OAuthStrategy {
+    async getRedirectUrl(params: Params): Promise<string> {
+      const { origins } = this.authentication.configuration.oauth
+
+      if (Array.isArray(origins)) {
+        const referer = params?.headers?.referer || origins[0]
+        const allowedOrigin = origins.find((current) =>
+          referer.toLowerCase().startsWith(current.toLowerCase())
+        )
+
+        if (!allowedOrigin) {
+          throw new NotAuthenticated(`Referer "${referer}" is not allowed.`)
+        }
+      }
+
+      return origins[0]
+    }
+  }
+  ```
+
+test "rank1107: the referer is parsed to a URL and its origin compared exactly"
+  lang javascript
+  file packages/authentication-oauth/src/strategy.ts
+  reject VYQL-CFG-018
+  code
+  ```
+  export class OAuthStrategy {
+    async getRedirectUrl(params: Params): Promise<string> {
+      const { origins } = this.authentication.configuration.oauth
+
+      if (Array.isArray(origins)) {
+        const referer = params?.headers?.referer || origins[0]
+
+        let refererOrigin: string
+        try {
+          refererOrigin = new URL(referer).origin
+        } catch {
+          throw new NotAuthenticated(`Invalid referer "${referer}".`)
+        }
+
+        const allowedOrigin = origins.find(
+          (current) => refererOrigin.toLowerCase() === current.toLowerCase()
+        )
+
+        if (!allowedOrigin) {
+          throw new NotAuthenticated(`Referer "${referer}" is not allowed.`)
+        }
+      }
+
+      return origins[0]
+    }
+  }
+  ```
