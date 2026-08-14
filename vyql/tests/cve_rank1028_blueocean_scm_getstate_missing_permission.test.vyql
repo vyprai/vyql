@@ -1,0 +1,64 @@
+# Rank 1028 / CVE-2022-30953 (SECURITY-2502): Blue Ocean's SCM endpoints let an
+# attacker make Jenkins connect to a server of their choosing. getState() on the
+# Github, Bitbucket and Git SCM classes validated a caller-supplied endpoint and
+# reached out to it with no permission check, and the enclosing resource was
+# annotated @PUT rather than @POST. The fix 9f44b895d0 adds a shared
+# checkPermission() on AbstractScm requiring Item.CREATE on the root org folder,
+# calls it from each getState(), and changes the verb to @POST.
+#
+# ATTENTION, precision cost, and the third measurement of the same shape in this
+# batch. Nothing focused fires either side: the vulnerable and fixed revisions of
+# GithubScm.java both report the same four rows, one VYQL-DESER-001 and three
+# VYQL-INJ-004, none of which concern the missing permission check.
+#
+# The two rules this CVE invites are the ones already measured and rejected here.
+# Requiring a permission check on REST endpoints: the plugin has 46 endpoint
+# methods in its main sources while only 16 files call hasPermission or
+# checkPermission at all, and three endpoints needed the fix, so the rule reports
+# on the order of thirty sites for three true positives. Requiring a particular
+# HTTP verb annotation: rank 1027 measured that on another Jenkins plugin, where
+# 19 form methods carried one annotation between them after its own security fix.
+# Rank 1011 measured the authorization variant on a Go service at 4.1 per cent
+# package-scoped and 19.5 per cent file-scoped. Three independent codebases, the
+# same answer: endpoints legitimately differ in whether they need a guard, and
+# the structure does not say which.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1028: SCM state endpoint validates a caller endpoint with no permission check"
+  lang java
+  file blueocean-github-pipeline/src/main/java/io/jenkins/blueocean/blueocean_github_pipeline/GithubScm.java
+  reject VYQL-AUTH-073
+  code
+  ```
+  public class GithubScm extends AbstractScm {
+      @Override
+      public Object getState() {
+          this.validateExistingAccessToken();
+          return super.getState();
+      }
+  }
+  ```
+
+test "rank1028: fix requires Item.CREATE before returning the state"
+  lang java
+  file blueocean-github-pipeline/src/main/java/io/jenkins/blueocean/blueocean_github_pipeline/GithubScm.java
+  reject VYQL-AUTH-073
+  code
+  ```
+  public class GithubScm extends AbstractScm {
+      @Override
+      public Object getState() {
+          checkPermission();
+          this.validateExistingAccessToken();
+          return super.getState();
+      }
+
+      protected void checkPermission() {
+          AccessControlled rootOrgFolder = getRootOrgFolder();
+          if (!rootOrgFolder.hasPermission(Item.CREATE)) {
+              throw new ServiceException.ForbiddenException("You do not have Job/Create permission");
+          }
+      }
+  }
+  ```
