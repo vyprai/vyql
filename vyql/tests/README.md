@@ -102,6 +102,20 @@ test "python: input crosses routes.py -> db.py into cursor.execute"
 kotlin, powershell, swift, perl, solidity, objc` (the snippet is written to a file with
 that language's extension and routed through its frontend + adapters).
 
+## Directories
+
+| Directory | Holds |
+|---|---|
+| `graph/` | Graph specs for the asset/identity packs. |
+| `cve001/`, `cve002/`, … | One spec per reviewed CVE corpus rank, named `cve_rank<N>_<slug>.test.vyql`. |
+
+CVE rank specs are split by thousands so that no single directory grows without bound:
+rank `N` belongs in `cve<printf "%03d" (N/1000+1)>`, so ranks 0–999 are in `cve001`,
+ranks 1000–1999 are in `cve002`, and so on. A coverage gate fails the suite if a rank
+spec sits anywhere else. The runner walks the whole tree and names each subtest after
+the file's base name, so `-run 'TestVyqlSpecs/cve_rank1079'` selects a spec without
+naming its directory.
+
 ## Files
 
 | File | Covers |
