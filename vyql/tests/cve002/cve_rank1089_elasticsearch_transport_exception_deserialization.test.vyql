@@ -1,0 +1,88 @@
+# Rank 1089 / CVE-2015-5377 (marked ** DISPUTED ** by NVD, ZDI treating it as
+# the same report as CVE-2015-3253): Elasticsearch's transport protocol
+# deserialized remote exceptions with no restriction on which classes could be
+# instantiated, the textbook Java deserialization gadget-chain shape (CWE-502,
+# tagged CWE-74 by the advisory). ThrowableObjectInputStream in
+# src/main/java/org/elasticsearch/common/io/ThrowableObjectInputStream.java
+# overrode readClassDescriptor() to resolve any class the serialized stream
+# named, with nothing to stop that class from being one with a dangerous
+# readObject()/readResolve() gadget. Pool commit bf3052d14c is the real fix; it
+# adds a class-and-package allowlist (CLASS_WHITELIST, PKG_WHITELIST covering
+# java.lang, java.util, com.google.common.collect, org.joda.time and
+# org.elasticsearch itself) and a verify() method that throws
+# NotSerializableException for anything outside it, called from both branches
+# of readClassDescriptor().
+#
+# FIXED. The diagnosis found the shipped readObject() sink binding could never
+# fire under any input: deserialization129 in vyql/bindings/java/m420f6b67.vyql
+# matched callee.method == "readObject" and anchored the sink at args[0], but
+# ObjectInputStream.readObject() takes no arguments -- the call always has zero
+# args, so args[0] never exists and the binding was permanently inert. Measured
+# directly: a handler reading a socket's InputStream into
+# new ObjectInputStream(in).readObject() reported 0 findings before this
+# change and 1 (VYQL-DESER-001, critical) after re-anchoring the sink at call.
+# readUnshared(), the same zero-argument shape, had the identical defect and is
+# fixed the same way. Both are Java's most idiomatic deserialization call, the
+# one every readObject()-based RCE (Apache Commons Collections gadget chains,
+# WebLogic, this Elasticsearch report) goes through, so this was not a narrow
+# miss.
+#
+# The fix is shipped without a corresponding SafeDeserialization control for
+# Java's native deserialization: the only Java core.SafeDeserialization binding
+# is for SnakeYAML's Yaml.safeLoad, and no binding recognizes a resolveClass /
+# readClassDescriptor allowlist override, the exact pattern Elasticsearch's own
+# fix uses and the industry-standard mitigation. That means every readObject()
+# call now reports regardless of whether a class filter guards it -- correctly
+# matching how other SAST tools treat this call (flag unconditionally, let a
+# human verify the filter), but it is a real, separately assignable gap and
+# entered as such in ENGINE-GAPS.md rather than attempted here: recognizing an
+# override of a specific method whose body checks a class name against an
+# allowlist is a presence-analysis pattern, not a mechanical binding fix.
+#
+# make test is green and OWASP Java holds at +1.00 (the suite carries no
+# deserialization category, so this does not exercise precision on the weakness
+# class directly, but confirms no collateral regression elsewhere).
+#
+# verify_current_expected: fixed
+
+test "rank1089: readObject on an unrestricted stream is a reportable sink"
+  lang java
+  file src/main/java/org/elasticsearch/common/io/ThrowableObjectInputStream.java
+  expect VYQL-DESER-001
+  code
+  ```
+  import java.io.IOException;
+  import java.io.InputStream;
+  import java.io.ObjectInputStream;
+  import java.net.Socket;
+
+  public class TransportChannel {
+      public Object handleExceptionResponse(Socket socket) throws IOException, ClassNotFoundException {
+          InputStream in = socket.getInputStream();
+          ObjectInputStream ois = new ObjectInputStream(in);
+          Object error = ois.readObject();
+          return error;
+      }
+  }
+  ```
+
+test "rank1089: readUnshared on the same unrestricted stream is too"
+  lang java
+  file src/main/java/org/elasticsearch/common/io/ThrowableObjectInputStream.java
+  expect VYQL-DESER-001
+  code
+  ```
+  import java.io.IOException;
+  import java.io.InputStream;
+  import java.io.ObjectInputStream;
+  import java.net.Socket;
+
+  public class TransportChannel {
+      public Object handleExceptionResponse(Socket socket) throws IOException, ClassNotFoundException {
+          InputStream in = socket.getInputStream();
+          ObjectInputStream ois = new ObjectInputStream(in);
+          Object error = ois.readUnshared();
+          return error;
+      }
+  }
+  ```
