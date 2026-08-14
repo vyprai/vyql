@@ -1,0 +1,72 @@
+# Rank 1117 / CVE-2025-68932: FreshRSS derived its persistent login cookie
+# token from mt_rand(), a non-cryptographic PRNG, so a token guessable from
+# the generator's internal state let an attacker forge a valid "remember me"
+# cookie for another user (CWE-338).
+#
+# FormAuth::makeCookie in app/Models/FormAuth.php built the token with
+# sha1(salt . $username . uniqid('' . mt_rand(), true)). Both mt_rand() and
+# uniqid() (time-based, and only "more entropy" when explicitly asked) are
+# unsuitable as an unpredictability source for a security token; hashing does
+# not add entropy the inputs did not have.
+#
+# Pool commit 57e1a375cbd2 is the real fix (COMMIT_OK, "Strengthen some
+# crypto"). It replaces the token construction with
+# hash('sha256', salt . $username . random_bytes(32)), drawing directly from
+# PHP's CSPRNG, and makes the same substitution across the CSRF token, the
+# nonce, the email-validation token and the install-time salt generator in
+# the same commit.
+#
+# CAUGHT. code.WeakRandomValue already binds php.mt_rand (and rand) with no
+# extra condition, and VYQL-CRY-003 consumes it directly. Scanning the real
+# checkout reports VYQL-CRY-003 at FormAuth.php:55, the mt_rand() call inside
+# the vulnerable token construction, and nothing at the same line once
+# random_bytes replaces it. A second, unrelated VYQL-CRY-003 at line 73 fires
+# identically on both revisions and is not part of this CVE's fix.
+#
+# verify_current_expected: current-behavior
+
+test "rank1117: the login token seeds from mt_rand"
+  lang php
+  file app/Models/FormAuth.php
+  expect VYQL-CRY-003
+  code
+  ```
+  <?php
+  class FreshRSS_FormAuth {
+      public static function makeCookie(string $username, string $password_hash): string|false {
+          do {
+              $token = sha1(FreshRSS_Context::systemConf()->salt . $username . uniqid('' . mt_rand(), true));
+              $token_file = DATA_PATH . '/tokens/' . $token . '.txt';
+          } while (file_exists($token_file));
+
+          if (@file_put_contents($token_file, $username . "\t" . $password_hash) === false) {
+              return false;
+          }
+
+          return self::renewCookie($token);
+      }
+  }
+  ```
+
+test "rank1117: the login token seeds from random_bytes"
+  lang php
+  file app/Models/FormAuth.php
+  reject VYQL-CRY-003
+  code
+  ```
+  <?php
+  class FreshRSS_FormAuth {
+      public static function makeCookie(string $username, string $password_hash): string|false {
+          do {
+              $token = hash('sha256', FreshRSS_Context::systemConf()->salt . $username . random_bytes(32));
+              $token_file = DATA_PATH . '/tokens/' . $token . '.txt';
+          } while (file_exists($token_file));
+
+          if (@file_put_contents($token_file, $username . "\t" . $password_hash) === false) {
+              return false;
+          }
+
+          return self::renewCookie($token);
+      }
+  }
+  ```
