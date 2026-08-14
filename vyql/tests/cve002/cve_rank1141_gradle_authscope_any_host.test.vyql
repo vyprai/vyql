@@ -1,0 +1,103 @@
+# Rank 1141 / CVE-2019-15052: Gradle registered HTTP repository credentials
+# against Apache HttpClient's wildcard AuthScope, so any host the build's
+# HTTP client connected to during dependency resolution received the same
+# credentials, letting a redirect or a compromised/malicious repository
+# capture credentials meant only for the configured one (CWE-522).
+#
+# HttpClientConfigurer.configureCredentials in
+# subprojects/resources-http/.../HttpClientConfigurer.java called
+# `useCredentials(credentialsProvider, AuthScope.ANY_HOST, AuthScope.ANY_PORT,
+# authentications)`, and useCredentials registered every authentication's
+# credentials with `new AuthScope(host, port, AuthScope.ANY_REALM, scheme)`
+# using those wildcard host/port values, which HttpClient's CredentialsProvider
+# matches against any request regardless of target host.
+#
+# Pool commit de6f4f158e41 is the real fix despite the COMMIT_NONE flag,
+# checked against the PR title it names ("Fill AuthScope with host and
+# port"): it replaces the wildcard call with a per-authentication
+# `Collection<AuthenticationInternal.HostAndPort>`, requiring each
+# authentication to declare the specific hosts it applies to before its
+# credentials are registered, so a repository's credentials now scope only
+# to that repository's own host and port. No pool correction.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports 0 findings, and
+# nothing in the ontology reaches this shape: an HTTP client library's own
+# credential-scoping API (Apache HttpClient's AuthScope) is asked to match
+# any host instead of the one the credentials are meant for, so the client
+# itself, not application logic, is what leaks the credential to an
+# unintended destination. code.SecretDatabindingReview (VYQL-SEC-040) is the
+# nearest secret-handling rule by category, but its condition is about a
+# secret configuration parameter accepted without conversion to protected
+# storage, not about a credential-registration call's scope parameter; a
+# wildcard AuthScope carries no databinding step to observe at all.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1141: credentials are registered against a wildcard host and port"
+  lang java
+  file HttpClientConfigurer.java
+  reject VYQL-SEC-040
+  code
+  ```
+  package org.gradle.internal.resource.transport.http;
+
+  import org.apache.http.auth.AuthScope;
+  import org.apache.http.auth.Credentials;
+  import org.apache.http.auth.UsernamePasswordCredentials;
+  import org.apache.http.client.CredentialsProvider;
+  import org.apache.http.impl.client.HttpClientBuilder;
+
+  public class HttpClientConfigurer {
+      private void configureCredentials(HttpClientBuilder builder, CredentialsProvider credentialsProvider, Collection<Authentication> authentications) {
+          if (authentications.size() > 0) {
+              useCredentials(credentialsProvider, AuthScope.ANY_HOST, AuthScope.ANY_PORT, authentications);
+          }
+      }
+
+      private void useCredentials(CredentialsProvider credentialsProvider, String host, int port, Collection<? extends Authentication> authentications) {
+          for (Authentication authentication : authentications) {
+              PasswordCredentials passwordCredentials = (PasswordCredentials) ((AuthenticationInternal) authentication).getCredentials();
+              Credentials httpCredentials = new UsernamePasswordCredentials(passwordCredentials.getUsername(), passwordCredentials.getPassword());
+              credentialsProvider.setCredentials(new AuthScope(host, port, AuthScope.ANY_REALM, "basic"), httpCredentials);
+          }
+      }
+  }
+  ```
+
+test "rank1141: credentials are registered only against the hosts the authentication declares"
+  lang java
+  file HttpClientConfigurer.java
+  reject VYQL-SEC-040
+  code
+  ```
+  package org.gradle.internal.resource.transport.http;
+
+  import org.apache.http.auth.AuthScope;
+  import org.apache.http.auth.Credentials;
+  import org.apache.http.auth.UsernamePasswordCredentials;
+  import org.apache.http.client.CredentialsProvider;
+  import org.apache.http.impl.client.HttpClientBuilder;
+
+  public class HttpClientConfigurer {
+      private void configureCredentials(HttpClientBuilder builder, CredentialsProvider credentialsProvider, Collection<Authentication> authentications) {
+          if (authentications.size() > 0) {
+              useCredentials(credentialsProvider, authentications);
+          }
+      }
+
+      private void useCredentials(CredentialsProvider credentialsProvider, Collection<? extends Authentication> authentications) {
+          for (Authentication authentication : authentications) {
+              AuthenticationInternal authenticationInternal = (AuthenticationInternal) authentication;
+              PasswordCredentials passwordCredentials = (PasswordCredentials) authenticationInternal.getCredentials();
+
+              Collection<AuthenticationInternal.HostAndPort> hostsForAuthentication = authenticationInternal.getHostsForAuthentication();
+              for (AuthenticationInternal.HostAndPort hostAndPort : hostsForAuthentication) {
+                  Credentials httpCredentials = new UsernamePasswordCredentials(passwordCredentials.getUsername(), passwordCredentials.getPassword());
+                  credentialsProvider.setCredentials(new AuthScope(hostAndPort.getHost(), hostAndPort.getPort(), AuthScope.ANY_REALM, "basic"), httpCredentials);
+              }
+          }
+      }
+  }
+  ```
