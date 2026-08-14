@@ -1,0 +1,117 @@
+# Rank 1063 / CVE-2026-54782: CoreWCF verified a SAML 1.1 assertion's signature
+# in two branches, and one of them checked no signature at all (CWE-347,
+# CWE-290). SamlSerializer.ReadToken held
+#
+#   if (signingToken is X509SecurityToken x509signingToken)
+#       assertion.Signature.Verify(imX509SecurityKey, cryptoProviderFactory);
+#   else
+#       assertion.Signature.SignedInfo.Verify(CryptoProviderFactory.Default);
+#
+# SignedInfo.Verify takes no key: it recomputes the Reference digests and stops,
+# so the SignatureValue is never checked. The else branch is reached whenever
+# the out-of-band resolver returns a non-X509 signing token, such as the
+# symmetric proof-key BinarySecretSecurityToken a WS-Trust holder-of-key STS
+# issues, and an attacker who writes the assertion can compute those key-less
+# digests and attach any SignatureValue. Pool commit b914495 is the real fix
+# ("Fix SAML signature bypass when signing token is non-X509"); it bridges the
+# resolved key to a Microsoft.IdentityModel key and calls Signature.Verify with
+# it, throwing when no key can be derived rather than falling back.
+#
+# Pool corrected: the row named 8a40f550f2, "Add ValidateToken input validation
+# to SAML token handlers", which adds null and type guards to the token handlers
+# and is not this advisory's fix, which is why the metadata check reported
+# COMMIT_NONE against a repository it matched.
+#
+# FIXED by a concept, a rule and one binding. Nothing was labelled at either
+# revision before: the file's only labels are four code.TrustBoundary rows, and
+# the SAML vocabulary that exists could not reach this. Three concepts name a
+# SAML signature defect -- SamlFirstSignatureOnlyBypass, SamlAssertionWrappingBypass
+# and SamlXmlRoundtripValidationBypass -- and each is emitted by a single
+# presence keyed on one project's identifiers, the C# one on
+# signedDocument.GetElementsByTagName beside signedXml.CheckSignature.
+#
+# code.XmlSignatureDigestOnlyVerification states the class instead: an XML
+# signature path that verifies the SignedInfo digests and never the signature
+# value against a key. The discriminator is the API rather than a project, since
+# SignedInfo.Verify's own signature takes no key and so cannot be a signature
+# check, whichever XML-DSig implementation calls it. VYQL-AUTH-109 reports it at
+# critical.
+#
+# Measured on the real file: 1 finding at the vulnerable revision, VYQL-AUTH-109
+# at SamlSerializer.cs:94, which is the CVE's line, and 0 at the fixed revision.
+# The full spec suite stays green and OWASP Java and Python are unchanged at
+# +1.00 and +0.90, which they must be since neither corpus contains C#.
+#
+# The two snippets differ only in what the non-X509 branch verifies.
+
+test "rank1063: the non-X509 branch verifies SignedInfo instead of the signature"
+  lang csharp
+  file src/CoreWCF.Primitives/src/CoreWCF/IdentityModel/Tokens/SamlSerializer.cs
+  expect VYQL-AUTH-109
+  code
+  ```
+  using Microsoft.IdentityModel.Tokens;
+
+  namespace CoreWCF.IdentityModel.Tokens
+  {
+      public class SamlSerializer
+      {
+          public SamlSecurityToken ReadToken(SamlAssertion assertion, SecurityToken signingToken)
+          {
+              if (signingToken is X509SecurityToken x509signingToken)
+              {
+                  var cryptoProviderFactory = new Sha1CryptoProviderFactory();
+                  var imX509SecurityKey = new X509SecurityKey(x509signingToken.Certificate);
+                  imX509SecurityKey.CryptoProviderFactory = cryptoProviderFactory;
+                  assertion.Signature.Verify(imX509SecurityKey, cryptoProviderFactory);
+              }
+              else
+              {
+                  assertion.Signature.SignedInfo.Verify(CryptoProviderFactory.Default);
+              }
+
+              return new SamlSecurityToken(assertion);
+          }
+      }
+  }
+  ```
+
+test "rank1063: the same branch verifying the signature against a bridged key"
+  lang csharp
+  file src/CoreWCF.Primitives/src/CoreWCF/IdentityModel/Tokens/SamlSerializer.cs
+  reject VYQL-AUTH-109
+  code
+  ```
+  using Microsoft.IdentityModel.Tokens;
+
+  namespace CoreWCF.IdentityModel.Tokens
+  {
+      public class SamlSerializer
+      {
+          public SamlSecurityToken ReadToken(SamlAssertion assertion, SecurityToken signingToken, SecurityKey verificationKey)
+          {
+              if (signingToken is X509SecurityToken x509signingToken)
+              {
+                  var cryptoProviderFactory = new Sha1CryptoProviderFactory();
+                  var imX509SecurityKey = new X509SecurityKey(x509signingToken.Certificate);
+                  imX509SecurityKey.CryptoProviderFactory = cryptoProviderFactory;
+                  assertion.Signature.Verify(imX509SecurityKey, cryptoProviderFactory);
+              }
+              else
+              {
+                  SecurityKey msVerificationKey = TryCreateMicrosoftIdentityVerificationKey(verificationKey);
+                  if (msVerificationKey == null)
+                  {
+                      throw new SecurityTokenException("no bridgeable verification key");
+                  }
+
+                  var cryptoProviderFactory = new Sha1CryptoProviderFactory();
+                  msVerificationKey.CryptoProviderFactory = cryptoProviderFactory;
+                  assertion.Signature.Verify(msVerificationKey, cryptoProviderFactory);
+              }
+
+              return new SamlSecurityToken(assertion);
+          }
+      }
+  }
+  ```

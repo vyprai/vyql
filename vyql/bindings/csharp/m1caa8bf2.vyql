@@ -1148,3 +1148,8 @@ binding htmlRender204 {
   query pattern callExpr where callee.method == "WriteAsync"
   emit sink code.HtmlRender at args[0]
 }
+
+binding xmlSignatureDigestOnlyVerification205 {
+  query pattern callExpr where callee.path ~= "SignedInfo.Verify"
+  emit issue code.XmlSignatureDigestOnlyVerification at call
+}
