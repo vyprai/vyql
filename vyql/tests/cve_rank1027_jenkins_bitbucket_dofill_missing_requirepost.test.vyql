@@ -1,0 +1,109 @@
+# Rank 1027 / CVE-2022-20619 (SECURITY-2467): the Bitbucket branch source
+# plugin's doFillRepositoryItems form method was reachable by GET. It resolves
+# stored Jenkins credentials for a caller-supplied serverUrl and then calls the
+# Bitbucket API with them, so a crafted page could make a victim's browser
+# drive a connection to an attacker's server carrying those credentials
+# (CWE-352). The fix a596f651a4 adds a single annotation, @RequirePOST.
+#
+# ATTENTION, precision cost, measured, plus a concept that does not reach it.
+#
+# The naive rule is "a Stapler form method without @RequirePOST". This plugin
+# has 19 doFill, doCheck and doTest methods, and even after the security fix
+# exactly 1 carries the annotation, so that rule would report 19 sites for one
+# true positive here. The other 18 are deliberately left alone because they
+# neither connect out nor change state, which is what the Jenkins guidance
+# actually asks about.
+#
+# The right discriminator is narrower: the method resolves credentials and then
+# performs a remote call with them, which is what separates
+# doFillRepositoryItems from its sibling doFillCredentialsIdItems, left
+# unannotated in the same class because it only lists local credential ids. The
+# remote half is plugin-specific naming (BitbucketApiFactory.newInstance,
+# getTeam, getRepositories), and expressing "calls out through some client
+# object" needs argument-to-call pairing the flat feature bag does not provide,
+# the same limit ranks 1017 and 1022 hit. No Jenkins corpus is available here
+# beyond this one plugin, so a narrower credentials-plus-remote-call binding
+# could not be measured for precision and none was written.
+#
+# The existing concept misses this twice over.
+# code.JenkinsCredentialEndpointMissingPostPermission (VYQL-AUTH-073, CWE-862
+# and CWE-352) describes the weakness well, but its binding is pinned to the
+# method names doCreateApiToken, doCheckRepoAccess and doTestGithubAccess, and
+# it also requires the absence of checkPermission or hasPermission. This method
+# performs both an Item.EXTENDED_READ and a CredentialsProvider.USE_ITEM check;
+# the permissions were never the problem, only the missing POST requirement.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1027: form method resolves credentials and calls out with no POST requirement"
+  lang java
+  file src/main/java/com/cloudbees/jenkins/plugins/bitbucket/BitbucketSCMSource.java
+  reject VYQL-AUTH-073
+  code
+  ```
+  public static class DescriptorImpl extends SCMSourceDescriptor {
+      @SuppressWarnings("unused") // used By stapler
+      public ListBoxModel doFillRepositoryItems(@AncestorInPath SCMSourceOwner context,
+                                                @QueryParameter String serverUrl,
+                                                @QueryParameter String credentialsId,
+                                                @QueryParameter String repoOwner)
+              throws IOException, InterruptedException {
+          if (context != null && !context.hasPermission(Item.EXTENDED_READ)) {
+              return new ListBoxModel();
+          }
+          if (context != null && !context.hasPermission(CredentialsProvider.USE_ITEM)) {
+              return new ListBoxModel();
+          }
+
+          StandardCredentials credentials = BitbucketCredentials.lookupCredentials(
+                  serverUrl, context, credentialsId, StandardCredentials.class);
+          BitbucketAuthenticator authenticator = AuthenticationTokens.convert(
+                  BitbucketAuthenticator.authenticationContext(serverUrl), credentials);
+
+          BitbucketApi bitbucket = BitbucketApiFactory.newInstance(serverUrl, authenticator, repoOwner, null);
+          BitbucketTeam team = bitbucket.getTeam();
+          ListBoxModel result = new ListBoxModel();
+          for (BitbucketRepository repo : bitbucket.getRepositories(null)) {
+              result.add(repo.getRepositoryName());
+          }
+          return result;
+      }
+  }
+  ```
+
+test "rank1027: fix requires POST on the same form method"
+  lang java
+  file src/main/java/com/cloudbees/jenkins/plugins/bitbucket/BitbucketSCMSource.java
+  reject VYQL-AUTH-073
+  code
+  ```
+  public static class DescriptorImpl extends SCMSourceDescriptor {
+      @SuppressWarnings("unused") // used By stapler
+      @RequirePOST
+      public ListBoxModel doFillRepositoryItems(@AncestorInPath SCMSourceOwner context,
+                                                @QueryParameter String serverUrl,
+                                                @QueryParameter String credentialsId,
+                                                @QueryParameter String repoOwner)
+              throws IOException, InterruptedException {
+          if (context != null && !context.hasPermission(Item.EXTENDED_READ)) {
+              return new ListBoxModel();
+          }
+          if (context != null && !context.hasPermission(CredentialsProvider.USE_ITEM)) {
+              return new ListBoxModel();
+          }
+
+          StandardCredentials credentials = BitbucketCredentials.lookupCredentials(
+                  serverUrl, context, credentialsId, StandardCredentials.class);
+          BitbucketAuthenticator authenticator = AuthenticationTokens.convert(
+                  BitbucketAuthenticator.authenticationContext(serverUrl), credentials);
+
+          BitbucketApi bitbucket = BitbucketApiFactory.newInstance(serverUrl, authenticator, repoOwner, null);
+          BitbucketTeam team = bitbucket.getTeam();
+          ListBoxModel result = new ListBoxModel();
+          for (BitbucketRepository repo : bitbucket.getRepositories(null)) {
+              result.add(repo.getRepositoryName());
+          }
+          return result;
+      }
+  }
+  ```
