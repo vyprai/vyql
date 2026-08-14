@@ -1,0 +1,95 @@
+# Rank 1138 / CVE-2026-40281: Gotenberg's ExifTool metadata writer accepted
+# any string as a metadata tag key with no character restriction, and
+# go-exiftool talks to the exiftool process over a line-based stdin
+# protocol, so a key containing a newline split into a separate line ExifTool
+# reads as its own argument, letting a metadata key inject ExifTool flags
+# such as `-if` with a Perl eval expression (CWE-88).
+#
+# ExifTool.WriteMetadata in pkg/modules/exiftool/exiftool.go iterated
+# `metadata` (a map keyed by caller-supplied tag names from the PDF metadata
+# API) and checked each key only against a `dangerousTags` denylist by exact,
+# case-insensitive name; nothing constrained what characters a key could
+# contain before it reached go-exiftool's line-oriented stdin writer.
+#
+# Pool commit 405f1069c026 is the real fix (COMMIT_OK, its own message names
+# the mechanism). It adds `safeKeyPattern`, `^[a-zA-Z0-9\-_.:]+$`, and rejects
+# any metadata key that fails to match it before the dangerousTags check
+# runs, so a key carrying a newline or any other control character is
+# refused outright. No pool correction.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports 0 findings.
+# code.CredentialProtocolNewlineInjection is the closest concept in the
+# ontology by mechanism, "a line-oriented protocol writes key/value records
+# without rejecting embedded newlines," which is exactly this shape one
+# level up, but its own name and reviewAssumption are scoped to credential
+# protocols specifically (a git-credential-helper style writer), and its
+# only binding is C, not Go. A metadata-tag key reaching an external tool's
+# stdin line protocol is the same weakness on a different kind of record,
+# not a credential at all, and nothing in the ontology states the general
+# form: any key or field written into a line-delimited external-process
+# protocol needs the same newline rejection a credential protocol does.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1138: a metadata key is written with no character restriction"
+  lang go
+  file exiftool.go
+  reject_review code.CredentialProtocolNewlineInjection
+  code
+  ```
+  package exiftool
+
+  import "strings"
+
+  func (engine *ExifTool) WriteMetadata(ctx context.Context, metadata map[string]string) error {
+      dangerousTags := []string{"FileName", "Directory", "HardLink", "SymLink"}
+
+      for key := range metadata {
+          for _, tag := range dangerousTags {
+              if strings.EqualFold(key, tag) {
+                  return fmt.Errorf("cannot write protected tag %q", key)
+              }
+          }
+      }
+
+      return engine.exiftool.WriteMetadata(metadata)
+  }
+  ```
+
+test "rank1138: a metadata key must match a safe character allowlist first"
+  lang go
+  file exiftool.go
+  reject_review code.CredentialProtocolNewlineInjection
+  code
+  ```
+  package exiftool
+
+  import (
+      "regexp"
+      "strings"
+  )
+
+  var safeKeyPattern = regexp.MustCompile(`^[a-zA-Z0-9\-_.:]+$`)
+
+  func (engine *ExifTool) WriteMetadata(ctx context.Context, metadata map[string]string) error {
+      dangerousTags := []string{"FileName", "Directory", "HardLink", "SymLink"}
+
+      for key := range metadata {
+          if !safeKeyPattern.MatchString(key) {
+              return fmt.Errorf("write PDF metadata with ExifTool: invalid metadata key %q", key)
+          }
+      }
+
+      for key := range metadata {
+          for _, tag := range dangerousTags {
+              if strings.EqualFold(key, tag) {
+                  return fmt.Errorf("cannot write protected tag %q", key)
+              }
+          }
+      }
+
+      return engine.exiftool.WriteMetadata(metadata)
+  }
+  ```
