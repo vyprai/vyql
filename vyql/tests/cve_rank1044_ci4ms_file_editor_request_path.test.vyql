@@ -1,0 +1,148 @@
+# Rank 1044 / CVE-2026-25510: the ci4ms backend file editor writes request-named
+# paths, and before the fix it accepted any extension, so a .php file could be
+# created or overwritten and then executed (CWE-94, CWE-434). saveFile and
+# createFile in modules/Fileeditor/Controllers/Fileeditor.php take the path and
+# the content straight from the request:
+#
+#   $path    = $this->request->getVar('path');
+#   $content = $this->request->getVar('content');
+#   $fullPath = realpath(ROOTPATH . $path);
+#   ...
+#   file_put_contents($fullPath, $content);
+#
+# The fix 86be2930d1 adds $allowedExtensions = ['css','js','html','txt','json',
+# 'sql','md'] and rejects anything else in both methods. It also lowercases the
+# route patterns in FileeditorConfig, because the filter was registered as
+# backend/Fileeditor while routes match lowercase, so the login filter never ran.
+#
+# FIXED by a binding. CodeIgniter 4's IncomingRequest accessors had no binding at
+# all, so the source was missing and the file reported nothing while its sinks
+# were already labelled: four code.FilePathAccess rows and one basename control.
+# request.getVar, getGet, getPost, getPostGet, getGetPost, getJSON and
+# getRawInput now emit code.HttpInput, which is what the framework's request
+# documentation describes them as and nothing more.
+#
+# Measured: the controller goes from 0 findings to 4 VYQL-PATH-001 at high
+# confidence, source code.HttpInput and sink code.FilePathAccess, with both
+# unless clauses unsatisfied. The full spec suite stays green, and OWASP Java and
+# Python are unchanged at +1.00 and +0.90, which they must be since neither
+# corpus contains PHP. The Real-Vuln corpus holds no PHP either, so it cannot
+# move that score.
+#
+# What this does not do is separate the two revisions, and the reason is worth
+# keeping. The path containment the code already had, realpath plus
+# strpos(...) !== 0, is present in both, and the only thing the fix adds is the
+# extension allow-list, which is an in_array test against a property. Binding
+# in_array as a suppressing control is what rank 1034 declined to do, because it
+# is too common in PHP to bind without a measurement no single rank can make. So
+# the second snippet keeps the allow-list and still reports, and the row it
+# reports is the path axis rather than the extension axis the maintainers fixed.
+#
+# verify_current_expected: fixed-source-binding
+
+test "rank1044: the file editor writes a path taken from the request"
+  lang php
+  file modules/Fileeditor/Controllers/Fileeditor.php
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  namespace Modules\Fileeditor\Controllers;
+
+  class Fileeditor extends \Modules\Backend\Controllers\BaseController
+  {
+      public function saveFile()
+      {
+          $path = $this->request->getVar('path');
+          $content = $this->request->getVar('content');
+          $fullPath = realpath(ROOTPATH . $path);
+
+          if (!$fullPath || !is_file($fullPath) || strpos($fullPath, realpath(ROOTPATH)) !== 0) {
+              return $this->response->setJSON(['error' => lang('Backend.invalid', [lang('Fileeditor.path')])])->setStatusCode(400);
+          }
+
+          file_put_contents($fullPath, $content);
+
+          return $this->response->setJSON(['success' => true]);
+      }
+  }
+  ```
+
+test "rank1044: the extension allow-list is not a control, so the fix still reports"
+  lang php
+  file modules/Fileeditor/Controllers/Fileeditor.php
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  namespace Modules\Fileeditor\Controllers;
+
+  class Fileeditor extends \Modules\Backend\Controllers\BaseController
+  {
+      protected $allowedExtensions = ['css', 'js', 'html', 'txt', 'json', 'sql', 'md'];
+
+      public function saveFile()
+      {
+          $path = $this->request->getVar('path');
+          $content = $this->request->getVar('content');
+          $fullPath = realpath(ROOTPATH . $path);
+
+          $extension = pathinfo($fullPath, PATHINFO_EXTENSION);
+          if (!in_array(strtolower($extension), $this->allowedExtensions)) {
+              return $this->response->setJSON(['error' => lang('Fileeditor.fileTypeEditNotAllowed')])->setStatusCode(403);
+          }
+
+          if (!$fullPath || !is_file($fullPath) || strpos($fullPath, realpath(ROOTPATH)) !== 0) {
+              return $this->response->setJSON(['error' => lang('Backend.invalid', [lang('Fileeditor.path')])])->setStatusCode(400);
+          }
+
+          file_put_contents($fullPath, $content);
+
+          return $this->response->setJSON(['success' => true]);
+      }
+  }
+  ```
+
+test "rank1044: a path built from the framework request without any containment"
+  lang php
+  file modules/Fileeditor/Controllers/Fileeditor.php
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  namespace Modules\Fileeditor\Controllers;
+
+  class Reader extends \Modules\Backend\Controllers\BaseController
+  {
+      public function readFile()
+      {
+          $name = $this->request->getPost('name');
+
+          return $this->response->setJSON(['content' => file_get_contents(ROOTPATH . $name)]);
+      }
+  }
+  ```
+
+test "rank1044: a basename'd request path is not reported"
+  lang php
+  file modules/Fileeditor/Controllers/Fileeditor.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  namespace Modules\Fileeditor\Controllers;
+
+  class Reader extends \Modules\Backend\Controllers\BaseController
+  {
+      public function readFile()
+      {
+          $name = basename($this->request->getPost('name'));
+
+          return $this->response->setJSON(['content' => file_get_contents(ROOTPATH . $name)]);
+      }
+  }
+  ```
