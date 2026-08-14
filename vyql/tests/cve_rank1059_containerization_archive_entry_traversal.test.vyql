@@ -1,0 +1,130 @@
+# Rank 1059 / CVE-2026-20613: apple/containerization joined an archive entry's
+# own path to the extraction directory and wrote it, so an entry named with
+# leading traversal escaped the directory (CWE-22, CWE-59).
+# ArchiveReader.extractContents held
+#
+#   guard let p = entry.path else { continue }
+#   let target = directory.appending(path: p)
+#   ...
+#   try data.write(to: target, options: .atomic)
+#   chmod(target.path(), entry.permissions)
+#
+# with no containment check and no O_NOFOLLOW, so a symlink entry extracted
+# first redirected the writes that followed. Pool commit 3e93416b9a is the real
+# fix (COMMIT_OK, named by GHSA-cq3j-qj2h-6rv3, a merge from an advisory fork);
+# it adds FileDescriptor+SecurePath.swift and rewrites extraction to walk from a
+# root descriptor with mkdirSecure and openat carrying
+# O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW, returning the entry paths it rejected.
+# No pool correction.
+#
+# ATTENTION, vocabulary gap, and the rule is not the problem. VYQL-PATH-004 is
+# `taint core.UserControlledData -> code.ArchiveEntryWrite` with
+# `unless path coveredBy core.PathCanonicalization` and
+# `unless endpoint coveredBy core.PathAccessCheck`, which is this weakness
+# stated language-neutrally. Both ends are missing in Swift.
+#
+#  - No source. code.ArchiveEntryName is bound in java, javascript, php,
+#    powershell and python, and not in swift, so an entry's own name is not
+#    attacker-controlled data to the engine and the taint rule has nothing to
+#    start from.
+#  - The one sink binding is repro-shaped, and it labels the wrong revision.
+#    Swift emits code.ArchiveEntryWrite from a single binding,
+#    `query pattern callExpr where callee.method == "extractEntry"`. The
+#    vulnerable code has no such method -- it writes through
+#    `data.write(to: target, options: .atomic)` inside `extractContents` -- while
+#    the fix introduces a private `extractEntry` helper, so the label appears
+#    only after the patch. Measured on the real package: at the vulnerable
+#    revision nothing archive-related is labelled, and at the fixed revision
+#    code.ArchiveEntryWrite is labelled at ArchiveReader.swift:205. Neither
+#    revision reports, because the source is absent either way, but the label
+#    is exactly backwards. This is what a binding written from one repository's
+#    method name rather than from a library's documentation does, and it is
+#    worth fixing on its own account.
+#
+# The last two snippets are that pair, differing only in the name of the method
+# doing the write.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1059: the entry path is joined to the destination and written"
+  lang swift
+  file Sources/ContainerizationArchive/Reader.swift
+  reject VYQL-PATH-004
+  code
+  ```
+  import Foundation
+
+  public final class ArchiveReader {
+      public func extractContents(to directory: URL) throws {
+          let fm = FileManager.default
+          try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+
+          for (entry, data) in self {
+              guard let p = entry.path else { continue }
+              let target = directory.appending(path: p)
+
+              if entry.fileType == .directory {
+                  try fm.createDirectory(at: target, withIntermediateDirectories: true)
+              } else {
+                  try data.write(to: target, options: .atomic)
+              }
+
+              chmod(target.path(), entry.permissions)
+          }
+      }
+  }
+  ```
+
+test "rank1059: the fix walks from a root descriptor with openat and O_NOFOLLOW"
+  lang swift
+  file Sources/ContainerizationArchive/ArchiveReader.swift
+  reject VYQL-PATH-004
+  code
+  ```
+  import Foundation
+  import SystemPackage
+
+  public final class ArchiveReader {
+      private func extractEntry(memberPath: FilePath, rootFileDescriptor: FileDescriptor, fileMode: mode_t) throws -> Bool {
+          guard let lastComponent = memberPath.lastComponent else { return false }
+          let relativePath = memberPath.removingLastComponent()
+
+          try rootFileDescriptor.mkdirSecure(relativePath, makeIntermediates: true) { fd in
+              try? fd.unlinkRecursiveSecure(filename: lastComponent)
+              let fileFd = openat(fd.rawValue, lastComponent.string, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, fileMode)
+              guard fileFd >= 0 else {
+                  throw ArchiveError.failedToExtractArchive("failed to create file: \(memberPath)")
+              }
+          }
+          return true
+      }
+  }
+  ```
+
+test "rank1059: the binding's pair, the write the vulnerable code actually does"
+  lang swift
+  file Sources/ContainerizationArchive/Reader.swift
+  reject VYQL-PATH-004
+  code
+  ```
+  import Foundation
+
+  func extractContents(to directory: URL, entryPath: String, data: Data) throws {
+      let target = directory.appending(path: entryPath)
+      try data.write(to: target, options: .atomic)
+  }
+  ```
+
+test "rank1059: the binding's pair, the same write under the name it keys on"
+  lang swift
+  file Sources/ContainerizationArchive/Reader.swift
+  reject VYQL-PATH-004
+  code
+  ```
+  import Foundation
+
+  func extractEntry(to directory: URL, entryPath: String, data: Data) throws {
+      let target = directory.appending(path: entryPath)
+      try data.write(to: target, options: .atomic)
+  }
+  ```
