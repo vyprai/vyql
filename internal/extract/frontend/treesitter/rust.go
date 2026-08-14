@@ -524,6 +524,9 @@ func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	for _, tok := range c.rsStructuredContextTokens(body) {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
+	if tok := c.rustClosureUnwindStaleLength(fn, body); tok != "" {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: loc},
 		Args:   args,
@@ -594,6 +597,64 @@ func (c *rsConv) rsStructuredContextTokens(root *tree_sitter.Node) []string {
 		add(tok)
 	}
 	return out
+}
+
+// rustClosureUnwindStaleLength reports the shape of the retain family of
+// memory-safety bugs (rust-lang/rust#60977, #78498): a function takes a
+// caller-supplied closure, calls it between a raw buffer copy and the final
+// set_len, and carries no unwind protection. A panic inside the closure then
+// leaves the collection with its stale pre-compaction length, and the drop
+// that follows frees moved elements twice or observes holes. Both guarded
+// forms suppress the fact: zeroing the length before the loop (set_len(0)),
+// or restoring it from an inline Drop guard. The check is keyed on this
+// shape, never on any one crate's identifiers.
+func (c *rsConv) rustClosureUnwindStaleLength(fn, body *tree_sitter.Node) string {
+	bodyText := rustCompactText(c.text(body))
+	if !strings.Contains(bodyText, "ptr::copy") || !strings.Contains(bodyText, "set_len(") {
+		return ""
+	}
+	if strings.Contains(bodyText, "set_len(0)") || strings.Contains(bodyText, "Dropfor") {
+		return ""
+	}
+	// The closure bound lives in the signature or the where clause, not in the
+	// parameter list, so read everything before the body.
+	fnText := rustCompactText(c.text(fn))
+	sig := strings.TrimSuffix(fnText, bodyText)
+	if !strings.Contains(sig, "FnMut") && !strings.Contains(sig, "FnOnce") && !strings.Contains(sig, "Fn(") {
+		return ""
+	}
+	for _, p := range c.params(field(fn, "parameters")) {
+		name := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(p), "mut "))
+		if name == "" || name == "self" || !rustCompactCallsIdent(bodyText, name) {
+			continue
+		}
+		return "rust_review:closure_unwind_stale_length"
+	}
+	return ""
+}
+
+// rustCompactCallsIdent reports whether compact holds a call to the bare
+// identifier: name immediately followed by an open parenthesis, with no
+// path or field character in front, so a parameter named len does not match
+// every .len() in the body.
+func rustCompactCallsIdent(compact, name string) bool {
+	needle := name + "("
+	for at := strings.Index(compact, needle); at >= 0; {
+		if at == 0 {
+			return true
+		}
+		prev := compact[at-1]
+		if !(prev >= 'a' && prev <= 'z') && !(prev >= 'A' && prev <= 'Z') &&
+			!(prev >= '0' && prev <= '9') && prev != '_' && prev != '.' && prev != ':' {
+			return true
+		}
+		next := strings.Index(compact[at+1:], needle)
+		if next < 0 {
+			break
+		}
+		at += 1 + next
+	}
+	return false
 }
 
 func rustSemanticReviewTokens(raw string) []string {
