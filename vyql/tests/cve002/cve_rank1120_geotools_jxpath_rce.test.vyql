@@ -1,0 +1,112 @@
+# Rank 1120 / CVE-2024-36401: GeoServer's remote code execution came from a
+# GeoTools library it depends on, where a feature property accessor built a
+# JXPathContext with Commons JXPath's default configuration, which resolves
+# Java method calls embedded in an XPath string, and fed it a property name
+# that OGC requests (WFS GetFeature, WMS GetMap, and others) control directly
+# (CWE-94, CWE-95).
+#
+# FeaturePropertyAccessorFactory's inner accessor, in
+# modules/extension/complex/.../expression/FeaturePropertyAccessorFactory.java,
+# built `JXPathContext.newContext(object)` in both get() and set() with no
+# further configuration, then called context.iteratePointers(xpath) and
+# context.setValue(xpath, value). Commons JXPath's default context resolves
+# extension functions, including arbitrary static Java method calls, from the
+# expression string itself, so an xpath value like a call into
+# java.lang.Runtime executes.
+#
+# The pool row named GeoServer's own release-notes commit for a version bump,
+# which the advisory's PoC section already states applies to every GeoServer
+# instance regardless of that release; the advisory's actual code reference is
+# GeoTools's own advisory GHSA-w3pj-wh35-fq8w and geotools/geotools#4797.
+# Corpus correction, in place: pool.tsv now names geotools/geotools at
+# f0c9961dc4d40c5acfce2169fab92805738de5ea, that PR's merge commit (COMMIT_OK
+# once corrected), and corrects the language from python to java. It adds
+# JXPathUtils.newSafeContext, which builds the same JXPathContext and then
+# calls context.setFunctions(new FunctionLibrary()), installing an empty
+# function library so no method call in an XPath expression can resolve, and
+# replaces both call sites with it.
+#
+# CAUGHT. code.UnsafeJXPathContextEvaluation already exists for exactly this
+# weakness, already binds Java's JXPathContext.newContext + iterate/getValue/
+# selectNodes pattern excluding setFunctions and JXPathUtils.newSafeContext,
+# and VYQL-INJ-189 reports both call sites, FeaturePropertyAccessorFactory.java:258
+# and :291, on the vulnerable revision and neither on the fixed one.
+#
+# verify_current_expected: current-behavior
+
+test "rank1120: the accessor iterates an unsafe JXPathContext"
+  lang java
+  file FeaturePropertyAccessorFactory.java
+  expect VYQL-INJ-189
+  code
+  ```
+  package org.geotools.data.complex.expression;
+
+  import java.util.ArrayList;
+  import java.util.Enumeration;
+  import java.util.Iterator;
+  import java.util.List;
+  import org.apache.commons.jxpath.JXPathContext;
+  import org.apache.commons.jxpath.Pointer;
+  import org.xml.sax.helpers.NamespaceSupport;
+
+  public class FeaturePropertyAccessorFactory {
+
+      static class ComplexFeaturePropertyAccessor {
+          NamespaceSupport namespaces;
+
+          public <T> T get(Object object, String xpath, Class<T> target) {
+              JXPathContext context = JXPathContext.newContext(object);
+              Enumeration declaredPrefixes = namespaces.getDeclaredPrefixes();
+              while (declaredPrefixes.hasMoreElements()) {
+                  String prefix = (String) declaredPrefixes.nextElement();
+                  String uri = namespaces.getURI(prefix);
+                  context.registerNamespace(prefix, uri);
+              }
+
+              Iterator it = context.iteratePointers(xpath);
+              List results = new ArrayList<>();
+              while (it.hasNext()) {
+                  Pointer pointer = (Pointer) it.next();
+                  results.add(pointer.getValue());
+              }
+              return (T) results;
+          }
+      }
+  }
+  ```
+
+test "rank1120: the accessor builds a safe context with an empty function library"
+  lang java
+  file FeaturePropertyAccessorFactory.java
+  reject VYQL-INJ-189
+  code
+  ```
+  package org.geotools.data.complex.expression;
+
+  import java.util.ArrayList;
+  import java.util.Iterator;
+  import java.util.List;
+  import org.apache.commons.jxpath.JXPathContext;
+  import org.apache.commons.jxpath.Pointer;
+  import org.geotools.xsd.impl.jxpath.JXPathUtils;
+  import org.xml.sax.helpers.NamespaceSupport;
+
+  public class FeaturePropertyAccessorFactory {
+
+      static class ComplexFeaturePropertyAccessor {
+          NamespaceSupport namespaces;
+
+          public <T> T get(Object object, String xpath, Class<T> target) {
+              JXPathContext context = JXPathUtils.newSafeContext(object, false, this.namespaces, true);
+              Iterator it = context.iteratePointers(xpath);
+              List results = new ArrayList<>();
+              while (it.hasNext()) {
+                  Pointer pointer = (Pointer) it.next();
+                  results.add(pointer.getValue());
+              }
+              return (T) results;
+          }
+      }
+  }
+  ```
