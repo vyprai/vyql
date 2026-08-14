@@ -806,3 +806,8 @@ binding closureUnwindStaleLength {
   query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "closure_unwind_stale_length"
   emit issue code.ClosureUnwindStaleLength at node
 }
+
+binding unpinImplMissingBound {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "rust.unpin_impl_missing_bound"
+  emit issue code.UnsafeAutoTraitImpl at node
+}

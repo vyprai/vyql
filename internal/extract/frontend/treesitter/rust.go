@@ -141,6 +141,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, ParamEntries: c.rsParamEntries(c.text(field(n, "name")), params, attrs), Body: body, Loc: L, Exported: exported}}
 	case "impl_item":
 		out := c.rsUnsafeImplMetadata(n)
+		out = append(out, c.rsUnpinImplMetadata(n)...)
 		out = append(out, c.rsRunTestsAutoApprovalMetadata(n)...)
 		out = append(out, c.decls(field(n, "body"))...)
 		return out
@@ -469,6 +470,37 @@ func (c *rsConv) rsUnsafeImplMetadata(n *tree_sitter.Node) []nir.Stmt {
 		}
 	}
 	return out
+}
+
+// rsUnpinImplMetadata reports an unconditional Unpin impl for a generic type
+// in a file that also pins with Pin::new_unchecked. Unpin is a safe trait, so
+// the impl alone proves nothing -- a wrapper whose field is a Box is Unpin
+// whatever its parameter is. The unsoundness needs both halves: the blanket
+// impl lets safe code move the value out of a Pin, and new_unchecked is the
+// promise that it never moves. Together they let a caller free a buffer the
+// pinned I/O object still references (RUSTSEC's Framed shape). A bound on the
+// parameter (T: Unpin) makes the impl conditional and drops the fact.
+func (c *rsConv) rsUnpinImplMetadata(n *tree_sitter.Node) []nir.Stmt {
+	compact := rustCompactText(c.text(n))
+	if strings.HasPrefix(compact, "unsafeimpl") || !strings.HasPrefix(compact, "impl") {
+		return nil
+	}
+	if !strings.Contains(compact, "Unpinfor") {
+		return nil
+	}
+	// Only a generic impl can promise Unpin for parameters it does not know.
+	if !strings.HasPrefix(compact, "impl<") {
+		return nil
+	}
+	if strings.Contains(compact, ":Unpin") || strings.Contains(compact, "+Unpin") {
+		return nil
+	}
+	if !strings.Contains(string(c.src), "new_unchecked") {
+		return nil
+	}
+	loc := c.loc(n)
+	return []nir.Stmt{c.rsAnalysisCall("analysis.rust.unpin_impl_missing_bound", "unpin_impl_missing_bound", loc,
+		"lang=rust", "trait:Unpin", "missing_bound:Unpin")}
 }
 
 func (c *rsConv) rsAnalysisCall(path, method, loc string, tokens ...string) nir.Stmt {
