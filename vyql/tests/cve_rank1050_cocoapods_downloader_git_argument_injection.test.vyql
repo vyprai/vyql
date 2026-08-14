@@ -1,0 +1,138 @@
+# Rank 1050 / CVE-2022-24440: cocoapods-downloader passed a Podfile-supplied git
+# URL to git as a positional argument, so a value beginning with `--` became an
+# option (CWE-74, CWE-88). Git.preprocess_options in
+# lib/cocoapods-downloader/git.rb built
+#
+#   command = ['ls-remote', options[:git], options[:branch]]
+#   output = Git.execute_command('git', command)
+#
+# and `:git => '--upload-pack=touch ./HELLO1;'` runs that command. The fix
+# 52a0d54464 rejects any value starting with `--` or containing ` --`, and adds
+# `--` to the command as an argument separator.
+#
+# ATTENTION. The vocabulary for this weakness is right and the plumbing is
+# missing, in three separable places.
+#
+#  - The sink concept is orphaned. code.CommandOptionInjectionSink exists with
+#    cwe CWE_74 and CWE_88 and vulnerableTo injection.ArgumentInjection, four
+#    bindings emit it, and no rule in vyql/packs consumes it. Only the presence
+#    issue code.CommandOptionInjection has a rule, VYQL-INJ-031, so argument
+#    injection cannot be reported by taint anywhere, in any language.
+#  - Ruby command execution through backticks is invisible. execute_command in
+#    api.rb runs `\n#{executable} #{command} 2>&1`, and neither that form nor a
+#    plain `#{cmd}` is labelled a sink; a probe binding on callee.method == "`"
+#    matches nothing, so the frontend does not present a backtick as a call at
+#    all. The 18 Ruby command bindings cover system, exec, spawn, the Kernel
+#    forms, IO.popen and Open3, which is every way of running a command except
+#    the most idiomatic one.
+#  - No control describes the fix. There is no concept for an argument separator
+#    or for rejecting a leading dash, and String#shellescape is unbound, only
+#    Shellwords.escape and Shellwords.shelljoin are, so the escaping this file
+#    does is unlabelled too.
+#
+# One thing is already correct and should not be changed while fixing the rest:
+# core.ProcessArgVector neutralizes injection.CommandInjection only, so the array
+# form at git.rb:26, which vyql match does label, will not wrongly suppress an
+# argument-injection finding once one can be raised.
+#
+# Scanning lib/ reports 6 findings at the vulnerable revision, 3 VYQL-PATH-001,
+# 2 VYQL-RF-001 and 1 VYQL-RES-001, all in remote_file.rb and none in git.rb.
+# The sources are present: vyql match labels eight code.ExternalEntryInput rows
+# in git.rb through library.param-source, including the one this CVE starts from.
+#
+# verify_current_expected: attention-orphaned-sink
+
+test "rank1050: a caller-supplied git URL becomes a git option"
+  lang ruby
+  file lib/cocoapods-downloader/git.rb
+  profile library
+  reject VYQL-INJ-031
+  code
+  ```
+  module Pod
+    module Downloader
+      class Git < Base
+        def self.preprocess_options(options)
+          return options unless options[:branch]
+
+          command = ['ls-remote',
+                     options[:git],
+                     options[:branch]]
+          output = Git.execute_command('git', command)
+          match = commit_from_ls_remote output, options[:branch]
+
+          return options if match.nil?
+
+          options[:commit] = match
+          options.delete(:branch)
+
+          options
+        end
+
+        def self.execute_command(executable, command, raise_on_failure = false)
+          require 'shellwords'
+          command = command.map(&:to_s).map(&:shellescape).join(' ')
+          output = `\n#{executable} #{command} 2>&1`
+          output
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1050: fix rejects a leading dash and separates the arguments"
+  lang ruby
+  file lib/cocoapods-downloader/git.rb
+  profile library
+  reject VYQL-INJ-031
+  code
+  ```
+  module Pod
+    module Downloader
+      class Git < Base
+        def self.preprocess_options(options)
+          return options unless options[:branch]
+
+          input = [options[:git], options[:commit]].map(&:to_s)
+          invalid = input.compact.any? { |value| value.start_with?('--') || value.include?(' --') }
+          raise DownloaderError, "Provided unsafe input for git #{options}." if invalid
+
+          command = ['ls-remote',
+                     '--',
+                     options[:git],
+                     options[:branch]]
+
+          output = Git.execute_command('git', command)
+          match = commit_from_ls_remote output, options[:branch]
+
+          return options if match.nil?
+
+          options[:commit] = match
+          options.delete(:branch)
+
+          options
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1050: neither backtick form is labelled a command sink"
+  lang ruby
+  file lib/cocoapods-downloader/api.rb
+  profile library
+  reject VYQL-INJ-031
+  code
+  ```
+  module Pod
+    module Downloader
+      module API
+        def run(executable, command)
+          out1 = `#{executable} #{command}`
+          out2 = `\n#{executable} #{command} 2>&1`
+          [out1, out2]
+        end
+      end
+    end
+  end
+  ```
