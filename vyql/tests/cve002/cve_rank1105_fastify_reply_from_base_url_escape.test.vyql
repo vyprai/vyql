@@ -1,0 +1,82 @@
+# Rank 1105 / CVE-2021-21321: fastify-reply-from's request-forwarding URL
+# builder checked the resolved destination against the configured base by
+# comparing origins only, so a client-controlled forwarding path could resolve
+# to a destination outside the base's path prefix while sharing its origin
+# (CWE-20).
+#
+# buildURL in lib/utils.js resolved `new URL(source, reqBase)`, where source
+# came from the incoming request and reqBase was the operator-configured
+# upstream base (for example http://internal-host/api/v1/). The guard was
+# `if (reqBase && !reqBase.startsWith(dest.origin)) throw`, which compares
+# reqBase against dest.origin, the scheme+host+port only. An absolute-path
+# source like /admin/secrets resolves against reqBase to
+# http://internal-host/admin/secrets; dest.origin is http://internal-host,
+# and reqBase does start with that, so the guard passes even though the
+# resolved destination has left /api/v1/ entirely.
+#
+# Pool commit dea227dda606 is the real fix (COMMIT_OK, GHSA-qmw8-3v4g-gwj4).
+# It compares the full resolved href against the full reqBase instead of
+# origin against origin: `if (!dest.href.startsWith(reqBase)) throw`, after
+# ensuring reqBase carries a trailing slash so a base of .../v1 cannot be
+# satisfied by a sibling path like .../v10. No pool correction.
+#
+# ATTENTION, vocabulary gap. Scanning either revision of lib/utils.js reports
+# nothing, and vyql match labels nothing on buildURL. The nearest concept by
+# weakness shape, code.CanonicalPathStringPrefixContainment (CWE_22, a
+# resolved path checked against a trusted parent by string-prefix containment
+# instead of structural containment), is a plausible one-level-up
+# generalization of "the resolved location is compared to the trusted base by
+# a prefix check that is too permissive", but its only binding is Java's
+# getCanonicalPath idiom and has nothing to do with building a URL from a
+# request path and a configured base, so it does not and should not fire on
+# this JavaScript code.
+#
+# Both revisions here compare with a string-prefix check (startsWith); the
+# fix is not "structural instead of string" the way the Java form is, it is
+# comparing the full base including its path instead of just its origin. That
+# is a narrower, JavaScript-specific condition this concept does not state,
+# and generalizing it needs its own vocabulary rather than reuse.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1105: the guard compares origins, not the full base path"
+  lang javascript
+  file lib/utils.js
+  reject VYQL-PATH-040
+  code
+  ```
+  function buildURL (source, reqBase) {
+    const dest = new URL(source, reqBase)
+
+    if (reqBase && !reqBase.startsWith(dest.origin)) {
+      throw new Error('source must be a relative path string')
+    }
+
+    return dest
+  }
+  ```
+
+test "rank1105: the guard compares the full resolved href against the full base"
+  lang javascript
+  file lib/utils.js
+  reject VYQL-PATH-040
+  code
+  ```
+  function buildURL (source, reqBase) {
+    const dest = new URL(source, reqBase)
+
+    if (reqBase) {
+      if (!reqBase.endsWith('/') && dest.href.length > reqBase.length) {
+        reqBase = reqBase + '/'
+      }
+
+      if (!dest.href.startsWith(reqBase)) {
+        throw new Error('source must be a relative path string')
+      }
+    }
+
+    return dest
+  }
+  ```
