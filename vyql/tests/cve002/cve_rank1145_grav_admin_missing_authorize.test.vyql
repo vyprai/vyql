@@ -1,0 +1,103 @@
+# Rank 1145 / CVE-2021-29439: Grav's admin plugin dispatched every admin
+# controller task after checking only a view blacklist and a CSRF nonce,
+# with no check anywhere that the requester was actually logged into the
+# admin panel, so an unauthenticated request carrying a valid nonce could
+# invoke any admin task, and one specific task,
+# taskRemoveFileFromBlueprint, had no permission check at all even after
+# that (CWE-863).
+#
+# AdminBaseController::execute in classes/plugin/AdminBaseController.php
+# checked `in_array($this->view, $this->blacklist_views, true)` and
+# `$this->validateNonce()`, and called the requested task straight after,
+# with nothing checking `$this->admin->authorize()`. Separately,
+# taskRemoveFileFromBlueprint(), which base64-decodes a blueprint path from
+# the request and removes a file, called no `authorizeTask(...)` at all,
+# unlike its sibling file-management tasks.
+#
+# Pool commit a220359877fd is the real fix (COMMIT_OK, a 1.10.11 release
+# batch whose CHANGELOG entry names the CVE). It adds
+# `if (!$this->admin->authorize()) { return false; }` to execute(), before
+# nonce validation runs, and adds
+# `if (!$this->authorizeTask('remove file', $this->dataPermissions())) { return false; }`
+# to taskRemoveFileFromBlueprint(); it also splits several tasks that
+# previously shared the single 'save' permission string into their own named
+# permissions ('upload file', 'delete file', 'get files'), so a user granted
+# permission for one file operation no longer implicitly has it for the
+# others. No pool correction.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports the same
+# finding count and shape (VYQL-PATH-001 and VYQL-RF-043 rows unrelated to
+# authorization, line-shifted but structurally unchanged); nothing labels
+# the missing authorize() call or the missing authorizeTask() call.
+# code.PrivilegedEntryPointReview is the nearest concept by theme, "review
+# privileged entry point dispatch and caller privilege checks," and PHP
+# already has a binding for it, but that binding keys on a dedicated
+# frontend review marker (phpReview == "privileged_entry_point_review")
+# that only a handful of specific, already-classified functions carry;
+# nothing in the PHP extractor classifies a generic task-dispatch method
+# like execute() this way, so recognizing this shape needs new extractor
+# classification work, not a binding addition.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1145: execute() dispatches a task after checking only the view blacklist and a nonce"
+  lang php
+  file AdminBaseController.php
+  reject_review code.PrivilegedEntryPointReview
+  code
+  ```
+  <?php
+  class AdminBaseController
+  {
+      public function execute()
+      {
+          if (in_array($this->view, $this->blacklist_views, true)) {
+              return false;
+          }
+
+          if (!$this->validateNonce()) {
+              return false;
+          }
+
+          $method = 'task' . ucfirst($this->task);
+          if (!method_exists($this, $method)) {
+              return false;
+          }
+          return $this->{$method}();
+      }
+  }
+  ```
+
+test "rank1145: execute() requires admin login before dispatching a task"
+  lang php
+  file AdminBaseController.php
+  reject_review code.PrivilegedEntryPointReview
+  code
+  ```
+  <?php
+  class AdminBaseController
+  {
+      public function execute()
+      {
+          if (in_array($this->view, $this->blacklist_views, true)) {
+              return false;
+          }
+
+          if (!$this->admin->authorize()) {
+              return false;
+          }
+
+          if (!$this->validateNonce()) {
+              return false;
+          }
+
+          $method = 'task' . ucfirst($this->task);
+          if (!method_exists($this, $method)) {
+              return false;
+          }
+          return $this->{$method}();
+      }
+  }
+  ```
