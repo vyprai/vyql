@@ -1,0 +1,152 @@
+# Rank 1100 / CVE-2026-44668: FACTION's Struts2 interceptor read the session
+# user and populated the action context from it, but called invocation.invoke()
+# on every path, so a request carrying no session reached the action anyway
+# (CWE-306). Four BoilerPlateConfig action methods carried no local session
+# check either, so an unauthenticated request could read, overwrite, deactivate
+# and permanently delete any boilerplate template.
+#
+# Pool commit 825cc330ad14 is the real fix. The advisory (GHSA-7cv6-h22r-2qf2)
+# references only the 1.8.3 release tag, which is why the metadata flag is
+# nocommit, but the commit carries both halves the advisory describes: an else
+# branch in AccessControlInterceptor.intercept that returns "login" for any
+# namespace other than the root one, and a getSessionUser() == null check at
+# the head of each BoilerPlateConfig action. No pool correction.
+#
+# The XWork Interceptor contract states the deny path: intercept() returns a
+# result name to stop the invocation, and calls invocation.invoke() to let it
+# continue. So an intercept(ActionInvocation) body that consults the session and
+# then reaches invocation.invoke() with no result name anywhere in it has no
+# deny path at all, and that is what the binding observes. The result names it
+# looks for are the ones the Action interface declares — login, error, input,
+# none — as string literals or as the constants of the same name.
+#
+# Only the interceptor half is detected. The other half, an action method with
+# no local session check, would mean labelling every @Action method that does
+# not call a recognized authentication check, which fires on every correctly
+# gated Struts2 application as well.
+#
+# verify_current_expected: expect fires on the unguarded interceptor; reject on
+# the guarded one, on the same guard written with a result constant, and on an
+# interceptor that never consults the session.
+
+test "rank1100: the interceptor consults the session and invokes regardless"
+  lang java
+  file src/com/fuse/utils/AccessControlInterceptor.java
+  expect_review code.AuthenticationRequiredOp
+  code
+  ```
+  package com.fuse.utils;
+
+  import org.apache.struts2.ServletActionContext;
+
+  import com.fuse.dao.User;
+  import com.opensymphony.xwork2.ActionContext;
+  import com.opensymphony.xwork2.ActionInvocation;
+  import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
+
+  public class AccessControlInterceptor extends AbstractInterceptor {
+
+      @Override
+      public String intercept(ActionInvocation invocation) throws Exception {
+
+          User user = (User) ServletActionContext.getRequest().getSession(true).getAttribute("user");
+
+          if (user != null) {
+              ActionContext.getContext().put("user", user);
+              ActionContext.getContext().put("isAdmin", user.getPermissions().isAdmin());
+              ActionContext.getContext().put("isManager", user.getPermissions().isManager());
+          }
+          return invocation.invoke();
+      }
+  }
+  ```
+
+test "rank1100: the guarded interceptor returns a result name before invoking"
+  lang java
+  file src/com/fuse/utils/AccessControlInterceptor.java
+  reject_review code.AuthenticationRequiredOp
+  code
+  ```
+  package com.fuse.utils;
+
+  import org.apache.struts2.ServletActionContext;
+
+  import com.fuse.dao.User;
+  import com.opensymphony.xwork2.ActionContext;
+  import com.opensymphony.xwork2.ActionInvocation;
+  import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
+
+  public class AccessControlInterceptor extends AbstractInterceptor {
+
+      @Override
+      public String intercept(ActionInvocation invocation) throws Exception {
+
+          User user = (User) ServletActionContext.getRequest().getSession(true).getAttribute("user");
+
+          if (user != null) {
+              ActionContext.getContext().put("user", user);
+              ActionContext.getContext().put("isAdmin", user.getPermissions().isAdmin());
+              ActionContext.getContext().put("isManager", user.getPermissions().isManager());
+          } else {
+              String namespace = invocation.getProxy().getNamespace();
+              if (!"/".equals(namespace)) {
+                  return "login";
+              }
+          }
+          return invocation.invoke();
+      }
+  }
+  ```
+
+test "rank1100: the same guard written with the Action result constant"
+  lang java
+  file src/com/fuse/utils/AccessControlInterceptor.java
+  reject_review code.AuthenticationRequiredOp
+  code
+  ```
+  package com.fuse.utils;
+
+  import org.apache.struts2.ServletActionContext;
+
+  import com.fuse.dao.User;
+  import com.opensymphony.xwork2.Action;
+  import com.opensymphony.xwork2.ActionInvocation;
+  import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
+
+  public class AccessControlInterceptor extends AbstractInterceptor {
+
+      @Override
+      public String intercept(ActionInvocation invocation) throws Exception {
+
+          User user = (User) ServletActionContext.getRequest().getSession(true).getAttribute("user");
+
+          if (user == null) {
+              return Action.LOGIN;
+          }
+          return invocation.invoke();
+      }
+  }
+  ```
+
+test "rank1100: an interceptor that never consults the session is not this"
+  lang java
+  file src/com/fuse/utils/TimerInterceptor.java
+  reject_review code.AuthenticationRequiredOp
+  code
+  ```
+  package com.fuse.utils;
+
+  import com.opensymphony.xwork2.ActionInvocation;
+  import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
+
+  public class TimerInterceptor extends AbstractInterceptor {
+
+      @Override
+      public String intercept(ActionInvocation invocation) throws Exception {
+          long start = System.currentTimeMillis();
+          String result = invocation.invoke();
+          System.out.println("elapsed " + (System.currentTimeMillis() - start));
+          return result;
+      }
+  }
+  ```
