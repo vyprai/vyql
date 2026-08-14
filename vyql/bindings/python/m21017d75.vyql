@@ -4285,3 +4285,12 @@ binding codeExecValidationPyQuotedLiteral901 {
     }
   }
 }
+
+binding pathAccessCheckPyIsRelativeTo902 {
+  query pattern callExpr where callee.method == "is_relative_to"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

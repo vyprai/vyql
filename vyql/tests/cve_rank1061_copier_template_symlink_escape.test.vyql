@@ -1,0 +1,168 @@
+# Rank 1061 / CVE-2026-23986: copier walked a template and followed the symlinks
+# in it, so a template carrying a link to a path outside its own root copied
+# that file's contents into the generated project (CWE-61). Worker._render_template
+# held
+#
+#   for src in scantree(str(self.template_copy_root), follow_symlinks):
+#       src_abspath = Path(src.path)
+#       ...
+#       if not dst_realpath.is_relative_to(dst_root):
+#           raise ForbiddenPathError(path=dst_relpath)
+#
+# and _render_file then read src_abspath. The destination is contained and the
+# source is not, so the guard stops a template writing outside the subproject
+# and does nothing about one reading outside the template. Pool commit
+# b3a7b3772d is the real fix (COMMIT_OK, named by GHSA-4fqp-r85r-hxqh); it
+# raises ForbiddenPathError when a source entry is a symlink, symlinks are not
+# being preserved, and the resolved target is not inside the template root.
+# No pool correction.
+#
+# ATTENTION, vocabulary gap. Nothing labels a path that comes out of a
+# directory walk as attacker-influenced. code.ArchiveEntryName says an archive
+# entry's own name is data and has no filesystem equivalent, and os.scandir is
+# bound the other way round, as a code.FilePathAccess sink on its argument, so
+# a symlink sitting in a downloaded template is not data to any rule.
+#
+# The two issue concepts for this weakness class cannot see it either, and both
+# are worth fixing on their own account. code.ArchiveSymlinkFilterBypass
+# (VYQL-PATH-007, CWE-22 and CWE-59) is emitted in Python by one presence
+# analysis keyed on a function named `safe_extract` plus eight substring tests
+# on its body, which recognises one widely copied snippet rather than the
+# weakness. code.SpecialFileAccessReview carries this CVE's CWE-61 and
+# path.LinkFollowing, and its one binding is a Go presence keyed on the literal
+# `/proc/self/attr/exec`.
+#
+# Measured on the real package: 34 findings at both revisions, the same rows
+# with line numbers shifted by the fix's 14 added lines, and nothing at the
+# render loop. VYQL-PATH-001 does report `src_abspath.read_bytes()`, but its
+# witness is the library profile's per-parameter source on `self`, which fires
+# on every path built from a constructor attribute and states nothing about
+# links.
+#
+# One thing did ship, found by reading the fix: Path.is_relative_to is now a
+# core.PathAccessCheck in the Python bindings, beside relative_to, which was
+# already one. It is the boolean form of the same containment question and the
+# idiomatic one since 3.9. Measured with the first two snippets, which differ
+# only in that guard: two findings become one. The spec suite stays green,
+# OWASP Java and Python are unchanged at +1.00 and +0.90, and copier itself
+# does not move, because the check the fix adds sits in a different function
+# from the read it protects and so never dominates it.
+#
+# The last two snippets are the walk before and after the fix. They report the
+# same two rows with the same fingerprints, both raised on the walk root
+# reaching os.scandir and neither on the symlink, which is what makes the fix
+# invisible.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1061: a template file is read with no containment check"
+  lang python
+  file copier/_main.py
+  profile cli
+  expect VYQL-PATH-001
+  code
+  ```
+  import sys
+  from pathlib import Path
+
+
+  class Worker:
+      def __init__(self, template_root: Path) -> None:
+          self.template_root = template_root
+
+      def render_file(self, src_relpath: Path) -> bytes:
+          src_abspath = self.template_root / src_relpath
+          return src_abspath.read_bytes()
+
+
+  Worker(Path(sys.argv[1])).render_file(Path(sys.argv[2]))
+  ```
+
+test "rank1061: the containment check the fix adds clears it"
+  lang python
+  file copier/_main.py
+  profile cli
+  reject VYQL-PATH-001
+  code
+  ```
+  import sys
+  from pathlib import Path
+
+
+  class Worker:
+      def __init__(self, template_root: Path) -> None:
+          self.template_root = template_root
+
+      def render_file(self, src_relpath: Path) -> bytes:
+          src_abspath = self.template_root / src_relpath
+          if not src_abspath.resolve().is_relative_to(self.template_root):
+              raise ValueError("forbidden path")
+          return src_abspath.read_bytes()
+
+
+  Worker(Path(sys.argv[1])).render_file(Path(sys.argv[2]))
+  ```
+
+test "rank1061: the walk the render loop actually runs"
+  lang python
+  file copier/_main.py
+  profile cli
+  expect VYQL-PATH-001
+  code
+  ```
+  import os
+  import sys
+  from pathlib import Path
+
+
+  def scantree(path: str, follow_symlinks: bool):
+      for entry in os.scandir(path):
+          yield entry
+          if entry.is_dir(follow_symlinks=follow_symlinks):
+              yield from scantree(entry.path, follow_symlinks)
+
+
+  def render_template(template_root: Path, dst_root: Path) -> None:
+      for src in scantree(str(template_root), True):
+          src_abspath = Path(src.path)
+          dst_abspath = dst_root / src_abspath.relative_to(template_root)
+          if not dst_abspath.resolve().is_relative_to(dst_root):
+              raise ValueError("forbidden path")
+          dst_abspath.write_bytes(src_abspath.read_bytes())
+
+
+  render_template(Path(sys.argv[1]), Path(sys.argv[2]))
+  ```
+
+test "rank1061: the same walk with the source-side symlink check"
+  lang python
+  file copier/_main.py
+  profile cli
+  expect VYQL-PATH-001
+  code
+  ```
+  import os
+  import sys
+  from pathlib import Path
+
+
+  def scantree(path: str, follow_symlinks: bool):
+      for entry in os.scandir(path):
+          yield entry
+          if entry.is_dir(follow_symlinks=follow_symlinks):
+              yield from scantree(entry.path, follow_symlinks)
+
+
+  def render_template(template_root: Path, dst_root: Path) -> None:
+      for src in scantree(str(template_root), True):
+          src_abspath = Path(src.path)
+          if src_abspath.is_symlink() and not src_abspath.resolve().is_relative_to(template_root):
+              raise ValueError("forbidden path")
+          dst_abspath = dst_root / src_abspath.relative_to(template_root)
+          if not dst_abspath.resolve().is_relative_to(dst_root):
+              raise ValueError("forbidden path")
+          dst_abspath.write_bytes(src_abspath.read_bytes())
+
+
+  render_template(Path(sys.argv[1]), Path(sys.argv[2]))
+  ```
