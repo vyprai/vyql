@@ -434,6 +434,16 @@ binding domInput84 {
   emit source code.DomInput at call.result
 }
 
+binding domInputXhrResponseText {
+  query pattern callExpr where callee.path ~= "responseText"
+  emit source code.DomInput at call.result
+}
+
+binding domInputXhrResponseXml {
+  query pattern callExpr where callee.path ~= "responseXML"
+  emit source code.DomInput at call.result
+}
+
 binding domInput85 {
   query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.entryKind contains "call_lambda_param" and args.any.context.callMethod contains "getJSON"
   emit source code.DomInput at call.result

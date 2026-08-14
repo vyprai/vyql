@@ -1,0 +1,61 @@
+# Rank 1005 / CVE-2021-43853: Ajax.NET-Professional client-side code injection.
+# AjaxPro.parse runs eval('(' + text + ')') on the XMLHttpRequest responseText,
+# after a loose regex rewrites date-shaped quoted strings into raw JavaScript
+# via regExDate. A crafted response can therefore break out of string context
+# and execute attacker code (CWE-79, CWE-94/95). The fix c89e39b967 tightens the
+# date regex to only the numeric \/Date(digits)\/ form and removes the ISO-date
+# rewriting branch, but keeps eval, so the underlying eval-of-response weakness
+# remains in the patched library.
+#
+# Detection: xhr.responseText and responseXML are untrusted response data, the
+# same class already labelled for response.json / res.json / getJSON / ajax.
+# Labelling them as code.DomInput lets the code-injection rule (VYQL-INJ-003)
+# fire when the response flows to eval. The safe form parses the response with
+# JSON.parse instead of eval and does not fire, which is the real safe/unsafe
+# boundary for handling response bodies.
+
+test "rank1005: eval of XMLHttpRequest responseText is code injection"
+  lang javascript
+  file AjaxPro/core.js
+  expect VYQL-INJ-003
+  code
+  ```
+  var AjaxPro = {
+    regExDate: function (str) {
+      var date = str.substring(1).replace('"', '');
+      if (date.substring(0, 7) == "\\\/Date(") {
+        var d = date.match(/Date\((.*?)\)/)[1];
+        return "new Date(" + parseInt(d) + ")";
+      }
+      var matches = date.split(/[-,:,T,Z]/);
+      if (matches.length == 7) {
+        return "new Date(Date.UTC(" + matches.join(",") + "))";
+      }
+      return str;
+    },
+    parse: function (text) {
+      var regEx = /(\"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}.*?\")|(\"\\\/Date\(.*?\)\\\/")/g;
+      text = text.replace(regEx, this.regExDate);
+      return eval('(' + text + ')');
+    },
+    onReadyStateChange: function (xmlHttp) {
+      return AjaxPro.parse(xmlHttp.responseText);
+    }
+  };
+  ```
+
+test "rank1005: parsing the response with JSON.parse instead of eval is safe"
+  lang javascript
+  file AjaxPro/core.js
+  reject VYQL-INJ-003
+  code
+  ```
+  var AjaxPro = {
+    parse: function (text) {
+      return JSON.parse(text);
+    },
+    onReadyStateChange: function (xmlHttp) {
+      return AjaxPro.parse(xmlHttp.responseText);
+    }
+  };
+  ```
