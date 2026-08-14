@@ -1,0 +1,186 @@
+# Rank 1158 / CVE-2026-32733: halloy's DCC SEND handling took the filename
+# out of the attacker-supplied CTCP text and joined it straight into the
+# configured file-transfer save directory, so a peer offering
+# `../../../.ssh/authorized_keys` as the DCC filename could write outside
+# that directory (CWE-22).
+#
+# `dcc::Send::decode` builds the filename by joining and quote-trimming the
+# CTCP arguments with no path handling at all. `file_transfer::Manager`
+# reads it back through `Send::filename()`, joins it onto the configured
+# save directory, and hands the resulting `PathBuf` to a `Handle::approve`
+# call that forwards it across an `mpsc` channel (`Action::Approve { save_to
+# }`) to the async task that actually opens the file with
+# `tokio::fs::File::create`.
+#
+# Pool commit 0f77b2cfc5f822517a256ea5a4b94bad8bfe38b6 is the real fix
+# (COMMIT_OK, matches the advisory and its own diff): it adds
+# `file_transfer::sanitize_filename`, which extracts `Path::file_name()`
+# (dropping any `..`/directory component) and replaces control characters,
+# and threads every filename -- the one recorded on the `FileTransfer`, the
+# one used for the save dialog, and the one joined onto the save directory
+# -- through it before it reaches a path. No pool correction.
+#
+# ATTENTION, engine gap (not mechanical). `code.ExternalEntryInput` already
+# labels `dcc::decode`'s `content` parameter (confirmed with `vyql match` on
+# the real checkout: `dcc.rs:9 <- library.param-source`, since `data/` is a
+# library crate in halloy's own Cargo workspace and the auto profile detects
+# it as such) and `code.FilePathAccess` already labels `File::create` in
+# task.rs (`rust.sinks@resolved`) -- both ends of this flow are already
+# vocabulary the engine has. `vyql trace -from code.ExternalEntryInput -to
+# code.FilePathAccess` on the real checkout shows every path dead-ending at
+# `Handle::approve`'s `self.sender.try_send(...)`:
+# "no outgoing flow (callee not traced -- external or cross-package)". A
+# hand-built minimal pair isolates the construct: the identical chain
+# (decode -> Send::filename -> Manager::receive -> Handle::approve ->
+# File::create) reports VYQL-PATH-001 when `Handle::approve` calls the file
+# write directly, and reports nothing once the exact same call is replaced
+# by `sender.try_send` into an `mpsc::Receiver` consumed by a separate async
+# fn -- the only thing that differs between the two hand-built snippets is
+# the direct call vs. the channel hop. An `mpsc::Sender::try_send` has no
+# static call edge to the `Receiver::next().await` that later reads the same
+# value out of the channel, so the solver has no relation to follow across
+# that hop, for any language. This is a new dataflow relation (send/receive
+# pairing on a channel type), not a pattern over one call site, so no
+# definition change attempted. See ENGINE-GAPS.md.
+#
+# Confirmed against the real repository: `vyql scan --cache off --max-ram
+# 4GB` on `data/src/dcc.rs`, `data/src/file_transfer.rs`,
+# `data/src/file_transfer/manager.rs` and `data/src/file_transfer/task.rs`
+# reports the same six findings (five `VYQL-MEM-006` null-deref rows plus
+# nothing else) at both revisions, with nothing at either revision's
+# `save_directory.join`/`File::create` lines.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1158: DCC filename is joined into the save directory with no path handling"
+  lang rust
+  profile library
+  file dcc_transfer.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  use std::path::PathBuf;
+  use futures::channel::mpsc::{Receiver, Sender};
+  use futures::StreamExt;
+  use tokio::fs::File;
+
+  pub enum Send {
+      Direct { filename: String },
+  }
+
+  impl Send {
+      pub fn filename(&self) -> &str {
+          match self {
+              Send::Direct { filename } => filename,
+          }
+      }
+  }
+
+  pub fn decode(content: &str) -> Option<Send> {
+      let filename = content.split_whitespace().next()?.to_string();
+      Some(Send::Direct { filename })
+  }
+
+  pub enum Action {
+      Approve { save_to: PathBuf },
+  }
+
+  pub struct Handle {
+      sender: Sender<Action>,
+  }
+
+  impl Handle {
+      pub fn approve(&mut self, save_to: PathBuf) {
+          let _ = self.sender.try_send(Action::Approve { save_to });
+      }
+  }
+
+  pub struct Manager;
+
+  impl Manager {
+      pub fn receive(&mut self, dcc_send: Send, save_directory: &PathBuf, handle: &mut Handle) {
+          let filename = dcc_send.filename().to_string();
+          let save_path = save_directory.join(&filename);
+          handle.approve(save_path);
+      }
+  }
+
+  async fn run(mut action: Receiver<Action>) {
+      let Some(Action::Approve { save_to }) = action.next().await else {
+          return;
+      };
+      let mut file = File::create(&save_to).await.unwrap();
+  }
+  ```
+
+test "rank1158: the filename is extracted through sanitize_filename before the save path is built"
+  lang rust
+  profile library
+  file dcc_transfer.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  use std::path::{Path, PathBuf};
+  use futures::channel::mpsc::{Receiver, Sender};
+  use futures::StreamExt;
+  use tokio::fs::File;
+
+  const FALLBACK_FILENAME: &str = "dcc_transfer";
+
+  pub fn sanitize_filename(raw: &str) -> String {
+      let trimmed = raw.trim().trim_matches('"');
+      let name = Path::new(trimmed)
+          .file_name()
+          .and_then(|n| n.to_str())
+          .unwrap_or(FALLBACK_FILENAME);
+      name.to_string()
+  }
+
+  pub enum Send {
+      Direct { filename: String },
+  }
+
+  impl Send {
+      pub fn filename(&self) -> &str {
+          match self {
+              Send::Direct { filename } => filename,
+          }
+      }
+  }
+
+  pub fn decode(content: &str) -> Option<Send> {
+      let filename = sanitize_filename(content.split_whitespace().next().unwrap_or(""));
+      Some(Send::Direct { filename })
+  }
+
+  pub enum Action {
+      Approve { save_to: PathBuf },
+  }
+
+  pub struct Handle {
+      sender: Sender<Action>,
+  }
+
+  impl Handle {
+      pub fn approve(&mut self, save_to: PathBuf) {
+          let _ = self.sender.try_send(Action::Approve { save_to });
+      }
+  }
+
+  pub struct Manager;
+
+  impl Manager {
+      pub fn receive(&mut self, dcc_send: Send, save_directory: &PathBuf, handle: &mut Handle) {
+          let filename = sanitize_filename(dcc_send.filename());
+          let save_path = save_directory.join(&filename);
+          handle.approve(save_path);
+      }
+  }
+
+  async fn run(mut action: Receiver<Action>) {
+      let Some(Action::Approve { save_to }) = action.next().await else {
+          return;
+      };
+      let mut file = File::create(&save_to).await.unwrap();
+  }
+  ```
