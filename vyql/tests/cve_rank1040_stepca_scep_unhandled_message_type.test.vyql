@@ -1,0 +1,179 @@
+# Rank 1040 / CVE-2026-30836: step-ca issued certificates for a SCEP message
+# type it parsed but never authorized (CWE-287, CWE-295). PKIOperation in
+# scep/api/api.go runs the challenge check only for two of the message types it
+# accepts, and then signs regardless:
+#
+#   if msg.MessageType == smallscep.PKCSReq || msg.MessageType == smallscep.RenewalReq {
+#       challengeOptions, err := auth.ValidateChallenge(ctx, csr, challengePassword, transactionID)
+#       ...
+#       signCSROpts = append(signCSROpts, challengeOptions...)
+#   }
+#   // signing continues here for every other message type
+#
+# UpdateReq reaches that point because DecryptPKIEnvelope in scep/authority.go
+# lists it beside PKCSReq and RenewalReq, so the envelope parses and a CSR is
+# produced. The same switch also ends with a bare `return nil` and no default,
+# so any further message type is reported as decrypted successfully. The fix
+# e6da031d51 adds an else branch that fails the request, drops UpdateReq from the
+# parsing case, and replaces the trailing return with a default that errors.
+#
+# ATTENTION. Three layers are missing, and the third is the one that decides it.
+#
+#  - No sink. Signing a certificate is not a sink in the vocabulary, so the
+#    operation the attacker obtains has no name.
+#  - No control. ValidateChallenge is the authorization step and nothing marks it
+#    as one; vyql match on the file lists three controls, io.ReadAll, r.Body.Close
+#    and strings.ReplaceAll, and no authorization among them.
+#  - No relation. Even with both of the above, the weakness is that the control
+#    runs on some paths to the sink and not others, where the branch condition
+#    tests an attacker-supplied discriminator. Nothing expresses "reached without
+#    the control on this path", and the switch half needs a notion of a branch
+#    falling through to success. Both are dataflow and control-flow work rather
+#    than a binding.
+#
+# The message-type constants are the only other discriminator available, and a
+# binding naming smallscep.UpdateReq detects this release of this server rather
+# than the weakness: the same fail-open shape in any other protocol handler,
+# written over its own constants, walks past it.
+#
+# Scanning the scep package reports nothing at either revision, over 7 Go files.
+# Sources are labelled, 10 code.HttpInput rows in api.go alone, so the input side
+# is not what is missing.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1040: the challenge check runs for two message types and signing continues for the rest"
+  lang go
+  file scep/api/api.go
+  reject VYQL-AUTH-001
+  code
+  ```
+  package api
+
+  func PKIOperation(ctx context.Context, req request) (Response, error) {
+      msg, err := smallscep.ParsePKIMessage(req.Message)
+      if err != nil {
+          return Response{}, err
+      }
+
+      auth := scep.MustFromContext(ctx)
+      if err := auth.DecryptPKIEnvelope(ctx, msg); err != nil {
+          return Response{}, err
+      }
+
+      csr := msg.CSRReqMessage.CSR
+      transactionID := string(msg.TransactionID)
+      challengePassword := msg.CSRReqMessage.ChallengePassword
+
+      var signCSROpts []provisioner.SignCSROption
+      if msg.MessageType == smallscep.PKCSReq || msg.MessageType == smallscep.RenewalReq {
+          challengeOptions, err := auth.ValidateChallenge(ctx, csr, challengePassword, transactionID)
+          if err != nil {
+              if errors.Is(err, provisioner.ErrSCEPChallengeInvalid) {
+                  return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, err.Error(), err)
+              }
+              scepErr := errors.New("failed validating challenge password")
+              return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, scepErr.Error(), scepErr)
+          }
+          signCSROpts = append(signCSROpts, challengeOptions...)
+      }
+
+      certRep, err := auth.SignCSR(ctx, csr, msg, signCSROpts...)
+      if err != nil {
+          return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, err.Error(), err)
+      }
+
+      return Response{Data: certRep.Raw}, nil
+  }
+  ```
+
+test "rank1040: the decrypt switch reports success for a message type it does not handle"
+  lang go
+  file scep/authority.go
+  reject VYQL-AUTH-001
+  code
+  ```
+  package scep
+
+  func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) error {
+      switch msg.MessageType {
+      case smallscep.CertRep:
+          certs, err := smallscep.CACerts(msg.pkiEnvelope)
+          if err != nil {
+              return fmt.Errorf("error extracting CA certs from pkcs7 degenerate data: %w", err)
+          }
+          msg.CertRepMessage.Certificate = certs[0]
+          return nil
+      case smallscep.PKCSReq, smallscep.UpdateReq, smallscep.RenewalReq:
+          csr, err := x509.ParseCertificateRequest(msg.pkiEnvelope)
+          if err != nil {
+              return fmt.Errorf("parse CSR from pkiEnvelope: %w", err)
+          }
+          if err := csr.CheckSignature(); err != nil {
+              return fmt.Errorf("invalid CSR signature; %w", err)
+          }
+          cp, err := smallscepx509util.ParseChallengePassword(msg.pkiEnvelope)
+          if err != nil {
+              return fmt.Errorf("parse challenge password in pkiEnvelope: %w", err)
+          }
+          msg.CSRReqMessage = &smallscep.CSRReqMessage{
+              RawDecrypted:      msg.pkiEnvelope,
+              CSR:               csr,
+              ChallengePassword: cp,
+          }
+          return nil
+      case smallscep.GetCRL, smallscep.GetCert, smallscep.CertPoll:
+          return errors.New("not implemented")
+      }
+
+      return nil
+  }
+  ```
+
+test "rank1040: fix rejects the message types it does not authorize"
+  lang go
+  file scep/api/api.go
+  reject VYQL-AUTH-001
+  code
+  ```
+  package api
+
+  func PKIOperation(ctx context.Context, req request) (Response, error) {
+      msg, err := smallscep.ParsePKIMessage(req.Message)
+      if err != nil {
+          return Response{}, err
+      }
+
+      auth := scep.MustFromContext(ctx)
+      if err := auth.DecryptPKIEnvelope(ctx, msg); err != nil {
+          return Response{}, err
+      }
+
+      csr := msg.CSRReqMessage.CSR
+      transactionID := string(msg.TransactionID)
+      challengePassword := msg.CSRReqMessage.ChallengePassword
+
+      var signCSROpts []provisioner.SignCSROption
+      if msg.MessageType == smallscep.PKCSReq || msg.MessageType == smallscep.RenewalReq {
+          challengeOptions, err := auth.ValidateChallenge(ctx, csr, challengePassword, transactionID)
+          if err != nil {
+              if errors.Is(err, provisioner.ErrSCEPChallengeInvalid) {
+                  return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, err.Error(), err)
+              }
+              scepErr := errors.New("failed validating challenge password")
+              return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, scepErr.Error(), scepErr)
+          }
+          signCSROpts = append(signCSROpts, challengeOptions...)
+      } else {
+          scepErr := fmt.Errorf("unexpected message type: (%s)", string(msg.MessageType))
+          return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, scepErr.Error(), scepErr)
+      }
+
+      certRep, err := auth.SignCSR(ctx, csr, msg, signCSROpts...)
+      if err != nil {
+          return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, err.Error(), err)
+      }
+
+      return Response{Data: certRep.Raw}, nil
+  }
+  ```
