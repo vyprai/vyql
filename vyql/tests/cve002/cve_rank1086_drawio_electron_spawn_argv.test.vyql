@@ -1,0 +1,95 @@
+# Rank 1086 / CVE-2023-3975: draw.io's Electron desktop process spawned
+# external binaries with argv arrays built from file paths the renderer
+# supplied, so a value beginning with a dash reaches the target program as an
+# option rather than a filename (CWE-78 as classified by the advisory, though
+# the shape is argument injection, CWE-88). main/webapp/electron.js has
+#
+#   var child = spawn('attrib', ['+h', draftFileName]);
+#
+# among several spawn calls whose argv array holds a value the main process did
+# not originate.
+#
+# This CVE has no in-repo before/after code pair: the ChangeLog entry for the
+# fix release states the remediation plainly -- "Moves electron.js out of
+# drawio project into desktop" -- and the fix commit 8ec95cb03e deletes
+# electron.js (2454 lines) and electron-preload.js from this repository
+# entirely rather than patching them, moving the Electron main process to
+# jgraph/drawio-desktop. The one in-repo code delta the same release carries,
+# tightening export.js's navigator.userAgent check for
+# " electron/" to also require " draw.io/", is real but is UI/CSP hardening,
+# not demonstrably the sink this advisory names, and pinning it as the fix
+# would overstate what the diff supports.
+#
+# ATTENTION, and the vocabulary gap is concrete and measured, a third instance
+# of the orphaned-sink cause recorded for ranks 1050 and 1085.
+#
+#  - spawn's argv-array elements are bound as code.CommandExecution, a CWE-78
+#    sink, only when the invoked command is a shell (cmd.exe, powershell,
+#    /bin/sh, /bin/bash, or an explicit shell: true), correctly so: spawn
+#    without a shell target does not reinterpret its argv as shell syntax, and
+#    binding every spawn(cmd, [args]) call this way would flag the documented,
+#    safe way to avoid shell injection in Node.js. Measured directly:
+#    spawn('cp', [tainted, dest]) reports nothing, and the identical call with
+#    cmd.exe as the target does report, VYQL-INJ-002 CWE-78.
+#  - What that correct scoping leaves uncovered is CWE-88: a value in that same
+#    argv array reaching a non-shell binary that itself parses leading-dash
+#    arguments as options, which is exactly attrib's +h argument and this CVE's
+#    shape. code.CommandOptionInjectionSink exists for this and is unbound for
+#    JavaScript's spawn family entirely, on top of rank 1050's finding that no
+#    rule in vyql/packs consumes that sink in any language regardless.
+#
+# Scanning electron.js in isolation, without the renderer-side call sites that
+# would establish draftFileName and filePath as tainted, reports nothing; the
+# file was not scanned as a whole corpus because its removal from HEAD means
+# the vulnerable revision is only reachable by checking out the fix's parent.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1086: spawn's argv array carries a value the process did not originate"
+  lang javascript
+  file src/main/webapp/electron.js
+  reject VYQL-INJ-002
+  code
+  ```
+  const { spawn } = require('child_process');
+
+  function hideDraftFile(draftFileName) {
+    var child = spawn('attrib', ['+h', draftFileName]);
+    child.on('error', function (err) {
+      console.log('hiding draft file error: ' + err);
+    });
+  }
+  ```
+
+# The scoping pair. Both calls put the same tainted value in the argv array;
+# only the target program differs, and that is the whole difference between a
+# genuine CWE-78 shell-reinterpretation sink and a non-shell binary that spawn
+# alone does not make injectable.
+
+test "rank1086: the same argv element passed to a non-shell binary"
+  lang javascript
+  file non_shell.js
+  reject VYQL-INJ-002
+  code
+  ```
+  const { spawn } = require('child_process');
+
+  function handler(req, res) {
+    const path = req.query.path;
+    spawn('cp', [path, '/var/backups/']);
+  }
+  ```
+
+test "rank1086: the same argv element passed to a shell target"
+  lang javascript
+  file shell_target.js
+  expect VYQL-INJ-002
+  code
+  ```
+  const { spawn } = require('child_process');
+
+  function handler(req, res) {
+    const path = req.query.path;
+    spawn('cmd.exe', ['/c', path]);
+  }
+  ```
