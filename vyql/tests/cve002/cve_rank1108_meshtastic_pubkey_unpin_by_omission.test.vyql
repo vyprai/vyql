@@ -1,0 +1,91 @@
+# Rank 1108 / CVE-2025-55293: Meshtastic's NodeDB accepted a NodeInfo update
+# packet that omitted its public key field as proof no key change was
+# intended, when omission is exactly what an attacker controls, letting a
+# forged update erase a node's already-pinned identity key (CWE-287).
+#
+# NodeDB::updateUser in src/mesh/NodeDB.cpp guarded key preservation with
+# `if (p.public_key.size > 0) { if (info->user.public_key.size > 0) { ...
+# memcpy the existing key back into p... } }`. The preservation copy runs only
+# when the incoming packet also carries a key. A packet with public_key.size
+# == 0 skips the entire block, so p.public_key stays empty, and the
+# unconditional `info->user = lite;` a few lines later overwrites the node's
+# previously pinned key with that empty one. The state that was supposed to
+# gate trust, do we already have a pinned key for this node, never gets
+# consulted when the attacker simply leaves the key field out.
+#
+# Pool commit cf7f0f9d0895 is the real fix (COMMIT_OK, its own message names
+# the exploit). It moves the `if (info->user.public_key.size > 0)` check
+# outside the `if (p.public_key.size > 0)` guard, so the existing key is
+# copied back into p whenever one is already pinned, regardless of what the
+# incoming packet carries, and only accepts a new key when none was pinned
+# before. No pool correction.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports the same
+# twenty-six findings, one identical low-confidence NullableDeref row and
+# nothing else; nothing labels updateUser at all. code.ProtocolStateReview
+# carries this exact CWE among its five and its own text states the shape
+# almost verbatim, "stale, or unauthenticated data accepted without the
+# required state check", and it already has a C++ binding, but that binding is
+# a single named TLS handshake analysis
+# (protocol.tls_appdata_before_decryptable) with no generic notion of "a field
+# that gates whether new data may overwrite protected state, checked only
+# conditionally on that same new data's own presence". Firmware/mesh protocol
+# code names its own structures (meshtastic_User, NodeInfoLite, public_key)
+# that nothing outside this project would write from documentation alone.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1108: the pinned key is preserved only when the incoming packet also carries one"
+  lang cpp
+  file src/mesh/NodeDB.cpp
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  bool NodeDB::updateUser(uint32_t nodeId, meshtastic_User &p, uint8_t channelIndex)
+  {
+      meshtastic_NodeInfoLite *info = getOrCreateMeshNode(nodeId);
+      if (!info) {
+          return false;
+      }
+
+      if (p.public_key.size > 0) {
+          if (info->user.public_key.size > 0) {
+              // if we have a key for this user already, don't overwrite with a new one
+              memcpy(p.public_key.bytes, info->user.public_key.bytes, 32);
+          }
+      }
+
+      auto lite = TypeConversions::ConvertToUserLite(p);
+      info->user = lite;
+      info->has_user = true;
+      return true;
+  }
+  ```
+
+test "rank1108: the pinned key is preserved regardless of what the incoming packet carries"
+  lang cpp
+  file src/mesh/NodeDB.cpp
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  bool NodeDB::updateUser(uint32_t nodeId, meshtastic_User &p, uint8_t channelIndex)
+  {
+      meshtastic_NodeInfoLite *info = getOrCreateMeshNode(nodeId);
+      if (!info) {
+          return false;
+      }
+
+      if (info->user.public_key.size > 0) {
+          // if we have a key for this user already, don't overwrite with a new one
+          p.public_key.size = 32;
+          memcpy(p.public_key.bytes, info->user.public_key.bytes, 32);
+      }
+
+      auto lite = TypeConversions::ConvertToUserLite(p);
+      info->user = lite;
+      info->has_user = true;
+      return true;
+  }
+  ```
