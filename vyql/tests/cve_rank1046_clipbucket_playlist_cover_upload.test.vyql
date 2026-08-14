@@ -1,0 +1,94 @@
+# Rank 1046 / CVE-2025-21624: ClipBucket's playlist cover upload took the
+# extension from the uploaded file's own name and moved the upload to that path
+# (CWE-434), so a .php cover became executable code under the web root.
+# playlist_upload_cover in upload/includes/functions_playlist.php did
+#
+#   $extension = getExt($args['name']);
+#   $uploaded_file = DirPath::get('playlist_covers') . $folder . '/' . $filename . '.' . $extension;
+#   if (move_uploaded_file($args['tmp_name'], $uploaded_file)) { ... }
+#
+# with $args coming from $_FILES['playlist_cover'] in the admin page. The fix
+# 893bfb0f12 removes the cover upload entirely: the handler block, the function,
+# the covers directory creation and the constant all go.
+#
+# CAUGHT by VYQL-INJ-015. The finding is interprocedural and crosses the two
+# files: source code.HttpInput at manage_playlist.php:117, sink code.UnsafeUpload
+# at functions_playlist.php:150, with the path running through the argument, the
+# array element, the subscript in the callee and the three format steps that
+# build the destination string.
+#
+# Measured on the real checkout, the two files together: the vulnerable revision
+# reports 6 findings, 1 VYQL-INJ-015, 2 VYQL-RF-003 and 3 VYQL-RF-043, and the
+# fixed revision reports 1, an unrelated VYQL-RF-043, with no upload row at all.
+#
+# The specs put caller and callee in one file, because a spec snippet is a single
+# file while the real taint path spans two.
+#
+# One thing the rule cannot do, worth its own rank rather than this one:
+# VYQL-INJ-015 is `taint core.UserControlledData -> code.UnsafeUpload` with no
+# `unless` at all, and no control concept anywhere neutralises
+# injection.UnrestrictedUpload. So the same snippet with a fixed .jpg extension
+# still reports, because the temporary file name is user-controlled too, and a
+# correct upload handler is indistinguishable from this one. The reject below is
+# therefore the rule's only real discriminator, which is whether user-controlled
+# data reaches the move at all.
+
+test "rank1046: the destination extension comes from the uploaded file name"
+  lang php
+  file upload/includes/functions_playlist.php
+  expect VYQL-INJ-015
+  code
+  ```
+  <?php
+
+  function playlist_upload_cover($args): bool
+  {
+      $filename = $args['playlist_id'];
+      $extension = getExt($args['name']);
+      $folder = create_dated_folder(DirPath::get('playlist_covers'));
+      $uploaded_file = DirPath::get('playlist_covers') . $folder . '/' . $filename . '.' . $extension;
+
+      if (!empty($filename)) {
+          if (move_uploaded_file($args['tmp_name'], $uploaded_file)) {
+              return true;
+          }
+      }
+
+      return false;
+  }
+
+  if (isset($_POST['upload_playlist_cover'])) {
+      $cover = $_FILES['playlist_cover'];
+      $cover['playlist_id'] = $pid;
+
+      if (playlist_upload_cover($cover)) {
+          e(lang('Playlist cover has been uploaded'), 'm');
+      }
+  }
+  ```
+
+test "rank1046: a move with no user-controlled data does not report"
+  lang php
+  file upload/includes/functions_playlist.php
+  reject VYQL-INJ-015
+  code
+  ```
+  <?php
+
+  function playlist_store_generated_cover($playlist_id): bool
+  {
+      $folder = create_dated_folder(DirPath::get('playlist_covers'));
+      $uploaded_file = DirPath::get('playlist_covers') . $folder . '/' . $playlist_id . '.jpg';
+      $generated = DirPath::get('tmp') . '/generated_cover.jpg';
+
+      if (move_uploaded_file($generated, $uploaded_file)) {
+          return true;
+      }
+
+      return false;
+  }
+
+  if (isset($_POST['generate_playlist_cover'])) {
+      playlist_store_generated_cover(get_playlist_id());
+  }
+  ```
