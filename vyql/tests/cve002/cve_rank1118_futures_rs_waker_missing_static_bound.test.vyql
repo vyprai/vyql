@@ -1,0 +1,85 @@
+# Rank 1118 / CVE-2020-35906: futures-rs's public `waker()` constructor
+# accepted an `Arc<W>` with no `'static` bound on `W`, so a caller could build
+# a `Waker` around data with a shorter lifetime; the `Waker`'s raw vtable
+# erases the type behind a raw pointer and can call back into it at any later
+# time via `wake()`, which is unsound once the original data is gone (CWE-416).
+#
+# `pub fn waker<W>(wake: Arc<W>) -> Waker where W: ArcWake` compiled cleanly
+# for any `W: ArcWake` regardless of its lifetime, because generic bounds are
+# the only thing the type checker consults; nothing about `Arc::into_raw`
+# erasing the pointee's lifetime is visible at this call's own type
+# signature. A `Waker` built from non-`'static` data can outlive that data,
+# and calling `wake()` afterward dereferences a dangling pointer.
+#
+# The pool row named a release-bump commit (74b2ff0ed6) the advisory itself
+# never points at; GHSA-r93v-9p5q-vhpf's only code reference is pull request
+# #2206, whose merge commit is 4d54611f93cecab7fb6072db436064e92fefb5e2.
+# Corpus correction, in place: pool.tsv now names that commit. It is the real
+# fix (COMMIT_OK once corrected): it adds `+ 'static` to the `where` clause,
+# so the type checker rejects any `W` shorter-lived than `'static` at the
+# call site, closing the soundness hole entirely at compile time. No other
+# pool correction.
+#
+# ATTENTION, engine gap. Scanning either revision of waker.rs reports 0
+# findings, and nothing in the ontology reaches this shape: every CWE_416
+# concept in the corpus targets a value used or dereferenced after an
+# explicit free, close, or drop call, a dataflow relation between a release
+# site and a later use. This bug has no release site and no use site to
+# relate; the entire defect is a missing trait bound in a generic function's
+# own signature, decidable only by knowing that `Arc::into_raw` type-erases
+# its lifetime and that the erased pointer can be dereferenced arbitrarily
+# later through the vtable. Recognizing "this generic parameter needs but
+# lacks a `'static` bound because the function passes it through a
+# type-erasing conversion" is Rust trait and lifetime analysis, not a taint
+# or presence pattern; the nearest concept by CWE, code.PointerUse behind
+# VYQL-MEM-007 (a pointer dereferenced or used after a prior release), has no
+# Rust binding at all, and its own condition is a dataflow relation this bug
+# does not have.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1118: waker() accepts a non-'static ArcWake with no lifetime bound"
+  lang rust
+  file futures-task/src/waker.rs
+  reject VYQL-MEM-007
+  code
+  ```
+  use std::sync::Arc;
+  use std::task::{RawWaker, RawWakerVTable, Waker};
+
+  pub trait ArcWake {
+      fn wake(self: Arc<Self>);
+  }
+
+  pub fn waker<W>(wake: Arc<W>) -> Waker
+  where
+      W: ArcWake,
+  {
+      let ptr = Arc::into_raw(wake) as *const ();
+      unsafe { Waker::from_raw(RawWaker::new(ptr, waker_vtable::<W>())) }
+  }
+  ```
+
+test "rank1118: waker() requires the ArcWake type to be 'static"
+  lang rust
+  file futures-task/src/waker.rs
+  reject VYQL-MEM-007
+  code
+  ```
+  use std::sync::Arc;
+  use std::task::{RawWaker, RawWakerVTable, Waker};
+
+  pub trait ArcWake {
+      fn wake(self: Arc<Self>);
+  }
+
+  pub fn waker<W>(wake: Arc<W>) -> Waker
+  where
+      W: ArcWake + 'static,
+  {
+      let ptr = Arc::into_raw(wake) as *const ();
+      unsafe { Waker::from_raw(RawWaker::new(ptr, waker_vtable::<W>())) }
+  }
+  ```
