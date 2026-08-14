@@ -1,0 +1,142 @@
+# Rank 1056 / CVE-2021-21642: the Jenkins config-file-provider plugin parsed a
+# user-supplied Maven settings.xml with a default DocumentBuilderFactory, so an
+# external entity in the file was resolved (CWE-611).
+# CredentialsHelper.fillAuthentication held
+#
+#   Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(new InputSource(new StringReader(content)));
+#
+# where content is the settings file the user submitted. Pool commit 5f845bc015
+# is the real fix (COMMIT_OK, named by GHSA-q7xg-hh3q-hc68, titled SECURITY-2204);
+# it assigns the factory to a local and clears both external-access properties
+# before building:
+#
+#   DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+#   documentBuilderFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+#   documentBuilderFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+#
+# No pool correction.
+#
+# CAUGHT by VYQL-DESER-004 at medium severity and high confidence, and this one
+# separates the revisions, which most do not. On the real file the vulnerable
+# revision reports 4 findings including code.XmlParserCreate at
+# CredentialsHelper.java:118, the CVE's own line, with both
+# `unless endpoint coveredBy core.XmlHardening` and
+# `unless sameReceiver coveredBy core.XmlHardening` unsatisfied. The fixed
+# revision reports 3, and the line-118 row is gone: binding xmlHardening277
+# matches `setAttribute` with a literal containing ACCESS_EXTERNAL_DTD and
+# covers `sameReceiver` anchored on the callee's receiver, which the fix
+# supplies by naming the factory.
+#
+# That anchor is the whole reason the discrimination works, and it is worth
+# stating because it is also the limit. Hardening is only ever recognised
+# through a shared receiver, so the vulnerable one-liner could not have been
+# suppressed by any hardening call: `DocumentBuilderFactory.newInstance()
+# .newDocumentBuilder().parse(...)` names no factory to harden. The fix had to
+# introduce the local to have somewhere to put the guard, and a project that
+# hardened a factory and then parsed through a different chained call would
+# still report.
+#
+# One row the fix does not address, and it is a true positive rather than noise:
+# the same method builds a Transformer from a default TransformerFactory
+# (line 215 before the fix, 222 after, the shift being the added lines), and
+# code.XmlParserCreate reports it at both revisions with no ACCESS_EXTERNAL_DTD
+# or ACCESS_EXTERNAL_STYLESHEET anywhere on that receiver.
+
+test "rank1056: the settings document is parsed by an unhardened factory"
+  lang java
+  file src/main/java/org/jenkinsci/plugins/configfiles/maven/security/CredentialsHelper.java
+  expect VYQL-DESER-004
+  code
+  ```
+  package org.jenkinsci.plugins.configfiles.maven.security;
+
+  import java.io.StringReader;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.w3c.dom.Document;
+  import org.xml.sax.InputSource;
+
+  public class CredentialsHelper {
+      public static String fillAuthentication(String mavenSettingsContent) throws Exception {
+          String content = mavenSettingsContent;
+          Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(new InputSource(new StringReader(content)));
+          return doc.getDocumentElement().getNodeName();
+      }
+  }
+  ```
+
+test "rank1056: the fix clears the external-access properties on a named factory"
+  lang java
+  file src/main/java/org/jenkinsci/plugins/configfiles/maven/security/CredentialsHelper.java
+  reject VYQL-DESER-004
+  code
+  ```
+  package org.jenkinsci.plugins.configfiles.maven.security;
+
+  import java.io.StringReader;
+  import javax.xml.XMLConstants;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.w3c.dom.Document;
+  import org.xml.sax.InputSource;
+
+  public class CredentialsHelper {
+      public static String fillAuthentication(String mavenSettingsContent) throws Exception {
+          String content = mavenSettingsContent;
+          DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+          documentBuilderFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+          documentBuilderFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+          Document doc = documentBuilderFactory.newDocumentBuilder().parse(new InputSource(new StringReader(content)));
+          return doc.getDocumentElement().getNodeName();
+      }
+  }
+  ```
+
+test "rank1056: hardening is recognised through the receiver, not the enclosing method"
+  lang java
+  file src/main/java/org/jenkinsci/plugins/configfiles/maven/security/CredentialsHelper.java
+  expect VYQL-DESER-004
+  code
+  ```
+  package org.jenkinsci.plugins.configfiles.maven.security;
+
+  import java.io.StringReader;
+  import javax.xml.XMLConstants;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.w3c.dom.Document;
+  import org.xml.sax.InputSource;
+
+  public class CredentialsHelper {
+      public static String fillAuthentication(String mavenSettingsContent) throws Exception {
+          DocumentBuilderFactory hardened = DocumentBuilderFactory.newInstance();
+          hardened.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+          Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(new InputSource(new StringReader(mavenSettingsContent)));
+          return doc.getDocumentElement().getNodeName();
+      }
+  }
+  ```
+
+test "rank1056: the transformer the fix leaves alone is reported at both revisions"
+  lang java
+  file src/main/java/org/jenkinsci/plugins/configfiles/maven/security/CredentialsHelper.java
+  expect VYQL-DESER-004
+  code
+  ```
+  package org.jenkinsci.plugins.configfiles.maven.security;
+
+  import java.io.StringWriter;
+  import javax.xml.transform.OutputKeys;
+  import javax.xml.transform.Transformer;
+  import javax.xml.transform.TransformerFactory;
+  import javax.xml.transform.dom.DOMSource;
+  import javax.xml.transform.stream.StreamResult;
+  import org.w3c.dom.Document;
+
+  public class CredentialsHelper {
+      public static String serialize(Document doc) throws Exception {
+          StringWriter writer = new StringWriter();
+          Transformer xformer = TransformerFactory.newInstance().newTransformer();
+          xformer.setOutputProperty(OutputKeys.INDENT, "yes");
+          xformer.transform(new DOMSource(doc), new StreamResult(writer));
+          return writer.toString();
+      }
+  }
+  ```
