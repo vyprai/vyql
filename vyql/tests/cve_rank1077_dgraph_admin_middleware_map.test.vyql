@@ -1,0 +1,105 @@
+# Rank 1077 / CVE-2026-34976: Dgraph's admin GraphQL endpoint ran one mutation
+# with no authorization middleware, because the operation was registered as a
+# resolver and left out of the middleware table (CWE-862). admin.go holds two
+# maps keyed by operation name: the resolver map, with
+#
+#   "restoreTenant":   resolveTenantRestore,
+#
+# and adminMutationMWConfig, which lists backup, config, draining, export,
+# login, restore, shutdown, removeNode, moveTablet, assign, updateGQLSchema,
+# addNamespace, deleteNamespace, resetPassword and the user and group
+# operations -- and not restoreTenant. Every other cluster-level mutation gets
+# gogMutMWs, which is IP allow-listing plus GuardianOfTheGalaxy authorization
+# plus logging; this one got nothing. Pool commit b15c87e935 is the real fix
+# (COMMIT_OK, named by GHSA-p5rh-vmhp-gvcw); it adds `"restoreTenant": gogMutMWs`
+# and a test asserting the two tables agree. No pool correction.
+#
+# ATTENTION, and this gap is worth separating from the one it resembles. Ranks
+# 1039, 1040 and 1047 are recorded as needing a relation over branches that no
+# presence pattern can state, because no single function there is wrong when read
+# alone. This is not that: both sides are literals in one file, twenty lines
+# apart, and the property that separates the revisions is stated in one sentence
+# -- every key of the resolver map appears in the middleware map. A test in the
+# fix asserts exactly that.
+#
+# What is missing is the ability to say it. A binding matches a call or a
+# presence node and reads its context as strings, so it can ask whether some text
+# occurs near some other text; it cannot compare the key sets of two collection
+# literals. Written with the strings available it becomes `context.literal
+# contains "restoreTenant"` on one map and not on the other, which names this
+# project's operation rather than the shape, and the next table with a missing
+# key walks past it. Set inclusion between two literals is the feature, and it is
+# worth having beyond authorization tables: route tables against handler tables,
+# permission maps against action maps, and feature flags against defaults are all
+# the same question.
+#
+# Measured: nothing is labelled or reported in admin.go at either revision.
+#
+# The two snippets differ only in the one entry.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1077: a mutation is resolved with no middleware entry"
+  lang go
+  file graphql/admin/admin.go
+  reject VYQL-AUTH-081
+  code
+  ```
+  package admin
+
+  import "github.com/dgraph-io/dgraph/v25/graphql/resolve"
+
+  var (
+  	gogMutMWs = resolve.MutationMiddlewares{
+  		resolve.IpWhitelistingMW4Mutation,
+  		resolve.GuardianOfTheGalaxyAuthMW4Mutation,
+  		resolve.LoggingMWMutation,
+  	}
+
+  	adminMutationMWConfig = map[string]resolve.MutationMiddlewares{
+  		"backup":   gogMutMWs,
+  		"restore":  gogMutMWs,
+  		"shutdown": gogMutMWs,
+  	}
+
+  	adminMutationResolvers = map[string]resolve.MutationResolverFunc{
+  		"backup":        resolveBackup,
+  		"restore":       resolveRestore,
+  		"shutdown":      resolveShutdown,
+  		"restoreTenant": resolveTenantRestore,
+  	}
+  )
+  ```
+
+test "rank1077: the same tables with the entry present"
+  lang go
+  file graphql/admin/admin.go
+  reject VYQL-AUTH-081
+  code
+  ```
+  package admin
+
+  import "github.com/dgraph-io/dgraph/v25/graphql/resolve"
+
+  var (
+  	gogMutMWs = resolve.MutationMiddlewares{
+  		resolve.IpWhitelistingMW4Mutation,
+  		resolve.GuardianOfTheGalaxyAuthMW4Mutation,
+  		resolve.LoggingMWMutation,
+  	}
+
+  	adminMutationMWConfig = map[string]resolve.MutationMiddlewares{
+  		"backup":        gogMutMWs,
+  		"restore":       gogMutMWs,
+  		"shutdown":      gogMutMWs,
+  		"restoreTenant": gogMutMWs,
+  	}
+
+  	adminMutationResolvers = map[string]resolve.MutationResolverFunc{
+  		"backup":        resolveBackup,
+  		"restore":       resolveRestore,
+  		"shutdown":      resolveShutdown,
+  		"restoreTenant": resolveTenantRestore,
+  	}
+  )
+  ```
