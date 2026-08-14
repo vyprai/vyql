@@ -1,0 +1,76 @@
+# Rank 1111 / CVE-2021-31405: Vaadin's EmailField validated input against a
+# hand-written regex whose domain-suffix group backtracks catastrophically on
+# a crafted string, so client input the server also re-validates could hang
+# the JVM thread evaluating it (CWE-400).
+#
+# EmailField.java's EMAIL_PATTERN was
+# "^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:.[a-zA-Z0-9-]+)*$". The
+# trailing group `(?:.[a-zA-Z0-9-]+)*` repeats a single unescaped `.` (any
+# character) directly followed by a `[a-zA-Z0-9-]+` character class, so a
+# string of many dots overlaps the two sub-matches in exponentially many ways
+# before failing, the standard catastrophic-backtracking shape.
+#
+# Pool commit 0eb84df737b6 is the real fix despite the COMMIT_NONE flag,
+# checked against the advisory (GHSA-2wqp-jmcc-mc77) it names in its title:
+# it replaces the pattern with
+# "^([a-zA-Z0-9_\.\-+])+@[a-zA-Z0-9-.]+\.[a-zA-Z0-9-]{2,}$", which drops the
+# nested unbounded-inside-unbounded group entirely in favor of one dot
+# literal and one bounded tail class. No pool correction.
+#
+# ATTENTION, and not a straightforward binding-coverage gap even though the
+# concept and CWE match exactly. code.CatastrophicRegex carries CWE_400 and a
+# reviewCondition literally worded for this shape, "a static regular
+# expression has catastrophic-backtracking structure", and VYQL-DOS-003
+# already binds it in Python, JavaScript and Ruby. But every one of those
+# bindings, checked directly, is a literal substring of one specific known-
+# vulnerable regex from one specific CVE's fix commit
+# (node.context.literal contains "d]*(?:;" and the like), not a structural
+# nested-quantifier detector; there is no regex-AST or backtracking-complexity
+# analysis anywhere in the engine or bindings for any language. Adding a
+# fourth literal-substring binding for Java's EMAIL_PATTERN would catch this
+# rank and repeat the same shape the AGENTS.md genericity test already flags
+# for the existing three: nobody would write "matches this exact fifty-
+# character regex" from a regex engine's documentation, and the next
+# catastrophic regex anyone writes, in any language, walks straight past it.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1111: the domain-suffix group repeats an unescaped dot inside an unbounded class"
+  lang java
+  file EmailField.java
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  package com.vaadin.flow.component.textfield;
+
+  public class EmailField {
+      private static final String EMAIL_PATTERN =
+          "^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:.[a-zA-Z0-9-]+)*$";
+
+      public boolean isValid(String value) {
+          return value.matches(EMAIL_PATTERN);
+      }
+  }
+  ```
+
+test "rank1111: the domain suffix is one dot literal and a bounded tail class"
+  lang java
+  file EmailField.java
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  package com.vaadin.flow.component.textfield;
+
+  public class EmailField {
+      private static final String EMAIL_PATTERN = "^" + "([a-zA-Z0-9_\\.\\-+])+" // local
+              + "@" + "[a-zA-Z0-9-.]+" // domain
+              + "\\." + "[a-zA-Z0-9-]{2,}" // tld
+              + "$";
+
+      public boolean isValid(String value) {
+          return value.matches(EMAIL_PATTERN);
+      }
+  }
+  ```
