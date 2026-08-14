@@ -3927,3 +3927,8 @@ binding csvFormulaProneExportRow900 {
   query pattern presenceNode where node.scope == "function" and node.context.callPath contains "Papa.unparse" and not (node.context.literal contains "escapeFormulae")
   emit issue code.CsvFormulaProneExportRow at node
 }
+
+binding esmExportSpecifierEval901 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "split" and node.context.literal contains "$happy_dom.exports['" and not (node.context.expr contains "test(importName)")
+  emit issue code.EsmExportSpecifierEval at node
+}
