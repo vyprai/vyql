@@ -1,0 +1,210 @@
+# Rank 1081 / CVE-2026-49780: Dokan's /dokan/v1/customers REST controller
+# inherits WooCommerce's customer CRUD routes and replaces the manage_woocommerce
+# capability check with a role check on the caller, so the permission callback
+# never looks at which user the request targets (CWE-266, CWE-639). In
+# includes/REST/CustomersController.php the whole check is
+#
+#   protected function check_permission( $request, $action ) {
+#       if ( ! $this->check_vendor_permission() ) { return new WP_Error( ... ); }
+#       return true;
+#   }
+#
+#   public function check_vendor_permission(): bool {
+#       return dokan_is_user_seller( dokan_get_current_user_id() );
+#   }
+#
+# $request['id'] is never read, so any vendor could PUT or DELETE any user,
+# administrators included, and set that user's password.
+#
+# The fix 34784b4 adds is_target_user_allowed( $target_id ), called from
+# check_permission for the view, edit and delete actions, which rejects a target
+# that holds an admin capability, is itself a vendor, or has never ordered from
+# the requesting vendor; it also forces the listing to the current user and
+# rejects role fields in create and batch payloads.
+#
+# ATTENTION. The vocabulary for the weakness exists and is right:
+# code.IdorPolicyReview carries CWE_639 and vulnerableTo access_control.Idor, and
+# VYQL-AUTH-081 consumes it. What is missing is any way to state the condition
+# from data.
+#
+#  - Every binding emitting code.IdorPolicyReview keys on a phpReview token, and
+#    those tokens are not data. They are 136 hardcoded strings.Contains tests in
+#    internal/extract/frontend/treesitter/php.go, one per project shape, with
+#    names like review_id_without_customer_id and audioigniter_playlist_idor.
+#    Reporting this rank that way means adding a 137th, which is a Go change and
+#    a repro-shaped patch at the same time.
+#  - The generic condition is "a REST permission callback grants on a role check
+#    and never consults the request's target id". Its second half is a negation
+#    over a function body, the flat-bag matching trap already recorded for ranks
+#    1013, 1017, 1030 and 1042, and a collection endpoint whose permission
+#    callback legitimately checks only a capability has exactly that shape. The
+#    positive side alone would report most permission callbacks in most plugins.
+#  - Class-level control presence cannot rescue it either. The vulnerable file
+#    does carry a recognized control, current_user_can at line 171 labelled
+#    core.AuthorizationCheck, but it guards search_customers, a different method
+#    from the CRUD path this CVE reaches. A control being present in the class
+#    says nothing about the path that needed one.
+#
+# Scanning includes/REST/CustomersController.php reports 0 findings at each
+# revision. vyql match labels no source and no sink, and that one control.
+#
+# Corpus corrections: the pool row named the 5.0.3 release merge d7fadd9a85,
+# which carries the fix among version bumps and translations; it now names the
+# fix itself, 34784b4. The language was typescript, which is what the repository
+# holds most of; the vulnerability and its fix are PHP.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1081: the permission callback checks the caller's role only"
+  lang php
+  file includes/REST/CustomersController.php
+  reject VYQL-AUTH-081
+  code
+  ```
+  <?php
+
+  class CustomersController extends WC_REST_Customers_Controller {
+
+      protected function check_permission( $request, $action ) {
+          if ( ! $this->check_vendor_permission() ) {
+              $messages = [
+                  'view'   => __( 'Sorry, you cannot list resources.', 'dokan-lite' ),
+                  'edit'   => __( 'Sorry, you are not allowed to edit this resource.', 'dokan-lite' ),
+                  'delete' => __( 'Sorry, you are not allowed to delete this resource.', 'dokan-lite' ),
+              ];
+              return new WP_Error( "dokan_rest_cannot_$action", $messages[ $action ], [ 'status' => rest_authorization_required_code() ] );
+          }
+          return true;
+      }
+
+      public function check_vendor_permission(): bool {
+          return dokan_is_user_seller( dokan_get_current_user_id() );
+      }
+
+      public function update_item( $request ) {
+          return $this->perform_vendor_action(
+              function () use ( $request ) {
+                  return parent::update_item( $request );
+              }
+          );
+      }
+
+      public function delete_item( $request ) {
+          return $this->perform_vendor_action(
+              function () use ( $request ) {
+                  return parent::delete_item( $request );
+              }
+          );
+      }
+  }
+  ```
+
+test "rank1081: the callback constrains the target user as well"
+  lang php
+  file includes/REST/CustomersController.php
+  reject VYQL-AUTH-081
+  code
+  ```
+  <?php
+
+  class CustomersController extends WC_REST_Customers_Controller {
+
+      protected function check_permission( $request, $action ) {
+          $messages = [
+              'view'   => __( 'Sorry, you cannot list resources.', 'dokan-lite' ),
+              'edit'   => __( 'Sorry, you are not allowed to edit this resource.', 'dokan-lite' ),
+              'delete' => __( 'Sorry, you are not allowed to delete this resource.', 'dokan-lite' ),
+          ];
+
+          if ( ! $this->check_vendor_permission() ) {
+              return new WP_Error( "dokan_rest_cannot_$action", $messages[ $action ], [ 'status' => rest_authorization_required_code() ] );
+          }
+
+          $target_id = isset( $request['id'] ) ? (int) $request['id'] : 0;
+          if ( $target_id > 0 && in_array( $action, [ 'view', 'edit', 'delete' ], true ) ) {
+              $allowed = $this->is_target_user_allowed( $target_id );
+              if ( is_wp_error( $allowed ) ) {
+                  $status = $allowed->get_error_data();
+                  $status = isset( $status['status'] ) ? (int) $status['status'] : 403;
+                  return new WP_Error( "dokan_rest_cannot_$action", $messages[ $action ], [ 'status' => $status ] );
+              }
+          }
+
+          return true;
+      }
+
+      protected function is_target_user_allowed( int $target_id ) {
+          if ( $target_id <= 0 || ! get_userdata( $target_id ) ) {
+              return new WP_Error( 'dokan_rest_invalid_target', __( 'Invalid user.', 'dokan-lite' ), [ 'status' => 404 ] );
+          }
+
+          foreach ( [ 'manage_options', 'manage_woocommerce', 'edit_users', 'delete_users' ] as $cap ) {
+              if ( user_can( $target_id, $cap ) ) {
+                  return new WP_Error( 'dokan_rest_forbidden_target', __( 'You cannot operate on this user.', 'dokan-lite' ), [ 'status' => 403 ] );
+              }
+          }
+
+          if ( dokan_is_user_seller( $target_id ) ) {
+              return new WP_Error( 'dokan_rest_forbidden_target', __( 'You cannot operate on this user.', 'dokan-lite' ), [ 'status' => 403 ] );
+          }
+
+          if ( ! dokan_customer_has_order_from_this_seller( $target_id, dokan_get_current_user_id() ) ) {
+              return new WP_Error( 'dokan_rest_forbidden_target', __( 'You cannot operate on this customer.', 'dokan-lite' ), [ 'status' => 403 ] );
+          }
+
+          return true;
+      }
+
+      public function check_vendor_permission(): bool {
+          return dokan_is_user_seller( dokan_get_current_user_id() );
+      }
+
+      public function update_item( $request ) {
+          return $this->perform_vendor_action(
+              function () use ( $request ) {
+                  return parent::update_item( $request );
+              }
+          );
+      }
+  }
+  ```
+
+# A capability check in a sibling method is what makes class-level control
+# presence useless here: this class carries a recognized core.AuthorizationCheck
+# while the CRUD path it guards nothing on stays open.
+
+test "rank1081: a capability check guards a different method in the same class"
+  lang php
+  file includes/REST/CustomersController.php
+  reject VYQL-AUTH-081
+  code
+  ```
+  <?php
+
+  class CustomersController extends WC_REST_Customers_Controller {
+
+      protected function check_permission( $request, $action ) {
+          if ( ! $this->check_vendor_permission() ) {
+              return new WP_Error( 'dokan_rest_cannot_edit', __( 'Denied.', 'dokan-lite' ), [ 'status' => 401 ] );
+          }
+          return true;
+      }
+
+      public function search_customers( $request ) {
+          if ( ! current_user_can( 'edit_shop_orders' ) ) {
+              return new WP_Error( 'dokan_rest_cannot_search', __( 'You do not have permission to search customers.', 'dokan-lite' ), [ 'status' => rest_authorization_required_code() ] );
+          }
+
+          $term = $request->get_param( 'search' );
+          return $this->get_customers( $term );
+      }
+
+      public function delete_item( $request ) {
+          return $this->perform_vendor_action(
+              function () use ( $request ) {
+                  return parent::delete_item( $request );
+              }
+          );
+      }
+  }
+  ```
