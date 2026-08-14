@@ -1,0 +1,162 @@
+# Rank 1101 / CVE-2026-54297: Faraday's nested params decoder put no limit on
+# how deeply a query string could nest, so a key like a[b][c][d]... built one
+# container per bracket pair and then recursed once per level to normalize it,
+# exhausting the stack (CWE-674).
+# NestedParamsEncoder::DecodeMethods#decode_pair in
+# lib/faraday/encoders/nested_params_encoder.rb scanned the key into subkeys and
+# iterated them building a Hash or Array per level, and #decode finished by
+# calling dehash(params, 0), which calls itself once per nesting level. Neither
+# the subkey count nor the recursion depth was bounded.
+#
+# Pool commit 36764bfc48aa is the real fix (named by GHSA-98m9-hrrm-r99r; the
+# metadata flag is nocommit because the advisory references the release rather
+# than the commit). It adds a param_depth_limit accessor defaulting to 100 and a
+# validate_params_depth! call at the head of decode_pair, which raises once
+# subkeys.length exceeds the limit. dehash is untouched: the bound is applied
+# before the nested structure is ever built.
+#
+# ATTENTION, vocabulary gap, and the same library-internal shape as ranks 1083
+# and 1097. Scanning either revision reports nothing, and vyql match labels only
+# six code.HttpInput rows on the encode side, nothing on the decode side.
+#
+# The generic statement of this weakness is "the depth of a recursion or of a
+# constructed nesting is determined by untrusted input and is not bounded". No
+# concept states it: code.UnboundedAllocationReview is the closest, and it is
+# about an allocation size derived from a parsed count, not about depth. The
+# three CWE_674 concepts in the ontology are each written for one project's
+# call chain.
+#
+# The gap is not that the observation is hard to make, it is that no observation
+# separates the two revisions. What the fix adds inside decode_pair is a call to
+# a method of its own naming, so a binding narrow enough to see the difference
+# would key on validate_params_depth!, which is Faraday's name and nobody
+# else's. Stating the condition generically instead needs to relate a taint
+# source to a recursion or nesting depth, which is a dataflow relation the
+# engine does not have and the binding language cannot express. Reporting the
+# recursion on its own does not work either: dehash is identical at both
+# revisions, so a binding on the unbounded self-call reports the patched file
+# too.
+#
+# Reporting the caller instead — an application handing an untrusted query
+# string to Faraday's decoder — was already measured unshippable at rank 1083:
+# it fires on every user of the library, correct version or not, and the
+# version-ranged control that would gate it fails closed on non-exact
+# specifiers. Faraday is not in vyql/sca/advisories.json.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1101: the decoder iterates unbounded subkeys"
+  lang ruby
+  file lib/faraday/encoders/nested_params_encoder.rb
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  module Faraday
+    module DecodeMethods
+      SUBKEYS_REGEX = /[^\[\]]+(?:\]?\[\])?/
+
+      def decode(query)
+        return nil if query.nil?
+
+        params = {}
+        query.split('&').each do |pair|
+          next if pair.empty?
+
+          key, value = pair.split('=', 2)
+          key = unescape(key)
+          value = unescape(value.tr('+', ' ')) if value
+          decode_pair(key, value, params)
+        end
+
+        dehash(params, 0)
+      end
+
+      def decode_pair(key, value, context)
+        subkeys = key.scan(SUBKEYS_REGEX)
+        subkeys.each_with_index do |subkey, i|
+          is_array = subkey =~ /[\[\]]+\Z/
+          subkey = Regexp.last_match.pre_match if is_array
+          last_subkey = i == subkeys.length - 1
+
+          context = prepare_context(context, subkey, is_array, last_subkey)
+          add_to_context(is_array, context, value, subkey) if last_subkey
+        end
+      end
+
+      def dehash(hash, depth)
+        hash.each do |key, value|
+          hash[key] = dehash(value, depth + 1) if value.is_a?(Hash)
+        end
+
+        if depth.positive? && !hash.empty? && hash.keys.all? { |k| k =~ /^\d+$/ }
+          hash.sort.map(&:last)
+        else
+          hash
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1101: the decoder raises once the subkey count passes the limit"
+  lang ruby
+  file lib/faraday/encoders/nested_params_encoder.rb
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  module Faraday
+    module DecodeMethods
+      SUBKEYS_REGEX = /[^\[\]]+(?:\]?\[\])?/
+
+      def decode(query)
+        return nil if query.nil?
+
+        params = {}
+        query.split('&').each do |pair|
+          next if pair.empty?
+
+          key, value = pair.split('=', 2)
+          key = unescape(key)
+          value = unescape(value.tr('+', ' ')) if value
+          decode_pair(key, value, params)
+        end
+
+        dehash(params, 0)
+      end
+
+      def decode_pair(key, value, context)
+        subkeys = key.scan(SUBKEYS_REGEX)
+        validate_params_depth!(subkeys.length)
+
+        subkeys.each_with_index do |subkey, i|
+          is_array = subkey =~ /[\[\]]+\Z/
+          subkey = Regexp.last_match.pre_match if is_array
+          last_subkey = i == subkeys.length - 1
+
+          context = prepare_context(context, subkey, is_array, last_subkey)
+          add_to_context(is_array, context, value, subkey) if last_subkey
+        end
+      end
+
+      def validate_params_depth!(depth)
+        return unless @param_depth_limit && depth > @param_depth_limit
+
+        raise Faraday::Error, "exceeded nested parameter depth limit of #{@param_depth_limit}"
+      end
+
+      def dehash(hash, depth)
+        hash.each do |key, value|
+          hash[key] = dehash(value, depth + 1) if value.is_a?(Hash)
+        end
+
+        if depth.positive? && !hash.empty? && hash.keys.all? { |k| k =~ /^\d+$/ }
+          hash.sort.map(&:last)
+        else
+          hash
+        end
+      end
+    end
+  end
+  ```
