@@ -1,0 +1,117 @@
+# Rank 1090 / CVE-2020-15133: faye-websocket-ruby's client connected wss: URLs
+# with EventMachine::Connection#start_tls and never set :verify_peer, and
+# EventMachine's default for that option is off, so every wss: connection this
+# library made accepted any certificate for any hostname with no verification
+# at all (CWE-295). lib/faye/websocket/client.rb had
+#
+#   if secure
+#     socket_tls = { :sni_hostname => URI.parse(@url).host }.merge(@socket_tls)
+#     @stream.start_tls(socket_tls)
+#   end
+#
+# with no :verify_peer anywhere and no ssl_verify_peer/ssl_handshake_completed
+# callbacks implemented on the Connection module, so EventMachine's optional
+# verification hook was simply never used. Faye's own advisory frames this as
+# the same underlying gap independently discovered and fixed in
+# igrigorik/em-http-request (a sibling, unrelated project, not a dependency of
+# this one) around the same time. The fix (merge f41e67c428, PR #129) adds
+# :verify_peer => true to the merged tls_options, and implements
+# ssl_verify_peer/ssl_handshake_completed via a new SslVerifier class that
+# checks the certificate chain and the hostname.
+#
+# Corpus correction: pool.tsv named igrigorik/em-http-request for this rank,
+# flagged repo!. GHSA-2v5c-755p-p4gv's own vulnerabilities field names package
+# faye-websocket, and its description explicitly distinguishes this report
+# from em-http-request's separate, earlier advisory for the same underlying
+# EventMachine gap; the two are unrelated sibling libraries sharing one root
+# cause, not a dependency relationship. Corrected in place to
+# faye/faye-websocket-ruby with fix commit f41e67c428 (merge of PR #129); rank,
+# CVE and language are unchanged.
+#
+# ATTENTION. code.CertValidationDisabled and VYQL-CFG-004 exist for CWE-295,
+# but every Ruby binding for it keys on an explicit disable: verify_mode(...
+# VERIFY_NONE), or a named project's presence pattern such as Kubeclient or Fog
+# setting verify_ssl=false. None can state "start_tls was called with no
+# verify_peer option, and the library's default for that option is off" --
+# there is no call here disabling anything, only an option that was never
+# turned on, and EventMachine's own default choice is what makes that
+# dangerous. This is the same class of gap as rank 1053's CleartextChannel,
+# read from the certificate side of the connection rather than the scheme
+# side: the weakness is a library default nobody overrode, and stating it
+# needs a review concept naming the option and the library, not a presence
+# pattern over an explicit disable call.
+#
+# Scanning client.rb reports 2 findings, both unrelated library-profile
+# heuristic findings (a taint-labelled write parameter and a URL fetch), and
+# vyql match labels no source or sink around start_tls.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1090: start_tls is called with no verify_peer option set"
+  lang ruby
+  file lib/faye/websocket/client.rb
+  reject VYQL-CFG-004
+  code
+  ```
+  module Faye
+    module WebSocket
+      class Client
+        def initialize(url, protocols = nil, options = {})
+          @url = url
+          @origin_tls = options.fetch(:tls, {})
+          @socket_tls = @origin_tls
+        end
+
+        def on_connect(stream)
+          @stream = stream
+          secure = @url.start_with?('wss:')
+
+          if secure
+            socket_tls = { :sni_hostname => URI.parse(@url).host }.merge(@socket_tls)
+            @stream.start_tls(socket_tls)
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1090: the fix enables verify_peer and implements the callbacks"
+  lang ruby
+  file lib/faye/websocket/client.rb
+  reject VYQL-CFG-004
+  code
+  ```
+  module Faye
+    module WebSocket
+      class Client
+        def initialize(url, protocols = nil, options = {})
+          @url = url
+          @origin_tls = options.fetch(:tls, {})
+          @socket_tls = @origin_tls
+        end
+
+        def start_tls(uri, options)
+          return unless uri.scheme == 'wss'
+
+          tls_options = { :sni_hostname => uri.host, :verify_peer => true }.merge(options)
+          @ssl_verifier = SslVerifier.new(uri.host, tls_options)
+          @stream.start_tls(tls_options)
+        end
+
+        def on_connect(stream)
+          @stream = stream
+          start_tls(URI.parse(@url), @socket_tls)
+        end
+
+        def ssl_verify_peer(cert)
+          @ssl_verifier.ssl_verify_peer(cert)
+        end
+
+        def ssl_handshake_completed
+          @ssl_verifier.ssl_handshake_completed
+        end
+      end
+    end
+  end
+  ```
