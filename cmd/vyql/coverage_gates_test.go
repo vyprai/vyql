@@ -1383,29 +1383,203 @@ func countV2TaintEndpointMappings(t *testing.T, subs ...string) (int, int, int) 
 	return sourceCount, sinkCount, checkCount
 }
 
-func TestCVE1000LedgerCoverageGate(t *testing.T) {
-	repo := testRepoRoot(t)
-	if _, err := os.Stat(filepath.Join(repo, "cve-1000")); os.IsNotExist(err) {
-		t.Skip("cve-1000 corpus is not part of this tree")
+// cveDigestRow is one rank of the CVE corpus as the digest records it: the CVE
+// that rank was reviewed against, and what the review concluded.
+type cveDigestRow struct {
+	cve    string
+	status string
+}
+
+// readCVELedgerDigest loads the in-tree projection of the CVE corpus. The corpus
+// itself carries per-rank analysis notes and does not ship here, so the digest is
+// what makes the coverage gate below runnable in this tree rather than skipped.
+// TestCVECorpusMatchesLedgerDigest keeps the two in agreement wherever both exist.
+func readCVELedgerDigest(t *testing.T) map[int]cveDigestRow {
+	t.Helper()
+	path := filepath.Join("testdata", "cve_ledger_digest.tsv")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read CVE ledger digest: %v", err)
 	}
-	poolPath := filepath.Join(repo, "cve-1000", "pool.tsv")
-	ledgerPath := filepath.Join(repo, "cve-1000", "ledger.tsv")
-	poolRaw, err := os.ReadFile(poolPath)
+	rows := map[int]cveDigestRow{}
+	for i, line := range strings.Split(string(raw), "\n") {
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) != 3 {
+			t.Fatalf("%s:%d: has %d fields, want 3: %q", path, i+1, len(fields), line)
+		}
+		rank, err := strconv.Atoi(fields[0])
+		if err != nil {
+			t.Fatalf("%s:%d: invalid rank %q", path, i+1, fields[0])
+		}
+		if prev, ok := rows[rank]; ok {
+			t.Fatalf("%s:%d: rank %d appears more than once (first %s)", path, i+1, rank, prev.cve)
+		}
+		switch fields[2] {
+		case "CAUGHT", "FIXED", "ATTENTION", "SKIP", "PENDING":
+		default:
+			t.Fatalf("%s:%d: rank %d has unknown status %q", path, i+1, rank, fields[2])
+		}
+		rows[rank] = cveDigestRow{cve: fields[1], status: fields[2]}
+	}
+	return rows
+}
+
+// Every rank the CVE corpus reviewed and did not skip must be pinned here by a
+// runnable cve_rank*.test.vyql spec, or be named in the burn-down list with a
+// reason. Without this, a rule can be narrowed or a spec deleted and the CVE it
+// was written for stops being checked, which is exactly how rank 406 drifted:
+// its advisory was withdrawn for good reason, the spec went with it, and nothing
+// recorded that the rank now rests on the ledger alone.
+func TestCVELedgerCoverageGate(t *testing.T) {
+	digest := readCVELedgerDigest(t)
+	if len(digest) < 1000 {
+		t.Fatalf("CVE ledger digest rows = %d, want at least 1000", len(digest))
+	}
+	statuses := map[string]int{}
+	for _, row := range digest {
+		statuses[row.status]++
+	}
+	// Floors, not exact counts. The pool is extended a block at a time and
+	// reviewed a rank at a time, so exact counts cannot hold during a campaign.
+	// A floor still catches a status being lost: a review conclusion may only be
+	// revised into another conclusion, never deleted.
+	minStatuses := map[string]int{"ATTENTION": 110, "CAUGHT": 107, "FIXED": 781, "SKIP": 2}
+	for status, min := range minStatuses {
+		if statuses[status] < min {
+			t.Fatalf("CVE ledger digest %s = %d, want at least %d (statuses = %v)",
+				status, statuses[status], min, statuses)
+		}
+	}
+
+	// Review runs in rank order. A PENDING rank below a reviewed one was passed
+	// over rather than not yet reached, and would otherwise never be noticed.
+	watermark := -1
+	for rank, row := range digest {
+		if row.status != "PENDING" && rank > watermark {
+			watermark = rank
+		}
+	}
+	var skipped []string
+	for rank, row := range digest {
+		if row.status == "PENDING" && rank < watermark {
+			skipped = append(skipped, strconv.Itoa(rank))
+		}
+	}
+	if len(skipped) > 0 {
+		sort.Strings(skipped)
+		t.Fatalf("CVE ranks below the reviewed watermark %d are still PENDING; review skipped them: %s",
+			watermark, strings.Join(skipped, ", "))
+	}
+
+	cveSpecs := readCVERankSpecFiles(t)
+	specNamesByRank := map[int][]string{}
+	for _, path := range cveSpecs {
+		rank, ok := cveRankFromSpecName(filepath.Base(path))
+		if !ok {
+			t.Fatalf("CVE spec file has invalid rank name: %s", filepath.Base(path))
+		}
+		if _, ok := digest[rank]; !ok {
+			t.Fatalf("CVE spec %s references rank %d which is not in the ledger digest", filepath.Base(path), rank)
+		}
+		specNamesByRank[rank] = append(specNamesByRank[rank], filepath.Base(path))
+	}
+	uniqueSpecRanks := map[int]bool{}
+	for rank, names := range specNamesByRank {
+		uniqueSpecRanks[rank] = true
+		if len(names) > 1 && !cve1000AllowedDuplicateSpecRanks[rank] {
+			sort.Strings(names)
+			t.Fatalf("CVE rank %d has %d spec files but is not in the duplicate-spec allowlist: %s", rank, len(names), strings.Join(names, ", "))
+		}
+	}
+	for rank := range cve1000AllowedDuplicateSpecRanks {
+		if len(specNamesByRank[rank]) < 2 {
+			t.Fatalf("CVE duplicate-spec allowlist rank %d is stale; found %d spec file(s)", rank, len(specNamesByRank[rank]))
+		}
+	}
+	if len(cveSpecs) < 786 || len(uniqueSpecRanks) < 780 {
+		t.Fatalf("CVE runnable rank specs regressed: files=%d unique_ranks=%d, want at least files=786 unique_ranks=780", len(cveSpecs), len(uniqueSpecRanks))
+	}
+
+	var missingRunnable, staleNoSpecExceptions, skipWithSpecs, pendingWithSpecs []string
+	for rank, row := range digest {
+		hasSpec := uniqueSpecRanks[rank]
+		switch {
+		case row.status == "SKIP" && hasSpec:
+			skipWithSpecs = append(skipWithSpecs, strconv.Itoa(rank))
+		// A spec for a rank with no ledger row means the review happened and its
+		// conclusion was never recorded, so the corpus understates the work done.
+		case row.status == "PENDING" && hasSpec:
+			pendingWithSpecs = append(pendingWithSpecs, strconv.Itoa(rank))
+		case row.status != "SKIP" && row.status != "PENDING" && !hasSpec && !cve1000AcceptedNoSpecRanks[rank]:
+			missingRunnable = append(missingRunnable, fmt.Sprintf("%d:%s", rank, row.status))
+		}
+	}
+	for rank := range cve1000AcceptedNoSpecRanks {
+		row, ok := digest[rank]
+		if !ok {
+			staleNoSpecExceptions = append(staleNoSpecExceptions, fmt.Sprintf("%d:missing-ledger", rank))
+			continue
+		}
+		if row.status == "SKIP" || row.status == "PENDING" {
+			staleNoSpecExceptions = append(staleNoSpecExceptions, fmt.Sprintf("%d:%s-status", rank, strings.ToLower(row.status)))
+			continue
+		}
+		if uniqueSpecRanks[rank] {
+			staleNoSpecExceptions = append(staleNoSpecExceptions, fmt.Sprintf("%d:now-has-spec", rank))
+		}
+	}
+	if len(skipWithSpecs) > 0 {
+		sort.Strings(skipWithSpecs)
+		t.Fatalf("CVE SKIP ranks must not have runnable specs; remove skip or spec: %s", strings.Join(skipWithSpecs, ", "))
+	}
+	if len(pendingWithSpecs) > 0 {
+		sort.Strings(pendingWithSpecs)
+		t.Fatalf("CVE ranks have runnable specs but no ledger row; record the review: %s", strings.Join(pendingWithSpecs, ", "))
+	}
+	if len(missingRunnable) > 0 {
+		sort.Strings(missingRunnable)
+		t.Fatalf("CVE non-SKIP ledger ranks without runnable specs must be listed in cve1000AcceptedNoSpecRanks: %s", strings.Join(missingRunnable, ", "))
+	}
+	if len(staleNoSpecExceptions) > 0 {
+		sort.Strings(staleNoSpecExceptions)
+		t.Fatalf("CVE no-spec exception list is stale; remove or fix: %s", strings.Join(staleNoSpecExceptions, ", "))
+	}
+	t.Logf("CVE ledger digest: ranks=%d statuses=%v cve_specs=%d unique_spec_ranks=%d",
+		len(digest), statuses, len(cveSpecs), len(uniqueSpecRanks))
+}
+
+// In the tree that holds the corpus, the digest must be a faithful projection of
+// it and the corpus must be internally consistent. A digest regenerated from an
+// edited ledger fails here, which is the only place that can tell -- the tree
+// that reads the digest alone has nothing to compare it against.
+func TestCVECorpusMatchesLedgerDigest(t *testing.T) {
+	repo := testRepoRoot(t)
+	corpus := filepath.Join(repo, "cve-1000")
+	if _, err := os.Stat(corpus); os.IsNotExist(err) {
+		t.Skip("cve-1000 corpus is not part of this tree; the digest gate covers what is here")
+	}
+	poolRaw, err := os.ReadFile(filepath.Join(corpus, "pool.tsv"))
 	if err != nil {
 		t.Fatalf("read CVE pool: %v", err)
 	}
-	ledgerRaw, err := os.ReadFile(ledgerPath)
+	ledgerRaw, err := os.ReadFile(filepath.Join(corpus, "ledger.tsv"))
 	if err != nil {
 		t.Fatalf("read CVE ledger: %v", err)
 	}
 
 	poolRows := nonemptyTSVRows(string(poolRaw))
-	if len(poolRows) != 1000 {
-		t.Fatalf("cve-1000 pool rows = %d, want 1000", len(poolRows))
+	if len(poolRows) < 1000 {
+		t.Fatalf("cve pool rows = %d, want at least 1000", len(poolRows))
 	}
+	// The pool grows a block at a time and is reviewed a rank at a time, so the
+	// ledger trails it for the length of a campaign. It may never lead: a ledger
+	// row for a rank the pool does not hold is a review of nothing.
 	ledgerRows := nonemptyTSVRows(string(ledgerRaw))
-	if len(ledgerRows) != len(poolRows) {
-		t.Fatalf("cve-1000 ledger rows = %d, want exactly %d pool rows", len(ledgerRows), len(poolRows))
+	if len(ledgerRows) > len(poolRows) {
+		t.Fatalf("cve ledger rows = %d, more than the %d pool rows", len(ledgerRows), len(poolRows))
 	}
 	poolFieldsByRank := make([][]string, len(poolRows))
 	for rank, row := range poolRows {
@@ -1415,9 +1589,9 @@ func TestCVE1000LedgerCoverageGate(t *testing.T) {
 		}
 		poolFieldsByRank[rank] = fields
 	}
-	covered := make(map[int]bool, len(poolRows))
-	ledgerByRank := make(map[int]string, len(poolRows))
-	statuses := map[string]int{}
+
+	digest := readCVELedgerDigest(t)
+	seen := make(map[int]string, len(poolRows))
 	usedCVEOverrides := map[int]bool{}
 	for i, row := range ledgerRows {
 		fields := strings.SplitN(row, "\t", 6)
@@ -1431,6 +1605,11 @@ func TestCVE1000LedgerCoverageGate(t *testing.T) {
 		if rank < 0 || rank >= len(poolRows) {
 			t.Fatalf("ledger row %d rank %d outside pool range 0..%d", i+1, rank, len(poolRows)-1)
 		}
+		if prev, ok := seen[rank]; ok {
+			t.Fatalf("cve-1000 ledger rank %d appears more than once:\nfirst: %s\nagain: %s", rank, prev, row)
+		}
+		seen[rank] = row
+
 		poolFields := poolFieldsByRank[rank]
 		if !cve1000LedgerRepoMatches(fields[1], poolFields) {
 			t.Fatalf("ledger row %d rank %d repo = %q, want pool repo %q, owner %q, or owner/repo", i+1, rank, fields[1], poolFields[0], poolFields[1])
@@ -1444,111 +1623,59 @@ func TestCVE1000LedgerCoverageGate(t *testing.T) {
 			}
 			usedCVEOverrides[rank] = true
 		}
-		status := fields[4]
-		switch status {
+		switch fields[4] {
 		case "CAUGHT", "FIXED", "ATTENTION", "SKIP":
-			statuses[status]++
 		default:
-			t.Fatalf("ledger row %d rank %d has unknown status %q", i+1, rank, status)
+			t.Fatalf("ledger row %d rank %d has unknown status %q", i+1, rank, fields[4])
 		}
 		if strings.TrimSpace(fields[5]) == "" {
-			t.Fatalf("ledger row %d rank %d status %s is missing verification evidence", i+1, rank, status)
+			t.Fatalf("ledger row %d rank %d status %s is missing verification evidence", i+1, rank, fields[4])
 		}
-		if prev, ok := ledgerByRank[rank]; ok {
-			t.Fatalf("cve-1000 ledger rank %d appears more than once:\nfirst: %s\nagain: %s", rank, prev, row)
+
+		want, ok := digest[rank]
+		if !ok {
+			t.Fatalf("ledger rank %d is missing from the digest; regenerate cve_ledger_digest.tsv", rank)
 		}
-		ledgerByRank[rank] = row
-		covered[rank] = true
+		if want.cve != fields[3] || want.status != fields[4] {
+			t.Fatalf("digest rank %d = (%s, %s), ledger has (%s, %s); regenerate cve_ledger_digest.tsv",
+				rank, want.cve, want.status, fields[3], fields[4])
+		}
 	}
-	var missing []string
+	// A pool rank with no ledger row is PENDING, and the digest must say so with
+	// the pool's own CVE -- otherwise a spec written for a pending rank could be
+	// checked against the wrong advisory.
+	var wrongPending []string
 	for rank := range poolRows {
-		if !covered[rank] {
-			missing = append(missing, strconv.Itoa(rank))
+		if _, reviewed := seen[rank]; reviewed {
+			continue
+		}
+		row, ok := digest[rank]
+		if !ok {
+			wrongPending = append(wrongPending, fmt.Sprintf("%d:absent", rank))
+			continue
+		}
+		if row.status != "PENDING" {
+			wrongPending = append(wrongPending, fmt.Sprintf("%d:%s", rank, row.status))
+			continue
+		}
+		if row.cve != poolFieldsByRank[rank][3] {
+			wrongPending = append(wrongPending, fmt.Sprintf("%d:cve=%s want %s", rank, row.cve, poolFieldsByRank[rank][3]))
 		}
 	}
-	if len(missing) > 0 {
-		t.Fatalf("cve-1000 ledger missing %d pool rank(s): %s", len(missing), strings.Join(missing, ", "))
+	if len(wrongPending) > 0 {
+		sort.Strings(wrongPending)
+		t.Fatalf("unreviewed pool ranks must be PENDING in the digest with the pool's CVE; regenerate cve_ledger_digest.tsv: %s",
+			strings.Join(wrongPending, ", "))
 	}
-	wantStatuses := map[string]int{"ATTENTION": 110, "CAUGHT": 107, "FIXED": 781, "SKIP": 2}
-	if !intMapsEqual(statuses, wantStatuses) {
-		t.Fatalf("cve-1000 ledger statuses = %v, want %v", statuses, wantStatuses)
+	if len(digest) != len(poolRows) {
+		t.Fatalf("digest has %d ranks, pool has %d; regenerate cve_ledger_digest.tsv", len(digest), len(poolRows))
 	}
 	for rank, cve := range cve1000AcceptedLedgerCVEMetadataOverrides {
 		if !usedCVEOverrides[rank] {
 			t.Fatalf("CVE ledger metadata override rank %d (%s) is stale; remove it or fix the ledger/pool pair", rank, cve)
 		}
 	}
-
-	cveSpecs := readCVERankSpecFiles(t)
-	specRanksByRank := map[int][]string{}
-	for _, path := range cveSpecs {
-		rank, ok := cveRankFromSpecName(filepath.Base(path))
-		if !ok {
-			t.Fatalf("CVE spec file has invalid rank name: %s", filepath.Base(path))
-		}
-		if _, ok := ledgerByRank[rank]; !ok {
-			t.Fatalf("CVE spec %s references rank %d which is not present in cve-1000 ledger", filepath.Base(path), rank)
-		}
-		specRanksByRank[rank] = append(specRanksByRank[rank], filepath.Base(path))
-	}
-	uniqueSpecRanks := map[int]bool{}
-	for rank, names := range specRanksByRank {
-		uniqueSpecRanks[rank] = true
-		if len(names) > 1 && !cve1000AllowedDuplicateSpecRanks[rank] {
-			sort.Strings(names)
-			t.Fatalf("CVE rank %d has %d spec files but is not in the duplicate-spec allowlist: %s", rank, len(names), strings.Join(names, ", "))
-		}
-	}
-	for rank := range cve1000AllowedDuplicateSpecRanks {
-		if len(specRanksByRank[rank]) < 2 {
-			t.Fatalf("CVE duplicate-spec allowlist rank %d is stale; found %d spec file(s)", rank, len(specRanksByRank[rank]))
-		}
-	}
-	if len(cveSpecs) < 787 || len(uniqueSpecRanks) < 781 {
-		t.Fatalf("CVE runnable rank specs regressed: files=%d unique_ranks=%d, want at least files=787 unique_ranks=781", len(cveSpecs), len(uniqueSpecRanks))
-	}
-
-	var missingRunnable, staleNoSpecExceptions, skipWithSpecs []string
-	for rank, row := range ledgerByRank {
-		fields := strings.SplitN(row, "\t", 6)
-		status := fields[4]
-		hasSpec := uniqueSpecRanks[rank]
-		switch {
-		case status == "SKIP" && hasSpec:
-			skipWithSpecs = append(skipWithSpecs, fmt.Sprintf("%d", rank))
-		case status != "SKIP" && !hasSpec && !cve1000AcceptedNoSpecRanks[rank]:
-			missingRunnable = append(missingRunnable, fmt.Sprintf("%d:%s", rank, status))
-		}
-	}
-	for rank := range cve1000AcceptedNoSpecRanks {
-		row, ok := ledgerByRank[rank]
-		if !ok {
-			staleNoSpecExceptions = append(staleNoSpecExceptions, fmt.Sprintf("%d:missing-ledger", rank))
-			continue
-		}
-		fields := strings.SplitN(row, "\t", 6)
-		if fields[4] == "SKIP" {
-			staleNoSpecExceptions = append(staleNoSpecExceptions, fmt.Sprintf("%d:skip-status", rank))
-			continue
-		}
-		if uniqueSpecRanks[rank] {
-			staleNoSpecExceptions = append(staleNoSpecExceptions, fmt.Sprintf("%d:now-has-spec", rank))
-		}
-	}
-	if len(skipWithSpecs) > 0 {
-		sort.Strings(skipWithSpecs)
-		t.Fatalf("CVE SKIP ranks must not have runnable specs; remove skip or spec: %s", strings.Join(skipWithSpecs, ", "))
-	}
-	if len(missingRunnable) > 0 {
-		sort.Strings(missingRunnable)
-		t.Fatalf("CVE non-SKIP ledger ranks without runnable specs must be listed in cve1000AcceptedNoSpecRanks: %s", strings.Join(missingRunnable, ", "))
-	}
-	if len(staleNoSpecExceptions) > 0 {
-		sort.Strings(staleNoSpecExceptions)
-		t.Fatalf("CVE no-spec exception list is stale; remove or fix: %s", strings.Join(staleNoSpecExceptions, ", "))
-	}
-	t.Logf("cve-1000 ledger: pool=%d ledger_rows=%d unique_ranks=%d statuses=%v cve_specs=%d unique_spec_ranks=%d",
-		len(poolRows), len(ledgerRows), len(covered), statuses, len(cveSpecs), len(uniqueSpecRanks))
+	t.Logf("cve corpus: pool=%d ledger_rows=%d digest_ranks=%d", len(poolRows), len(ledgerRows), len(digest))
 }
 
 var cve1000AllowedDuplicateSpecRanks = map[int]bool{
@@ -1574,7 +1701,13 @@ var cve1000AcceptedNoSpecRanks = map[int]bool{
 	21: true,
 	28: true, 37: true,
 	62: true, 69: true, 71: true, 73: true,
-	83:  true,
+	83: true,
+	// Rank 406 asked for a requests advisory pinned at 2.31.0, which is HTTPie's
+	// decision and fires on every project whose declaration permits a higher
+	// release. Scoping it needs a manifest reader that knows the project's own
+	// declared name, which none of the five formats extracts. The advisory and
+	// its spec are withdrawn, so the ledger row is all that verifies this rank.
+	406: true,
 	574: true, 588: true,
 }
 
@@ -1587,18 +1720,6 @@ func nonemptyTSVRows(src string) []string {
 		}
 	}
 	return rows
-}
-
-func intMapsEqual(a, b map[string]int) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for key, av := range a {
-		if b[key] != av {
-			return false
-		}
-	}
-	return true
 }
 
 func cve1000LedgerRepoMatches(ledgerRepo string, poolFields []string) bool {

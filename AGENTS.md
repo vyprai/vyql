@@ -20,6 +20,49 @@ A Go engine plus a large body of security knowledge stored as data.
 new Go. Reach for a Go change only after `vyql match` shows the concept is
 genuinely unreachable from the data.
 
+## The layering is a boundary, not a filing convention
+
+Each layer answers one question, and only that one:
+
+| Layer | Where | The one question it answers |
+|---|---|---|
+| binding | `vyql/bindings/` | what does this code *mean* — this call is an `HttpInput` source, that one a `SqlExecution` sink. Technology-specific, judgement-free. |
+| concept | `vyql/ontology/` | what kinds of things exist — the language-neutral vocabulary bindings emit and rules consume. |
+| rule | `vyql/packs/` | which combinations of concepts are a finding, at what severity, under which CWE. Judgement, no APIs. |
+| engine | `internal/` | how taint propagates, calls resolve, and patterns match. Semantics, no vocabulary. |
+
+When a finding is missed, the diagnosis (next section) names the layer, and the
+fix goes there:
+
+- nothing labelled → binding
+- the vocabulary cannot express it → concept; reuse an existing one before
+  minting — a concept per case instead of per weakness class is how the
+  ontology rots
+- concepts exist and connect, but nothing judges them → rule
+- a real vulnerability with no taint path (authz, protocol state, logic) →
+  emit an existing `code.*Review` concept
+- taint stops at a language construct the engine mishandles → engine, which
+  means a Go change or an issue; **never** a data workaround that fakes the
+  path
+
+Two moves erode the boundary, and both look like progress in the moment:
+
+- **A binding that encodes judgement** — firing only when the code "looks
+  dangerous". Labelling and judging in one place means no other rule can reuse
+  the label, and the judgement hides where nobody audits it. The binding says
+  what the API is; whether that is a problem is the rule's call.
+- **A rule that names one library's API.** Rules are language-neutral; the
+  moment one matches on a path or method name it silently stops covering every
+  other language, and its judgement cannot transfer. Naming APIs is what
+  bindings are for.
+
+The test for a new binding: would someone who has never seen your motivating
+case write the same binding from the library's documentation alone? If not, it
+is a repro-shaped patch, and the next variant of the same weakness walks past
+it. This discipline is why tens of thousands of bindings stay maintainable:
+each is answerable to its API's documentation, not to the incident that
+prompted it.
+
 ## Three rules that are not preferences
 
 **`go test -count=1`, always.** The Go test cache keys on source files and does
@@ -76,14 +119,16 @@ VYQL_BENCH=1 BENCH_DIR=/tmp/bench/BenchmarkPython go test -count=1 -v ./cmd/vyql
 Both are gated in CI and must not regress. Current: **+1.00** and **+0.90**,
 Youden (`TPR − FPR`) macro-averaged. `benchmarks/RESULTS.md` has the method.
 
-**`benchmarks/RESULTS.md` records numbers, not narrative.** It is the page people
-check before trusting a score, and it only does that job while it stays short
-enough to read. Every run adds the temptation to explain itself there; a few
-rounds of that and nobody reads any of it. A run that moves nothing needs one
-line saying so, not a section explaining the change — reasoning belongs in
-`CHANGELOG.md` and the pull request. Replace stale numbers rather than appending
-new ones beside them, and cut a caveat back to a line once it stops reproducing.
-Git history holds whatever the page drops.
+**After a benchmark run, change the numbers and nothing else.** This governs
+`benchmarks/RESULTS.md` and `README.md` alike. Replace the stale figures in
+place and stop: no sentence explaining the run, no fresh caveat about the
+corpus, no extra table breaking the score down. These are the pages people check
+before trusting a score, and they only do that job while they stay short enough
+to read. Every run brings the temptation to explain itself there, and after a
+few rounds of that nobody reads any of it. A run that moves nothing needs one
+line saying so. Reasoning belongs in `CHANGELOG.md` and the pull request, and
+git history holds whatever the page drops. Never write a local directory layout
+into either page; name the environment variable instead.
 
 ## Traps
 
