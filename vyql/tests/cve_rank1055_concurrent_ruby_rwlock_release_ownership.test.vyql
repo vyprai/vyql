@@ -1,0 +1,233 @@
+# Rank 1055 / CVE-2026-54906: concurrent-ruby's ReadWriteLock let any thread
+# release a write lock it never took, and let a stray read release wedge the
+# lock permanently (CWE-414, CWE-667).
+# lib/concurrent-ruby/concurrent/atomic/read_write_lock.rb held
+#
+#   def release_write_lock
+#     return true unless running_writer?
+#     c = @Counter.update { |counter| counter - RUNNING_WRITER }
+#
+# The guard asks whether a writer is running, not whether the caller is that
+# writer, so a second thread holding a reference to the lock clears the
+# RUNNING_WRITER bit while the real writer is still inside its critical section
+# and a further writer then acquires and runs beside it. The read side had no
+# guard at all: release_read_lock decremented @Counter unconditionally, so on a
+# fresh lock the counter reached -1, and max_readers? then read
+# -1 & MAX_READERS == MAX_READERS and answered ResourceLimitError to every later
+# acquire.
+#
+# The fix 3fd493283c tracks the owner in an AtomicReference and makes the
+# release compare against it:
+#
+#   unless @Writer.compare_and_set(Thread.current, nil)
+#     raise IllegalOperationError, 'Cannot release a write lock which is not held by the current thread'
+#   end
+#
+# and refuses a read release when running_readers(c) is zero. Pool commit
+# 3fd493283c is the real fix in spite of COMMIT_NONE: its title names both
+# halves, its two files are the lock and its spec, and the added specs assert
+# exactly the two behaviours the advisory describes. The metadata check found no
+# link because GHSA-6wx8-w4f5-wwcr cites no commit.
+#
+# ATTENTION, analysis gap. Scanning the file reports nothing at either revision,
+# and neither does the whole atomic directory: 19 Ruby files, 0 findings, before
+# and after. Two things are missing and only the first is a binding.
+#
+#  - Ruby has no lock vocabulary at all. code.LockAcquire and core.LockRelease
+#    are wired for c, cpp, csharp, go, java, objc and swift and for no other
+#    language; Mutex, Monitor and synchronize have zero occurrences across the
+#    Ruby binding set. So VYQL-LIFE-001 cannot fire on Ruby whatever the code
+#    does. The last two snippets are that pair, differing only in whether the
+#    lock is released, and both are rejected. This one is binding work rather
+#    than engine work, and it is its own rank: the Java form is
+#    callee.method == "lock" and "unlock", writable from Ruby's Mutex
+#    documentation alone, but it would not have caught this CVE, because
+#    ReadWriteLock is hand-rolled on AtomicFixnum and its methods are named
+#    acquire_write_lock and release_write_lock.
+#  - With that vocabulary the weakness would still not be stateable. It is not
+#    an unreleased lock, which is all VYQL-LIFE-001 judges; it is a release
+#    whose guard tests the resource instead of the caller. Nothing is wrong with
+#    any line read alone -- running_writer? is a correct predicate and the
+#    decrement is a correct decrement -- so there is no node to label, and the
+#    discriminator is the absence of a caller-identity comparison on the path to
+#    the state change. The Ruby features a binding can read are callPath,
+#    functionName, literal, paramName, field, attr, assign, selector and expr,
+#    none of which express a guard's subject; stating it means a rubyReview
+#    observation computed in the frontend, as the 15 Ruby review analyses
+#    already wired are. A binding keyed on
+#    functionName == "release_write_lock" would detect
+#    this project rather than the weakness, since the same fail-open release
+#    written as unlock or release_exclusive walks past it.
+#
+# Recorded in ENGINE-GAPS.md under the items that are not mechanical: what has
+# to be decided is what counts as a caller-identity guard, which is judgement
+# rather than a port.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1055: the write release checks that a writer runs, not that the caller is it"
+  lang ruby
+  file lib/concurrent-ruby/concurrent/atomic/read_write_lock.rb
+  reject VYQL-LIFE-001
+  code
+  ```
+  class ReadWriteLock < Synchronization::Object
+    def initialize
+      super()
+      @Counter   = AtomicFixnum.new(0)
+      @ReadLock  = Synchronization::Lock.new
+      @WriteLock = Synchronization::Lock.new
+    end
+
+    def with_write_lock
+      raise ArgumentError.new('no block given') unless block_given?
+      acquire_write_lock
+      begin
+        yield
+      ensure
+        release_write_lock
+      end
+    end
+
+    def release_write_lock
+      return true unless running_writer?
+      c = @Counter.update { |counter| counter - RUNNING_WRITER }
+      @ReadLock.broadcast
+      @WriteLock.signal if waiting_writers(c) > 0
+      true
+    end
+  end
+  ```
+
+test "rank1055: the fix compares the releasing thread against the recorded owner"
+  lang ruby
+  file lib/concurrent-ruby/concurrent/atomic/read_write_lock.rb
+  reject VYQL-LIFE-001
+  code
+  ```
+  class ReadWriteLock < Synchronization::Object
+    def initialize
+      super()
+      @Counter   = AtomicFixnum.new(0)
+      @Writer    = AtomicReference.new(nil)
+      @ReadLock  = Synchronization::Lock.new
+      @WriteLock = Synchronization::Lock.new
+    end
+
+    def with_write_lock
+      raise ArgumentError.new('no block given') unless block_given?
+      acquire_write_lock
+      begin
+        yield
+      ensure
+        release_write_lock
+      end
+    end
+
+    def release_write_lock
+      unless @Writer.compare_and_set(Thread.current, nil)
+        raise IllegalOperationError, 'Cannot release a write lock which is not held by the current thread'
+      end
+
+      c = @Counter.update { |counter| counter - RUNNING_WRITER }
+      @ReadLock.broadcast
+      @WriteLock.signal if waiting_writers(c) > 0
+      true
+    end
+  end
+  ```
+
+test "rank1055: the read release decrements with no floor, so the counter underflows"
+  lang ruby
+  file lib/concurrent-ruby/concurrent/atomic/read_write_lock.rb
+  reject VYQL-LIFE-001
+  code
+  ```
+  class ReadWriteLock < Synchronization::Object
+    def release_read_lock
+      while true
+        c = @Counter.value
+        if @Counter.compare_and_set(c, c-1)
+          if waiting_writer?(c) && running_readers(c) == 1
+            @WriteLock.signal
+          end
+          break
+        end
+      end
+      true
+    end
+
+    def max_readers?(c = @Counter.value)
+      (c & MAX_READERS) == MAX_READERS
+    end
+  end
+  ```
+
+test "rank1055: the fix refuses a read release when no read lock is held"
+  lang ruby
+  file lib/concurrent-ruby/concurrent/atomic/read_write_lock.rb
+  reject VYQL-LIFE-001
+  code
+  ```
+  class ReadWriteLock < Synchronization::Object
+    def release_read_lock
+      while true
+        c = @Counter.value
+        raise IllegalOperationError, 'Cannot release a read lock which is not held' if running_readers(c) == 0
+
+        if @Counter.compare_and_set(c, c-1)
+          if waiting_writer?(c) && running_readers(c) == 1
+            @WriteLock.signal
+          end
+          break
+        end
+      end
+      true
+    end
+
+    def max_readers?(c = @Counter.value)
+      (c & MAX_READERS) == MAX_READERS
+    end
+  end
+  ```
+
+test "rank1055: Ruby has no lock vocabulary, so an unreleased mutex is not reported"
+  lang ruby
+  file app/services/counter_service.rb
+  reject VYQL-LIFE-001
+  code
+  ```
+  class CounterService
+    def initialize
+      @mutex = Mutex.new
+      @total = 0
+    end
+
+    def bump(amount)
+      @mutex.lock
+      @total += amount
+      @total
+    end
+  end
+  ```
+
+test "rank1055: the released partner of that pair is not reported either"
+  lang ruby
+  file app/services/counter_service.rb
+  reject VYQL-LIFE-001
+  code
+  ```
+  class CounterService
+    def initialize
+      @mutex = Mutex.new
+      @total = 0
+    end
+
+    def bump(amount)
+      @mutex.lock
+      @total += amount
+      @mutex.unlock
+      @total
+    end
+  end
+  ```
