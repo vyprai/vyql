@@ -1,0 +1,89 @@
+# Rank 1095 / CVE-2024-32644: Evmos's EVM state commit skipped a storage write
+# whenever the dirty value equalled the value the whole transaction started
+# with, so a contract that changed a storage slot, called a precompile
+# (triggering an intermediate commit), and then reverted the slot back to its
+# original value had that intermediate change silently dropped rather than
+# persisted and then reverted, letting the transaction behave as if it were
+# non-atomic (CWE-662). StateDB.Commit in x/evm/statedb/statedb.go had
+#
+#   value := obj.dirtyStorage[key]
+#   if value == obj.originStorage[key] {
+#     continue
+#   }
+#   s.keeper.SetState(s.ctx, obj.Address(), key, value.Bytes())
+#
+# comparing only against originStorage, the value before the transaction began,
+# with no notion of what had actually been committed to the store partway
+# through, via an earlier precompile-triggered commit within the same
+# transaction. The fix adds a transientStorage map recording what was actually
+# persisted since the transaction's last commit, and skips a write only when
+# the dirty value matches that intermediate record (or matches originStorage
+# when no intermediate commit happened), so an A -> B -> A cycle spanning a
+# precompile call now commits B and then A instead of collapsing to a no-op.
+#
+# ATTENTION, not mechanical. This is a protocol-level state-machine
+# correctness bug in one blockchain VM's own storage-diffing algorithm --
+# whether a transaction's net effect is the same as what actually happened at
+# each intermediate commit boundary -- expressed entirely through
+# Evmos-internal names (dirtyStorage, originStorage, transientStorage,
+# StateDB.Commit) with no public API or documented pattern a binding could
+# generalize from. No CWE-662 concept, or any taint/sink shape, could describe
+# "a value equality check used to skip a write does not account for an
+# intermediate commit that already persisted a different value" without
+# encoding this project's own storage-versioning scheme; the weakness is
+# entirely in what gets compared against what, not in any call, argument or
+# data flow VyQL's vocabulary reaches. No rule in the pack library carries
+# CWE_662, so the reject assertions below name VYQL-RACE-001 (file TOCTOU,
+# CWE_367) purely as a syntactically valid placeholder that never fires on
+# this shape, not as a close match, since none exists. No definition change
+# attempted.
+#
+# verify_current_expected: attention-not-mechanical
+
+test "rank1095: a commit skips a write whenever it matches the transaction's starting value"
+  lang go
+  file x/evm/statedb/statedb.go
+  reject VYQL-RACE-001
+  code
+  ```
+  package statedb
+
+  func (s *StateDB) Commit() error {
+    for _, obj := range s.stateObjects {
+      for _, key := range obj.dirtyStorage.SortedKeys() {
+        value := obj.dirtyStorage[key]
+        if value == obj.originStorage[key] {
+          continue
+        }
+        s.keeper.SetState(s.ctx, obj.Address(), key, value.Bytes())
+      }
+    }
+    return nil
+  }
+  ```
+
+test "rank1095: the fix tracks what was actually persisted since the last commit"
+  lang go
+  file x/evm/statedb/statedb.go
+  reject VYQL-RACE-001
+  code
+  ```
+  package statedb
+
+  func (s *StateDB) Commit() error {
+    for _, obj := range s.stateObjects {
+      for _, key := range obj.dirtyStorage.SortedKeys() {
+        dirtyValue := obj.dirtyStorage[key]
+        originValue := obj.originStorage[key]
+        transientStorageValue, ok := obj.transientStorage[key]
+        if (ok && transientStorageValue == dirtyValue) ||
+          (!ok && dirtyValue == originValue) {
+          continue
+        }
+        s.keeper.SetState(s.ctx, obj.Address(), key, dirtyValue.Bytes())
+        obj.transientStorage[key] = dirtyValue
+      }
+    }
+    return nil
+  }
+  ```
