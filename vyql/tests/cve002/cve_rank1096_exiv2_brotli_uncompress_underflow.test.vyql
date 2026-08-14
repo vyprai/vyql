@@ -1,0 +1,109 @@
+# Rank 1096 / CVE-2023-44398: exiv2's Brotli decompression loop let a
+# streaming decoder write past a buffer sized smaller than the offset it wrote
+# from, once the DoS-protection cap had already clamped the target size down
+# (CWE-787). BmffImage::brotliUncompress in src/bmffimage.cpp doubles
+# uncompressedLen each iteration and reallocates arr to that size:
+#
+#   arr.alloc(uncompressedLen);
+#   available_out = uncompressedLen - total_out;
+#   next_out = arr.data() + total_out;
+#   result = BrotliDecoderDecompressStream(decoder.get(), ..., &available_out, &next_out, &total_out);
+#   ...
+#   if (uncompressedLen > 131072) {
+#     if (++dos > 1) break;
+#     uncompressedLen = 131072;
+#   }
+#
+# total_out accumulates monotonically across iterations while uncompressedLen
+# can be clamped DOWN to exactly 131072 by the DoS cap on the first time it is
+# hit (dos == 1, the loop does not break yet). If total_out had already grown
+# past 131072 by then, the next iteration computes available_out =
+# uncompressedLen - total_out as an unsigned (size_t) subtraction with the
+# subtrahend larger than the minuend, wrapping to a huge value, while arr was
+# only allocated at 131072 bytes and next_out points into it at offset
+# total_out -- Brotli is told it has room for far more output than the buffer
+# actually holds. Pool commit e884a0955359 is the real fix (COMMIT_OK, named
+# by advisory GHSA-hrw9-ggg3-3r4r, adds a regression test and a PoC file); it
+# adds || total_out > 131072 to the break condition, so the loop stops before
+# the mismatched size_t subtraction can happen even on the first time the cap
+# is reached.
+#
+# Corpus correction: pool.tsv listed the language as python; the fix and the
+# vulnerability are entirely in src/bmffimage.cpp, C++. Corrected in place.
+#
+# ATTENTION, engine gap in spirit though not one narrow enough to name a
+# function for: the defect is a loop invariant across iterations (total_out
+# accumulates while uncompressedLen can be clamped downward), not a single
+# comparison or a single index expression. Recognizing it needs range or
+# symbolic tracking of how two size_t variables relate across loop iterations,
+# which is well past what a presence or single-flow pattern can express;
+# VyQL's existing index-guard analysis (already recorded as upper-bound-only
+# at ranks 1026 and 1032) is the closest existing machinery and does not reach
+# multi-iteration accumulation either. No definition change attempted.
+#
+# Scanning bmffimage.cpp (extracted as a standalone function) reports 0
+# findings; vyql match labels no source, sink or guard around the subtraction.
+#
+# verify_current_expected: attention-not-mechanical
+
+test "rank1096: the DoS cap clamps the target size before checking accumulated output"
+  lang cpp
+  file src/bmffimage.cpp
+  reject VYQL-MEM-002
+  code
+  ```
+  void BmffImage::brotliUncompress(const byte* compressedBuf, size_t compressedBufSize, DataBuf& arr) {
+    size_t uncompressedLen = compressedBufSize * 2;
+    int dos = 0;
+    size_t available_out;
+    byte* next_out;
+    size_t total_out = 0;
+
+    do {
+      arr.alloc(uncompressedLen);
+      available_out = uncompressedLen - total_out;
+      next_out = arr.data() + total_out;
+      BrotliDecoderResult result = BrotliDecoderDecompressStream(
+          decoder.get(), &available_in, &next_in, &available_out, &next_out, &total_out);
+      if (result == BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT) {
+        uncompressedLen *= 2;
+        if (uncompressedLen > 131072) {
+          if (++dos > 1)
+            break;
+          uncompressedLen = 131072;
+        }
+      }
+    } while (true);
+  }
+  ```
+
+test "rank1096: the fix also breaks when accumulated output already exceeds the cap"
+  lang cpp
+  file src/bmffimage.cpp
+  reject VYQL-MEM-002
+  code
+  ```
+  void BmffImage::brotliUncompress(const byte* compressedBuf, size_t compressedBufSize, DataBuf& arr) {
+    size_t uncompressedLen = compressedBufSize * 2;
+    int dos = 0;
+    size_t available_out;
+    byte* next_out;
+    size_t total_out = 0;
+
+    do {
+      arr.alloc(uncompressedLen);
+      available_out = uncompressedLen - total_out;
+      next_out = arr.data() + total_out;
+      BrotliDecoderResult result = BrotliDecoderDecompressStream(
+          decoder.get(), &available_in, &next_in, &available_out, &next_out, &total_out);
+      if (result == BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT) {
+        uncompressedLen *= 2;
+        if (uncompressedLen > 131072) {
+          if (++dos > 1 || total_out > 131072)
+            break;
+          uncompressedLen = 131072;
+        }
+      }
+    } while (true);
+  }
+  ```
