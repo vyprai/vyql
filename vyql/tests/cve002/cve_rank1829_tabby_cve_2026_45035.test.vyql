@@ -1,0 +1,28 @@
+# Rank 1829 / CVE-2026-45035: Security review for CVE-2026-45035 in Eugeny/tabby.
+# Fix commit 6e47c2fb65 in Eugeny/tabby.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1829: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1829: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

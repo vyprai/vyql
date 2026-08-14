@@ -1,0 +1,28 @@
+# Rank 1808 / CVE-2026-53782: Security review for CVE-2026-53782 in steipete/summarize.
+# Fix commit 3c5522440c in steipete/summarize.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1808: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1808: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

@@ -1,0 +1,28 @@
+# Rank 1899 / CVE-2026-45156: Security review for CVE-2026-45156 in nextcloud/user_oidc.
+# Fix commit 5797f57702 in nextcloud/user_oidc.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1899: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1899: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

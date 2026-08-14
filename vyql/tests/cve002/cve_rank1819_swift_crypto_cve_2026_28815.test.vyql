@@ -1,0 +1,26 @@
+# Rank 1819 / CVE-2026-28815: Security review for CVE-2026-28815 in apple/swift-crypto.
+# Fix commit bb4ba815da in apple/swift-crypto.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1819: vulnerable code pattern before fix"
+  lang swift
+  file main.swift
+  reject VYQL-PATH-001
+  code
+  ```
+  func handleRequest(input: String) -> String {
+    return input
+}
+  ```
+
+test "rank1819: validated or patched form"
+  lang swift
+  file main.swift
+  reject VYQL-PATH-001
+  code
+  ```
+  func handleRequest(input: String) -> String {
+    if input.isEmpty { return "" }
+    return input
+}
+  ```

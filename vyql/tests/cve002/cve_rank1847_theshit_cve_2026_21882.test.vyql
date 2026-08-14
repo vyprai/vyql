@@ -1,0 +1,28 @@
+# Rank 1847 / CVE-2026-21882: Security review for CVE-2026-21882 in AsfhtgkDavid/theshit.
+# Fix commit 5293957b11 in AsfhtgkDavid/theshit.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1847: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1847: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

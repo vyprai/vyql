@@ -1,0 +1,28 @@
+# Rank 1833 / CVE-2025-1467: Security review for CVE-2025-1467 in AmauriC/tarteaucitron.js.
+# Fix commit 1249057900 in AmauriC/tarteaucitron.js.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1833: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1833: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

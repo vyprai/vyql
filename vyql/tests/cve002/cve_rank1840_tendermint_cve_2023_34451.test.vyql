@@ -1,0 +1,32 @@
+# Rank 1840 / CVE-2023-34451: Security review for CVE-2023-34451 in tendermint/tendermint.
+# Fix commit 6de7effb05 in tendermint/tendermint.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1840: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1840: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

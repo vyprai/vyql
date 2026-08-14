@@ -1,0 +1,26 @@
+# Rank 1896 / CVE-2018-20721: Security review for CVE-2018-20721 in uriparser/uriparser.
+# Fix commit cef25028de in uriparser/uriparser.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1896: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1896: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

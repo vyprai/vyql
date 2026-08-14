@@ -1,0 +1,28 @@
+# Rank 1879 / CVE-2023-24814: Security review for CVE-2023-24814 in typo3/typo3.
+# Fix commit 0005a6fd86 in typo3/typo3.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1879: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1879: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

@@ -1,0 +1,27 @@
+# Rank 1816 / CVE-2012-4406: Security review for CVE-2012-4406 in openstack/swift.
+# Fix commit e1ff51c045 in openstack/swift.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1816: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1816: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

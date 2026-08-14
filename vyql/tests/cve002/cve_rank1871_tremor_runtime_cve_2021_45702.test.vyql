@@ -1,0 +1,28 @@
+# Rank 1871 / CVE-2021-45702: Security review for CVE-2021-45702 in tremor-rs/tremor-runtime.
+# Fix commit 1a2efcdbe6 in tremor-rs/tremor-runtime.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1871: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1871: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

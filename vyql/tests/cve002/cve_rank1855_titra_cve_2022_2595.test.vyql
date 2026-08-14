@@ -1,0 +1,28 @@
+# Rank 1855 / CVE-2022-2595: Security review for CVE-2022-2595 in kromitgmbh/titra.
+# Fix commit fe8c3cdeb7 in kromitgmbh/titra.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1855: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1855: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

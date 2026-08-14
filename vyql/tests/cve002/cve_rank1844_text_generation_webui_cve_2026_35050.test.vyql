@@ -1,0 +1,27 @@
+# Rank 1844 / CVE-2026-35050: Security review for CVE-2026-35050 in oobabooga/text-generation-webui.
+# Fix commit 256431f258 in oobabooga/text-generation-webui.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1844: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1844: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

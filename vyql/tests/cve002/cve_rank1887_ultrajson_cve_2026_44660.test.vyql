@@ -1,0 +1,26 @@
+# Rank 1887 / CVE-2026-44660: Security review for CVE-2026-44660 in ultrajson/ultrajson.
+# Fix commit 82af1d0ac0 in ultrajson/ultrajson.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1887: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1887: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

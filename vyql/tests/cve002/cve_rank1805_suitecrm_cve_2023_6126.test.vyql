@@ -1,0 +1,28 @@
+# Rank 1805 / CVE-2023-6126: Security review for CVE-2023-6126 in salesagility/suitecrm.
+# Fix commit 54bc56c3bd in salesagility/suitecrm.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1805: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1805: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

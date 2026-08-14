@@ -1,0 +1,28 @@
+# Rank 1864 / CVE-2017-15010: Security review for CVE-2017-15010 in salesforce/tough-cookie.
+# Fix commit f1ed420a6a in salesforce/tough-cookie.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1864: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1864: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

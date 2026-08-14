@@ -1,0 +1,30 @@
+# Rank 1845 / CVE-2018-17107: Security review for CVE-2018-17107 in tgstation/tgstation-server.
+# Fix commit 1812a9c679 in tgstation/tgstation-server.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1845: vulnerable code pattern before fix"
+  lang csharp
+  file Main.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  class Handler {
+    public static string HandleRequest(string input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1845: validated or patched form"
+  lang csharp
+  file Main.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  class Handler {
+    public static string HandleRequest(string input) {
+        if (input == null) return string.Empty;
+        return input;
+    }
+}
+  ```

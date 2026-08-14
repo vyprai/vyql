@@ -1,0 +1,30 @@
+# Rank 1882 / CVE-2018-15761: Security review for CVE-2018-15761 in cloudfoundry/uaa.
+# Fix commit 95b7d9e7fa in cloudfoundry/uaa.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1882: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1882: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

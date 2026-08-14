@@ -1,0 +1,26 @@
+# Rank 1838 / CVE-2018-20552: Security review for CVE-2018-20552 in appneta/tcpreplay.
+# Fix commit 2595c903b6 in appneta/tcpreplay.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1838: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1838: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

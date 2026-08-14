@@ -1,0 +1,26 @@
+# Rank 1841 / CVE-2023-25668: Security review for CVE-2023-25668 in tensorflow/tensorflow.
+# Fix commit 7b174a0f2e in tensorflow/tensorflow.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1841: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1841: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

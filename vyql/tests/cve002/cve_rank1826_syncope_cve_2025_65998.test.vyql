@@ -1,0 +1,30 @@
+# Rank 1826 / CVE-2025-65998: Security review for CVE-2025-65998 in apache/syncope.
+# Fix commit 9d706af25d in apache/syncope.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1826: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1826: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

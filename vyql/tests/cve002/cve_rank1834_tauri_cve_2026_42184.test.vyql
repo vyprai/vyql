@@ -1,0 +1,28 @@
+# Rank 1834 / CVE-2026-42184: Security review for CVE-2026-42184 in tauri-apps/tauri.
+# Fix commit ba025588f3 in tauri-apps/tauri.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1834: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1834: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

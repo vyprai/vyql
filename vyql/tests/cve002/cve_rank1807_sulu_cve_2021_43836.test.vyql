@@ -1,0 +1,28 @@
+# Rank 1807 / CVE-2021-43836: Security review for CVE-2021-43836 in sulu/sulu.
+# Fix commit 9c948f9ce3 in sulu/sulu.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1807: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1807: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

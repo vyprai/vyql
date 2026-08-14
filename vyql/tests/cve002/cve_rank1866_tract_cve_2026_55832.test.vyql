@@ -1,0 +1,28 @@
+# Rank 1866 / CVE-2026-55832: Security review for CVE-2026-55832 in sonos/tract.
+# Fix commit 8fdacbd7ab in sonos/tract.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1866: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1866: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

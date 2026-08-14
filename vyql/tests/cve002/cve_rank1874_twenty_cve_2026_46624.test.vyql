@@ -1,0 +1,28 @@
+# Rank 1874 / CVE-2026-46624: Security review for CVE-2026-46624 in twentyhq/twenty.
+# Fix commit 7d68868df5 in twentyhq/twenty.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1874: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1874: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

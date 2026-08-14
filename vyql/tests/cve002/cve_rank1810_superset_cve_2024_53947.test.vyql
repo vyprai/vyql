@@ -1,0 +1,27 @@
+# Rank 1810 / CVE-2024-53947: Security review for CVE-2024-53947 in apache/superset.
+# Fix commit 0e0028260f in apache/superset.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1810: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1810: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

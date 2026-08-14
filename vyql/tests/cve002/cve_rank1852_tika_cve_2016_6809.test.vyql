@@ -1,0 +1,30 @@
+# Rank 1852 / CVE-2016-6809: Security review for CVE-2016-6809 in apache/tika.
+# Fix commit 8a68b5d474 in apache/tika.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1852: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1852: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

@@ -1,0 +1,30 @@
+# Rank 1811 / CVE-2022-45383: Security review for CVE-2022-45383 in jenkinsci/support-core-plugin.
+# Fix commit 9b7a1d48db in jenkinsci/support-core-plugin.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1811: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1811: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

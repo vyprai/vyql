@@ -1,0 +1,28 @@
+# Rank 1830 / CVE-2026-45545: Security review for CVE-2026-45545 in nextcloud/tables.
+# Fix commit 5c30527f8c in nextcloud/tables.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1830: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1830: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

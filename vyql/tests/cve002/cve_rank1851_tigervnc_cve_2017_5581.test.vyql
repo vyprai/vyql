@@ -1,0 +1,26 @@
+# Rank 1851 / CVE-2017-5581: Security review for CVE-2017-5581 in tigervnc/tigervnc.
+# Fix commit 18c020124f in tigervnc/tigervnc.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1851: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1851: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

@@ -1,0 +1,27 @@
+# Rank 1876 / CVE-2020-10108: Security review for CVE-2020-10108 in twisted/twisted.
+# Fix commit 4a7d22e490 in twisted/twisted.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1876: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1876: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

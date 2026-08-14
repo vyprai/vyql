@@ -1,0 +1,32 @@
+# Rank 1884 / CVE-2026-33191: Security review for CVE-2026-33191 in free5gc/udm.
+# Fix commit 65d7070f4b in free5gc/udm.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1884: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1884: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

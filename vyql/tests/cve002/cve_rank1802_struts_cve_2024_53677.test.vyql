@@ -1,0 +1,30 @@
+# Rank 1802 / CVE-2024-53677: Security review for CVE-2024-53677 in apache/struts.
+# Fix commit 930fef7679 in apache/struts.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1802: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1802: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

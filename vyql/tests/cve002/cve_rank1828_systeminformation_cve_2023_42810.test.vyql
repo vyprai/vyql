@@ -1,0 +1,28 @@
+# Rank 1828 / CVE-2023-42810: Security review for CVE-2023-42810 in sebhildebrandt/systeminformation.
+# Fix commit 7972565812 in sebhildebrandt/systeminformation.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1828: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1828: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

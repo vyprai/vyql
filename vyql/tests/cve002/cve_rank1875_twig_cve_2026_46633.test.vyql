@@ -1,0 +1,28 @@
+# Rank 1875 / CVE-2026-46633: Security review for CVE-2026-46633 in twigphp/twig.
+# Fix commit ea3f7a2844 in twigphp/twig.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1875: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1875: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

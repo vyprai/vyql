@@ -1,0 +1,28 @@
+# Rank 1832 / CVE-2026-33055: Security review for CVE-2026-33055 in alexcrichton/tar-rs.
+# Fix commit de1a5870e6 in alexcrichton/tar-rs.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1832: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1832: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

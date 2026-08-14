@@ -1,0 +1,28 @@
+# Rank 1877 / CVE-2026-28445: Security review for CVE-2026-28445 in baptistearno/typebot.io.
+# Fix commit 474ecbf46b in baptistearno/typebot.io.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1877: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1877: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

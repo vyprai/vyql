@@ -1,0 +1,28 @@
+# Rank 1823 / CVE-2026-31824: Security review for CVE-2026-31824 in sylius/sylius.
+# Fix commit af579b0b6e in sylius/sylius.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1823: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1823: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

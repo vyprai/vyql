@@ -1,0 +1,28 @@
+# Rank 1853 / CVE-2026-28792: Security review for CVE-2026-28792 in tinacms/tinacms.
+# Fix commit 56d533e610 in tinacms/tinacms.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1853: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1853: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

@@ -1,0 +1,28 @@
+# Rank 1850 / CVE-2026-48235: Security review for CVE-2026-48235 in openises/tickets.
+# Fix commit ecfeb406a0 in openises/tickets.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1850: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1850: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

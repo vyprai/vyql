@@ -1,0 +1,32 @@
+# Rank 1885 / CVE-2026-44324: Security review for CVE-2026-44324 in free5gc/udr.
+# Fix commit 8a1d3c63be in free5gc/udr.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1885: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1885: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

@@ -1,0 +1,28 @@
+# Rank 1872 / CVE-2025-68621: Security review for CVE-2025-68621 in triliumnext/trilium.
+# Fix commit 33098a1120 in triliumnext/trilium.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1872: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1872: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

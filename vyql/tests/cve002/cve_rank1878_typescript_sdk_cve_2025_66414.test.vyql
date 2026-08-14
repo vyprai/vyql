@@ -1,0 +1,28 @@
+# Rank 1878 / CVE-2025-66414: Security review for CVE-2025-66414 in modelcontextprotocol/typescript-sdk.
+# Fix commit 09623e2aa5 in modelcontextprotocol/typescript-sdk.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1878: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1878: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

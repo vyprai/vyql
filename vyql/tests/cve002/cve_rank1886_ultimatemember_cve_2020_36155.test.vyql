@@ -1,0 +1,28 @@
+# Rank 1886 / CVE-2020-36155: Security review for CVE-2020-36155 in ultimatemember/ultimatemember.
+# Fix commit 427bb6da1c in ultimatemember/ultimatemember.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1886: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1886: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

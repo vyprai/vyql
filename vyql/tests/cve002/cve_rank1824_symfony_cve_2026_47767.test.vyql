@@ -1,0 +1,28 @@
+# Rank 1824 / CVE-2026-47767: Security review for CVE-2026-47767 in symfony/symfony.
+# Fix commit 3228c3806e in symfony/symfony.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1824: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1824: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

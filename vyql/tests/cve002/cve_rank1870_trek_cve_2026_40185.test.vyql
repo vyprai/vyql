@@ -1,0 +1,28 @@
+# Rank 1870 / CVE-2026-40185: Security review for CVE-2026-40185 in mauriceboe/trek.
+# Fix commit 16277a3811 in mauriceboe/trek.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1870: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1870: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

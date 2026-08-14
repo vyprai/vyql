@@ -1,0 +1,27 @@
+# Rank 1898 / CVE-2018-20060: Security review for CVE-2018-20060 in urllib3/urllib3.
+# Fix commit 560bd227b9 in urllib3/urllib3.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1898: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1898: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

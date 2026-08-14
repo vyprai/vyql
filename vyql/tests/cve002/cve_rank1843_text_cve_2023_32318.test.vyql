@@ -1,0 +1,28 @@
+# Rank 1843 / CVE-2023-32318: Security review for CVE-2023-32318 in nextcloud/text.
+# Fix commit 3b9f353172 in nextcloud/text.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1843: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1843: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

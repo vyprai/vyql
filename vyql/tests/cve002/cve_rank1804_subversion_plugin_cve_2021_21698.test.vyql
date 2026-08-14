@@ -1,0 +1,30 @@
+# Rank 1804 / CVE-2021-21698: Security review for CVE-2021-21698 in jenkinsci/subversion-plugin.
+# Fix commit 7d1525edea in jenkinsci/subversion-plugin.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1804: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1804: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

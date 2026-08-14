@@ -1,0 +1,28 @@
+# Rank 1846 / CVE-2020-27224: Security review for CVE-2020-27224 in eclipse-theia/theia.
+# Fix commit 309b21892e in eclipse-theia/theia.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1846: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1846: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

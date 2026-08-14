@@ -1,0 +1,32 @@
+# Rank 1849 / CVE-2019-0210: Security review for CVE-2019-0210 in apache/thrift.
+# Fix commit 264a3f318e in apache/thrift.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1849: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1849: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

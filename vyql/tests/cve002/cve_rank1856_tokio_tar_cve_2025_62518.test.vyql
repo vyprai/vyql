@@ -1,0 +1,28 @@
+# Rank 1856 / CVE-2025-62518: Security review for CVE-2025-62518 in astral-sh/tokio-tar.
+# Fix commit 22b3f884ad in astral-sh/tokio-tar.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1856: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1856: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

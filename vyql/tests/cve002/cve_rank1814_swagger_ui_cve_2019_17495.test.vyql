@@ -1,0 +1,28 @@
+# Rank 1814 / CVE-2019-17495: Security review for CVE-2019-17495 in swagger-api/swagger-ui.
+# Fix commit 77f4651cbf in swagger-api/swagger-ui.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1814: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1814: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```
