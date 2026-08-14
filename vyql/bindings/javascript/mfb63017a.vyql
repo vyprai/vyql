@@ -679,6 +679,14 @@ binding sqlExecution131 {
   emit sink code.SqlExecution at args[0]
 }
 
+binding sqlExecution131a {
+  requires {
+    import("@evershop/postgres-query-builder")
+  }
+  query pattern callExpr where callee.path ~= "execute"
+  emit sink code.SqlExecution at args[1]
+}
+
 binding sqlExecution132 {
   query pattern callExpr where callee.method == "unprepared"
   emit sink code.SqlExecution at args[0]
