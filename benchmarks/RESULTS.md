@@ -52,7 +52,7 @@ Both public suites are **GPL**: clone them at run time, never vendor them into a
 permissively-licensed repo.
 
 `benchmarks/fetch-corpora.sh` fetches every corpus into
-`~/workspace/vypr/benchmark-corpora` (outside this repo, so nothing GPL is
+`$VYQL_BENCH_CORPORA` (outside this repo, so nothing GPL is
 vendored) and symlinks it at `/tmp/bench`, which is where the `BENCH_DIR` paths
 below point. It is idempotent, so a corpus already fetched is never refetched;
 after a reboot clears `/tmp`, re-running it just restores the symlinks. Run it
@@ -70,9 +70,7 @@ VYQL_BENCH=1 BENCH_DIR=/tmp/bench/ports/owasp-js   go test -count=1 -v ./cmd/vyq
 
 ### 3.1 Full corpora
 
-Every fetched corpus, measured 2026-08-13 on `fe529827d` in one sweep. Every
-figure below, including the per-category tables in 3.1.1 and 3.1.2, reproduced
-unchanged against the 2026-08-06 sweep:
+Every fetched corpus, measured 2026-08-13 on `fe529827d` in one sweep:
 
 | Corpus | Youden macro |
 |---|---|
@@ -133,18 +131,12 @@ fires on them either way; that work is covered by
 
 ### 3.2 Runtime
 
-Wall time of `TestOWASPBenchmark` itself, excluding the Go build:
-
 | Corpus | Cases | Time |
 |---|---|---|
 | BenchmarkJava | 2,740 | 2.0 s |
 | BenchmarkPython | 1,230 | 2.9 s |
 | owasp-js | 2,740 | 1.3 s |
 | owasp-go | 2,740 | 0.6 s |
-
-The stratified subsets described in the appendix are not kept in
-`~/workspace/vypr/benchmark-corpora`, so they are not timed here. Time the full
-corpora instead: they are fast enough that a subset saves nothing.
 
 ## 4. Known corpus defects
 
@@ -195,40 +187,8 @@ code that produces their published numbers, via a SARIF adapter for VyQL.
 |---|---|---|---|---|---|---|
 | **976** | 2316 | 758 | 234 | **0.2965** | **0.5629** | −0.3454 |
 
-> **One verdict per emitted finding.** `score_realvuln.py` calls `collapse_fanout()` on
-> every match set, so a rule that lists four CWEs is charged one false positive rather
-> than four. Any figure quoting a higher FP count is counting `(result × CWE)` pairs
-> instead, and the two scales are not comparable. Recall is the same either way, because
-> the matcher credits one detection per ground-truth entry.
-
-Recall on real-world code is the number to watch here, and the negative Youden is an
-artefact of the corpus shape rather than a verdict on precision: RealVuln carries 1,896
-real findings against 280 false-positive traps, so `TN` is tiny and `FPR` is near 1 for
-any scanner that reports at scale. Compare scanners on precision and recall on this
-corpus, not on Youden.
-
-Four rules carry a third of all false positives:
-
-| rule | severity | FP | TP | precision |
-|---|---|---|---|---|
-| `VYQL-CRY-003` | medium | 394 | 41 | 0.094 |
-| `VYQL-INJ-004` | high | 223 | 38 | 0.146 |
-| `VYQL-PATH-001` | high | 135 | 68 | 0.335 |
-| `VYQL-AUTH-106` | medium | 128 | 53 | 0.293 |
-
-Six rules produce false positives and **no** true positives at all on this corpus:
-`VYQL-CFG-008` (110), `VYQL-SEC-025` (68), `VYQL-INJ-013` (64), `VYQL-INJ-134` (59),
-`VYQL-INJ-001` (55) and `VYQL-SEC-002` (48 FP against 2 TP). Those are where precision
-work pays first, because nothing is lost by tightening them.
-
-Reproduce both views with:
-
-```sh
-python3 benchmarks/score_realvuln.py \
-  ~/workspace/vypr/benchmark-corpora/Real-Vuln-Benchmark ./bin/vyql ./vyql
-python3 benchmarks/score_realvuln.py \
-  ~/workspace/vypr/benchmark-corpora/Real-Vuln-Benchmark ./bin/vyql ./vyql --by-rule
-```
+> One verdict per emitted finding: `score_realvuln.py` calls `collapse_fanout()`, so a
+> rule listing four CWEs is charged one false positive rather than four.
 
 #### 6.1.1 Receiver scoping for package-gated bindings
 
@@ -283,9 +243,8 @@ applications do not.
 At 0.563 recall VyQL is **well clear of both published static scanners** and roughly two
 thirds of the way to the best LLM agent, at a fraction of the cost. Precision (0.297)
 remains the weak axis and is where the next work belongs. `VYQL-SMELL-*` is an
-`info`-severity candidate stream for agent review rather than a finding stream, and
-`VYQL-SMELL-DATA`, `-STATE` and `-AUTHZ` together carry 282 of the 2,316 false
-positives.
+`info`-severity candidate stream for agent review, not a finding stream, and it is a
+large share of the 2,316 false positives.
 
 **Caveats:**
 
