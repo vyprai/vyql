@@ -1,0 +1,75 @@
+# Rank 1112 / CVE-2026-40895: follow-redirects stripped only three hardcoded
+# header names on a cross-domain or protocol-downgrade redirect, so any custom
+# authentication header an application set, X-Api-Key, X-Auth-Token, and the
+# like, followed the redirect to whatever host the response pointed at
+# (CWE-200, CWE-212).
+#
+# RedirectableRequest.prototype._processResponse in index.js called
+# removeMatchingHeaders(/^(?:(?:proxy-)?authorization|cookie)$/i, ...) on a
+# cross-origin or downgraded redirect. Every header outside that fixed list,
+# including any bearer token an application sent under its own header name,
+# was copied to the next request unchanged.
+#
+# Pool commit 844c4d302ac9 is the real fix despite the COMMIT_NONE flag,
+# checked against GHSA-r4q5-vmmm-2653 which it implements: it adds a
+# `sensitiveHeaders` request option, builds `this._headerFilter` from the
+# three built-in names plus whatever the caller supplies, and strips against
+# that instead of the fixed regex. The three built-in names are unchanged, so
+# a request that does not pass `sensitiveHeaders` behaves identically before
+# and after the upgrade; only a caller that also adds its own header name to
+# the option is protected. This is a different shape from the library-only
+# bugs at ranks 1083, 1097, 1101, 1103 and 1105: there the application side
+# was identical on both revisions and only the dependency mattered, but here
+# the application has to change too, so the vulnerable and fixed forms differ
+# in the request options an application passes, not only in which
+# follow-redirects version is installed.
+#
+# ATTENTION, vocabulary gap. Scanning index.js at either revision reports the
+# same one unrelated SSRF-shaped finding on the internal redirect URL
+# construction; nothing labels the header-stripping call in either. The
+# nearest concept by CWE, code.ExternalLinkReferrerLeak (CWE_200, an HTML
+# template's external links leaking the current page's sensitive URL through
+# the browser's own Referer header), shares the theme, a secret carried in an
+# HTTP header crossing an origin boundary, but not the mechanism: this is a
+# Referer leak from rendered markup, not a client library forwarding an
+# application-named header across a redirect, and its only binding scans
+# config/template files. No concept states "an HTTP client's redirect
+# behavior forwards headers outside an explicit allowlist across an origin
+# change." Stating it generically also needs knowing which of an
+# application's own header names carry a secret, which nothing in the request
+# options declares on its own.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1112: a custom auth header has nothing telling the client to strip it on redirect"
+  lang javascript
+  file app.js
+  reject VYQL-SEC-025
+  code
+  ```
+  const followRedirects = require('follow-redirects');
+
+  function fetchWithApiKey(url, apiKey) {
+    return followRedirects.https.request(url, {
+      headers: { 'X-Api-Key': apiKey },
+    });
+  }
+  ```
+
+test "rank1112: the custom header is named so the client strips it across origins"
+  lang javascript
+  file app.js
+  reject VYQL-SEC-025
+  code
+  ```
+  const followRedirects = require('follow-redirects');
+
+  function fetchWithApiKey(url, apiKey) {
+    return followRedirects.https.request(url, {
+      headers: { 'X-Api-Key': apiKey },
+      sensitiveHeaders: ['X-Api-Key'],
+    });
+  }
+  ```
