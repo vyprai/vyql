@@ -1,0 +1,138 @@
+# Rank 1082 / CVE-2019-10664: Domoticz built a SQL query by interpolating a
+# request parameter with %s (CWE-89). GetFloorplanImage in main/WebServer.cpp
+# read idx with request::findValue and passed it straight through:
+#
+#   result = m_sql.safe_queryBlob("SELECT Image FROM Floorplans WHERE ID=%s", idx.c_str());
+#
+# The fix ee70db46f8 changes one line, to %d with atol(idx.c_str()), so the value
+# can only be a number.
+#
+# The name safe_queryBlob is not a promise about its arguments. It is
+#
+#   char *zQuery = sqlite3_vmprintf(fmt, args);
+#
+# and SQLite's printf documents %q and %Q as the SQL-literal escapes while %s
+# substitutes the string unchanged. The bug is the specifier at the call site,
+# not a missing wrapper.
+#
+# ATTENTION, engine gap. Taint does not cross a C or C++ varargs wrapper. The
+# last two snippets are the same flow, a recv into a formatted SQL string into
+# sqlite3_exec, and differ only in whether the formatting happens behind a
+# function taking `...`:
+#
+#  - written inline, VYQL-INJ-001 reports at high confidence, source
+#    code.HttpInput to sink code.SqlExecution;
+#  - moved behind a wrapper that does va_start, vsnprintf and va_end, nothing
+#    reports.
+#
+# That is exactly Domoticz's shape, so the CVE cannot be reached from the call
+# site no matter what the sink binding says. Recorded in ENGINE-GAPS.md.
+#
+# A second gap sits behind the first and is data, not engine: sqlite3_mprintf
+# and sqlite3_vmprintf occur in zero bindings, so even with varargs support the
+# wrapper's inner call is not a SQL sink. The four C and C++ SQL sinks are
+# mysql_query, sqlite3_exec, sqlite3_prepare_v2 and PQexec. Nothing represents
+# %q and %Q as the escaping the query builder offers, either.
+#
+# Scanning main/WebServer.cpp reports 145 findings at the vulnerable revision,
+# 144 VYQL-MEM-002 and 1 VYQL-MEM-006, none of them at the query. vyql match
+# over the handler labels no source and no SQL sink.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1082: the floorplan id is formatted into the query with %s"
+  lang cpp
+  file main/WebServer.cpp
+  reject VYQL-INJ-001
+  code
+  ```
+  #include <string>
+  #include <vector>
+
+  void CWebServer::GetFloorplanImage(WebEmSession & session, const request& req, reply & rep)
+  {
+  	std::string idx = request::findValue(&req, "idx");
+  	if (idx == "") {
+  		return;
+  	}
+  	std::vector<std::vector<std::string> > result;
+  	result = m_sql.safe_queryBlob("SELECT Image FROM Floorplans WHERE ID=%s", idx.c_str());
+  	if (result.empty())
+  		return;
+  	reply::set_content(&rep, result[0][0].begin(), result[0][0].end());
+  }
+  ```
+
+test "rank1082: the id is converted to a number before formatting"
+  lang cpp
+  file main/WebServer.cpp
+  reject VYQL-INJ-001
+  code
+  ```
+  #include <string>
+  #include <vector>
+
+  void CWebServer::GetFloorplanImage(WebEmSession & session, const request& req, reply & rep)
+  {
+  	std::string idx = request::findValue(&req, "idx");
+  	if (idx == "") {
+  		return;
+  	}
+  	std::vector<std::vector<std::string> > result;
+  	result = m_sql.safe_queryBlob("SELECT Image FROM Floorplans WHERE ID=%d", atol(idx.c_str()));
+  	if (result.empty())
+  		return;
+  	reply::set_content(&rep, result[0][0].begin(), result[0][0].end());
+  }
+  ```
+
+# The varargs pair. Same source, same formatting, same sink; only the hop
+# through a `...` parameter differs, and it is the difference between a
+# high-confidence report and silence.
+
+test "rank1082: a formatted query reaching the sink in one function"
+  lang cpp
+  file inline.cpp
+  expect VYQL-INJ-001
+  code
+  ```
+  #include <cstdio>
+  #include <string>
+
+  void handler(int fd)
+  {
+  	char idx[128];
+  	recv(fd, idx, sizeof(idx), 0);
+  	char buf[512];
+  	snprintf(buf, sizeof(buf), "SELECT Image FROM Floorplans WHERE ID=%s", idx);
+  	sqlite3_exec(db, buf, 0, 0, 0);
+  }
+  ```
+
+test "rank1082: the same query formatted behind a varargs wrapper"
+  lang cpp
+  file wrapped.cpp
+  reject VYQL-INJ-001
+  code
+  ```
+  #include <cstdarg>
+  #include <cstdio>
+  #include <string>
+
+  int wrapper(const char *fmt, ...)
+  {
+  	va_list args;
+  	char buf[512];
+  	va_start(args, fmt);
+  	vsnprintf(buf, sizeof(buf), fmt, args);
+  	va_end(args);
+  	return sqlite3_exec(db, buf, 0, 0, 0);
+  }
+
+  void handler(int fd)
+  {
+  	char idx[128];
+  	recv(fd, idx, sizeof(idx), 0);
+  	wrapper("SELECT Image FROM Floorplans WHERE ID=%s", idx);
+  }
+  ```
