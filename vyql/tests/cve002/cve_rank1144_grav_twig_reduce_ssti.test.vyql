@@ -1,0 +1,113 @@
+# Rank 1144 / CVE-2023-34251: Grav registered custom, guarded overrides for
+# Twig's `filter` and `map` callback filters after an earlier SSTI CVE, but
+# left `reduce` on Twig's stock implementation with no equivalent guard, so a
+# template author (or anyone who could inject template content) could still
+# reach arbitrary PHP function execution through `{{ array|reduce('system') }}`
+# (CWE-94).
+#
+# GravExtension's getFilters/getFunctions registered `filterFunc` and
+# `mapFunc` -- each checking
+# `!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)`
+# before evaluating the caller-supplied arrow value -- for `filter` and
+# `map`, but never registered anything for `reduce`, so Twig's own
+# `array_reduce` filter, with no dangerous-function check at all, handled it.
+#
+# Pool commit 244758d43830 is the real fix (COMMIT_OK, "also handle SSTI in
+# reduce twig filter + function"). It adds `reduceFunc`, the same guard
+# reused verbatim, and registers it for both the `reduce` filter and the
+# `reduce` function. No pool correction.
+#
+# ATTENTION, vocabulary gap, and the same shape already recorded across this
+# batch for "a guard covers some structurally parallel paths and not
+# others" (ranks 1039, 1040, 1047, 1109, 1125): filter, map and reduce are
+# three siblings in Twig's array-callback family, and the dangerous-function
+# check was only ever ported to two of the three when the earlier CVE was
+# fixed. Scanning either revision reports the same one unrelated WeakHash
+# finding. No concept in the ontology names a Twig callback-filter dangerous-
+# function check at all, so there is nothing to extend a sibling-path
+# gap onto here the way the Go/Rust cases in this batch could reuse an
+# existing binding family; this is a fresh vocabulary gap, not a coverage
+# gap in an existing one.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1144: reduce has no dangerous-function guard, unlike its filter and map siblings"
+  lang php
+  file GravExtension.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+  class GravExtension extends AbstractExtension
+  {
+      public function getFilters()
+      {
+          return [
+              new TwigFilter('filter', [$this, 'filterFunc'], ['needs_environment' => true]),
+              new TwigFilter('map', [$this, 'mapFunc'], ['needs_environment' => true]),
+          ];
+      }
+
+      function filterFunc(Environment $env, $array, $arrow)
+      {
+          if (!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)) {
+              throw new RuntimeError('Twig |filter("' . $arrow . '") is not allowed.');
+          }
+          return twig_array_filter($env, $array, $arrow);
+      }
+
+      function mapFunc(Environment $env, $array, $arrow)
+      {
+          if (!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)) {
+              throw new RuntimeError('Twig |map("' . $arrow . '") is not allowed.');
+          }
+          return twig_array_map($env, $array, $arrow);
+      }
+  }
+  ```
+
+test "rank1144: reduce carries the same dangerous-function guard as its siblings"
+  lang php
+  file GravExtension.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+  class GravExtension extends AbstractExtension
+  {
+      public function getFilters()
+      {
+          return [
+              new TwigFilter('filter', [$this, 'filterFunc'], ['needs_environment' => true]),
+              new TwigFilter('map', [$this, 'mapFunc'], ['needs_environment' => true]),
+              new TwigFilter('reduce', [$this, 'reduceFunc'], ['needs_environment' => true]),
+          ];
+      }
+
+      function filterFunc(Environment $env, $array, $arrow)
+      {
+          if (!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)) {
+              throw new RuntimeError('Twig |filter("' . $arrow . '") is not allowed.');
+          }
+          return twig_array_filter($env, $array, $arrow);
+      }
+
+      function mapFunc(Environment $env, $array, $arrow)
+      {
+          if (!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)) {
+              throw new RuntimeError('Twig |map("' . $arrow . '") is not allowed.');
+          }
+          return twig_array_map($env, $array, $arrow);
+      }
+
+      function reduceFunc(Environment $env, $array, $arrow)
+      {
+          if (!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)) {
+              throw new RuntimeError('Twig |reduce("' . $arrow . '") is not allowed.');
+          }
+          return twig_array_map($env, $array, $arrow);
+      }
+  }
+  ```
