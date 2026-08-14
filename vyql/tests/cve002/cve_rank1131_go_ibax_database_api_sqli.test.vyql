@@ -1,0 +1,68 @@
+# Rank 1131 / CVE-2022-3798: go-ibax exposed a set of "open database info"
+# API handlers that built raw SQL with fmt.Sprintf from unvalidated request
+# parameters, table names, sort orders, and WHERE clauses, and ran them with
+# GORM's Raw() with no parameterization at all (CWE-89).
+#
+# getOpenTablesInfoHandler built
+# `fmt.Sprintf("... tablename like %s order by %s offset %d limit %d", ...,
+# form.Order, ...)` from schema-bound request fields and passed it straight
+# to `q.Raw(query).Rows()`; GetRowsInfo (called from getOpenRowsInfoHandler)
+# did the same with `tableName`, `execOrder` and the caller-supplied `where`
+# clause interpolated directly into `select * from "%s" ... %s ...`.
+#
+# Pool commit b0183d8e5508 is the real fix (COMMIT_OK, GHSA-mgqh-3qm7-gx82).
+# Rather than parameterizing the queries, it deletes packages/api/database.go
+# outright, all 201 lines, along with the six lines in packages/api/route.go
+# that registered its handlers, removing the vulnerable endpoints from the
+# API surface entirely.
+#
+# CAUGHT. Scanning the real vulnerable file reports three VYQL-INJ-001
+# findings, HttpInput reaching SqlExecution through fmt.Sprintf with no
+# SqlParameterization control on any of the three handlers; the fixed
+# revision has no database.go to scan at all, since the file and its route
+# registrations are gone.
+#
+# verify_current_expected: current-behavior
+
+test "rank1131: table name and order are interpolated into a raw SQL query"
+  lang go
+  file database.go
+  expect VYQL-INJ-001
+  code
+  ```
+  package api
+
+  import (
+      "fmt"
+      "net/http"
+
+      "github.com/IBAX-io/go-ibax/packages/storage/sqldb"
+  )
+
+  type tableInfoForm struct {
+      Order      string `schema:"order"`
+      Limit      int    `json:"limit"`
+      Page       int    `json:"page"`
+      Table_name string `json:"table_name,omitempty"`
+  }
+
+  func getOpenTablesInfoHandler(w http.ResponseWriter, r *http.Request) {
+      form := &tableInfoForm{}
+      if err := parseForm(r, form); err != nil {
+          errorResponse(w, err, http.StatusBadRequest)
+          return
+      }
+      if form.Order == "" {
+          form.Order = "tablename asc"
+      }
+      q := sqldb.GetDB(nil)
+      query := fmt.Sprintf("SELECT tablename from pg_tables where schemaname ='public' and tablename like %s order by %s offset %d limit %d", "'%"+form.Table_name+"%'", form.Order, (form.Page-1)*form.Limit, form.Limit)
+      rows, err := q.Raw(query).Rows()
+      if err != nil {
+          errorResponse(w, err, http.StatusBadRequest)
+          return
+      }
+      result, _ := sqldb.GetResult(rows)
+      jsonResponse(w, result)
+  }
+  ```
