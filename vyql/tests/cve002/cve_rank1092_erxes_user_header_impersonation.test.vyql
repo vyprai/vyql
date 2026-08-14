@@ -1,0 +1,96 @@
+# Rank 1092 / CVE-2024-57190: erxes's gateway forwarded a client-supplied User
+# HTTP header straight to its internal GraphQL services, which trusted it as
+# the caller's identity, so a request carrying its own User header impersonated
+# any user with no authentication at all (CWE-284, CWE-287).
+# packages/gateway/src/middlewares/userMiddleware.ts has
+#
+#   const generateBase64 = (req) => {
+#     if (req.user) {
+#       const userJson = JSON.stringify(req.user);
+#       const userJsonBase64 = Buffer.from(userJson, 'utf8').toString('base64');
+#       req.headers.user = userJsonBase64;
+#     }
+#   };
+#
+# called after the gateway's own token check sets req.user for an authenticated
+# request. The base64-encoded header this produces is what internal services
+# decode into IContext.user. The bug is what this function does not do: it
+# only overwrites req.headers.user when req.user is truthy, so on an
+# unauthenticated request the gateway never sets req.user, generateBase64
+# leaves the header alone, and whatever value the client sent for User passes
+# through untouched to services that trust it as pre-verified identity. Pool
+# commit 4ed2ca797241 is the real fix; it adds delete req.headers['user'] both
+# as the gateway's first middleware, unconditionally, and again inside
+# userMiddleware itself, so no client-supplied value can ever reach the
+# internal services, and separately hardens currentUser() to refuse a user
+# object whose _id is not a string.
+#
+# ATTENTION, and this is the same vocabulary gap rank 1091 recorded: a value
+# the caller supplies about their own identity is trusted as authentication
+# with nothing that verifies it. There the header carried a bearer token
+# checked for presence only; here it carries a base64-encoded identity object
+# consumed directly, and the flaw is not that a check was skipped on the value
+# but that the sanitizing step (stripping the header before trusting the
+# internal path) never runs on the unauthenticated branch. Both are instances
+# of the same class -- a self-asserted identity or credential header accepted
+# without either validating it or unconditionally clearing it first -- for
+# which no concept exists yet.
+#
+# Scanning userMiddleware.ts reports 0 findings; vyql match labels no source or
+# sink around req.headers.user.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1092: the identity header is only overwritten, never cleared"
+  lang javascript
+  file packages/gateway/src/middlewares/userMiddleware.ts
+  reject VYQL-AUTH-108
+  code
+  ```
+  const generateBase64 = (req) => {
+    if (req.user) {
+      const userJson = JSON.stringify(req.user);
+      const userJsonBase64 = Buffer.from(userJson, 'utf8').toString('base64');
+      req.headers.user = userJsonBase64;
+    }
+  };
+
+  export default async function userMiddleware(req, _res, next) {
+    const erxesCoreToken = req.headers['erxes-core-token'];
+
+    if (erxesCoreToken) {
+      req.user = { _id: 'userId', customPermissions: [] };
+    }
+
+    generateBase64(req);
+    next();
+  }
+  ```
+
+test "rank1092: the fix clears the header before any authentication logic runs"
+  lang javascript
+  file packages/gateway/src/middlewares/userMiddleware.ts
+  reject VYQL-AUTH-108
+  code
+  ```
+  const generateBase64 = (req) => {
+    if (req.user) {
+      const userJson = JSON.stringify(req.user);
+      const userJsonBase64 = Buffer.from(userJson, 'utf8').toString('base64');
+      req.headers.user = userJsonBase64;
+    }
+  };
+
+  export default async function userMiddleware(req, _res, next) {
+    delete req.headers['user'];
+
+    const erxesCoreToken = req.headers['erxes-core-token'];
+
+    if (erxesCoreToken) {
+      req.user = { _id: 'userId', customPermissions: [] };
+    }
+
+    generateBase64(req);
+    next();
+  }
+  ```
