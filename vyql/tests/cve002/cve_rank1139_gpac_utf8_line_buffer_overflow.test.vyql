@@ -1,0 +1,81 @@
+# Rank 1139 / CVE-2024-0321: GPAC's UTF-8 line converter checked the
+# converted length against its own internal conversion buffer's size, but
+# never against the caller-supplied destination buffer's size before
+# copying, so a converted line longer than the caller's buffer overflowed it
+# (CWE-121, CWE-787).
+#
+# gf_text_get_utf8_line in src/filters/load_text.c converts a line read from
+# a subtitle file to UTF-8 into the fixed-size local `szLineConv`, computing
+# `j` as the converted length and clamping it to
+# `GF_ARRAY_LENGTH(szLineConv) - 1` if it overflowed that array. It then
+# called `strcpy(szLine, szLineConv)`, where `szLine` is the caller's buffer
+# sized by the separate `lineSize` parameter; nothing compared `j` against
+# `lineSize` before the copy, so a line converting to something longer than
+# the caller's buffer, but still within `szLineConv`'s own size, overflowed
+# `szLine`.
+#
+# Pool commit d0ced41651b2 is the real fix (COMMIT_OK, "add dest buffer len
+# check"). It adds `if (j >= lineSize) { j = lineSize - 1; }` immediately
+# before the copy, clamping against the destination buffer's own size in
+# addition to the source conversion buffer's. No pool correction.
+#
+# ATTENTION. code.UnboundedCopySmell (VYQL-MEM-002) already fires on the
+# `strcpy(szLine, szLineConv)` call at both revisions identically, since the
+# rule has no `unless` clause at all: it is an intentional, unconditional
+# low-confidence smell on any unbounded-looking copy, not a discriminator
+# between guarded and unguarded forms. The fix adds a clamp against `j`
+# derived from a variable, `lineSize`, distinct from the array-length bound
+# already checked a few lines earlier against `GF_ARRAY_LENGTH(szLineConv)`;
+# recognizing that the copy is now safe would mean relating the destination
+# buffer's own size parameter to the length variable at the copy site across
+# two separate checks against two different bounds, the same "compare two
+# different length-carrying variables" limitation already on record for the
+# C index-guard family (ranks 1026, 1032, 1038, 1096, 1102), here applied to
+# a raw string copy rather than an indexed array access.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-precision-limit, both revisions fire identically
+
+test "rank1139: the converted line is copied with only the source buffer bound checked"
+  lang c
+  file load_text.c
+  expect VYQL-MEM-002
+  code
+  ```
+  char *gf_text_get_utf8_line(char *szLine, u32 lineSize, FILE *txt_in, s32 unicode_type) {
+      char szLineConv[1024];
+      u32 j;
+
+      j = convert_to_utf8(szLine, szLineConv, sizeof(szLineConv));
+      if (j >= GF_ARRAY_LENGTH(szLineConv)) {
+          j = GF_ARRAY_LENGTH(szLineConv) - 1;
+      }
+      szLineConv[j] = 0;
+      strcpy(szLine, szLineConv);
+      return szLine;
+  }
+  ```
+
+test "rank1139: the destination buffer's own size is also checked before the copy"
+  lang c
+  file load_text.c
+  expect VYQL-MEM-002
+  code
+  ```
+  char *gf_text_get_utf8_line(char *szLine, u32 lineSize, FILE *txt_in, s32 unicode_type) {
+      char szLineConv[1024];
+      u32 j;
+
+      j = convert_to_utf8(szLine, szLineConv, sizeof(szLineConv));
+      if (j >= GF_ARRAY_LENGTH(szLineConv)) {
+          j = GF_ARRAY_LENGTH(szLineConv) - 1;
+      }
+      if (j >= lineSize) {
+          j = lineSize - 1;
+      }
+      szLineConv[j] = 0;
+      strcpy(szLine, szLineConv);
+      return szLine;
+  }
+  ```
