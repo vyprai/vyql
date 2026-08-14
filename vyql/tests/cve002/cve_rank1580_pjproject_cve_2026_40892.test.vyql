@@ -1,0 +1,26 @@
+# Rank 1580 / CVE-2026-40892: Security review for CVE-2026-40892 in pjsip/pjproject.
+# Fix commit c82123ea6f in pjsip/pjproject.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1580: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1580: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

@@ -1,0 +1,27 @@
+# Rank 1548 / CVE-2022-46742: Security review for CVE-2022-46742 in PaddlePaddle/Paddle.
+# Fix commit 26c419ca38 in PaddlePaddle/Paddle.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1548: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1548: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

@@ -1,0 +1,26 @@
+# Rank 1525 / CVE-2026-34717: Security review for CVE-2026-34717 in opf/openproject.
+# Fix commit d0aa47d345 in opf/openproject.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1525: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1525: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

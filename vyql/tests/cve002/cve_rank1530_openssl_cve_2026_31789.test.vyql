@@ -1,0 +1,26 @@
+# Rank 1530 / CVE-2026-31789: Security review for CVE-2026-31789 in openssl/openssl.
+# Fix commit a91e537d16 in openssl/openssl.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1530: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1530: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

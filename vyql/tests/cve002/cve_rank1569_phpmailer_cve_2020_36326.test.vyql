@@ -1,0 +1,28 @@
+# Rank 1569 / CVE-2020-36326: Security review for CVE-2020-36326 in PHPMailer/PHPMailer.
+# Fix commit e2e07a355e in PHPMailer/PHPMailer.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1569: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1569: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

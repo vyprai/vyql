@@ -1,0 +1,32 @@
+# Rank 1501 / CVE-2026-33757: Security review for CVE-2026-33757 in openbao/openbao.
+# Fix commit e321039519 in openbao/openbao.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1501: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1501: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

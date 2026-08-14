@@ -1,0 +1,28 @@
+# Rank 1588 / CVE-2024-53866: Security review for CVE-2024-53866 in pnpm/pnpm.
+# Fix commit 11afcddea4 in pnpm/pnpm.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1588: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1588: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

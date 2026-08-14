@@ -1,0 +1,28 @@
+# Rank 1550 / CVE-2020-35910: Security review for CVE-2020-35910 in Amanieu/parking_lot.
+# Fix commit 7de94f95f5 in Amanieu/parking_lot.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1550: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1550: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

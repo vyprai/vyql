@@ -1,0 +1,32 @@
+# Rank 1589 / CVE-2025-6032: Security review for CVE-2025-6032 in containers/podman.
+# Fix commit 726b506acc in containers/podman.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1589: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1589: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

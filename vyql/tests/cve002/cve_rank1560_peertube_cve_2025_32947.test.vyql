@@ -1,0 +1,28 @@
+# Rank 1560 / CVE-2025-32947: Security review for CVE-2025-32947 in chocobozzz/peertube.
+# Fix commit 76226d8568 in chocobozzz/peertube.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1560: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1560: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

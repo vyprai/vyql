@@ -1,0 +1,26 @@
+# Rank 1565 / CVE-2024-32970: Security review for CVE-2024-32970 in phlex-ruby/phlex.
+# Fix commit da8f94342a in phlex-ruby/phlex.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1565: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1565: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

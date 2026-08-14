@@ -1,0 +1,30 @@
+# Rank 1513 / CVE-2024-25421: Security review for CVE-2024-25421 in igniterealtime/openfire.
+# Fix commit d66bddd29d in igniterealtime/openfire.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1513: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1513: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

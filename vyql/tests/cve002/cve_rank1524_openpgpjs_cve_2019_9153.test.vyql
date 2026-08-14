@@ -1,0 +1,28 @@
+# Rank 1524 / CVE-2019-9153: Security review for CVE-2019-9153 in openpgpjs/openpgpjs.
+# Fix commit b1b19946d8 in openpgpjs/openpgpjs.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1524: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1524: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

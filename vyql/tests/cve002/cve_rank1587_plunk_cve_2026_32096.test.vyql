@@ -1,0 +1,28 @@
+# Rank 1587 / CVE-2026-32096: Security review for CVE-2026-32096 in useplunk/plunk.
+# Fix commit b8f1ad9ab5 in useplunk/plunk.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1587: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1587: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

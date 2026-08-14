@@ -1,0 +1,28 @@
+# Rank 1585 / CVE-2023-22731: Security review for CVE-2023-22731 in shopware/platform.
+# Fix commit 89d1ea1546 in shopware/platform.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1585: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1585: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

@@ -1,0 +1,28 @@
+# Rank 1549 / CVE-2025-49132: Security review for CVE-2025-49132 in pterodactyl/panel.
+# Fix commit 24c82b0e33 in pterodactyl/panel.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1549: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1549: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

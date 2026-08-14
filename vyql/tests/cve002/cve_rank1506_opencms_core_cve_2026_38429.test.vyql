@@ -1,0 +1,30 @@
+# Rank 1506 / CVE-2026-38429: Security review for CVE-2026-38429 in alkacon/opencms-core.
+# Fix commit e3e41e5a96 in alkacon/opencms-core.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1506: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1506: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

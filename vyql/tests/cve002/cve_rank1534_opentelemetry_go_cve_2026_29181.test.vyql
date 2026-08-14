@@ -1,0 +1,32 @@
+# Rank 1534 / CVE-2026-29181: Security review for CVE-2026-29181 in open-telemetry/opentelemetry-go.
+# Fix commit aa1894e09e in open-telemetry/opentelemetry-go.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1534: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1534: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

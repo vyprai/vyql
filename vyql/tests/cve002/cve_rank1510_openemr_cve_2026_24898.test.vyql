@@ -1,0 +1,28 @@
+# Rank 1510 / CVE-2026-24898: Security review for CVE-2026-24898 in openemr/openemr.
+# Fix commit 8e4de59ab5 in openemr/openemr.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1510: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1510: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

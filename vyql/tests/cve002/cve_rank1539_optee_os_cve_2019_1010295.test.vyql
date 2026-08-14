@@ -1,0 +1,26 @@
+# Rank 1539 / CVE-2019-1010295: Security review for CVE-2019-1010295 in op-tee/optee_os.
+# Fix commit d5c5b0b77b in op-tee/optee_os.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1539: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1539: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

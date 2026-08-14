@@ -1,0 +1,29 @@
+# Rank 1507 / CVE-2023-37261: Security review for CVE-2023-37261 in mightypirates/opencomputers.
+# Fix commit d13c015357 in mightypirates/opencomputers.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1507: vulnerable code pattern before fix"
+  lang scala
+  file Main.scala
+  reject VYQL-PATH-001
+  code
+  ```
+  object App {
+  def handleRequest(input: String): String = {
+    input
+  }
+}
+  ```
+
+test "rank1507: validated or patched form"
+  lang scala
+  file Main.scala
+  reject VYQL-PATH-001
+  code
+  ```
+  object App {
+  def handleRequest(input: String): String = {
+    if (input == null) "" else input
+  }
+}
+  ```

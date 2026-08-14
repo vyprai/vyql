@@ -1,0 +1,28 @@
+# Rank 1595 / CVE-2023-44270: Security review for CVE-2023-44270 in postcss/postcss.
+# Fix commit 58cc860b4c in postcss/postcss.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1595: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1595: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

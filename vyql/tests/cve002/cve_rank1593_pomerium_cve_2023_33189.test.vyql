@@ -1,0 +1,32 @@
+# Rank 1593 / CVE-2023-33189: Security review for CVE-2023-33189 in pomerium/pomerium.
+# Fix commit d315e68335 in pomerium/pomerium.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1593: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1593: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

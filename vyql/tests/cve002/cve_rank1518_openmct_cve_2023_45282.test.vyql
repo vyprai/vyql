@@ -1,0 +1,28 @@
+# Rank 1518 / CVE-2023-45282: Security review for CVE-2023-45282 in nasa/openmct.
+# Fix commit 2243381d52 in nasa/openmct.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1518: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1518: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

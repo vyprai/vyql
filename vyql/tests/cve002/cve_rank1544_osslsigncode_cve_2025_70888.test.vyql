@@ -1,0 +1,27 @@
+# Rank 1544 / CVE-2025-70888: Security review for CVE-2025-70888 in mtrojnar/osslsigncode.
+# Fix commit d787541107 in mtrojnar/osslsigncode.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1544: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1544: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

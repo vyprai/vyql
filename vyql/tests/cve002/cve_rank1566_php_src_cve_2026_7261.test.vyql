@@ -1,0 +1,26 @@
+# Rank 1566 / CVE-2026-7261: Security review for CVE-2026-7261 in php/php-src.
+# Fix commit db2a7f9348 in php/php-src.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1566: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1566: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

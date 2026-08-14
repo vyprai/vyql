@@ -1,0 +1,32 @@
+# Rank 1594 / CVE-2026-44881: Security review for CVE-2026-44881 in portainer/portainer.
+# Fix commit aae5e533c6 in portainer/portainer.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1594: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1594: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

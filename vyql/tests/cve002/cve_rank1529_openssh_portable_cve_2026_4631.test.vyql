@@ -1,0 +1,26 @@
+# Rank 1529 / CVE-2026-4631: Security review for CVE-2026-4631 in openssh/openssh-portable.
+# Fix commit 7ef3787 in openssh/openssh-portable.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1529: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1529: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

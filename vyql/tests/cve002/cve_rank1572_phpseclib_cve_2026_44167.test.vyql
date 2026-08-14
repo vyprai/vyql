@@ -1,0 +1,28 @@
+# Rank 1572 / CVE-2026-44167: Security review for CVE-2026-44167 in phpseclib/phpseclib.
+# Fix commit d53d2021bc in phpseclib/phpseclib.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1572: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1572: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

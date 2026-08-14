@@ -1,0 +1,28 @@
+# Rank 1592 / CVE-2026-25221: Security review for CVE-2026-25221 in polarnl/polarlearn.
+# Fix commit 44669bbb5b in polarnl/polarlearn.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1592: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1592: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

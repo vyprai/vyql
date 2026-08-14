@@ -1,0 +1,28 @@
+# Rank 1536 / CVE-2026-46669: Security review for CVE-2026-46669 in openvm-org/openvm.
+# Fix commit a720e2c7ba in openvm-org/openvm.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1536: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1536: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

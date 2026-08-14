@@ -1,0 +1,28 @@
+# Rank 1570 / CVE-2019-19617: Security review for CVE-2019-19617 in phpmyadmin/phpmyadmin.
+# Fix commit 1119de642b in phpmyadmin/phpmyadmin.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1570: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1570: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

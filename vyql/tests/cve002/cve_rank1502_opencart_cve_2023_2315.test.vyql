@@ -1,0 +1,28 @@
+# Rank 1502 / CVE-2023-2315: Security review for CVE-2023-2315 in opencart/opencart.
+# Fix commit 0a8dd91e38 in opencart/opencart.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1502: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1502: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

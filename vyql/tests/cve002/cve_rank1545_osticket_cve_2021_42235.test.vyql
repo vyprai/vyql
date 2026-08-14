@@ -1,0 +1,28 @@
+# Rank 1545 / CVE-2021-42235: Security review for CVE-2021-42235 in osticket/osticket.
+# Fix commit e28291022e in osticket/osticket.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1545: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1545: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

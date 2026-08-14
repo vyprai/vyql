@@ -1,0 +1,30 @@
+# Rank 1503 / CVE-2021-43821: Security review for CVE-2021-43821 in opencast/opencast.
+# Fix commit 65c46b9d3e in opencast/opencast.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1503: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1503: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

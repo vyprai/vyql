@@ -1,0 +1,32 @@
+# Rank 1512 / CVE-2026-33729: Security review for CVE-2026-33729 in openfga/openfga.
+# Fix commit 049b50ccd2 in openfga/openfga.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1512: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1512: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

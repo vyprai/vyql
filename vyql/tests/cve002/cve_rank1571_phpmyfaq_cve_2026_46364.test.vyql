@@ -1,0 +1,28 @@
+# Rank 1571 / CVE-2026-46364: Security review for CVE-2026-46364 in thorsten/phpmyfaq.
+# Fix commit 05f83bf4e5 in thorsten/phpmyfaq.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1571: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1571: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

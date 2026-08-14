@@ -1,0 +1,26 @@
+# Rank 1511 / CVE-2026-42217: Security review for CVE-2026-42217 in academysoftwarefoundation/openexr.
+# Fix commit 21eaa33bcb in academysoftwarefoundation/openexr.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1511: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1511: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

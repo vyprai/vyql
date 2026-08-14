@@ -1,0 +1,28 @@
+# Rank 1522 / CVE-2026-39361: Security review for CVE-2026-39361 in openobserve/openobserve.
+# Fix commit d1a5d8f65b in openobserve/openobserve.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1522: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1522: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

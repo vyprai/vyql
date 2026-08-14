@@ -1,0 +1,28 @@
+# Rank 1579 / CVE-2026-27634: Security review for CVE-2026-27634 in piwigo/piwigo.
+# Fix commit 0d5ed1f777 in piwigo/piwigo.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1579: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1579: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

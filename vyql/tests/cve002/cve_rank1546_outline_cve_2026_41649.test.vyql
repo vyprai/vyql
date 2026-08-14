@@ -1,0 +1,28 @@
+# Rank 1546 / CVE-2026-41649: Security review for CVE-2026-41649 in outline/outline.
+# Fix commit 1b91a295e1 in outline/outline.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1546: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1546: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

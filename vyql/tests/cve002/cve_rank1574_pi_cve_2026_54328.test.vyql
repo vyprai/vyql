@@ -1,0 +1,28 @@
+# Rank 1574 / CVE-2026-54328: Security review for CVE-2026-54328 in earendil-works/pi.
+# Fix commit ea3465a8e3 in earendil-works/pi.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1574: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1574: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

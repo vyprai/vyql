@@ -1,0 +1,28 @@
+# Rank 1543 / CVE-2025-67221: Security review for CVE-2025-67221 in ijl/orjson.
+# Fix commit 62bb185b70 in ijl/orjson.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1543: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1543: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

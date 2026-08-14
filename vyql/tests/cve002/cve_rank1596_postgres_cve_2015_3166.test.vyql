@@ -1,0 +1,26 @@
+# Rank 1596 / CVE-2015-3166: Security review for CVE-2015-3166 in postgres/postgres.
+# Fix commit 0c071936e9 in postgres/postgres.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1596: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1596: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

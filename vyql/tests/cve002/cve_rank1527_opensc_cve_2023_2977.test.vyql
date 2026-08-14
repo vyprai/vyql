@@ -1,0 +1,26 @@
+# Rank 1527 / CVE-2023-2977: Security review for CVE-2023-2977 in opensc/opensc.
+# Fix commit 81944d1529 in opensc/opensc.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1527: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1527: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

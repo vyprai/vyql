@@ -1,0 +1,32 @@
+# Rank 1556 / CVE-2026-42083: Security review for CVE-2026-42083 in free5gc/pcf.
+# Fix commit 8c4d457cdf in free5gc/pcf.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1556: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1556: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

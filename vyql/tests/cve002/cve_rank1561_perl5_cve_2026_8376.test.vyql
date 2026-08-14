@@ -1,0 +1,26 @@
+# Rank 1561 / CVE-2026-8376: Security review for CVE-2026-8376 in perl/perl5.
+# Fix commit 5e7f119eb2 in perl/perl5.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1561: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1561: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

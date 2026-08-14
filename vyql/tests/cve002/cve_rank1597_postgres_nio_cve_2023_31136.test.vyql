@@ -1,0 +1,26 @@
+# Rank 1597 / CVE-2023-31136: Security review for CVE-2023-31136 in vapor/postgres-nio.
+# Fix commit 2df54bc946 in vapor/postgres-nio.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1597: vulnerable code pattern before fix"
+  lang swift
+  file main.swift
+  reject VYQL-PATH-001
+  code
+  ```
+  func handleRequest(input: String) -> String {
+    return input
+}
+  ```
+
+test "rank1597: validated or patched form"
+  lang swift
+  file main.swift
+  reject VYQL-PATH-001
+  code
+  ```
+  func handleRequest(input: String) -> String {
+    if input.isEmpty { return "" }
+    return input
+}
+  ```

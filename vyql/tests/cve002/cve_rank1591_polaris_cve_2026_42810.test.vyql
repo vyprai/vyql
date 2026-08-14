@@ -1,0 +1,30 @@
+# Rank 1591 / CVE-2026-42810: Security review for CVE-2026-42810 in apache/polaris.
+# Fix commit da54eb15c2 in apache/polaris.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1591: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1591: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

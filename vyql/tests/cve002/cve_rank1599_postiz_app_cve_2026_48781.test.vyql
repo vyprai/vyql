@@ -1,0 +1,28 @@
+# Rank 1599 / CVE-2026-48781: Security review for CVE-2026-48781 in gitroomhq/postiz-app.
+# Fix commit 23696d2973 in gitroomhq/postiz-app.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1599: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1599: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

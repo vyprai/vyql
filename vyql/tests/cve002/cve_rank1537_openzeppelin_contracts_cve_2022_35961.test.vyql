@@ -1,0 +1,28 @@
+# Rank 1537 / CVE-2022-35961: Security review for CVE-2022-35961 in openzeppelin/openzeppelin-contracts.
+# Fix commit d693d89d99 in openzeppelin/openzeppelin-contracts.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1537: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1537: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

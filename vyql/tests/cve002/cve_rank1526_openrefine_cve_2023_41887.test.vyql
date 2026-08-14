@@ -1,0 +1,30 @@
+# Rank 1526 / CVE-2023-41887: Security review for CVE-2023-41887 in OpenRefine/OpenRefine.
+# Fix commit 693fde606d in OpenRefine/OpenRefine.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1526: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1526: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

@@ -1,0 +1,26 @@
+# Rank 1553 / CVE-2018-12026: Security review for CVE-2018-12026 in phusion/passenger.
+# Fix commit fd3717a3cd in phusion/passenger.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1553: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1553: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

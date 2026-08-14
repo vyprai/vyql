@@ -1,0 +1,26 @@
+# Rank 1590 / CVE-2025-9394: Security review for CVE-2025-9394 in podofo/podofo.
+# Fix commit 22d16cb142 in podofo/podofo.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1590: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1590: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

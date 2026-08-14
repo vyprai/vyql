@@ -1,0 +1,28 @@
+# Rank 1573 / CVE-2024-45048: Security review for CVE-2024-45048 in phpoffice/phpspreadsheet.
+# Fix commit bea2d4b30f in phpoffice/phpspreadsheet.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1573: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1573: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

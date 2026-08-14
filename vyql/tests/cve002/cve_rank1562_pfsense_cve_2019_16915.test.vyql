@@ -1,0 +1,28 @@
+# Rank 1562 / CVE-2019-16915: Security review for CVE-2019-16915 in pfsense/pfsense.
+# Fix commit 2c544ac61c in pfsense/pfsense.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1562: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1562: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

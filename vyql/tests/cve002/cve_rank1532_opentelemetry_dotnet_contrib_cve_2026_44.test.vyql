@@ -1,0 +1,30 @@
+# Rank 1532 / CVE-2026-44213: Security review for CVE-2026-44213 in open-telemetry/opentelemetry-dotnet-contrib.
+# Fix commit 3b5b6e1405 in open-telemetry/opentelemetry-dotnet-contrib.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1532: vulnerable code pattern before fix"
+  lang csharp
+  file Main.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  class Handler {
+    public static string HandleRequest(string input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1532: validated or patched form"
+  lang csharp
+  file Main.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  class Handler {
+    public static string HandleRequest(string input) {
+        if (input == null) return string.Empty;
+        return input;
+    }
+}
+  ```

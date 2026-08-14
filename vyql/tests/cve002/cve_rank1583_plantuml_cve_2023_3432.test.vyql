@@ -1,0 +1,30 @@
+# Rank 1583 / CVE-2023-3432: Security review for CVE-2023-3432 in plantuml/plantuml.
+# Fix commit b32500bb61 in plantuml/plantuml.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1583: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1583: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

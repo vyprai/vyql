@@ -1,0 +1,26 @@
+# Rank 1515 / CVE-2021-41035: Security review for CVE-2021-41035 in eclipse-openj9/openj9.
+# Fix commit 9f0b7b785a in eclipse-openj9/openj9.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1515: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1515: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

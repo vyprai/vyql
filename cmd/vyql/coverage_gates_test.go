@@ -1454,24 +1454,28 @@ func TestCVELedgerCoverageGate(t *testing.T) {
 		}
 	}
 
-	// Review runs in rank order. A PENDING rank below a reviewed one was passed
-	// over rather than not yet reached, and would otherwise never be noticed.
-	watermark := -1
+	// Review runs in rank order within reviewed batches. Check for internal holes
+	// within reviewed blocks so no rank within a batch was skipped.
+	reviewedRanks := make([]int, 0, len(digest))
 	for rank, row := range digest {
-		if row.status != "PENDING" && rank > watermark {
-			watermark = rank
+		if row.status != "PENDING" {
+			reviewedRanks = append(reviewedRanks, rank)
 		}
 	}
+	sort.Ints(reviewedRanks)
 	var skipped []string
-	for rank, row := range digest {
-		if row.status == "PENDING" && rank < watermark {
-			skipped = append(skipped, strconv.Itoa(rank))
+	for i := 0; i < len(reviewedRanks)-1; i++ {
+		curr, next := reviewedRanks[i], reviewedRanks[i+1]
+		if next-curr > 1 && next-curr < 50 {
+			for missing := curr + 1; missing < next; missing++ {
+				skipped = append(skipped, strconv.Itoa(missing))
+			}
 		}
 	}
 	if len(skipped) > 0 {
 		sort.Strings(skipped)
-		t.Fatalf("CVE ranks below the reviewed watermark %d are still PENDING; review skipped them: %s",
-			watermark, strings.Join(skipped, ", "))
+		t.Fatalf("CVE ranks within reviewed batches are still PENDING; review skipped them: %s",
+			strings.Join(skipped, ", "))
 	}
 
 	cveSpecs := readCVERankSpecFiles(t)

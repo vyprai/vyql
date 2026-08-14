@@ -1,0 +1,28 @@
+# Rank 1505 / CVE-2026-41329: Security review for CVE-2026-41329 in openclaw/openclaw.
+# Fix commit a30214a624 in openclaw/openclaw.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1505: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1505: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

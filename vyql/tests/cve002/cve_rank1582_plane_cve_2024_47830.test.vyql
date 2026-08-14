@@ -1,0 +1,28 @@
+# Rank 1582 / CVE-2024-47830: Security review for CVE-2024-47830 in makeplane/plane.
+# Fix commit b9f78ba42b in makeplane/plane.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1582: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1582: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

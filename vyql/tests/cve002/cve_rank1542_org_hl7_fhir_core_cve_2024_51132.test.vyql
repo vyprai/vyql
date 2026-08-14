@@ -1,0 +1,30 @@
+# Rank 1542 / CVE-2024-51132: Security review for CVE-2024-51132 in hapifhir/org.hl7.fhir.core.
+# Fix commit 7ede053a5f in hapifhir/org.hl7.fhir.core.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1542: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1542: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```
