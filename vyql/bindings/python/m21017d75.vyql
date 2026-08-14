@@ -4294,3 +4294,13 @@ binding pathAccessCheckPyIsRelativeTo902 {
     }
   }
 }
+
+binding deserializationPyTorchLoad903 {
+  query pattern callExpr where callee.path ~= "torch.load" and not (args.any.literal contains "weights_only=True")
+  emit sink code.Deserialization at args[0]
+}
+
+binding cliArgumentPyArgparse904 {
+  query pattern callExpr where callee.method == "parse_args"
+  emit source code.CliArgument at call.result
+}
