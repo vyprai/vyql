@@ -1,0 +1,77 @@
+# Rank 1026 / CVE-2017-14639: Bento4's visual sample entry parser read the
+# compressor name length out of an MP4 file into a signed type:
+#
+#   char compressor_name[33];
+#   stream.Read(compressor_name, 32);
+#   int name_length = compressor_name[0];
+#   if (name_length < 32) {
+#       compressor_name[name_length+1] = 0;
+#
+# char is signed on the usual platforms, so a length byte of 0x80 or above
+# arrives as a negative number, sails through the "< 32" check, and the write
+# lands before the start of the buffer (CWE-843 as assigned; the mechanism is a
+# signed conversion producing a negative index). The fix 03d1222ab9 declares the
+# buffer and the length as AP4_UI08, so the value is 0 to 255 and the existing
+# comparison finally means something.
+#
+# ATTENTION, engine gaps, three of them, and the class is worth the work: this
+# is CERT STR34-C, cast characters to unsigned char before converting to a
+# larger integer type, not a quirk of this parser.
+#
+#  - No feature exposes a local's declared type. The whole difference between
+#    these two revisions is char versus AP4_UI08 on a local array, and C and C++
+#    presence nodes carry only paramType, for parameters, alongside
+#    assignOpShape and callArgShape. A binding cannot see the signedness that
+#    decides the outcome.
+#  - The index guard analysis knows only upper bounds.
+#    ccIndexAccessObservations marks guard=upper_bound as soon as an upper-bound
+#    comparison exists, and this code has one, so a negative index reads as
+#    guarded. There is no lower-bound or signedness notion to fail on.
+#  - It observes only structured, field-derived indices. ccStructuredIndex
+#    filters to shapes like hdr->len, so a plain local such as name_length+1 is
+#    never observed. Both revisions below report nothing at all, which confirms
+#    the access is invisible rather than merely judged safe.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1026: signed length byte from the file indexes the buffer after only an upper-bound check"
+  lang cpp
+  file Source/C++/Core/Ap4SampleEntry.cpp
+  reject VYQL-MEM-010
+  code
+  ```
+  #include <stdio.h>
+
+  void ReadFields(Stream& stream, const char*& m_CompressorName)
+  {
+      char compressor_name[33];
+      compressor_name[32] = 0;
+      stream.Read(compressor_name, 32);
+      int name_length = compressor_name[0];
+      if (name_length < 32) {
+          compressor_name[name_length+1] = 0;
+          m_CompressorName = &compressor_name[1];
+      }
+  }
+  ```
+
+test "rank1026: fix reads the length as unsigned so the bound check holds"
+  lang cpp
+  file Source/C++/Core/Ap4SampleEntry.cpp
+  reject VYQL-MEM-010
+  code
+  ```
+  #include <stdio.h>
+
+  void ReadFields(Stream& stream, const char*& m_CompressorName)
+  {
+      unsigned char compressor_name[33];
+      compressor_name[32] = 0;
+      stream.Read(compressor_name, 32);
+      unsigned char name_length = compressor_name[0];
+      if (name_length < 32) {
+          compressor_name[name_length+1] = 0;
+          m_CompressorName = (const char*)(&compressor_name[1]);
+      }
+  }
+  ```
