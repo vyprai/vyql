@@ -1,0 +1,97 @@
+# Rank 1035 / CVE-2022-24838: Nextcloud Calendar's public appointment booking
+# took the attendee address from the request and concatenated it into the
+# iCalendar document without validating it (CWE-74):
+#
+#   $vcalendar->VEVENT->add('ATTENDEE',
+#     'mailto:' . $email,
+#     [ 'CN' => $displayName, ... ]);
+#
+# BookingController::bookSlot is a @PublicPage, so $email arrives from an
+# unauthenticated caller, passes through BookingService::book and reaches
+# BookingCalendarWriter. The fix 7b70edfb8a injects OCP\Mail\IMailer and rejects
+# the request with 422 when validateMailAddress fails.
+#
+# ATTENTION. Three layers are missing at once, and the middle one carries a
+# measured precision cost.
+#
+#  - No source. vyql match reports no sources at all on the three files, because
+#    a parameter of a Nextcloud AppFramework controller method is bound from the
+#    request by the framework and nothing says so. A general binding for that is
+#    writable from the AppFramework documentation, but it would add sources to
+#    every Nextcloud app at once and no Nextcloud corpus is available here
+#    beyond this one, so it could not be measured.
+#  - No sink. code.MailHeaderWrite is bound in PHP only for the fourth argument
+#    of mail(), and an iCalendar property is not that.
+#  - No control. IMailer::validateMailAddress, which is the whole fix, is not a
+#    known email-validation control.
+#
+# Binding the iCalendar property as a CRLF sink is the tempting middle step and
+# the measurement argues against it: the same function writes 'CN' =>
+# $displayName and DESCRIPTION => $description from equally unvalidated request
+# data, so the rule reports 3 sites in the one function the fix touched, for 1
+# true positive, and the maintainers left the other two alone. What separates
+# the address is that it becomes a mail recipient rather than a document field,
+# and the sending happens in another component entirely.
+#
+# Both revisions report the same three VYQL-RF-043 rows with identical
+# fingerprints, all for booking mapper writes and none about the address.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1035: an unvalidated booking address is concatenated into the attendee property"
+  lang php
+  file lib/Service/Appointments/BookingCalendarWriter.php
+  reject VYQL-INJ-017
+  code
+  ```
+  <?php
+  class BookingCalendarWriter {
+      public function write($config, $start, string $displayName, string $email, string $description) {
+          $vcalendar = new VCalendar([
+              'VEVENT' => [ 'SUMMARY' => $config->getName(), 'DTSTART' => $start ]
+          ]);
+          if (!empty($description)) {
+              $vcalendar->VEVENT->add('DESCRIPTION', $description);
+          }
+          $vcalendar->VEVENT->add('ATTENDEE',
+              'mailto:' . $email,
+              [
+                  'CN' => $displayName,
+                  'CUTYPE' => 'INDIVIDUAL',
+                  'RSVP' => 'TRUE'
+              ]
+          );
+          return $vcalendar->serialize();
+      }
+  }
+  ```
+
+test "rank1035: fix rejects the booking when the address does not validate"
+  lang php
+  file lib/Controller/BookingController.php
+  reject VYQL-INJ-017
+  code
+  ```
+  <?php
+  class BookingController extends Controller {
+      private $mailer;
+      private $bookingService;
+
+      public function bookSlot(int $appointmentConfigId,
+                               int $start,
+                               int $end,
+                               string $displayName,
+                               string $email,
+                               string $description,
+                               string $timeZone): JsonResponse {
+          if (!$this->mailer->validateMailAddress($email)) {
+              return JsonResponse::fail('Invalid email address', Http::STATUS_UNPROCESSABLE_ENTITY);
+          }
+          if ($start > $end) {
+              return JsonResponse::fail('Invalid time range', Http::STATUS_UNPROCESSABLE_ENTITY);
+          }
+          $booking = $this->bookingService->book($config, $start, $end, $timeZone, $displayName, $email, $description);
+          return JsonResponse::success($booking);
+      }
+  }
+  ```
