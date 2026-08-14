@@ -1,0 +1,94 @@
+# Rank 1128 / CVE-2026-26314: go-ethereum's secp256k1 IsOnCurve check
+# accepted (x, y) coordinates without first confirming they were reduced
+# modulo the field prime, so an attacker-supplied point with a coordinate
+# ≥ P could satisfy the curve equation only because Go's modular arithmetic
+# silently wraps it, letting an out-of-canonical-range point pass as a valid
+# curve point (CWE-20).
+#
+# IsOnCurve in crypto/secp256k1/curve.go computed y2 = y*y mod P and the
+# right-hand side of y2 = x3 + b mod P directly from the caller's x and y,
+# with no check that x < P and y < P first. Because every intermediate value
+# is reduced mod P anyway, a coordinate an attacker chose to be P plus some
+# offset produces the same reduced result as the canonical coordinate, so
+# the equation can still balance for a point that is not the one it claims
+# to be, an "invalid curve point" confusion that can corrupt downstream
+# scalar multiplication and signature/key-derivation logic relying on
+# IsOnCurve as a genuine membership test.
+#
+# Pool commit 895a8597cb16 is the real fix (COMMIT_OK, its own title names
+# the mechanism). It adds `if x.Cmp(P) >= 0 || y.Cmp(P) >= 0 { return false }`
+# at the top of IsOnCurve, the nocgo build's own IsOnCurve override in
+# signature_nocgo.go, and the equivalent guard in the cgo path's C helper,
+# secp256k1_fe_set_b32_limit's return value now checked instead of ignored.
+# No pool correction.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports 0 findings.
+# code.EcdhPeerPublicKeyMissingCurveValidation is the closest concept in the
+# ontology, sharing the same theme, using a point in curve arithmetic without
+# confirming it is a genuine member of the curve, but its condition assumes
+# IsOnCurve itself is trustworthy and asks only whether it was called before
+# a scalar multiplication; this bug is one layer beneath that, IsOnCurve's
+# own precondition on its input coordinates is what is missing, and neither
+# it nor code.EcdsaSignatureScalarBoundsMissing (the other CWE_347 sibling,
+# for signature r/s range checks rather than point coordinates) has a Go
+# binding. Stating the general shape, a modular-arithmetic membership test
+# accepts an input outside the field's canonical representative range because
+# every step re-reduces it anyway, needs recognizing that a value entering
+# a mod-P computation was never itself checked to be less than P, a numeric
+# range relationship distinct from the checks either existing concept states.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1128: IsOnCurve accepts coordinates without checking they're reduced mod P"
+  lang go
+  file curve.go
+  reject_review code.EcdhPeerPublicKeyMissingCurveValidation
+  code
+  ```
+  package secp256k1
+
+  import "math/big"
+
+  func (bitCurve *BitCurve) IsOnCurve(x, y *big.Int) bool {
+      y2 := new(big.Int).Mul(y, y)
+      y2.Mod(y2, bitCurve.P)
+
+      y23 := new(big.Int).Mul(x, x)
+      y23.Mul(y23, x)
+
+      y23.Add(y23, bitCurve.B)
+      y23.Mod(y23, bitCurve.P)
+
+      return y2.Cmp(y23) == 0
+  }
+  ```
+
+test "rank1128: IsOnCurve rejects coordinates at or past the field prime first"
+  lang go
+  file curve.go
+  reject_review code.EcdhPeerPublicKeyMissingCurveValidation
+  code
+  ```
+  package secp256k1
+
+  import "math/big"
+
+  func (bitCurve *BitCurve) IsOnCurve(x, y *big.Int) bool {
+      if x.Cmp(bitCurve.P) >= 0 || y.Cmp(bitCurve.P) >= 0 {
+          return false
+      }
+
+      y2 := new(big.Int).Mul(y, y)
+      y2.Mod(y2, bitCurve.P)
+
+      y23 := new(big.Int).Mul(x, x)
+      y23.Mul(y23, x)
+
+      y23.Add(y23, bitCurve.B)
+      y23.Mod(y23, bitCurve.P)
+
+      return y2.Cmp(y23) == 0
+  }
+  ```
