@@ -2582,3 +2582,8 @@ binding authenticationRequiredOp457 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "intercept" and node.context.paramType contains "ActionInvocation" and node.context.call contains "getSession" and node.context.call contains "invoke" and not (containsAny(node.context.literal, ["login", "error", "input", "none"])) and not (containsAny(node.context.identifier, ["LOGIN", "ERROR", "INPUT", "NONE"]))
   emit issue code.AuthenticationRequiredOp at node
 }
+
+binding h2oJdbcDisallowedParameterDenylistGap458 {
+  query pattern presenceNode where node.scope == "class" and node.context.className contains "SQLManager" and node.context.identifier contains "DEFAULT_JDBC_DISALLOWED_PARAMETERS" and node.context.literal contains "autoDeserialize" and node.context.literal contains "allowLoadLocalInfile" and not (containsAny(node.context.literal, ["socketFactory", "sslfactory", "statementInterceptors"]))
+  emit issue code.H2oJdbcDisallowedParameterDenylistGap at node
+}
