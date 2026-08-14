@@ -1,0 +1,126 @@
+# Rank 1091 / CVE-2022-29226: Envoy's OAuth2 filter treated the mere presence
+# of a client-supplied Authorization: Bearer header, or a token= query
+# parameter, as proof of authentication and let the request through with no
+# call to the auth server, no signature check and no introspection at all
+# (CWE-306). source/extensions/filters/http/oauth2/filter.cc had
+#
+#   access_token_ = extractAccessToken(headers);
+#   if (!access_token_.empty()) {
+#     found_bearer_token_ = true;
+#     finishFlow();
+#     return Http::FilterHeadersStatus::Continue;
+#   }
+#
+# where extractAccessToken reads the Authorization header (or the token query
+# param) straight off the incoming request, and finishFlow, when
+# found_bearer_token_ is set, does nothing but bump a success counter and call
+# continueDecoding(). Per the filter's own documentation, a request is only
+# meant to be authenticated once a signed cookie set after the token exchange
+# is present; this branch let any caller manufacture that state by sending any
+# non-empty Authorization header. The fix (781, commit 7ffda4e809) removes
+# extractAccessToken entirely along with this whole branch, and instead strips
+# the incoming Authorization header before the filter runs
+# (headers.removeInline(authorization_handle.handle())), so the only path
+# left to being considered authenticated is the cookie the filter itself set
+# after a real token exchange.
+#
+# ATTENTION. This is not a taint-reachable weakness: nothing dangerous happens
+# with the header's string content, and no sink processes it. The bug is a
+# control-flow decision, whether the request is authenticated, driven by the
+# mere presence of a value the caller supplies about themselves. Scanning the
+# vulnerable file (extracted as a standalone unit) reports 0 findings, and
+# vyql match labels no source or sink.
+#
+# The closest existing vocabulary does not fit. code.UnverifiedJwt requires a
+# JWT actually being decoded with signature verification off; here nothing is
+# decoded or verified at all, a header's presence alone is the whole check.
+# code.TokenCacheAuthorizationBypass is about returning a cached token ahead of
+# an authorization check, a different shape. code.HopByHopHeaderAuthBypass is
+# about a reverse proxy failing to strip a client's hop-by-hop header before
+# writing its own privileged one, not about trusting a self-asserted header as
+# proof of identity. No concept currently states "an auth filter treats the
+# presence of a client-supplied credential header as authentication, with no
+# call out to validate it" -- the generic shape this CVE and its class share
+# (self-asserted bearer tokens accepted at face value by a gateway or proxy
+# filter) has no vocabulary to mint a binding against yet.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1091: a bearer header alone finishes the auth flow"
+  lang cpp
+  file source/extensions/filters/http/oauth2/filter.cc
+  reject VYQL-AUTH-108
+  code
+  ```
+  #include <string>
+
+  namespace Envoy {
+  namespace Extensions {
+  namespace HttpFilters {
+  namespace Oauth2 {
+
+  std::string OAuth2Filter::extractAccessToken(const Http::RequestHeaderMap& headers) const {
+    const Http::HeaderEntry* authorization = headers.getInline(authorization_handle.handle());
+    if (authorization != nullptr) {
+      const auto value = StringUtil::trim(authorization->value().getStringView());
+      const auto& bearer_prefix = bearerPrefix();
+      if (absl::StartsWithIgnoreCase(value, bearer_prefix)) {
+        const size_t start = bearer_prefix.length();
+        return std::string(StringUtil::ltrim(value.substr(start)));
+      }
+    }
+    return EMPTY_STRING;
+  }
+
+  Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+    access_token_ = extractAccessToken(headers);
+    if (!access_token_.empty()) {
+      found_bearer_token_ = true;
+      finishFlow();
+      return Http::FilterHeadersStatus::Continue;
+    }
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  void OAuth2Filter::finishFlow() {
+    if (found_bearer_token_) {
+      config_->stats().oauth_success_.inc();
+      decoder_callbacks_->continueDecoding();
+      return;
+    }
+  }
+
+  }}}}
+  ```
+
+test "rank1091: the incoming header is stripped and the cookie flow is the only path"
+  lang cpp
+  file source/extensions/filters/http/oauth2/filter.cc
+  reject VYQL-AUTH-108
+  code
+  ```
+  #include <string>
+
+  namespace Envoy {
+  namespace Extensions {
+  namespace HttpFilters {
+  namespace Oauth2 {
+
+  Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+    headers.removeInline(authorization_handle.handle());
+
+    if (!isCallbackRequest(headers)) {
+      redirectToAuthServer(headers);
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  void OAuth2Filter::finishFlow() {
+    setBearerCookieOnResponse();
+    decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_LOGGED_IN);
+    config_->stats().oauth_success_.inc();
+  }
+
+  }}}}
+  ```
