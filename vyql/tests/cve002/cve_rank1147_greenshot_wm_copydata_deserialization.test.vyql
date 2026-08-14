@@ -1,0 +1,113 @@
+# Rank 1147 / CVE-2025-59050: Greenshot deserialized the payload of any
+# WM_COPYDATA Windows message it received with an unrestricted
+# BinaryFormatter, and WM_COPYDATA can be sent by any process on the same
+# desktop session regardless of privilege level, so a lower-privileged local
+# process could send a crafted payload and achieve remote code execution in
+# Greenshot's process through a known BinaryFormatter gadget chain (CWE-502).
+#
+# The window procedure handling WM_COPYDATA in src/Greenshot/Helpers/CopyData.cs
+# copied the message's raw bytes with `Marshal.Copy(cds.lpData, data, 0,
+# cds.cbData)`, wrapped them in a MemoryStream, and called
+# `new BinaryFormatter().Deserialize(stream)` with no restriction on what
+# type the stream could construct.
+#
+# Pool commit f5a29a2ed3b0 is the real fix (COMMIT_OK, its own message names
+# the mechanism and the advisory). It adds a `SafeSerializationBinder`, a
+# `SerializationBinder` subclass allowlisting only `CopyDataObjectData`, and
+# assigns it to `BinaryFormatter.Binder` before deserializing, so any other
+# type throws instead of constructing. No pool correction.
+#
+# ATTENTION, engine gap, and a source-side one rather than a missing sink or
+# control. `code.Deserialization` already binds C#'s `BinaryFormatter` by
+# name and correctly labels the sink at CopyData.cs:125 in both revisions
+# (`vyql match` confirms it); the reason nothing fires either way is that
+# `== source ==` is empty for this file. The data at risk arrives through a
+# Win32 window-message callback reading `Message.LParam` into a
+# `COPYDATASTRUCT` and `Marshal.Copy`-ing its buffer, not through any of the
+# request/parameter-shaped sources the corpus already recognizes, so nothing
+# marks it as attacker-controlled even though any co-resident process,
+# regardless of privilege, can send it. This is the same class of gap
+# recorded at rank 1079 for a raw socket read having no source binding in any
+# language; here the missing source is Windows inter-process messaging (a
+# WM_COPYDATA/WndProc pattern) rather than a network read, and closing it
+# generically means recognizing that shape, not this one call site.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-engine-gap, no source labelled in either revision
+
+test "rank1147: WM_COPYDATA bytes are deserialized with an unrestricted BinaryFormatter"
+  lang csharp
+  file CopyData.cs
+  reject VYQL-DESER-001
+  code
+  ```
+  using System.IO;
+  using System.Runtime.InteropServices;
+  using System.Runtime.Serialization.Formatters.Binary;
+  using System.Windows.Forms;
+
+  namespace Greenshot.Helpers
+  {
+      public class CopyDataTransport
+      {
+          protected override void WndProc(ref Message m)
+          {
+              if (m.Msg == WM_COPYDATA)
+              {
+                  var cds = (CopyDataStruct)Marshal.PtrToStructure(m.LParam, typeof(CopyDataStruct));
+                  byte[] data = new byte[cds.cbData];
+                  Marshal.Copy(cds.lpData, data, 0, cds.cbData);
+                  MemoryStream stream = new MemoryStream(data);
+                  BinaryFormatter b = new BinaryFormatter();
+                  CopyDataObjectData cdo = (CopyDataObjectData)b.Deserialize(stream);
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1147: the deserializer is bound to an allowlisting SerializationBinder"
+  lang csharp
+  file CopyData.cs
+  reject VYQL-DESER-001
+  code
+  ```
+  using System.IO;
+  using System.Runtime.InteropServices;
+  using System.Runtime.Serialization;
+  using System.Runtime.Serialization.Formatters.Binary;
+  using System.Windows.Forms;
+
+  namespace Greenshot.Helpers
+  {
+      public class CopyDataTransport
+      {
+          protected override void WndProc(ref Message m)
+          {
+              if (m.Msg == WM_COPYDATA)
+              {
+                  var cds = (CopyDataStruct)Marshal.PtrToStructure(m.LParam, typeof(CopyDataStruct));
+                  byte[] data = new byte[cds.cbData];
+                  Marshal.Copy(cds.lpData, data, 0, cds.cbData);
+                  MemoryStream stream = new MemoryStream(data);
+                  BinaryFormatter b = new BinaryFormatter();
+                  b.Binder = new SafeSerializationBinder();
+                  CopyDataObjectData cdo = (CopyDataObjectData)b.Deserialize(stream);
+              }
+          }
+      }
+
+      internal class SafeSerializationBinder : SerializationBinder
+      {
+          public override System.Type BindToType(string assemblyName, string typeName)
+          {
+              if (typeName == typeof(CopyDataObjectData).FullName)
+              {
+                  return typeof(CopyDataObjectData);
+              }
+              throw new System.Security.SecurityException("Suspicious type received via WM_COPYDATA");
+          }
+      }
+  }
+  ```
