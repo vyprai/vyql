@@ -1,0 +1,119 @@
+# Rank 1038 / CVE-2026-2245: CCExtractor's MPEG-TS table parser reads past the
+# end of the PID buffer (CWE-119). parse_PAT in src/lib_ccx/ts_tables.c computes
+# a payload pointer and its remaining length, then reads two header bytes
+# without comparing that length against the offsets it uses:
+#
+#   payload_start  = ctx->PID_buffers[0]->buffer + pointer_field + 1;
+#   payload_length = ctx->PID_buffers[0]->buffer_length - (pointer_field + 1);
+#   section_number      = payload_start[6];
+#   last_section_number = payload_start[7];
+#
+# pointer_field is the first byte of the packet, so a crafted stream makes
+# payload_length smaller than 8 and both reads land outside the buffer. The fix
+# fd7271bae2 returns 0 when payload_length < 8, and adds the matching
+# ES_info_length bound to the two descriptor loops in parse_PMT that still
+# lacked it.
+#
+# ATTENTION, engine gap, and it is the one already recorded for ranks 1026 and
+# 1032, measured here on a third codebase. ccIndexAccessObservations in
+# internal/extract/frontend/treesitter/c.go emits the bounds observation only
+# when ccStructuredIndex holds for the index expression, that is only when the
+# index text contains "->" or ".". A constant index into a pointer whose valid
+# length lives in a separate local is never examined, so the guard question is
+# never asked.
+#
+# The last two snippets isolate that on their own. They differ in the index
+# expression and nothing else: with ctx->section_offset the access carries
+# analysis.index.field_derived_missing_upper_bound and VYQL-MEM-010 reports it
+# twice at high confidence, and with the constant 6 the same access carries only
+# code.IndexAccess and nothing reports.
+#
+# Both revisions of the real file report the same 27 rows, 12 VYQL-MEM-006,
+# 8 VYQL-MEM-010 and 7 VYQL-MEM-016, with 16 fingerprints identical and the rest
+# differing only by the line shift the fix introduces. None of the 8 VYQL-MEM-010
+# rows is in parse_PAT or in either descriptor loop; they sit at the
+# ctx->pinfo[ctx->nb_program] and ctx->PIDs_programs[elementary_PID] accesses,
+# which are field-derived.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1038: PAT header bytes are read without checking the remaining length"
+  lang c
+  file src/lib_ccx/ts_tables.c
+  reject VYQL-MEM-010
+  code
+  ```
+  int parse_PAT(struct ccx_demuxer *ctx)
+  {
+      unsigned char pointer_field = 0;
+      unsigned char *payload_start = NULL;
+      unsigned int payload_length = 0;
+      unsigned int section_number = 0;
+      unsigned int last_section_number = 0;
+
+      pointer_field = *(ctx->PID_buffers[0]->buffer);
+
+      payload_start = ctx->PID_buffers[0]->buffer + pointer_field + 1;
+      payload_length = ctx->PID_buffers[0]->buffer_length - (pointer_field + 1);
+
+      section_number = payload_start[6];
+      last_section_number = payload_start[7];
+
+      return section_number + last_section_number + payload_length;
+  }
+  ```
+
+test "rank1038: fix returns before the header read when the payload is too short"
+  lang c
+  file src/lib_ccx/ts_tables.c
+  reject VYQL-MEM-010
+  code
+  ```
+  int parse_PAT(struct ccx_demuxer *ctx)
+  {
+      unsigned char pointer_field = 0;
+      unsigned char *payload_start = NULL;
+      unsigned int payload_length = 0;
+      unsigned int section_number = 0;
+      unsigned int last_section_number = 0;
+
+      pointer_field = *(ctx->PID_buffers[0]->buffer);
+
+      payload_start = ctx->PID_buffers[0]->buffer + pointer_field + 1;
+      payload_length = ctx->PID_buffers[0]->buffer_length - (pointer_field + 1);
+
+      if (payload_length < 8)
+          return 0;
+
+      section_number = payload_start[6];
+      last_section_number = payload_start[7];
+
+      return section_number + last_section_number + payload_length;
+  }
+  ```
+
+test "rank1038: the same unguarded read is reported when the index is field-derived"
+  lang c
+  file src/lib_ccx/ts_tables.c
+  expect VYQL-MEM-010
+  code
+  ```
+  int parse_PAT(struct ccx_demuxer *ctx)
+  {
+      unsigned char pointer_field = 0;
+      unsigned char *payload_start = NULL;
+      unsigned int payload_length = 0;
+      unsigned int section_number = 0;
+      unsigned int last_section_number = 0;
+
+      pointer_field = *(ctx->PID_buffers[0]->buffer);
+
+      payload_start = ctx->PID_buffers[0]->buffer + pointer_field + 1;
+      payload_length = ctx->PID_buffers[0]->buffer_length - (pointer_field + 1);
+
+      section_number = payload_start[ctx->section_offset];
+      last_section_number = payload_start[ctx->last_offset];
+
+      return section_number + last_section_number + payload_length;
+  }
+  ```
