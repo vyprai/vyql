@@ -1,0 +1,103 @@
+# Rank 1130 / CVE-2026-45570: go-git's SSH transport built the remote exec
+# command by wrapping the repository path in literal single quotes with no
+# escaping of single quotes embedded in the path itself, diverging from
+# canonical Git's own wire format, so a path containing a single quote could
+# break out of the quoted region on any SSH server that evaluates the exec
+# command through a shell (CWE-116).
+#
+# buildCommand in plumbing/transport/ssh/ssh.go ran
+# `fmt.Fprintf(&b, "%s '%s'", req.Command, req.URL.Path)` and the same
+# unescaped `'%s'` pattern for each `req.Args` entry. Canonical Git quotes the
+# same values through `sq_quote_buf`, which escapes an embedded `'` as the
+# close-escape-reopen sequence `'\''`; go-git's version had no equivalent, so
+# the bytes it put on the wire were not what real Git would send for the
+# same input.
+#
+# The pool commit named a 2018 documentation-only merge, unrelated to this
+# 2026 CVE; the advisory itself carries no commit or PR link. Corpus
+# correction, in place: pool.tsv now names
+# 5aee0b92dd085296b4be514d4b1f961282c4fc37 (COMMIT_OK once corrected), found
+# by searching the repository's commit history for the sq_quote_buf port the
+# advisory describes; its message states the mechanism directly and dates to
+# this CVE's window. It adds writeShellQuote, a direct port of Git's
+# sq_quote_buf, escaping `'` and `!` with the POSIX close-escape-reopen
+# idiom, and routes both the path and every arg through it instead of the
+# bare `'%s'` format. No pool correction.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports 0 findings.
+# code.CommandLineAssemblyReview is a strong match on mechanism, its
+# reviewCondition, "command line text is assembled from contextual values
+# without observed shell quoting," describes this exact shape, and CWE_88 is
+# one of its three, but both of its existing bindings key on a dedicated
+# frontend analysis marker (glib_unquoted_placeholder for C,
+# pythonReview == "command_line_assembly_review" for Python) that the Go
+# extractor has no equivalent of; there is no generic Go context feature
+# recognizing "a Printf-style format string wraps an interpolated value in
+# quote characters with no escape call in between" for a binding to key on
+# without either inventing that Go-side analysis or keying narrowly enough
+# on go-git's own identifiers to fail the genericity test.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1130: the path is wrapped in single quotes with no escaping"
+  lang go
+  file ssh.go
+  reject_review code.CommandLineAssemblyReview
+  code
+  ```
+  package ssh
+
+  import (
+      "fmt"
+      "strings"
+  )
+
+  func buildCommand(req *transport.Request) string {
+      var b strings.Builder
+      fmt.Fprintf(&b, "%s '%s'", req.Command, req.URL.Path)
+      for _, arg := range req.Args {
+          fmt.Fprintf(&b, " '%s'", arg)
+      }
+      return b.String()
+  }
+  ```
+
+test "rank1130: embedded quote and bang characters are escaped before wrapping"
+  lang go
+  file ssh.go
+  reject_review code.CommandLineAssemblyReview
+  code
+  ```
+  package ssh
+
+  import "strings"
+
+  func buildCommand(req *transport.Request) string {
+      var b strings.Builder
+      b.WriteString(req.Command)
+      b.WriteByte(' ')
+      writeShellQuote(&b, req.URL.Path)
+      for _, arg := range req.Args {
+          b.WriteByte(' ')
+          writeShellQuote(&b, arg)
+      }
+      return b.String()
+  }
+
+  func writeShellQuote(b *strings.Builder, s string) {
+      b.WriteByte('\'')
+      for i := 0; i < len(s); i++ {
+          c := s[i]
+          if c == '\'' || c == '!' {
+              b.WriteString(`'\`)
+              b.WriteByte(c)
+              b.WriteByte('\'')
+              continue
+          }
+          b.WriteByte(c)
+      }
+      b.WriteByte('\'')
+  }
+  ```
