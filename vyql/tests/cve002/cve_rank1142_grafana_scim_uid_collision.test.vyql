@@ -1,0 +1,74 @@
+# Rank 1142 / CVE-2025-41115: Grafana's SCIM provisioning let a malicious or
+# compromised SCIM client provision a user whose externalId was purely
+# numeric, and that value became the user's internal UID with nothing
+# stopping it from colliding with (and thereby impersonating or escalating
+# to) an existing internal user ID (CWE-266).
+#
+# The application logic that maps a SCIM externalId to a Grafana user UID,
+# and that would need to reject or namespace a numeric-looking value before
+# using it as one, lives in Grafana Enterprise: the advisory states SCIM
+# provisioning "was introduced in Grafana Enterprise and Grafana Cloud," and
+# a search of this public repository for SCIM externalId handling in Go
+# source finds none. Only the accompanying database migration is public.
+#
+# Pool commit ca5d89812015 is the real fix (COMMIT_OK, its message names the
+# mechanism directly, and the advisory cites it). It widens the user table's
+# uid column to VARCHAR(190) and retroactively rewrites every provisioned
+# user's uid to carry a scim- prefix (`UPDATE user SET uid = 'scim-' || uid
+# WHERE is_provisioned = 1 AND uid NOT LIKE 'scim-%'`), guaranteeing a
+# provisioned user's uid can never again equal a bare numeric internal ID. It
+# is a data-remediation migration, not the runtime check that presumably now
+# applies the same prefix when a new SCIM user is provisioned; that logic is
+# not in this repository to observe either revision of.
+#
+# ATTENTION, and a different kind of gap than a missing concept: the
+# vulnerable and fixed application code is closed-source, so this repository
+# can never show the two revisions apart no matter what the tool understands.
+# code.UserIdentityMappingReview (CWE_286, CWE_863) is the closest concept by
+# mechanism, "external identity data determines local user or group
+# identifiers without an observed uniqueness boundary," worded almost for
+# this exact CVE, but its only Go binding is a single unrelated project's
+# function name and package path (github.com/ubuntu/authd's userPreCheck),
+# so it would not reach Grafana Enterprise's SCIM code even if that code were
+# available to scan. Diagnosis: scanning the public migration file at either
+# revision reports 0 findings.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-closed-source, both revisions rejected.
+
+test "rank1142: the migration retroactively prefixes provisioned users' uid"
+  lang go
+  file user_mig.go
+  reject_review code.UserIdentityMappingReview
+  code
+  ```
+  package migrations
+
+  func addUserMigrations(mg *Migrator) {
+      mg.AddMigration("Expand user.uid length to 190", NewRawSQLMigration("").
+          SQLite("SELECT 1;").
+          Postgres("ALTER TABLE `user` ALTER COLUMN uid TYPE VARCHAR(190);").
+          Mysql("ALTER TABLE user MODIFY uid VARCHAR(190);"))
+
+      mg.AddMigration("Prefix SCIM uid for provisioned users", NewRawSQLMigration("").
+          SQLite("UPDATE user SET uid = 'scim-' || uid WHERE is_provisioned = 1 AND uid NOT LIKE 'scim-%';").
+          Postgres("UPDATE `user` SET uid = 'scim-' || uid WHERE is_provisioned = TRUE AND uid NOT LIKE 'scim-%';").
+          Mysql("UPDATE user SET uid = CONCAT('scim-', uid) WHERE is_provisioned = 1 AND uid NOT LIKE 'scim-%';"))
+  }
+  ```
+
+test "rank1142: the same migration file before this fix was added"
+  lang go
+  file user_mig.go
+  reject_review code.UserIdentityMappingReview
+  code
+  ```
+  package migrations
+
+  func addUserMigrations(mg *Migrator) {
+      mg.AddMigration("Add index on user.is_service_account and user.last_seen_at", NewAddIndexMigration(userV2, &Index{
+          Cols: []string{"is_service_account", "last_seen_at"}, Type: IndexType,
+      }))
+  }
+  ```
