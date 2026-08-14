@@ -1,0 +1,102 @@
+# Rank 1127 / CVE-2025-68121: Go's crypto/tls resumed a TLS session using a
+# certificate chain cached from the original handshake, checking only that
+# the cached chain had not expired and never re-checking that its root was
+# still trusted under the current Config, so a Config mutated between the
+# original and resumed handshakes (Config.Clone() plus mutation, or
+# GetConfigForClient returning a different Config) could let a resumed
+# session succeed with a chain that would be rejected on a fresh handshake
+# (CWE-295).
+#
+# anyUnexpiredChain in src/crypto/tls/common.go walked verifiedChains, the
+# chains verified during the original handshake and cached in the session
+# state, and returned true if any chain had no expired certificate, with no
+# reference to the Config in play for the resumption at all.
+#
+# Pool commit 026fa9dc597e is the real fix (COMMIT_OK; the nocommit flag on
+# this rank is a false positive from the repository-linking heuristic, since
+# the advisory's structured repository field names the advisory database
+# itself rather than golang/go; the commit's own message states "Updates
+# CVE-2025-68121" and matches Go issue #77217 and Gerrit CL 737700 exactly).
+# It renames the function to anyValidVerifiedChain, adds an x509.VerifyOptions
+# built from the CURRENT Config's RootCAs/ClientCAs, and after the expiry
+# check calls root.Verify(opts) on each chain's root certificate against that
+# live trust store before accepting the resumption. No pool correction.
+#
+# ATTENTION, and the same dependency-only shape recorded repeatedly this
+# batch (ranks 1083, 1097, 1101, 1103, 1105, 1112, 1122), here inside the Go
+# standard library itself rather than a third-party package: any application
+# calling crypto/tls the ordinary way looks identical before and after this
+# fix, since the entire defect is internal to how the standard library
+# revalidates a cached certificate chain, and the only remedy is upgrading
+# the Go toolchain. Scanning either revision of common.go reports the same
+# one unrelated lock-lifecycle finding. code.CertValidationDisabled
+# (VYQL-CFG-004) carries the same CWE_295 exactly and is the nearest concept
+# in the ontology, but its bindings look for certificate validation being
+# turned off outright (InsecureSkipVerify and its equivalents across
+# languages), a single explicit flag; this bug has no such flag anywhere,
+# validation stays nominally on throughout, and what silently narrows is
+# which trust store a cached result is checked against between two
+# handshakes, a relationship between two points in time that a presence
+# pattern over one flag cannot express.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1127: resumption accepts a cached chain checked only for expiry"
+  lang go
+  file common.go
+  reject VYQL-CFG-004
+  code
+  ```
+  package tls
+
+  import (
+      "crypto/x509"
+      "slices"
+      "time"
+  )
+
+  func anyUnexpiredChain(verifiedChains [][]*x509.Certificate, now time.Time) bool {
+      for _, chain := range verifiedChains {
+          if len(chain) != 0 && !slices.ContainsFunc(chain, func(cert *x509.Certificate) bool {
+              return now.Before(cert.NotBefore) || now.After(cert.NotAfter)
+          }) {
+              return true
+          }
+      }
+      return false
+  }
+  ```
+
+test "rank1127: resumption also revalidates the cached chain's root against the current Config"
+  lang go
+  file common.go
+  reject VYQL-CFG-004
+  code
+  ```
+  package tls
+
+  import (
+      "crypto/x509"
+      "slices"
+  )
+
+  func anyValidVerifiedChain(verifiedChains [][]*x509.Certificate, opts x509.VerifyOptions) bool {
+      for _, chain := range verifiedChains {
+          if len(chain) == 0 {
+              continue
+          }
+          if slices.ContainsFunc(chain, func(cert *x509.Certificate) bool {
+              return opts.CurrentTime.Before(cert.NotBefore) || opts.CurrentTime.After(cert.NotAfter)
+          }) {
+              continue
+          }
+          root := chain[len(chain)-1]
+          if _, err := root.Verify(opts); err == nil {
+              return true
+          }
+      }
+      return false
+  }
+  ```
