@@ -1,0 +1,145 @@
+# Rank 1042 / CVE-2022-3741: Chatwoot's rate limits were keyed on exact request
+# path equality, so appending a format suffix skipped every throttle (CWE-307).
+# config/initializers/rack_attack.rb throttled with
+#
+#   throttle('login/ip', limit: 5, period: 20.seconds) do |req|
+#     req.ip if req.path == '/auth/sign_in' && req.post?
+#   end
+#
+# and Rails routes /auth/sign_in.json to the same action, so the comparison is
+# false and the request is never counted. The fix 9525d4f034 adds
+#
+#   def path_without_extentions
+#     path[/^[^.]+/]
+#   end
+#
+# to the Request subclass and compares against it in all nine throttles, and
+# tightens the limits.
+#
+# ATTENTION, and unlike most it is one feature away from shippable. The weakness
+# class is generic and writable from documentation: a rack-attack throttle keyed
+# on exact path equality under-matches on Rails, because the router accepts a
+# format suffix for the same action. What is missing is a way to state it.
+#
+#  - No vocabulary. Nothing anywhere in the binding set names rack-attack:
+#    throttle, blocklist and safelist have zero occurrences, and
+#    code.AuthAttemptLimitReview with VYQL-AUTH-088 carries exactly one binding,
+#    in Go, matching one project's SolveChallenge function.
+#  - The available feature cannot express the discriminator. node.context.binary
+#    matches by substring, so a needle of req.path also matches
+#    req.path_without_extentions, which is the fixed form. The last two snippets
+#    below differ only in that identifier and a binding keyed on
+#    req.path=='/auth/sign_in' reports both. Negating the longer name works but
+#    names this project's helper; negating req.path_ covers derived accessors in
+#    general but still reports every normalization written as a method chain,
+#    such as req.path.sub or req.path.start_with?.
+#  - The operator alone does not match either. node.context.binary contains
+#    "req.path==" reports nothing while the same needle with a literal attached
+#    reports, so the positive side cannot say "compared for equality against any
+#    string" and would have to enumerate sign-in paths.
+#
+# This is the prefix half of the trap the ENGINE-GAPS file already records for
+# negations: path matching elsewhere is segment-aware, so Random does not match
+# SecureRandom, and here the shorter accessor does match the longer one.
+#
+# Scanning the real file reports nothing at either revision.
+#
+# verify_current_expected: attention-feature-gap
+
+test "rank1042: the throttle is keyed on exact path equality"
+  lang ruby
+  file config/initializers/rack_attack.rb
+  reject VYQL-AUTH-088
+  code
+  ```
+  class Rack::Attack
+    class Request < ::Rack::Request
+      def remote_ip
+        @remote_ip ||= (env['action_dispatch.remote_ip'] || ip).to_s
+      end
+    end
+
+    throttle('login/ip', limit: 5, period: 20.seconds) do |req|
+      req.ip if req.path == '/auth/sign_in' && req.post?
+    end
+
+    throttle('login/email', limit: 20, period: 5.minutes) do |req|
+      if req.path == '/auth/sign_in' && req.post?
+        email = req.params['email'].presence || ActionDispatch::Request.new(req.env).params['email'].presence
+        email.to_s.downcase.gsub(/\s+/, '')
+      end
+    end
+
+    throttle('reset_password/email', limit: 5, period: 1.hour) do |req|
+      if req.path == '/auth/password' && req.post?
+        email = req.params['email'].presence || ActionDispatch::Request.new(req.env).params['email'].presence
+        email.to_s.downcase.gsub(/\s+/, '')
+      end
+    end
+  end
+  ```
+
+test "rank1042: fix compares against the path with the extension stripped"
+  lang ruby
+  file config/initializers/rack_attack.rb
+  reject VYQL-AUTH-088
+  code
+  ```
+  class Rack::Attack
+    class Request < ::Rack::Request
+      def remote_ip
+        @remote_ip ||= (env['action_dispatch.remote_ip'] || ip).to_s
+      end
+
+      # Rails would allow requests to paths with extentions, so lets compare against the path with extention stripped
+      # example /auth & /auth.json would both work
+      def path_without_extentions
+        path[/^[^.]+/]
+      end
+    end
+
+    throttle('login/ip', limit: 5, period: 5.minutes) do |req|
+      req.ip if req.path_without_extentions == '/auth/sign_in' && req.post?
+    end
+
+    throttle('login/email', limit: 10, period: 15.minutes) do |req|
+      if req.path_without_extentions == '/auth/sign_in' && req.post?
+        email = req.params['email'].presence || ActionDispatch::Request.new(req.env).params['email'].presence
+        email.to_s.downcase.gsub(/\s+/, '')
+      end
+    end
+
+    throttle('reset_password/email', limit: 5, period: 1.hour) do |req|
+      if req.path_without_extentions == '/auth/password' && req.post?
+        email = req.params['email'].presence || ActionDispatch::Request.new(req.env).params['email'].presence
+        email.to_s.downcase.gsub(/\s+/, '')
+      end
+    end
+  end
+  ```
+
+test "rank1042: the pair a binding cannot separate, exact equality"
+  lang ruby
+  file config/initializers/rack_attack.rb
+  reject VYQL-AUTH-088
+  code
+  ```
+  class Rack::Attack
+    throttle('login/ip', limit: 5, period: 20.seconds) do |req|
+      req.ip if req.path == '/auth/sign_in' && req.post?
+    end
+  end
+  ```
+
+test "rank1042: the pair a binding cannot separate, derived accessor"
+  lang ruby
+  file config/initializers/rack_attack.rb
+  reject VYQL-AUTH-088
+  code
+  ```
+  class Rack::Attack
+    throttle('login/ip', limit: 5, period: 20.seconds) do |req|
+      req.ip if req.path_without_extentions == '/auth/sign_in' && req.post?
+    end
+  end
+  ```
