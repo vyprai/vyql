@@ -1,0 +1,55 @@
+# Rank 1098 / CVE-2026-33979: express-xss-sanitizer treated an explicitly
+# empty allowedTags: [] or allowedAttributes: {} as "not provided" and fell
+# back to sanitize-html's permissive defaults, so a developer who asked to
+# strip every tag and attribute got the library's default allowlist instead
+# (CWE-79, CWE-183). lib/sanitize.js's initializeOptions had
+#
+#   if (hasOwn(options, 'allowedTags') && Array.isArray(options.allowedTags) && options.allowedTags.length > 0) {
+#     sanitizerOptions.allowedTags = options.allowedTags;
+#   }
+#   if (hasOwn(options, 'allowedAttributes') && Object.keys(options.allowedAttributes).length > 0) {
+#     sanitizerOptions.allowedAttributes = options.allowedAttributes;
+#   }
+#
+# so an empty array or object failed the length check and was silently
+# dropped rather than passed through. Pool commit 0c1f75d41e85 is the real
+# fix, despite the COMMIT_MISMATCH flag: it matches the advisory's own root
+# cause and PoC exactly, dropping the length/key-count checks so any
+# explicitly provided value, empty or not, reaches sanitize-html unchanged.
+# No pool correction.
+#
+# CAUGHT, though not for the reason a taint rule usually catches something.
+# express-xss-sanitizer's sanitize() is bound as a control nowhere in the
+# corpus, so the tool has no notion that calling it is supposed to neutralize
+# anything -- an HTML-render sink downstream of sanitize(bio, {allowedTags: [],
+# allowedAttributes: {}}) reports VYQL-INJ-004 simply because nothing
+# suppresses it, the same way it would for any unrecognized function. That
+# happens to be the correct verdict on the vulnerable library version, since
+# the call does not actually sanitize anything, but it is also what a scan
+# reports against the *fixed* library version calling the exact same line,
+# where the call now genuinely does strip everything. The two revisions are
+# not separated by anything the tool understands about this library; they are
+# both reported because neither is recognized. Binding sanitize() as a
+# core.HtmlEscape control would fix the false positive on the patched form but
+# reintroduces this rank's exact false negative, since a control has no way to
+# express "except when allowedTags/allowedAttributes is empty, which this
+# library's own bug used to ignore" -- the same shape as rank 1083's finding
+# that a version-gated control fails closed on non-exact specifiers, so no
+# definition change is shipped here either.
+#
+# verify_current_expected: caught-by-omission
+
+test "rank1098: sanitize is called with an explicit empty allowlist"
+  lang javascript
+  file app.js
+  expect VYQL-INJ-004
+  code
+  ```
+  const { sanitize } = require('express-xss-sanitizer');
+
+  function handler(req, res) {
+    const bio = req.query.bio;
+    const clean = sanitize(bio, { allowedTags: [], allowedAttributes: {} });
+    res.send('<div>' + clean + '</div>');
+  }
+  ```
