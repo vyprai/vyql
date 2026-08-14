@@ -1,0 +1,155 @@
+# Rank 1058 / CVE-2026-28909: apple/container builds a resolver config path from
+# a domain name taken straight off the command line, so a name carrying path
+# separators writes outside the resolver directory, and the command runs as an
+# administrator.
+# HostDNSResolver.createDomain held
+#
+#   let path = self.configURL.appending(path: "\(Self.containerizationPrefix)\(name)").path
+#   ...
+#   try resolverText.write(toFile: path, atomically: true, encoding: .utf8)
+#
+# with name arriving as `@Argument(help: "The local domain name") var domainName: String`
+# in DNSCreate.swift and reaching createDomain unvalidated; deleteDomain builds
+# the same path and unlinks it. Pool commit f9899013fd is the real fix in spite
+# of COMMIT_NONE: it is a "Merge commit from fork", which is how a GitHub
+# advisory's private fix lands, and it parses the argument through
+# `DNSName(domainName)` before use, changes createDomain, deleteDomain and
+# listDomains to take DNSName rather than String, and adds the `pqdn` accessor
+# so the validated labels are what reaches the path. No pool correction.
+#
+# NVD records this as CWE-522. The code is path traversal, CWE-22: what the fix
+# adds is input validation on a value used to build a filesystem path, and the
+# credential exposure is the consequence of writing where the attacker chooses.
+#
+# ATTENTION, vocabulary gap. Scanning HostDNSResolver.swift reports nothing, and
+# vyql match labels one thing in the whole file, code.UrlFetch on the URL
+# initializer, which is neither the source nor the sink. Three separate holes,
+# and only the first is why this CVE is missed.
+#
+#  - The source is a swift-argument-parser property wrapper. Nothing binds
+#    `@Argument` or `@Option`, and binding a framework's declared parameters
+#    makes every argument of every Swift command a source in one step. That is
+#    the move ranks 1035 and 1043 both declined, for the Nextcloud AppFramework
+#    and for Gradio, on the grounds that one application is not enough to
+#    measure it; the same holds here.
+#  - Swift's only command-line source binding is dead. `cliArgument0` is
+#    `query pattern callExpr where callee.path ~= "CommandLine.arguments"`, and
+#    `CommandLine.arguments` is a static property, never a call, so the query
+#    cannot match it. Measured on four spellings -- the subscript, the bare
+#    property, an assignment to a local, and the property passed directly as an
+#    argument -- and none is labelled, so `code.CliArgument` never appears in
+#    Swift at all. This is binding work, it is separable from this CVE, and it
+#    is its own rank: fixing it would not catch this one, because the real
+#    source here is the property wrapper and not `CommandLine.arguments`.
+#  - The sink is missing too. Swift binds `code.FilePathAccess` three times, on
+#    `contentsOfFile`, `contents` and `FileHandle`, all reads.
+#    `String.write(toFile:atomically:encoding:)` is the write this CVE lands on
+#    and nothing names it, nor `FileManager.createFile(atPath:)`. These are
+#    Foundation APIs writable from documentation, so this half is ordinary
+#    coverage work rather than a judgement call.
+#
+# The last two snippets are the source pair: identical but for whether the name
+# arrives from the command line or as a plain parameter, and neither reports,
+# which is what pins the dead binding.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1058: the resolver path is built from the unvalidated domain name"
+  lang swift
+  file Sources/Services/ContainerAPIService/Client/HostDNSResolver.swift
+  reject VYQL-PATH-001
+  code
+  ```
+  import Foundation
+
+  public struct HostDNSResolver {
+      static let containerizationPrefix = "containerization."
+      let configURL = URL(fileURLWithPath: "/etc/resolver")
+
+      public func createDomain(name: String, localhost: IPAddress? = nil) throws {
+          let path = self.configURL.appending(path: "\(Self.containerizationPrefix)\(name)").path
+          let fm: FileManager = FileManager.default
+
+          guard !fm.fileExists(atPath: path) else {
+              throw ContainerizationError(.exists, message: "domain \(name) already exists")
+          }
+
+          let resolverText = """
+              domain \(name)
+              search \(name)
+              nameserver 127.0.0.1
+              port 2053
+              """
+
+          try resolverText.write(toFile: path, atomically: true, encoding: .utf8)
+      }
+  }
+  ```
+
+test "rank1058: the fix validates the name into DNSName before it reaches the path"
+  lang swift
+  file Sources/ContainerCommands/System/DNS/DNSCreate.swift
+  reject VYQL-PATH-001
+  code
+  ```
+  import DNSServer
+  import Foundation
+
+  extension Application {
+      public struct DNSCreate: AsyncLoggableCommand {
+          @Argument(help: "The local domain name")
+          var domainName: String
+
+          public func run() async throws {
+              guard let domainName = try? DNSName(domainName) else {
+                  throw ContainerizationError(.invalidArgument, message: "invalid domain name: \(domainName)")
+              }
+
+              let resolver: HostDNSResolver = HostDNSResolver()
+              try resolver.createDomain(name: domainName, localhost: nil)
+              print(domainName.pqdn)
+          }
+      }
+  }
+  ```
+
+test "rank1058: the source pair, name taken from the command line"
+  lang swift
+  file Sources/Services/ContainerAPIService/Client/HostDNSResolver.swift
+  reject VYQL-PATH-001
+  code
+  ```
+  import Foundation
+
+  func createDomain(name: String) throws {
+      let configURL = URL(fileURLWithPath: "/etc/resolver")
+      let path = configURL.appending(path: "containerization.\(name)").path
+      let resolverText = "domain \(name)\nnameserver 127.0.0.1\n"
+      try resolverText.write(toFile: path, atomically: true, encoding: .utf8)
+  }
+
+  func run() throws {
+      let name = CommandLine.arguments[1]
+      try createDomain(name: name)
+  }
+  ```
+
+test "rank1058: the source pair, name arriving as a plain parameter"
+  lang swift
+  file Sources/Services/ContainerAPIService/Client/HostDNSResolver.swift
+  reject VYQL-PATH-001
+  code
+  ```
+  import Foundation
+
+  func createDomain(name: String) throws {
+      let configURL = URL(fileURLWithPath: "/etc/resolver")
+      let path = configURL.appending(path: "containerization.\(name)").path
+      let resolverText = "domain \(name)\nnameserver 127.0.0.1\n"
+      try resolverText.write(toFile: path, atomically: true, encoding: .utf8)
+  }
+
+  func run(name: String) throws {
+      try createDomain(name: name)
+  }
+  ```
