@@ -1,0 +1,94 @@
+# Rank 1132 / CVE-2022-29173: go-tuf's update client downloaded and trusted
+# new timestamp/snapshot metadata without first loading whatever metadata it
+# had already verified and stored locally, so it had no last-known-good
+# version to compare a newly-served file against, letting a malicious or
+# compromised repository roll a client back to older, previously superseded
+# (and possibly since-revoked) metadata (CWE-354).
+#
+# Client.Update in client/client.go called c.downloadMetaUnsafe("timestamp.json", ...)
+# as its first real step. TUF's rollback-attack protection (spec steps
+# 5.4.2-5.4.4 and 5.5.3/5/6) depends entirely on the client already holding
+# the previous timestamp/snapshot version in memory to compare a new
+# download's version number against; skip loading that prior state and every
+# comparison downstream has nothing to compare against.
+#
+# Pool commit ed6788e710fc is the real fix (COMMIT_OK, GHSA-66x3-6cw3-v5gj).
+# It inserts `c.getLocalMeta()` as Update's first step, reworks getLocalMeta
+# to clear and reload the in-memory metadata map, verify each cached file
+# against the latest root before trusting it, and continue past individual
+# load failures rather than aborting, and comments every subsequent step
+# with its TUF specification section number. No pool correction.
+#
+# ATTENTION, and the same shape already recorded at ranks 1108 and 1124 in
+# this batch: a piece of state that is supposed to gate whether new,
+# possibly-attacker-influenced data can be trusted is never loaded or
+# consulted before that data is accepted. code.ProtocolStateReview's own
+# text, "review protocol/state transitions for out-of-sequence, stale, or
+# unauthenticated data accepted without the required state check," describes
+# this shape about as directly as any concept in the ontology does, and it
+# already has a Go binding, but that binding is one named TLS handshake
+# analysis (protocol.tls_appdata_before_decryptable) with no generic notion
+# of "load prior trusted state before evaluating new state for freshness."
+# Scanning either revision of client.go reports 0 findings.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1132: Update downloads new metadata with no prior trusted version loaded"
+  lang go
+  file client.go
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  package client
+
+  func (c *Client) Update() (data.TargetFiles, error) {
+      if err := c.getRootFileUnsafe(); err != nil {
+          return nil, err
+      }
+
+      timestampJSON, err := c.downloadMetaUnsafe("timestamp.json", defaultTimestampDownloadLimit)
+      if err != nil {
+          return nil, err
+      }
+      snapshotMeta, err := c.decodeTimestamp(timestampJSON)
+      if err != nil {
+          return nil, err
+      }
+      if err := c.local.SetMeta("timestamp.json", timestampJSON); err != nil {
+          return nil, err
+      }
+      return nil, nil
+  }
+  ```
+
+test "rank1132: Update loads and verifies prior trusted metadata before downloading anything new"
+  lang go
+  file client.go
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  package client
+
+  func (c *Client) Update() (data.TargetFiles, error) {
+      if err := c.getRootFileUnsafe(); err != nil {
+          return nil, err
+      }
+
+      c.getLocalMeta()
+
+      timestampJSON, err := c.downloadMetaUnsafe("timestamp.json", defaultTimestampDownloadLimit)
+      if err != nil {
+          return nil, err
+      }
+      snapshotMeta, err := c.decodeTimestamp(timestampJSON)
+      if err != nil {
+          return nil, err
+      }
+      if err := c.local.SetMeta("timestamp.json", timestampJSON); err != nil {
+          return nil, err
+      }
+      return nil, nil
+  }
+  ```
