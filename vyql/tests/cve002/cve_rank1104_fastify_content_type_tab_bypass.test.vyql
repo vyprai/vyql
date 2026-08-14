@@ -1,0 +1,125 @@
+# Rank 1104 / CVE-2026-25223: Fastify computed the request's content type two
+# different ways for two different decisions, and the two computations
+# disagreed on whether a tab character ends the media type (CWE-436).
+#
+# lib/content-type-parser.js's getParser matched a registered parser against
+# a Content-Type header by prefix, and its boundary check accepted a
+# following space, semicolon, OR tab (charCodeAt === 9) as the end of the
+# media type. lib/validation.js's getEssenceMediaType, used to look up a
+# per-content-type body schema, split the header on `/[ ;]/` only, with no
+# tab. A header of `application/json\t<anything>` therefore matched the JSON
+# parser (tab treated as a boundary) but missed the schema keyed under
+# `application/json` (tab not treated as a boundary, so the essence type is
+# the whole string including the appended garbage), so the body was parsed as
+# JSON and handed to the route with no schema applied at all.
+#
+# Confirmed against the real request path, not just the two functions in
+# isolation: an application/json route with a `body.content['application/json']`
+# schema requiring one field and additionalProperties: false receives a POST
+# with `Content-Type: application/json\ta` and a JSON object holding only a
+# field the schema forbids; the vulnerable revision returns 200 with that
+# field intact, and the fixed revision returns 415.
+#
+# Pool commit 32d7b6add39d is the real fix (COMMIT_OK, named by
+# GHSA-jx2c-rxcm-jvmq). It adds lib/content-type.js, a single ContentType
+# class both content-type-parser.js and handle-request.js now go through, and
+# removes the byte-code boundary check from getParser's prefix match entirely
+# in favor of an exact match against the class's normalized string or its
+# type/subtype pair; validation.js is unchanged, but a header this class
+# rejects, or normalizes to something that fails every parser lookup, now
+# reaches FST_ERR_CTP_INVALID_MEDIA_TYPE in content-type-parser.js's run()
+# before the request body is parsed at all, so the two decisions can no
+# longer disagree. No pool correction.
+#
+# ATTENTION, vocabulary gap. Nothing in the ontology carries CWE_436, and the
+# nearest concept by mechanism, code.AmbiguousQueryParameterSeparator
+# (CWE_444, a sibling weakness under the same interpretation-conflict
+# family, a query parser that treats a semicolon as an alternate separator),
+# is bound only to a Python-specific `qs.replace(';','&')` idiom and has
+# nothing to do with a Content-Type header, so it does not and should not
+# fire here.
+#
+# Stating this class generically needs a relation between two functions
+# reading the same untrusted value with different delimiter rules, one of
+# them gating a security decision -- comparing the character classes two
+# different pieces of code treat as a boundary is not a taint or presence
+# pattern over one function, and scanning the two files together gives
+# fifteen identical findings at both revisions, all pre-existing HTML-escape
+# noise unrelated to this weakness. No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1104: the parser's prefix match treats a tab as a boundary"
+  lang javascript
+  file lib/content-type-parser.js
+  reject_review code.AmbiguousQueryParameterSeparator
+  code
+  ```
+  ContentTypeParser.prototype.getParser = function (contentType) {
+    let parser = this.customParsers.get(contentType)
+    if (parser !== undefined) return parser
+    parser = this.cache.get(contentType)
+    if (parser !== undefined) return parser
+
+    const caseInsensitiveContentType = contentType.toLowerCase()
+    for (let i = 0; i !== this.parserList.length; ++i) {
+      const parserListItem = this.parserList[i]
+      if (
+        caseInsensitiveContentType.slice(0, parserListItem.length) === parserListItem &&
+        (
+          caseInsensitiveContentType.length === parserListItem.length ||
+          caseInsensitiveContentType.charCodeAt(parserListItem.length) === 59 /* `;` */ ||
+          caseInsensitiveContentType.charCodeAt(parserListItem.length) === 32 /* ` ` */ ||
+          caseInsensitiveContentType.charCodeAt(parserListItem.length) === 9  /* `\t` */
+        )
+      ) {
+        parser = this.customParsers.get(parserListItem)
+        this.cache.set(contentType, parser)
+        return parser
+      }
+    }
+
+    return this.customParsers.get('')
+  }
+  ```
+
+test "rank1104: the schema lookup's split does not treat a tab as a boundary"
+  lang javascript
+  file lib/validation.js
+  reject_review code.AmbiguousQueryParameterSeparator
+  code
+  ```
+  function getEssenceMediaType (header) {
+    if (!header) return ''
+    return header.split(/[ ;]/, 1)[0].trim().toLowerCase()
+  }
+
+  function validate (context, request) {
+    const contentType = getEssenceMediaType(request.headers['content-type'])
+    const contentSchema = context[bodySchema][contentType]
+    if (contentSchema !== undefined) {
+      return contentSchema(request.body)
+    }
+    return true
+  }
+  ```
+
+test "rank1104: a single normalizer decides the parser and rejects a bad header before either lookup runs"
+  lang javascript
+  file lib/handle-request.js
+  reject_review code.AmbiguousQueryParameterSeparator
+  code
+  ```
+  const ContentType = require('./content-type')
+  const { FST_ERR_CTP_INVALID_MEDIA_TYPE } = require('./errors')
+
+  function handleRequest (err, request, reply) {
+    const ctHeader = request.headers['content-type']
+    const contentType = new ContentType(ctHeader)
+    if (contentType.isValid === false) {
+      reply.status(415).send(new FST_ERR_CTP_INVALID_MEDIA_TYPE())
+      return
+    }
+    request[kRouteContext].contentTypeParser.run(contentType.toString(), handler, request, reply)
+  }
+  ```
