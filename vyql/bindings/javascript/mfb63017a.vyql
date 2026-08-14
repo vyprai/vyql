@@ -2391,6 +2391,16 @@ binding redirectTarget452 {
   emit sink code.RedirectTargetSink at args[0]
 }
 
+binding redirectTargetResRedirectStatusForm {
+  query pattern callExpr where callee.path ~= "res.redirect"
+  emit sink code.RedirectTargetSink at args[1]
+}
+
+binding redirectTargetReplyRedirectStatusForm {
+  query pattern callExpr where callee.path ~= "reply.redirect"
+  emit sink code.RedirectTargetSink at args[1]
+}
+
 binding redirectTarget453 {
   query pattern callExpr where callee.path ~= "response.redirect"
   emit sink code.RedirectTargetSink at args[0]

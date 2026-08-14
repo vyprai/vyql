@@ -1,0 +1,62 @@
+# Rank 1019 / CVE-2025-57800: Audiobookshelf OIDC token exfiltration. The OIDC
+# login route stored a caller-supplied callback in the auth_cb cookie after
+# checking only that it was present, and the callback handler then issued
+# res.redirect(302, `${req.cookies.auth_cb}?setToken=...&accessToken=...`), so a
+# crafted login link sends the victim's tokens to an attacker host and allows
+# full account takeover (CWE-601, CWE-598, CWE-523). The fix 99a3867ce9 adds
+# isValidWebCallbackUrl(callback, req) and refuses to store a callback that is
+# not same-origin.
+#
+# Binding gap found and closed. Express documents res.redirect([status,] path),
+# but only args[0] carried code.RedirectTargetSink, so every two-argument
+# redirect was invisible and the vulnerable line was not reported; the only open
+# redirect VyQL saw in this file was the unrelated redirect to the identity
+# provider's authorization URL. Binding the second argument as well, for
+# res.redirect and the equivalent reply.redirect, makes the vulnerable line fire
+# as VYQL-RF-002 from req.cookies.auth_cb into the redirect. Measured before and
+# after on two real Express servers: audiobookshelf/server went from 3 findings
+# to 4, the one added finding being this CVE, and actual's sync-server stayed at
+# 1. The full spec suite passes and the OWASP scores are unchanged at Java +1.00
+# and Python +0.90.
+#
+# ATTENTION nonetheless: the finding does not discriminate this fix. The
+# validation the patch adds runs at the cookie write in a different route, while
+# the redirect reads the cookie on a later request, so the taint from
+# req.cookies.auth_cb into res.redirect is identical either side of the commit.
+# Recognising the patch would require carrying a control across two requests
+# through the cookie store, which taint analysis of a single request path cannot
+# do.
+#
+# The tests below pin the newly bound argument position.
+#
+# verify_current_expected: attention-no-discrimination
+
+test "rank1019: redirect with a status argument carries the target in the second position"
+  lang javascript
+  file server/Auth.js
+  expect VYQL-RF-002
+  code
+  ```
+  function handleCallback(req, res, userResponse) {
+    if (req.cookies.auth_cb) {
+      res.redirect(302, `${req.cookies.auth_cb}?setToken=${userResponse.user.token}`)
+    } else {
+      res.status(400).send('No callback or already expired')
+    }
+  }
+  ```
+
+test "rank1019: a constant redirect target with a status argument is not a finding"
+  lang javascript
+  file server/Auth.js
+  reject VYQL-RF-002
+  code
+  ```
+  function handleCallback(req, res, userResponse) {
+    if (req.cookies.auth_cb) {
+      res.redirect(302, '/library')
+    } else {
+      res.status(400).send('No callback or already expired')
+    }
+  }
+  ```
