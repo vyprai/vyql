@@ -1,0 +1,111 @@
+# Rank 1078 / CVE-2026-35172: the registry's repository-scoped blob descriptor
+# cache checked that a digest belonged to the caller's repository and then
+# cleared it everywhere (CWE-284).
+# repositoryScopedRedisBlobDescriptorService.Clear held
+#
+#   member, err := rsrbds.upstream.pool.SIsMember(ctx, rsrbds.repositoryBlobSetKey(rsrbds.repo), dgst.String()).Result()
+#   ...
+#   if !member { return distribution.ErrBlobUnknown }
+#   return rsrbds.upstream.Clear(ctx, dgst)
+#
+# so a client with push access to one repository could evict another
+# repository's cached descriptor for any digest the first repository also holds.
+# The membership check is right; the deletion it authorizes is not the deletion
+# it performs. Pool commit 078b0783f2 is the real fix (COMMIT_OK, named by
+# GHSA-f2g3-hh2r-cwgc); it replaces the upstream call with a transactional
+# pipeline removing the digest from this repository's set, deleting this
+# repository's descriptor hash and clearing only the three fields of the shared
+# hash. No pool correction.
+#
+# ATTENTION, and the shape here is the one this block keeps arriving at from
+# different directions: the guard and the guarded operation disagree about
+# scope. Rank 1074 has a read with no check at all, and rank 1077 a table with a
+# missing entry; this one has the check present, correct, and attached to a
+# narrower thing than the effect. Nothing in the ontology distinguishes the
+# receiver a check was made against from the receiver an operation runs on --
+# there is no notion of scope on a concept at all -- so `x.pool.SIsMember(repoKey)`
+# followed by `x.Clear(dgst)` reads as a guard followed by an operation, which is
+# the shape of correct code.
+#
+# What would state it is a relation between the arguments of the check and the
+# arguments of the effect: the check names rsrbds.repo and the effect does not.
+# That is expressible in principle over a single function's expressions, unlike
+# the branch relation ranks 1039, 1040 and 1047 need, but it wants an argument
+# comparison the binding layer has no way to make, the same missing feature rank
+# 1077 records for two collection literals.
+#
+# Measured: nothing is labelled or reported in redis.go at either revision.
+#
+# The two snippets differ only in what the authorized branch then deletes.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1078: the scoped check authorizes an unscoped delete"
+  lang go
+  file registry/storage/cache/redis/redis.go
+  reject VYQL-AUTH-081
+  code
+  ```
+  package redis
+
+  import (
+  	"context"
+
+  	"github.com/opencontainers/go-digest"
+  )
+
+  func (rsrbds *repositoryScopedRedisBlobDescriptorService) Clear(ctx context.Context, dgst digest.Digest) error {
+  	if err := dgst.Validate(); err != nil {
+  		return err
+  	}
+
+  	member, err := rsrbds.upstream.pool.SIsMember(ctx, rsrbds.repositoryBlobSetKey(rsrbds.repo), dgst.String()).Result()
+  	if err != nil {
+  		return err
+  	}
+  	if !member {
+  		return ErrBlobUnknown
+  	}
+
+  	return rsrbds.upstream.Clear(ctx, dgst)
+  }
+  ```
+
+test "rank1078: the same check authorizing a scoped delete"
+  lang go
+  file registry/storage/cache/redis/redis.go
+  reject VYQL-AUTH-081
+  code
+  ```
+  package redis
+
+  import (
+  	"context"
+
+  	"github.com/opencontainers/go-digest"
+  )
+
+  func (rsrbds *repositoryScopedRedisBlobDescriptorService) Clear(ctx context.Context, dgst digest.Digest) error {
+  	if err := dgst.Validate(); err != nil {
+  		return err
+  	}
+
+  	pool := rsrbds.upstream.pool
+
+  	member, err := pool.SIsMember(ctx, rsrbds.repositoryBlobSetKey(rsrbds.repo), dgst.String()).Result()
+  	if err != nil {
+  		return err
+  	}
+  	if !member {
+  		return ErrBlobUnknown
+  	}
+
+  	pipe := pool.TxPipeline()
+  	pipe.SRem(ctx, rsrbds.repositoryBlobSetKey(rsrbds.repo), dgst.String())
+  	pipe.Del(ctx, rsrbds.blobDescriptorHashKey(dgst))
+  	pipe.HDel(ctx, rsrbds.upstream.blobDescriptorHashKey(dgst), "digest", "size", "mediatype")
+
+  	_, err = pipe.Exec(ctx)
+  	return err
+  }
+  ```
