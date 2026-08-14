@@ -1,0 +1,191 @@
+# Rank 1080 / CVE-2015-3629: Docker resolved a container mount's destination in
+# the host's mount namespace and then handed the resolved path to libcontainer
+# to mount inside the container, so a symlink placed in the image redirected the
+# bind mount outside the container (CWE-59). setupMounts in
+# daemon/execdriver/native/create.go resolved with
+#
+#   dest, err := symlink.FollowSymlinkInScope(filepath.Join(c.Rootfs, m.Destination), c.Rootfs)
+#
+# and stored dest as the mount Destination. The resolution and the mount happen
+# in different namespaces at different times, so the scope check does not hold
+# when the mount is finally performed.
+#
+# The fix d5ebb60bdd deletes the resolution, passing m.Destination through
+# unchanged so libcontainer evaluates the symlink itself, inside the container's
+# own namespace at mount time.
+#
+# ATTENTION, and the first reason is the interesting one.
+#
+#  - The fix removes a control. symlink.FollowSymlinkInScope is bound as
+#    core.PathCanonicalization, a neutralizing control, so the vulnerable
+#    revision is the one carrying the control and the patched revision is the
+#    one carrying none. Any rule reasoning about a missing canonicalization
+#    ranks these two revisions backwards. The weakness is not that the path was
+#    unresolved; it is that it was resolved in the wrong namespace, and no
+#    concept distinguishes where a resolution happened from whether it happened.
+#  - Nothing describes the boundary the value crosses. A path resolved under one
+#    root and used under another is the whole bug, and the vocabulary has no way
+#    to say that a check and the operation it guards run in different namespaces
+#    or at different times.
+#
+# A third finding is separable and mechanical, recorded in ENGINE-GAPS.md: the
+# generated package binding that would label FollowSymlinkInScope never fires,
+# because its requires clause gates it on dependency("github.com/moby/sys/symlink")
+# and that gate is not satisfied even when the module is required in go.mod,
+# imported in the file, present in the local module cache, and reported by the
+# SCA layer as a reachable package. The same binding body with the requires
+# clause removed does fire.
+#
+# Scanning daemon/execdriver/native reports 0 findings at each revision. vyql
+# match over the vulnerable file labels no source and no sink, only two lock
+# controls unrelated to the mount.
+#
+# The snippets use github.com/moby/sys/symlink, the current home of the package
+# this code imported as github.com/docker/docker/pkg/symlink, because that is
+# the path the shipped binding names.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1080: the mount destination is resolved in the host namespace"
+  lang go
+  file daemon/execdriver/native/create.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package native
+
+  import (
+  	"path/filepath"
+  	"syscall"
+
+  	"github.com/moby/sys/symlink"
+  )
+
+  func (d *driver) setupMounts(container *configs.Config, c *execdriver.Command) error {
+  	userMounts := make(map[string]struct{})
+  	for _, m := range c.Mounts {
+  		userMounts[m.Destination] = struct{}{}
+  	}
+
+  	var defaultMounts []*configs.Mount
+  	for _, m := range container.Mounts {
+  		if _, ok := userMounts[m.Destination]; !ok {
+  			defaultMounts = append(defaultMounts, m)
+  		}
+  	}
+  	container.Mounts = defaultMounts
+
+  	for _, m := range c.Mounts {
+  		dest, err := symlink.FollowSymlinkInScope(filepath.Join(c.Rootfs, m.Destination), c.Rootfs)
+  		if err != nil {
+  			return err
+  		}
+  		flags := syscall.MS_BIND | syscall.MS_REC
+  		if !m.Writable {
+  			flags |= syscall.MS_RDONLY
+  		}
+  		container.Mounts = append(container.Mounts, &configs.Mount{
+  			Source:      m.Source,
+  			Destination: dest,
+  			Device:      "bind",
+  			Flags:       flags,
+  		})
+  	}
+  	return nil
+  }
+  ```
+
+test "rank1080: the destination is passed through for the runtime to resolve"
+  lang go
+  file daemon/execdriver/native/create.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package native
+
+  import (
+  	"syscall"
+  )
+
+  func (d *driver) setupMounts(container *configs.Config, c *execdriver.Command) error {
+  	userMounts := make(map[string]struct{})
+  	for _, m := range c.Mounts {
+  		userMounts[m.Destination] = struct{}{}
+  	}
+
+  	var defaultMounts []*configs.Mount
+  	for _, m := range container.Mounts {
+  		if _, ok := userMounts[m.Destination]; !ok {
+  			defaultMounts = append(defaultMounts, m)
+  		}
+  	}
+  	container.Mounts = defaultMounts
+
+  	for _, m := range c.Mounts {
+  		flags := syscall.MS_BIND | syscall.MS_REC
+  		if !m.Writable {
+  			flags |= syscall.MS_RDONLY
+  		}
+  		container.Mounts = append(container.Mounts, &configs.Mount{
+  			Source:      m.Source,
+  			Destination: m.Destination,
+  			Device:      "bind",
+  			Flags:       flags,
+  		})
+  	}
+  	return nil
+  }
+  ```
+
+# The pair for the requires-gate finding: the same request-driven read, once
+# through the package the shipped binding names as a canonicalization control
+# and once through filepath.Base, which is bound without a requires clause.
+# Only the second is suppressed, so the first still reports VYQL-PATH-001.
+
+test "rank1080: a scoped resolution from a gated package does not neutralize"
+  lang go
+  file scope.go
+  expect VYQL-PATH-001
+  code
+  ```
+  package p
+
+  import (
+  	"net/http"
+  	"os"
+
+  	"github.com/moby/sys/symlink"
+  )
+
+  func h(w http.ResponseWriter, r *http.Request) {
+  	p := r.URL.Query().Get("f")
+  	dest, err := symlink.FollowSymlinkInScope(p, "/srv")
+  	if err != nil {
+  		return
+  	}
+  	b, _ := os.ReadFile(dest)
+  	w.Write(b)
+  }
+  ```
+
+test "rank1080: an ungated canonicalization on the same read does neutralize"
+  lang go
+  file scope.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package p
+
+  import (
+  	"net/http"
+  	"os"
+  	"path/filepath"
+  )
+
+  func h(w http.ResponseWriter, r *http.Request) {
+  	p := r.URL.Query().Get("f")
+  	dest := filepath.Base(p)
+  	b, _ := os.ReadFile(dest)
+  	w.Write(b)
+  }
+  ```
