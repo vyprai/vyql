@@ -1,0 +1,62 @@
+# Rank 1021 / CVE-2025-23206: the AWS CDK IAM OIDC custom resource downloads the
+# provider's CA thumbprint over a TLS socket opened with
+# rejectUnauthorized: false, so the certificate is never verified and the
+# thumbprint can be taken from whoever answers the connection (CWE-347,
+# CWE-295). The fix 3e4f3773bf makes the setting a parameter, so the caller
+# decides and a feature flag turns verification on.
+#
+# Already covered: VYQL-CFG-004 reports the disabled certificate check on the
+# vulnerable file and is silent once the literal false is replaced by the
+# parameter.
+
+test "rank1021: thumbprint download opens a TLS socket with verification disabled"
+  lang javascript
+  file packages/@aws-cdk/custom-resource-handlers/lib/aws-iam/oidc-handler/external.ts
+  expect VYQL-CFG-004
+  code
+  ```
+  const tls = require('tls');
+  const url = require('url');
+
+  async function downloadThumbprint(issuerUrl) {
+    return new Promise((ok, ko) => {
+      const purl = url.parse(issuerUrl);
+      const port = purl.port || 443;
+
+      const socket = tls.connect(port, purl.host, { rejectUnauthorized: false, servername: purl.host });
+      socket.once('error', ko);
+
+      socket.once('secureConnect', () => {
+        const cert = socket.getPeerX509Certificate();
+        socket.end();
+        ok(cert.fingerprint.split(':').join(''));
+      });
+    });
+  }
+  ```
+
+test "rank1021: fix lets the caller require certificate verification"
+  lang javascript
+  file packages/@aws-cdk/custom-resource-handlers/lib/aws-iam/oidc-handler/external.ts
+  reject VYQL-CFG-004
+  code
+  ```
+  const tls = require('tls');
+  const url = require('url');
+
+  async function downloadThumbprint(issuerUrl, rejectUnauthorized) {
+    return new Promise((ok, ko) => {
+      const purl = url.parse(issuerUrl);
+      const port = purl.port || 443;
+
+      const socket = tls.connect(port, purl.host, { rejectUnauthorized, servername: purl.host });
+      socket.once('error', ko);
+
+      socket.once('secureConnect', () => {
+        const cert = socket.getPeerX509Certificate();
+        socket.end();
+        ok(cert.fingerprint.split(':').join(''));
+      });
+    });
+  }
+  ```
