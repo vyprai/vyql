@@ -1,0 +1,129 @@
+# Rank 1157 / CVE-2022-25168: Hadoop's FileUtil.unTarUsingTar builds a shell
+# command by string concatenation and runs it with `bash -c`, so any
+# metacharacter in the archive's path reaches a shell unless the value is
+# neutralised before it lands in the command text (CWE-78, CWE-88).
+#
+# The non-gzipped branch appends `FileUtil.makeSecureShellPath(inFile)`
+# straight into `untarCommand` with no surrounding quotes, while the gzipped
+# branch and the `cd` segment both wrap the same helper's result in a literal
+# `'...'` pair. `makeSecureShellPath` only escapes embedded single quotes
+# (`replace("'", "'\''")`); that escaping does nothing unless the caller also
+# wraps the result in single quotes, so the unquoted branch passes shell
+# metacharacters straight through to `bash -c`.
+#
+# Pool commit cae749b076f3 is the real fix (COMMIT_OK: comparing the parent
+# and the commit shows the change described below, matching the advisory).
+# It introduces `final String source = "'" + FileUtil.makeSecureShellPath(inFile)
+# + "'";` and uses `source` in both branches, so the previously-unquoted
+# non-gzipped case now gets the same quoting the gzipped case already had. No
+# pool correction.
+#
+# ATTENTION, engine gap (not mechanical). Scanning a hand-built minimal pair
+# confirms the taint model resolves this chain correctly on both revisions --
+# `vyql trace -from code.HttpInput -to code.CommandExecution` reaches a
+# `ShellCommandExecutor` sink through the StringBuffer/append chain, the
+# interprocedural `makeSecureShellPath` call and the `bash`/`-c`/command
+# array literal identically for the quoted and unquoted forms, because
+# nothing in the query language inspects the literal `'` characters
+# surrounding a call in a concatenation. `code.CommandLineAssemblyReview`
+# (CWE_77/CWE_88/CWE_829, VYQL-INJ-053) is the nearest concept by mechanism --
+# "command line text is assembled from contextual values without observed
+# shell quoting" is exactly this shape -- and it already ships for C
+# (`glib_unquoted_placeholder`) and Python (`command_line_assembly_review`),
+# both keyed on a `node.analysis` marker a Go-side heuristic sets; Java has no
+# such marker, so nothing labels either revision. See ENGINE-GAPS.md.
+#
+# No definition change attempted: a binding narrow enough to key on Hadoop's
+# own variable and literal text would report only this one call site, and a
+# `code.CommandExecution` sink bound to `ShellCommandExecutor` without that
+# distinction fires identically on the quoted, safe form -- confirmed on the
+# same hand-built pair -- so it is not shipped either.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1157: the non-gzipped branch concatenates the escaped path with no surrounding quotes"
+  lang java
+  file FileUtil.java
+  reject_review code.CommandLineAssemblyReview
+  code
+  ```
+  package org.apache.hadoop.fs;
+
+  public class FileUtil {
+    private static void unTarUsingTar(File inFile, File untarDir, boolean gzipped) throws IOException {
+      StringBuffer untarCommand = new StringBuffer();
+      if (gzipped) {
+        untarCommand.append(" gzip -dc '")
+            .append(FileUtil.makeSecureShellPath(inFile))
+            .append("' | (");
+      }
+      untarCommand.append("cd '")
+          .append(FileUtil.makeSecureShellPath(untarDir))
+          .append("' && ")
+          .append("tar -xf ");
+
+      if (gzipped) {
+        untarCommand.append(" -)");
+      } else {
+        untarCommand.append(FileUtil.makeSecureShellPath(inFile));
+      }
+      String[] shellCmd = { "bash", "-c", untarCommand.toString() };
+      ShellCommandExecutor shexec = new ShellCommandExecutor(shellCmd);
+      shexec.execute();
+      int exitcode = shexec.getExitCode();
+      if (exitcode != 0) {
+        throw new IOException("Error untarring file " + inFile +
+                    ". Tar process exited with exit code " + exitcode);
+      }
+    }
+
+    public static String makeSecureShellPath(File file) throws IOException {
+      return makeShellPath(file, false).replace("'", "'\\''");
+    }
+  }
+  ```
+
+test "rank1157: both branches wrap the escaped path in single quotes before concatenation"
+  lang java
+  file FileUtil.java
+  reject_review code.CommandLineAssemblyReview
+  code
+  ```
+  package org.apache.hadoop.fs;
+
+  public class FileUtil {
+    private static void unTarUsingTar(File inFile, File untarDir, boolean gzipped) throws IOException {
+      StringBuffer untarCommand = new StringBuffer();
+      final String source = "'" + FileUtil.makeSecureShellPath(inFile) + "'";
+      if (gzipped) {
+        untarCommand.append(" gzip -dc ")
+            .append(source)
+            .append(" | (");
+      }
+      untarCommand.append("cd '")
+          .append(FileUtil.makeSecureShellPath(untarDir))
+          .append("' && ")
+          .append("tar -xf ");
+
+      if (gzipped) {
+        untarCommand.append(" -)");
+      } else {
+        untarCommand.append(source);
+      }
+      LOG.debug("executing [{}]", untarCommand);
+      String[] shellCmd = { "bash", "-c", untarCommand.toString() };
+      ShellCommandExecutor shexec = new ShellCommandExecutor(shellCmd);
+      shexec.execute();
+      int exitcode = shexec.getExitCode();
+      if (exitcode != 0) {
+        throw new IOException("Error untarring file " + inFile +
+            ". Tar process exited with exit code " + exitcode
+            + " from command " + untarCommand);
+      }
+    }
+
+    public static String makeSecureShellPath(File file) throws IOException {
+      return makeShellPath(file, false).replace("'", "'\\''");
+    }
+  }
+  ```
