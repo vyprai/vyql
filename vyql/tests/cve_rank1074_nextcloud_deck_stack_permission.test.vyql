@@ -1,0 +1,100 @@
+# Rank 1074 / CVE-2021-39225: Nextcloud Deck let any authenticated user read a
+# stack, and the cards on it, by asking for its id (CWE-639, CWE-862).
+# StackService::find validated that the id was numeric and then read straight
+# through the mappers
+#
+#   $stack = $this->stackMapper->find($stackId);
+#   $cards = $this->cardMapper->findAll($stackId);
+#
+# with no check that the caller may see that board. Pool commit 0783fde14b is the
+# real fix by content, the merge of deck#3316 "Additional check for stacks"; it
+# adds $this->permissionService->checkPermission($this->stackMapper, $stackId,
+# Acl::PERMISSION_READ) before the read and drops a duplicate CardService method.
+# The metadata check reported COMMIT_NONE because NVD links the Nextcloud
+# advisory rather than a commit. No pool correction.
+#
+# ATTENTION, vocabulary gap, and it is the whole of the weakness rather than half
+# of it. Neither revision carries an authorization label of any kind:
+# PermissionService::checkPermission is the Nextcloud app framework's documented
+# way to ask whether the current user may act on an entity, and no binding emits
+# core.AuthorizationCheck for it, so the fixed revision looks exactly like the
+# vulnerable one to every rule. What both files do report is eight VYQL-RF-043
+# rows on state-changing operations, which is the same answer before and after.
+#
+# Binding that call would be documentation-derived and is still not enough on its
+# own, which is why nothing shipped here. A control with no rule asking for it
+# changes no finding: the missing half is a rule that says a read addressed by an
+# id belonging to another user's board requires one, and deciding which reads
+# those are is the branch-and-guard relation already recorded for ranks 1039,
+# 1040 and 1047 -- no single function is wrong when read alone. The concept that
+# would carry it, code.IdorPolicyReview with VYQL-AUTH-081, exists and its three
+# PHP bindings are presences keyed on one project's analysis flags each.
+#
+# The two snippets differ only in the permission check.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1074: a stack is read by id with no permission check"
+  lang php
+  file lib/Service/StackService.php
+  reject VYQL-AUTH-081
+  code
+  ```
+  <?php
+
+  namespace OCA\Deck\Service;
+
+  use OCA\Deck\BadRequestException;
+
+  class StackService {
+      private $stackMapper;
+      private $cardMapper;
+      private $permissionService;
+
+      public function find($stackId) {
+          if (is_numeric($stackId) === false) {
+              throw new BadRequestException('stack id must be a number');
+          }
+
+          $stack = $this->stackMapper->find($stackId);
+          $cards = $this->cardMapper->findAll($stackId);
+          $stack->setCards($cards);
+
+          return $stack;
+      }
+  }
+  ```
+
+test "rank1074: the same read behind the permission check"
+  lang php
+  file lib/Service/StackService.php
+  reject VYQL-AUTH-081
+  code
+  ```
+  <?php
+
+  namespace OCA\Deck\Service;
+
+  use OCA\Deck\BadRequestException;
+  use OCA\Deck\Db\Acl;
+
+  class StackService {
+      private $stackMapper;
+      private $cardMapper;
+      private $permissionService;
+
+      public function find($stackId) {
+          if (is_numeric($stackId) === false) {
+              throw new BadRequestException('stack id must be a number');
+          }
+
+          $this->permissionService->checkPermission($this->stackMapper, $stackId, Acl::PERMISSION_READ);
+
+          $stack = $this->stackMapper->find($stackId);
+          $cards = $this->cardMapper->findAll($stackId);
+          $stack->setCards($cards);
+
+          return $stack;
+      }
+  }
+  ```
