@@ -1,0 +1,116 @@
+# Rank 1124 / CVE-2026-40034: gitoxide's submodule config reader guarded
+# `update = !<shell command>` against coming from an untrusted `.gitmodules`
+# file by checking the wrong thing, so once a submodule had ever been
+# initialized locally, an attacker who controlled `.gitmodules` could still
+# smuggle a command through it (CWE-77, CWE-183, CWE-349, CWE-501).
+#
+# File::update in gix-submodule/src/access.rs read the value with
+# `self.config.string(...)`, which walks config sources newest-to-oldest and
+# silently falls through to `.gitmodules` if a locally-trusted override
+# section exists but doesn't itself set `update`. The guard then asked
+# `has_value_from_foreign_section`: does ANY section named
+# submodule.<name>.* exist from a source that isn't `.gitmodules`? Once
+# `submodule.<name>.url` had been written to `.git/config` by any normal
+# `git submodule` workflow, that question is true regardless of where the
+# `update` value the code is about to run actually came from. Real Git's own
+# `git submodule update` aborts on the identical repository state with
+# "invalid value for 'submodule.sub.update'"; gitoxide's equivalent returned
+# `Ok(Some(Update::Command("touch /tmp/pwned")))`.
+#
+# The pool commit named the introducing commit for the whole gix-submodule
+# abstraction (2023), not the fix -- the advisory itself states the
+# vulnerable code "was introduced in" that commit while separately pointing
+# at the actual bug. Corpus correction, in place: pool.tsv now names
+# e3ca1e64b0bcd627c7c5d3620f891cc22d1d03c7 (COMMIT_OK once corrected), found
+# by walking access.rs's own commit history for the fix dated in this CVE's
+# window; its message states directly that the earlier attempt "wasn't
+# correctly implemented." It replaces `self.config.string(...)` with
+# `self.config.string_filter(...)`, whose callback runs at the exact moment
+# the value is read and records whether that specific read's source is the
+# `.gitmodules` file itself (`std::ptr::eq(meta, our_meta)`), then checks that
+# recorded flag instead of asking whether any unrelated section exists.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports the same one
+# unrelated low-confidence NullableDeref row; nothing labels the provenance
+# check. code.ProtocolStateReview is the nearest concept in spirit -- CWE_349
+# is one of its five, and its text, "stale, or unauthenticated data accepted
+# without the required state check," is a fair one-level-up description of a
+# guard that verifies a related-but-wrong condition instead of the specific
+# value in play -- but stating the actual shape needs relating a value's read
+# site to its own provenance across a config-merge operation, a value-level
+# taint-source distinction the binding language has no vocabulary for; no
+# binding for this concept reaches Rust in any case.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1124: the guard checks whether ANY foreign section exists, not the value's own source"
+  lang rust
+  file access.rs
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  impl File {
+      pub fn update(&self, name: &BStr) -> Result<Option<Update>, config::update::Error> {
+          let value: Update = match self.config.string(&format!("submodule.{name}.update")) {
+              Some(v) => v.as_ref().try_into().map_err(|()| config::update::Error::Invalid {
+                  submodule: name.to_owned(),
+                  actual: v.into_owned(),
+              })?,
+              None => return Ok(None),
+          };
+
+          if let Update::Command(cmd) = &value {
+              let ours = self.config.meta();
+              let has_value_from_foreign_section = self
+                  .config
+                  .sections_by_name("submodule")
+                  .into_iter()
+                  .flatten()
+                  .any(|s| s.header().subsection_name() == Some(name) && !std::ptr::eq(s.meta(), ours));
+              if !has_value_from_foreign_section {
+                  return Err(config::update::Error::CommandForbiddenInModulesConfiguration {
+                      submodule: name.to_owned(),
+                      actual: cmd.to_owned(),
+                  });
+              }
+          }
+          Ok(Some(value))
+      }
+  }
+  ```
+
+test "rank1124: the guard checks whether the value actually read came from .gitmodules"
+  lang rust
+  file access.rs
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  impl File {
+      pub fn update(&self, name: &BStr) -> Result<Option<Update>, config::update::Error> {
+          let mut value_is_from_modules_file = None;
+          let our_meta = self.config.meta();
+          let value: Update = match self.config.string_filter(&format!("submodule.{name}.update"), |meta| {
+              value_is_from_modules_file = Some(std::ptr::eq(meta, our_meta));
+              true
+          }) {
+              Some(v) => v.as_ref().try_into().map_err(|()| config::update::Error::Invalid {
+                  submodule: name.to_owned(),
+                  actual: v.into_owned(),
+              })?,
+              None => return Ok(None),
+          };
+
+          if let Update::Command(cmd) = &value {
+              if value_is_from_modules_file.unwrap_or_default() {
+                  return Err(config::update::Error::CommandForbiddenInModulesConfiguration {
+                      submodule: name.to_owned(),
+                      actual: cmd.to_owned(),
+                  });
+              }
+          }
+          Ok(Some(value))
+      }
+  }
+  ```
