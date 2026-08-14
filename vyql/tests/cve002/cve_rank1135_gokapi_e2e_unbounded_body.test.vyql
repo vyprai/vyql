@@ -1,0 +1,101 @@
+# Rank 1135 / CVE-2026-30955: Gokapi's E2E metadata-store API endpoint
+# decoded the raw HTTP request body as JSON with no size limit, so an
+# authenticated user sending a very large request body could exhaust server
+# memory and crash the process for every user (CWE-400).
+#
+# paramE2eStore.ProcessParameter in internal/webserver/api/routing.go called
+# `json.NewDecoder(r.Body).Decode(&input)` directly on the request. The Go
+# standard library's json.Decoder reads and buffers as much of the stream as
+# the input requires with no inherent cap, so nothing bounded how large that
+# body could be before it was fully in memory.
+#
+# The pool commit's own title, "Added tests, fixed minor race condition,
+# updated version number," describes a different, unrelated fix bundled in
+# the same release; the advisory's actual mechanism, an unbounded body on an
+# E2E metadata endpoint, is nowhere in that commit's diff. Corpus correction,
+# in place: pool.tsv now names dc9347294e18a5ae12bf629dd189c6283aef7568
+# (COMMIT_OK once corrected), found by searching the repository's commit
+# history for the fix; its own message, "Fixed race conditions and limit e2e
+# info," and its routing.go diff match the advisory's description exactly.
+# It wraps `r.Body` in `http.MaxBytesReader(nil, r.Body, 5*1024*1024)` before
+# decoding, so `json.Decode` now returns an error once the body exceeds 5MB
+# instead of buffering it without limit. No further pool correction.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports 0 findings.
+# code.ConduitHyperUnboundedBodyToBytes carries this exact CWE (400) and its
+# reviewCondition, "HTTP request bodies are fully collected... before a
+# request-size limit is enforced," is the same shape almost word for word,
+# but the concept is named and scoped for one Rust web framework
+# (conduit-hyper) specifically, and its only binding is Rust. There is no
+# generic, language-neutral concept for "an HTTP body is decoded with no
+# MaxBytesReader-equivalent cap," even though the underlying weakness, an
+# unbounded read into memory driven entirely by client input, is identical
+# across ecosystems and json.NewDecoder(r.Body).Decode() with no
+# http.MaxBytesReader wrap is a well-documented, generic Go anti-pattern in
+# its own right.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1135: the e2e metadata body is decoded with no size limit"
+  lang go
+  file routing.go
+  reject_review code.ConduitHyperUnboundedBodyToBytes
+  code
+  ```
+  package api
+
+  import (
+      "encoding/json"
+      "net/http"
+  )
+
+  type paramE2eStore struct{}
+
+  func (p *paramE2eStore) ProcessParameter(r *http.Request) error {
+      type expectedInput struct {
+          Content string `json:"content"`
+      }
+      var input expectedInput
+
+      err := json.NewDecoder(r.Body).Decode(&input)
+      if err != nil {
+          return err
+      }
+      return nil
+  }
+  ```
+
+test "rank1135: the body is wrapped in MaxBytesReader before decoding"
+  lang go
+  file routing.go
+  reject_review code.ConduitHyperUnboundedBodyToBytes
+  code
+  ```
+  package api
+
+  import (
+      "encoding/json"
+      "net/http"
+  )
+
+  type paramE2eStore struct{}
+
+  func (p *paramE2eStore) ProcessParameter(r *http.Request) error {
+      const maxBodySize = 5 * 1024 * 1024
+      bodyReader := http.MaxBytesReader(nil, r.Body, maxBodySize)
+      defer bodyReader.Close()
+
+      type expectedInput struct {
+          Content string `json:"content"`
+      }
+      var input expectedInput
+
+      err := json.NewDecoder(bodyReader).Decode(&input)
+      if err != nil {
+          return err
+      }
+      return nil
+  }
+  ```
