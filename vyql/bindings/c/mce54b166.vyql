@@ -682,6 +682,86 @@ binding zeroLengthRadiusAttributeValueParse130 {
   emit issue code.ZeroLengthRadiusAttributeValueParse at node
 }
 
+binding deprecatedUnboundedDecoder0 {
+  query pattern presenceNode where node.path ~= "decode_tag_number_and_value"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
+binding deprecatedUnboundedDecoder1 {
+  query pattern presenceNode where node.path ~= "decode_tag_number"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
+binding deprecatedUnboundedDecoder2 {
+  query pattern presenceNode where node.path ~= "decode_object_id"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
+binding deprecatedUnboundedDecoder3 {
+  query pattern presenceNode where node.path ~= "decode_unsigned"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
+binding deprecatedUnboundedDecoder4 {
+  query pattern presenceNode where node.path ~= "decode_signed"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
+binding deprecatedUnboundedDecoder5 {
+  query pattern presenceNode where node.path ~= "decode_enumerated"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
+binding deprecatedUnboundedDecoder6 {
+  query pattern presenceNode where node.path ~= "decode_real"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
+binding deprecatedUnboundedDecoder7 {
+  query pattern presenceNode where node.path ~= "decode_double"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
+binding deprecatedUnboundedDecoder8 {
+  query pattern presenceNode where node.path ~= "decode_octet_string"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
+binding deprecatedUnboundedDecoder9 {
+  query pattern presenceNode where node.path ~= "decode_character_string"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
+binding deprecatedUnboundedDecoder10 {
+  query pattern presenceNode where node.path ~= "decode_bitstring"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
+binding deprecatedUnboundedDecoder11 {
+  query pattern presenceNode where node.path ~= "decode_context_object_id"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
+binding deprecatedUnboundedDecoder12 {
+  query pattern presenceNode where node.path ~= "decode_context_unsigned"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
+binding deprecatedUnboundedDecoder13 {
+  query pattern presenceNode where node.path ~= "decode_context_enumerated"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
+binding deprecatedUnboundedDecoder14 {
+  query pattern presenceNode where node.path ~= "decode_context_character_string"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
+binding deprecatedUnboundedDecoder15 {
+  query pattern presenceNode where node.path ~= "decode_context_octet_string"
+  emit issue code.DeprecatedUnboundedDecoder at node
+}
+
 binding uncheckedNullableResultDeref131 {
   query pattern presenceNode where node.kind == "any" and node.analysis ~= "nullable_result.unchecked_deref"
   emit issue code.UncheckedNullableResultDeref at node
