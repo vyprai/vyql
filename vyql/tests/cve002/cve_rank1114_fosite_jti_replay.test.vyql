@@ -1,0 +1,107 @@
+# Rank 1114 / CVE-2020-15222: fosite's private_key_jwt client authentication
+# checked that a client_assertion JWT carried a jti claim, but never recorded
+# which jti values it had already accepted, so a captured, still-valid
+# assertion could authenticate the client again and again until it expired
+# (CWE-287, CWE-345).
+#
+# Fosite.AuthenticateClient in client_authentication.go validated the
+# assertion's issuer, subject and signature, then required
+# `jti, ok := (*claims)["jti"].(string); ok && len(jti) > 0`, and stopped
+# there. RFC 7523's jti requirement exists precisely so a server can detect
+# reuse; checking only that the claim is present and non-empty verifies the
+# assertion's shape, not that this specific token has not been presented
+# before.
+#
+# Pool commit 0c9e0f6d654913ad57c507dd9a36631e1858a3e9 is the real fix
+# (COMMIT_OK, GHSA-v3q9-2p3m-7g43). After the jti presence check it calls
+# `f.Store.ClientAssertionJWTValid(ctx, jti)`, rejecting with ErrJTIKnown if
+# that jti was seen before, extracts the claim's own expiry, and calls
+# `f.Store.SetClientAssertionJWT(ctx, jti, expiry)` to record this jti before
+# the assertion is accepted, so a second presentation of the same token is
+# rejected. No pool correction.
+#
+# ATTENTION, vocabulary gap. Scanning either revision of client_authentication.go
+# reports 0 findings; nothing labels the jti check. The nearest concepts by
+# CWE, code.ForgeableIdentityToken (CWE_345, a reversible encoding accepted as
+# an identity credential with no integrity protection) and
+# code.FidoRegistrationChallengeReplay (CWE_294, a WebAuthn registration
+# challenge reused after successful registration, Python-only), both miss the
+# actual shape: this token is properly signed and its integrity is not in
+# question, and this is not a session challenge but a claim inside a signed
+# JWT checked for presence with no store consulted for prior use. No concept
+# states "a token includes a single-use nonce claim, and the claim's presence
+# is verified but its value is never checked against or recorded in a store of
+# previously accepted values" -- the general shape behind CWE-345 replay
+# protection across any nonce-bearing credential, not specific to JWT or OAuth.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1114: the jti claim is checked for presence, never recorded"
+  lang go
+  file client_authentication.go
+  reject_review code.ForgeableIdentityToken
+  code
+  ```
+  package fosite
+
+  func (f *Fosite) AuthenticateClient(ctx context.Context, r *http.Request, form url.Values) (Client, error) {
+      token, err := jwt.ParseWithClaims(assertion, &jwt.MapClaims{}, keyFunc)
+      if err != nil {
+          return nil, err
+      }
+      claims, ok := token.Claims.(*jwt.MapClaims)
+      if !ok {
+          return nil, ErrInvalidClient
+      }
+
+      if !claims.VerifyIssuer(clientID, true) {
+          return nil, ErrInvalidClient.WithHint("Claim \"iss\" must match the \"client_id\".")
+      } else if sub, ok := (*claims)["sub"].(string); !ok || sub != clientID {
+          return nil, ErrInvalidClient.WithHint("Claim \"sub\" must match the \"client_id\".")
+      } else if jti, ok := (*claims)["jti"].(string); !ok || len(jti) == 0 {
+          return nil, ErrInvalidClient.WithHint("Claim \"jti\" must be set but is not.")
+      }
+
+      return client, nil
+  }
+  ```
+
+test "rank1114: the jti claim is checked against and recorded in the store"
+  lang go
+  file client_authentication.go
+  reject_review code.ForgeableIdentityToken
+  code
+  ```
+  package fosite
+
+  func (f *Fosite) AuthenticateClient(ctx context.Context, r *http.Request, form url.Values) (Client, error) {
+      token, err := jwt.ParseWithClaims(assertion, &jwt.MapClaims{}, keyFunc)
+      if err != nil {
+          return nil, err
+      }
+      claims, ok := token.Claims.(*jwt.MapClaims)
+      if !ok {
+          return nil, ErrInvalidClient
+      }
+
+      var jti string
+      if !claims.VerifyIssuer(clientID, true) {
+          return nil, ErrInvalidClient.WithHint("Claim \"iss\" must match the \"client_id\".")
+      } else if sub, ok := (*claims)["sub"].(string); !ok || sub != clientID {
+          return nil, ErrInvalidClient.WithHint("Claim \"sub\" must match the \"client_id\".")
+      } else if jti, ok = (*claims)["jti"].(string); !ok || len(jti) == 0 {
+          return nil, ErrInvalidClient.WithHint("Claim \"jti\" must be set but is not.")
+      } else if f.Store.ClientAssertionJWTValid(context.Background(), jti) != nil {
+          return nil, ErrJTIKnown.WithHint("Claim \"jti\" MUST only be used once.")
+      }
+
+      expiry := int64((*claims)["exp"].(float64))
+      if err := f.Store.SetClientAssertionJWT(context.Background(), jti, time.Unix(expiry, 0)); err != nil {
+          return nil, err
+      }
+
+      return client, nil
+  }
+  ```
