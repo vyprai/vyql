@@ -1,0 +1,126 @@
+# Rank 1076 / CVE-2026-42570: devalue's parser allocated an array of whatever
+# length the payload declared, so a few bytes could ask for gigabytes
+# (CWE-770). unflatten held
+#
+#   if (!Number.isInteger(len) || len < 0) { ... }
+#   const array = new Array(len);
+#
+# and the elements that follow are read one at a time, so a payload declaring a
+# hundred million entries and supplying none still made the engine allocate a
+# contiguous backing store for them. Pool commit 206ca6712f is the real fix
+# (COMMIT_OK, named by GHSA-77vg-94rm-hx3p); it bounds the declared length
+# against the maximum array length, builds the array empty, touches the largest
+# possible index once to force the engine into dictionary-elements mode so no
+# contiguous store is reserved, and only sets `length` at the end.
+# No pool correction.
+#
+# ATTENTION, and the concept for this already exists and cannot be reached.
+# code.LengthDerivedAllocation carries CWE-400 and CWE-789 with the review
+# condition "parsed length controls allocation before the available input bytes
+# are proven", which is this weakness stated exactly, and rule VYQL-DOS-006
+# consumes it. Its bindings are Go, C and C++ presences over frontend analyses,
+# and there is none for JavaScript.
+#
+# Writing the JavaScript one as a presence is what the precision test rejects.
+# `new Array(n)` with a non-literal argument is how every dynamically sized array
+# in the language is written, so a presence over it reports the idiom rather than
+# the weakness. What distinguishes devalue's call is that `n` was parsed out of
+# untrusted input and the elements it claims were never counted, which is a taint
+# question, and code.LengthDerivedAllocation is an issue rather than a sink, so
+# no rule can ask it. The concept would have to gain a sink form -- allocation
+# size as a sink, with a source of parsed length -- before a JavaScript binding
+# would be anything but noise. That is a design step, not a binding.
+#
+# Measured: nothing is reported on the parser at either revision. The file's only
+# labels are three code.ProtoPollute sinks on the property writes at parse.js:64,
+# 86 and 94, which is a different weakness in the same function and one the fix
+# does not touch.
+#
+# The two snippets differ only in how the array of that length is built.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1076: the declared length sizes the allocation"
+  lang javascript
+  file src/parse.js
+  reject VYQL-DOS-006
+  code
+  ```
+  export function unflatten(parsed, revivers) {
+      const values = parsed;
+
+      function hydrate(index) {
+          const value = values[index];
+
+          if (Array.isArray(value) && value[0] === 'Array') {
+              const len = value[1];
+
+              if (!Number.isInteger(len) || len < 0) {
+                  throw new Error('Invalid array length');
+              }
+
+              const array = new Array(len);
+
+              for (let i = 2; i < value.length; i += 2) {
+                  const idx = value[i];
+                  if (!Number.isInteger(idx) || idx < 0 || idx >= len) {
+                      throw new Error('Invalid array index');
+                  }
+                  array[idx] = hydrate(value[i + 1]);
+              }
+
+              return array;
+          }
+
+          return value;
+      }
+
+      return hydrate(0);
+  }
+  ```
+
+test "rank1076: the same length applied after the elements are placed"
+  lang javascript
+  file src/parse.js
+  reject VYQL-DOS-006
+  code
+  ```
+  const MAX_ARRAY_LEN = 2 ** 32 - 1;
+  const MAX_ARRAY_INDEX = MAX_ARRAY_LEN - 1;
+
+  export function unflatten(parsed, revivers) {
+      const values = parsed;
+
+      function hydrate(index) {
+          const value = values[index];
+
+          if (Array.isArray(value) && value[0] === 'Array') {
+              const len = value[1];
+
+              if (!Number.isInteger(len) || len < 0 || len > MAX_ARRAY_LEN) {
+                  throw new Error('Invalid array length');
+              }
+
+              const array = [];
+              array[MAX_ARRAY_INDEX] = undefined;
+              delete array[MAX_ARRAY_INDEX];
+
+              for (let i = 2; i < value.length; i += 2) {
+                  const idx = value[i];
+                  if (!Number.isInteger(idx) || idx < 0 || idx > MAX_ARRAY_INDEX || idx >= len) {
+                      throw new Error('Invalid array index');
+                  }
+                  array[idx] = hydrate(value[i + 1]);
+              }
+
+              array.length = len;
+
+              return array;
+          }
+
+          return value;
+      }
+
+      return hydrate(0);
+  }
+  ```
