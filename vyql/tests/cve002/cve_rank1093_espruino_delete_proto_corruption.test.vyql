@@ -1,0 +1,80 @@
+# Rank 1093 / CVE-2022-25044: Espruino's JS interpreter corrupted its internal
+# variable graph when a script ran delete [].__proto__ (CWE-787, reported as a
+# stack buffer overflow in jsvNewFromString though the root cause is upstream of
+# it). jspNewPrototype returns a JsVar that is a 'prototype' name already
+# linked as a child of the object it describes; jspGetNamedFieldInParents used
+# that return value directly as if it were a standalone value, so
+# jspeFactorDelete's removal path called jsvRemoveChild(parent, a) on a node
+# that was never really parent's own child, corrupting Espruino's
+# reference-counted variable graph rather than performing a valid array-bounds
+# or pointer operation. Pool commit e069be2ecc5 is the real fix; it wraps the
+# prototype lookup in a proper child-creation call
+# (jsvCreateNewChild(object, i, p)) so the returned node genuinely belongs to
+# its parent, adds an explicit jsvIsChild(parent, a) membership check before
+# jspeFactorDelete calls jsvRemoveChild, and adds debug-build asserts of the
+# same invariant at two more call sites (jsvAddName, jsvRemoveChild itself).
+#
+# ATTENTION, not mechanical. This is a graph-membership invariant inside
+# Espruino's own reference-counted JsVar/JsVarRef object model, a
+# domain-specific data structure this project alone implements; it is not a
+# buffer index, a pointer arithmetic expression, or any other shape VyQL's C
+# memory-safety vocabulary (index-guard bound checking, pointer-use tracking)
+# is built to reach. Stating the fix generically -- "verify a node is a member
+# of the structure you are about to remove it from" -- has no public API to
+# write a binding against, since jsvIsChild/jsvRemoveChild are Espruino
+# internals with no other consumer in the corpus; a binding keyed on those
+# names would be a repro-shaped patch for this one project, not a weakness
+# class. No definition change attempted.
+#
+# verify_current_expected: attention-not-mechanical
+
+test "rank1093: a returned prototype name is deleted as if it were a plain child"
+  lang c
+  file src/jsparse.c
+  reject VYQL-MEM-002
+  code
+  ```
+  JsVar *jspGetNamedFieldInParents(JsVar *object, const char *name) {
+    const char *objName = jswGetBasicObjectName(object);
+    if (objName) {
+      return jspNewPrototype(objName);
+    }
+    return 0;
+  }
+
+  JsVar *jspeFactorDelete(JsVar *parent, JsVar *a) {
+    if (jsvHasChildren(parent)) {
+      jsvRemoveChild(parent, a);
+      return jsvNewFromBool(true);
+    }
+    return jsvNewFromBool(false);
+  }
+  ```
+
+test "rank1093: the fix links the prototype as a real child and checks membership"
+  lang c
+  file src/jsparse.c
+  reject VYQL-MEM-002
+  code
+  ```
+  JsVar *jspGetNamedFieldInParents(JsVar *object, const char *name) {
+    const char *objName = jswGetBasicObjectName(object);
+    if (objName) {
+      JsVar *p = jsvSkipNameAndUnLock(jspNewPrototype(objName));
+      JsVar *i = jsvNewFromString(name);
+      JsVar *child = 0;
+      if (p) child = jsvCreateNewChild(object, i, p);
+      jsvUnLock(i);
+      return child;
+    }
+    return 0;
+  }
+
+  JsVar *jspeFactorDelete(JsVar *parent, JsVar *a) {
+    if (jsvHasChildren(parent) && jsvIsChild(parent, a)) {
+      jsvRemoveChild(parent, a);
+      return jsvNewFromBool(true);
+    }
+    return jsvNewFromBool(false);
+  }
+  ```
