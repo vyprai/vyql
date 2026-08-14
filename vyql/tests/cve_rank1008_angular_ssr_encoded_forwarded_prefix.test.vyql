@@ -1,0 +1,58 @@
+# Rank 1008 / CVE-2026-44437: Angular SSR open redirect / request steering via
+# an encoded X-Forwarded-Prefix header. validateHeaders checked the header with
+# a denylist regex for literal ".." path segments
+# (INVALID_PREFIX_REGEX = /^(?:\\|\/[/\\])|(?:^|[/\\])\.\.?(?:[/\\]|$)/). A value
+# like /%2e%2e/evil contains no literal "..", so it passes the denylist, and a
+# downstream consumer (the browser handling the redirect Location, or the
+# router) percent-decodes it into ../ and steers the redirect (CWE-22, CWE-601).
+# The fix 94023f62c5 (COMMIT_NONE in the advisory DB, but this is the referenced
+# @angular/ssr fix) replaces the denylist with an allow-list regex
+# (VALID_PREFIX_REGEX = /^\/([a-z0-9_-]+\/)*[a-z0-9_-]*$/i) that rejects the "%"
+# character, and adds the trustProxyHeaders option to strip or gate proxy
+# headers.
+#
+# ATTENTION, no precise generic detection. The decode that turns %2e%2e into ../
+# does not happen in the validated code; it happens in a downstream consumer, so
+# there is no locally visible check-then-decode ordering to key on. Flagging any
+# denylist ".." validation as insufficient would flag ordinary code everywhere,
+# since a denylist is correct whenever the value is not later percent-decoded.
+# The header-to-redirect flow is also not modeled: X-Forwarded-Prefix is not a
+# labelled source and the redirect Location is not an open-redirect sink here, so
+# the taint reaches only unrelated log sinks (VYQL-INJ-009) that fire identically
+# on the vulnerable and fixed revisions.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1008: X-Forwarded-Prefix validated by a denylist that misses encoded traversal"
+  lang javascript
+  file packages/angular/ssr/src/utils/validation.ts
+  reject VYQL-RF-013
+  code
+  ```
+  const INVALID_PREFIX_REGEX = /^(?:\\|\/[/\\])|(?:^|[/\\])\.\.?(?:[/\\]|$)/;
+
+  function validateHeaders(request: Request): void {
+    const headers = request.headers;
+    const xForwardedPrefix = headers.get('x-forwarded-prefix');
+    if (xForwardedPrefix && INVALID_PREFIX_REGEX.test(xForwardedPrefix)) {
+      throw new Error('Header "x-forwarded-prefix" must not contain ".", ".." path segments.');
+    }
+  }
+  ```
+
+test "rank1008: fix validates X-Forwarded-Prefix with an allow-list regex"
+  lang javascript
+  file packages/angular/ssr/src/utils/validation.ts
+  reject VYQL-RF-013
+  code
+  ```
+  const VALID_PREFIX_REGEX = /^\/([a-z0-9_-]+\/)*[a-z0-9_-]*$/i;
+
+  function validateHeaders(request: Request): void {
+    const headers = request.headers;
+    const xForwardedPrefix = headers.get('x-forwarded-prefix');
+    if (xForwardedPrefix && !VALID_PREFIX_REGEX.test(xForwardedPrefix)) {
+      throw new Error('Header "x-forwarded-prefix" is invalid.');
+    }
+  }
+  ```
