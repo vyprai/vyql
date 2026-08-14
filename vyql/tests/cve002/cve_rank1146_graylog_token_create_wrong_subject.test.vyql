@@ -1,0 +1,80 @@
+# Rank 1146 / CVE-2025-53106: Graylog's token-creation endpoint checked
+# whether the REQUESTING user could create tokens for themselves, then used
+# that answer to authorize creating a token for whichever OTHER user the URL
+# named, so any user holding the token-create permission for their own
+# account could mint API tokens for arbitrary other accounts by changing the
+# path parameter (CWE-285).
+#
+# UsersResource's token-creation handler in
+# .../rest/resources/users/UsersResource.java loaded `futureOwner` from the
+# `userId` path parameter (the account the token would belong to), then
+# called `isPermitted(USERS_TOKENCREATE, currentUser.getName())`, checking
+# the permission against `currentUser`, the account making the request, not
+# `futureOwner`, the account being acted on.
+#
+# Pool commit 9215b8f1fd32 is the real fix (COMMIT_OK, its changelog entry
+# names the advisory). It removes the `currentUser` lookup entirely and
+# checks `isPermitted(USERS_TOKENCREATE, futureOwner.getName())`, so the
+# permission check now runs against the actual target of the operation. No
+# pool correction.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports the same
+# thirteen findings, all unrelated CSRF-shaped noise; nothing labels the
+# subject mismatch itself. code.IdorPolicyReview is the nearest concept by
+# theme, an authorization check missing the current-principal ownership
+# constraint its own resource lookup should carry, and it already has PHP
+# and JavaScript bindings, but none for Java, and its stated condition is
+# about a lookup or delete missing an ownership constraint entirely rather
+# than a check present but evaluated against the wrong principal (self
+# instead of the operation's actual target) -- a related but narrower shape
+# this concept does not quite name either.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1146: the permission check runs against the requester, not the token's future owner"
+  lang java
+  file UsersResource.java
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  package org.graylog2.rest.resources.users;
+
+  public class UsersResource extends RestResource {
+      public Response createToken(@PathParam("userId") String userId, GenerateTokenTTL body) {
+          final User futureOwner = loadUserById(userId);
+          final User currentUser = getCurrentUser();
+
+          if (currentUser == null) {
+              throw new ForbiddenException("Not allowed to create tokens for unknown user.");
+          }
+          if (!isPermitted(USERS_TOKENCREATE, currentUser.getName())) {
+              throw new ForbiddenException(currentUser.getName() + " is not allowed to create token.");
+          }
+
+          return createTokenForUser(futureOwner);
+      }
+  }
+  ```
+
+test "rank1146: the permission check runs against the token's actual future owner"
+  lang java
+  file UsersResource.java
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  package org.graylog2.rest.resources.users;
+
+  public class UsersResource extends RestResource {
+      public Response createToken(@PathParam("userId") String userId, GenerateTokenTTL body) {
+          final User futureOwner = loadUserById(userId);
+
+          if (!isPermitted(USERS_TOKENCREATE, futureOwner.getName())) {
+              throw new ForbiddenException("You are not allowed to create a token for user " + futureOwner.getName() + ".");
+          }
+
+          return createTokenForUser(futureOwner);
+      }
+  }
+  ```
