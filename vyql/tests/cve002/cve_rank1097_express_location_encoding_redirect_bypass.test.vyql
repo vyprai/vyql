@@ -1,0 +1,103 @@
+# Rank 1097 / CVE-2024-29041: Express's res.location() ran the URL through
+# encodeurl before setting the Location header, and a malformed URL could
+# encode to something a browser interprets differently than the string an
+# application's own allowlist check evaluated, bypassing a correctly written
+# redirect allowlist (CWE-601, CWE-1286). The prior fix (express@4.19.0/.1)
+# tried to detect this by re-parsing both the raw and the encoded URL with
+# url.parse and comparing hosts, but that comparison itself was bypassable.
+# lib/response.js's res.location had that host-comparison approach; pool
+# commit 0b746953c4bd8e is the improved fix, replacing it with a regex
+# (schemaAndHostRegExp) that finds where the scheme+host portion of the URL
+# ends and encodes only what comes after it, so a backslash or similar
+# malformed sequence in the host portion is never re-encoded into something
+# meaningful.
+#
+# ATTENTION, and this is the same shape as rank 1083 (DOMPurify): the flaw is
+# entirely inside a dependency's own code, not in how an application calls it.
+# res.redirect(url) is bound as code.RedirectTargetSink and the shipped
+# VYQL-RF-002 rule already reports an unvalidated call correctly -- but this
+# CVE is not about a missing allowlist, it is about a validated URL that the
+# dependency itself corrupts before sending it. An application that validates
+# its redirect target against an allowlist and then calls res.redirect() with
+# it is doing everything a source-level scan can ask for; core.AllowlistValidation
+# suppresses the finding, correctly, and the vulnerable version of Express is
+# what breaks the guarantee that control was supposed to provide. Express is
+# not in vyql/sca/advisories.json (an empty grep for "express"), so there is no
+# route to flag the version either. No definition change shipped: the fix here
+# is entirely inside a library this project depends on, and reporting every
+# res.redirect() call regardless of validation, or minting a version-ranged
+# control the same way rank 1083 measured to fail closed on non-exact
+# specifiers, would either lose the true positive case or gain nothing over
+# the status quo.
+#
+# Scanning lib/response.js reports 0 findings on the extracted function; vyql
+# match labels no source or sink around the encoding logic itself, since the
+# weakness is what the encoding produces, not a taint path into it.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1097: a validated redirect target is not reported, whatever the express version"
+  lang javascript
+  file app.js
+  reject VYQL-RF-002
+  code
+  ```
+  const ALLOWED_HOSTS = new Set(['app.example.com', 'www.example.com']);
+
+  function isAllowedRedirect(url) {
+    try {
+      const parsed = new URL(url, 'https://app.example.com');
+      return ALLOWED_HOSTS.has(parsed.host);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function handler(req, res) {
+    const target = req.query.next;
+    if (isAllowedRedirect(target)) {
+      res.redirect(target);
+    } else {
+      res.redirect('/');
+    }
+  }
+  ```
+
+test "rank1097: the same call with no allowlist at all is reported"
+  lang javascript
+  file app.js
+  expect VYQL-RF-002
+  code
+  ```
+  function handler(req, res) {
+    const target = req.query.next;
+    res.redirect(target);
+  }
+  ```
+
+# The library's own fix, kept so a later reader can see what changed inside
+# Express rather than inferring it from the advisory text.
+
+test "rank1097: the fix encodes only the portion of the url after its host"
+  lang javascript
+  file lib/response.js
+  reject VYQL-RF-002
+  code
+  ```
+  var schemaAndHostRegExp = /^(?:[a-zA-Z][a-zA-Z0-9+.-]*:)?\/\/[^\\\/\?]+/;
+
+  res.location = function location(url) {
+    var loc;
+    if (url === 'back') {
+      loc = this.req.get('Referrer') || '/';
+    } else {
+      loc = String(url);
+    }
+
+    var m = schemaAndHostRegExp.exec(loc);
+    var pos = m ? m[0].length + 1 : 0;
+    loc = loc.slice(0, pos) + encodeUrl(loc.slice(pos));
+
+    return this.set('Location', loc);
+  };
+  ```
