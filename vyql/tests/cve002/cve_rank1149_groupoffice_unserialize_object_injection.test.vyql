@@ -1,0 +1,89 @@
+# Rank 1149 / CVE-2026-34838: Group-Office deserialized stored settings
+# values with PHP's `unserialize()` and no `allowed_classes` restriction, so
+# a value an authenticated user could set (a per-user or per-controller
+# setting persisted with a `serialized:` prefix) could carry a PHP Object
+# Injection gadget chain reaching remote code execution once read back and
+# deserialized (CWE-502).
+#
+# AbstractSettingsCollection's setting loader in
+# www/go/base/model/AbstractSettingsCollection.php called
+# `unserialize(substr($value, 11))` for any stored value prefixed
+# `serialized:`, with PHP's default deserialization behavior, which
+# instantiates any class named in the serialized payload and can invoke its
+# `__wakeup`/`__destruct` magic methods, giving an attacker who could
+# influence a stored settings value most of what a PHP Object Injection
+# gadget chain needs. Two sibling call sites, AbstractExportController's
+# column-selection cache and Crypt's session-token unserialize, carried the
+# identical pattern.
+#
+# Pool commit aceedacb5fe is the real fix despite the COMMIT_NONE flag,
+# checked against its own message, which names the vulnerability class and
+# the vulnerable class directly, and its cherry-pick source: it adds
+# `['allowed_classes' => false]` as unserialize()'s second argument at all
+# three call sites, restricting deserialization to scalars and arrays only,
+# so no object of any class, and therefore no magic-method gadget, can be
+# constructed from the payload. No pool correction.
+#
+# ATTENTION, and a two-part gap rather than one missing piece.
+# code.Deserialization already binds PHP's unserialize() and correctly
+# labels the sink identically at both revisions (confirmed with vyql match);
+# nothing fires because, first, no source in this file reaches it (the
+# tainted $value comes from a settings-loading call chain this narrow
+# extraction does not include), and second, even if a source did reach it,
+# core.SafeDeserialization, the control the rule checks against, has no PHP
+# binding at all, so an unserialize() call with allowed_classes => false set
+# would report identically to one without it. The second half is the more
+# consequential one: PHP is the language this CVE's own class of bug is most
+# associated with, and the language-native mitigation, restricting
+# allowed_classes, is not recognized as a control in any PHP binding in the
+# corpus.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected
+
+test "rank1149: a stored setting is deserialized with PHP's default class-instantiation behavior"
+  lang php
+  file AbstractSettingsCollection.php
+  reject VYQL-DESER-001
+  code
+  ```
+  <?php
+  abstract class AbstractSettingsCollection extends \GO\Base\Model
+  {
+      protected function setValues($values)
+      {
+          foreach ($values as $property => $value) {
+              if (isset($value)) {
+                  if (substr($value, 0, 11) == 'serialized:') {
+                      $value = unserialize(substr($value, 11));
+                  }
+                  $this->{substr($property, strlen($this->myPrefix()))} = $value;
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1149: the same call restricts deserialization to scalars and arrays only"
+  lang php
+  file AbstractSettingsCollection.php
+  reject VYQL-DESER-001
+  code
+  ```
+  <?php
+  abstract class AbstractSettingsCollection extends \GO\Base\Model
+  {
+      protected function setValues($values)
+      {
+          foreach ($values as $property => $value) {
+              if (isset($value)) {
+                  if (substr($value, 0, 11) == 'serialized:') {
+                      $value = unserialize(substr($value, 11), ['allowed_classes' => false]);
+                  }
+                  $this->{substr($property, strlen($this->myPrefix()))} = $value;
+              }
+          }
+      }
+  }
+  ```
