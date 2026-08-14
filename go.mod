@@ -1,6 +1,6 @@
 module github.com/vyprai/vyql
 
-go 1.26.4
+go 1.26.6
 
 // A published version cannot be removed from the module proxy, only retracted:
 // proxy.golang.org has it cached and sum.golang.org has recorded its hash, both
