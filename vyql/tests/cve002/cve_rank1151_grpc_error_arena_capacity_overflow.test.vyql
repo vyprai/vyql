@@ -1,0 +1,135 @@
+# Rank 1151 / CVE-2017-9431: gRPC's grpc_error arena grew its own capacity
+# field with no bound on the result, so an error object accumulating enough
+# fields (ints, strings, times, or child errors — driven by ordinary
+# processing of a malformed request, not a single attacker-supplied number)
+# wrapped that field's width and wrote past the buffer it had just
+# undersized (CWE-787).
+#
+# get_placement in src/core/lib/iomgr/error.c grows arena_capacity, a
+# uint8_t, with `(uint8_t)(3 * arena_capacity / 2)` whenever the arena is
+# full. Once arena_capacity passes 170, `3 * capacity` exceeds 255 before
+# the narrowing cast truncates it, so the field can wrap down to a value
+# smaller than arena_size, the separately tracked count of slots already in
+# use. gpr_realloc then shrinks the buffer to match the wrapped-down
+# capacity, but the function still returns arena_size as the next write
+# placement — a value the shrunk buffer no longer has room for — and every
+# caller (internal_set_int, internal_set_str, internal_set_time,
+# internal_add_error) writes to `arena[placement]` unconditionally.
+#
+# Pool commit 55a61e43b9 carries the `nocommit` flag because the advisory
+# links no commit hash directly; checked against its own diff and the
+# GHSA-6q3h-fg8c-jqrj advisory, which references PR #10492 by URL and this
+# commit is that PR's merge, titled "Fix Error Overflow Bug" and touching
+# exactly error.c. Confirmed as the real fix, not a release bump. No pool
+# correction.
+#
+# The fix clamps the growth to `GPR_MIN(UINT8_MAX - 1, 3 * capacity / 2)`,
+# then re-checks `arena_size + slots > arena_capacity` against the clamped
+# value and returns the UINT8_MAX sentinel instead of growing if even the
+# maximum still cannot fit. Every caller now checks for that sentinel and
+# drops the field (logging it) instead of writing.
+#
+# ATTENTION, engine gap, the same interprocedural relation already on
+# record at ranks 1096 and 1102: an allocation's size and the offset a
+# later write uses need to be related across functions, and nothing in the
+# engine states that relation. `vyql match` confirms both halves are
+# labelled correctly and independently: the growth multiplication at
+# error.c:7 is `code.ComputedSizeValue` (a source) and also
+# `code.IntegerSizeArithmeticSink`, and the `arena[slot]` write at error.c:23
+# is `code.IndexAccessSink`, both identically in the vulnerable and patched
+# revisions. `vyql trace -from code.ComputedSizeValue -to
+# code.IndexAccessSink` finds no path from either source: the capacity
+# computation's only route out is into `gpr_realloc`, an external call with
+# no traced return, and the index written, `placement`, comes from
+# arena_size, a field the capacity growth never touches. There is no
+# dataflow edge between the two quantities to trace, because the bug is
+# that they can drift apart, not that one taints the other, which is a
+# sharper version of 1096's and 1102's gap: those need a size and an offset
+# related across a call boundary; this one needs two independently-updated
+# fields of the same object related, where a general dataflow-taint
+# framing cannot even state the property being violated. Scanning either
+# revision reports only unrelated VYQL-MEM-006 NullableDeref rows,
+# unconditional low-confidence deref smells on every `(*err)->` access, not
+# a discriminator.
+#
+# No definition change attempted. Folded into ENGINE-GAPS.md's 1096/1102
+# entry as a third instance.
+#
+# verify_current_expected: attention-engine-gap, no path relates the two fields in either revision
+
+test "rank1151: arena_capacity grows with an unclamped narrowing cast, and the stale arena_size placement is written unconditionally"
+  lang c
+  file error.c
+  reject VYQL-MEM-005
+  code
+  ```
+  typedef struct grpc_error {
+    uint8_t arena_size;
+    uint8_t arena_capacity;
+    uint8_t ints[4];
+    intptr_t arena[1];
+  } grpc_error;
+
+  static uint8_t get_placement(grpc_error **err, size_t size) {
+    uint8_t slots = (uint8_t)(size / sizeof(intptr_t));
+    if ((*err)->arena_size + slots > (*err)->arena_capacity) {
+      (*err)->arena_capacity = (uint8_t)(3 * (*err)->arena_capacity / 2);
+      *err = gpr_realloc(
+          *err, sizeof(grpc_error) + (*err)->arena_capacity * sizeof(intptr_t));
+    }
+    uint8_t placement = (*err)->arena_size;
+    (*err)->arena_size = (uint8_t)((*err)->arena_size + slots);
+    return placement;
+  }
+
+  static void internal_set_int(grpc_error **err, int which, intptr_t value) {
+    uint8_t slot = (*err)->ints[which];
+    if (slot == UINT8_MAX) {
+      slot = get_placement(err, sizeof(value));
+    }
+    (*err)->ints[which] = slot;
+    (*err)->arena[slot] = value;
+  }
+  ```
+
+test "rank1151: the growth is clamped and re-checked, returning a sentinel instead of an out-of-range placement"
+  lang c
+  file error.c
+  reject VYQL-MEM-005
+  code
+  ```
+  typedef struct grpc_error {
+    uint8_t arena_size;
+    uint8_t arena_capacity;
+    uint8_t ints[4];
+    intptr_t arena[1];
+  } grpc_error;
+
+  static uint8_t get_placement(grpc_error **err, size_t size) {
+    uint8_t slots = (uint8_t)(size / sizeof(intptr_t));
+    if ((*err)->arena_size + slots > (*err)->arena_capacity) {
+      (*err)->arena_capacity =
+          (uint8_t)GPR_MIN(UINT8_MAX - 1, (3 * (*err)->arena_capacity / 2));
+      if ((*err)->arena_size + slots > (*err)->arena_capacity) {
+        return UINT8_MAX;
+      }
+      *err = gpr_realloc(
+          *err, sizeof(grpc_error) + (*err)->arena_capacity * sizeof(intptr_t));
+    }
+    uint8_t placement = (*err)->arena_size;
+    (*err)->arena_size = (uint8_t)((*err)->arena_size + slots);
+    return placement;
+  }
+
+  static void internal_set_int(grpc_error **err, int which, intptr_t value) {
+    uint8_t slot = (*err)->ints[which];
+    if (slot == UINT8_MAX) {
+      slot = get_placement(err, sizeof(value));
+      if (slot == UINT8_MAX) {
+        return;
+      }
+    }
+    (*err)->ints[which] = slot;
+    (*err)->arena[slot] = value;
+  }
+  ```
