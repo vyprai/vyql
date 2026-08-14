@@ -1,0 +1,94 @@
+# Rank 1072 / CVE-2024-51378: CyberPanel concatenated a JSON field from the
+# request body into a shell command and ran it as root, on views reachable
+# without authentication (CWE-77, CWE-78, CWE-276). getresetstatus in dns/views.py
+# and ftp/views.py held
+#
+#   data = json.loads(request.body)
+#   statusfile = data['statusfile']
+#   installStatus = ProcessUtilities.outputExecutioner("sudo cat " + statusfile)
+#
+# and then `sudo rm -f ' + statusfile` on two branches below it. Pool commit
+# 1c0c6cbcf7 is the real fix (COMMIT_OK, named by GHSA-c45f-33wq-x2qc); it adds
+# the admin ACL check both views were missing. No pool correction.
+#
+# CAUGHT by VYQL-INJ-002 at critical and high confidence, across the two files:
+# source code.HttpInput at views.py:248, the json.loads(request.body) read, sink
+# code.CommandExecution at processUtilities.py:323, where the project's own
+# executioner reaches the shell. Three code.DynamicCommandExec rows and one
+# code.CommandStringWrapperExecution are reported beside it, so the command
+# surface of this helper is well covered.
+#
+# It does not separate the revisions, and here that is right rather than a
+# limit: the fix adds an authorization check and leaves the concatenation and
+# the shell call exactly as they were, so the injection is still present and
+# still reported -- 14 findings at both revisions, the same fingerprints. What
+# the fix changes is who can reach it, and VYQL-INJ-002's unless clauses ask
+# about escaping and argument validation, not about who may call the view. A
+# rule that suppressed an injection because an authorization check appeared
+# above it would be wrong.
+#
+# The snippets call subprocess with shell=True directly, since a spec snippet is
+# one file and the real executioner is a wrapper two calls deep, so they report
+# VYQL-INJ-004 rather than VYQL-INJ-002: the same source and sink concepts, a
+# different rule over them. The two differ only in the ACL check the fix adds,
+# and both report.
+#
+# verify_current_expected: caught-partial
+
+test "rank1072: a status file from the request body is concatenated into a command"
+  lang python
+  file dns/views.py
+  expect VYQL-INJ-004
+  code
+  ```
+  import json
+  import subprocess
+
+  from django.http import HttpResponse
+
+
+  class ProcessUtilities:
+      @staticmethod
+      def outputExecutioner(command):
+          return subprocess.check_output(command, shell=True).decode()
+
+
+  def getresetstatus(request):
+      data = json.loads(request.body)
+      statusfile = data['statusfile']
+      installStatus = ProcessUtilities.outputExecutioner("sudo cat " + statusfile)
+
+      return HttpResponse(json.dumps({'requestStatus': installStatus}))
+  ```
+
+test "rank1072: the same view behind the admin check"
+  lang python
+  file dns/views.py
+  expect VYQL-INJ-004
+  code
+  ```
+  import json
+  import subprocess
+
+  from django.http import HttpResponse
+
+
+  class ProcessUtilities:
+      @staticmethod
+      def outputExecutioner(command):
+          return subprocess.check_output(command, shell=True).decode()
+
+
+  def getresetstatus(request):
+      userID = request.session['userID']
+      currentACL = ACLManager.loadedACL(userID)
+
+      if currentACL['admin'] != 1:
+          return ACLManager.loadErrorJson('FilemanagerAdmin', 0)
+
+      data = json.loads(request.body)
+      statusfile = data['statusfile']
+      installStatus = ProcessUtilities.outputExecutioner("sudo cat " + statusfile)
+
+      return HttpResponse(json.dumps({'requestStatus': installStatus}))
+  ```
