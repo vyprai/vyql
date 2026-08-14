@@ -1,0 +1,99 @@
+# Rank 1012 / CVE-2023-43800: Arduino Create Agent privilege escalation through
+# the /v2/pkgs/tools/installed endpoint. Tools.Install accepted a caller-supplied
+# URL and installed from it, and the only integrity control was a checksum taken
+# from the same request payload:
+#
+#   if payload.URL != nil {
+#       return c.install(ctx, path, *payload.URL, *payload.Checksum)
+#   }
+#
+# install() downloads the URL, extracts the archive into the tools folder, and
+# only then compares its SHA-256 against the supplied checksum. Because the
+# attacker supplies both the URL and the checksum, the comparison proves the
+# bytes arrived intact but proves nothing about who produced them, so anyone who
+# can reach the localhost endpoint installs an arbitrary archive and runs code as
+# the agent user (CWE-345). The pool commit was a later HEAD-handler feature;
+# corrected to the real fix 33080c3, which requires a signature and verifies it
+# against a trusted RSA public key before installing:
+# utilities.VerifyInput(*payload.URL, *payload.Signature).
+#
+# ATTENTION, vocabulary and expressiveness gap.
+#  - No concept covers this weakness class. The closest,
+#    code.NodePreGypRemoteBinaryInstall (CWE-494) and
+#    code.InsecureExecutableDownload (CWE-319), describe a package manifest
+#    fetching a remote binary and a cleartext download; neither is "the artifact
+#    URL and its integrity value arrive in the same untrusted message".
+#  - The concept that belongs here is general and worth building: an integrity
+#    value supplied by the same untrusted party as the artifact it certifies
+#    provides no authenticity, and the control is a signature checked against a
+#    trusted key. Expressing it needs a provenance comparison between two values
+#    (the URL and the checksum both originate from one request payload), which
+#    is a dataflow relation the presence-node binding layer cannot state. A
+#    binding keyed on the literal selectors payload.URL and payload.Checksum
+#    would be repro-shaped: an updater using req.DownloadURL and req.SHA256
+#    walks straight past it, so it fails the genericity test.
+#  - The available taint framing is also wrong and would not discriminate the
+#    fix. Labelling the request payload as a source makes the URL reach the
+#    code.UrlFetch sink already detected at tools.go:181 and reports SSRF
+#    (CWE-918), but the fix still fetches the same caller-supplied URL and only
+#    adds a signature check, so that finding would fire on the vulnerable and
+#    fixed revisions alike.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1012: tool install trusts a URL and checksum from the same request payload"
+  lang go
+  file v2/pkgs/tools.go
+  reject VYQL-RF-001
+  code
+  ```
+  package pkgs
+
+  import (
+      "context"
+      "path/filepath"
+
+      "github.com/arduino/arduino-create-agent/gen/tools"
+  )
+
+  func (c *Tools) Install(ctx context.Context, payload *tools.ToolPayload) (*tools.Operation, error) {
+      path := filepath.Join(payload.Packager, payload.Name, payload.Version)
+
+      if payload.URL != nil {
+          return c.install(ctx, path, *payload.URL, *payload.Checksum)
+      }
+
+      return nil, tools.MakeNotFound(nil)
+  }
+  ```
+
+test "rank1012: fix verifies an RSA signature over the URL before installing"
+  lang go
+  file v2/pkgs/tools.go
+  reject VYQL-RF-001
+  code
+  ```
+  package pkgs
+
+  import (
+      "context"
+      "path/filepath"
+
+      "github.com/arduino/arduino-create-agent/gen/tools"
+      "github.com/arduino/arduino-create-agent/utilities"
+  )
+
+  func (c *Tools) Install(ctx context.Context, payload *tools.ToolPayload) (*tools.Operation, error) {
+      path := filepath.Join(payload.Packager, payload.Name, payload.Version)
+
+      if payload.URL != nil && payload.Signature != nil && payload.Checksum != nil {
+          err := utilities.VerifyInput(*payload.URL, *payload.Signature)
+          if err != nil {
+              return nil, err
+          }
+          return c.install(ctx, path, *payload.URL, *payload.Checksum)
+      }
+
+      return nil, tools.MakeNotFound(nil)
+  }
+  ```
