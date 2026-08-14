@@ -1,0 +1,108 @@
+# Rank 1123 / CVE-2022-36882: Jenkins git-plugin's notifyCommit webhook
+# accepted an unauthenticated sha1 parameter and triggered polling for the
+# exact commit named, with no verification that the caller was the git
+# server it claimed to be, so anyone who could reach the endpoint could force
+# a build of a chosen commit or drive branch/URL-confusion across jobs
+# (CWE-352).
+#
+# GitStatus is an UnprotectedRootAction by design, so doNotifyCommit is meant
+# to be reachable with no Jenkins session, the way a real git server's
+# webhook call is. The vulnerable form took url, branches and sha1 straight
+# from @QueryParameter and used them immediately, with nothing establishing
+# that the caller had any relationship to the repository it named.
+#
+# Pool commit b46165c74a0b is the real fix (COMMIT_OK, SECURITY-284 /
+# SECURITY-907). It adds a whole new ApiTokenPropertyConfiguration class and
+# requires a token @QueryParameter that must validate against it before
+# doNotifyCommit does anything with url, branches or sha1, unless an
+# administrator has explicitly disabled the check via the
+# NOTIFY_COMMIT_ACCESS_CONTROL system property. No pool correction.
+#
+# ATTENTION, and not the same shape as the doTest*/doCheck* validation family
+# already covered at rank 1121. Those are internal admin-configuration
+# endpoints where the generic fix is @RequirePOST plus
+# Jenkins.get().checkPermission(Jenkins.ADMINISTER); doNotifyCommit is
+# deliberately unauthenticated by design (an UnprotectedRootAction meant for
+# external webhook callers with no Jenkins session at all), so neither
+# @RequirePOST nor a standard permission check would even be the right fix,
+# and indeed the real fix is a bespoke per-plugin API-token scheme instead.
+# code.JenkinsBuildScheduleMissingPermission (CWE_862) is the nearest by
+# theme, an unguarded action that ends in triggering a build, but its
+# condition and its one binding both require an observed
+# Jenkins.get.getQueue.schedule call and a hasPermission/checkPermission gate
+# neither of which appears anywhere in this fix; doNotifyCommit reaches an
+# SCM trigger/poll path several calls deeper, and what it is missing is a
+# caller-identity check that has no relationship to Jenkins's permission
+# model at all.
+#
+# Diagnosis: scanning either revision reports the same one unrelated finding,
+# an sha1-to-response-header taint path neither this CVE's mechanism nor its
+# fix touches.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1123: notifyCommit uses sha1 with no caller-identity check"
+  lang java
+  file GitStatus.java
+  reject_review code.JenkinsBuildScheduleMissingPermission
+  code
+  ```
+  @Extension
+  public class GitStatus implements UnprotectedRootAction {
+
+      public HttpResponse doNotifyCommit(HttpServletRequest request, @QueryParameter(required=true) String url,
+                                         @QueryParameter(required=false) String branches,
+                                         @QueryParameter(required=false) String sha1) throws ServletException, IOException {
+          lastURL = url;
+          lastBranches = branches;
+          if (StringUtils.isNotBlank(sha1) && !SHA1_PATTERN.matcher(sha1.trim()).matches()) {
+              return HttpResponses.error(SC_BAD_REQUEST, "Illegal SHA1");
+          }
+          final List<ResponseContributor> contributors = new ArrayList<>();
+          for (Listener listener : Jenkins.get().getExtensionList(Listener.class)) {
+              contributors.addAll(listener.onNotifyCommit(request.getHeader("User-Agent"), new URIish(url), sha1, branches));
+          }
+          return HttpResponses.ok();
+      }
+  }
+  ```
+
+test "rank1123: notifyCommit validates an api token before doing anything"
+  lang java
+  file GitStatus.java
+  reject_review code.JenkinsBuildScheduleMissingPermission
+  code
+  ```
+  @Extension
+  public class GitStatus implements UnprotectedRootAction {
+
+      static String NOTIFY_COMMIT_ACCESS_CONTROL =
+              SystemProperties.getString(GitStatus.class.getName() + ".NOTIFY_COMMIT_ACCESS_CONTROL");
+
+      public HttpResponse doNotifyCommit(HttpServletRequest request, @QueryParameter(required=true) String url,
+                                         @QueryParameter() String branches, @QueryParameter() String sha1,
+                                         @QueryParameter() String token) {
+          if (!"disabled".equalsIgnoreCase(NOTIFY_COMMIT_ACCESS_CONTROL)
+                  && !"disabled-for-polling".equalsIgnoreCase(NOTIFY_COMMIT_ACCESS_CONTROL)) {
+              if (StringUtils.isEmpty(token)) {
+                  return HttpResponses.errorWithoutStack(401, "An access token is required.");
+              }
+              if (!ApiTokenPropertyConfiguration.get().isValidApiToken(token)) {
+                  return HttpResponses.errorWithoutStack(403, "Invalid access token");
+              }
+          }
+          lastURL = url;
+          lastBranches = branches;
+          if (StringUtils.isNotBlank(sha1) && !SHA1_PATTERN.matcher(sha1.trim()).matches()) {
+              return HttpResponses.error(SC_BAD_REQUEST, "Illegal SHA1");
+          }
+          final List<ResponseContributor> contributors = new ArrayList<>();
+          for (Listener listener : Jenkins.get().getExtensionList(Listener.class)) {
+              contributors.addAll(listener.onNotifyCommit(request.getHeader("User-Agent"), new URIish(url), sha1, branches));
+          }
+          return HttpResponses.ok();
+      }
+  }
+  ```
