@@ -1,0 +1,139 @@
+# Rank 1066 / CVE-2026-8634: crabbox let a single `*` in the environment
+# allow-list forward every variable of the calling process into the sandboxed
+# command (CWE-94). envAllowed in internal/cli/repo.go held
+#
+#   if strings.HasSuffix(pattern, "*") {
+#       if strings.HasPrefix(name, strings.TrimSuffix(pattern, "*")) {
+#           return true
+#       }
+#       continue
+#   }
+#
+# and trimming the star off `*` leaves the empty string, which every name begins
+# with, so the allow-list allows everything -- including the variables that
+# decide what a child process loads and runs. The function already refuses an
+# empty pattern two lines above; what it does not refuse is a pattern that
+# becomes empty. Pool commit eaae40ae4c is the real fix (COMMIT_OK, named by
+# GHSA-fm77-94qm-4894); it binds the trimmed value and skips the pattern when
+# that value is empty. No pool correction.
+#
+# ATTENTION, vocabulary gap, and the mechanism is already known here under
+# another name. code.CorsWildcardPrefixTruncation (VYQL-CFG-018, CWE-346) is
+# this defect written for one protocol: a wildcard pattern truncated to the text
+# before the star and then used with prefix matching. Its single binding is a Go
+# presence over a CORS origin parser, so the same mistake in an environment
+# allow-list, a header allow-list or a hostname allow-list is unreachable. What
+# recurs is the shape rather than the protocol -- trim the star, prefix-match
+# the remainder, never ask whether the remainder is empty -- and stating it once
+# would cover this rank and the CORS one together.
+#
+# Two things would be needed and only one is hard. The language fact is exact
+# and documented: strings.HasPrefix returns true for an empty prefix, so a
+# prefix match against a possibly-empty value accepts everything. The part the
+# binding layer cannot ask is whether the value can be empty, since that is a
+# question about what the trimmed pattern can hold rather than about any call in
+# the expression, and answering it by pattern would flag every wildcard
+# allow-list including the ones whose patterns are constants.
+#
+# Measured: nothing is labelled in the file at either revision and neither
+# revision reports. The two snippets differ only in the emptiness check.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1066: trimming the star leaves a prefix that matches every name"
+  lang go
+  file internal/cli/repo.go
+  reject VYQL-CFG-018
+  code
+  ```
+  package cli
+
+  import (
+  	"os"
+  	"strings"
+  )
+
+  func envAllowed(name string, allow []string) bool {
+  	for _, pattern := range allow {
+  		pattern = strings.TrimSpace(pattern)
+  		if pattern == "" {
+  			continue
+  		}
+  		if strings.HasSuffix(pattern, "*") {
+  			if strings.HasPrefix(name, strings.TrimSuffix(pattern, "*")) {
+  				return true
+  			}
+  			continue
+  		}
+  		if name == pattern {
+  			return true
+  		}
+  	}
+  	return false
+  }
+
+  func allowedEnv(allow []string) map[string]string {
+  	out := map[string]string{}
+  	for _, env := range os.Environ() {
+  		k, v, ok := strings.Cut(env, "=")
+  		if !ok {
+  			continue
+  		}
+  		if envAllowed(k, allow) {
+  			out[k] = v
+  		}
+  	}
+  	return out
+  }
+  ```
+
+test "rank1066: the same allow-list refusing an empty prefix"
+  lang go
+  file internal/cli/repo.go
+  reject VYQL-CFG-018
+  code
+  ```
+  package cli
+
+  import (
+  	"os"
+  	"strings"
+  )
+
+  func envAllowed(name string, allow []string) bool {
+  	for _, pattern := range allow {
+  		pattern = strings.TrimSpace(pattern)
+  		if pattern == "" {
+  			continue
+  		}
+  		if strings.HasSuffix(pattern, "*") {
+  			prefix := strings.TrimSuffix(pattern, "*")
+  			if prefix == "" {
+  				continue
+  			}
+  			if strings.HasPrefix(name, prefix) {
+  				return true
+  			}
+  			continue
+  		}
+  		if name == pattern {
+  			return true
+  		}
+  	}
+  	return false
+  }
+
+  func allowedEnv(allow []string) map[string]string {
+  	out := map[string]string{}
+  	for _, env := range os.Environ() {
+  		k, v, ok := strings.Cut(env, "=")
+  		if !ok {
+  			continue
+  		}
+  		if envAllowed(k, allow) {
+  			out[k] = v
+  		}
+  	}
+  	return out
+  }
+  ```
