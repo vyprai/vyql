@@ -1,0 +1,78 @@
+# Rank 1136 / CVE-2020-24707: gophish's campaign results export built a CSV
+# from campaign event data, target names and emails an attacker's simulated
+# phishing recipients (or a malicious target list) can influence, with no
+# escaping of spreadsheet formula characters, so a value starting with `=`,
+# `+`, `-` or `@` opened as a live formula the moment the operator's
+# spreadsheet software loaded the export (CWE-1236).
+#
+# exportAsCSV in static/js/src/app/campaign_results.js called
+# `Papa.unparse(csvScope, {})`, PapaParse's default configuration, which
+# performs no formula-character escaping.
+#
+# Pool commit b25f5ac5e468 is the real fix (COMMIT_OK). It vendors an
+# up-to-date PapaParse build that supports the `escapeFormulae` option and
+# changes the call to `Papa.unparse(csvScope, { 'escapeFormulae': true })`,
+# which prefixes a value beginning with a formula-trigger character with a
+# single quote before writing it, so spreadsheet software treats it as text.
+# No pool correction.
+#
+# FIXED. code.CsvFormulaProneExportRow already exists for exactly this
+# weakness, carries CWE_1236 alone, and VYQL-INJ-121 already binds it in PHP
+# and Ruby via dedicated frontend review markers neither language shares with
+# JavaScript. PapaParse is a widely used, general-purpose JS CSV library
+# whose own documentation names `escapeFormulae` for exactly this mitigation,
+# not a project-specific detail; added csvFormulaProneExportRow900, keyed on
+# `callPath contains "Papa.unparse"` and the absence of the literal
+# `escapeFormulae` anywhere in the call, using only generic JS context
+# features rather than a new frontend marker.
+#
+# Diagnosis: scanning the real vulnerable file reports VYQL-INJ-121 at
+# campaign_results.js:203, and nothing at the fixed revision.
+#
+# verify_current_expected: current-behavior
+
+test "rank1136: the CSV export uses PapaParse's default, unescaped config"
+  lang javascript
+  file campaign_results.js
+  expect VYQL-INJ-121
+  code
+  ```
+  function exportAsCSV(scope) {
+    var csvScope = scope.results.map(function (result) {
+      return {
+        "First Name": result.first_name,
+        "Last Name": result.last_name,
+        "Email": result.email,
+        "Status": result.status,
+      }
+    })
+    var csvString = Papa.unparse(csvScope, {})
+    var csvData = new Blob([csvString], {
+      type: 'text/csv;charset=utf-8;'
+    });
+  }
+  ```
+
+test "rank1136: the CSV export escapes formula-trigger characters"
+  lang javascript
+  file campaign_results.js
+  reject VYQL-INJ-121
+  code
+  ```
+  function exportAsCSV(scope) {
+    var csvScope = scope.results.map(function (result) {
+      return {
+        "First Name": result.first_name,
+        "Last Name": result.last_name,
+        "Email": result.email,
+        "Status": result.status,
+      }
+    })
+    var csvString = Papa.unparse(csvScope, {
+      'escapeFormulae': true
+    })
+    var csvData = new Blob([csvString], {
+      type: 'text/csv;charset=utf-8;'
+    });
+  }
+  ```
