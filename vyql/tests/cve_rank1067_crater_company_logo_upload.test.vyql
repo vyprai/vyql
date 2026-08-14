@@ -1,0 +1,171 @@
+# Rank 1067 / CVE-2021-4080: Crater took the stored file name of a company logo
+# straight from the request body, so a base64 upload named .php landed in public
+# storage and ran (CWE-434). CompanyController::uploadCompanyLogo held
+#
+#   $data = json_decode($request->company_logo);
+#   ...
+#   $company->addMediaFromBase64($data->data)
+#       ->usingFileName($data->name)
+#       ->toMediaCollection('logo');
+#
+# with no check on the name or the decoded content. Pool commit cdc913d16c is
+# the real fix (COMMIT_OK, named by GHSA-wppj-3pjr-9w79); it types the two
+# upload actions with new FormRequests and adds a Base64Mime rule that decodes
+# the payload, reads its mime type and requires it to be an allowed image type.
+# No pool correction.
+#
+# ATTENTION, source gap, and the sink half shipped. spatie/laravel-medialibrary
+# had no binding: addMediaFromBase64 and usingFileName are the documented ways
+# to store an upload and name it, and neither was labelled, so the media library
+# every Laravel application uses for uploads was invisible. Both now emit
+# code.UnsafeUpload under a lockfile resolving that package. Proven end to end
+# with the third snippet, which replaces the request accessor with an ordinary
+# one: VYQL-INJ-015 reports the upload at medium and does not report the same
+# call with a constant name.
+#
+# What is missing is that Laravel's own primary input accessor is not input.
+# The framework documents dynamic properties as the way to read request data,
+# `$request->company_logo`, and that is an attribute rather than a call: the
+# graph holds it as an Attr node with path $request.company_logo. Bindings can
+# query callExpr and presenceNode and nothing else -- every one of the shipped
+# bindings is one of those two, and presence nodes carry kinds any, call and
+# binop -- so no binding can name an attribute read. PHP's request sources are
+# consequently all calls: $request.__subscript, $request.query.get, the
+# CodeIgniter accessors and the rest. Until an attribute pattern exists, every
+# Laravel controller reading input the documented way starts no taint.
+#
+# The first two snippets differ only in whether the name is request-supplied.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1067: the stored name comes from the request body"
+  lang php
+  file composer.lock
+  code
+  ```
+  {
+      "packages": [
+          {"name": "spatie/laravel-medialibrary", "version": "9.6.0"}
+      ],
+      "packages-dev": []
+  }
+  ```
+  file app/Http/Controllers/V1/Admin/Settings/CompanyController.php
+  reject VYQL-INJ-015
+  code
+  ```
+  <?php
+
+  namespace Crater\Http\Controllers\V1\Admin\Settings;
+
+  use Illuminate\Http\Request;
+
+  class CompanyController extends Controller
+  {
+      public function uploadCompanyLogo(Request $request)
+      {
+          $company = Company::find($request->header('company'));
+
+          $this->authorize('manage company', $company);
+
+          $data = json_decode($request->company_logo);
+
+          if ($data) {
+              $company->clearMediaCollection('logo');
+              $company->addMediaFromBase64($data->data)
+                  ->usingFileName($data->name)
+                  ->toMediaCollection('logo');
+          }
+
+          return response()->json(['success' => true]);
+      }
+  }
+  ```
+
+test "rank1067: the same upload with a validated request"
+  lang php
+  file composer.lock
+  code
+  ```
+  {
+      "packages": [
+          {"name": "spatie/laravel-medialibrary", "version": "9.6.0"}
+      ],
+      "packages-dev": []
+  }
+  ```
+  file app/Http/Controllers/V1/Admin/Settings/CompanyController.php
+  reject VYQL-INJ-015
+  code
+  ```
+  <?php
+
+  namespace Crater\Http\Controllers\V1\Admin\Settings;
+
+  use Crater\Http\Requests\CompanyLogoRequest;
+
+  class CompanyController extends Controller
+  {
+      public function uploadCompanyLogo(CompanyLogoRequest $request)
+      {
+          $company = Company::find($request->header('company'));
+
+          $this->authorize('manage company', $company);
+
+          $data = json_decode($request->company_logo);
+
+          if ($data) {
+              $company->clearMediaCollection('logo');
+              $company->addMediaFromBase64($data->data)
+                  ->usingFileName($data->name)
+                  ->toMediaCollection('logo');
+          }
+
+          return response()->json(['success' => true]);
+      }
+  }
+  ```
+
+test "rank1067: the same upload from an ordinary request accessor"
+  lang php
+  file composer.lock
+  code
+  ```
+  {
+      "packages": [
+          {"name": "spatie/laravel-medialibrary", "version": "9.6.0"}
+      ],
+      "packages-dev": []
+  }
+  ```
+  file app/Http/Controllers/V1/Admin/Settings/CompanyController.php
+  expect VYQL-INJ-015
+  code
+  ```
+  <?php
+
+  namespace Crater\Http\Controllers\V1\Admin\Settings;
+
+  class CompanyController extends Controller
+  {
+      public function uploadCompanyLogo()
+      {
+          $data = json_decode($_POST['company_logo']);
+
+          if ($data) {
+              $company = Company::find(1);
+              $company->addMediaFromBase64($data->data)
+                  ->usingFileName($data->name)
+                  ->toMediaCollection('logo');
+          }
+      }
+
+      public function uploadFixedName()
+      {
+          $company = Company::find(1);
+          $company->addMediaFromBase64(base64_encode('x'))
+              ->usingFileName('logo.png')
+              ->toMediaCollection('logo');
+      }
+  }
+  ```

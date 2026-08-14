@@ -1,0 +1,17 @@
+module bindings.php.generated.m7c1e5a04;
+
+binding unsafeUpload0 {
+  requires {
+    dependency("spatie/laravel-medialibrary")
+  }
+  query pattern callExpr where callee.method == "usingFileName"
+  emit sink code.UnsafeUpload at args[0]
+}
+
+binding unsafeUpload1 {
+  requires {
+    dependency("spatie/laravel-medialibrary")
+  }
+  query pattern callExpr where callee.method == "addMediaFromBase64"
+  emit sink code.UnsafeUpload at args[0]
+}
