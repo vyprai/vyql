@@ -1,0 +1,72 @@
+# Rank 1099 / CVE-2022-31121: Hyperledger Fabric's orderer dispatched any
+# non-Submit gRPC StepRequest as a consensus message without checking that its
+# consensus field was actually populated, so a malformed request satisfying
+# neither oneof case crashed the orderer node with a nil dereference deeper in
+# the dispatch path (CWE-20). orderer/common/cluster/service.go's
+# handleMessage had
+#
+#   if submitReq := request.GetSubmitRequest(); submitReq != nil {
+#     return s.handleSubmit(submitReq, stream, addr)
+#   }
+#   // Else, it's a consensus message.
+#   return s.Dispatcher.DispatchConsensus(stream.Context(), request.GetConsensusRequest())
+#
+# treating "not a Submit request" as proof of "is a Consensus request", when a
+# StepRequest with neither field set makes GetConsensusRequest() return nil.
+# Pool commit 0f18359493bc is the real fix (a cherry-pick, COMMIT_OK, named by
+# advisory GHSA-72x4-cq6r-jp4p, credited to Haosheng Wang); it checks
+# consensusReq != nil explicitly and returns an error for a request that is
+# neither.
+#
+# ATTENTION, not mechanical. This is the standard protobuf-oneof shape --
+# multiple GetX() accessors on one message, each nil unless that case was set
+# -- and Go has no generic vocabulary for it: code.NullableDeref exists and
+# reaches CWE_476, but its only Go binding is a presence pattern hardcoded to
+# one function name and one call chain in an unrelated project
+# (free5gc/ausf's UeAuthPostRequestProcedure), not a general "this accessor's
+# result was passed onward without a nil check" rule. Stating the generic
+# condition -- "a value obtained from a oneof-style accessor reaches a call
+# with no nil guard on an alternate path" -- needs a notion of what a oneof
+# accessor is and a lower-bound-style guard search on nilness, neither of
+# which the binding query language expresses; this is design work on the
+# concept and the guard analysis together, not a port. No definition change
+# attempted.
+#
+# Scanning the extracted handleMessage reports 0 findings; vyql match labels
+# no source, sink or guard.
+#
+# verify_current_expected: attention-not-mechanical
+
+test "rank1099: a non-submit request is dispatched as consensus with no nil check"
+  lang go
+  file orderer/common/cluster/service.go
+  reject VYQL-MEM-006
+  code
+  ```
+  package cluster
+
+  func (s *Service) handleMessage(request *orderer.StepRequest, stream StepStream, addr string) error {
+    if submitReq := request.GetSubmitRequest(); submitReq != nil {
+      return s.handleSubmit(submitReq, stream, addr)
+    }
+    return s.Dispatcher.DispatchConsensus(stream.Context(), request.GetConsensusRequest())
+  }
+  ```
+
+test "rank1099: the fix requires the consensus field to be populated"
+  lang go
+  file orderer/common/cluster/service.go
+  reject VYQL-MEM-006
+  code
+  ```
+  package cluster
+
+  func (s *Service) handleMessage(request *orderer.StepRequest, stream StepStream, addr string) error {
+    if submitReq := request.GetSubmitRequest(); submitReq != nil {
+      return s.handleSubmit(submitReq, stream, addr)
+    } else if consensusReq := request.GetConsensusRequest(); consensusReq != nil {
+      return s.Dispatcher.DispatchConsensus(stream.Context(), request.GetConsensusRequest())
+    }
+    return errors.Errorf("message is neither a Submit nor a Consensus request")
+  }
+  ```
