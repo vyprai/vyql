@@ -2694,3 +2694,38 @@ binding httpInput50 {
   query pattern callExpr where callee.method == "getallheaders"
   emit source code.HttpInput at call.result
 }
+
+binding httpInput51 {
+  query pattern callExpr where callee.path ~= "request.getVar"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput52 {
+  query pattern callExpr where callee.path ~= "request.getGet"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput53 {
+  query pattern callExpr where callee.path ~= "request.getPost"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput54 {
+  query pattern callExpr where callee.path ~= "request.getPostGet"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput55 {
+  query pattern callExpr where callee.path ~= "request.getGetPost"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput56 {
+  query pattern callExpr where callee.path ~= "request.getJSON"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput57 {
+  query pattern callExpr where callee.path ~= "request.getRawInput"
+  emit source code.HttpInput at call.result
+}
