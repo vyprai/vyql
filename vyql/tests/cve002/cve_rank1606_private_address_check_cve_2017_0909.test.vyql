@@ -1,0 +1,26 @@
+# Rank 1606 / CVE-2017-0909: Security review for CVE-2017-0909 in jtdowney/private_address_check.
+# Fix commit 516ab853e7 in jtdowney/private_address_check.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1606: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1606: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

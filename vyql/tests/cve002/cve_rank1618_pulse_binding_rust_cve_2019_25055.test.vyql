@@ -1,0 +1,28 @@
+# Rank 1618 / CVE-2019-25055: Security review for CVE-2019-25055 in jnqnfe/pulse-binding-rust.
+# Fix commit 7fd282aef7 in jnqnfe/pulse-binding-rust.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1618: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1618: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

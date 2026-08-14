@@ -1,0 +1,32 @@
+# Rank 1665 / CVE-2026-44429: Security review for CVE-2026-44429 in modelcontextprotocol/registry.
+# Fix commit 78b7bbde07 in modelcontextprotocol/registry.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1665: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1665: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

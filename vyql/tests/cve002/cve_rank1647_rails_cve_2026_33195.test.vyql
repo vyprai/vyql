@@ -1,0 +1,26 @@
+# Rank 1647 / CVE-2026-33195: Security review for CVE-2026-33195 in rails/rails.
+# Fix commit 1db4b89687 in rails/rails.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1647: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1647: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

@@ -1,0 +1,26 @@
+# Rank 1638 / CVE-2021-34825: Security review for CVE-2021-34825 in quassel/quassel.
+# Fix commit 0674fae039 in quassel/quassel.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1638: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1638: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

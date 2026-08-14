@@ -1,0 +1,28 @@
+# Rank 1673 / CVE-2016-9124: Security review for CVE-2016-9124 in revive-adserver/revive-adserver.
+# Fix commit 847941390f in revive-adserver/revive-adserver.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1673: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1673: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

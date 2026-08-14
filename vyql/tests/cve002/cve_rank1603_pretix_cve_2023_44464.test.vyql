@@ -1,0 +1,27 @@
+# Rank 1603 / CVE-2023-44464: Security review for CVE-2023-44464 in pretix/pretix.
+# Fix commit 8583bfb7d9 in pretix/pretix.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1603: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1603: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

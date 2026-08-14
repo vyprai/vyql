@@ -1,0 +1,26 @@
+# Rank 1634 / CVE-2018-9918: Security review for CVE-2018-9918 in qpdf/qpdf.
+# Fix commit b4d6cf6836 in qpdf/qpdf.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1634: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1634: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

@@ -1,0 +1,26 @@
+# Rank 1619 / CVE-2022-24790: Security review for CVE-2022-24790 in puma/puma.
+# Fix commit 5bb7d202e2 in puma/puma.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1619: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1619: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

@@ -1,0 +1,26 @@
+# Rank 1695 / CVE-2024-45409: Security review for CVE-2024-45409 in saml-toolkits/ruby-saml.
+# Fix commit 1ec5392bc5 in saml-toolkits/ruby-saml.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1695: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1695: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

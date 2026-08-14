@@ -1,0 +1,27 @@
+# Rank 1626 / CVE-2026-27459: Security review for CVE-2026-27459 in pyca/pyopenssl.
+# Fix commit 358cbf29c4 in pyca/pyopenssl.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1626: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1626: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

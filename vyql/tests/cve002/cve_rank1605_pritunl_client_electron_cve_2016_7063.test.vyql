@@ -1,0 +1,28 @@
+# Rank 1605 / CVE-2016-7063: Security review for CVE-2016-7063 in pritunl/pritunl-client-electron.
+# Fix commit 0e5559c2ba in pritunl/pritunl-client-electron.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1605: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1605: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

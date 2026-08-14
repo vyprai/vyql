@@ -1,0 +1,28 @@
+# Rank 1632 / CVE-2024-2221: Security review for CVE-2024-2221 in qdrant/qdrant.
+# Fix commit e6411907f0 in qdrant/qdrant.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1632: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1632: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

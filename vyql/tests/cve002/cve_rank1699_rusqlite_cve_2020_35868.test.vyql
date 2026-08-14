@@ -1,0 +1,28 @@
+# Rank 1699 / CVE-2020-35868: Security review for CVE-2020-35868 in rusqlite/rusqlite.
+# Fix commit 45fd77ee43 in rusqlite/rusqlite.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1699: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1699: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

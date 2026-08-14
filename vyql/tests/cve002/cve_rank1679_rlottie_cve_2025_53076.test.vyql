@@ -1,0 +1,26 @@
+# Rank 1679 / CVE-2025-53076: Security review for CVE-2025-53076 in samsung/rlottie.
+# Fix commit 36ddb42d78 in samsung/rlottie.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1679: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1679: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

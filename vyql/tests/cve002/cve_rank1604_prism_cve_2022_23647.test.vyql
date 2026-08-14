@@ -1,0 +1,28 @@
+# Rank 1604 / CVE-2022-23647: Security review for CVE-2022-23647 in PrismJS/prism.
+# Fix commit e002e78c34 in PrismJS/prism.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1604: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1604: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

@@ -1,0 +1,26 @@
+# Rank 1631 / CVE-2017-6503: Security review for CVE-2017-6503 in qbittorrent/qbittorrent.
+# Fix commit 6ca3e4f094 in qbittorrent/qbittorrent.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1631: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1631: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

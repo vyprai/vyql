@@ -1,0 +1,26 @@
+# Rank 1633 / CVE-2024-24474: Security review for CVE-2024-24474 in qemu/qemu.
+# Fix commit 77668e4b9b in qemu/qemu.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1633: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1633: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

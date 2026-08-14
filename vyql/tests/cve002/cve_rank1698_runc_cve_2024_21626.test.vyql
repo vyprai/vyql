@@ -1,0 +1,32 @@
+# Rank 1698 / CVE-2024-21626: Security review for CVE-2024-21626 in opencontainers/runc.
+# Fix commit 02120488a4 in opencontainers/runc.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1698: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1698: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

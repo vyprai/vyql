@@ -1,0 +1,28 @@
+# Rank 1621 / CVE-2021-31590: Security review for CVE-2021-31590 in pwndoc/pwndoc.
+# Fix commit ff1b868cec in pwndoc/pwndoc.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1621: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1621: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

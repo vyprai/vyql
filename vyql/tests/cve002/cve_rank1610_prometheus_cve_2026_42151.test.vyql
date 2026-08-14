@@ -1,0 +1,32 @@
+# Rank 1610 / CVE-2026-42151: Security review for CVE-2026-42151 in prometheus/prometheus.
+# Fix commit 26dae7f06b in prometheus/prometheus.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1610: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1610: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

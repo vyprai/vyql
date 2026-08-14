@@ -1,0 +1,28 @@
+# Rank 1613 / CVE-2026-41242: Security review for CVE-2026-41242 in protobufjs/protobuf.js.
+# Fix commit ff7b2afef8 in protobufjs/protobuf.js.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1613: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1613: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

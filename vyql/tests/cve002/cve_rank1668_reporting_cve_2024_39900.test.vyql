@@ -1,0 +1,26 @@
+# Rank 1668 / CVE-2024-39900: Security review for CVE-2024-39900 in opensearch-project/reporting.
+# Fix commit 2403014c57 in opensearch-project/reporting.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1668: vulnerable code pattern before fix"
+  lang kotlin
+  file Main.kt
+  reject VYQL-PATH-001
+  code
+  ```
+  fun handleRequest(input: String): String {
+    return input
+}
+  ```
+
+test "rank1668: validated or patched form"
+  lang kotlin
+  file Main.kt
+  reject VYQL-PATH-001
+  code
+  ```
+  fun handleRequest(input: String): String {
+    if (input.isEmpty()) return ""
+    return input
+}
+  ```

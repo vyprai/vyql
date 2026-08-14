@@ -1,0 +1,28 @@
+# Rank 1677 / CVE-2025-61588: Security review for CVE-2025-61588 in risc0/risc0.
+# Fix commit 3f00e1fa01 in risc0/risc0.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1677: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1677: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

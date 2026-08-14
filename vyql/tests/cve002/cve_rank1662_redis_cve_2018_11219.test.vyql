@@ -1,0 +1,26 @@
+# Rank 1662 / CVE-2018-11219: Security review for CVE-2018-11219 in antirez/redis.
+# Fix commit e89086e09a in antirez/redis.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1662: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1662: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

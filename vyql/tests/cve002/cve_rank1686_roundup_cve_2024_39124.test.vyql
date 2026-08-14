@@ -1,0 +1,27 @@
+# Rank 1686 / CVE-2024-39124: Security review for CVE-2024-39124 in roundup-tracker/roundup.
+# Fix commit 860e3c8d07 in roundup-tracker/roundup.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1686: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1686: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

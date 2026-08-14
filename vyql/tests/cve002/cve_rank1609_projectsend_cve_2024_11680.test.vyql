@@ -1,0 +1,28 @@
+# Rank 1609 / CVE-2024-11680: Security review for CVE-2024-11680 in projectsend/projectsend.
+# Fix commit 193367d937 in projectsend/projectsend.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1609: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1609: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

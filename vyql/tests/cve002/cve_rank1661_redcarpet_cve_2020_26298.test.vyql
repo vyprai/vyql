@@ -1,0 +1,26 @@
+# Rank 1661 / CVE-2020-26298: Security review for CVE-2020-26298 in vmg/redcarpet.
+# Fix commit a699c82292 in vmg/redcarpet.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1661: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1661: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

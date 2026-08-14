@@ -1,0 +1,32 @@
+# Rank 1639 / CVE-2025-59530: Security review for CVE-2025-59530 in quic-go/quic-go.
+# Fix commit ce7c9ea883 in quic-go/quic-go.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1639: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1639: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

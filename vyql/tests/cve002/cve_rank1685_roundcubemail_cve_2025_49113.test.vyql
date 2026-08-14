@@ -1,0 +1,28 @@
+# Rank 1685 / CVE-2025-49113: Security review for CVE-2025-49113 in roundcube/roundcubemail.
+# Fix commit c50a07d88c in roundcube/roundcubemail.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1685: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1685: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

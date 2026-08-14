@@ -1,0 +1,30 @@
+# Rank 1617 / CVE-2022-33684: Security review for CVE-2022-33684 in apache/pulsar.
+# Fix commit 11b5df797b in apache/pulsar.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1617: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1617: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

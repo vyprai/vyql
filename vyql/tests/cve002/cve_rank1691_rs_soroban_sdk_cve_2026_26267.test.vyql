@@ -1,0 +1,28 @@
+# Rank 1691 / CVE-2026-26267: Security review for CVE-2026-26267 in stellar/rs-soroban-sdk.
+# Fix commit e92a3933e5 in stellar/rs-soroban-sdk.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1691: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1691: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

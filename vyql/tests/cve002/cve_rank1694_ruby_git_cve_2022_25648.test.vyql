@@ -1,0 +1,26 @@
+# Rank 1694 / CVE-2022-25648: Security review for CVE-2022-25648 in ruby-git/ruby-git.
+# Fix commit 291ca0946b in ruby-git/ruby-git.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1694: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1694: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

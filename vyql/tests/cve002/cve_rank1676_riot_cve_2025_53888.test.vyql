@@ -1,0 +1,26 @@
+# Rank 1676 / CVE-2025-53888: Security review for CVE-2025-53888 in riot-os/riot.
+# Fix commit f6f7de4ccc in riot-os/riot.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1676: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1676: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

@@ -1,0 +1,32 @@
+# Rank 1654 / CVE-2026-49980: Security review for CVE-2026-49980 in rclone/rclone.
+# Fix commit 9222ed2c5a in rclone/rclone.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1654: vulnerable code pattern before fix"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	return input
+}
+  ```
+
+test "rank1654: validated or patched form"
+  lang go
+  file main.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+func HandleRequest(input string) string {
+	if input == "" {
+		return ""
+	}
+	return input
+}
+  ```

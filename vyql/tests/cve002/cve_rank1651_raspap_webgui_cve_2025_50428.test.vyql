@@ -1,0 +1,28 @@
+# Rank 1651 / CVE-2025-50428: Security review for CVE-2025-50428 in RaspAP/raspap-webgui.
+# Fix commit 36610ac519 in RaspAP/raspap-webgui.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1651: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1651: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```

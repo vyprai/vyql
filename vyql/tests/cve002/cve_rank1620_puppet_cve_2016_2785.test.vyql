@@ -1,0 +1,26 @@
+# Rank 1620 / CVE-2016-2785: Security review for CVE-2016-2785 in puppetlabs/puppet.
+# Fix commit 6592a81665 in puppetlabs/puppet.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1620: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1620: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

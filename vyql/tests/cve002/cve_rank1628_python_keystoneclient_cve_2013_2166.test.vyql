@@ -1,0 +1,27 @@
+# Rank 1628 / CVE-2013-2166: Security review for CVE-2013-2166 in openstack/python-keystoneclient.
+# Fix commit eeefb784f2 in openstack/python-keystoneclient.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1628: vulnerable code pattern before fix"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    data = input_val
+    return data
+  ```
+
+test "rank1628: validated or patched form"
+  lang python
+  file main.py
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input_val):
+    if not input_val:
+        return None
+    data = input_val
+    return data
+  ```

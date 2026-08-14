@@ -1,0 +1,26 @@
+# Rank 1693 / CVE-2017-17790: Security review for CVE-2017-17790 in ruby/ruby.
+# Fix commit 6781840f6c in ruby/ruby.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1693: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1693: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

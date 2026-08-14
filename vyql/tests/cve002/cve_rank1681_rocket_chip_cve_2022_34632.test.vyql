@@ -1,0 +1,29 @@
+# Rank 1681 / CVE-2022-34632: Security review for CVE-2022-34632 in chipsalliance/rocket-chip.
+# Fix commit 4ecc497ccb in chipsalliance/rocket-chip.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1681: vulnerable code pattern before fix"
+  lang scala
+  file Main.scala
+  reject VYQL-PATH-001
+  code
+  ```
+  object App {
+  def handleRequest(input: String): String = {
+    input
+  }
+}
+  ```
+
+test "rank1681: validated or patched form"
+  lang scala
+  file Main.scala
+  reject VYQL-PATH-001
+  code
+  ```
+  object App {
+  def handleRequest(input: String): String = {
+    if (input == null) "" else input
+  }
+}
+  ```

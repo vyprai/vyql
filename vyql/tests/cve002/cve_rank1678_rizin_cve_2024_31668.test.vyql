@@ -1,0 +1,26 @@
+# Rank 1678 / CVE-2024-31668: Security review for CVE-2024-31668 in rizinorg/rizin.
+# Fix commit c025dcee40 in rizinorg/rizin.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1678: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1678: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

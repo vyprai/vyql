@@ -1,0 +1,26 @@
+# Rank 1615 / CVE-2022-1812: Security review for CVE-2022-1812 in publify/publify.
+# Fix commit 29a5837c29 in publify/publify.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1615: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1615: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

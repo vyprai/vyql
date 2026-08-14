@@ -1,0 +1,26 @@
+# Rank 1636 / CVE-2023-24607: Security review for CVE-2023-24607 in qt/qtbase.
+# Fix commit aaf1381eab in qt/qtbase.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1636: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1636: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

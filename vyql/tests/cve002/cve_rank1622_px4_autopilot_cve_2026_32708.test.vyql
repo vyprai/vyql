@@ -1,0 +1,26 @@
+# Rank 1622 / CVE-2026-32708: Security review for CVE-2026-32708 in px4/px4-autopilot.
+# Fix commit 0b6e4687de in px4/px4-autopilot.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1622: vulnerable code pattern before fix"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    return input;
+}
+  ```
+
+test "rank1622: validated or patched form"
+  lang c
+  file main.c
+  reject VYQL-PATH-001
+  code
+  ```
+  char* handle_request(char* input) {
+    if (!input) return 0;
+    return input;
+}
+  ```

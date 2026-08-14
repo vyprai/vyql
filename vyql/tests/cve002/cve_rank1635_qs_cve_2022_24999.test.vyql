@@ -1,0 +1,28 @@
+# Rank 1635 / CVE-2022-24999: Security review for CVE-2022-24999 in ljharb/qs.
+# Fix commit 7320525993 in ljharb/qs.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1635: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1635: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

@@ -1,0 +1,28 @@
+# Rank 1666 / CVE-2019-12041: Security review for CVE-2019-12041 in jonschlinkert/remarkable.
+# Fix commit 287dfbf22e in jonschlinkert/remarkable.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1666: vulnerable code pattern before fix"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    let data = input;
+    return data;
+}
+  ```
+
+test "rank1666: validated or patched form"
+  lang javascript
+  file main.js
+  reject VYQL-PATH-001
+  code
+  ```
+  function handleRequest(input) {
+    if (!input) return null;
+    let data = input;
+    return data;
+}
+  ```

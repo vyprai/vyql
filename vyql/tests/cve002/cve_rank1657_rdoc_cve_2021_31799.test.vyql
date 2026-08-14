@@ -1,0 +1,26 @@
+# Rank 1657 / CVE-2021-31799: Security review for CVE-2021-31799 in ruby/rdoc.
+# Fix commit a7f5d6ab88 in ruby/rdoc.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1657: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1657: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

@@ -1,0 +1,28 @@
+# Rank 1697 / CVE-2022-31099: Security review for CVE-2022-31099 in rulex-rs/rulex.
+# Fix commit 60aa2dc03a in rulex-rs/rulex.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1697: vulnerable code pattern before fix"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    input
+}
+  ```
+
+test "rank1697: validated or patched form"
+  lang rust
+  file main.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub fn handle_request(input: &str) -> &str {
+    if input.is_empty() {
+        return "";
+    }
+    input
+}
+  ```

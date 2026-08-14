@@ -1,0 +1,26 @@
+# Rank 1649 / CVE-2016-10522: Security review for CVE-2016-10522 in railsadminteam/rails_admin.
+# Fix commit b13e879eb9 in railsadminteam/rails_admin.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1649: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1649: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

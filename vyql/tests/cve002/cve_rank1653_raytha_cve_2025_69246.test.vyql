@@ -1,0 +1,30 @@
+# Rank 1653 / CVE-2025-69246: Security review for CVE-2025-69246 in raythahq/raytha.
+# Fix commit 79001db259 in raythahq/raytha.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1653: vulnerable code pattern before fix"
+  lang csharp
+  file Main.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  class Handler {
+    public static string HandleRequest(string input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1653: validated or patched form"
+  lang csharp
+  file Main.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  class Handler {
+    public static string HandleRequest(string input) {
+        if (input == null) return string.Empty;
+        return input;
+    }
+}
+  ```

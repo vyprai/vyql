@@ -1,0 +1,26 @@
+# Rank 1670 / CVE-2018-12584: Security review for CVE-2018-12584 in resiprocate/resiprocate.
+# Fix commit 2cb291191c in resiprocate/resiprocate.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1670: vulnerable code pattern before fix"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    return input;
+}
+  ```
+
+test "rank1670: validated or patched form"
+  lang cpp
+  file main.cpp
+  reject VYQL-PATH-001
+  code
+  ```
+  const char* handle_request(const char* input) {
+    if (!input) return nullptr;
+    return input;
+}
+  ```

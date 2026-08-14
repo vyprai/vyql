@@ -1,0 +1,30 @@
+# Rank 1680 / CVE-2025-14308: Security review for CVE-2025-14308 in robo-code/robocode.
+# Fix commit 9acfd9c146 in robo-code/robocode.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1680: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1680: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

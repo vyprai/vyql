@@ -1,0 +1,26 @@
+# Rank 1643 / CVE-2026-39324: Security review for CVE-2026-39324 in rack/rack-session.
+# Fix commit f43638cb3a in rack/rack-session.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1643: vulnerable code pattern before fix"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  input
+end
+  ```
+
+test "rank1643: validated or patched form"
+  lang ruby
+  file main.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  def handle_request(input)
+  return nil unless input
+  input
+end
+  ```

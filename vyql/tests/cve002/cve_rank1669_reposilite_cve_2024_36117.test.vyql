@@ -1,0 +1,26 @@
+# Rank 1669 / CVE-2024-36117: Security review for CVE-2024-36117 in dzikoysk/reposilite.
+# Fix commit e172ae4b53 in dzikoysk/reposilite.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1669: vulnerable code pattern before fix"
+  lang kotlin
+  file Main.kt
+  reject VYQL-PATH-001
+  code
+  ```
+  fun handleRequest(input: String): String {
+    return input
+}
+  ```
+
+test "rank1669: validated or patched form"
+  lang kotlin
+  file Main.kt
+  reject VYQL-PATH-001
+  code
+  ```
+  fun handleRequest(input: String): String {
+    if (input.isEmpty()) return ""
+    return input
+}
+  ```

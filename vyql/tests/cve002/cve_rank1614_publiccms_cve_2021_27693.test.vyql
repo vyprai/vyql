@@ -1,0 +1,30 @@
+# Rank 1614 / CVE-2021-27693: Security review for CVE-2021-27693 in sanluan/publiccms.
+# Fix commit 0f4c487291 in sanluan/publiccms.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1614: vulnerable code pattern before fix"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        return input;
+    }
+}
+  ```
+
+test "rank1614: validated or patched form"
+  lang java
+  file Main.java
+  reject VYQL-PATH-001
+  code
+  ```
+  class App {
+    public static String handleRequest(String input) {
+        if (input == null) return "";
+        return input;
+    }
+}
+  ```

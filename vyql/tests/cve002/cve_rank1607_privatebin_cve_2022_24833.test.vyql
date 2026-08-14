@@ -1,0 +1,28 @@
+# Rank 1607 / CVE-2022-24833: Security review for CVE-2022-24833 in PrivateBin/PrivateBin.
+# Fix commit 2a4d572c1e in PrivateBin/PrivateBin.
+# ATTENTION, vocabulary/engine gap.
+
+test "rank1607: vulnerable code pattern before fix"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    return $input;
+}
+  ```
+
+test "rank1607: validated or patched form"
+  lang php
+  file main.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+function handleRequest($input) {
+    if (!$input) return '';
+    return $input;
+}
+  ```
