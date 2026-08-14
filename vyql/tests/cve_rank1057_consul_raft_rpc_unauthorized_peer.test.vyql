@@ -1,0 +1,181 @@
+# Rank 1057 / CVE-2021-37219: Consul handed a TLS connection to the Raft
+# consensus transport without checking that the peer was a server, so any client
+# holding a certificate the agent CA signed could join the consensus layer
+# (CWE-295).
+# Server.handleConn dispatched on the connection's first byte and the Raft arm
+# went straight through:
+#
+#   case pool.RPCRaft:
+#     metrics.IncrCounter([]string{"rpc", "raft_handoff"}, 1)
+#     s.raftLayer.Handoff(conn)
+#
+# with the same two lines repeated in handleNativeTLS for the ALPN path. A valid
+# client-agent certificate is enough to reach it, and the Raft layer trusts
+# whatever it is handed. Pool commit ccf8eb1947 is the real fix (COMMIT_OK,
+# named by GHSA-ccw8-7688-vqx4); it routes both arms through a new
+# handleRaftRPC that calls tlsConfigurator.AuthorizeServerConn, which verifies
+# the peer certificate chains to the agent CA and carries a DNSName matching the
+# local ServerSNI, and closes the connection otherwise. No pool correction.
+#
+# ATTENTION, analysis gap. Scanning agent/consul/rpc.go reports nothing at
+# either revision, and vyql match labels only the transport furniture: two
+# code.ResourceReview rows on Accept, one code.NetworkSend, and fourteen
+# core.ResourceRelease rows on conn.Close. Nothing labels the handoff.
+#
+# What makes this rank worth recording is that the vocabulary and the judgement
+# both already exist and only the observation is missing.
+# code.PrivilegedEntryPointReview carries CWE_862 and
+# vulnerableTo access_control.MissingAuthorization, and
+# vyql/review/concepts/review/PrivilegedEntryPointReview.vyql consumes it with
+# expected: [core.AuthorizationCheck], which is exactly the question the fix
+# answers. Two things stop it reaching Go, and they are separable.
+#
+#  - Go computes no review observations at all. The concept is bound twice, in C
+#    through node.analysis ~= "privileged.entrypoint_missing_uid_gate" and in
+#    PHP through node.context.phpReview == "privileged_entry_point_review", both
+#    frontend analyses. There are zero goReview analyses across the whole
+#    binding set, so the route those two use does not exist for Go. Writing the
+#    binding as a plain callExpr instead would mean keying on
+#    callee.path ~= "Handoff", which is Consul's own RaftLayer method rather
+#    than anything hashicorp/raft documents, so it would detect this project and
+#    not the weakness.
+#  - Even with the entry point labelled, the review could not separate the
+#    revisions. core.AuthorizationCheck is bound in java, javascript, php,
+#    python, ruby and the generated package corpus, and not once in
+#    vyql/bindings/go. So AuthorizeServerConn is not an authorization check to
+#    the review, the expected control can never be satisfied in Go, and the
+#    patched form would report identically to the vulnerable one. The last two
+#    snippets are that pair: they differ only by the AuthorizeServerConn call
+#    and both are rejected.
+#
+# The second blocker is binding work rather than engine work and is the one to
+# do first, because an entry-point observation shipped without it turns every Go
+# entry point into an unauthorized one.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1057: the raft arm hands the connection off with no peer check"
+  lang go
+  file agent/consul/rpc.go
+  reject_review code.PrivilegedEntryPointReview
+  code
+  ```
+  package consul
+
+  import (
+      "net"
+
+      "github.com/armon/go-metrics"
+      "github.com/hashicorp/consul/agent/pool"
+  )
+
+  func (s *Server) handleConn(conn net.Conn, isTLS bool) {
+      buf := make([]byte, 1)
+      if _, err := conn.Read(buf); err != nil {
+          conn.Close()
+          return
+      }
+
+      switch pool.RPCType(buf[0]) {
+      case pool.RPCConsul:
+          s.handleConsulConn(conn)
+
+      case pool.RPCRaft:
+          metrics.IncrCounter([]string{"rpc", "raft_handoff"}, 1)
+          s.raftLayer.Handoff(conn)
+
+      case pool.RPCMultiplexV2:
+          s.handleMultiplexV2(conn)
+
+      default:
+          conn.Close()
+      }
+  }
+  ```
+
+test "rank1057: the ALPN arm repeats it"
+  lang go
+  file agent/consul/rpc.go
+  reject_review code.PrivilegedEntryPointReview
+  code
+  ```
+  package consul
+
+  import (
+      "crypto/tls"
+
+      "github.com/armon/go-metrics"
+      "github.com/hashicorp/consul/agent/pool"
+  )
+
+  func (s *Server) handleNativeTLS(conn net.Conn) {
+      tlsConn := tls.Server(conn, s.tlsConfigurator.IncomingALPNRPCConfig(nil))
+      if err := tlsConn.Handshake(); err != nil {
+          conn.Close()
+          return
+      }
+
+      switch tlsConn.ConnectionState().NegotiatedProtocol {
+      case pool.ALPN_RPCConsul:
+          s.handleConsulConn(tlsConn)
+
+      case pool.ALPN_RPCRaft:
+          metrics.IncrCounter([]string{"rpc", "raft_handoff"}, 1)
+          s.raftLayer.Handoff(tlsConn)
+
+      default:
+          tlsConn.Close()
+      }
+  }
+  ```
+
+test "rank1057: the pair the review cannot separate, unauthorized handoff"
+  lang go
+  file agent/consul/rpc.go
+  reject_review code.PrivilegedEntryPointReview
+  code
+  ```
+  package consul
+
+  import (
+      "crypto/tls"
+      "net"
+
+      "github.com/armon/go-metrics"
+  )
+
+  func (s *Server) handleRaftRPC(conn net.Conn) {
+      metrics.IncrCounter([]string{"rpc", "raft_handoff"}, 1)
+      s.raftLayer.Handoff(conn)
+  }
+  ```
+
+test "rank1057: the pair the review cannot separate, authorized handoff"
+  lang go
+  file agent/consul/rpc.go
+  reject_review code.PrivilegedEntryPointReview
+  code
+  ```
+  package consul
+
+  import (
+      "crypto/tls"
+      "net"
+
+      "github.com/armon/go-metrics"
+  )
+
+  func (s *Server) handleRaftRPC(conn net.Conn) {
+      if tlsConn, ok := conn.(*tls.Conn); ok {
+          err := s.tlsConfigurator.AuthorizeServerConn(s.config.Datacenter, tlsConn)
+          if err != nil {
+              s.rpcLogger().Warn(err.Error(), "from", conn.RemoteAddr(), "operation", "raft RPC")
+              conn.Close()
+              return
+          }
+      }
+
+      metrics.IncrCounter([]string{"rpc", "raft_handoff"}, 1)
+      s.raftLayer.Handoff(conn)
+  }
+  ```
