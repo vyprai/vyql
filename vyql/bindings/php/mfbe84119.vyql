@@ -2729,3 +2729,8 @@ binding httpInput57 {
   query pattern callExpr where callee.path ~= "request.getRawInput"
   emit source code.HttpInput at call.result
 }
+
+binding storedHtmlWrite473 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "haxcms_page_break_description_stored_html_write"
+  emit issue code.StoredHtmlWrite at node
+}

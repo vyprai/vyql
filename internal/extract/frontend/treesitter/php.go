@@ -1141,6 +1141,11 @@ func (c *phConv) phpReviewTokens(n *tree_sitter.Node) []string {
 		!strings.Contains(compact, "setSafeMode(true)") {
 		add("stored_html_write")
 	}
+	if strings.Contains(compact, `$data["attributes"]["description"]`) &&
+		strings.Contains(compact, `$page->description=$data["attributes"]["description"];`) &&
+		!strings.Contains(compact, `$page->description=strip_tags($data["attributes"]["description"]);`) {
+		add("haxcms_page_break_description_stored_html_write")
+	}
 	if strings.Contains(compact, "toggleSubpalette") && strings.Contains(compact, "Input->post('field')") &&
 		strings.Contains(compact, "prepare(\"UPDATE\"") && !strings.Contains(compact, "__selector__") &&
 		!strings.Contains(compact, "hasAccess($dc->table") {
