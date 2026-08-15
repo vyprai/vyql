@@ -1,0 +1,152 @@
+# Rank 1184 / CVE-2024-55875: http4k's Xml object builds a Document with a
+# stock javax.xml DocumentBuilderFactory:
+#
+#   fun String.asXmlDocument(): Document =
+#       DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(byteInputStream())
+#
+# A JAXP DocumentBuilderFactory resolves DOCTYPE-declared external entities
+# and external DTDs/schemas by default. Body.xml() feeds this straight from
+# an HTTP request body, so a request carrying
+# `<!DOCTYPE root [<!ENTITY xxe SYSTEM "http://attacker">]>` makes the server
+# fetch attacker-chosen URLs (SSRF) and can read local files back into the
+# parsed document (info disclosure) -- CWE-611, CWE-918, CWE-200. Pool commit
+# 35297adc6d carries no flag; read anyway per Step 0's note that flags are
+# not the only source of pool errors, and confirmed against its own diff as
+# the real fix: it adds an `XmlParsingConfig` typealias
+# (`DocumentBuilderFactory.() -> Unit`), a `defaultXmlParsingConfig` value
+# that sets `isExpandEntityReferences = false` and blanks
+# `XMLConstants.ACCESS_EXTERNAL_DTD` / `ACCESS_EXTERNAL_SCHEMA` via
+# `setAttribute`, and threads that config through `.apply(config)` before
+# `newDocumentBuilder()` in every `asXmlDocument` overload; the new
+# XmlSecurityTest asserts none of DTD/schema/entity fetches reach a
+# listening test server. No pool correction needed.
+#
+# vyql match on the vulnerable file labels the parse call
+# (code.XmlParserCreate, kotlin.marks) but nothing covers it -- expected,
+# there is no hardening call anywhere. VYQL-DESER-004 fires, correctly.
+#
+# vyql match on the FIXED file also labels the same code.XmlParserCreate
+# call, and (before this rank's binding change) nothing covered it either:
+# the kotlin bindings had `setProperty` + ACCESS_EXTERNAL_DTD wired to
+# core.XmlHardening (the SAXParserFactory/XMLInputFactory idiom), but
+# DocumentBuilderFactory's real, documented API for this is `setAttribute`,
+# which had no kotlin binding at all -- only `setAttribute` bound generically
+# to code.TrustBoundary (the HttpSession.setAttribute idiom), a different
+# concept entirely. Added xmlHardening92a/92b/92c to
+# vyql/bindings/kotlin/m304d1620.vyql: `setAttribute` + literal
+# ACCESS_EXTERNAL_DTD / ACCESS_EXTERNAL_SCHEMA / ACCESS_EXTERNAL_STYLESHEET
+# -> check core.XmlHardening, covers sameReceiver anchored on
+# callee.receiver -- mirroring the three non-advisory Java bindings
+# (xmlHardening277/278/279 in vyql/bindings/java/m420f6b67.vyql) that
+# already cover this exact, standard DocumentBuilderFactory hardening call
+# for Java. Confirmed not orphaned: a same-function repro that calls
+# `factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")` right beside
+# `factory.newDocumentBuilder()` now clears VYQL-DESER-004 (third case
+# below), where before this binding it did not.
+#
+# ATTENTION anyway: the real fix's `setAttribute` calls do not sit in the
+# same function as `newDocumentBuilder()`. They live inside
+# `defaultXmlParsingConfig`, a value of the extension-lambda type
+# `DocumentBuilderFactory.() -> Unit`, applied indirectly via
+# `.apply(config)` where `config` is a named default-parameter reference,
+# not a literal trailing lambda at the call site. kotlin.go's
+# trailingLambdaStmts already inlines literal trailing lambdas passed to
+# apply/also/let/run so their statements execute in the caller's scope, but
+# a named reference to a lambda-typed value is not a literal at the call
+# site, so that inlining never triggers, and neither `endpoint` (same
+# function) nor `sameReceiver` (same receiver chain) coverage sees across
+# the indirection. Confirmed on the real checkout: `vyql scan --cache off
+# --max-ram 4GB` on the file at 35297adc6d^ reports VYQL-DESER-004 at
+# Xml.kt:43 among 1 finding; the same scan at 35297adc6d still reports
+# VYQL-DESER-004, now at Xml.kt:44, among 1 finding -- identical, despite
+# the added binding correctly emitting `core.XmlHardening` at both
+# `setAttribute` calls inside `defaultXmlParsingConfig` (confirmed via
+# `vyql match`: `setAttribute core.XmlHardening Xml.kt:92` and `:93`,
+# `kotlin.controls@resolved`) -- that coverage just never reaches the
+# `newDocumentBuilder()` call two functions away through the `apply(config)`
+# indirection. Recognizing this needs the engine to treat a named
+# lambda-with-receiver reference passed to a scope function the same way it
+# already treats a literal one: resolve the reference to its definition and
+# inline its body at the call site (or otherwise connect its implicit `this`
+# to the receiver chain). That is a dataflow/resolution change in
+# kotlin.go's trailingLambdaStmts and call resolution, not a binding or rule
+# fix, so it is entered in ENGINE-GAPS.md rather than attempted here.
+#
+# verify_current_expected: attention-precision-limit, both real revisions
+# fire identically
+#
+# vyql/bindings/kotlin/m304d1620.vyql: added xmlHardening92a/92b/92c
+# (setAttribute + ACCESS_EXTERNAL_DTD/SCHEMA/STYLESHEET -> core.XmlHardening,
+# covers sameReceiver). OWASP Java and Python unchanged at +1.00 and +0.90.
+
+test "rank1184: asXmlDocument builds a DocumentBuilder with no XML hardening"
+  lang kotlin
+  file Xml.kt
+  expect VYQL-DESER-004
+  code
+  ```
+  package org.http4k.format
+
+  import org.w3c.dom.Document
+  import javax.xml.parsers.DocumentBuilderFactory
+
+  object Xml {
+      fun String.asXmlDocument(): Document =
+          DocumentBuilderFactory
+              .newInstance()
+              .newDocumentBuilder()
+              .parse(byteInputStream())
+  }
+  ```
+
+test "rank1184: the fix's config lambda hardens the factory through apply(), but the check does not reach across the indirection"
+  lang kotlin
+  file Xml.kt
+  expect VYQL-DESER-004
+  code
+  ```
+  package org.http4k.format
+
+  import org.w3c.dom.Document
+  import javax.xml.XMLConstants
+  import javax.xml.parsers.DocumentBuilderFactory
+
+  object Xml {
+      fun String.asXmlDocument(config: XmlParsingConfig = defaultXmlParsingConfig): Document =
+          DocumentBuilderFactory
+              .newInstance()
+              .apply(config)
+              .newDocumentBuilder()
+              .parse(byteInputStream())
+  }
+
+  typealias XmlParsingConfig = DocumentBuilderFactory.() -> Unit
+
+  val defaultXmlParsingConfig: XmlParsingConfig = {
+      isExpandEntityReferences = false
+      setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
+      setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
+  }
+  ```
+
+test "rank1184: the same setAttribute hardening, called directly beside newDocumentBuilder, clears the check"
+  lang kotlin
+  file Xml.kt
+  reject VYQL-DESER-004
+  code
+  ```
+  package org.http4k.format
+
+  import org.w3c.dom.Document
+  import javax.xml.XMLConstants
+  import javax.xml.parsers.DocumentBuilderFactory
+
+  object Xml {
+      fun String.asXmlDocument(): Document {
+          val factory = DocumentBuilderFactory.newInstance()
+          factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
+          factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
+          return factory.newDocumentBuilder().parse(byteInputStream())
+      }
+  }
+  ```
