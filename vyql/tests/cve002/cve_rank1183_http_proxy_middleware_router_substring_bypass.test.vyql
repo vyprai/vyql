@@ -1,0 +1,100 @@
+# Rank 1183 / CVE-2026-55602: chimurai/http-proxy-middleware's proxy-table
+# router, getTargetFromProxyTable (src/router.ts), builds a single string from
+# the attacker-controlled request Host header and URL path, then selects the
+# backend target for a host+path routing key with an unanchored substring
+# test: hostAndPath.indexOf(key) > -1 (CWE-20/CWE-187). A crafted Host header
+# that is only a superstring of a configured host+path key still contains that
+# key, so a request meant for one backend routes to whichever other backend
+# the operator configured for a different, unrelated key. Fix f3775200bd
+# replaces the concatenate-then-indexOf check with an exact host comparison
+# plus an anchored path.startsWith(keyPath) prefix check.
+
+test "rank1183: proxy-table router matches host+path with an unanchored substring test"
+  lang javascript
+  file router.ts
+  expect VYQL-AUTH-110
+  code
+  ```
+  function getTargetFromProxyTable(req, table) {
+    let result;
+    const host = req.headers.host;
+    const path = req.url;
+
+    const hostAndPath = host + path;
+
+    for (const [key, value] of Object.entries(table)) {
+      if (containsPath(key)) {
+        if (hostAndPath.indexOf(key) > -1) {
+          // match 'localhost:3000/api'
+          result = value;
+          break;
+        }
+      } else {
+        if (key === host) {
+          // match 'localhost:3000'
+          result = value;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  function containsPath(v) {
+    return v.indexOf('/') > -1;
+  }
+  ```
+
+test "rank1183: proxy-table router requires an exact host and an anchored path prefix"
+  lang javascript
+  file router.ts
+  reject VYQL-AUTH-110
+  code
+  ```
+  function getTargetFromProxyTable(req, table) {
+    let result;
+    const host = req.headers.host || '';
+    const path = req.url || '';
+
+    for (const [key, value] of Object.entries(table)) {
+      if (containsPath(key)) {
+        if (isHostAndPathKey(key)) {
+          const [keyHost, keyPath] = splitHostAndPathKey(key);
+
+          // SECURITY: host+path keys must match exact host + path prefix.
+          if (host === keyHost && path.startsWith(keyPath)) {
+            // match 'localhost:3000/api'
+            result = value;
+            break;
+          }
+        } else {
+          if (path.startsWith(key)) {
+            // match '/api'
+            result = value;
+            break;
+          }
+        }
+      } else {
+        if (key === host) {
+          // match 'localhost:3000'
+          result = value;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  function containsPath(v) {
+    return v.indexOf('/') > -1;
+  }
+
+  function isHostAndPathKey(v) {
+    return containsPath(v) && !v.startsWith('/');
+  }
+
+  function splitHostAndPathKey(v) {
+    const firstSlash = v.indexOf('/');
+    return [v.slice(0, firstSlash), v.slice(firstSlash)];
+  }
+  ```

@@ -1,0 +1,11 @@
+module code;
+
+concept UnanchoredHostPathRoutingMatch : issue {
+  cwe: [CWE_20, CWE_187]
+  reviewAssumption: "the request's Host header and URL path are attacker-controlled and a routing table maps host+path keys to distinct backend targets"
+  reviewCategory: auth
+  reviewCondition: "a router or proxy selects a backend target by testing whether a string built from the request's host and path contains a configured routing key as a substring, instead of matching the host exactly and the path as an anchored prefix"
+  reviewConfidence: high
+  reviewEvidence: "routing table match context {pattern} concatenates request host and path and tests indexOf against a configured key instead of an exact host comparison plus a path prefix check"
+  vulnerableTo: [access_control.IncorrectAuthorization, validation.ImproperInputValidation]
+}
