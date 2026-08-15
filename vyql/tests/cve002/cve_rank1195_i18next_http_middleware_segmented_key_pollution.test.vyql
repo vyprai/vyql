@@ -1,0 +1,81 @@
+# Rank 1195 / CVE-2026-48714: the missing-key handler denylisted __proto__,
+# constructor and prototype as whole strings, but a dotted key such as
+# "__proto__.polluted" is not itself one of those literals. Backends that
+# split the forwarded key on keySeparator before persisting it (the documented
+# i18next-fs-backend writeFile path) then walk one of the split segments into
+# Object.prototype.
+
+test "rank1195: missing-key handler denylists the whole key, not its dotted segments"
+  lang javascript
+  file index.js
+  expect VYQL-INJ-208
+  expect_review code.SegmentedKeyDenylistBypassPrototypePollution
+  code
+  ```
+  export function missingKeyHandler (i18next, options = {}) {
+    extendOptionsWithDefaults(options)
+
+    return function (rq, rs) {
+      const { req, res } = checkForCombinedReqRes(rq, rs)
+
+      const lng = options.getParams(req)[options.lngParam || 'lng']
+      const ns = options.getParams(req)[options.nsParam || 'ns']
+
+      if (!i18next.services.backendConnector) {
+        options.setStatus(res, 404)
+        return options.send(res, 'no backend configured')
+      }
+
+      const body = options.getBody(req)
+
+      const saveMissingKeys = src => {
+        if (!src || typeof src !== 'object') return
+        for (const m of Object.keys(src)) {
+          if (utils.UNSAFE_KEYS.indexOf(m) > -1) continue
+          i18next.services.backendConnector.saveMissing([lng], ns, m, src[m])
+        }
+      }
+
+      saveMissingKeys(body)
+      return options.send(res, 'ok')
+    }
+  }
+  ```
+
+test "rank1195: missing-key handler checks delimiter-separated segments too"
+  lang javascript
+  file index.js
+  reject VYQL-INJ-208
+  reject_review code.SegmentedKeyDenylistBypassPrototypePollution
+  code
+  ```
+  export function missingKeyHandler (i18next, options = {}) {
+    extendOptionsWithDefaults(options)
+
+    return function (rq, rs) {
+      const { req, res } = checkForCombinedReqRes(rq, rs)
+
+      const lng = options.getParams(req)[options.lngParam || 'lng']
+      const ns = options.getParams(req)[options.nsParam || 'ns']
+
+      if (!i18next.services.backendConnector) {
+        options.setStatus(res, 404)
+        return options.send(res, 'no backend configured')
+      }
+
+      const body = options.getBody(req)
+      const keySeparator = i18next.options && i18next.options.keySeparator
+
+      const saveMissingKeys = src => {
+        if (!src || typeof src !== 'object') return
+        for (const m of Object.keys(src)) {
+          if (utils.hasUnsafeKeySegment(m, keySeparator)) continue
+          i18next.services.backendConnector.saveMissing([lng], ns, m, src[m])
+        }
+      }
+
+      saveMissingKeys(body)
+      return options.send(res, 'ok')
+    }
+  }
+  ```

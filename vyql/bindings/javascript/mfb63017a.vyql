@@ -3993,3 +3993,8 @@ binding arrayIdentityStringCoercionBypass907 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath == "String" and node.context.selector contains "Federated"
   emit issue code.ArrayIdentityStringCoercionBypass at node
 }
+
+binding segmentedKeyDenylistBypassPrototypePollution908 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "Object.keys" and node.context.callPath contains "indexOf" and node.context.callPath contains "saveMissing" and not (node.context.callPath contains "hasUnsafeKeySegment")
+  emit issue code.SegmentedKeyDenylistBypassPrototypePollution at node
+}
