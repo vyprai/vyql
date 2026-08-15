@@ -1,0 +1,134 @@
+# Rank 1193 / CVE-2020-35863: hyper's HTTP/1 client built GET, HEAD, and
+# CONNECT requests -- methods that conventionally carry no body -- whose
+# caller had supplied a body of unknown length by picking a close-delimited
+# encoder: one with no Content-Length and no Transfer-Encoding, which simply
+# writes whatever body bytes the caller gave it straight after the request
+# headers, with no length marker at all. Close-delimited framing (the
+# connection close marks the end) is valid for a *response*; a *request* has
+# no such signal, so a server or proxy on the other end follows RFC 7230,
+# sees a GET request with neither header, reads zero bytes of body, and
+# parses whatever bytes follow as the start of the next pipelined request.
+# An attacker who controls the body of a request hyper makes, even when the
+# request line and headers are otherwise trusted, can smuggle a second
+# request with headers the application never intended to send, bypassing
+# CORS and any other check that only looks at the first, legitimate request.
+#
+# set_length in src/proto/h1/role.rs picked the request's framing from the
+# HTTP method and body length. For a non-chunkable request (HTTP/1.0, or
+# method GET/HEAD/CONNECT under HTTP/1.1), when neither an existing
+# Content-Length header nor a body of known length was present, it fell
+# back to Encoder::close_delimited(). The fix,
+# 23fc8b0806e7fde435ca00479cd5e3c8c5bdeee7, replaces that fallback with
+# Encoder::length(0): a body-less method with no explicit length header now
+# sends an empty body instead of an unframed one.
+#
+# The pool row named c83b54dc88, hyper's v0.12.34 version-bump commit
+# (CHANGELOG.md, Cargo.toml, src/lib.rs only, no functional change), not the
+# fix -- confirmed by reading its diff per the nocommit flag. Corrected in
+# place to 23fc8b0806e7fde435ca00479cd5e3c8c5bdeee7, the commit the added
+# CHANGELOG entry itself names as closing #1925.
+#
+# ATTENTION, no taint path. `vyql match` on role.rs labels no source at all;
+# the bug is a decision over a HeaderMap and a BodyLength enum local to one
+# function, not attacker-controlled data reaching a sink. code.ProtocolStateReview
+# is the nearest concept in spirit -- its text covers a state transition
+# proceeding without the state check it needs, a fair one-level-up
+# description of choosing response-only framing for a request -- but the
+# check itself (method exhaustiveness against an Encoder enum private to
+# this crate) has no public API surface a binding could recognize from
+# hyper's documentation; every candidate binding can only be written by
+# reading this diff, which fails the genericity test. No definition change
+# attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1193: non-chunkable request with unknown body length falls back to close-delimited framing"
+  lang rust
+  file role.rs
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  impl Client {
+      fn set_length(head: &mut RequestHead, body: Option<BodyLength>) -> Encoder {
+          if let Some(body) = body {
+              let can_chunked = head.version == Version::HTTP_11
+                  && (head.subject.0 != Method::HEAD)
+                  && (head.subject.0 != Method::GET)
+                  && (head.subject.0 != Method::CONNECT);
+              set_length(&mut head.headers, body, can_chunked)
+          } else {
+              head.headers.remove(header::TRANSFER_ENCODING);
+              Encoder::length(0)
+          }
+      }
+  }
+
+  fn set_length(headers: &mut HeaderMap, body: BodyLength, can_chunked: bool) -> Encoder {
+      let existing_con_len = headers::content_length_parse_all(headers);
+      let mut should_remove_con_len = false;
+
+      if can_chunked {
+          Encoder::chunked()
+      } else {
+          // Chunked isn't legal, so if it is set, we need to remove it.
+          // Also, if it *is* set, then we shouldn't replace with a length,
+          // since the user tried to imply there isn't a length.
+          let encoder = if headers.remove(header::TRANSFER_ENCODING).is_some() {
+              trace!("removing illegal transfer-encoding header");
+              should_remove_con_len = true;
+              Encoder::close_delimited()
+          } else if let Some(len) = existing_con_len {
+              Encoder::length(len)
+          } else if let BodyLength::Known(len) = body {
+              set_content_length(headers, len)
+          } else {
+              Encoder::close_delimited()
+          };
+
+          if should_remove_con_len && existing_con_len.is_some() {
+              headers.remove(header::CONTENT_LENGTH);
+          }
+
+          encoder
+      }
+  }
+  ```
+
+test "rank1193: non-chunkable request with unknown body length is sent empty instead of unframed"
+  lang rust
+  file role.rs
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  impl Client {
+      fn set_length(head: &mut RequestHead, body: Option<BodyLength>) -> Encoder {
+          let body = if let Some(body) = body {
+              body
+          } else {
+              head.headers.remove(header::TRANSFER_ENCODING);
+              return Encoder::length(0);
+          };
+
+          let can_chunked = head.version == Version::HTTP_11;
+          let headers = &mut head.headers;
+
+          let existing_con_len = headers::content_length_parse_all(headers);
+
+          if !can_chunked {
+              if headers.remove(header::TRANSFER_ENCODING).is_some() {
+                  trace!("removing illegal transfer-encoding header");
+              }
+
+              return if let Some(len) = existing_con_len {
+                  Encoder::length(len)
+              } else if let BodyLength::Known(len) = body {
+                  set_content_length(headers, len)
+              } else {
+                  Encoder::length(0)
+              };
+          }
+
+          Encoder::chunked()
+      }
+  }
+  ```
