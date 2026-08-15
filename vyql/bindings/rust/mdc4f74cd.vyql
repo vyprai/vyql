@@ -811,3 +811,12 @@ binding unpinImplMissingBound {
   query pattern presenceNode where node.kind == "any" and node.analysis == "rust.unpin_impl_missing_bound"
   emit issue code.UnsafeAutoTraitImpl at node
 }
+
+matcher integrityCompareSensitiveIdentifier {
+  containsAny: ["digest", "hmac", "checksum", "secret", "password"]
+}
+
+binding secretComparisonReviewIntegrityCheck {
+  query pattern presenceNode where node.kind == "binop" and node.op in ["==", "!="] and not (containsAny(node.context.scopeCall, [ct_eq, constant_time_eq, verify_slices, ConstantTimeEq])) and operand(node, where: operand.identifier is integrityCompareSensitiveIdentifier)
+  emit issue code.SecretComparisonReview at node
+}
