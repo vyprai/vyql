@@ -1,0 +1,152 @@
+# Rank 1163 / CVE-2016-2052: HarfBuzz's hmtx/hhea metrics accelerator
+# sanity-checked a font-supplied table length with the comparison the wrong
+# way round, so an undersized hmtx table passed validation and a later
+# indexed read walked past the end of the allocated blob (CWE-125, buffer
+# over-read; NVD: "a buffer over-read resulting from an inverted length
+# check in hb-ot-font.cc"). hb_ot_face_metrics_accelerator_t::init in
+# src/hb-ot-font.cc computes the byte length the table must hold from two
+# font-supplied counts (num_advances from hhea, num_metrics from the glyph
+# count) and only resets the blob to empty when that computed length is
+# LESS than the blob's actual length:
+#
+#   if (unlikely (!this->num_advances ||
+#                 2 * (this->num_advances + this->num_metrics) < hb_blob_get_length (this->blob)))
+#
+# The protective case is the opposite one: the blob must be rejected when it
+# is SMALLER than the computed length, not larger. get_advance() later reads
+# this->table->longMetric[glyph], clamping glyph to num_advances - 1 first --
+# a real guard, but one that only holds if num_advances was itself validated
+# against the blob's actual size, which the inverted check fails to do.
+# Pool commit 63ef0b41dc (flagged nocommit) is confirmed as the real fix by
+# reading its diff: it is a single-character change, the `<` to `>` above,
+# authored by Behdad Esfahbod the same day libFuzzer found it -- matches the
+# NVD description exactly. No pool correction.
+#
+# ATTENTION, not mechanical. The vulnerable and fixed forms differ only in
+# a comparison operator's direction; there is no textbook "shape" of a bad
+# check to key on; a rule narrow enough to catch this one flipped operator
+# would be repro-shaped to this one function (AGENTS.md's genericity test),
+# and a rule broad enough to flag any size-comparison guard ahead of an
+# indexed access, without judging which direction is protective, fires
+# identically on both revisions since both contain a comparison of the same
+# shape. Diagnosis on a minimal pair (both revisions structurally identical
+# but for the operator): `vyql match` labels the computed length as
+# code.ComputedSizeValue and the indexed read as code.IndexAccessSink on
+# both, correctly and identically; `vyql trace -from code.ComputedSizeValue
+# -to code.IndexAccessSink` finds no path on either -- the computed length
+# feeds a boolean that conditionally resets num_advances/table, and
+# get_advance() reads num_advances afterward, but nothing here is a taint
+# edge from the size computation to the array index. Judging whether the
+# reset happens on the correct side of that boolean is a control-flow-carried
+# invariant across two methods of one struct (init sets the field, a later
+# call reads it), not a dataflow relation a taint engine has an edge for --
+# the same shape already recorded as not mechanical at ranks 1096 and 1151.
+# `vyql scan` on the real checkout at both the parent and the fix commit
+# reports 0 findings anywhere in src/hb-ot-font.cc, on either revision. No
+# definition change attempted.
+#
+# verify_current_expected: attention-not-mechanical
+
+test "rank1163: hmtx table length check resets on a computed length smaller than the blob"
+  lang cpp
+  file src/hb-ot-font.cc
+  reject VYQL-MEM-005
+  code
+  ```
+  struct hb_blob_t { unsigned int length; };
+  static inline unsigned int hb_blob_get_length (const hb_blob_t *b) { return b->length; }
+  static hb_blob_t *hb_blob_get_empty (void);
+  static void hb_blob_destroy (hb_blob_t *b);
+
+  struct LongMetric { int advance; };
+  struct MtxTable { LongMetric longMetric[1]; };
+
+  struct hb_face_t {
+    hb_blob_t *reference_table (unsigned int tag);
+  };
+
+  static hb_blob_t *sanitize_mtx (hb_blob_t *raw);
+  static const MtxTable *lock_mtx (hb_blob_t *blob);
+
+  struct hb_ot_face_metrics_accelerator_t
+  {
+    unsigned int num_metrics;
+    unsigned int num_advances;
+    unsigned int default_advance;
+    const MtxTable *table;
+    hb_blob_t *blob;
+
+    void init (hb_face_t *face, unsigned int _mtx_tag)
+    {
+      this->blob = sanitize_mtx (face->reference_table (_mtx_tag));
+      if (!this->num_advances ||
+          2 * (this->num_advances + this->num_metrics) < hb_blob_get_length (this->blob))
+      {
+        this->num_metrics = this->num_advances = 0;
+        hb_blob_destroy (this->blob);
+        this->blob = hb_blob_get_empty ();
+      }
+      this->table = lock_mtx (this->blob);
+    }
+
+    unsigned int get_advance (unsigned int glyph) const
+    {
+      if (glyph >= this->num_advances)
+        glyph = this->num_advances - 1;
+
+      return this->table->longMetric[glyph].advance;
+    }
+  };
+  ```
+
+test "rank1163: fix resets when the computed length exceeds the blob instead"
+  lang cpp
+  file src/hb-ot-font.cc
+  reject VYQL-MEM-005
+  code
+  ```
+  struct hb_blob_t { unsigned int length; };
+  static inline unsigned int hb_blob_get_length (const hb_blob_t *b) { return b->length; }
+  static hb_blob_t *hb_blob_get_empty (void);
+  static void hb_blob_destroy (hb_blob_t *b);
+
+  struct LongMetric { int advance; };
+  struct MtxTable { LongMetric longMetric[1]; };
+
+  struct hb_face_t {
+    hb_blob_t *reference_table (unsigned int tag);
+  };
+
+  static hb_blob_t *sanitize_mtx (hb_blob_t *raw);
+  static const MtxTable *lock_mtx (hb_blob_t *blob);
+
+  struct hb_ot_face_metrics_accelerator_t
+  {
+    unsigned int num_metrics;
+    unsigned int num_advances;
+    unsigned int default_advance;
+    const MtxTable *table;
+    hb_blob_t *blob;
+
+    void init (hb_face_t *face, unsigned int _mtx_tag)
+    {
+      this->blob = sanitize_mtx (face->reference_table (_mtx_tag));
+      if (!this->num_advances ||
+          2 * (this->num_advances + this->num_metrics) > hb_blob_get_length (this->blob))
+      {
+        this->num_metrics = this->num_advances = 0;
+        hb_blob_destroy (this->blob);
+        this->blob = hb_blob_get_empty ();
+      }
+      this->table = lock_mtx (this->blob);
+    }
+
+    unsigned int get_advance (unsigned int glyph) const
+    {
+      if (glyph >= this->num_advances)
+        glyph = this->num_advances - 1;
+
+      return this->table->longMetric[glyph].advance;
+    }
+  };
+  ```
