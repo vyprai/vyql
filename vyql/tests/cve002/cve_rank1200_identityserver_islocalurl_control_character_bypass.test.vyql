@@ -1,0 +1,134 @@
+# Rank 1200 / CVE-2024-39694: DuendeSoftware IdentityServer vendors its own
+# copy of ASP.NET Core's IsLocalUrl helper (StringsExtensions.cs) and uses it
+# to gate every redirect and return-URL sink in the login, logout, consent
+# and device-authorization flows. The helper treats any string starting with
+# a single "/" (not "//" or "/\\") as a safe local path and returns true
+# without looking past the first two characters (CWE-601, GHSA-ff4q-64jc-gx98).
+# Browsers and user agents strip leading ASCII control characters from a URL
+# before navigating, so a return URL like "/\t/evil.com" passes this check as
+# local, then resolves to "//evil.com" once the control character is gone —
+# an open redirect off an authentication endpoint. The fix fe817b499933d6ed
+# adds a HasControlCharacter scan over the remainder of the string and only
+# returns true when it comes back clean.
+
+test "rank1200: IsLocalUrl accepts a leading slash without rejecting control characters"
+  lang csharp
+  file StringExtensions.cs
+  expect VYQL-RF-039
+  expect_review code.WeakRedirectUrlValidation
+  code
+  ```
+  using System.Diagnostics;
+
+  internal static class StringExtensions
+  {
+      [DebuggerStepThrough]
+      public static bool IsLocalUrl(this string url)
+      {
+          if (string.IsNullOrEmpty(url))
+          {
+              return false;
+          }
+
+          if (url[0] == '/')
+          {
+              if (url.Length == 1)
+              {
+                  return true;
+              }
+
+              if (url[1] != '/' && url[1] != '\\')
+              {
+                  return true;
+              }
+
+              return false;
+          }
+
+          if (url[0] == '~' && url.Length > 1 && url[1] == '/')
+          {
+              if (url.Length == 2)
+              {
+                  return true;
+              }
+
+              if (url[2] != '/' && url[2] != '\\')
+              {
+                  return true;
+              }
+
+              return false;
+          }
+
+          return false;
+      }
+  }
+  ```
+
+test "rank1200: IsLocalUrl rejects a remainder that contains a control character"
+  lang csharp
+  file StringExtensions.cs
+  reject VYQL-RF-039
+  reject_review code.WeakRedirectUrlValidation
+  code
+  ```
+  using System;
+  using System.Diagnostics;
+
+  internal static class StringExtensions
+  {
+      [DebuggerStepThrough]
+      public static bool IsLocalUrl(this string url)
+      {
+          if (string.IsNullOrEmpty(url))
+          {
+              return false;
+          }
+
+          if (url[0] == '/')
+          {
+              if (url.Length == 1)
+              {
+                  return true;
+              }
+
+              if (url[1] != '/' && url[1] != '\\')
+              {
+                  return !HasControlCharacter(url.AsSpan(1));
+              }
+
+              return false;
+          }
+
+          if (url[0] == '~' && url.Length > 1 && url[1] == '/')
+          {
+              if (url.Length == 2)
+              {
+                  return true;
+              }
+
+              if (url[2] != '/' && url[2] != '\\')
+              {
+                  return !HasControlCharacter(url.AsSpan(2));
+              }
+
+              return false;
+          }
+
+          return false;
+
+          static bool HasControlCharacter(ReadOnlySpan<char> readOnlySpan)
+          {
+              for (var i = 0; i < readOnlySpan.Length; i++)
+              {
+                  if (char.IsControl(readOnlySpan[i]))
+                  {
+                      return true;
+                  }
+              }
+
+              return false;
+          }
+      }
+  }
+  ```

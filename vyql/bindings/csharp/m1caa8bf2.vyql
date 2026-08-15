@@ -1158,3 +1158,8 @@ binding xmlSignatureDigestOnlyVerification205 {
   query pattern callExpr where callee.path ~= "SignedInfo.Verify"
   emit issue code.XmlSignatureDigestOnlyVerification at call
 }
+
+binding weakRedirectUrlValidation206 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.functionName contains "IsLocalUrl" and containsAny(node.context.literal, ["/"]) and containsAny(node.context.literal, ["\\"]) and not (containsAny(node.context.callPath, ["IsControl"]))
+  emit issue code.WeakRedirectUrlValidation at node
+}
