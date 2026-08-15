@@ -3969,3 +3969,8 @@ binding databaseRead903 {
   query pattern callExpr where callee.method == "findMany"
   emit source code.DatabaseRead at call.result
 }
+
+binding proxyClientIpSpoofingBypass904 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "req.header" and node.context.literal contains "x-forwarded-for" and node.context.subscript contains "split[0]" and node.context.assign contains "address"
+  emit issue code.ProxyClientIpSpoofingBypass at node
+}
