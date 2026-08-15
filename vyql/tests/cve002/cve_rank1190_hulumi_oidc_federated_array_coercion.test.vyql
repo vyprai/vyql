@@ -1,0 +1,107 @@
+# Rank 1190 / CVE-2026-48032: hulumi's G_OIDC_1/G_OIDC_2 policy rules read an
+# AWS IAM trust statement's `Principal.Federated` value and coerce it with
+# `String(...)` before checking whether it names the GitHub Actions OIDC
+# provider (CWE-697/CWE-1023). AWS documents `Principal.Federated` as either a
+# single string or an array of strings. When a role trusts more than one
+# federated provider, the array holds more than one entry and
+# `String(array)` comma-joins them into one value. The anchored
+# marker/slash parse that correctly identifies a single provider ARN no
+# longer lines up with the joined string, so the equality check returns
+# false even though one array element is the real GitHub OIDC provider. The
+# caller then skips its wildcard/blast-radius check on that statement,
+# so a `sub` condition wide open to any repository or branch is reported as
+# compliant. Fix commit 070da5d314249e9fd930ab1f766bf6f6793ff4c9 (PR #178,
+# cluster "G_OIDC_1/G_OIDC_2 handle array Principal.Federated") drops the
+# `String(...)` coercion and has the matcher accept the raw value, testing
+# every array element on its own.
+#
+# FIXED. javascript.flags binds arrayIdentityStringCoercionBypass907 in
+# mfb63017a.vyql: a function-scoped presence match on a `String(...)` call
+# alongside a selector naming `Federated` — AWS's own documented field name
+# for a trust statement's federated-provider principal, not this project's
+# naming. Reuses code.ArrayIdentityStringCoercionBypass (VYQL-AUTH-111): an
+# identity check that coerces a string-or-array field to a single string
+# before matching it against a fixed identity host, missing the elements a
+# per-entry check would still see. Clears once the `String(...)` coercion is
+# removed and the match walks the value itself, array or not.
+
+test "rank1190: G_OIDC federated-provider check coerces Principal.Federated with String() before matching"
+  lang javascript
+  file github-oidc-issuer.ts
+  expect VYQL-AUTH-111
+  expect_review code.ArrayIdentityStringCoercionBypass
+  code
+  ```
+  function federatedIsGithubOidc(federated) {
+    let host = federated;
+    const marker = "oidc-provider/";
+    const idx = host.indexOf(marker);
+    if (idx !== -1) host = host.slice(idx + marker.length);
+    host = host.replace(/^https?:\/\//, "");
+    const slash = host.indexOf("/");
+    if (slash !== -1) host = host.slice(0, slash);
+    return host === "token.actions.githubusercontent.com";
+  }
+
+  function inspectAwsIamTrustPolicy(args, reportViolation) {
+    const policy = args.props.assumeRolePolicy;
+    const parsed = JSON.parse(policy);
+    const stmts = parsed.Statement;
+    for (const stmt of stmts) {
+      const principal = stmt.Principal;
+      if (!principal || principal.Federated === undefined) continue;
+      const fed = String(principal.Federated);
+      if (!federatedIsGithubOidc(fed)) continue;
+      const conds = stmt.Condition;
+      for (const [operator, rawCondition] of Object.entries(conds)) {
+        if (operator.endsWith("StringLike")) {
+          reportViolation(`wildcard sub claim on ${rawCondition}`);
+        }
+      }
+    }
+  }
+  ```
+
+test "rank1190: G_OIDC federated-provider check matches every array element without coercion"
+  lang javascript
+  file github-oidc-issuer.ts
+  reject VYQL-AUTH-111
+  reject_review code.ArrayIdentityStringCoercionBypass
+  code
+  ```
+  function federatedEntryIsGithubOidc(entry) {
+    let host = entry;
+    const marker = "oidc-provider/";
+    const idx = host.indexOf(marker);
+    if (idx !== -1) host = host.slice(idx + marker.length);
+    host = host.replace(/^https?:\/\//, "");
+    const slash = host.indexOf("/");
+    if (slash !== -1) host = host.slice(0, slash);
+    return host === "token.actions.githubusercontent.com";
+  }
+
+  function federatedIsGithubOidc(federated) {
+    if (Array.isArray(federated)) {
+      return federated.some((entry) => typeof entry === "string" && federatedEntryIsGithubOidc(entry));
+    }
+    if (typeof federated === "string") return federatedEntryIsGithubOidc(federated);
+    return false;
+  }
+
+  function inspectAwsIamTrustPolicy(args, reportViolation) {
+    const policy = args.props.assumeRolePolicy;
+    const parsed = JSON.parse(policy);
+    const stmts = parsed.Statement;
+    for (const stmt of stmts) {
+      const principal = stmt.Principal;
+      if (!principal || principal.Federated === undefined) continue;
+      if (!federatedIsGithubOidc(principal.Federated)) continue;
+      const conds = stmt.Condition;
+      for (const [operator, rawCondition] of Object.entries(conds)) {
+        if (operator.endsWith("StringLike")) {
+          reportViolation(`wildcard sub claim on ${rawCondition}`);
+        }
+      }
+    }
+  }
+  ```

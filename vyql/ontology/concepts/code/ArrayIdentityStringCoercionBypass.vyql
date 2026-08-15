@@ -1,0 +1,11 @@
+module code;
+
+concept ArrayIdentityStringCoercionBypass : issue {
+  cwe: [CWE_697, CWE_1023, CWE_863]
+  reviewAssumption: "the identity or principal field being checked can hold an array of provider values, not only a single string"
+  reviewCategory: auth
+  reviewCondition: "a security check coerces a value with String(...) before comparing it against a fixed identity host or marker, instead of testing each element of a possible array on its own"
+  reviewConfidence: medium
+  reviewEvidence: "identity comparison context {pattern} coerces a field to a single string with String(...) and matches the result against a fixed identity host"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

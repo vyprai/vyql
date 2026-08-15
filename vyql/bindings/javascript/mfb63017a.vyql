@@ -3988,3 +3988,8 @@ binding unanchoredHostPathRoutingMatch906 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "indexOf" and node.context.callPath contains "Object.entries" and node.context.selector contains "req.headers.host" and node.context.selector contains "req.url"
   emit issue code.UnanchoredHostPathRoutingMatch at node
 }
+
+binding arrayIdentityStringCoercionBypass907 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath == "String" and node.context.selector contains "Federated"
+  emit issue code.ArrayIdentityStringCoercionBypass at node
+}
