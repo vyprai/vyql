@@ -1,0 +1,205 @@
+# Rank 1179 / CVE-2020-29565: openstack/horizon's WorkflowView reads a "next"
+# URL from the query string, reflects it unchecked into the page's rendered
+# context, and later reads the same field name back from POST to build a
+# redirect (CWE-601, CWE-345).
+#
+# horizon/workflows/views.py:
+#
+#   def get_context_data(self, **kwargs):
+#       ...
+#       next = self.request.GET.get(workflow.redirect_param_name)
+#       context['REDIRECT_URL'] = next
+#       ...
+#
+#   def post(self, request, *args, **kwargs):
+#       ...
+#       next_url = self.request.POST.get(workflow.redirect_param_name)
+#       return shortcuts.redirect(next_url or workflow.get_success_url())
+#
+# REDIRECT_URL is rendered into a hidden form field
+# (horizon/templates/horizon/common/_workflow.html) that the workflow wizard
+# resubmits on every step; a link carrying ?next=http://evil round-trips
+# through that field, unescaped, until the final POST hands it back to
+# shortcuts.redirect() with nothing checking it first.
+#
+# Pool commit 252467100f is the real fix, confirmed against its own diff: it
+# adds `from django.utils import http as utils_http` and, in
+# get_context_data only, gates the GET-sourced value with
+# utils_http.is_safe_url(url=redirect_to, allowed_hosts=[self.request.get_host()])
+# before it reaches context['REDIRECT_URL']; a value that fails the check
+# becomes None instead. No pool correction needed.
+#
+# ATTENTION. VYQL-RF-002 (vypr.request_forgery.OpenRedirect) already fires on
+# this file at both revisions, and it discriminates nothing: its finding is
+# not the flow the patch changes. redirectTarget503/506 (any callee.path ~=
+# "redirect", vyql/bindings/python/m21017d75.vyql) already binds
+# shortcuts.redirect(...) as code.RedirectTargetSink, and httpInput38/39
+# already bind both self.request.GET and self.request.POST as code.HttpInput;
+# vyql match confirms the taint the rule reports runs entirely inside post(),
+# self.request.POST.get(workflow.redirect_param_name) straight into
+# shortcuts.redirect(next_url or ...), a call the fix commit's diff never
+# touches -- git diff of the fix against its parent, scoped to
+# horizon/workflows/views.py, has exactly one hunk, inside
+# get_context_data. Confirmed on the real checkout: vyql scan --cache off
+# --max-ram 4GB on horizon/workflows/views.py reports VYQL-RF-002 at the
+# post() redirect on both the vulnerable parent and the fix commit, same
+# rule, same call, only the line numbers and the finding's priority differ
+# (P3 on the parent, P4 on the fix commit -- the engine notes "near-miss path
+# coveredBy core.RedirectAllowlist" once is_safe_url exists nearby in
+# get_context_data, but that check does not dominate the post() path, so the
+# unless clause still does not fire).
+#
+# What the fix actually changes -- whether the value assigned to
+# context['REDIRECT_URL'] was checked before a template renders it into a
+# form field that a later, separate POST request reads back -- has no
+# reachable sink in the vocabulary: a dict assignment into a Django template
+# context is not a call to redirect() or any other modeled sink, and nothing
+# relates that assignment to the redirect_param_name field the next request
+# reads. Recognizing the patch would mean connecting two independently
+# dispatched request handlers through the name of an HTML form field, a
+# dataflow relation across the HTTP round-trip that the taint engine's
+# per-request model does not express and no existing concept states. This is
+# design work -- a new cross-request relation, not a missing binding or
+# `unless` clause -- so no ENGINE-GAPS.md entry.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-precision-limit, both revisions fire identically
+
+test "rank1179: the GET-sourced next value round-trips through the template and the POST redirect is unchecked"
+  lang python
+  file workflow_view.py
+  expect VYQL-RF-002
+  code
+  ```
+  from django import forms
+  from django import http
+  from django import shortcuts
+  from django.views import generic
+
+  from horizon import exceptions
+  from horizon import messages
+
+
+  class WorkflowView(generic.TemplateView):
+      context_object_name = "workflow"
+
+      def get_workflow(self):
+          entry_point = self.request.GET.get("step", None)
+          return self.workflow_class(self.request, entry_point=entry_point)
+
+      def get_context_data(self, **kwargs):
+          context = super(WorkflowView, self).get_context_data(**kwargs)
+          workflow = self.get_workflow()
+          workflow.verify_integrity()
+          context[self.context_object_name] = workflow
+
+          next = self.request.GET.get(workflow.redirect_param_name)
+          context['REDIRECT_URL'] = next
+
+          context['layout'] = self.get_layout()
+          return context
+
+      def post(self, request, *args, **kwargs):
+          context = self.get_context_data(**kwargs)
+          workflow = context[self.context_object_name]
+          if not workflow.is_valid():
+              return self.render_to_response(context)
+          try:
+              success = workflow.finalize()
+          except forms.ValidationError:
+              return self.render_to_response(context)
+          except Exception:
+              success = False
+              exceptions.handle(request)
+          if success:
+              msg = workflow.format_status_message(workflow.success_message)
+              messages.success(request, msg)
+          else:
+              msg = workflow.format_status_message(workflow.failure_message)
+              messages.error(request, msg)
+          next_url = self.request.POST.get(workflow.redirect_param_name)
+          return shortcuts.redirect(next_url or workflow.get_success_url())
+  ```
+
+test "rank1179: the fix gates only the GET-sourced value rendered into the form field; the POST redirect is unchanged"
+  lang python
+  file workflow_view.py
+  expect VYQL-RF-002
+  code
+  ```
+  from django import forms
+  from django import http
+  from django import shortcuts
+  from django.utils import http as utils_http
+  from django.views import generic
+
+  from horizon import exceptions
+  from horizon import messages
+
+
+  class WorkflowView(generic.TemplateView):
+      context_object_name = "workflow"
+
+      def get_workflow(self):
+          entry_point = self.request.GET.get("step", None)
+          return self.workflow_class(self.request, entry_point=entry_point)
+
+      def get_context_data(self, **kwargs):
+          context = super(WorkflowView, self).get_context_data(**kwargs)
+          workflow = self.get_workflow()
+          workflow.verify_integrity()
+          context[self.context_object_name] = workflow
+
+          redirect_to = self.request.GET.get(workflow.redirect_param_name)
+          # Make sure the requested redirect is safe
+          if redirect_to and not utils_http.is_safe_url(
+                  url=redirect_to,
+                  allowed_hosts=[self.request.get_host()]):
+              redirect_to = None
+          context['REDIRECT_URL'] = redirect_to
+
+          context['layout'] = self.get_layout()
+          return context
+
+      def post(self, request, *args, **kwargs):
+          context = self.get_context_data(**kwargs)
+          workflow = context[self.context_object_name]
+          if not workflow.is_valid():
+              return self.render_to_response(context)
+          try:
+              success = workflow.finalize()
+          except forms.ValidationError:
+              return self.render_to_response(context)
+          except Exception:
+              success = False
+              exceptions.handle(request)
+          if success:
+              msg = workflow.format_status_message(workflow.success_message)
+              messages.success(request, msg)
+          else:
+              msg = workflow.format_status_message(workflow.failure_message)
+              messages.error(request, msg)
+          next_url = self.request.POST.get(workflow.redirect_param_name)
+          return shortcuts.redirect(next_url or workflow.get_success_url())
+  ```
+
+test "rank1179: an allowlisted redirect target stays silent"
+  lang python
+  file workflow_view.py
+  reject VYQL-RF-002
+  code
+  ```
+  from django import shortcuts
+  from django.utils import http as utils_http
+  from django.views import generic
+
+
+  class SafeRedirectView(generic.View):
+      def post(self, request, *args, **kwargs):
+          next_url = request.POST.get("next")
+          if next_url and not utils_http.is_safe_url(
+                  url=next_url, allowed_hosts=[request.get_host()]):
+              next_url = "/"
+          return shortcuts.redirect(next_url)
+  ```
