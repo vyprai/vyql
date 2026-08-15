@@ -3953,3 +3953,19 @@ binding esmExportSpecifierEval901 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "split" and node.context.literal contains "$happy_dom.exports['" and not (node.context.expr contains "test(importName)")
   emit issue code.EsmExportSpecifierEval at node
 }
+
+binding databaseRead902 {
+  requires {
+    dependency("drizzle-orm")
+  }
+  query pattern callExpr where callee.method == "findFirst"
+  emit source code.DatabaseRead at call.result
+}
+
+binding databaseRead903 {
+  requires {
+    dependency("drizzle-orm")
+  }
+  query pattern callExpr where callee.method == "findMany"
+  emit source code.DatabaseRead at call.result
+}
