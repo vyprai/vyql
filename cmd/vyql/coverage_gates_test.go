@@ -1454,24 +1454,31 @@ func TestCVELedgerCoverageGate(t *testing.T) {
 		}
 	}
 
-	// Review runs in rank order. A PENDING rank below a reviewed one was passed
-	// over rather than not yet reached, and would otherwise never be noticed.
-	watermark := -1
-	for rank, row := range digest {
-		if row.status != "PENDING" && rank > watermark {
-			watermark = rank
-		}
-	}
+	// Review runs in rank order within a batch, but the batches themselves are
+	// work units that different review streams take in any order, so a PENDING
+	// rank below the highest reviewed one is no longer proof of a skip. What is
+	// proof: a PENDING rank with a reviewed rank above it inside the same
+	// 50-rank batch group, because inside a started batch review is strictly in
+	// order, so such a rank was passed over rather than not yet reached. A
+	// batch group with no reviewed rank at all is unstarted work, wherever it
+	// sits relative to other batches.
+	const cveBatchSize = 50
 	var skipped []string
 	for rank, row := range digest {
-		if row.status == "PENDING" && rank < watermark {
-			skipped = append(skipped, strconv.Itoa(rank))
+		if row.status != "PENDING" {
+			continue
+		}
+		for r := rank + 1; r < rank+cveBatchSize && r/cveBatchSize == rank/cveBatchSize; r++ {
+			if other, ok := digest[r]; ok && other.status != "PENDING" {
+				skipped = append(skipped, strconv.Itoa(rank))
+				break
+			}
 		}
 	}
 	if len(skipped) > 0 {
 		sort.Strings(skipped)
-		t.Fatalf("CVE ranks below the reviewed watermark %d are still PENDING; review skipped them: %s",
-			watermark, strings.Join(skipped, ", "))
+		t.Fatalf("CVE ranks still PENDING below reviewed ranks in their own batch; review skipped them: %s",
+			strings.Join(skipped, ", "))
 	}
 
 	cveSpecs := readCVERankSpecFiles(t)
