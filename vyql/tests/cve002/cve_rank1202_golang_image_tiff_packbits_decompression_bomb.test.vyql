@@ -1,0 +1,192 @@
+# Rank 1202 / CVE-2026-46599: golang.org/x/image's TIFF decoder decompresses
+# PackBits-encoded strips and tiles through unpackBits (tiff/compress.go),
+# which accumulates decoded bytes into dst with a loop that has no output-size
+# limit at all. Every other TIFF compression path (LZW, Deflate, CCITT, the
+# uncompressed case) is decoded through readBuf or gated directly against
+# blockMaxDataSize (tiff/reader.go), a limit derived from the image's own
+# declared width and height; unpackBits is called with the section reader
+# alone and bypasses that cap entirely. A 2MB PackBits-compressed TIFF can
+# decompress to 745MB, a 372x amplification (CWE-770, GHSA-q675-qj96-32m9).
+#
+# The pool row carries `nocommit`; read the diff per Step 0's note before
+# trusting it. fe8ae458fe is not a release bump -- it is the real, targeted
+# fix, confirmed against the advisory's own reference (`go.dev/cl/759960`,
+# the Gerrit change this commit's `Reviewed-on:` trailer names verbatim). It
+# adds a `lim int64` parameter to unpackBits, threads `blockMaxDataSize`
+# through the one call site in reader.go's cPackBits case, and returns a
+# FormatError once `len(dst)` exceeds it -- the identical shape `readBuf`
+# already enforces for the other four compression paths. No pool correction
+# needed.
+#
+# ATTENTION, engine gap. `vyql match` on unpackBits labels nothing at all --
+# no source, no sink, nothing for a rule to consume. `code.UnboundedAllocationReview`
+# (VYQL-DOS-041, the closest existing rule by CWE: CWE_400/CWE_770 matches the
+# advisory's CWE-770 exactly) is reachable today only through a `presenceNode`
+# match on an `analysis.*` fact a frontend emits -- the C frontend's
+# `ccUnboundedAccumulatedAllocationObservations` (internal/extract/frontend/
+# treesitter/c.go:2592, emitting `analysis.allocation.unbounded_accumulated_count`)
+# is the only place in the engine that produces one for this weakness shape,
+# and it is C-specific: a regex over the raw function body text, gated on a
+# `new[]` allocation. The Go frontend (internal/extract/frontend/golang/
+# golang.go) has no counterpart at all -- confirmed by grepping the whole
+# engine for "unbounded": it appears only in c.go, php.go and rust.go, never
+# in the golang package -- despite the Go frontend already having the exact
+# same machinery this pattern would use elsewhere (`goAnalysisObservation` at
+# golang.go:1090, and `goSecurityObservations` at :476 already walks a
+# function body emitting `analysis.go.*` facts for other structural shapes,
+# such as TLS verification and cookie flags).
+#
+# There is no discriminating pair to isolate within Go, because the capability
+# is absent for every shape, not just this one: a CVE-independent minimal
+# probe naming no TIFF-specific API -- a loop reading into a growing []byte
+# via `append`, once with a `len(dst) > lim` guard inside the loop and once
+# without -- labels nothing in both directions (`vyql match` on either reports
+# no source, sink or control at all), so unlike the C/C++ compound-assignment
+# gap (rank 1199) or PHP's include-in-condition gap (rank 1201), there is no
+# already-working baseline in Go to contrast against. This is the same shape
+# as the missing JVM/NuGet manifest reader (rank 1069's ENGINE-GAPS entry):
+# a capability entirely unimplemented for the language, not a construct one
+# working pipeline mishandles.
+#
+# Scanning the real checkout (golang/image, tiff/, bounded, go:10 files)
+# reports zero findings on both the commit before the fix and the fix commit
+# itself -- no discriminator on real code either direction. No definition
+# change attempted, per this loop's instruction not to do engine work. Entry
+# added to ENGINE-GAPS.md under Mechanical: the behaviour needed (a Go
+# structural fact for an unbounded accumulation loop, feeding the existing
+# `code.UnboundedAllocationReview` concept and VYQL-DOS-041 rule the same way
+# `ccUnboundedAccumulatedAllocationObservations` already feeds it for C/C++)
+# is well-defined and answerable from the language's own semantics -- "a loop
+# with no exit condition that keeps appending externally-sized data to a slice
+# with no upper-bound check" -- not from this CVE's specific API, so it clears
+# the genericity test on its own once written.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1202: unpackBits accumulates decoded PackBits data with no output size limit"
+  lang go
+  file tiff/compress.go
+  reject VYQL-DOS-041
+  code
+  ```
+  package tiff
+
+  import (
+  	"bufio"
+  	"io"
+  )
+
+  type byteReader interface {
+  	io.Reader
+  	io.ByteReader
+  }
+
+  // unpackBits decodes the PackBits-compressed data in src and returns the
+  // uncompressed data.
+  //
+  // The PackBits compression format is described in section 9 (p. 42)
+  // of the TIFF spec.
+  func unpackBits(r io.Reader) ([]byte, error) {
+  	buf := make([]byte, 128)
+  	dst := make([]byte, 0, 1024)
+  	br, ok := r.(byteReader)
+  	if !ok {
+  		br = bufio.NewReader(r)
+  	}
+
+  	for {
+  		b, err := br.ReadByte()
+  		if err != nil {
+  			if err == io.EOF {
+  				return dst, nil
+  			}
+  			return nil, err
+  		}
+  		code := int(int8(b))
+  		switch {
+  		case code >= 0:
+  			n, err := io.ReadFull(br, buf[:code+1])
+  			if err != nil {
+  				return nil, err
+  			}
+  			dst = append(dst, buf[:n]...)
+  		case code == -128:
+  			// No-op.
+  		default:
+  			if b, err = br.ReadByte(); err != nil {
+  				return nil, err
+  			}
+  			for j := 0; j < 1-code; j++ {
+  				buf[j] = b
+  			}
+  			dst = append(dst, buf[:1-code]...)
+  		}
+  	}
+  }
+  ```
+
+test "rank1202: the fix threads a lim parameter through and rejects once dst grows past it"
+  lang go
+  file tiff/compress.go
+  reject VYQL-DOS-041
+  code
+  ```
+  package tiff
+
+  import (
+  	"bufio"
+  	"io"
+  )
+
+  type byteReader interface {
+  	io.Reader
+  	io.ByteReader
+  }
+
+  // unpackBits decodes the PackBits-compressed data in src and returns the
+  // uncompressed data. The output size is limited to lim bytes to prevent
+  // decompression bombs.
+  //
+  // The PackBits compression format is described in section 9 (p. 42)
+  // of the TIFF spec.
+  func unpackBits(r io.Reader, lim int64) ([]byte, error) {
+  	buf := make([]byte, 128)
+  	dst := make([]byte, 0, 1024)
+  	br, ok := r.(byteReader)
+  	if !ok {
+  		br = bufio.NewReader(r)
+  	}
+
+  	for {
+  		b, err := br.ReadByte()
+  		if err != nil {
+  			if err == io.EOF {
+  				return dst, nil
+  			}
+  			return nil, err
+  		}
+  		code := int(int8(b))
+  		switch {
+  		case code >= 0:
+  			n, err := io.ReadFull(br, buf[:code+1])
+  			if err != nil {
+  				return nil, err
+  			}
+  			dst = append(dst, buf[:n]...)
+  		case code == -128:
+  			// No-op.
+  		default:
+  			if b, err = br.ReadByte(); err != nil {
+  				return nil, err
+  			}
+  			for j := 0; j < 1-code; j++ {
+  				buf[j] = b
+  			}
+  			dst = append(dst, buf[:1-code]...)
+  		}
+  		if int64(len(dst)) > lim {
+  			return nil, FormatError("PackBits: decompressed data too large")
+  		}
+  	}
+  }
+  ```
