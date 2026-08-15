@@ -1,0 +1,104 @@
+# Rank 1197 / CVE-2025-48057: icinga2's VerifyCertificate in
+# lib/base/tlsutility.cpp built a fresh X509_STORE from the caller-supplied
+# CA certificate on every call and verified the caller-supplied leaf
+# certificate against it, which reads as a correct, stateless verification at
+# every call site (CWE-295). The defect is inside OpenSSL itself when built
+# against a version older than 1.1.0: those releases cache a "valid" flag on
+# the X509 struct the first time it passes X509_verify_cert, and a later call
+# that reuses the same in-memory X509* for a second verification -- against a
+# different CA store, exactly what icinga2 does when re-checking a peer's
+# certificate against a rotated or per-endpoint trust anchor -- short-circuits
+# on that cached flag and returns valid without re-walking the chain against
+# the new store at all. Confirmed against the diff at 60f75f4a3d: the flag and
+# the short-circuit it drives live entirely inside OpenSSL's own
+# X509_verify_cert (removed upstream in openssl/openssl@0e76014e for 1.1.0),
+# not in any icinga2 source the fix touches.
+#
+# ATTENTION, no taint path, fails the genericity test. vyql match on
+# tlsutility.cpp labels nothing at VerifyCertificate, X509_STORE_CTX_init or
+# X509_verify_cert -- no source, no sink, nothing for a rule to consume -- and
+# scanning the real checkout at both revisions (icinga/icinga2, both cpp:637
+# files) reports the same VYQL-CRY-001/VYQL-LIFE-001/VYQL-MEM-002 findings
+# elsewhere in the file, unrelated to this function, identically before and
+# after. There is nothing to trace because the bug is not a dataflow relation
+# between two values in icinga2's own code: every call site of
+# VerifyCertificate is byte-identical before and after the patch, and the
+# vulnerable and patched forms of the function itself differ only in a
+# preprocessor-guarded block (`#if OPENSSL_VERSION_NUMBER < 0x10100000L`)
+# whose necessity is documented nowhere but OpenSSL's own change history --
+# not in X509_verify_cert's man page, not in any usage guidance a binding
+# could be written from. A rule narrow enough to require "certificate object
+# gets serialized and reparsed before its second verification" would match
+# only this one function's workaround (AGENTS.md's genericity test: nobody
+# reading OpenSSL's public documentation would write that binding without
+# having seen this CVE), and a rule broad enough to flag "certificate reused
+# across two verification calls" has no source location to anchor on -- both
+# revisions call VerifyCertificate the same way from the same call sites, so
+# the only distinguishing fact is a build-time macro no static source scan
+# evaluates. No definition change attempted; not an engine gap either, since
+# the engine's taint model has no missing edge here to add -- there is no
+# edge to have.
+#
+# verify_current_expected: attention-no-taint-path
+
+test "rank1197: VerifyCertificate builds and checks a fresh store against the caller's certificate directly"
+  lang cpp
+  file lib/base/tlsutility.cpp
+  reject VYQL-CFG-004
+  code
+  ```
+  bool VerifyCertificate(X509* caCertificate, X509* certificate, const String& crlFile)
+  {
+    std::unique_ptr<X509_STORE, decltype(&X509_STORE_free)> store{X509_STORE_new(), &X509_STORE_free};
+
+    if (!store)
+      return false;
+
+    X509_STORE_add_cert(store.get(), caCertificate);
+
+    if (!crlFile.IsEmpty()) {
+      AddCRLToSSLContext(store.get(), crlFile);
+    }
+
+    std::unique_ptr<X509_STORE_CTX, decltype(&X509_STORE_CTX_free)> csc{X509_STORE_CTX_new(), &X509_STORE_CTX_free};
+    X509_STORE_CTX_init(csc.get(), store.get(), certificate, nullptr);
+
+    int rc = X509_verify_cert(csc.get());
+
+    return rc == 1;
+  }
+  ```
+
+test "rank1197: fix re-serializes the certificate under old OpenSSL before the same store check"
+  lang cpp
+  file lib/base/tlsutility.cpp
+  reject VYQL-CFG-004
+  code
+  ```
+  bool VerifyCertificate(X509* caCertificate, X509* certificate, const String& crlFile)
+  {
+  #if OPENSSL_VERSION_NUMBER < 0x10100000L
+    std::shared_ptr<X509> copy = StringToCertificate(CertificateToString(certificate));
+    VERIFY(copy.get() != certificate);
+    certificate = copy.get();
+  #endif
+
+    std::unique_ptr<X509_STORE, decltype(&X509_STORE_free)> store{X509_STORE_new(), &X509_STORE_free};
+
+    if (!store)
+      return false;
+
+    X509_STORE_add_cert(store.get(), caCertificate);
+
+    if (!crlFile.IsEmpty()) {
+      AddCRLToSSLContext(store.get(), crlFile);
+    }
+
+    std::unique_ptr<X509_STORE_CTX, decltype(&X509_STORE_CTX_free)> csc{X509_STORE_CTX_new(), &X509_STORE_CTX_free};
+    X509_STORE_CTX_init(csc.get(), store.get(), certificate, nullptr);
+
+    int rc = X509_verify_cert(csc.get());
+
+    return rc == 1;
+  }
+  ```
