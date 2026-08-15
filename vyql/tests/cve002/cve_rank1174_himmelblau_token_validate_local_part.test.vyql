@@ -1,0 +1,147 @@
+# Rank 1174 / CVE-2026-45108: himmelblau's DAG token_validate compares a
+# requested account_id against an authenticated token's spn and, when the
+# two strings differ, falls back to an alias check that only compares the
+# domain half of each UPN (src/common/src/idprovider/himmelblau.rs,
+# HimmelblauProvider::token_validate). split_username(account_id) and
+# split_username(&spn) each discard the local part with `let (_, domain)`,
+# so `domains_are_aliases(domain1, domain2)` alone decides whether the
+# session is authorized. Combined with the QR/Bluetooth caBLE flow, which
+# lets a phone sign with any discoverable passkey, a second user (bob) can
+# scan the QR code on a locked GDM session (alice's) and sign with his own
+# credential: the token's spn is bob@example.com, the requested account_id
+# is alice@example.com, the domains match (same tenant), and the code never
+# looks at "alice" vs "bob" (CWE-863).
+#
+# Pool commit 349e5b829d is not the fix, confirmed against its own diff: it
+# is a dependabot "bump the all-cargo-updates group" commit touching only
+# Cargo.toml/Cargo.lock across 31 unrelated dependencies, none of which
+# touch idprovider/himmelblau.rs. Corrected in pool.tsv to
+# 87ca61892eb5c45582309e77b9128c660bd629bd ("Reject auth when token spn
+# local part differs from requested account_id"), the commit GHSA-pmxh-
+# j4r6-88mv's own release notes name, reachable from main: it captures
+# local1/local2 from split_username instead of discarding them, and widens
+# the guard to `local1.to_lowercase() != local2.to_lowercase() ||
+# !domains_match`, so an alias-domain match no longer authorizes a session
+# whose local part differs.
+#
+# ATTENTION, missing vocabulary. vyql match on both revisions labels
+# nothing at token_validate: account_id, spn and the two split_username
+# calls carry no source or sink binding, and domains_are_aliases resolves
+# to nothing the engine tracks, because none of this is a library call --
+# it is entirely himmelblau's own idprovider module. The closest existing
+# concept is code.UserIdentityMappingReview (CWE_286/CWE_863, "external
+# identity data determines local user or group identifiers without an
+# observed uniqueness boundary"), used for rank 151's authd UID/GID
+# generation bug in the same weakness family. It does not transfer
+# mechanically:
+#
+#  - Every binding that emits it keys on a presenceNode pattern naming that
+#    motivating case's own function and call names verbatim (functionName
+#    contains "userPreCheck", callPath contains "GenerateUID", ...) --
+#    tokens that are not data but one hardcoded shape per incident. Adding
+#    a 1175th case here (functionName contains "token_validate", callPath
+#    contains "domains_are_aliases", ...) is the same repro-shaped move
+#    AGENTS.md's genericity test rejects: nobody who has never seen this
+#    CVE would write that binding from a library's documentation, because
+#    there is no library here -- domains_are_aliases and split_username are
+#    private to this codebase.
+#  - The generic condition -- "an equality check on a composite identity
+#    (local part + domain) falls back to comparing only one of its two
+#    fields, and treats that partial match as sufficient" -- is a real
+#    weakness class, but no concept states it, and minting one needs a
+#    positive form the engine can express structurally (something like: two
+#    values are split into parts, one part is compared, the other is
+#    dropped, and the comparison result gates an authorization decision).
+#    That is design work: distinguishing a deliberately partial compare
+#    (domain aliasing, which is legitimate on its own) from one that is
+#    missing its other half requires knowing what "the other half" is for
+#    a given identity type, which is not decidable from syntax alone.
+#
+# Scanning both revisions of idprovider/himmelblau.rs (--cache off
+# --max-ram 4GB) reports 0 findings on token_validate at either commit.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1174: token_validate's alias fallback drops the UPN's local part"
+  lang rust
+  file src/common/src/idprovider/himmelblau.rs
+  reject_review code.UserIdentityMappingReview
+  code
+  ```
+  impl HimmelblauProvider {
+      async fn token_validate(
+          &self,
+          account_id: &str,
+          token: &UnixUserToken,
+      ) -> Result<AuthResult, IdpError> {
+          let spn = token.spn().map_err(|e| {
+              error!("Failed fetching user spn: {:?}", e);
+              IdpError::BadRequest
+          })?;
+          if account_id.to_string().to_lowercase() != spn.to_string().to_lowercase() {
+              let (_, domain1) = split_username(account_id).ok_or({
+                  error!("Failed splitting account_id username");
+                  IdpError::BadRequest
+              })?;
+              let (_, domain2) = split_username(&spn).ok_or({
+                  error!("Failed splitting spn username");
+                  IdpError::BadRequest
+              })?;
+              if !self
+                  .config
+                  .lock()
+                  .await
+                  .domains_are_aliases(domain1, domain2)
+                  .await
+              {
+                  let msg = format!("Authenticated user {} does not match requested user", account_id);
+                  error!(msg);
+                  return Ok(AuthResult::Denied(msg));
+              }
+          }
+          Ok(AuthResult::Success(token.clone()))
+      }
+  }
+  ```
+
+test "rank1174: token_validate's alias fallback also compares the local part"
+  lang rust
+  file src/common/src/idprovider/himmelblau.rs
+  reject_review code.UserIdentityMappingReview
+  code
+  ```
+  impl HimmelblauProvider {
+      async fn token_validate(
+          &self,
+          account_id: &str,
+          token: &UnixUserToken,
+      ) -> Result<AuthResult, IdpError> {
+          let spn = token.spn().map_err(|e| {
+              error!("Failed fetching user spn: {:?}", e);
+              IdpError::BadRequest
+          })?;
+          if account_id.to_string().to_lowercase() != spn.to_string().to_lowercase() {
+              let (local1, domain1) = split_username(account_id).ok_or_else(|| {
+                  error!("Failed splitting account_id username");
+                  IdpError::BadRequest
+              })?;
+              let (local2, domain2) = split_username(&spn).ok_or_else(|| {
+                  error!("Failed splitting spn username");
+                  IdpError::BadRequest
+              })?;
+              let domains_match = self
+                  .config
+                  .lock()
+                  .await
+                  .domains_are_aliases(domain1, domain2)
+                  .await;
+              if local1.to_lowercase() != local2.to_lowercase() || !domains_match {
+                  let msg = format!("Authenticated user {} does not match requested user", account_id);
+                  error!(msg);
+                  return Ok(AuthResult::Denied(msg));
+              }
+          }
+          Ok(AuthResult::Success(token.clone()))
+      }
+  }
+  ```
