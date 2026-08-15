@@ -1,0 +1,160 @@
+# Rank 1196 / CVE-2026-21675: iccMAX's CIccXform::Create() built a named-color
+# transform hint, handed it to the hint manager, and then deleted it itself
+# right after using it to build the transform (CWE-416/CWE-20).
+#
+# CIccCreateXformHintManager::AddHint is documented "Adds and owns the passed
+# named hint to it's list" (IccCmm.h). CIccXform::Create allocates a
+# CIccCreateNamedColorXformHint, adds it to the caller-supplied hint manager,
+# calls CIccXformCreator::CreateXform (which looks the hint back up through
+# the manager to build the named-color transform), and then calls
+# pHintManager->DeleteHint(pNamedColorHint) itself -- deleting memory the
+# manager's own documentation says it owns.
+#
+# Pool commit 510baf58fa48e00ebbb5dd577f0db4af8876bb31 is the real fix,
+# checked against its own diff (`git show`, IccCmm.cpp only): it deletes the
+# `pHintManager->DeleteHint(pNamedColorHint);` line and replaces it with a
+# comment, "hint manager takes ownership, we should not delete", matching the
+# pattern the sibling AdjustPCS/CmmEnvVar/LuminanceMatching hints already use
+# elsewhere in the same file (they are added and never explicitly deleted).
+#
+# ATTENTION, engine gap. `vyql match` on both the vulnerable and fixed repro
+# finds nothing labelled at all: pHintManager.AddHint and
+# pHintManager.DeleteHint are both unresolved calls (`vyql resolve` lists
+# them under "no callee body, not a known source/sink/control"), so nothing
+# reaches the existing code.PointerFree -> code.PointerUse rules
+# (PotentialUseAfterFree, VYQL-MEM-007; PotentialDoubleFree, VYQL-MEM-008).
+# A binding keyed on "DeleteHint" would be repro-shaped -- it is iccMAX's own
+# API name, documented nowhere else -- so the question is what a generic
+# binding could name instead.
+#
+# The mechanical half of the gap is isolated with a minimal pair that has
+# nothing to do with this CVE's own API: `int *p = new int(1); delete p;
+# delete p;`, the textbook double-free written the idiomatic C++ way, labels
+# nothing at all (`vyql match`: no source, sink or control anywhere) because
+# `internal/extract/frontend/treesitter/c.go`'s `expr()` has no case for
+# `delete_expression` (only `new_expression` is handled, at c.go:1534) --
+# the C++ `delete` operator is never lowered to NIR, so it can never carry
+# code.PointerFree the way a `free()` call already does. The equivalent
+# `free()`-based pair -- `free(p); int x = *p;` -- already reports
+# VYQL-MEM-007 at low confidence through the same rule, confirming the
+# PointerFree -> PointerUse pipeline itself works and only the `delete`
+# operator is invisible to it. Fixing that (a `delete`/`delete[]` case in
+# c.go's `expr()`/`stmt()`, emitting code.PointerFree the way pointerFree91/
+# pointerFree136 do for `free`) would close that half generically, answerable
+# to the C++ language spec rather than to this CVE, but would still not catch
+# this rank on its own: DeleteHint's own `delete pHint;` sits inside
+# IccCmm.cpp's CIccCreateXformHintManager::DeleteHint, a different function
+# from the call site, and connecting that internal delete back to the
+# pNamedColorHint argument at the call site needs interprocedural
+# parameter-to-argument concept propagation the engine does not have --
+# design work, not a one-line fix. No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1196: CIccXform::Create deletes a hint its own manager owns"
+  lang cpp
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  code
+  ```
+  class IIccCreateXformHint {
+  public:
+      virtual ~IIccCreateXformHint() {}
+      virtual const char *GetHintType() const = 0;
+  };
+
+  class CIccCreateNamedColorXformHint : public IIccCreateXformHint {
+  public:
+      virtual const char *GetHintType() const { return "CIccCreateNamedColorXformHint"; }
+      int csPcs;
+      int csDevice;
+  };
+
+  class CIccCreateXformHintManager {
+  public:
+      CIccCreateXformHintManager() { m_pList = 0; }
+      ~CIccCreateXformHintManager();
+      bool AddHint(IIccCreateXformHint* pHint);
+      bool DeleteHint(IIccCreateXformHint* pHint);
+      IIccCreateXformHint* GetHint(const char* hintName);
+  private:
+      void* m_pList;
+  };
+
+  class CIccXform {};
+
+  class CIccXformCreator {
+  public:
+      static CIccXform *CreateXform(int xformSig, void *pTag, CIccCreateXformHintManager *pHintManager);
+  };
+
+  CIccXform *CIccXform_Create(void *pTag, CIccCreateXformHintManager *pHintManager) {
+      CIccXform *rv = 0;
+
+      CIccCreateNamedColorXformHint* pNamedColorHint = new CIccCreateNamedColorXformHint();
+      pNamedColorHint->csPcs = 1;
+      pNamedColorHint->csDevice = 2;
+
+      if (pHintManager) {
+          pHintManager->AddHint(pNamedColorHint);
+          rv = CIccXformCreator::CreateXform(4, pTag, pHintManager);
+          pHintManager->DeleteHint(pNamedColorHint);
+      }
+
+      return rv;
+  }
+  ```
+
+test "rank1196: CIccXform::Create leaves the named-color hint owned by the manager"
+  lang cpp
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  code
+  ```
+  class IIccCreateXformHint {
+  public:
+      virtual ~IIccCreateXformHint() {}
+      virtual const char *GetHintType() const = 0;
+  };
+
+  class CIccCreateNamedColorXformHint : public IIccCreateXformHint {
+  public:
+      virtual const char *GetHintType() const { return "CIccCreateNamedColorXformHint"; }
+      int csPcs;
+      int csDevice;
+  };
+
+  class CIccCreateXformHintManager {
+  public:
+      CIccCreateXformHintManager() { m_pList = 0; }
+      ~CIccCreateXformHintManager();
+      bool AddHint(IIccCreateXformHint* pHint);
+      bool DeleteHint(IIccCreateXformHint* pHint);
+      IIccCreateXformHint* GetHint(const char* hintName);
+  private:
+      void* m_pList;
+  };
+
+  class CIccXform {};
+
+  class CIccXformCreator {
+  public:
+      static CIccXform *CreateXform(int xformSig, void *pTag, CIccCreateXformHintManager *pHintManager);
+  };
+
+  CIccXform *CIccXform_Create(void *pTag, CIccCreateXformHintManager *pHintManager) {
+      CIccXform *rv = 0;
+
+      CIccCreateNamedColorXformHint* pNamedColorHint = new CIccCreateNamedColorXformHint();
+      pNamedColorHint->csPcs = 1;
+      pNamedColorHint->csDevice = 2;
+
+      if (pHintManager) {
+          pHintManager->AddHint(pNamedColorHint);
+          // hint manager takes ownership, we should not delete
+          rv = CIccXformCreator::CreateXform(4, pTag, pHintManager);
+      }
+
+      return rv;
+  }
+  ```
