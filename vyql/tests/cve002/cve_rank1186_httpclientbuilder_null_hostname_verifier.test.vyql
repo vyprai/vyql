@@ -1,0 +1,156 @@
+# Rank 1186 / CVE-2013-4366: Apache HttpComponents HttpClient's fluent
+# builder, HttpClientBuilder.build() (httpclient/src/main/java/org/apache/
+# http/impl/client/HttpClientBuilder.java), reads its own settable-but-
+# optional `hostnameVerifier` field straight into the constructor of the SSL
+# socket factory it wires into the default connection manager -- CWE-20.
+# `setHostnameVerifier(...)` is the class's only way to populate that field,
+# so any caller who builds a client the ordinary way (`HttpClientBuilder.
+# create().build()`, never calling that setter) leaves it null. GHSA-pqwh-
+# 44jj-p5rm/NVD summarize the impact directly: "does not ensure that
+# X509HostnameVerifier is not null." Commit 08140864e3 carries no flag;
+# verified against its own diff and the SVN revision it names
+# (trunk@1528614) as a real, targeted fix, not a release bump -- it touches
+# only HttpClientBuilder.java (plus RELEASE_NOTES.txt) and introduces the
+# missing guard: read `this.hostnameVerifier` into a local, and if it is
+# null, default it to `SSLConnectionSocketFactory.BROWSER_COMPATIBLE_
+# HOSTNAME_VERIFIER` before any of the three branches construct the socket
+# factory with it. No pool correction needed.
+#
+# Checked why the null actually mattered: at the released 4.3 tag,
+# SSLConnectionSocketFactory's own constructor stored the argument verbatim
+# (`this.hostnameVerifier = hostnameVerifier;`, no defaulting), and its
+# verify path only ran the check when the field was non-null (`if (this.
+# hostnameVerifier != null) { this.hostnameVerifier.verify(...); }`, no
+# else) -- a null verifier silently skipped hostname verification rather
+# than failing closed. A sibling commit (d9e2140, svn r1528447, ~7.5 hours
+# earlier) closes that root cause inside SSLConnectionSocketFactory and the
+# deprecated SSLSocketFactory directly; 08140864e3 is GHSA's and NVD's named
+# fix commit and closes the same gap at HttpClientBuilder's own call site,
+# so a caller who reads `this.hostnameVerifier` back out (or a build() that
+# never reaches the now-patched constructor) cannot observe the bug either.
+#
+# vyql match on the vulnerable file labels nothing: no Java binding covers a
+# settable-but-unchecked HostnameVerifier passed straight into an SSL
+# socket-factory constructor. Checked for reuse first: certValidationDisabled
+# 319-321 (vyql/bindings/java/m420f6b67.vyql) already cover setHostnameVerifier
+# (true) / setDefaultHostnameVerifier(true) / NoopHostnameVerifier under
+# code.CertValidationDisabled (VYQL-CFG-004, CWE-295) -- the same weakness,
+# but all three require an explicit disable literal or class name; this shape
+# has neither, it is a missing null-check, so nothing existing reused.
+#
+# Tried a function-scoped presenceNode binding: call_path token for
+# "SSLConnectionSocketFactory" present, an identifier token for
+# "hostnameVerifier" present, and the guard's own binary expression
+# ("hostnameVerifier==null") absent. It labels the vulnerable snippet below
+# correctly and clears on the fixed one -- but scanning the real checkout
+# with it (`vyql scan --cache off --max-ram 4GB` on 08140864e3^) also fires
+# on two call sites that are not this bug: httpclient's own documented
+# example (ClientConfiguration.java:145, `X509HostnameVerifier
+# hostnameVerifier = new BrowserCompatHostnameVerifier();` -- a freshly
+# constructed, never-null verifier passed the same way) and five call sites
+# in TestSSLSocketFactory.java, none of which contain the identifier
+# "hostnameVerifier" at all -- they match because `node.context.identifier`
+# is case-insensitive substring containment over every bare-identifier leaf
+# in the function, which includes method and type names, not just variable
+# reads: `TestX509HostnameVerifier` (a class name) and
+# `getHostnameVerifier()` (a call name) both contain "hostnameVerifier" as a
+# substring and light up the same predicate a real field read would. ATTENTION,
+# engine gap.
+#
+# The root cause is the same one already on record for rank 1017 (`java.go`
+# emits no `call_arg`/`call_arg_at` token pairing a call with which
+# expression fills which argument, unlike c.go/php.go/scala.go/rust.go): with
+# that pairing, the binding could ask for `hostnameVerifier` specifically as
+# the *argument* of the `SSLConnectionSocketFactory`/`SSLSocketFactory`
+# constructor, instead of "this name occurs somewhere, in any role, in this
+# function" -- which is what lets a same-named getter, a same-suffixed class,
+# and the real vulnerable field read all collapse into one token. Added
+# rank 1186 and this spec to that ENGINE-GAPS.md row rather than opening a
+# new one -- same limitation, same fix. No definition change shipped.
+#
+# Full spec suite green. OWASP Java +1.00 (11/11 categories, 0 FP) and Python
+# +0.90, both unchanged (no definition touched).
+
+test "rank1186: HttpClientBuilder.build() passes its possibly-null hostnameVerifier straight into the SSL socket factory -- today's scanner labels nothing here"
+  lang java
+  file HttpClientBuilder.java
+  reject VYQL-CFG-004
+  code
+  ```
+  package org.apache.http.impl.client;
+
+  import org.apache.http.conn.HttpClientConnectionManager;
+  import org.apache.http.conn.socket.LayeredConnectionSocketFactory;
+  import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+  import org.apache.http.conn.ssl.SSLContexts;
+  import org.apache.http.conn.ssl.X509HostnameVerifier;
+
+  public class HttpClientBuilder {
+
+      private HttpClientConnectionManager connManager;
+      private LayeredConnectionSocketFactory sslSocketFactory;
+      private X509HostnameVerifier hostnameVerifier;
+      private SSLContext sslcontext;
+
+      public CloseableHttpClient build() {
+          HttpClientConnectionManager connManager = this.connManager;
+          if (connManager == null) {
+              LayeredConnectionSocketFactory sslSocketFactory = this.sslSocketFactory;
+              if (sslSocketFactory == null) {
+                  if (sslcontext != null) {
+                      sslSocketFactory = new SSLConnectionSocketFactory(sslcontext, hostnameVerifier);
+                  } else {
+                      sslSocketFactory = new SSLConnectionSocketFactory(
+                              SSLContexts.createDefault(),
+                              hostnameVerifier);
+                  }
+              }
+          }
+          return null;
+      }
+  }
+  ```
+
+test "rank1186: HttpClientBuilder.build() defaults a null hostnameVerifier to the browser-compatible verifier before use"
+  lang java
+  file HttpClientBuilder.java
+  reject VYQL-CFG-004
+  code
+  ```
+  package org.apache.http.impl.client;
+
+  import org.apache.http.conn.HttpClientConnectionManager;
+  import org.apache.http.conn.socket.LayeredConnectionSocketFactory;
+  import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+  import org.apache.http.conn.ssl.SSLContexts;
+  import org.apache.http.conn.ssl.X509HostnameVerifier;
+
+  public class HttpClientBuilder {
+
+      private HttpClientConnectionManager connManager;
+      private LayeredConnectionSocketFactory sslSocketFactory;
+      private X509HostnameVerifier hostnameVerifier;
+      private SSLContext sslcontext;
+
+      public CloseableHttpClient build() {
+          HttpClientConnectionManager connManager = this.connManager;
+          if (connManager == null) {
+              LayeredConnectionSocketFactory sslSocketFactory = this.sslSocketFactory;
+              if (sslSocketFactory == null) {
+                  X509HostnameVerifier hostnameVerifier = this.hostnameVerifier;
+                  if (hostnameVerifier == null) {
+                      hostnameVerifier = SSLConnectionSocketFactory.BROWSER_COMPATIBLE_HOSTNAME_VERIFIER;
+                  }
+                  if (sslcontext != null) {
+                      sslSocketFactory = new SSLConnectionSocketFactory(sslcontext, hostnameVerifier);
+                  } else {
+                      sslSocketFactory = new SSLConnectionSocketFactory(
+                              SSLContexts.createDefault(),
+                              hostnameVerifier);
+                  }
+              }
+          }
+          return null;
+      }
+  }
+  ```
