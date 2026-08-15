@@ -1,0 +1,175 @@
+# Rank 1187 / CVE-2026-49975: apache/httpd's mod_http2 lets an HTTP/2 request
+# grow request memory past LimitRequestFields. req_add_header
+# (modules/http2/h2_util.c) merges a repeated Cookie field into the existing
+# Cookie value with apr_table_setn(headers, "Cookie", apr_psprintf(...)) and
+# returns before reaching the `*pwas_added = 1;` line further down the
+# function, so the caller (h2_stream_add_header, modules/http2/h2_stream.c)
+# only does `if (was_added) ++stream->request_headers_added;` -- a merged
+# cookie crumb never increments the counter LimitRequestFields is checked
+# against. A stream that sends many small Cookie fields keeps allocating a
+# longer merged string on every one, all invisible to the field-count guard
+# (CWE-400, CWE-770, CWE-789). Fix 47d3100b25 (version-bump commit message,
+# real code change in the same diff) adds two lines to the cookie-merge
+# branch: `if (!nv->valuelen) return APR_SUCCESS;` before the merge, and
+# `*pwas_added = 1;` right before its `return APR_SUCCESS;`, so a merge now
+# counts as an add the same as every other header.
+#
+# ATTENTION, no taint path and no reusable vocabulary. vyql match on both
+# revisions labels nothing about cookies, merges or field counts -- only
+# generic code.IntegerSizeArithmeticSink/code.NullableDeref marks unrelated to
+# the weakness -- and scanning the real modules/http2 checkout at both
+# revisions with `vyql scan --cache off --max-ram 4GB` reports the same
+# findings either way, none of them at the cookie-merge branch. There is no
+# source-to-sink flow to trace: the defect is that req_add_header has two
+# return points inside one `if (existing) { ... }` branch, and only the one
+# reached after `*pwas_added = 1;` (further down, for a brand-new header)
+# marks the write; the early return from the cookie-merge branch skips it.
+# Recognizing that needs the engine to know, for a function with multiple
+# return points, whether an output parameter is set on every return path that
+# performs the same category of mutation (here, every branch that calls
+# apr_table_setn/apr_table_merge on the accumulator), and then to carry that
+# output parameter's value across the call into the caller's own counter
+# comparison against session->s->limit_req_fields. Nothing in the binding
+# query language asks either question: presenceNode context is a flat,
+# per-function bag of call/selector/literal tokens with no notion of "which
+# return statement is this token before," and no fact connects an out
+# parameter's value at a call site to what the caller does with it next.
+# Checked for reuse first: code.UnboundedAllocationReview (VYQL-DOS-041) is
+# the closest fit by CWE and by its own review text -- "review allocation
+# sizes derived from parsed counts for per-item limits, aggregate consistency
+# checks, and overflow" is exactly what the merge branch needs and does not
+# get -- but every existing binding that emits it keys on a call or a
+# presence pattern, not "this branch returns before a write a sibling branch
+# performs," so there is nothing to reuse. A binding narrow enough to
+# separate this function's two revisions would have to name "cookie",
+# "pwas_added", "apr_table_setn" and "scratch->max_len" outright; req_add_header
+# is httpd-internal request-parsing code with no public API documentation
+# to write such a binding from, so it would be a repro-shaped patch for one
+# function, not a case someone who never saw this CVE would derive from
+# anything the library documents. Entered in ENGINE-GAPS.md under "Not
+# mechanical, do not sweep these": this is a new class of analysis (output
+# parameter write-completeness across a function's return points, propagated
+# through one call into a counter comparison), not a one-line fix beside a
+# mechanical gap. No definition change shipped.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1187: cookie merge returns before marking the header added"
+  lang c
+  file modules/http2/h2_util.c
+  reject VYQL-DOS-041
+  code
+  ```
+  static apr_status_t req_add_header(apr_table_t *headers, apr_pool_t *pool,
+                                     nghttp2_nv *nv, h2_hd_scratch *scratch,
+                                     int *pwas_added)
+  {
+      const char *existing;
+
+      *pwas_added = 0;
+      strip_field_value_ws(nv);
+
+      if (h2_req_ignore_header(nv)) {
+          return APR_SUCCESS;
+      }
+      else if (nv->namelen == sizeof("cookie")-1
+               && !ap_cstr_casecmpn("cookie", (const char *)nv->name, nv->namelen)) {
+          existing = apr_table_get(headers, "cookie");
+          if (existing) {
+              /* Cookie header come separately in HTTP/2, but need
+               * to be merged by "; " (instead of default ", ")
+               */
+              if ((strlen(existing) + nv->valuelen + nv->namelen + 4)
+                     > scratch->max_len) {
+                  /* "key: oldval, nval" is too long */
+                  return APR_EINVAL;
+              }
+              apr_table_setn(headers, "Cookie",
+                             apr_psprintf(pool, "%s; %.*s", existing,
+                                          (int)nv->valuelen, nv->value));
+              return APR_SUCCESS;
+          }
+      }
+
+      if (((nv->namelen + nv->valuelen + 2) > scratch->max_len))
+          return APR_EINVAL;
+
+      memcpy(scratch->name, nv->name, nv->namelen);
+      scratch->name[nv->namelen] = 0;
+      memcpy(scratch->value, nv->value, nv->valuelen);
+      scratch->value[nv->valuelen] = 0;
+
+      *pwas_added = 1;
+      existing = apr_table_get(headers, scratch->name);
+      if (existing) {
+          apr_table_merge(headers, scratch->name, scratch->value);
+      }
+      else {
+          h2_util_camel_case_header(scratch->name, nv->namelen);
+          apr_table_set(headers, scratch->name, scratch->value);
+      }
+      return APR_SUCCESS;
+  }
+  ```
+
+test "rank1187: fix counts the merge against the field limit"
+  lang c
+  file modules/http2/h2_util.c
+  reject VYQL-DOS-041
+  code
+  ```
+  static apr_status_t req_add_header(apr_table_t *headers, apr_pool_t *pool,
+                                     nghttp2_nv *nv, h2_hd_scratch *scratch,
+                                     int *pwas_added)
+  {
+      const char *existing;
+
+      *pwas_added = 0;
+      strip_field_value_ws(nv);
+
+      if (h2_req_ignore_header(nv)) {
+          return APR_SUCCESS;
+      }
+      else if (nv->namelen == sizeof("cookie")-1
+               && !ap_cstr_casecmpn("cookie", (const char *)nv->name, nv->namelen)) {
+          existing = apr_table_get(headers, "cookie");
+          if (existing) {
+              if (!nv->valuelen)
+                  return APR_SUCCESS;
+              /* Cookie header come separately in HTTP/2, but need
+               * to be merged by "; " (instead of default ", ")
+               */
+              if ((strlen(existing) + nv->valuelen + nv->namelen + 4)
+                     > scratch->max_len) {
+                  /* "key: oldval, nval" is too long */
+                  return APR_EINVAL;
+              }
+              apr_table_setn(headers, "Cookie",
+                             apr_psprintf(pool, "%s; %.*s", existing,
+                                          (int)nv->valuelen, nv->value));
+              /* Treat the merge as an "add" to not escape LimitRequestFields */
+              *pwas_added = 1;
+              return APR_SUCCESS;
+          }
+      }
+
+      if (((nv->namelen + nv->valuelen + 2) > scratch->max_len))
+          return APR_EINVAL;
+
+      memcpy(scratch->name, nv->name, nv->namelen);
+      scratch->name[nv->namelen] = 0;
+      memcpy(scratch->value, nv->value, nv->valuelen);
+      scratch->value[nv->valuelen] = 0;
+
+      *pwas_added = 1;
+      existing = apr_table_get(headers, scratch->name);
+      if (existing) {
+          apr_table_merge(headers, scratch->name, scratch->value);
+      }
+      else {
+          h2_util_camel_case_header(scratch->name, nv->namelen);
+          apr_table_set(headers, scratch->name, scratch->value);
+      }
+      return APR_SUCCESS;
+  }
+  ```
