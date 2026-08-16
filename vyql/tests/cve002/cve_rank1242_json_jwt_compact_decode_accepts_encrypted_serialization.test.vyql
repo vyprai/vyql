@@ -1,0 +1,154 @@
+# Rank 1242 / CVE-2023-51774: JSON::JWT.decode is the single public entry point
+# of the json-jwt gem, and JSON::JWT.decode_compact_serialized picked the branch
+# from the token itself -- `case jwt_string.count('.') + 1`, three segments to
+# JWS.decode_compact_serialized and five to JWE.decode_compact_serialized. A
+# caller that asked for a signed token therefore also accepted an encrypted one.
+# Encrypting to a public key proves no identity, so anyone holding the recipient
+# public key can mint a token whose claims the application reads as verified,
+# and no signature is ever checked (CWE-347, sign/encryption confusion). The
+# published proof of concept signs {"user":"admin"} as RS256, repackages the same
+# claims as an RSA1_5 JWE, and both decode.
+#
+# Fix 9c4d842a94 ("reject blank JWE", the only change in v1.16.6) puts the
+# encrypted branch behind a guard instead of entering it unconditionally:
+#
+#   when JWE::NUM_OF_SEGMENTS
+#     if allow_blank_payload
+#       raise InvalidFormat.new("JWE w/ blank payload is not supported.")
+#     else
+#       JWE.decode_compact_serialized jwt_string, key_or_secret, algorithms, encryption_methods
+#     end
+#
+# No flag on the pool row, and the commit is the real fix rather than a release
+# bump: it is the sole non-version commit between v1.16.5 and v1.16.6, it touches
+# only lib/json/jwt.rb, and v1.16.6 is the version the advisory records as fixed.
+#
+# FIXED. The weakness has no taint path and no misused API -- the token is a
+# parameter of a library entry point and every call in the function is the
+# library's own decoder -- so what has to be stated is the dispatch shape. The
+# new Ruby extractor fact jose_compact_decode_accepts_encrypted_serialization
+# holds when one function counts the compact-serialization separators of a
+# token, reaches both a JWS decoder and a JWE decoder, and enters the encrypted
+# branch with no guard on the line that follows the branch selector. The
+# existing concept code.JwtUnverified and rule VYQL-CFG-005 judge it, because
+# what the caller gets on that branch is a token whose signature was never
+# verified; no new concept or rule is minted.
+#
+# The three clauses are what keep it off ordinary code. Counting '.' in a token
+# is what a compact-serialization dispatcher does and almost nothing else does;
+# requiring both a JWS decoder and a JWE decoder in the same function excludes
+# every library that exposes the two serializations as separate entry points,
+# which is the design RFC 7515 and RFC 7516 lead to; and the guard clause is the
+# control -- a branch that raises, returns, or tests what the caller expected
+# before decrypting is stating the serialization instead of inferring it.
+#
+# Measured bounded (timeout 180, --max-ram 4GB, --cache off): json-jwt at
+# 9c4d842a94^ goes from 6 findings to 7, the extra one being VYQL-CFG-005 at
+# lib/json/jwt.rb, and at 9c4d842a94 reports 6 with no VYQL-CFG-005. The gem's
+# own spec tree, which calls JSON::JWT.decode on both serializations, reports
+# none of them. ruby-jwt, jwe and rack-oauth2 report no VYQL-CFG-005 either.
+
+test "rank1242: a compact JOSE decoder routes an encrypted token down the same entry point as a signed one"
+  lang ruby
+  file lib/json/jwt.rb
+  expect VYQL-CFG-005
+  code
+  ```
+  module JSON
+    class JWT < ActiveSupport::HashWithIndifferentAccess
+      class InvalidFormat < StandardError; end
+
+      class << self
+        def decode_compact_serialized(jwt_string, key_or_secret, algorithms = nil, encryption_methods = nil, allow_blank_payload = false)
+          case jwt_string.count('.') + 1
+          when JWS::NUM_OF_SEGMENTS
+            JWS.decode_compact_serialized jwt_string, key_or_secret, algorithms, allow_blank_payload
+          when JWE::NUM_OF_SEGMENTS
+            JWE.decode_compact_serialized jwt_string, key_or_secret, algorithms, encryption_methods
+          else
+            raise InvalidFormat.new("Invalid JWT Format. JWT should include #{JWS::NUM_OF_SEGMENTS} or #{JWE::NUM_OF_SEGMENTS} segments.")
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1242: the fix guards the encrypted branch before decrypting"
+  lang ruby
+  file lib/json/jwt.rb
+  reject VYQL-CFG-005
+  code
+  ```
+  module JSON
+    class JWT < ActiveSupport::HashWithIndifferentAccess
+      class InvalidFormat < StandardError; end
+
+      class << self
+        def decode_compact_serialized(jwt_string, key_or_secret, algorithms = nil, encryption_methods = nil, allow_blank_payload = false)
+          case jwt_string.count('.') + 1
+          when JWS::NUM_OF_SEGMENTS
+            JWS.decode_compact_serialized jwt_string, key_or_secret, algorithms, allow_blank_payload
+          when JWE::NUM_OF_SEGMENTS
+            if allow_blank_payload
+              raise InvalidFormat.new("JWE w/ blank payload is not supported.")
+            else
+              JWE.decode_compact_serialized jwt_string, key_or_secret, algorithms, encryption_methods
+            end
+          else
+            raise InvalidFormat.new("Invalid JWT Format. JWT should include #{JWS::NUM_OF_SEGMENTS} or #{JWE::NUM_OF_SEGMENTS} segments.")
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1242: an entry point that only accepts the signed serialization is not reported"
+  lang ruby
+  file lib/token/reader.rb
+  reject VYQL-CFG-005
+  code
+  ```
+  module Token
+    class Reader
+      class InvalidFormat < StandardError; end
+
+      class << self
+        def decode_compact_serialized(token, public_key, algorithms = nil)
+          unless token.count('.') + 1 == JWS::NUM_OF_SEGMENTS
+            raise InvalidFormat.new("Expected a signed token of #{JWS::NUM_OF_SEGMENTS} segments.")
+          end
+          JWS.decode_compact_serialized token, public_key, algorithms
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1242: a dispatcher that refuses the encrypted form unless the caller asked for it is not reported"
+  lang ruby
+  file lib/token/dispatcher.rb
+  reject VYQL-CFG-005
+  code
+  ```
+  module Token
+    class Dispatcher
+      class InvalidFormat < StandardError; end
+
+      class << self
+        def decode_compact_serialized(token, key, algorithms = nil, expect_encrypted = false)
+          case token.count('.') + 1
+          when JWS::NUM_OF_SEGMENTS
+            JWS.decode_compact_serialized token, key, algorithms
+          when JWE::NUM_OF_SEGMENTS
+            raise InvalidFormat.new("An encrypted token is not accepted on this route.") unless expect_encrypted
+            JWE.decode_compact_serialized token, key, algorithms
+          else
+            raise InvalidFormat.new("Unexpected number of segments.")
+          end
+        end
+      end
+    end
+  end
+  ```

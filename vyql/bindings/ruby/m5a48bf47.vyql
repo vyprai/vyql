@@ -1466,3 +1466,8 @@ binding certValidationDisabled263 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "ruby" and node.context.call == "start_tls" and containsAny(node.context.callPath, ["EventMachine.connect", "EventMachine.bind_connect", "EventMachine::connect", "EM.connect", "EM.bind_connect", "EM::connect"]) and not containsAny(node.context.callPath, ["EventMachine.start_tls", "EventMachine::start_tls", "EM.start_tls", "EM::start_tls"]) and not containsAny(node.context.call, ["start_server", "start_unix_domain_server"]) and not containsAny(node.context.call, ["verify_certificate_identity", "add_cert", "ssl_verify_peer", "ssl_handshake_completed"]) and not (node.context.field contains "verify_peer=true")
   emit issue code.CertValidationDisabled at node
 }
+
+binding jwtUnverified292 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.functionName contains "decode" and node.context.rubyReview == "jose_compact_decode_accepts_encrypted_serialization"
+  emit issue code.JwtUnverified at node
+}
