@@ -1,0 +1,91 @@
+# Rank 1504 / CVE-2026-42074: OpenClaude's Bash and PowerShell tools exposed
+# dangerouslyDisableSandbox in the model-facing input schema, so a model-
+# controlled tool_use payload could set the flag directly and run its command
+# outside the sandbox (CWE-284, CWE-306): shouldUseSandbox() in
+# src/tools/BashTool/shouldUseSandbox.ts returned false -- no sandbox -- when
+# input.dangerouslyDisableSandbox was set and policy allowed unsandboxed
+# commands, and nothing distinguished the model's tool input from a trusted
+# internal caller. Pool commit aab489055c is the real fix (COMMIT_OK, "fix:
+# require trusted approval for sandbox override (#778)"): the schema gains an
+# internal _dangerouslyDisableSandboxApproved field that the model-facing
+# schema omits, and the override now requires both the flag and the approval.
+# No pool correction.
+#
+# ATTENTION, vocabulary gap. The weakness is not a taint flow: a security-
+# critical switch is controlled by model-facing input with no trust check on
+# the path. The sanctioned route for that shape is an issue review concept
+# with a binding, exactly as VYQL-AUTH-091 / code.RunTestsAutoApproval-
+# ExecutesCode does for run_tests-style tools that execute project code while
+# declaring automatic approval. What cannot be written from documentation
+# alone is the discriminator: a binding on the mere presence of
+# dangerouslyDisableSandbox in a tool schema fires on every Claude-Code-style
+# agent -- the flag is the de-facto documented BashTool surface and most
+# clones gate it with a permission callback or approval mode living outside
+# the schema file -- while keying on openclaude's own
+# _dangerouslyDisableSandboxApproved neighbour detects this repository's fix,
+# not the weakness. Measured on the real code: scanning src/tools/BashTool at
+# the fix parent and at the fix reports one unrelated finding each
+# (VYQL-CRY-003 weak random in sedEditParser.ts:304), nothing on
+# shouldUseSandbox, the schema, or the override path; the fix-directory scan
+# at the parent reports 557 injection-family findings, none touching the
+# sandbox decision. No ENGINE-GAPS.md entry: nothing here is a mechanical
+# engine change; the missing piece is a trustworthy way to state "this
+# schema field is settable by the untrusted party and gates a security
+# boundary", which is vocabulary design with a precision question attached.
+# No definition change shipped. Spec cve_rank1504 records the model-settable
+# override and the approval-gated form, both asserting reject VYQL-AUTH-091.
+
+test "rank1504: the model sets the sandbox override directly"
+  lang javascript
+  file src/tools/BashTool/shouldUseSandbox.ts
+  reject VYQL-AUTH-091
+  code
+  ```
+  type SandboxInput = {
+    command?: string
+    dangerouslyDisableSandbox?: boolean;
+  };
+
+  export function shouldUseSandbox(input: Partial<SandboxInput>): boolean {
+    if (input.dangerouslyDisableSandbox && SandboxManager.areUnsandboxedCommandsAllowed()) {
+      return false;
+    }
+    return true;
+  }
+
+  namespace SandboxManager {
+    export function areUnsandboxedCommandsAllowed(): boolean {
+      return true;
+    }
+  }
+  ```
+
+test "rank1504: the fix requires the internal approval marker"
+  lang javascript
+  file src/tools/BashTool/shouldUseSandbox.ts
+  reject VYQL-AUTH-091
+  code
+  ```
+  type SandboxInput = {
+    command?: string
+    dangerouslyDisableSandbox?: boolean;
+    _dangerouslyDisableSandboxApproved?: boolean;
+  };
+
+  export function shouldUseSandbox(input: Partial<SandboxInput>): boolean {
+    if (
+      input.dangerouslyDisableSandbox &&
+      input._dangerouslyDisableSandboxApproved &&
+      SandboxManager.areUnsandboxedCommandsAllowed()
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  namespace SandboxManager {
+    export function areUnsandboxedCommandsAllowed(): boolean {
+      return true;
+    }
+  }
+  ```
