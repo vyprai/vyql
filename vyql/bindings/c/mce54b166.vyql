@@ -1241,3 +1241,8 @@ binding httpInput209 {
   query pattern callExpr where callee.path ~= "gst_rtp_buffer_get_payload_bytes"
   emit source code.HttpInput at call.result
 }
+
+binding speciesResultBufferMissingElementTypeCheck210 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.callPath contains "typedarray_species_create" and containsAny(node.context.callArgShapeAt, ["memcpy:0:ecma_typedarray_get_buffer(", "memmove:0:ecma_typedarray_get_buffer(", "memcpy:0:ecma_arraybuffer_get_buffer(", "memmove:0:ecma_arraybuffer_get_buffer("]) and not (containsAny(node.context.callPath, ["ecma_typedarray_get_info", "ecma_get_typedarray_setter_fn"]))
+  emit issue code.SpeciesResultBufferMissingElementTypeCheck at node
+}
