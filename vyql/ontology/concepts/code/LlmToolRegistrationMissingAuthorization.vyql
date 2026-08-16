@@ -1,0 +1,11 @@
+module code;
+
+concept LlmToolRegistrationMissingAuthorization : issue {
+  cwe: [CWE_862, CWE_306]
+  reviewAssumption: "the chat or agent endpoint the tool set is attached to can be reached by a caller who does not hold the privilege the tool exercises"
+  reviewCategory: access_control
+  reviewCondition: "an LLM tool registry hands the model tools that administer accounts, roles or permissions without checking the caller's privilege before registering them"
+  reviewConfidence: high
+  reviewEvidence: "tool registry context {pattern} builds account-administration tools and carries no authorization check"
+  vulnerableTo: [access_control.MissingAuthorization, authentication.MissingAuthentication]
+}
