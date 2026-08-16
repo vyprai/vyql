@@ -2633,3 +2633,17 @@ binding hardcodedSecretLiteral460 {
   query pattern callExpr where callee.analysis ~= "secret.hardcoded" and args.any.literal contains "secret="
   emit issue code.HardcodedSecretLiteral at call
 }
+
+// filterSensitive strips each denylisted JDBC parameter (autoDeserialize,
+// allowLoadLocalInfile, allowUrlInLocalInfile, ...) from the URL by iterating the
+// denylist once and calling a string-replace per key. A denylisted key nested
+// inside another occurrence of itself survives: removing the inner match leaves
+// the two flanking fragments adjacent, which reconstructs the same key=value pair
+// the single pass already walked past. The fix (containSensitiveKey, re-invoked in
+// a loop until the URL no longer contains any denylisted key) re-scans after every
+// strip instead of scanning once, so its presence in the function's scope is what
+// distinguishes the patched form.
+binding jdbcSensitiveParamSinglePassFilterBypass461 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "filterSensitive" and node.context.callPath contains "StringUtils.replaceIgnoreCase" and node.context.callPath contains ".keySet" and not (node.context.scopeCall contains "containSensitiveKey")
+  emit issue code.JdbcSensitiveParamSinglePassFilterBypass at node
+}

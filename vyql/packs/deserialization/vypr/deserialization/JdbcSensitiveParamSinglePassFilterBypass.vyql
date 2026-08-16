@@ -1,0 +1,11 @@
+module vypr.deserialization;
+
+rule JdbcSensitiveParamSinglePassFilterBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_182, CWE_502]
+    id: "VYQL-DESER-022"
+    severity: high
+  }
+  issue code.JdbcSensitiveParamSinglePassFilterBypass as validator
+}
