@@ -2615,3 +2615,21 @@ binding jenkinsHtmlPublisherLegacyWrapperXss459 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "publishReports" and node.context.literal contains "links-data-holder'" and node.context.callPath contains "job.getName"
   emit issue code.JenkinsHtmlPublisherLegacyWrapperXss at node
 }
+
+// A secret-named field or local (secret/signing_key/jwt/hmac/api_key/private_key/
+// cipher_key/encryption_key/session_key/access_token/auth_token/refresh_token,
+// per secretNamedTarget in internal/extract/lowering/lowering.go) assigned a
+// non-trivial string literal directly, outside test/seed sources. The lowering
+// pass already emits this analysis call for every language sharing nir.Assign;
+// python and javascript already bind it, java had no binding consuming it at
+// all. Scoped to the "secret="-tagged evidence (secretNamedTarget) rather than
+// also the "credential_const="-tagged one (credentialConstName, the PASSWORD/
+// USERNAME family): Java schemas commonly declare a SCREAMING_CASE constant
+// like PASSWORD naming a property/column *key*, not holding a credential
+// value, and that shape fired on this project's own real code
+// (HugeUser.java's `PASSWORD = "~user_password"`) the first time this
+// evidence family was tried here.
+binding hardcodedSecretLiteral460 {
+  query pattern callExpr where callee.analysis ~= "secret.hardcoded" and args.any.literal contains "secret="
+  emit issue code.HardcodedSecretLiteral at call
+}
