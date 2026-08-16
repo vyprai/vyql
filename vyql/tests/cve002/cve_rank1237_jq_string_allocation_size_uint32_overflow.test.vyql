@@ -1,0 +1,251 @@
+# Rank 1237 / CVE-2026-32316: jq computes two string-buffer allocation sizes
+# with 32-bit arithmetic that wraps before the allocation is made, and then
+# writes the untruncated length into the undersized buffer. In src/jv.c,
+# `jvp_string_append` sizes the replacement buffer with
+#
+#   uint32_t allocsz = (currlen + len) * 2;
+#   jvp_string* news = jvp_string_alloc(allocsz);
+#   memcpy(news->data, s->data, currlen);
+#   memcpy(news->data + currlen, data, len);
+#
+# and `jvp_string_copy_replace_bad` sizes its replacement-character output with
+# `uint32_t maxlength = length * 3 + 1;`. Both products are taken in uint32_t,
+# so a string whose combined length passes INT_MAX wraps the product to a small
+# value, `jvp_string_alloc` reserves that small buffer, and the following copy
+# writes the full length past its end. The fix (e47e56d226) redoes each product
+# in uint64_t and returns `jv_invalid_with_msg(jv_string("String too long"))`
+# when the widened result reaches INT_MAX.
+#
+# VYQL-NUM-003 (TaintedIntegerSizeArithmetic) reaches both products, because
+# `fread` in jv_file.c:47 is a labelled source and the read length flows into
+# them: `timeout 180 ./bin/vyql scan --cache off --max-ram 4GB` over src/ at
+# the fix's parent reports jv.c:1117 (`length * 3 + 1`) and jv.c:1187
+# (`(currlen + len) * 2`). The products themselves are identical either side
+# of the fix, so the only thing that can separate the two revisions is the
+# rule's `unless endpoint coveredBy core.IntegerOverflowGuard`, and that needs
+# a binding which recognises the added range check.
+#
+# A C and a C++ binding emit core.IntegerOverflowGuard for the documented form
+# of that control: a function that compares a value against a fixed-width type
+# limit from <limits.h>/<stdint.h> (INT_MAX, SIZE_MAX, UINT32_MAX and the rest
+# of that family, plus std::numeric_limits<T>::max() in C++). The control
+# covers the endpoint, so it reaches the size arithmetic in the function that
+# carries the check and no other function. Over jq's src/ at the fix's parent
+# it suppresses 13 of 968 findings, all VYQL-NUM-003, and every one of them
+# sits in a function that clamps against INT_MAX already (`jv_set` in
+# jv_aux.c, `jv_array_set` in jv.c); over ImageMagick 6's magick/ it
+# suppresses 30 of 14158 on the same terms and adds none. Both functions the
+# CVE names report every one of their products at the fix's parent, and none
+# of them at the fix.
+#
+# verify_current_expected: fixed
+
+test "rank1237: the growth buffer is sized by a uint32 product of two lengths"
+  lang c
+  file src/jv.c
+  expect VYQL-NUM-003
+  code
+  ```
+  #include <stdint.h>
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  typedef struct {
+    uint32_t alloc_length;
+    char data[1];
+  } jvp_string;
+
+  static jvp_string* jvp_string_alloc(uint32_t size);
+
+  static jvp_string* jvp_string_append(jvp_string* s, uint32_t currlen, const char* data, uint32_t len) {
+    uint32_t allocsz = (currlen + len) * 2;
+    jvp_string* news = jvp_string_alloc(allocsz);
+    memcpy(news->data, s->data, currlen);
+    memcpy(news->data + currlen, data, len);
+    return news;
+  }
+
+  int read_and_append(FILE* f, jvp_string* s) {
+    char buf[4096];
+    uint32_t n = fread(buf, 1, sizeof(buf), f);
+    jvp_string_append(s, 16, buf, n);
+    return 0;
+  }
+  ```
+
+test "rank1237: the growth buffer's product is range-checked against INT_MAX first"
+  lang c
+  file src/jv.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <limits.h>
+  #include <stdint.h>
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  typedef struct {
+    uint32_t alloc_length;
+    char data[1];
+  } jvp_string;
+
+  static jvp_string* jvp_string_alloc(uint32_t size);
+
+  static jvp_string* jvp_string_append(jvp_string* s, uint32_t currlen, const char* data, uint32_t len) {
+    if ((uint64_t)currlen + len >= INT_MAX) {
+      return NULL;
+    }
+    uint32_t allocsz = (currlen + len) * 2;
+    jvp_string* news = jvp_string_alloc(allocsz);
+    memcpy(news->data, s->data, currlen);
+    memcpy(news->data + currlen, data, len);
+    return news;
+  }
+
+  int read_and_append(FILE* f, jvp_string* s) {
+    char buf[4096];
+    uint32_t n = fread(buf, 1, sizeof(buf), f);
+    jvp_string_append(s, 16, buf, n);
+    return 0;
+  }
+  ```
+
+test "rank1237: the replacement-character buffer is sized by a uint32 product of one length"
+  lang c
+  file src/jv.c
+  expect VYQL-NUM-003
+  code
+  ```
+  #include <stdint.h>
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  typedef struct {
+    uint32_t alloc_length;
+    char data[1];
+  } jvp_string;
+
+  static jvp_string* jvp_string_alloc(uint32_t size);
+
+  static jvp_string* jvp_string_copy_replace_bad(const char* data, uint32_t length) {
+    uint32_t maxlength = length * 3 + 1;
+    jvp_string* s = jvp_string_alloc(maxlength);
+    memcpy(s->data, data, length);
+    return s;
+  }
+
+  jvp_string* read_and_copy(FILE* f) {
+    char buf[4096];
+    uint32_t n = fread(buf, 1, sizeof(buf), f);
+    return jvp_string_copy_replace_bad(buf, n);
+  }
+  ```
+
+test "rank1237: the replacement-character product is widened and range-checked first"
+  lang c
+  file src/jv.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <limits.h>
+  #include <stdint.h>
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  typedef struct {
+    uint32_t alloc_length;
+    char data[1];
+  } jvp_string;
+
+  static jvp_string* jvp_string_alloc(uint32_t size);
+
+  static jvp_string* jvp_string_copy_replace_bad(const char* data, uint32_t length) {
+    uint64_t maxlength = (uint64_t)length * 3 + 1;
+    if (maxlength >= INT_MAX) {
+      return NULL;
+    }
+    jvp_string* s = jvp_string_alloc(maxlength);
+    memcpy(s->data, data, length);
+    return s;
+  }
+
+  jvp_string* read_and_copy(FILE* f) {
+    char buf[4096];
+    uint32_t n = fread(buf, 1, sizeof(buf), f);
+    return jvp_string_copy_replace_bad(buf, n);
+  }
+  ```
+
+test "rank1237: the same uint32 product in C++ reports with no width limit in the function"
+  lang cpp
+  file src/jv.cpp
+  expect VYQL-NUM-003
+  code
+  ```
+  #include <cstdint>
+  #include <cstdio>
+  #include <cstring>
+
+  struct jvp_string {
+    std::uint32_t alloc_length;
+    char data[1];
+  };
+
+  static jvp_string* jvp_string_alloc(std::uint32_t size);
+
+  static jvp_string* jvp_string_append(jvp_string* s, std::uint32_t currlen, const char* data, std::uint32_t len) {
+    std::uint32_t allocsz = (currlen + len) * 2;
+    jvp_string* news = jvp_string_alloc(allocsz);
+    std::memcpy(news->data, s->data, currlen);
+    std::memcpy(news->data + currlen, data, len);
+    return news;
+  }
+
+  int read_and_append(std::FILE* f, jvp_string* s) {
+    char buf[4096];
+    std::uint32_t n = std::fread(buf, 1, sizeof(buf), f);
+    jvp_string_append(s, 16, buf, n);
+    return 0;
+  }
+  ```
+
+test "rank1237: the same width limit read through std::numeric_limits covers C++ size arithmetic"
+  lang cpp
+  file src/jv.cpp
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <cstdint>
+  #include <cstdio>
+  #include <cstring>
+  #include <limits>
+
+  struct jvp_string {
+    std::uint32_t alloc_length;
+    char data[1];
+  };
+
+  static jvp_string* jvp_string_alloc(std::uint32_t size);
+
+  static jvp_string* jvp_string_append(jvp_string* s, std::uint32_t currlen, const char* data, std::uint32_t len) {
+    if (static_cast<std::uint64_t>(currlen) + len >= std::numeric_limits<int>::max()) {
+      return nullptr;
+    }
+    std::uint32_t allocsz = (currlen + len) * 2;
+    jvp_string* news = jvp_string_alloc(allocsz);
+    std::memcpy(news->data, s->data, currlen);
+    std::memcpy(news->data + currlen, data, len);
+    return news;
+  }
+
+  int read_and_append(std::FILE* f, jvp_string* s) {
+    char buf[4096];
+    std::uint32_t n = std::fread(buf, 1, sizeof(buf), f);
+    jvp_string_append(s, 16, buf, n);
+    return 0;
+  }
+  ```
