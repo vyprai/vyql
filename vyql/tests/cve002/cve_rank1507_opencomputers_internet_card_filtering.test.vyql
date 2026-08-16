@@ -1,0 +1,112 @@
+# Rank 1507 / CVE-2023-37261: OpenComputers' Internet Card let in-game
+# computers open HTTP and TCP connections with a filtering system that could
+# be bypassed (CWE-918). request() and connect() in
+# src/main/scala/li/cil/oc/server/component/InternetCard.scala took the
+# address from args.checkString(0) -- a value supplied by the in-game
+# computer, i.e. the untrusted party -- and the old whitelist/blacklist
+# filtering keyed on hostnames before resolution, so DNS rebinding and
+# address-form tricks walked past it into the server's loopback and private
+# ranges. Pool commit d13c015357 is the real fix (COMMIT_OK, "Rework
+# Internet Card filtering system."): a new InternetFilteringRule evaluates
+# allow/deny predicates on the RESOLVED java.net.InetAddress -- any-local,
+# loopback, link-local, site-local, bogon ranges -- an internetAccessAllowed
+# master switch checked before both request() and connect(), and a vendored
+# typesafe-config hook (OpenComputersConfigCommentManipulationHook) so the
+# rules cannot be edited out of application.conf via comment manipulation.
+# No pool correction.
+#
+# ATTENTION, whole-language coverage gap. The shape is request-forgery: an
+# untrusted argument (args.checkString) reaches a socket connection with
+# hostname-time filtering only. Nothing in the scala corpus participates:
+# there is no source binding for the mod's @Callback Arguments API, no
+# socket-level UrlFetch sink (SocketChannel.open is not a bound fetch form),
+# and no control concept for post-resolution InetAddress predicates, which
+# is the exact semantics of the fix. Scanning the fix's scala directories
+# (server/component and util) reports only two VYQL-CRY-003 weak-random
+# findings; the fix-revision directory scan adds config/injection families
+# on unrelated files, no VYQL-RF row at either revision. A binding on
+# OpenComputers' own checkString would detect this mod rather than the
+# weakness, and the missing pieces are three (source, sink, control) across
+# a language the corpus barely covers -- vocabulary design at scala depth,
+# not a mechanical change, and not worth one rank. No ENGINE-GAPS.md entry:
+# nothing here is localised to a file or construct; it is scala coverage as
+# a whole. No definition change shipped. Spec cve_rank1507 records the
+# pre-fix connect and the filtering-rule-guarded form, both asserting
+# reject VYQL-RF-001.
+
+test "rank1507: the in-game computer chooses the connect address"
+  lang scala
+  file src/main/scala/li/cil/oc/server/component/InternetCard.scala
+  reject VYQL-RF-001
+  code
+  ```
+  package li.cil.oc.server.component
+
+  import li.cil.oc.Settings
+  import net.minecraft.util.math.Vec3d
+
+  class InternetCard {
+    def connect(context: Context, args: Arguments): Array[AnyRef] = this.synchronized {
+      checkOwner(context)
+      val address = args.checkString(0)
+      val port = args.optInteger(1, -1)
+      if (!Settings.get.tcpEnabled) {
+        return result(Unit, "tcp connections are unavailable")
+      }
+      val channel = java.nio.channels.SocketChannel.open()
+      channel.connect(new java.net.InetSocketAddress(address, port))
+      result(channel)
+    }
+
+    def checkOwner(context: Context): Unit = {}
+    def result(value: AnyRef*): Array[AnyRef] = value.toArray
+  }
+
+  class Context
+  class Arguments {
+    def checkString(index: Int): String = ""
+    def optInteger(index: Int, default: Int): Int = default
+  }
+  ```
+
+test "rank1507: the reworked system checks the resolved address against rules"
+  lang scala
+  file src/main/scala/li/cil/oc/server/component/InternetCard.scala
+  reject VYQL-RF-001
+  code
+  ```
+  package li.cil.oc.server.component
+
+  import li.cil.oc.Settings
+  import li.cil.oc.util.InternetFilteringRule
+
+  class InternetCard {
+    def connect(context: Context, args: Arguments): Array[AnyRef] = this.synchronized {
+      checkOwner(context)
+      val address = args.checkString(0)
+      val port = args.optInteger(1, -1)
+      if (!Settings.get.internetAccessAllowed()) {
+        return result(Unit, "internet access is unavailable")
+      }
+      if (!Settings.get.tcpEnabled) {
+        return result(Unit, "tcp connections are unavailable")
+      }
+      val resolved = java.net.InetAddress.getByName(address)
+      if (!InternetFilteringRule.checkAddress(resolved, address)) {
+        return result(Unit, "address is not allowed")
+      }
+      val channel = java.nio.channels.SocketChannel.open()
+      channel.connect(new java.net.InetSocketAddress(resolved, port))
+      result(channel)
+    }
+
+    def checkOwner(context: Context): Unit = {}
+    def result(value: AnyRef*): Array[AnyRef] = value.toArray
+  }
+
+  class Context
+  class Arguments {
+    def checkString(index: Int): String = ""
+    def optInteger(index: Int, default: Int): Int = default
+  }
+  ```
