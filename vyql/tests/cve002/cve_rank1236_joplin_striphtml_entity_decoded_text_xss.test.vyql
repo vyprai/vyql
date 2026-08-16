@@ -1,0 +1,110 @@
+# A tag-stripping helper runs an HTML parser with entity decoding on and
+# concatenates the text callbacks, so a note body holding `&lt;img onerror=...&gt;`
+# comes back as live `<img onerror=...>` markup. The helper drops the text of
+# script, style and iframe elements, so its result is meant for a browser to
+# render, and the search UI feeds it to dangerouslySetInnerHTML. Re-encoding `<`
+# on the way out is what keeps the decoded entities inert.
+
+test "rank1236: tag stripping returns entity-decoded text with no re-encoding"
+  lang javascript
+  file htmlUtils.ts
+  expect VYQL-INJ-034
+  expect_review code.IncompleteHtmlEntityEscape
+  code
+  ```
+  const htmlparser2 = require('@joplin/fork-htmlparser2');
+
+  class HtmlUtils {
+
+  	public stripHtml(html: string) {
+  		const output: string[] = [];
+  		const tagStack: string[] = [];
+
+  		const currentTag = () => {
+  			if (!tagStack.length) return '';
+  			return tagStack[tagStack.length - 1];
+  		};
+
+  		const disallowedTags = ['script', 'style', 'head', 'iframe', 'frameset', 'frame', 'object', 'base'];
+
+  		const parser = new htmlparser2.Parser({
+
+  			onopentag: (name: string) => {
+  				tagStack.push(name.toLowerCase());
+  			},
+
+  			ontext: (decodedText: string) => {
+  				if (disallowedTags.includes(currentTag())) return;
+  				output.push(decodedText);
+  			},
+
+  			onclosetag: (name: string) => {
+  				if (currentTag() === name.toLowerCase()) tagStack.pop();
+  			},
+
+  		}, { decodeEntities: true });
+
+  		parser.write(html);
+  		parser.end();
+
+  		return output.join('').replace(/\s+/g, ' ');
+  	}
+
+  }
+
+  export default new HtmlUtils();
+  ```
+
+test "rank1236: tag stripping re-encodes the angle bracket it decoded"
+  lang javascript
+  file htmlUtils.ts
+  reject VYQL-INJ-034
+  reject_review code.IncompleteHtmlEntityEscape
+  code
+  ```
+  const htmlparser2 = require('@joplin/fork-htmlparser2');
+
+  class HtmlUtils {
+
+  	public stripHtml(html: string) {
+  		const output: string[] = [];
+  		const tagStack: string[] = [];
+
+  		const currentTag = () => {
+  			if (!tagStack.length) return '';
+  			return tagStack[tagStack.length - 1];
+  		};
+
+  		const disallowedTags = ['script', 'style', 'head', 'iframe', 'frameset', 'frame', 'object', 'base'];
+
+  		const parser = new htmlparser2.Parser({
+
+  			onopentag: (name: string) => {
+  				tagStack.push(name.toLowerCase());
+  			},
+
+  			ontext: (decodedText: string) => {
+  				if (disallowedTags.includes(currentTag())) return;
+  				output.push(decodedText);
+  			},
+
+  			onclosetag: (name: string) => {
+  				if (currentTag() === name.toLowerCase()) tagStack.pop();
+  			},
+
+  		}, { decodeEntities: true });
+
+  		parser.write(html);
+  		parser.end();
+
+  		// The text callbacks give back decoded entities, so `<` is encoded again
+  		// to stop a decoded entity from turning back into a tag.
+  		return output.join('')
+  			.replace(/\s+/g, ' ')
+  			.replace(/</g, '&lt;');
+  	}
+
+  }
+
+  export default new HtmlUtils();
+  ```
