@@ -1,0 +1,78 @@
+# Rank 1508 / CVE-2026-27960: OpenCTI authenticated a request by treating
+# one credential field as either an API token or a user identifier
+# (CWE-287). authenticateUserByTokenOrUserId in
+# opencti-graphql/src/domain/user.js did
+#   if (platformUsers.has(tokenOrId)) { let authenticatedUser =
+# platformUsers.get(tokenOrId); ... }
+# -- a map lookup with no secret comparison, so knowledge of a user's id
+# alone authenticated as that user (and the opencti-applicant-id header
+# could then impersonate further via isBypassUser). The task list carried
+# nocommit because the advisory names no commit; pool commit 5196318667
+# ("[backend] User authentication refactoring (#14267)") IS the fix, read
+# from its diff: the conflation is split into authenticateUserByToken,
+# which looks the user up by token and then requires
+# crypto.timingSafeEqual(Buffer.from(user.api_token), Buffer.from(token)),
+# and authenticateUserByUserId, used only where the id comes from an
+# already-identified context. No pool correction needed.
+#
+# ATTENTION, vocabulary gap, fourth of its family in this batch. The
+# weakness is an authentication decision on an identifier instead of a
+# secret -- a map-membership check standing in for credential verification,
+# with no dataflow to a sink. The corpus vocabulary reaches one edge of the
+# fix: VYQL-CRY-006 already treats timingSafeEqual as the safe comparison
+# form for secrets, which is exactly what the fix adopted. What is missing
+# is the other edge: nothing states "this lookup authenticates" or "this
+# value is a credential", so no rule can require the comparison. A binding
+# on opencti's own platformUsers.has would detect this repository rather
+# than the weakness. Measured on the real code: scanning the fix
+# directories at both revisions reports the same 21 findings (VYQL-CRY-006
+# weak comparisons and VYQL-SEC-002 hardcoded constants among them), none
+# on the authentication path; the refactor changes none of them. No
+# ENGINE-GAPS.md entry: the missing piece is credential-vs-identifier
+# classification, vocabulary design with the same precision question as
+# ranks 1501, 1504 and 1505 -- four rows now share this cause. No
+# definition change shipped. Spec cve_rank1508 records the map-lookup
+# authentication and the timing-safe split form, both asserting reject
+# VYQL-CRY-006.
+
+test "rank1508: the credential field is used as token or user id"
+  lang javascript
+  file opencti-graphql/src/domain/user.js
+  reject VYQL-CRY-006
+  code
+  ```
+  export const authenticateUserByTokenOrUserId = async (context, req, tokenOrId) => {
+    const platformUsers = await getEntitiesMapFromCache(context, SYSTEM_USER, ENTITY_TYPE_USER);
+    if (platformUsers.has(tokenOrId)) {
+      let authenticatedUser = platformUsers.get(tokenOrId);
+      const settings = await getEntityFromCache(context, SYSTEM_USER, ENTITY_TYPE_SETTINGS);
+      const applicantId = req.headers['opencti-applicant-id'];
+      if (applicantId && isBypassUser(authenticatedUser)) {
+        authenticatedUser = platformUsers.get(applicantId) || INTERNAL_USERS[applicantId];
+      }
+      validateUser(authenticatedUser, settings);
+      return userWithOrigin(req, authenticatedUser);
+    }
+    throw new Error(`Cant identify with ${tokenOrId}`);
+  };
+  ```
+
+test "rank1508: the fix compares the token in constant time"
+  lang javascript
+  file opencti-graphql/src/domain/user.js
+  reject VYQL-CRY-006
+  code
+  ```
+  import crypto from 'crypto';
+
+  export const authenticateUserByToken = async (context, req, token) => {
+    const platformUsers = await getEntitiesMapFromCache(context, SYSTEM_USER, ENTITY_TYPE_USER);
+    if (platformUsers.has(token)) {
+      const user = platformUsers.get(token);
+      if (crypto.timingSafeEqual(Buffer.from(user.api_token), Buffer.from(token))) {
+        return internalAuthenticateUser(context, req, user);
+      }
+    }
+    throw new Error('Cannot identify user with token');
+  };
+  ```
