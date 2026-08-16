@@ -1,0 +1,265 @@
+# Rank 1247 / CVE-2025-62712 jumpserver/jumpserver: SuperConnectionTokenViewSet
+# derives from ConnectionTokenViewSet, whose get_queryset() narrows the rows a
+# request may reach to ConnectionToken.objects.filter(user=self.request.user),
+# and overrides that method with `return ConnectionToken.objects.all()`. The
+# subclass's rbac_perms map also drops the 'list' and 'retrieve' entries the
+# base declares, so both routes fall back to a weaker permission and then read
+# every connection token in the deployment, each one carrying the asset,
+# account and protocol another user is connecting with (CWE-639, CWE-863).
+#
+# Pool commit 453ad331eec9d9667a38de735d6612608e558491 is the real fix,
+# confirmed against its own diff: one file, apps/authentication/api/
+# connection_token.py, adding 'list' and 'retrieve' to the subclass's
+# rbac_perms, replacing get_queryset() with ConnectionToken.objects.none(), and
+# adding a get_object() that fetches one token by primary key. Its message says
+# "perf: token retrieve", which is why the row carries no flag: nothing in the
+# metadata marks it, and only the diff shows it is the access-control fix. No
+# pool correction needed.
+#
+# FIXED. Nothing labelled the override: a bounded scan of both real revisions
+# of apps/authentication reports no VYQL-AUTH-095 on either side without the
+# binding below.
+# Added a Python binding, viewsetQuerysetOwnerScopeDroppedInOverride, emitting
+# the existing code.UnboundAuthorizationTarget (VYQL-AUTH-095). It reads a
+# get_queryset() override that returns the bare model manager, in a class that
+# derives from another application view class rather than from one of Django
+# REST Framework's own generic views or viewsets. Deriving straight from a
+# framework generic is the documented default shape, where the unfiltered
+# manager is expected and the view's permission classes decide who reaches it;
+# deriving from another view class means an inherited get_queryset() exists and
+# this override replaces whatever narrowing it applied. The override also has
+# to call none of the narrowing manager methods and to name no request user of
+# its own, so a queryset that filters, excludes or empties itself is not
+# reported.
+#
+# Both conjuncts are needed, and the third and fourth tests below are the real
+# code that proves it. jumpserver's own SuperTicketStatusAPI derives from
+# rest_framework.generics.RetrieveDestroyAPIView and returns
+# Ticket.objects.all(); it is rejected because the base is a framework generic.
+# AdminConnectionTokenViewSet derives from ConnectionTokenViewSet exactly as the
+# vulnerable class does, but its override keeps the owner filter, and it is
+# rejected because the queryset calls filter.
+#
+# Measured on the real checkout, bounded (timeout 180, --max-ram 4GB,
+# --cache off). apps/authentication at the vulnerable parent (134 python files)
+# reports 173 findings, one of them VYQL-AUTH-095 at
+# api/connection_token.py:574; the same directory at the fix commit reports 172,
+# the same set minus that finding. The whole repository exceeds the 180s bound,
+# so the app holding the changed file is the real-checkout evidence. False
+# positives: sweeping every other app under jumpserver/apps one directory at a
+# time reports VYQL-AUTH-095 zero times, and so do InvenTree (547 python files
+# of Django and Django REST Framework, swept per app), ironic/api,
+# ironic/common and IPython/core.
+
+test "rank1247: the subclass override returns the unfiltered manager the base class narrowed to the request user"
+  lang python
+  file connection_token.py
+  expect VYQL-AUTH-095
+  code
+  ```
+  from django.shortcuts import get_object_or_404
+  from django.utils import timezone
+  from rest_framework import status
+  from rest_framework.decorators import action
+  from rest_framework.exceptions import PermissionDenied
+  from rest_framework.response import Response
+
+  from common.api import JMSModelViewSet
+  from orgs.mixins.api import RootOrgViewMixin
+  from ..models import ConnectionToken
+  from ..serializers import ConnectionTokenSerializer, SuperConnectionTokenSerializer
+
+
+  class ConnectionTokenViewSet(RootOrgViewMixin, JMSModelViewSet):
+      serializer_classes = {
+          'default': ConnectionTokenSerializer,
+      }
+      rbac_perms = {
+          'list': 'authentication.view_connectiontoken',
+          'retrieve': 'authentication.view_connectiontoken',
+          'create': 'authentication.add_connectiontoken',
+      }
+
+      def get_queryset(self):
+          queryset = ConnectionToken.objects \
+              .filter(user=self.request.user) \
+              .filter(date_expired__gt=timezone.now())
+          return queryset
+
+      def get_user(self, serializer):
+          return self.request.user
+
+
+  class SuperConnectionTokenViewSet(ConnectionTokenViewSet):
+      serializer_classes = {
+          'default': SuperConnectionTokenSerializer,
+      }
+      rbac_perms = {
+          'create': 'authentication.add_superconnectiontoken',
+          'renewal': 'authentication.add_superconnectiontoken',
+          'check': 'authentication.view_superconnectiontoken',
+          'get_secret_detail': 'authentication.view_superconnectiontokensecret',
+      }
+
+      def get_queryset(self):
+          return ConnectionToken.objects.all()
+
+      def get_user(self, serializer):
+          return serializer.validated_data.get('user')
+
+      @action(methods=['GET'], detail=True, url_path='check')
+      def check(self, request, *args, **kwargs):
+          instance = self.get_object()
+          return Response(data={'detail': 'OK', 'expired': instance.is_expired})
+
+      @action(methods=['POST'], detail=False, url_path='secret')
+      def get_secret_detail(self, request, *args, **kwargs):
+          rbac_perm = 'authentication.view_superconnectiontokensecret'
+          if not request.user.has_perm(rbac_perm):
+              raise PermissionDenied('Not allow to view secret')
+          token_id = request.data.get('id') or ''
+          token = ConnectionToken.get_typed_connection_token(token_id)
+          serializer = self.get_serializer(instance=token)
+          return Response(serializer.data, status=status.HTTP_200_OK)
+  ```
+
+test "rank1247: the fix empties the list queryset and fetches one token by primary key"
+  lang python
+  file connection_token.py
+  reject VYQL-AUTH-095
+  code
+  ```
+  from django.shortcuts import get_object_or_404
+  from django.utils import timezone
+  from rest_framework import status
+  from rest_framework.decorators import action
+  from rest_framework.exceptions import PermissionDenied
+  from rest_framework.response import Response
+
+  from common.api import JMSModelViewSet
+  from orgs.mixins.api import RootOrgViewMixin
+  from ..models import ConnectionToken
+  from ..serializers import ConnectionTokenSerializer, SuperConnectionTokenSerializer
+
+
+  class ConnectionTokenViewSet(RootOrgViewMixin, JMSModelViewSet):
+      serializer_classes = {
+          'default': ConnectionTokenSerializer,
+      }
+      rbac_perms = {
+          'list': 'authentication.view_connectiontoken',
+          'retrieve': 'authentication.view_connectiontoken',
+          'create': 'authentication.add_connectiontoken',
+      }
+
+      def get_queryset(self):
+          queryset = ConnectionToken.objects \
+              .filter(user=self.request.user) \
+              .filter(date_expired__gt=timezone.now())
+          return queryset
+
+      def get_user(self, serializer):
+          return self.request.user
+
+
+  class SuperConnectionTokenViewSet(ConnectionTokenViewSet):
+      serializer_classes = {
+          'default': SuperConnectionTokenSerializer,
+      }
+      rbac_perms = {
+          'create': 'authentication.add_superconnectiontoken',
+          'renewal': 'authentication.add_superconnectiontoken',
+          'list': 'authentication.view_superconnectiontoken',
+          'check': 'authentication.view_superconnectiontoken',
+          'retrieve': 'authentication.view_superconnectiontoken',
+          'get_secret_detail': 'authentication.view_superconnectiontokensecret',
+      }
+
+      def get_queryset(self):
+          return ConnectionToken.objects.none()
+
+      def get_object(self):
+          pk = self.kwargs.get(self.lookup_field)
+          token = get_object_or_404(ConnectionToken, pk=pk)
+          return token
+
+      def get_user(self, serializer):
+          return serializer.validated_data.get('user')
+
+      @action(methods=['GET'], detail=True, url_path='check')
+      def check(self, request, *args, **kwargs):
+          instance = self.get_object()
+          return Response(data={'detail': 'OK', 'expired': instance.is_expired})
+
+      @action(methods=['POST'], detail=False, url_path='secret')
+      def get_secret_detail(self, request, *args, **kwargs):
+          rbac_perm = 'authentication.view_superconnectiontokensecret'
+          if not request.user.has_perm(rbac_perm):
+              raise PermissionDenied('Not allow to view secret')
+          token_id = request.data.get('id') or ''
+          token = ConnectionToken.get_typed_connection_token(token_id)
+          serializer = self.get_serializer(instance=token)
+          return Response(serializer.data, status=status.HTTP_200_OK)
+  ```
+
+test "rank1247: a view deriving straight from a framework generic keeps the unfiltered manager"
+  lang python
+  file super_ticket.py
+  reject VYQL-AUTH-095
+  code
+  ```
+  from rest_framework.generics import RetrieveDestroyAPIView
+
+  from orgs.utils import tmp_to_root_org
+  from ..models import Ticket
+  from ..serializers import SuperTicketSerializer
+
+
+  class SuperTicketStatusAPI(RetrieveDestroyAPIView):
+      serializer_class = SuperTicketSerializer
+      rbac_perms = {
+          'GET': 'tickets.view_superticket',
+          'DELETE': 'tickets.change_superticket'
+      }
+
+      def get_queryset(self):
+          with tmp_to_root_org():
+              return Ticket.objects.all()
+
+      def perform_destroy(self, instance):
+          instance.close()
+  ```
+
+test "rank1247: a subclass override that keeps the owner filter stays silent"
+  lang python
+  file admin_connection_token.py
+  reject VYQL-AUTH-095
+  code
+  ```
+  from ..models import AdminConnectionToken, ConnectionToken
+  from ..serializers import AdminConnectionTokenSerializer, ConnectionTokenSerializer
+  from common.api import JMSModelViewSet
+
+
+  class ConnectionTokenViewSet(JMSModelViewSet):
+      serializer_classes = {
+          'default': ConnectionTokenSerializer,
+      }
+
+      def get_queryset(self):
+          return ConnectionToken.objects.filter(user=self.request.user)
+
+
+  class AdminConnectionTokenViewSet(ConnectionTokenViewSet):
+      serializer_classes = {
+          'default': AdminConnectionTokenSerializer,
+      }
+
+      def check_permissions(self, request):
+          user = request.user
+          if not user.is_superuser:
+              self.permission_denied(request)
+
+      def get_queryset(self):
+          return AdminConnectionToken.objects.all().filter(user=self.request.user)
+  ```

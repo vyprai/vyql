@@ -1,0 +1,30 @@
+module bindings.python.viewset_queryset_owner_scope;
+
+// Django REST Framework resolves the rows a request may reach through the
+// view's get_queryset(), and its documentation gives one way to keep a
+// per-owner resource private: return the model manager narrowed against
+// self.request.user. A view class that derives from another application view
+// class rather than from one of the framework's own generic views inherits that
+// class's get_queryset(), so an override returning the bare manager replaces
+// whatever narrowing the inherited one applied, on the list route and on the
+// detail route alike.
+//
+// Deriving straight from a framework generic view or viewset is excluded,
+// because there the unfiltered manager is the documented default shape and the
+// view's permission classes are what decide who may reach it. The override also
+// has to call none of the narrowing manager methods and to name no request user
+// itself, so a queryset that filters, excludes or empties itself is left alone.
+// A permission check elsewhere in the class does not suppress it, because such
+// a check gates the route and not the rows the route then returns.
+binding viewsetQuerysetOwnerScopeDroppedInOverride {
+  query pattern presenceNode where node.scope == "function"
+    and node.token contains "lang=python"
+    and node.context.functionName == "get_queryset"
+    and node.token contains "class_base:"
+    and node.context.callPath contains ".objects.all"
+    and node.context.call == "all"
+    and not (node.context.call in ["filter", "exclude", "none", "filter_by", "get_queryset", "for_user", "get_queryset_for_user"])
+    and not (node.context.selector contains "request.user")
+    and not containsAny(node.context.classBase, ["APIView", "GenericAPIView", "CreateAPIView", "ListAPIView", "RetrieveAPIView", "DestroyAPIView", "UpdateAPIView", "ListCreateAPIView", "RetrieveUpdateAPIView", "RetrieveDestroyAPIView", "RetrieveUpdateDestroyAPIView", "ViewSet", "GenericViewSet", "ModelViewSet", "ReadOnlyModelViewSet", "ViewSetMixin", "ListModelMixin", "RetrieveModelMixin", "CreateModelMixin", "UpdateModelMixin", "DestroyModelMixin", "View", "TemplateView", "RedirectView", "ListView", "DetailView", "FormView", "CreateView", "UpdateView", "DeleteView", "SingleObjectMixin", "MultipleObjectMixin"])
+  emit issue code.UnboundAuthorizationTarget at node
+}
