@@ -1,0 +1,21 @@
+module bindings.php.generated.mopencartrequest;
+
+binding httpInputRequestGet {
+  query pattern callExpr where callee.path ~= "request.get.__subscript"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInputRequestPost {
+  query pattern callExpr where callee.path ~= "request.post.__subscript"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInputRequestServer {
+  query pattern callExpr where callee.path ~= "request.server.__subscript"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInputRequestCookie {
+  query pattern callExpr where callee.path ~= "request.cookie.__subscript"
+  emit source code.HttpInput at call.result
+}

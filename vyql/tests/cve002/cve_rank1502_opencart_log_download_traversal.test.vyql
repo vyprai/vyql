@@ -1,0 +1,125 @@
+# Rank 1502 / CVE-2023-2315: OpenCart's admin log tool took the name of the
+# file to read from the request, and one of its two entry points used it with
+# no restriction at all (CWE-22, CWE-20). download() in
+# upload/admin/controller/tool/log.php did
+#
+#   $filename = (string)$this->request->get['filename'];
+#   $file = DIR_LOGS . $filename;
+#   ... fopen($file, 'r') ... readfile-style streaming to the response
+#
+# so an administrator-level request with filename=../../config.php (the tool
+# sits behind the admin pane, but the value is still request-controlled) read
+# any file the process could reach. The sibling entry point, the log viewer's
+# getOutput(), used basename() on the request value, which stops traversal
+# written plainly -- but the same fix had to wrap it in
+# html_entity_decode(..., ENT_QUOTES, 'UTF-8') as well, because a filename
+# carrying HTML entities (&#46;&#46;&#47; or &sol;) survives basename() and
+# decodes into ../ only afterwards, so basename alone under-matched. Pool
+# commit 0a8dd91e38 is the real fix (COMMIT_OK, authored by OpenCart's
+# maintainer, one file): both entry points now take
+# basename(html_entity_decode($this->request->get['filename'], ENT_QUOTES,
+# 'UTF-8')). No pool correction.
+#
+# FIXED by a source binding. The file read side was already covered -- the
+# scan labels code.FilePathAccess at both fopen sites and core.PathCanonicalization
+# at the existing basename() -- but nothing labelled
+# $this->request->get['filename'], OpenCart's engine exposing query, post,
+# server and cookie parameters as public arrays on \Opencart\System\Library\
+# Request, so no source existed in any PHP binding. vyql/bindings/php/
+# mopencartrequest.vyql now emits code.HttpInput for request.get/post/server/
+# cookie subscripts, which is what the framework's documentation describes
+# them as and nothing more. Measured on the real file: the vulnerable revision
+# goes from 1 finding to 2, adding VYQL-PATH-001 at high confidence with
+# source code.HttpInput at log.php:143, sink code.FilePathAccess at
+# log.php:161 and the unless clause unsatisfied, exactly the download() path;
+# the fixed revision reports no PATH row, both entry points now carrying the
+# basename control. What this does not cover is the entity-decode half of the
+# fix: basename() alone is treated as canonicalization, so the pre-fix
+# getOutput(), whose entity-encoded bypass is real, is suppressed -- the
+# ordering of decode-after-basename is not expressible with current controls
+# and is not being invented for one rank.
+#
+# verify_current_expected: fixed-source-binding
+
+test "rank1502: the download streams a file named by the request with no restriction"
+  lang php
+  file upload/admin/controller/tool/log.php
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+  namespace Opencart\Admin\Controller\Tool;
+
+  class Log extends \Opencart\System\Engine\Controller {
+      public function download(): void {
+          $this->load->language('tool/log');
+
+          if (isset($this->request->get['filename'])) {
+              $filename = (string)$this->request->get['filename'];
+          } else {
+              $filename = '';
+          }
+
+          $file = DIR_LOGS . $filename;
+
+          if (is_file($file) && filesize($file)) {
+              $handle = fopen($file, 'r');
+              fread($handle, filesize($file));
+              fclose($handle);
+          }
+      }
+  }
+  ```
+
+test "rank1502: the fix decodes entities and takes the basename in both entry points"
+  lang php
+  file upload/admin/controller/tool/log.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+  namespace Opencart\Admin\Controller\Tool;
+
+  class Log extends \Opencart\System\Engine\Controller {
+      public function download(): void {
+          $this->load->language('tool/log');
+
+          if (isset($this->request->get['filename'])) {
+              $filename = (string)basename(html_entity_decode($this->request->get['filename'], ENT_QUOTES, 'UTF-8'));
+          } else {
+              $filename = '';
+          }
+
+          $file = DIR_LOGS . $filename;
+
+          if (is_file($file) && filesize($file)) {
+              $handle = fopen($file, 'r');
+              fread($handle, filesize($file));
+              fclose($handle);
+          }
+      }
+  }
+  ```
+
+test "rank1502: the log viewer's basename guard suppresses the plain traversal form"
+  lang php
+  file upload/admin/controller/tool/log.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+  namespace Opencart\Admin\Controller\Tool;
+
+  class Log extends \Opencart\System\Engine\Controller {
+      public function getOutput(): string {
+          if (isset($this->request->get['filename'])) {
+              $filename = (string)basename($this->request->get['filename']);
+          } else {
+              $filename = '';
+          }
+
+          $file = DIR_LOGS . $filename;
+          return file_get_contents($file);
+      }
+  }
+  ```
