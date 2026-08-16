@@ -1,0 +1,137 @@
+# Rank 1224 / CVE-2024-37358: Apache James's IMAP frame reader consumed a
+# request line one byte at a time with no cap on how long that line could
+# grow (CWE-400, GHSA-c5wf-8fj8-4j3q). NettyImapRequestLineReader.nextChar()
+# increments a per-connection `read` counter on every byte pulled off the
+# Netty ChannelBuffer, but the vulnerable form never compares that counter
+# against anything -- a pre-authentication client that keeps sending bytes
+# without a CRLF or a declared IMAP literal drives the frame decoder's
+# cumulation buffer arbitrarily large, since ImapRequestLineReader's tag/
+# command/argument parsers all loop by repeatedly calling nextChar() until a
+# delimiter appears.
+#
+# Pool commit b2f3c06edf carries no flag; read its diff per Step 0's note
+# that flags are not the only source of pool errors, and confirmed it is the
+# real, targeted fix: it touches exactly IMAPServer.java,
+# ImapRequestFrameDecoder.java, NettyImapRequestLineReader.java and that
+# class's test, all under
+# server/protocols/protocols-imap4/src/main/java/org/apache/james/imapserver/netty,
+# threading a new maxFrameLength constructor parameter down to nextChar(),
+# which now throws once `read > maxFrameLength`. The same commit also scopes
+# the literal-size limit itself to a small fixed default
+# (UNAUTHENTICATE_LITERAL_MAX_SIZE, 8192) for any session that is not yet
+# authenticated, but the line-length cap modelled here is the one added to
+# nextChar() -- the unbounded-accumulation shape a rule can express, as
+# opposed to the pre-auth-vs-post-auth trust distinction the second half adds.
+#
+# ATTENTION, engine gap, the same gap rank 1192 already isolated and entered
+# in ENGINE-GAPS.md. vyql match on a minimal pair reproducing nextChar()
+# verbatim from both revisions labels nothing at all -- no source, sink, or
+# issue on either one -- and vyql resolve shows every call inside the method
+# (buffer.readable, the constructor's own class/function context) terminating
+# unresolved, not a known source/sink/control. vyql scan --cache off
+# --max-ram 4GB over the real protocols-imap4 module (23 java files, both
+# revisions) reports zero findings on either side.
+#
+# Checked for reuse first: code.UnboundedAllocationReview (VYQL-DOS-041,
+# CWE_400/770) is the right concept by CWE and by its own review text --
+# "review allocation sizes derived from parsed counts for per-item limits,
+# aggregate consistency checks, and overflow" describes exactly this counter
+# -- but every language that binds it does so from a dedicated per-language
+# analysis fact (C's allocation.unbounded_accumulated_count, Rust's
+# rustReview == "unbounded_next_await", PHP's phpReview ==
+# "unbounded_report_period"), never from presenceNode's flat context bag
+# alone, and Java has none, confirmed at rank 1192 and unchanged since: the
+# only literal names available in nextChar() are "read", "buffer" and
+# "readable" -- ordinary field and method names that also appear in any
+# byte-counting read loop, safe or not -- and presenceNode's context bag has
+# no notion of loop structure or of an identity between the counter that is
+# incremented and a bound it is (or is not) compared against, the two facts
+# C's dedicated analysis correlates for the allocation case. This is not a
+# new gap to enter separately: it is the same missing Java analogue of
+# ccUnboundedAccumulatedAllocationObservations that rank 1192's
+# ENGINE-GAPS.md entry already names, so no new entry is added here -- see
+# that entry for the fix shape. No definition change attempted, per this
+# loop's instruction not to do engine work.
+#
+# verify_current_expected: attention-engine-gap, both revisions reject VYQL-DOS-041.
+
+test "rank1224: nextChar increments a byte counter with no upper bound on line length"
+  lang java
+  file NettyImapRequestLineReader.java
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  public class NettyImapRequestLineReader extends AbstractNettyImapRequestLineReader {
+
+      private final ChannelBuffer buffer;
+      private int read = 0;
+      private final int maxLiteralSize;
+
+      public NettyImapRequestLineReader(Channel channel, ChannelBuffer buffer, boolean retry, int maxLiteralSize) {
+          super(channel, retry);
+          this.buffer = buffer;
+          this.maxLiteralSize = maxLiteralSize;
+      }
+
+      @Override
+      public char nextChar() throws DecodingException {
+          if (!nextSeen) {
+              int next;
+
+              if (buffer.readable()) {
+                  next = buffer.readByte();
+                  read++;
+              } else {
+                  throw new NotEnoughDataException();
+              }
+              nextSeen = true;
+              nextChar = (char) next;
+          }
+          return nextChar;
+      }
+  }
+  ```
+
+test "rank1224: nextChar rejects once the counter passes maxFrameLength"
+  lang java
+  file NettyImapRequestLineReader.java
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  public class NettyImapRequestLineReader extends AbstractNettyImapRequestLineReader {
+
+      private final ChannelBuffer buffer;
+      private int read = 0;
+      private final int maxLiteralSize;
+      private final int maxFrameLength;
+
+      public NettyImapRequestLineReader(Channel channel, ChannelBuffer buffer, boolean retry, int maxLiteralSize, int maxFrameLength) {
+          super(channel, retry);
+          this.buffer = buffer;
+          this.maxLiteralSize = maxLiteralSize;
+          this.maxFrameLength = maxFrameLength;
+      }
+
+      @Override
+      public char nextChar() throws DecodingException {
+          if (!nextSeen) {
+              int next;
+
+              if (buffer.readable()) {
+                  next = buffer.readByte();
+                  read++;
+                  if (read > maxFrameLength) {
+                      throw new DecodingException(HumanReadableText.FAILED, "Line length exceeded.");
+                  }
+              } else {
+                  throw new NotEnoughDataException();
+              }
+              nextSeen = true;
+              nextChar = (char) next;
+          }
+          return nextChar;
+      }
+  }
+  ```
