@@ -1,0 +1,64 @@
+# jQuery Validation's `url` and `url2` methods validate a value with the widely
+# copied "dperini" URL regex (gist 729294). Its userinfo segment is written
+# `(?:\S+(?::\S*)?@)?`: `\S` matches `:` and `@` as well as everything else, so
+# `\S+` and `\S*` both compete for the same run of characters, and the optional
+# group adds a second split point. When the input has no `@`, the engine must
+# try every partition of the run between `\S+`, the literal `:` and `\S*` before
+# the group can fail, so match time grows super-linearly in the length of the
+# value. A form field long enough to be pasted is enough to freeze the page
+# (CWE-1333, CWE-400).
+#
+# The fix replaces `\S` in both halves of the userinfo segment with an explicit
+# character class that excludes `:` and `@` and allows only percent-escapes
+# beside it, `(?:[^\][?/<~#`!@$^&*()+=}|:";',>{ ]|%[0-9A-Fa-f]{2})`. The two
+# repetitions can then no longer match the same character, so the partition is
+# forced and the ambiguity is gone.
+#
+# The same userinfo segment appears verbatim in every library that copied the
+# dperini regex, so the binding names that segment and nothing about this
+# project. It matches the ambiguous `\S` form and not the character-class form,
+# which is the whole difference between the two revisions.
+
+test "javascript: a url regex whose userinfo repeats \\S on both sides of the colon"
+  lang javascript
+  profile library
+  expect VYQL-DOS-003
+  code
+  ```
+  $.validator.addMethod( "url", function( value, element ) {
+  	return this.optional( element ) || /^(?:(?:(?:https?|ftp):)?\/\/)(?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z0-9¡-￿][a-z0-9¡-￿_-]{0,62})?[a-z0-9¡-￿]\.)+(?:[a-z¡-￿]{2,}\.?))(?::\d{2,5})?(?:[/?#]\S*)?$/i.test( value );
+  } );
+  ```
+
+test "javascript: the same url regex with a userinfo class that excludes : and @"
+  lang javascript
+  profile library
+  reject VYQL-DOS-003
+  code
+  ```
+  $.validator.addMethod( "url", function( value, element ) {
+  	return this.optional( element ) || /^(?:(?:(?:https?|ftp):)?\/\/)(?:(?:[^\]\[?\/<~#`!@$^&*()+=}|:";',>{ ]|%[0-9A-Fa-f]{2})+(?::(?:[^\]\[?\/<~#`!@$^&*()+=}|:";',>{ ]|%[0-9A-Fa-f]{2})*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z0-9¡-￿][a-z0-9¡-￿_-]{0,62})?[a-z0-9¡-￿]\.)+(?:[a-z¡-￿]{2,}\.?))(?::\d{2,5})?(?:[/?#]\S*)?$/i.test( value );
+  } );
+  ```
+
+test "javascript: the url2 variant carries the same userinfo segment"
+  lang javascript
+  profile library
+  expect VYQL-DOS-003
+  code
+  ```
+  $.validator.addMethod( "url2", function( value, element ) {
+  	return this.optional( element ) || /^(?:(?:(?:https?|ftp):)?\/\/)(?:\S+(?::\S*)?@)?(?:(?:[a-z0-9¡-￿][a-z0-9¡-￿_-]{0,62})?[a-z0-9¡-￿]\.?)+(?:[a-z¡-￿]{2,}\.?)(?::\d{2,5})?(?:[/?#]\S*)?$/i.test( value );
+  } );
+  ```
+
+test "javascript: a url regex with no userinfo segment at all is not reported"
+  lang javascript
+  profile library
+  reject VYQL-DOS-003
+  code
+  ```
+  $.validator.addMethod( "url", function( value, element ) {
+  	return this.optional( element ) || /^(?:(?:(?:https?|ftp):)?\/\/)(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z0-9¡-￿][a-z0-9¡-￿_-]{0,62})?[a-z0-9¡-￿]\.)+(?:[a-z¡-￿]{2,}\.?))(?::\d{2,5})?(?:[/?#]\S*)?$/i.test( value );
+  } );
+  ```

@@ -4008,3 +4008,9 @@ binding recursionGuardIndexedByUnnormalizedKey910 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.subscript contains "jQuery.attrHooks[name.toLowerCase()]" and node.context.subscript contains "attrHandle[name]" and node.context.callPath contains "jQuery.find.attr" and node.context.callPath contains "name.toLowerCase" and not (node.context.subscript contains "attrHandle[lowercaseName]") and not (node.context.assign contains "name=name.toLowerCase()")
   emit issue code.RecursionGuardIndexedByUnnormalizedKey at node
 }
+
+binding catastrophicRegex911 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.literal contains "\\S+(?::\\S*)?@"
+  emit issue code.CatastrophicRegex at node
+  emit sink code.CatastrophicRegexSink at node
+}
