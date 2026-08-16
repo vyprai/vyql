@@ -1,0 +1,355 @@
+# Rank 1204 / CVE-2026-4755: ImageMagick's OpenBlob (magick/blob.c) treats any
+# image filename beginning with '|' as a command to pipe through popen_utf8,
+# a thin wrapper around popen() (magick/utility-private.h). Before piping it
+# runs the string through SanitizeString (magick/string.c), whose allowlist
+# --
+#   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 "
+#   "$-_.+!*'(),{}|\\^~[]`\"><#%;/?:@&="
+# -- passes backtick and double-quote through unescaped (CWE-78, surfaced
+# under CWE-20 by the advisory database because the fix gates on input
+# shape rather than escaping). Fix 58bef0396a04e07aad650d1416af6b4e11da5740
+# (`git show`, magick/blob.c only) changes line 2737's
+#   if (*filename == '|')
+# to
+#   if ((*filename == '|') && (strchr(filename,'`') == (char *) NULL) &&
+#       (strchr(filename,'"') == (char *) NULL))
+# so a filename carrying either character is never treated as a pipe command
+# at all, closing the specific escape SanitizeString's allowlist leaves open.
+#
+# `nocommit` flag resolved: 58bef0396a is the real, targeted fix, not a
+# release bump. It touches exactly magick/blob.c, three lines, in OpenBlob.
+# CVE-2026-4755 (NVD, published 2026-03-24) is assigned against
+# MolotovCherry/Android-ImageMagick7, a downstream clone; its own fix
+# (github.com/MolotovCherry/Android-ImageMagick7/pull/193, merged
+# 2025-12-19) states in its description that it is "the original security
+# patch from ImageMagick6 (commit 58bef03)" applied to a clone that had
+# fallen out of sync with upstream, and cites the same upstream issue
+# (ImageMagick/ImageMagick#6339) and GHSA-47q6-hqqr-mcr3 this row's fix
+# commit message links. This is the "umbrella/rename" case from Step 0: the
+# pool row already points at the canonical upstream project and its
+# canonical fix commit, which is the better scan target, so no pool.tsv
+# correction is needed.
+#
+# ATTENTION, engine gap -- two, both in the C/C++ frontend, and both are on
+# the critical path of this CVE's own call chain, so fixing only one would
+# not be enough to catch rank 1204.
+#
+# 1. Non-identifier assignment targets are dropped everywhere in the C/C++
+#    frontend, for both a plain `=` and the copy-primitive calls
+#    (`internal/extract/frontend/treesitter/c.go`, `exprStmt`'s
+#    `assignment_expression` case at ~1146 accepts only `left.Kind() ==
+#    "identifier"` and otherwise falls through to `assignmentFallback`,
+#    which evaluates the left and right sides as two independent, connected
+#    -to-nothing `ExprStmt`s; the `cPropagators`/`cReaders` special-casing
+#    for `strcpy`/`sprintf`/`memcpy`/... at ~1160 uses the same
+#    identifier-only test via `destName`, ~1236). A struct field written
+#    through either path -- `obj.field = x`, `obj->field = x`,
+#    `strcpy(obj.field, x)` -- never becomes an assignment target the NIR
+#    or the taint solver can see, so nothing downstream ever reads it as
+#    tainted, regardless of what was written. Isolated with a CVE-independent
+#    pair reusing the shipped `VYQL-INJ-002` pipeline unchanged: two chained
+#    `strcpy` calls through a plain local (`strcpy(buf1,argv[1]);
+#    strcpy(buf2,buf1); system(buf2);`) reports VYQL-INJ-002; the identical
+#    shape with the intermediate hop written into a struct field instead of
+#    a second local (`strcpy(info.filename,argv[1]); strcpy(buf,
+#    info.filename); system(buf);`) reports nothing. A plain assignment into
+#    the field instead of a `strcpy` (`info.filename=argv[1];
+#    strcpy(buf,info.filename); system(buf);`) reports nothing either, so
+#    this is the assignment-target gap, not something specific to copy
+#    primitives.
+# 2. Project-defined copy helpers with no recognized primitive in their own
+#    body are invisible regardless of (1). ImageMagick copies strings with
+#    its own `CopyMagickString` (magick/string.c:765) almost everywhere,
+#    including the exact call this CVE's vulnerable code depends on
+#    (`(void) CopyMagickString(filename,image->filename,MagickPathExtent);`,
+#    magick/blob.c:2691, inside OpenBlob, immediately before the `if
+#    (*filename == '|')` this fix changes). `CopyMagickString`'s body is a
+#    hand-rolled `*q++=*p++` pointer-walk loop, not a call to `strcpy` or any
+#    other name in `cPropagators`/`cReaders`, so it is not recognized as a
+#    propagator by name, and its body contains no recognized primitive for
+#    interprocedural resolution to fall through to either (contrast
+#    `popen_utf8`, whose body literally calls `popen`, which resolves fine
+#    with both files in scope). Isolated with a CVE-independent pair, same
+#    `VYQL-INJ-002` pipeline: `strcpy(filename,argv[1]); system(filename);`
+#    reports VYQL-INJ-002; replacing only the copy call with a project
+#    -defined function of the identical `*q++=*p++` loop shape reports
+#    nothing, argv[1] unchanged, system(filename) unchanged.
+#
+# Recognizing (1) means representing field/array/pointer-dereference
+# lvalues as assignment targets in NIR (today `nir.Assign.Targets` is
+# `[]string`, identifier-only) and having the taint solver key state by that
+# path instead of a bare name -- a structural extension to the IR and
+# solver, not a bounded function patch. Recognizing (2) means either
+# maintaining a per-project allow-list of copy-helper names (does not
+# generalize past the projects reviewed) or recognizing the pointer-walk
+# loop shape structurally (real pattern-detection work: telling a copy loop
+# apart from a hash loop, a validation loop, or a transform loop that
+# happens to touch two pointers). Both are recorded under ENGINE-GAPS.md's
+# non-mechanical section rather than the mechanical table for this reason.
+# No definition change attempted.
+#
+# Aside, not part of this CVE: the full, bounded repo scan (`timeout 180
+# --max-ram 4GB --cache off`) does report `VYQL-INJ-002` with sink
+# `magick/utility-private.h:187` (the `popen()` call inside `popen_utf8`'s
+# own body) on both the vulnerable and the fixed revision alike -- but its
+# source is `code.CliArgument @ magick/string.c:2089`, which is
+# `argv[i]=(char *) AcquireQuantumMemory(...)` inside `StringToArgv`'s own
+# tokenizer, a *local variable* named `argv` unrelated to a process's
+# command-line vector. The `callee.path ~= "argv"` binding matches on the
+# identifier alone, and the path from there to `popen_utf8` runs entirely
+# through generic allocator/deallocator calls
+# (`AcquireQuantumMemory`/`AcquireMagickMemory`/`RelinquishMagickMemory`)
+# shared by unrelated call sites across the codebase, which is what a
+# context-insensitive interprocedural merge produces, not a real value
+# flow. Confirmed the same finding persists with `magick/delegate.c`
+# excluded from the scan entirely, which rules out delegate.c's own
+# (separate, CWE-78, unpatched by this commit) `SanitizeString`-then
+# -`popen_utf8` call as the source of it too. This finding is not evidence
+# this CVE is caught; it is a precision artifact worth a future session's
+# attention but not swept here.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1204: OpenBlob pipes an unrestricted filename through popen after SanitizeString"
+  lang c
+  file magick_blob_vuln.c
+  reject VYQL-INJ-002
+  code
+  ```
+  #include <stdio.h>
+  #include <string.h>
+
+  typedef struct _ImageInfo { char filename[4096]; } ImageInfo;
+  typedef struct _Image { char filename[4096]; } Image;
+
+  extern char *SanitizeString(const char *source);
+  extern char *DestroyString(char *string);
+
+  static size_t CopyMagickString(char *destination,const char *source,
+    const size_t length)
+  {
+    char *q;
+    const char *p;
+    size_t n;
+
+    p=source;
+    q=destination;
+    for (n=length; n != 0; n--)
+      if (((*q++)=(*p++)) == '\0')
+        return((size_t) (p-source-1));
+    return((size_t) (p-source));
+  }
+
+  static inline FILE *popen_utf8(const char *command,const char *type)
+  {
+    return popen(command,type);
+  }
+
+  static int OpenBlob(const ImageInfo *image_info,Image *image)
+  {
+    char
+      filename[4096];
+
+    *filename='\0';
+    (void) CopyMagickString(filename,image->filename,4096);
+    if (*filename == '|')
+      {
+        char
+          fileMode[4096],
+          *sanitize_command;
+
+        *fileMode='r';
+        fileMode[1]='\0';
+        sanitize_command=SanitizeString(filename+1);
+        (void) popen_utf8(sanitize_command,fileMode);
+        sanitize_command=DestroyString(sanitize_command);
+        return 1;
+      }
+    return 0;
+  }
+
+  int main(int argc,char **argv)
+  {
+    ImageInfo image_info;
+    Image image;
+
+    (void) CopyMagickString(image_info.filename,argv[1],4096);
+    (void) CopyMagickString(image.filename,image_info.filename,4096);
+    return OpenBlob(&image_info,&image);
+  }
+  ```
+
+test "rank1204: OpenBlob refuses to pipe a filename carrying a backtick or a double-quote"
+  lang c
+  file magick_blob_fixed.c
+  reject VYQL-INJ-002
+  code
+  ```
+  #include <stdio.h>
+  #include <string.h>
+
+  typedef struct _ImageInfo { char filename[4096]; } ImageInfo;
+  typedef struct _Image { char filename[4096]; } Image;
+
+  extern char *SanitizeString(const char *source);
+  extern char *DestroyString(char *string);
+
+  static size_t CopyMagickString(char *destination,const char *source,
+    const size_t length)
+  {
+    char *q;
+    const char *p;
+    size_t n;
+
+    p=source;
+    q=destination;
+    for (n=length; n != 0; n--)
+      if (((*q++)=(*p++)) == '\0')
+        return((size_t) (p-source-1));
+    return((size_t) (p-source));
+  }
+
+  static inline FILE *popen_utf8(const char *command,const char *type)
+  {
+    return popen(command,type);
+  }
+
+  static int OpenBlob(const ImageInfo *image_info,Image *image)
+  {
+    char
+      filename[4096];
+
+    *filename='\0';
+    (void) CopyMagickString(filename,image->filename,4096);
+    if ((*filename == '|') && (strchr(filename,'`') == (char *) NULL) &&
+        (strchr(filename,'"') == (char *) NULL))
+      {
+        char
+          fileMode[4096],
+          *sanitize_command;
+
+        *fileMode='r';
+        fileMode[1]='\0';
+        sanitize_command=SanitizeString(filename+1);
+        (void) popen_utf8(sanitize_command,fileMode);
+        sanitize_command=DestroyString(sanitize_command);
+        return 1;
+      }
+    return 0;
+  }
+
+  int main(int argc,char **argv)
+  {
+    ImageInfo image_info;
+    Image image;
+
+    (void) CopyMagickString(image_info.filename,argv[1],4096);
+    (void) CopyMagickString(image.filename,image_info.filename,4096);
+    return OpenBlob(&image_info,&image);
+  }
+  ```
+
+# Isolating pair 1 (CVE-independent, existing pipeline, no ImageMagick API
+# named): a struct field carries the taint that two chained locals do not
+# lose -- gap (1) above.
+
+test "rank1204: two chained locals through strcpy still reach the sink"
+  lang c
+  file chained_locals.c
+  expect VYQL-INJ-002
+  code
+  ```
+  #include <string.h>
+  #include <stdlib.h>
+
+  int main(int argc,char **argv)
+  {
+    char buf1[256];
+    char buf2[256];
+
+    strcpy(buf1,argv[1]);
+    strcpy(buf2,buf1);
+    system(buf2);
+    return 0;
+  }
+  ```
+
+test "rank1204: the identical chain through a struct field instead of a second local is invisible"
+  lang c
+  file chained_field.c
+  reject VYQL-INJ-002
+  code
+  ```
+  #include <string.h>
+  #include <stdlib.h>
+
+  typedef struct { char filename[256]; } Info;
+
+  int main(int argc,char **argv)
+  {
+    Info info;
+    char buf[256];
+
+    strcpy(info.filename,argv[1]);
+    strcpy(buf,info.filename);
+    system(buf);
+    return 0;
+  }
+  ```
+
+# Isolating pair 2 (CVE-independent, existing pipeline, no ImageMagick API
+# named): a hand-rolled copy loop of the exact shape CopyMagickString uses
+# is invisible where the identical chain through strcpy is not -- gap (2)
+# above.
+
+test "rank1204: strcpy into a local still reaches the sink"
+  lang c
+  file strcpy_direct.c
+  expect VYQL-INJ-002
+  code
+  ```
+  #include <string.h>
+  #include <stdlib.h>
+
+  int main(int argc,char **argv)
+  {
+    char filename[256];
+
+    strcpy(filename,argv[1]);
+    system(filename);
+    return 0;
+  }
+  ```
+
+test "rank1204: a hand-rolled pointer-walk copy of the identical shape is invisible"
+  lang c
+  file handrolled_direct.c
+  reject VYQL-INJ-002
+  code
+  ```
+  #include <stdlib.h>
+
+  static size_t CopyMagickString(char *destination,const char *source,
+    const size_t length)
+  {
+    char *q;
+    const char *p;
+    size_t n;
+
+    p=source;
+    q=destination;
+    for (n=length; n != 0; n--)
+      if (((*q++)=(*p++)) == '\0')
+        return((size_t) (p-source-1));
+    return((size_t) (p-source));
+  }
+
+  int main(int argc,char **argv)
+  {
+    char filename[256];
+
+    (void) CopyMagickString(filename,argv[1],256);
+    system(filename);
+    return 0;
+  }
+  ```
