@@ -1,0 +1,265 @@
+# Rank 1217 / CVE-2026-32318: Cryptomator for iOS unlocks a Hub-backed vault by
+# reading the vault's own `vault.cryptomator` config file from cloud storage
+# (VaultDBManager.getUnverifiedVaultConfig, CryptomatorCommon/Sources/
+# CryptomatorCommonCore/Manager/VaultDBManager.swift) into an
+# UnverifiedVaultConfig -- "unverified" because its JWT signature is not yet
+# checked against the vault's own key at this point -- and then hands its
+# `allegedHubConfig` straight to the OAuth flow. HubAuthenticationCoordinator.
+# start() (CryptomatorCommon/Sources/CryptomatorCommonCore/Hub/
+# HubAuthenticationCoordinator.swift) does
+# `authState = try await authenticator.authenticate(with: hubConfig)` with no
+# check in between, and CryptomatorHubAuthenticator+HubAuthenticating.swift's
+# authenticate(with:from:) builds the OIDServiceConfiguration straight from
+# the config's own fields:
+#   guard let authorizationEndpoint = URL(string: hubConfig.authEndpoint) else { throw ... }
+#   guard let tokenEndpoint = URL(string: hubConfig.tokenEndpoint) else { throw ... }
+# Because the vault config file is attacker-alterable (anyone with write
+# access to the cloud storage holding the vault can edit vault.cryptomator),
+# an attacker can set authEndpoint to a legitimate identity provider and
+# tokenEndpoint to a server they control (or the reverse), so the OAuth code
+# exchange sends the victim's authorization code, and ultimately an access
+# token, to a host the vault's actual owner never approved (CWE-346, CWE-354,
+# CWE-451, CWE-923). Confirmed with `git diff 3aeeccc..d198171` inside the
+# fix's own merge (see below): CryptomatorHubAuthenticator+HubAuthenticating.
+# swift is untouched by the fix; the endpoints it builds are exactly as
+# attacker-influenced after 2.8.3 as before.
+#
+# Pool commit 83b27d78a1 (flagged commit?) is `Merge branch 'release/2.8.3'`,
+# a merge commit rather than a single authored commit, which is why the
+# metadata scan flagged it -- `git show 83b27d78a1 --stat` alone shows only
+# a version bump and localisation-file churn. But `git diff 3aeeccc..d198171`
+# (the merge's own two parents) shows the real fix squashed into that
+# release branch: new files HubHostTrustValidator.swift (101 lines) and
+# HubHostTrustValidatorTests.swift (297 lines), plus
+# HubAuthenticationCoordinator.swift gaining a checkHostTrust(hubConfig:)
+# call before authenticate(with:) that rejects the flow (or asks the user to
+# explicitly trust a new host) unless every URL involved -- the vault's own
+# base URL, hubConfig.getAPIBaseURL(), authEndpoint and tokenEndpoint --
+# share one authority already in CryptomatorUserDefaults.trustedHubAuthorities
+# or its own cryptomator.cloud allowlist. This is the actual GHSA-g7fr-c82r-
+# hm6j fix (WebSearch: "cryptomator.org/tags/vulnerability", GHSA advisory
+# text: "an integrity check vulnerability allows an attacker to tamper with
+# the vault configuration file leading to a man-in-the-middle vulnerability
+# in Hub key loading mechanism... patched in version 2.8.3"), so pool.tsv's
+# commit for rank 1217 is correct as recorded and needs no correction.
+#
+# ATTENTION, engine gap. `vyql resolve` on a two-file repro faithful to both
+# HubAuthenticationCoordinator.swift and CryptomatorHubAuthenticator+
+# HubAuthenticating.swift's real bodies (both revisions) shows 0 call sites
+# resolved inside authenticate(with:from:) -- neither `URL(string:
+# hubConfig.authEndpoint)` nor `URL(string: hubConfig.tokenEndpoint)` is
+# labelled at all, on either revision, because both sit inside a
+# `guard let X = EXPR else { throw ... }`. Root-caused with a tree-sitter AST
+# dump of `guard let u = URL(string: s) else { return }`: the guard's named
+# children are flat siblings -- `value_binding_pattern` ("let"),
+# `simple_identifier` ("u"), `call_expression` ("URL(string: s)"), `else`,
+# `statements` -- not a single wrapped condition node. swift.go's
+# `(*swConv).stmt`, case "if_statement", "guard_statement" (swift.go:262-288),
+# assigns `cond` from at most one child, gated by
+# `if cond == nil && n.Kind() == "if_statement"` (swift.go:283): for
+# `guard_statement` that condition is always false, so `cond` is never
+# assigned at all and every guard's condition -- boolean or optional-binding,
+# call or no call -- is dropped outright; confirmed a plain boolean guard
+# (`guard URL(string: s) != nil else { return }`, no `let`) also resolves
+# 0 call sites, ruling out "only bindings are affected". `if_statement` fares
+# only partly better: its own condition IS visited, but `cond` is claimed by
+# the FIRST matching child, which for `if let u = URL(string: s)` is
+# `value_binding_pattern` -- a childless node whose only child is the
+# unnamed `let` token -- so `c.expr` on it returns an empty `nir.Seq{}` that
+# still counts as "cond != nil" for every later sibling, and the real
+# `call_expression` (the third child) is silently skipped; confirmed
+# `if URL(string: s) != nil { }` (single-child boolean condition, no
+# binding) resolves the call while `if let u = URL(string: s) { }`
+# (three-child binding condition) does not. Fix is mechanical and localised
+# to that one case block: accumulate every non-statements/non-else child
+# into `cond` (as a `nir.Seq`, the same way `expr()`'s own
+# `case "if_statement"` at swift.go:680 already does) instead of taking only
+# the first, and drop the `n.Kind() == "if_statement"` restriction so
+# `guard_statement` gets the same treatment.
+#
+# This blocks more than this CVE: `guard let`/`if let` is Swift's standard
+# idiom for unwrapping an optional or validating a parsed value before use,
+# so any source or sink written directly inside one of these conditions --
+# not just this CVE's `URL(string:)` calls -- is invisible today, regardless
+# of which binding would otherwise apply. `code.HttpInput`, `code.UrlFetch`,
+# `code.SqlExecution` and every other Swift sink already checked can each be
+# defeated the same way; the isolating pair below uses the environment
+# variable -> URL(string:) shape from the corpus's own
+# coverage_swift_exhaustive.test.vyql to prove the drop is about the guard
+# construct, not about this CVE's Hub types.
+#
+# Even with the engine gap fixed, this specific CVE would still not be
+# caught by VYQL-RF-001 (SSRF, `taint core.UserControlledData -> code.
+# UrlFetch`) without a further change: nothing in the Swift bindings treats
+# `hubConfig.authEndpoint`/`.tokenEndpoint` (fields decoded from the
+# downloaded vault.cryptomator token) as untrusted. The only concept that
+# fits, code.ConfigFileInput, is `coverageReservedSource: true` and bound
+# nowhere; the one call site that reads the raw bytes,
+# `Data(contentsOf: localVaultConfigURL)` in VaultDBManager.swift, is
+# `Data(contentsOf:)`, a completely generic local-file-read API used
+# throughout iOS apps for bundle resources, caches and other benign reads
+# with no call-site signal distinguishing "downloaded from attacker-
+# reachable cloud storage" from "read from the app's own bundle" -- binding
+# it as a source would flag ordinary file reads everywhere (the precision
+# failure AGENTS.md's genericity test exists to catch), and a binding keyed
+# on `UnverifiedVaultConfig`/`HubConfig` instead would name Cryptomator's own
+# vocabulary, not something written from a library's public documentation.
+# Recorded as a second, separate reason this rank stays ATTENTION rather than
+# as something to fix -- no binding was attempted for it.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1217: HubAuthenticationCoordinator hands the unverified hub config straight to authenticate(with:), no host check"
+  lang swift
+  file CryptomatorCommon/Sources/CryptomatorCommonCore/Hub/HubAuthenticationCoordinator.swift
+  reject VYQL-RF-001
+  code
+  ```
+  import AppAuthCore
+  import CryptomatorCloudAccessCore
+  import Dependencies
+  import UIKit
+
+  public final class HubAuthenticationCoordinator: Coordinator {
+      public var navigationController: UINavigationController
+      public weak var parent: Coordinator?
+      private let vaultConfig: UnverifiedVaultConfig
+      private let unlockHandler: HubVaultUnlockHandler
+      @Dependency(\.hubAuthenticationService) var hubAuthenticator
+      private weak var delegate: HubAuthenticationCoordinatorDelegate?
+
+      public func start() {
+          guard let hubConfig = vaultConfig.allegedHubConfig else {
+              return
+          }
+          Task { @MainActor in
+              let authenticator = HubUserAuthenticator(hubAuthenticator: hubAuthenticator, viewController: navigationController)
+              let authState: OIDAuthState
+              do {
+                  authState = try await authenticator.authenticate(with: hubConfig)
+              } catch {
+                  return
+              }
+              let viewModel = HubAuthenticationViewModel(authState: authState, vaultConfig: vaultConfig, unlockHandler: unlockHandler, delegate: self)
+              await viewModel.continueToAccessCheck()
+          }
+      }
+  }
+  ```
+
+test "rank1217: the endpoint builder guards each URL with guard-let, unchanged by the fix"
+  lang swift
+  file CryptomatorCommon/Sources/CryptomatorCommon/CryptomatorHubAuthenticator+HubAuthenticating.swift
+  reject VYQL-RF-001
+  code
+  ```
+  import AppAuth
+  import CryptomatorCloudAccessCore
+  import CryptomatorCommonCore
+  import UIKit
+
+  extension CryptomatorHubAuthenticator: HubAuthenticating {
+      public func authenticate(with hubConfig: HubConfig, from viewController: UIViewController) async throws -> OIDAuthState {
+          guard let authorizationEndpoint = URL(string: hubConfig.authEndpoint) else {
+              throw HubAuthenticationError.invalidAuthEndpoint
+          }
+          guard let tokenEndpoint = URL(string: hubConfig.tokenEndpoint) else {
+              throw HubAuthenticationError.invalidTokenEndpoint
+          }
+          let configuration = OIDServiceConfiguration(authorizationEndpoint: authorizationEndpoint, tokenEndpoint: tokenEndpoint)
+          let request = OIDAuthorizationRequest(configuration: configuration, clientId: hubConfig.clientId, scopes: nil, redirectURL: authorizationEndpoint, responseType: OIDResponseTypeCode, additionalParameters: nil)
+          return try await withCheckedThrowingContinuation({ continuation in
+              DispatchQueue.main.async {
+                  _ = OIDAuthState.authState(byPresenting: request, presenting: viewController) { authState, error in
+                      if let authState { continuation.resume(returning: authState) }
+                  }
+              }
+          })
+      }
+  }
+  ```
+
+test "rank1217: fixed HubAuthenticationCoordinator validates host trust before calling authenticate(with:)"
+  lang swift
+  file CryptomatorCommon/Sources/CryptomatorCommonCore/Hub/HubAuthenticationCoordinator.swift
+  reject VYQL-RF-001
+  code
+  ```
+  import AppAuthCore
+  import CocoaLumberjackSwift
+  import CryptomatorCloudAccessCore
+  import Dependencies
+  import UIKit
+
+  public final class HubAuthenticationCoordinator: Coordinator {
+      public var navigationController: UINavigationController
+      public weak var parent: Coordinator?
+      private let vaultConfig: UnverifiedVaultConfig
+      private let unlockHandler: HubVaultUnlockHandler
+      @Dependency(\.hubAuthenticationService) var hubAuthenticator
+      private weak var delegate: HubAuthenticationCoordinatorDelegate?
+
+      public func start() {
+          guard let hubConfig = vaultConfig.allegedHubConfig else {
+              return
+          }
+          Task { @MainActor in
+              do {
+                  try await checkHostTrust(hubConfig: hubConfig)
+              } catch {
+                  return
+              }
+              let authenticator = HubUserAuthenticator(hubAuthenticator: hubAuthenticator, viewController: navigationController)
+              let authState: OIDAuthState
+              do {
+                  authState = try await authenticator.authenticate(with: hubConfig)
+              } catch {
+                  return
+              }
+              let viewModel = HubAuthenticationViewModel(authState: authState, vaultConfig: vaultConfig, unlockHandler: unlockHandler, delegate: self)
+              await viewModel.continueToAccessCheck()
+          }
+      }
+
+      @MainActor
+      private func checkHostTrust(hubConfig: HubConfig) async throws {
+          guard let vaultBaseURL = getVaultBaseURL() else {
+              try await rejectHostTrust(message: LocalizedString.getValue("hubAuthentication.trustHost.error.inconsistentAuthority"))
+          }
+          let result = try HubHostTrustValidator.validate(hubConfig: hubConfig, vaultBaseURL: vaultBaseURL, trustedAuthorities: CryptomatorUserDefaults.shared.trustedHubAuthorities)
+          switch result {
+          case .trusted:
+              return
+          case let .userConfirmationRequired(untrustedAuthorities):
+              let approved = await showTrustHostAlert(untrustedAuthorities: untrustedAuthorities)
+              if !approved {
+                  throw CancellationError()
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1217: engine gap isolated -- environment-sourced URL fetched outside any guard reports"
+  lang swift
+  expect VYQL-RF-001
+  code
+  ```
+  func handler() {
+    let u = ProcessInfo.processInfo.environment["URL"]!
+    let endpoint = URL(string: u)
+    print(endpoint!)
+  }
+  ```
+
+test "rank1217: engine gap isolated -- identical taint into the identical call, only wrapped in guard-let, does not report"
+  lang swift
+  reject VYQL-RF-001
+  code
+  ```
+  func handler() {
+    let u = ProcessInfo.processInfo.environment["URL"]!
+    guard let endpoint = URL(string: u) else { return }
+    print(endpoint)
+  }
+  ```
