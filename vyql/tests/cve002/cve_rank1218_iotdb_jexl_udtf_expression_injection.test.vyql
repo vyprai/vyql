@@ -1,0 +1,97 @@
+# Rank 1218 / CVE-2026-24713 (GHSA-6w48-2g9j-v9q5, CWE-20/CWE-917): IoTDB's
+# built-in `jexl` UDTF compiles its `expr` attribute -- a key=value pair a
+# client supplies straight in the SQL function call, e.g.
+# `SELECT jexl(s1, 'expr'='...') FROM root.sg.d1` -- as an Apache Commons
+# JEXL script and runs it against every row. UDTFJexl.beforeStart reads the
+# attribute with `parameters.getString("expr")` and hands it to
+# `JexlEngine.createScript(String)` unmodified, so a query that names this
+# built-in function gets arbitrary JEXL execution, which JEXL's own sandbox
+# does not confine to the series being queried.
+#
+# The fix (8fbfddc5f8, "Remove built-in jexl function in tree mode") deletes
+# UDTFJexl.java and its registration outright rather than sandboxing the
+# script, so there is no patched form of this class to model as the safe
+# case. UDTFConst.java, in the same builtin package, reads the same
+# UDFParameters.getString API for its own attributes ("type", "value") and
+# never reaches a script/expression evaluator, so it stands in for the safe
+# direction: proof that labelling UDFParameters.getString as user-controlled
+# does not itself trigger VYQL-INJ-016 -- only reaching an expression-eval
+# sink does.
+
+test "rank1218: jexl UDTF compiles its expr attribute as a JEXL script"
+  lang java
+  file iotdb-core/node-commons/src/main/java/org/apache/iotdb/commons/udf/builtin/UDTFJexl.java
+  expect VYQL-INJ-016
+  code
+  ```
+  package org.apache.iotdb.commons.udf.builtin;
+
+  import org.apache.iotdb.commons.exception.MetadataException;
+  import org.apache.iotdb.udf.api.UDTF;
+  import org.apache.iotdb.udf.api.customizer.config.UDTFConfigurations;
+  import org.apache.iotdb.udf.api.customizer.parameter.UDFParameters;
+  import org.apache.iotdb.udf.api.exception.UDFInputSeriesDataTypeNotValidException;
+  import org.apache.iotdb.udf.api.exception.UDFOutputSeriesDataTypeNotValidException;
+
+  import org.apache.commons.jexl3.JexlBuilder;
+  import org.apache.commons.jexl3.JexlEngine;
+  import org.apache.commons.jexl3.JexlScript;
+
+  public class UDTFJexl implements UDTF {
+
+    private JexlScript script;
+
+    @Override
+    public void beforeStart(UDFParameters parameters, UDTFConfigurations configurations)
+        throws UDFInputSeriesDataTypeNotValidException,
+            UDFOutputSeriesDataTypeNotValidException,
+            MetadataException {
+      String expr = parameters.getString("expr");
+      JexlEngine jexl = new JexlBuilder().create();
+      script = jexl.createScript(expr);
+    }
+  }
+  ```
+
+test "rank1218: UDTFConst reads the same UDFParameters.getString API but never reaches an expression evaluator"
+  lang java
+  file iotdb-core/node-commons/src/main/java/org/apache/iotdb/commons/udf/builtin/UDTFConst.java
+  reject VYQL-INJ-016
+  code
+  ```
+  package org.apache.iotdb.commons.udf.builtin;
+
+  import org.apache.iotdb.udf.api.UDTF;
+  import org.apache.iotdb.udf.api.customizer.config.UDTFConfigurations;
+  import org.apache.iotdb.udf.api.customizer.parameter.UDFParameters;
+  import org.apache.tsfile.enums.TSDataType;
+  import org.apache.tsfile.utils.Binary;
+
+  public class UDTFConst implements UDTF {
+
+    private TSDataType dataType;
+    private int intValue;
+    private long longValue;
+    private double doubleValue;
+    private Binary binaryValue;
+
+    @Override
+    public void beforeStart(UDFParameters parameters, UDTFConfigurations configurations) {
+      dataType = TSDataType.valueOf(parameters.getString("type"));
+      switch (dataType) {
+        case INT32:
+          intValue = Integer.parseInt(parameters.getString("value"));
+          break;
+        case INT64:
+          longValue = Long.parseLong(parameters.getString("value"));
+          break;
+        case DOUBLE:
+          doubleValue = Double.parseDouble(parameters.getString("value"));
+          break;
+        default:
+          binaryValue = new Binary(parameters.getString("value"), java.nio.charset.StandardCharsets.UTF_8);
+          break;
+      }
+    }
+  }
+  ```

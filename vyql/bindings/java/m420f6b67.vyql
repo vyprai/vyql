@@ -2147,6 +2147,16 @@ binding expressionEval357 {
   emit sink code.ExpressionEval at args[0]
 }
 
+// Apache Commons JEXL's JexlEngine.createScript(String) compiles source text into
+// an executable JexlScript, the library's own documented entrypoint for turning a
+// string into code it will run -- the same shape as expressionEval355's
+// createExpression a few lines up, just JEXL's script form rather than its
+// single-expression form.
+binding expressionEval462 {
+  query pattern callExpr where callee.method == "createScript"
+  emit sink code.ExpressionEval at args[0]
+}
+
 binding weakCipher358 {
   query pattern callExpr where callee.path ~= "Cipher.getInstance" and args.any.literal contains "DES"
   emit issue code.WeakCipher at call
@@ -2646,4 +2656,22 @@ binding hardcodedSecretLiteral460 {
 binding jdbcSensitiveParamSinglePassFilterBypass461 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "filterSensitive" and node.context.callPath contains "StringUtils.replaceIgnoreCase" and node.context.callPath contains ".keySet" and not (node.context.scopeCall contains "containSensitiveKey")
   emit issue code.JdbcSensitiveParamSinglePassFilterBypass at node
+}
+
+// UDFParameters is the API a UDF's beforeStart/validate receives its caller-supplied
+// arguments through; its own class Javadoc states it "is used to parse the parameters
+// in the UDF entered by the user" -- getString(key) and getStringOrDefault(key,
+// default) are the two accessors that return that user-entered text, so a caller
+// reading either has user-controlled data regardless of what the UDF then does with
+// it. Path-matched rather than gated on callee.receiver.type, which stays open when
+// the receiver type is unresolved and would let this fire on any getString of any
+// receiver; the dotted path only forms once the receiver resolves to UDFParameters.
+binding userControlledData463 {
+  query pattern callExpr where callee.method == "getString" and callee.receiver.type == "UDFParameters"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData464 {
+  query pattern callExpr where callee.method == "getStringOrDefault" and callee.receiver.type == "UDFParameters"
+  emit source core.UserControlledData at call.result
 }
