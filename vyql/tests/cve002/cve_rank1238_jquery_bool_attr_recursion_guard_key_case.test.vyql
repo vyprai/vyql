@@ -1,0 +1,208 @@
+# jQuery resolves an attribute hook through the lowercased attribute name but
+# passes the caller's original spelling on to jQuery.find.attr. The wrappers
+# registered for boolean attributes break recursion by clearing their own slot
+# in jQuery.expr.attrHandle, and they index that table with the unnormalized
+# name, so `.attr("CHECKED")` clears a slot nothing reads and the next lookup
+# returns the same wrapper again until the stack is exhausted. Indexing the
+# table with the lowercased name is what makes the guard reach the right slot.
+
+test "rank1238: boolean attribute wrapper clears its handler slot under the unnormalized name"
+  lang javascript
+  file attr.js
+  expect VYQL-DOS-045
+  expect_review code.RecursionGuardIndexedByUnnormalizedKey
+  code
+  ```
+  var boolHook,
+  	attrHandle = jQuery.expr.attrHandle;
+
+  jQuery.extend( {
+  	attr: function( elem, name, value ) {
+  		var ret, hooks,
+  			nType = elem.nodeType;
+
+  		if ( nType === 3 || nType === 8 || nType === 2 ) {
+  			return;
+  		}
+
+  		// Attribute hooks are determined by the lowercase version
+  		if ( nType !== 1 || !jQuery.isXMLDoc( elem ) ) {
+  			hooks = jQuery.attrHooks[ name.toLowerCase() ] ||
+  				( jQuery.expr.match.bool.test( name ) ? boolHook : undefined );
+  		}
+
+  		if ( hooks && "get" in hooks && ( ret = hooks.get( elem, name ) ) !== null ) {
+  			return ret;
+  		}
+
+  		ret = jQuery.find.attr( elem, name );
+
+  		return ret == null ? undefined : ret;
+  	}
+  } );
+
+  boolHook = {
+  	set: function( elem, value, name ) {
+  		if ( value === false ) {
+  			jQuery.removeAttr( elem, name );
+  		} else {
+  			elem.setAttribute( name, name );
+  		}
+  		return name;
+  	}
+  };
+
+  jQuery.each( jQuery.expr.match.bool.source.match( /\w+/g ), function( i, name ) {
+  	var getter = attrHandle[ name ] || jQuery.find.attr;
+
+  	attrHandle[ name ] = function( elem, name, isXML ) {
+  		var ret, handle;
+  		if ( !isXML ) {
+
+  			// Avoid an infinite loop by temporarily removing this function from the getter
+  			handle = attrHandle[ name ];
+  			attrHandle[ name ] = ret;
+  			ret = getter( elem, name, isXML ) != null ?
+  				name.toLowerCase() :
+  				null;
+  			attrHandle[ name ] = handle;
+  		}
+  		return ret;
+  	};
+  } );
+  ```
+
+test "rank1238: boolean attribute wrapper clears its handler slot under the lowercased name"
+  lang javascript
+  file attr.js
+  reject VYQL-DOS-045
+  reject_review code.RecursionGuardIndexedByUnnormalizedKey
+  code
+  ```
+  var boolHook,
+  	attrHandle = jQuery.expr.attrHandle;
+
+  jQuery.extend( {
+  	attr: function( elem, name, value ) {
+  		var ret, hooks,
+  			nType = elem.nodeType;
+
+  		if ( nType === 3 || nType === 8 || nType === 2 ) {
+  			return;
+  		}
+
+  		// Attribute hooks are determined by the lowercase version
+  		if ( nType !== 1 || !jQuery.isXMLDoc( elem ) ) {
+  			hooks = jQuery.attrHooks[ name.toLowerCase() ] ||
+  				( jQuery.expr.match.bool.test( name ) ? boolHook : undefined );
+  		}
+
+  		if ( hooks && "get" in hooks && ( ret = hooks.get( elem, name ) ) !== null ) {
+  			return ret;
+  		}
+
+  		ret = jQuery.find.attr( elem, name );
+
+  		return ret == null ? undefined : ret;
+  	}
+  } );
+
+  boolHook = {
+  	set: function( elem, value, name ) {
+  		if ( value === false ) {
+  			jQuery.removeAttr( elem, name );
+  		} else {
+  			elem.setAttribute( name, name );
+  		}
+  		return name;
+  	}
+  };
+
+  jQuery.each( jQuery.expr.match.bool.source.match( /\w+/g ), function( i, name ) {
+  	var getter = attrHandle[ name ] || jQuery.find.attr;
+
+  	attrHandle[ name ] = function( elem, name, isXML ) {
+  		var ret, handle,
+  			lowercaseName = name.toLowerCase();
+
+  		if ( !isXML ) {
+
+  			// Avoid an infinite loop by temporarily removing this function from the getter
+  			handle = attrHandle[ lowercaseName ];
+  			attrHandle[ lowercaseName ] = ret;
+  			ret = getter( elem, name, isXML ) != null ?
+  				lowercaseName :
+  				null;
+  			attrHandle[ lowercaseName ] = handle;
+  		}
+  		return ret;
+  	};
+  } );
+  ```
+
+test "rank1238: attribute dispatch that lowercases the name itself before the lookup"
+  lang javascript
+  file attr.js
+  reject VYQL-DOS-045
+  reject_review code.RecursionGuardIndexedByUnnormalizedKey
+  code
+  ```
+  var boolHook,
+  	attrHandle = jQuery.expr.attrHandle;
+
+  jQuery.extend( {
+  	attr: function( elem, name, value ) {
+  		var ret, hooks,
+  			nType = elem.nodeType;
+
+  		if ( nType === 3 || nType === 8 || nType === 2 ) {
+  			return;
+  		}
+
+  		// All attributes are lowercase
+  		if ( nType !== 1 || !jQuery.isXMLDoc( elem ) ) {
+  			name = name.toLowerCase();
+  			hooks = jQuery.attrHooks[ name ] ||
+  				( jQuery.expr.match.bool.test( name ) ? boolHook : undefined );
+  		}
+
+  		if ( hooks && "get" in hooks && ( ret = hooks.get( elem, name ) ) !== null ) {
+  			return ret;
+  		}
+
+  		ret = jQuery.find.attr( elem, name );
+
+  		return ret == null ? undefined : ret;
+  	}
+  } );
+
+  boolHook = {
+  	set: function( elem, value, name ) {
+  		if ( value === false ) {
+  			jQuery.removeAttr( elem, name );
+  		} else {
+  			elem.setAttribute( name, name );
+  		}
+  		return name;
+  	}
+  };
+
+  jQuery.each( jQuery.expr.match.bool.source.match( /\w+/g ), function( i, name ) {
+  	var getter = attrHandle[ name ] || jQuery.find.attr;
+
+  	attrHandle[ name ] = function( elem, name, isXML ) {
+  		var ret, handle;
+  		if ( !isXML ) {
+
+  			// Avoid an infinite loop by temporarily removing this function from the getter
+  			handle = attrHandle[ name ];
+  			attrHandle[ name ] = ret;
+  			ret = getter( elem, name, isXML ) != null ?
+  				name.toLowerCase() :
+  				null;
+  			attrHandle[ name ] = handle;
+  		}
+  		return ret;
+  	};
+  } );
+  ```
