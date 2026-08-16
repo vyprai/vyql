@@ -1,0 +1,106 @@
+# Rank 1515 / CVE-2021-41035: Eclipse OpenJ9 resolved an interface
+# method through a method handle without checking the resolved method's
+# access flags, so a Java application could invoke a non-public interface
+# method and bypass Java access control (execution with unnecessary
+# privileges, CWE-250). The dispatch path is three-headed:
+# VM_MHInterpreter::dispatchLoop in runtime/vm/MHInterpreter.inc runs
+# `method = convertITableIndexToVirtualMethod(receiverClazz,
+# interfaceClazz, getVMSlot(methodHandle)); if (NULL != method) { goto
+# runMethod; }` with no look at the resolved J9Method's modifiers; the JIT
+# counterpart Java_java_lang_invoke_InterfaceHandle_
+# convertITableIndexToVTableIndex in runtime/compiler/env/VMJ9.cpp:9496
+# returned the itable offset directly; and the JCL wrapper
+# InterfaceHandle.java:80 returned `convertITableIndexToVTableIndex(...)
+# << VTABLE_ENTRY_SHIFT` unchecked. Pool commit 9f0b7b785a is the real
+# fix (the nocommit flag resolved: the advisory names no commit, but the
+# merge "Throw IllegalAccessError (IAE): Lookup.findVirtual" carries the
+# three fix commits -- VMJ9.cpp now reads the resolved J9Method's
+# modifiers and returns -1 when J9AccPublic is absent,
+# MHInterpreter.inc calls setIllegalAccessErrorNonPublicInvokeInterface
+# before runMethod, and InterfaceHandle.java throws IllegalAccessError
+# on the negative sentinel). No pool correction.
+#
+# ATTENTION, access-modifier verification vocabulary. The weakness is a
+# missing authorization decision on a resolved callee -- no input flows,
+# no tainted value reaches a sink, and both revisions differ only in
+# whether the runtime consults the callee's access flags before
+# dispatch. Nothing in the corpus can express "this invocation must
+# verify the resolved member's accessibility": it is the same
+# missing-concept family as ranks 1513/1514 (authorization decisions
+# with no dataflow), one step lower in the runtime -- the corpus would
+# need a concept for the resolved-method descriptor and a rule judging
+# dispatch without an accessibility check. A binding on OpenJ9's own
+# convertITableIndexToVirtualMethod or J9AccPublic macros would detect
+# this JVM rather than the weakness. Measured on the real code: scanning
+# runtime/compiler/env/VMJ9.cpp reports 87 findings at the fix parent
+# and 88 at the fix, all memory-family noise (VYQL-MEM-016
+# RawMemoryCopySize, VYQL-MEM-002 UnboundedCopySmell, VYQL-MEM-004/006
+# stack/deref smells, one MEM-004 inside the vulnerable function's
+# region at VMJ9.cpp:9544 from an unrelated alloca) -- the delta is the
+# fix's added lines shifting noise, nothing on the dispatch path;
+# scanning jcl/.../InterfaceHandle.java reports 0 findings at both
+# revisions. The interpreter half is invisible for a second reason,
+# entered in ENGINE-GAPS.md (Medium): runtime/vm/MHInterpreter.inc is
+# routed to the php frontend by its extension (.inc), so it is never
+# parsed as C++ -- identical bytes scan as .inc ("scanned php:1", 0
+# findings) and as .cpp ("scanned cpp:1", 135 findings). No definition
+# change shipped. Spec cve_rank1515 records the label-free dispatch and
+# the modifier-checked form, both asserting reject VYQL-AUTH-079: when
+# resolved-member accessibility lands as vocabulary, the unchecked
+# dispatch must flip to expect.
+
+test "rank1515: the interpreter dispatches a resolved interface method without checking its access flags"
+  lang cpp
+  file runtime/vm/MHInterpreter_dispatch.cpp
+  reject VYQL-AUTH-079
+  code
+  ```
+  static J9Method *dispatchInterfaceMethod(J9VMThread *_currentThread, j9object_t methodHandle, j9object_t receiver) {
+      J9Method *method = NULL;
+      J9Class *receiverClazz = J9VM_J9CLASS_FROM_HEAPCLASS(_currentThread, receiver);
+      J9Class *interfaceClazz = J9VM_J9CLASS_FROM_HEAPCLASS(
+          _currentThread, J9VMJAVALANGINVOKEPRIMITIVEHANDLE_REFERENCECLASS(_currentThread, methodHandle));
+      method = convertITableIndexToVirtualMethod(receiverClazz, interfaceClazz, getVMSlot(methodHandle));
+      if (NULL != method) {
+          goto runMethod;
+      }
+      prepareForExceptionThrow(_currentThread);
+      goto throwCurrentException;
+
+  runMethod:
+      return method;
+  throwCurrentException:
+      return NULL;
+  }
+  ```
+
+test "rank1515: the fix refuses non-public interface methods"
+  lang cpp
+  file runtime/vm/MHInterpreter_dispatch.cpp
+  reject VYQL-AUTH-079
+  code
+  ```
+  static J9Method *dispatchInterfaceMethod(J9VMThread *_currentThread, j9object_t methodHandle, j9object_t receiver) {
+      J9Method *method = NULL;
+      J9Class *receiverClazz = J9VM_J9CLASS_FROM_HEAPCLASS(_currentThread, receiver);
+      J9Class *interfaceClazz = J9VM_J9CLASS_FROM_HEAPCLASS(
+          _currentThread, J9VMJAVALANGINVOKEPRIMITIVEHANDLE_REFERENCECLASS(_currentThread, methodHandle));
+      method = convertITableIndexToVirtualMethod(receiverClazz, interfaceClazz, getVMSlot(methodHandle));
+      if (NULL != method) {
+          J9ROMMethod *romMethod = J9_ROM_METHOD_FROM_RAM_METHOD(method);
+          if (J9_ARE_NO_BITS_SET(romMethod->modifiers, J9AccPublic)) {
+              prepareForExceptionThrow(_currentThread);
+              setIllegalAccessErrorNonPublicInvokeInterface(_currentThread, method);
+              goto throwCurrentException;
+          }
+          goto runMethod;
+      }
+      prepareForExceptionThrow(_currentThread);
+      goto throwCurrentException;
+
+  runMethod:
+      return method;
+  throwCurrentException:
+      return NULL;
+  }
+  ```
