@@ -265,6 +265,21 @@ binding insecureTempFile49 {
   emit issue code.InsecureTempFile at node
 }
 
+binding insecureTempFile162 {
+  query pattern presenceNode where node.context.macroBody contains "\"/tmp/"
+  emit issue code.InsecureTempFile at node
+}
+
+binding insecureTempFile163 {
+  query pattern presenceNode where node.context.macroBody contains "\"/var/tmp/"
+  emit issue code.InsecureTempFile at node
+}
+
+binding insecureTempFile164 {
+  query pattern presenceNode where node.context.macroBody contains "\"/dev/shm/"
+  emit issue code.InsecureTempFile at node
+}
+
 binding insecurePermission50 {
   query pattern callExpr where callee.path ~= "chmod" and args.any.literal contains "0777"
   emit issue code.InsecurePermission at call

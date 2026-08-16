@@ -1,0 +1,160 @@
+# Rank 1226 / CVE-2015-5232 ("various /tmp races in opa-fm, opa-ff",
+# oss-security 2015/09/22, Red Hat bug 1257098): opa-fm places the Unix
+# domain sockets its command client and its managers use in the shared,
+# world-writable /tmp directory, under names any local user can predict.
+# Three headers -- Esm/ib/include/hsm_config_srvr_data.h,
+# Esm/ib/src/linux/fm_cmd/hsm_config_client_data.h and
+# Esm/ib/src/linux/rem_conf/hsm_config_data.h -- each define
+#
+#   #define HSM_FM_SCK_PREFIX	"/tmp/"
+#
+# and Esm/ib/src/linux/fm_cmd/hsm_config_client.c builds every socket path
+# from it:
+#
+#   pid = getpid();
+#   sprintf(s_path,"%s%s%d",HSM_FM_SCK_PREFIX,mgr_prefix,hdl->instance);
+#   sprintf(c_path,"%s%s%d_C_%lu",HSM_FM_SCK_PREFIX,mgr_prefix,
+#           hdl->instance, (long unsigned)pid);
+#
+# The server path has no unique part at all and the client path's only
+# unique part is the process id, which is small, reused and observable, so a
+# local user can create the path first as a symlink and win the race
+# (CWE-377, CWE-59). The shell scripts shipped beside them have the same
+# shape, `temp=/tmp/ifsfm$$`.
+#
+# Fix c5759e7b76f5bf844be6c6641cc1b356bbc83869 ("Fix scripts and code that
+# use well-known tmp files"), one of the two opa-fm commits NVD lists as
+# references for CVE-2015-5232, moves the prefix out of the shared directory
+# to "/opt/opafm/", replaces the pid suffix with an mkstemp template
+# (`_C_XXXXXX` plus a `mkstemp(hdl->c_path)` call in hcom_client_init), and
+# rewrites the two startup scripts to use mktemp. The sibling commit
+# 5f4087aabb5d03c42738b320af0fc60e9df4d1f7 converts three more scripts
+# (`TEMP1=/tmp/smdiffa$$` and friends) to `mktemp` the same way. The commit
+# is the real, targeted fix and not a release bump: it changes only the path
+# construction, the temp-file creation and the cleanup that follows from it.
+#
+# FIXED. code.InsecureTempFile already exists (CWE_377, CWE_59, rule
+# VYQL-PATH-003) and the C bindings for it named only the mktemp/tmpnam/
+# tempnam family, so a program that builds its own well-known path instead
+# of calling one of those functions was not labelled at all. The C and C++
+# bindings now also treat a preprocessor macro whose body is a string
+# literal starting at a shared temporary directory -- "/tmp/", "/var/tmp/"
+# or "/dev/shm/" -- as code.InsecureTempFile. A compile-time constant path
+# inside a directory every local user can write is a well-known name by
+# construction, which is the weakness itself; the safe form is an atomic
+# create-with-unique-name call (mkstemp, mkdtemp) or a directory the program
+# owns. The binding answers to that general rule and names no opa-fm symbol.
+#
+# Measured on the real checkout, bounded (timeout 180, --max-ram 4GB,
+# --cache off): the vulnerable revision goes from 7627 findings to 7630, the
+# three new ones being exactly the three headers the fix commit changes, and
+# the fixed revision reports 7627 with no VYQL-PATH-003 anywhere. Two
+# independent C corpora (ImageMagick 6, c:443/cpp:62, and imageworsener,
+# c:18) report no VYQL-PATH-003, so the macro form is not colliding with
+# ordinary constants.
+#
+# Two parts of the same commit stay out of reach and are pinned below as
+# rejects. The C use site is invisible because the C/C++ frontend does not
+# expand macros, so `sprintf(c_path,"%s%s%d_C_%lu",HSM_FM_SCK_PREFIX,...)`
+# carries no /tmp literal of its own -- the finding lands on the header that
+# defines the prefix, not on the call. The shell form is invisible because
+# the bash frontend turns `variable_assignment` into an nir.Assign with no
+# queryable node and emits no per-statement context tokens, so no binding
+# can read `temp=/tmp/ifsfm$$`; the identical literal in a command argument
+# position (`rm -f /tmp/ifsfm$$`) is matched by an ordinary callExpr
+# binding, which isolates the gap to the assignment form.
+#
+# verify_current_expected: fixed
+
+test "rank1226: the socket path prefix macro names the shared temporary directory"
+  lang c
+  expect VYQL-PATH-003
+  file hsm_config_srvr_data.h
+  ```
+  #include "hsm_config_srvr_api.h"
+
+  #define HSM_FM_SCK_PREFIX	"/tmp/"
+  #define HSM_FM_SCK_SM		"sm_"
+  #define HSM_FM_SCK_PM		"pm_"
+  #define HSM_FM_SCK_FE		"fe_"
+
+  typedef struct	_fm_config_conx_hdl{
+  	int instance;
+  } fm_config_conx_hdl;
+  ```
+
+test "rank1226: the socket path prefix macro names a directory the program owns"
+  lang c
+  reject VYQL-PATH-003
+  file hsm_config_srvr_data.h
+  ```
+  #include "hsm_config_srvr_api.h"
+
+  #define HSM_FM_SCK_PREFIX	"/opt/opafm/"
+  #define HSM_FM_SCK_SM		"sm_"
+  #define HSM_FM_SCK_PM		"pm_"
+  #define HSM_FM_SCK_FE		"fe_"
+
+  typedef struct	_fm_config_conx_hdl{
+  	int instance;
+  } fm_config_conx_hdl;
+  ```
+
+# The use site carries no path literal of its own. The prefix reaches it
+# only through the macro, which the C frontend does not expand, so the
+# report lands on the header above rather than on this call.
+
+test "rank1226: the path built through the prefix macro carries no literal of its own"
+  lang c
+  reject VYQL-PATH-003
+  file hsm_config_client.c
+  ```
+  #include "hsm_config_client_data.h"
+
+  fm_mgr_config_errno_t fm_mgr_config_mgr_connect(fm_config_conx_hdl *hdl,
+    fm_mgr_type_t mgr)
+  {
+  	char                    s_path[256];
+  	char                    c_path[256];
+  	char                    *mgr_prefix;
+  	pid_t                   pid;
+
+  	memset(s_path,0,sizeof(s_path));
+  	memset(c_path,0,sizeof(c_path));
+
+  	pid = getpid();
+  	mgr_prefix = HSM_FM_SCK_SM;
+
+  	sprintf(s_path,"%s%s%d",HSM_FM_SCK_PREFIX,mgr_prefix,hdl->instance);
+  	sprintf(c_path,"%s%s%d_C_%lu",HSM_FM_SCK_PREFIX,mgr_prefix,
+  			hdl->instance, (long unsigned)pid);
+
+  	return FM_CONF_OK;
+  }
+  ```
+
+# The shell scripts in the same commit hold the weakness in an assignment.
+# The bash frontend produces no queryable node and no context token for a
+# variable assignment, so the right-hand side cannot be read by any binding.
+
+test "rank1226: a shell temporary path built from the process id is not labelled"
+  lang bash
+  reject VYQL-PATH-003
+  file opafm.sh
+  ```
+  #!/bin/sh
+  temp=/tmp/ifsfm$$
+  trap "rm -rf $temp; exit 1" 1 2 3 9 15
+  eval $EXTRACT_CMD < $CONFIG_FILE > $temp
+  ```
+
+test "rank1226: a shell temporary path created by mktemp is not labelled"
+  lang bash
+  reject VYQL-PATH-003
+  file opafm_fixed.sh
+  ```
+  #!/bin/sh
+  temp=$(mktemp "/tmp/ifsfmXXXXX")
+  trap "rm -rf $temp; exit 1" 1 2 3 9 15
+  eval $EXTRACT_CMD < $CONFIG_FILE > $temp
+  ```
