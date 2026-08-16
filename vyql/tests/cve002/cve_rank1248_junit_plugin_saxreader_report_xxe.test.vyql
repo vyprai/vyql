@@ -1,0 +1,98 @@
+# Rank 1248 / CVE-2018-1000056 (SECURITY-521): the Jenkins JUnit plugin
+# parses test report XML with a stock dom4j SAXReader:
+#
+#   SAXReader saxReader = new SAXReader();
+#   saxReader.setEntityResolver(new XMLEntityResolver());
+#   Document result = saxReader.read(xmlReportStream);
+#
+# A dom4j SAXReader resolves DOCTYPE-declared external entities by default.
+# The report file comes from the build workspace, so anyone who can make a
+# build write a testsuite XML file gets the Jenkins controller to fetch
+# attacker-chosen URLs and read local files back into the parsed document
+# (CWE-611). The plugin's own XMLEntityResolver does not stop this: it
+# redirects only TestNG system ids to a bundled DTD and returns null for
+# everything else, and null means "resolve it yourself" to the SAX parser.
+#
+# Pool commit 15f39fc49d carries no flag; read anyway, and confirmed as the
+# real fix from its own diff. It adds a setFeatureQuietly helper and calls
+# it with "http://xml.org/sax/features/external-general-entities" set to
+# false before the read, and changes XMLEntityResolver's fallback from null
+# to an empty InputSource so an unrecognised entity resolves to nothing
+# instead of being fetched. Its new JUnitResultArchiverTest.testXxe asserts
+# that an out-of-band entity never reaches a listening root action. No pool
+# correction needed.
+#
+# VYQL-DESER-004 already covers both directions here, on the real checkout
+# as well as on these snippets: the vulnerable parent reports
+# code.XmlParserCreate at SuiteResult.java:159, and the fixed tree reports
+# nothing, because the presence binding for a SAXReader read requires that
+# no external-entity feature literal appears in the same function. The fix
+# routes its setFeature call through a helper, and the feature name is still
+# a literal in the parsing function, so the suppression holds across that
+# indirection. The reject case below keeps the helper so the indirection
+# stays covered.
+
+test "rank1248: dom4j SAXReader reads a test report with no external entity hardening"
+  lang java
+  expect VYQL-DESER-004
+  code
+  ```
+  import org.dom4j.Document;
+  import org.dom4j.Element;
+  import org.dom4j.io.SAXReader;
+  import java.io.File;
+  import java.io.FileInputStream;
+
+  public final class SuiteResult {
+      static void parse(File xmlReport) throws Exception {
+          SAXReader saxReader = new SAXReader();
+          saxReader.setEntityResolver(new XMLEntityResolver());
+
+          FileInputStream xmlReportStream = new FileInputStream(xmlReport);
+          try {
+              Document result = saxReader.read(xmlReportStream);
+              Element root = result.getRootElement();
+              parseSuite(root);
+          } finally {
+              xmlReportStream.close();
+          }
+      }
+  }
+  ```
+
+test "rank1248: dom4j SAXReader disables external general entities before the read"
+  lang java
+  reject VYQL-DESER-004
+  code
+  ```
+  import org.dom4j.Document;
+  import org.dom4j.Element;
+  import org.dom4j.io.SAXReader;
+  import org.xml.sax.SAXException;
+  import java.io.File;
+  import java.io.FileInputStream;
+
+  public final class SuiteResult {
+      static void parse(File xmlReport) throws Exception {
+          SAXReader saxReader = new SAXReader();
+          setFeatureQuietly(saxReader, "http://xml.org/sax/features/external-general-entities", false);
+          saxReader.setEntityResolver(new XMLEntityResolver());
+
+          FileInputStream xmlReportStream = new FileInputStream(xmlReport);
+          try {
+              Document result = saxReader.read(xmlReportStream);
+              Element root = result.getRootElement();
+              parseSuite(root);
+          } finally {
+              xmlReportStream.close();
+          }
+      }
+
+      private static void setFeatureQuietly(SAXReader reader, String feature, boolean value) {
+          try {
+              reader.setFeature(feature, value);
+          } catch (SAXException ignored) {
+          }
+      }
+  }
+  ```
