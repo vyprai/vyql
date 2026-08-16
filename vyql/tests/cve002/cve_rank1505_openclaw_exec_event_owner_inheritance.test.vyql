@@ -1,0 +1,84 @@
+# Rank 1505 / CVE-2026-41329: OpenClaw's exec-event heartbeat runs inherited
+# owner-only tool access from the session delivery target (CWE-863).
+# resolveCommandAuthorization() in src/auto-reply/command-auth.ts computed
+# senderIsOwner = senderIsOwnerByIdentity || senderIsOwnerByScope ||
+# ownerAllowAll from the message context, and an exec event -- node exec
+# output riding a heartbeat -- delivered into an owner's session carried the
+# owner's From/To routing fields, so output an untrusted process produced was
+# authorised for owner-only commands. Pool commit a30214a624 is the real fix
+# (COMMIT_OK, "fix(heartbeat): block owner-only auth inheritance for exec
+# events (#57652)"): the message context gains a trusted
+# ForceSenderIsOwnerFalse marker that heartbeat exec-event paths set, and
+# senderIsOwner is forced false when it is present. No pool correction.
+#
+# ATTENTION, vocabulary gap, third of its family in this batch: the weakness
+# is an identity-trust inference -- routing context decides the sender is the
+# owner -- with no dataflow to a sink, and the trustworthy-origin knowledge
+# (which context fields an exec event may carry) lives in openclaw's internal
+# design. Existing authorization concepts key on identities and tokens
+# (ForgeableIdentityToken, CaseInsensitiveLocalIdentityAuthorizationBypass,
+# UserIdentityMappingReview); none states "an untrusted delivery surface
+# inherits the recipient's authority", and a binding keyed on openclaw's own
+# senderIsOwnerByIdentity or ForceSenderIsOwnerFalse would detect this
+# repository rather than the weakness. Measured on the real code: the
+# repository (11194 tracked files) exceeds the 180s scan budget on its fix
+# directories, so the measurement is the two files the fix touches --
+# scanning src/auto-reply/command-auth.ts and src/infra/heartbeat-runner.ts
+# at the fix parent reports 11 findings (prototype-pollution, path and log
+# families), none on resolveCommandAuthorization or the senderIsOwner
+# computation, and the fix changes none of them. No ENGINE-GAPS.md entry:
+# the missing piece is a review vocabulary for delivery-context identity
+# inheritance, which is design work with the same precision question as the
+# schema-override shape at rank 1504 and the callback-confirmation shape at
+# rank 1501 -- three ranks now share this cause. No definition change
+# shipped. Spec cve_rank1505 records the context-inferred owner and the
+# forced-false form, both asserting reject VYQL-AUTH-083.
+
+test "rank1505: exec output inherits the owner identity through routing context"
+  lang javascript
+  file src/auto-reply/command-auth.ts
+  reject VYQL-AUTH-083
+  code
+  ```
+  type MsgContext = {
+    Provider: string;
+    From: string;
+    To: string;
+    GatewayClientScopes?: string[];
+  };
+
+  export function resolveCommandAuthorization(ctx: MsgContext, ownerAllowAll: boolean) {
+    const senderIsOwnerByIdentity = ctx.From === ctx.To;
+    const senderIsOwnerByScope =
+      Array.isArray(ctx.GatewayClientScopes) &&
+      ctx.GatewayClientScopes.includes("operator.admin");
+    const senderIsOwner = senderIsOwnerByIdentity || senderIsOwnerByScope || ownerAllowAll;
+    return { senderIsOwner };
+  }
+  ```
+
+test "rank1505: the fix forces the sender non-owner for exec events"
+  lang javascript
+  file src/auto-reply/command-auth.ts
+  reject VYQL-AUTH-083
+  code
+  ```
+  type MsgContext = {
+    Provider: string;
+    From: string;
+    To: string;
+    GatewayClientScopes?: string[];
+    ForceSenderIsOwnerFalse?: boolean;
+  };
+
+  export function resolveCommandAuthorization(ctx: MsgContext, ownerAllowAll: boolean) {
+    const senderIsOwnerByIdentity = ctx.From === ctx.To;
+    const senderIsOwnerByScope =
+      Array.isArray(ctx.GatewayClientScopes) &&
+      ctx.GatewayClientScopes.includes("operator.admin");
+    const senderIsOwner = ctx.ForceSenderIsOwnerFalse
+      ? false
+      : senderIsOwnerByIdentity || senderIsOwnerByScope || ownerAllowAll;
+    return { senderIsOwner };
+  }
+  ```
