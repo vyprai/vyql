@@ -1,0 +1,47 @@
+test "rank1243 javascript: user-agent parser regex repeats a group that already matches any text"
+  lang javascript
+  profile library
+  expect VYQL-DOS-003
+  expect_review code.CatastrophicRegex
+  code
+  ```
+  var parser;
+  exports.device = [];
+
+  parser = Object.create(null);
+  parser[0] = new RegExp("(HbbTV)/1\\.1\\.1.*CE-HTML/1\\.\\d;(Vendor/)*(THOM[^;]*?)[;\\s](?:.*SW-Version/.*)*(LF[^;]+);?");
+  parser[1] = "$1";
+  exports.device[531] = parser;
+
+  exports.parse = function parse(userAgent) {
+    for (var i = 0; i < exports.device.length; i++) {
+      var res = exports.device[i][0].exec(userAgent);
+      if (res) return res;
+    }
+    return null;
+  };
+  ```
+
+test "rank1243 javascript: bounding the repeated section keeps the same parser safe"
+  lang javascript
+  profile library
+  reject VYQL-DOS-003
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  var parser;
+  exports.device = [];
+
+  parser = Object.create(null);
+  parser[0] = new RegExp("(HbbTV)/1\\.1\\.1.*CE-HTML/1\\.\\d;(Vendor/|)(THOM[^;]*?)[;\\s].{0,30}(LF[^;]+);?");
+  parser[1] = "$1";
+  exports.device[531] = parser;
+
+  exports.parse = function parse(userAgent) {
+    for (var i = 0; i < exports.device.length; i++) {
+      var res = exports.device[i][0].exec(userAgent);
+      if (res) return res;
+    }
+    return null;
+  };
+  ```

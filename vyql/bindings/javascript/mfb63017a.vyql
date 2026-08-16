@@ -4014,3 +4014,9 @@ binding catastrophicRegex911 {
   emit issue code.CatastrophicRegex at node
   emit sink code.CatastrophicRegexSink at node
 }
+
+binding catastrophicRegex960 {
+  query pattern presenceNode where node.context.language == "javascript" and node.context.literal contains "(?:.*" and node.context.literal contains ".*)*"
+  emit issue code.CatastrophicRegex at node
+  emit sink code.CatastrophicRegexSink at node
+}
