@@ -1,0 +1,90 @@
+# Rank 1506 / CVE-2026-38429: OpenCMS's older import versions unmarshalled an
+# uploaded manifest with no entity resolver, so external entities in the
+# import archive were fetched (CWE-611). CmsImportVersion2 through 5 and
+# CmsXmlPageConverter all called CmsXmlUtils.unmarshalHelper(bytes, null);
+# the core overload (CmsXmlUtils.java:817) builds a dom4j SAXReader, calls
+# reader.setEntityResolver(resolver) only when the resolver is non-null, and
+# reads -- so a null resolver left the parser's default entity resolution in
+# place and file:///http:///opencms:// references in the manifest resolved
+# externally. Pool commit e3e41e5a96 is the real fix (COMMIT_OK, "Fixed XXE
+# vulnerability in older import versions."): every unmarshalHelper call in
+# CmsImportVersion2/3/4/5 and CmsXmlPageConverter now passes
+# new CmsXmlEntityResolver(null), whose resolveEntity() answers only from
+# internal caches, the classpath XMLPAGE DTD/XSD, the opencms:// VFS scheme
+# and the internal: scheme, and throws "Entity reference not allowed" for
+# everything else. No pool correction.
+#
+# FIXED by a sink binding. The import versions' own digester sites were
+# already reported (VYQL-DESER-002 at CmsImportVersion7/10 through
+# digester.parse), but the unmarshalHelper sites were invisible: the call
+# is a static helper in another package (org.opencms.xml), taint does not
+# cross package boundaries into the wrapper, and no binding labelled the
+# helper itself. vyql/bindings/java/mxmlentityresolver.vyql emits
+# code.XmlParse at unmarshalHelper's first argument -- the method is
+# documented as unmarshalling XML, and any method of that name does.
+# Measured on the real code (src/org/opencms/importexport): the vulnerable
+# revision goes from 6 to 13 VYQL-DESER-002 findings, adding exactly this
+# commit's call sites -- CmsImportVersion2.java:191 and :833,
+# CmsImportVersion3.java:127, CmsImportVersion4.java:132,
+# CmsImportVersion5.java:143, CmsXmlPageConverter.java:79 and
+# A_CmsImport.java:345 -- each with source code.HttpInput at
+# CmsImportHelper (the uploaded import archive) and the unless clauses
+# unsatisfied. The fix's own control is not expressible, recorded rather
+# than papered over: distinguishing unmarshalHelper(x, null) from
+# unmarshalHelper(x, new CmsXmlEntityResolver(null)) needs an argument-
+# shape predicate, java's null_literal lowers to Const without a Value
+# (internal/extract/frontend/treesitter/java.go) and args.any.path is not
+# implemented in the scanner IR lowering (internal/bindings/
+# compile_shapes.go), so the binding cannot condition on the resolver's
+# presence and the fixed revision still reports at the call sites -- the
+# same shape-survives-the-fix family as rank 1503. Entered in
+# ENGINE-GAPS.md as a mechanical gap with the minimal pair below: the
+# expect case reports, the reject case (same call, resolver passed) should
+# not but does. The spec's reject direction therefore pins the boundary
+# the rule can draw today, following the rank 232 precedent: bytes that
+# are read but never handed to an XML parser report nothing.
+#
+# verify_current_expected: fixed-sink-binding
+
+test "rank1506: the import manifest is unmarshalled with no entity resolver"
+  lang java
+  file src/org/opencms/importexport/CmsImportVersion2.java
+  expect VYQL-DESER-002
+  code
+  ```
+  package org.opencms.importexport;
+
+  import jakarta.ws.rs.FormParam;
+  import jakarta.ws.rs.POST;
+
+  public class CmsImportVersion2 {
+    @POST
+    public void importManifest(@FormParam("file") byte[] manifest) throws Exception {
+      org.dom4j.Document doc = CmsXmlUtils.unmarshalHelper(manifest, null);
+      doc.getRootElement().getName();
+    }
+  }
+  ```
+
+test "rank1506: uploaded bytes that never reach an xml parser report nothing"
+  lang java
+  file src/org/opencms/importexport/CmsImportVersion2.java
+  reject VYQL-DESER-002
+  code
+  ```
+  package org.opencms.importexport;
+
+  import jakarta.ws.rs.FormParam;
+  import jakarta.ws.rs.POST;
+
+  public class CmsImportVersion2 {
+    @POST
+    public String importManifest(@FormParam("file") byte[] manifest) throws Exception {
+      int total = 0;
+      for (byte b : manifest) {
+        total += b;
+      }
+      return Integer.toString(total);
+    }
+  }
+  ```
