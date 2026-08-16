@@ -1,0 +1,294 @@
+# Rank 1235 / CVE-2018-15882: Joomla's InputFilter::isSafeFile
+# (libraries/src/Filter/InputFilter.php) is the upload validator every core
+# extension calls before it accepts a file. Step 3 of that validator opens the
+# uploaded temporary file, reads it in 128 KB chunks, and rejects any chunk
+# holding the `<?php` opening tag or -- for a short list of text-ish
+# extensions -- the `<?` short tag:
+#
+#   $fp = @fopen($tempName, 'r');
+#   while (!feof($fp)) {
+#       $data .= @fread($fp, 131072);
+#       if ($options['php_tag_in_content'] && stristr($data, '<?php')) { return false; }
+#       ...
+#   }
+#
+# A phar archive does not need an opening tag anywhere an ASCII scan can see.
+# What it does need, by the format's own definition, is the stub terminator
+# `__HALT_COMPILER();`, and the stub may be preceded by arbitrary bytes -- so
+# an archive built to avoid the literal `<?php` passes every branch above,
+# lands on disk under a harmless extension, and stays loadable through the
+# `phar://` stream wrapper, which unserializes the archive's metadata on open.
+# That is CWE-434 with a deserialization payoff, and it is why the advisory
+# (20180801, "Hardening the InputFilter for phar stubs") rates it critical.
+#
+# Step 0, `nocommit` flag: pool commit ff3b587e81 is titled "Prepare 3.8.12
+# release", which reads as a version bump. It is not only that. Joomla holds
+# security patches out of the public branch until release day and lands them
+# inside the release-prep commit, and `git show ff3b587e81` here changes five
+# files: the version manifest and Version.php, plus three security patches for
+# the three CVEs of that release -- an escaped profile field, a disabled-field
+# request check in Form.php, and this one. The InputFilter.php hunk adds the
+# `phar_stub_in_content` option, defaults it on, includes it in the guard that
+# decides whether to open the file at all, and adds the check itself:
+#
+#   if ($options['phar_stub_in_content'] && stripos($data, '__HALT_COMPILER()') !== false)
+#   {
+#       return false;
+#   }
+#
+# So the pool row is correct as it stands and needs no repointing.
+#
+# FIXED. Nothing was labelled before: `vyql scan` over
+# libraries/src/Filter at the vulnerable revision reported only
+# VYQL-CRY-001 (a md5 call elsewhere in the class) and VYQL-RES-001 (the file
+# handle), neither of which says anything about what the scan is looking for.
+# The nearest shipped vocabulary, code.IncompleteDangerousUploadExtensionBlocklist
+# (VYQL-INJ-070), judges a *filename extension* denylist -- and Joomla's
+# extension denylist already lists `phar`, so that concept is both the wrong
+# shape and, here, satisfied. The gap is the content scan's marker set, which
+# no concept covered.
+#
+# Adds code.UploadContentScanMissingPharStub (VYQL-INJ-209) for that shape and
+# one PHP binding for it. The binding asks three things of a function, all
+# derivable from PHP's own documentation with no knowledge of this CVE: it
+# reads bytes (fread/fgets/file_get_contents), those bytes belong to an upload
+# (the function mentions `tmp_name`, the documented $_FILES key holding the
+# temporary path), and it searches them for the literal `<?php` with one of the
+# five substring functions. It stays silent as soon as `__HALT_COMPILER`
+# appears anywhere in the same function, which is exactly what the patch adds.
+#
+# Measured on the real checkout, bounded (timeout 180, --max-ram 4GB,
+# --cache off): the whole repository does not finish inside the bound, so the
+# scan is scoped to libraries/, which holds the changed file -- 904 PHP files,
+# 872 findings, 51s. VYQL-INJ-209 appears exactly once in that output, at
+# src/Filter/InputFilter.php:503, the declaration line of isSafeFile. The same
+# scan over the patched file does not report it. Across the whole repository
+# the literal `'<?php'` occurs in one file only, so there is no second
+# candidate for the binding to have missed or misfired on.
+#
+# verify_current_expected: pass
+
+test "rank1235: the upload content scan rejects the PHP open tag but not the phar stub"
+  lang php
+  file libraries/src/Filter/InputFilter.php
+  expect VYQL-INJ-209
+  code
+  ```
+  <?php
+  namespace Joomla\CMS\Filter;
+
+  class InputFilter
+  {
+      public static function isSafeFile($file, $options = array())
+      {
+          $defaultOptions = array(
+              'null_byte'            => true,
+              'forbidden_extensions' => array(
+                  'php', 'phps', 'pht', 'phtml', 'php3', 'php4', 'php5', 'php6', 'php7', 'phar', 'inc', 'pl', 'cgi', 'fcgi', 'java', 'jar', 'py',
+              ),
+              'php_tag_in_content'   => true,
+              'shorttag_in_content'  => true,
+              'shorttag_extensions'  => array(
+                  'inc', 'phps', 'class', 'php3', 'php4', 'php5', 'txt', 'dat', 'tpl', 'tmpl',
+              ),
+          );
+
+          $options = array_merge($defaultOptions, $options);
+
+          $descriptors = $file;
+
+          if (isset($file['name']) && isset($file['tmp_name']))
+          {
+              $descriptors = array($file);
+          }
+
+          foreach ($descriptors as $fileDescriptor)
+          {
+              $tempName     = $fileDescriptor['tmp_name'];
+              $intendedName = $fileDescriptor['name'];
+
+              if ($options['null_byte'] && strstr($intendedName, "\x00"))
+              {
+                  return false;
+              }
+
+              $explodedName = array_map('strtolower', array_reverse(explode('.', $intendedName)));
+
+              foreach ($options['forbidden_extensions'] as $ext)
+              {
+                  if (in_array($ext, $explodedName))
+                  {
+                      return false;
+                  }
+              }
+
+              if ($options['php_tag_in_content'] || $options['shorttag_in_content'])
+              {
+                  $fp = @fopen($tempName, 'r');
+
+                  if ($fp !== false)
+                  {
+                      $data = '';
+
+                      while (!feof($fp))
+                      {
+                          $data .= @fread($fp, 131072);
+
+                          if ($options['php_tag_in_content'] && stristr($data, '<?php'))
+                          {
+                              return false;
+                          }
+
+                          if ($options['shorttag_in_content'] && strstr($data, '<?'))
+                          {
+                              return false;
+                          }
+
+                          $data = substr($data, -10);
+                      }
+
+                      fclose($fp);
+                  }
+              }
+          }
+
+          return true;
+      }
+  }
+  ```
+
+test "rank1235: the same scan with the phar stub marker added is silent"
+  lang php
+  file libraries/src/Filter/InputFilter.php
+  reject VYQL-INJ-209
+  code
+  ```
+  <?php
+  namespace Joomla\CMS\Filter;
+
+  class InputFilter
+  {
+      public static function isSafeFile($file, $options = array())
+      {
+          $defaultOptions = array(
+              'null_byte'            => true,
+              'forbidden_extensions' => array(
+                  'php', 'phps', 'pht', 'phtml', 'php3', 'php4', 'php5', 'php6', 'php7', 'phar', 'inc', 'pl', 'cgi', 'fcgi', 'java', 'jar', 'py',
+              ),
+              'php_tag_in_content'   => true,
+              'shorttag_in_content'  => true,
+              'phar_stub_in_content' => true,
+              'shorttag_extensions'  => array(
+                  'inc', 'phps', 'class', 'php3', 'php4', 'php5', 'txt', 'dat', 'tpl', 'tmpl',
+              ),
+          );
+
+          $options = array_merge($defaultOptions, $options);
+
+          $descriptors = $file;
+
+          if (isset($file['name']) && isset($file['tmp_name']))
+          {
+              $descriptors = array($file);
+          }
+
+          foreach ($descriptors as $fileDescriptor)
+          {
+              $tempName     = $fileDescriptor['tmp_name'];
+              $intendedName = $fileDescriptor['name'];
+
+              if ($options['null_byte'] && strstr($intendedName, "\x00"))
+              {
+                  return false;
+              }
+
+              $explodedName = array_map('strtolower', array_reverse(explode('.', $intendedName)));
+
+              foreach ($options['forbidden_extensions'] as $ext)
+              {
+                  if (in_array($ext, $explodedName))
+                  {
+                      return false;
+                  }
+              }
+
+              if ($options['php_tag_in_content'] || $options['shorttag_in_content'] || $options['phar_stub_in_content'])
+              {
+                  $fp = @fopen($tempName, 'r');
+
+                  if ($fp !== false)
+                  {
+                      $data = '';
+
+                      while (!feof($fp))
+                      {
+                          $data .= @fread($fp, 131072);
+
+                          if ($options['php_tag_in_content'] && stripos($data, '<?php') !== false)
+                          {
+                              return false;
+                          }
+
+                          if ($options['phar_stub_in_content'] && stripos($data, '__HALT_COMPILER()') !== false)
+                          {
+                              return false;
+                          }
+
+                          if ($options['shorttag_in_content'] && strstr($data, '<?'))
+                          {
+                              return false;
+                          }
+
+                          $data = substr($data, -10);
+                      }
+
+                      fclose($fp);
+                  }
+              }
+          }
+
+          return true;
+      }
+  }
+  ```
+
+test "rank1235: a cache reader that looks for the same tag outside an upload path is silent"
+  lang php
+  file libraries/src/Cache/Storage/FileStorage.php
+  reject VYQL-INJ-209
+  code
+  ```
+  <?php
+  namespace Joomla\CMS\Cache\Storage;
+
+  class FileStorage
+  {
+      public function readCacheEntry($path)
+      {
+          $fp = @fopen($path, 'rb');
+
+          if ($fp === false)
+          {
+              return false;
+          }
+
+          $data = '';
+
+          while (!feof($fp))
+          {
+              $data .= @fread($fp, 131072);
+
+              if (stripos($data, '<?php') !== false)
+              {
+                  fclose($fp);
+
+                  return false;
+              }
+          }
+
+          fclose($fp);
+
+          return $data;
+      }
+  }
+  ```
