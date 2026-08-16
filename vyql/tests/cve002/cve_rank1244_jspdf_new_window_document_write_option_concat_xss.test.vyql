@@ -10,6 +10,7 @@
 test "rank1244: new window document is written from a concatenated markup string"
   lang javascript
   file jspdf.js
+  expect VYQL-INJ-240
   expect_review code.OpenedWindowConcatenatedDocumentWrite
   code
   ```
@@ -77,6 +78,7 @@ test "rank1244: new window document is written from a concatenated markup string
 test "rank1244: new window document is built from created elements"
   lang javascript
   file jspdf.js
+  reject VYQL-INJ-240
   reject_review code.OpenedWindowConcatenatedDocumentWrite
   code
   ```
