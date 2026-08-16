@@ -1,0 +1,75 @@
+# Rank 1514 / CVE-2026-7551: OpenHarness registered its bridge command as
+# remotely invocable by default, so a gateway caller could spawn bridge
+# sessions on the victim's machine (missing function-level access control,
+# CWE-306). create_default_command_registry in
+# src/openharness/commands/registry.py registered
+#   registry.register(SlashCommand("bridge", "Inspect bridge helpers and
+#       spawn bridge sessions", _bridge_handler))
+# with no exposure flags: the SlashCommand default leaves the command
+# invocable through the remote gateway, and the handler inspects and
+# SPAWNS bridge sessions. Pool commit 438e37309 is the real fix
+# (COMMIT_OK, "fix: keep bridge command local-only by default"): the same
+# registration now passes remote_invocable=False and
+# remote_admin_opt_in=True, with gateway tests asserting the command is
+# not reachable remotely. No pool correction.
+#
+# ATTENTION, access-control default vocabulary. The vulnerability is a
+# registration default, not a flow: the handler never runs in the
+# vulnerable revision unless a remote peer asks, no tainted value reaches
+# a sink, and the single changed line is metadata on a constructor call.
+# For the corpus to catch this it would need to know that a registry of
+# remotely-invocable commands treats every registration as exposed
+# unless flagged, and which handlers are powerful -- both application
+# semantics of the same missing-concept family as ranks 1501/1504/1505/
+# 1508/1513, with the added twist that the "sink" is an option default
+# rather than a call. Measured on the real code: scanning
+# src/openharness/commands at the fix parent reports two VYQL-AUTH-105
+# rate-limit rows and four VYQL-CFG-008 rows at registry.py:120 and :768,
+# authentication-throttle heuristics far from the bridge registration;
+# nothing fires on the command table at either revision (the wave's
+# repo-wide scans both terminated under the 180s bound at 441 tracked
+# files, so the directory scan is the evidence). A binding on
+# OpenHarness' own SlashCommand would detect this application rather
+# than the weakness. No ENGINE-GAPS.md entry: the piece is ontology
+# design (remote-exposure defaults), not a localised construct. No
+# definition change shipped. Spec cve_rank1514 records the default
+# registration and the local-only flags, both asserting reject
+# VYQL-AUTH-105.
+
+test "rank1514: the bridge command is registered with default exposure"
+  lang python
+  file src/openharness/commands/registry.py
+  reject VYQL-AUTH-105
+  code
+  ```
+  def create_default_command_registry():
+      registry = CommandRegistry()
+      registry.register(SlashCommand("rewind", "Remove the latest conversation turn(s)", _rewind_handler))
+      registry.register(SlashCommand("files", "List files in the current workspace", _files_handler))
+      registry.register(SlashCommand("bridge", "Inspect bridge helpers and spawn bridge sessions", _bridge_handler))
+      registry.register(SlashCommand("login", "Show auth status or store an API key", _login_handler))
+      return registry
+  ```
+
+test "rank1514: the fix keeps the bridge command local-only"
+  lang python
+  file src/openharness/commands/registry.py
+  reject VYQL-AUTH-105
+  code
+  ```
+  def create_default_command_registry():
+      registry = CommandRegistry()
+      registry.register(SlashCommand("rewind", "Remove the latest conversation turn(s)", _rewind_handler))
+      registry.register(SlashCommand("files", "List files in the current workspace", _files_handler))
+      registry.register(
+          SlashCommand(
+              "bridge",
+              "Inspect bridge helpers and spawn bridge sessions",
+              _bridge_handler,
+              remote_invocable=False,
+              remote_admin_opt_in=True,
+          )
+      )
+      registry.register(SlashCommand("login", "Show auth status or store an API key", _login_handler))
+      return registry
+  ```
