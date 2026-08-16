@@ -1,0 +1,227 @@
+# Rank 1233 / CVE-2025-5115 jetty/jetty.project: an HTTP/2 peer can make the
+# server generate RST_STREAM frames for it, and nothing charges those frames
+# against the connection's rate control (CWE-400, CWE-770, the weakness the
+# "MadeYouReset" family of HTTP/2 advisories describes). Jetty meters the
+# frames it receives -- RateControl.onEvent returns false once a connection has
+# spent its budget, and the parser closes the connection with
+# ENHANCE_YOUR_CALM -- but HTTP2Session.reset() wrote the reset frame through
+# control(), closed the stream and dropped it from the session registry with no
+# charge at all. A peer that keeps sending frames the server must answer with a
+# stream error (a zero-delta WINDOW_UPDATE, a flow-control overflow, a frame on
+# a closed stream) therefore drives stream creation, stream teardown and
+# outbound frame emission at whatever rate it can write, and each teardown
+# frees a slot in the concurrent-stream limit immediately, so the limit stops
+# bounding the work in flight.
+#
+# Repository names: rank 1232 scans eclipse/jetty.project and this rank scans
+# jetty/jetty.project. Both names resolve to the same repository -- the GitHub
+# API answers repos/eclipse/jetty.project with full_name jetty/jetty.project
+# and fork false -- so the project moved organisation and both pool rows are
+# correct as written. The two CVEs are genuinely different: CVE-2019-17638 is a
+# 9.4 buffer release defect and CVE-2025-5115 is this 12.0 rate-control gap.
+# No pool correction is needed for either row.
+#
+# Pool commit f9ee390478 carries no flag; read its diff per Step 0's note that
+# flags are not the only source of pool errors, and confirmed it is the real
+# fix: it is the merge of pull request 13449, whose GitHub title is "HTTP2Session
+# cleanups to address CVE-2025-5115", and its combined diff touches only the
+# HTTP/2 module -- HTTP2Session.java, the four parser classes that expose
+# RateControl, the module configuration that lowers the default event budget,
+# and two tests. Its first parent 6b1a663d is the vulnerable state. The same
+# change went to the 9.4 and 10.0 branches as pull requests 13461 and 13462.
+#
+# FIXED. Nothing labelled the teardown path: a bounded scan of the whole
+# jetty-core tree at the vulnerable parent reports 1263 findings and none of
+# them names HTTP2Session.reset.
+# Added code.StreamResetWithoutRateControl (VYQL-DOS-044) with a Java binding
+# at function scope. The binding asks for three things together, because the
+# weakness is the conjunction and not any one of them: the method receives the
+# reset frame or the stream error that describes it (ResetFrame,
+# RstStreamFrame, Http2ResetFrame, StreamException -- the frame types the Java
+# HTTP/2 stacks use), it writes that frame out itself (Jetty's control(), or
+# writeRstStream / sendRstStream / writeStreamReset / sendStreamReset /
+# writeReset / sendReset in the other stacks), and it removes the stream from
+# the session registry. Any rate-control name on that path suppresses it, in
+# both spellings applications use: the interface Jetty documents
+# (rateControlOnEvent, getRateControl, rateControl.onEvent, onEvent) and an
+# ordinary token bucket (rateLimiter.tryAcquire, limiter.acquire, throttle,
+# checkRate), plus a rateControl or rateLimiter field name and the
+# ENHANCE_YOUR_CALM error the charge produces when it fails.
+#
+# All three conjuncts are needed, and the rejecting tests below are the reason.
+# The third test is the same teardown guarded by a token bucket under a name
+# Jetty never uses, so the binding cannot be keyed to one library's limiter.
+# The fourth is HTTP2Stream.reset() copied from the same revision: it receives
+# the frame and it removes the stream, but it forwards the write to
+# session.reset() rather than performing it, so the charge belongs to the method
+# it forwards to and flagging the caller would report the same defect twice.
+#
+# Measured on the real checkout, bounded (timeout 180, --max-ram 4GB,
+# --cache off). Scanning jetty-core/jetty-http2 (173 java files) at the
+# vulnerable parent 6b1a663d reports 98 findings, one of them VYQL-DOS-044 at
+# HTTP2Session.java:816, the reset() method the fix changes; the same module at
+# f9ee390478 reports 97, the same set minus that finding. Widening to the whole
+# jetty-core tree (2197 java files, which holds the HTTP/2 client, the HTTP/2
+# server, the HTTP/3 session that has the same reset shape, and their tests)
+# still reports VYQL-DOS-044 exactly once at the vulnerable parent and zero
+# times at the fix, so the three conjuncts do not fire on the neighbouring
+# session implementations. The whole repository exceeds the 180s bound, so
+# jetty-core is the real-checkout evidence. False positives: the same binding
+# over an unrelated Java corpus already cloned for this corpus,
+# jackson-databind/src (721 java files), reports VYQL-DOS-044 zero times, and
+# the full spec suite (4376 specs) passes unchanged.
+#
+
+test "rank1233: the session sends RST_STREAM and tears the stream down with no rate charge"
+  lang java
+  file HTTP2Session.java
+  expect VYQL-DOS-044
+  expect_review code.StreamResetWithoutRateControl
+  code
+  ```
+  package org.eclipse.jetty.http2;
+
+  import org.eclipse.jetty.http2.frames.ResetFrame;
+  import org.eclipse.jetty.util.Callback;
+
+  public abstract class HTTP2Session extends AbstractLifeCycle implements Session, Parser.Listener
+  {
+      void reset(HTTP2Stream stream, ResetFrame frame, Callback callback)
+      {
+          control(stream, Callback.from(() ->
+          {
+              if (stream != null)
+              {
+                  stream.close();
+                  removeStream(stream);
+              }
+          }, callback), frame);
+      }
+  }
+  ```
+
+test "rank1233: the teardown path charges the connection rate control before writing the frame"
+  lang java
+  file HTTP2Session.java
+  reject VYQL-DOS-044
+  reject_review code.StreamResetWithoutRateControl
+  code
+  ```
+  package org.eclipse.jetty.http2;
+
+  import org.eclipse.jetty.http2.frames.ResetFrame;
+  import org.eclipse.jetty.util.Callback;
+
+  public abstract class HTTP2Session extends AbstractLifeCycle implements Session, Parser.Listener
+  {
+      void reset(HTTP2Stream stream, ResetFrame frame, Callback callback)
+      {
+          if (rateControlOnEvent(frame))
+          {
+              control(stream, Callback.from(() ->
+              {
+                  if (stream != null)
+                  {
+                      stream.close();
+                      removeStream(stream);
+                  }
+              }, callback), frame);
+          }
+          else
+          {
+              onConnectionFailure(ErrorCode.ENHANCE_YOUR_CALM_ERROR.code, "invalid_rst_stream_frame_rate");
+          }
+      }
+
+      private boolean rateControlOnEvent(Object event)
+      {
+          return getParser().rateControlOnEvent(event);
+      }
+  }
+  ```
+
+test "rank1233: a teardown path guarded by a token-bucket limiter under a different name"
+  lang java
+  file Http2ConnectionHandler.java
+  reject VYQL-DOS-044
+  reject_review code.StreamResetWithoutRateControl
+  code
+  ```
+  package com.example.http2;
+
+  import com.example.http2.frames.ResetFrame;
+
+  public class Http2ConnectionHandler
+  {
+      private final RateLimiter rateLimiter;
+
+      void resetStream(Http2Stream stream, ResetFrame frame, Callback callback)
+      {
+          if (!rateLimiter.tryAcquire())
+          {
+              connectionError(Http2Error.ENHANCE_YOUR_CALM, "reset_rate_exceeded");
+              return;
+          }
+          writeRstStream(stream, frame, callback);
+          stream.close();
+          removeStream(stream);
+      }
+  }
+  ```
+
+test "rank1233: the stream-level reset entry point delegates the frame write to the session"
+  lang java
+  file HTTP2Stream.java
+  reject VYQL-DOS-044
+  reject_review code.StreamResetWithoutRateControl
+  code
+  ```
+  package org.eclipse.jetty.http2;
+
+  import org.eclipse.jetty.http2.frames.ResetFrame;
+  import org.eclipse.jetty.util.Callback;
+
+  public class HTTP2Stream implements Stream, Attachable, Closeable, Callback, Dumpable
+  {
+      @Override
+      public void reset(ResetFrame frame, Callback callback)
+      {
+          if (LOG.isDebugEnabled())
+              LOG.debug("Resetting {} {}", frame, this);
+
+          int flowControlLength;
+          boolean reset = true;
+          Throwable resetFailure = null;
+          try (AutoLock ignored = lock.lock())
+          {
+              flowControlLength = drain();
+              if (localReset)
+              {
+                  reset = false;
+                  resetFailure = failure;
+              }
+              else
+              {
+                  localReset = true;
+                  failure = new EOFException("reset");
+              }
+          }
+
+          session.dataConsumed(this, flowControlLength);
+
+          if (reset)
+          {
+              session.reset(this, frame, callback);
+          }
+          else
+          {
+              close();
+              session.removeStream(this);
+              if (resetFailure == null)
+                  callback.succeeded();
+              else
+                  callback.failed(resetFailure);
+          }
+      }
+  }
+  ```
