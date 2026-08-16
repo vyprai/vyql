@@ -1,0 +1,95 @@
+# Rank 1513 / CVE-2024-25421: Openfire did not remove a deleted user's
+# multi-user-chat affiliations, so a new user registering the same
+# username inherited the old user's room privileges (privilege
+# inheritance on identity reuse, CWE-269). MUCRoom in
+# xmppserver/src/main/java/org/jivesoftware/openfire/muc/MUCRoom.java
+# implemented GroupEventListener but had no UserEventListener: when a user
+# was deleted, owner/admin/member/outcast affiliations in every room
+# survived, and MultiUserChatManager's registration path matched the new
+# account to them by bare JID. Pool commit d66bddd29 is the real fix
+# (COMMIT_OK, "OF-2795 / OF-2166: Remove MUC affiliation of a user that
+# is being deleted. (#2420)"): MUCRoom now implements UserEventListener,
+# and userDeleting() takes the chat-room lock, keeps the room owned by
+# replacing a sole owner with an administrative account, then addNone()
+# the deleted user's JID and syncs the room; MultiUserChatManager
+# removes affiliations from rooms not loaded in memory, and
+# LocalMUCRoomManager drops the deleted user's nickname entries. The task
+# list carried no flag; the prefetch wave had marked the rank NO_COMMIT
+# because a stale git lock from an earlier crash made the commit look
+# unfetchable -- the commit resolves in the clone and is the fix, so no
+# pool correction.
+#
+# ATTENTION, authorization-lifecycle vocabulary. The weakness is a
+# missing revocation on an identity lifecycle event: no input flows
+# anywhere, no operation is performed with attacker-controlled data, and
+# the vulnerable class is simply silent where the fix adds a handler.
+# Nothing in the corpus can express "this affiliation store must react to
+# user deletion" -- it is the same credential-versus-decision family as
+# ranks 1501, 1504, 1505 and 1508, but one step more semantic: even the
+# concept names are missing, not just the bindings. Measured on the real
+# code: scanning the muc package at both revisions reports the same two
+# VYQL-AUTH-079 rows (code.SensitiveOperation by auditreview.marks at
+# MUCRoom.java:1803/1830 parent, 1806/1833 fix -- line shift only, the
+# added imports), audit heuristics unrelated to the deletion path; the
+# affiliation-lifecycle weakness is invisible at both. A binding on
+# Openfire's own UserEventListener would detect this application rather
+# than the weakness. No ENGINE-GAPS.md entry: the piece is ontology
+# design (identity-lifecycle revocation), not a localised construct. No
+# definition change shipped. Spec cve_rank1513 records a room without
+# the deletion handler and the handler-bearing form, both asserting
+# reject VYQL-AUTH-079.
+
+test "rank1513: the room keeps affiliations when their user is deleted"
+  lang java
+  file xmppserver/src/main/java/org/jivesoftware/openfire/muc/MUCRoom.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.jivesoftware.openfire.muc;
+
+  import java.util.Map;
+  import org.jivesoftware.openfire.user.User;
+
+  public class MUCRoom implements GroupEventListener {
+      public void groupCreated(String groupName, Map<String, Object> params) {}
+      public void groupDeleting(String groupName, Map<String, Object> params) {}
+      public void groupModified(String groupName, Map<String, Object> params) {}
+  }
+  ```
+
+test "rank1513: the fix revokes affiliations on user deletion"
+  lang java
+  file xmppserver/src/main/java/org/jivesoftware/openfire/muc/MUCRoom.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.jivesoftware.openfire.muc;
+
+  import java.util.Map;
+  import java.util.concurrent.locks.Lock;
+  import org.jivesoftware.openfire.user.User;
+
+  public class MUCRoom implements GroupEventListener, UserEventListener {
+      public void userCreated(User user, Map<String, Object> params) {}
+      public void userModified(User user, Map<String, Object> params) {}
+
+      public void userDeleting(User user, Map<String, Object> params) {
+          final JID userJid = XMPPServer.getInstance().createJID(user.getUsername(), null);
+          final Lock lock = getMUCService().getChatRoomLock(getJID().getNode());
+          try {
+              lock.lock();
+              if (getAffiliation(userJid) == MUCRole.Affiliation.none) {
+                  return;
+              }
+              if (getOwners().contains(userJid) && getOwners().size() == 1) {
+                  final JID adminJid = XMPPServer.getInstance().getAdmins().iterator().next();
+                  addOwner(adminJid, getRole());
+              }
+              addNone(userJid, getRole());
+              getMUCService().syncChatRoom(this);
+          } finally {
+              lock.unlock();
+          }
+      }
+  }
+  ```
