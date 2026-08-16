@@ -1,0 +1,218 @@
+# Rank 1203 / CVE-2017-17499: Magick::Image::read (Magick++/lib/Image.cpp)
+# takes an ExceptionInfo* the caller owns and, when no image frame was
+# actually loaded, both explicitly destroys it and then falls through,
+# unconditionally, into the ThrowImageException macro -- which itself reads
+# from that same exception object and destroys it a second time (CWE-415,
+# CWE-416).
+#
+# `#define ThrowImageException ThrowPPException(quiet())` and
+# `#define ThrowPPException(quiet) throwException(exceptionInfo,quiet);
+# (void) MagickCore::DestroyExceptionInfo(exceptionInfo)`
+# (Magick++/lib/Magick++/Include.h). The vulnerable read():
+#
+#   if (exceptionInfo->severity == MagickCore::UndefinedException &&
+#       image == (MagickCore::Image *) NULL)
+#     {
+#       (void) MagickCore::DestroyExceptionInfo(exceptionInfo);
+#       throwExceptionExplicit(ImageWarning,"No image was loaded.");
+#     }
+#   ThrowImageException;
+#
+# has no `else` between the `if` and the macro invocation, so whenever the
+# guard is true and quiet() suppresses throwExceptionExplicit's own throw
+# (it returns instead of throwing when the caller asked for quiet errors),
+# execution falls through to ThrowImageException regardless -- which reads
+# exceptionInfo's fields (throwException(exceptionInfo,...), a use) and
+# frees it a second time (DestroyExceptionInfo(exceptionInfo) again, per its
+# own doc comment: "deallocates memory associated with an exception," and
+# relinquishes the struct itself when the caller-owned exception's
+# `relinquish` flag is set, which AcquireExceptionInfo's callers set). Fix
+# dd96d671e4d5ae22c6894c302e8996c13f24c45a, read via `git show` on
+# Magick++/lib/Image.cpp only, adds the missing `else`, so the macro's
+# double touch of exceptionInfo runs only on the path that never destroyed
+# it, and makes throwExceptionExplicit unconditional-on-not-quiet instead of
+# always running before the fallthrough.
+#
+# No flag on the pool row. Verified the commit is the real, targeted fix
+# rather than a release bump per Step 0's note that flags are not the only
+# source of pool errors: the diff touches exactly the nine lines quoted
+# above, in the one function CVE-2017-17499's advisory names
+# (Magick::Image::read), and nothing else in the commit.
+#
+# ATTENTION, engine gap. `vyql match` on both the vulnerable and the fixed
+# form of read() labels nothing at all -- no source, sink, or control
+# anywhere in the function on either revision. `vyql resolve` confirms why:
+# the explicit `MagickCore::DestroyExceptionInfo(exceptionInfo)` inside the
+# `if` block is a real, visible (if unbound) call site, but `ThrowImageException;`
+# is not a call site at all. It is an object-like macro invoked with no
+# parentheses, so tree-sitter parses it as a bare identifier expression
+# statement; the two calls its body actually performs --
+# `throwException(exceptionInfo,quiet())` and the second
+# `DestroyExceptionInfo(exceptionInfo)` -- exist only in the macro's
+# unexpanded text and never reach the AST the extractor walks. This is where
+# both the double-free and the use-after-free actually happen (the first
+# `DestroyExceptionInfo` is the only visible one), so nothing downstream of
+# node emission -- no binding, no rule -- can see them regardless of what
+# vocabulary exists for MagickCore's Destroy*Info release convention.
+#
+# Isolated with a CVE-independent minimal pair naming no ImageMagick API,
+# reusing the free()-based pipeline that already ships (code.PointerFree,
+# code.PointerUse, VYQL-MEM-007 PotentialUseAfterFree) to prove the
+# labelling and rule layers work and only the macro invocation is invisible:
+#
+#   void directUse(int *p) { free(p); int x = *p; }
+#
+# reports VYQL-MEM-007 on the dereference; the identical free-then-use
+# spelled as an object-like macro body --
+#
+#   #define ThrowFreeUse free(p); int x = *p;
+#   void macroUse(int *p) { ThrowFreeUse; }
+#
+# -- reports nothing (`vyql match`: no source, sink or control anywhere;
+# `vyql resolve` lists no call sites for `free` or the dereference at all,
+# not even as unresolved). The two snippets differ only in whether the
+# free-then-use is written as two direct statements or invoked through one
+# macro that expands to those same two statements.
+#
+# Scanning the real checkout (bounded, timeout 180, --max-ram 4GB,
+# --cache off) confirms the same absence at scale: both revisions report
+# 33171 findings, 13686 at or above high, and the two outputs diverge only
+# in 52 unrelated taint-path lines elsewhere in the corpus (which caller of a
+# shared allocation helper the path printer picked first -- present on both
+# revisions, not a detection difference); nothing in either output names
+# Image.cpp near the read() function, and no VYQL-MEM-007 or VYQL-MEM-008
+# finding appears in Image.cpp on either revision.
+#
+# Expanding macro invocations (object-like here; the chain also passes
+# through the function-like ThrowPPException(quiet) one level in) before or
+# during AST construction is not a bounded, one-function fix the way the
+# nearby delete-expression and #if-0 gaps are -- it is a preprocessing
+# subsystem (recognizing #define, substituting at each use site, handling
+# both macro forms and their interaction, keeping source-to-node line
+# mapping sane for diagnostics) spanning the whole C/C++ frontend rather
+# than one AST case, so it is recorded under ENGINE-GAPS.md's non-mechanical
+# section rather than the mechanical table. No definition change attempted.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1203: Image::read falls through into the exception macro after already destroying it"
+  lang cpp
+  file image_read.cpp
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  code
+  ```
+  namespace MagickCore {
+    typedef struct _ExceptionInfo { int severity; } ExceptionInfo;
+    ExceptionInfo *DestroyExceptionInfo(ExceptionInfo *exception);
+    typedef struct _Image Image;
+    enum { UndefinedException, ImageWarning };
+  }
+
+  namespace Magick {
+    void throwExceptionExplicit(int severity, const char *reason);
+    void throwException(MagickCore::ExceptionInfo *exception_, const bool quiet_);
+
+    class Image {
+    public:
+      bool quiet() const;
+      void replaceImage(MagickCore::Image *image);
+      void read(MagickCore::Image *image, MagickCore::ExceptionInfo *exceptionInfo);
+    };
+  }
+
+  #define ThrowImageException \
+    throwException(exceptionInfo,quiet()); \
+    (void) MagickCore::DestroyExceptionInfo(exceptionInfo)
+
+  void Magick::Image::read(MagickCore::Image *image,
+    MagickCore::ExceptionInfo *exceptionInfo)
+  {
+    replaceImage(image);
+    if (exceptionInfo->severity == MagickCore::UndefinedException &&
+        image == (MagickCore::Image *) 0)
+      {
+        (void) MagickCore::DestroyExceptionInfo(exceptionInfo);
+        throwExceptionExplicit(MagickCore::ImageWarning,"No image was loaded.");
+      }
+    ThrowImageException;
+  }
+  ```
+
+test "rank1203: Image::read only reaches the macro on the path that never destroyed the exception"
+  lang cpp
+  file image_read_fixed.cpp
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  code
+  ```
+  namespace MagickCore {
+    typedef struct _ExceptionInfo { int severity; } ExceptionInfo;
+    ExceptionInfo *DestroyExceptionInfo(ExceptionInfo *exception);
+    typedef struct _Image Image;
+    enum { UndefinedException, ImageWarning };
+  }
+
+  namespace Magick {
+    void throwExceptionExplicit(int severity, const char *reason);
+    void throwException(MagickCore::ExceptionInfo *exception_, const bool quiet_);
+
+    class Image {
+    public:
+      bool quiet() const;
+      void replaceImage(MagickCore::Image *image);
+      void read(MagickCore::Image *image, MagickCore::ExceptionInfo *exceptionInfo);
+    };
+  }
+
+  #define ThrowImageException \
+    throwException(exceptionInfo,quiet()); \
+    (void) MagickCore::DestroyExceptionInfo(exceptionInfo)
+
+  void Magick::Image::read(MagickCore::Image *image,
+    MagickCore::ExceptionInfo *exceptionInfo)
+  {
+    replaceImage(image);
+    if (exceptionInfo->severity == MagickCore::UndefinedException &&
+        image == (MagickCore::Image *) 0)
+      {
+        (void) MagickCore::DestroyExceptionInfo(exceptionInfo);
+        if (!quiet())
+          throwExceptionExplicit(MagickCore::ImageWarning,"No image was loaded.");
+      }
+    else
+      {
+        ThrowImageException;
+      }
+  }
+  ```
+
+# The isolating pair. Same free-then-use shape the existing PointerFree ->
+# PointerUse pipeline already reports; only whether it is written as two
+# direct statements or invoked through one macro that expands to those same
+# two statements differs.
+
+test "rank1203: a direct free-then-use is labelled by the existing pipeline"
+  lang cpp
+  file direct_free_use.cpp
+  expect VYQL-MEM-007
+  code
+  ```
+  void directUse(int *p) {
+      free(p);
+      int x = *p;
+  }
+  ```
+
+test "rank1203: the identical free-then-use invoked through an object-like macro is invisible"
+  lang cpp
+  file macro_free_use.cpp
+  reject VYQL-MEM-007
+  code
+  ```
+  #define ThrowFreeUse free(p); int x = *p;
+
+  void macroUse(int *p) {
+      ThrowFreeUse;
+  }
+  ```
