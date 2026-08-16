@@ -1,0 +1,268 @@
+# Rank 1213 / CVE-2012-6696: InspIRCd's DNS response parser checks the
+# remaining bytes before reading a fixed-size resource record header, but
+# does the check in unsigned arithmetic that the attacker-controlled cursor
+# can push past the checked length. DNSRequest::ResultIsReady in src/dns.cpp
+# walks `i` forward by attacker-supplied label lengths from `header.payload`,
+# an `unsigned char payload[512]` field, then guards the next read with
+#
+#   if (length - i < 10)
+#       return std::make_pair((unsigned char*)NULL,"Incorrectly sized DNS reply");
+#   DNS::FillResourceRecord(&rr,&header.payload[i]);
+#
+# where both `length` and `i` are `unsigned` (confirmed with
+# `git show ed28c1ba666b39581adb860bf51cdde43c84cc89^:src/dns.cpp`, line 696
+# and the local `unsigned i = 0`). A crafted reply advances `i` past `length`
+# (the preceding label-length loop only stops once `i` reaches `length`, not
+# before overshooting it), so `length - i` wraps to a huge unsigned value,
+# `< 10` is false, the guard passes, and FillResourceRecord reads 10 bytes
+# from `header.payload + i` out of the 512-byte buffer (CWE-20 per NVD; the
+# mechanism is CWE-191, unsigned integer underflow, in the guard's own
+# subtraction). This is an incomplete fix to CVE-2012-1836, which fixed a
+# comparison earlier in the same function; this defect sits in the same
+# unsigned-cursor pattern one check later.
+#
+# Pool commit 58c893e834 (COMMIT_MISMATCH, GHSA-67r3-xhrr-46h9) touches the
+# same function's DN_QUERY_CNAME/PTR decompression loop the next day (adds a
+# `lowest_pos` monotonic-decrease check to stop compression-pointer loops), a
+# real but different defect in the same file; it is not the fix
+# GHSA-67r3-xhrr-46h9 and NVD cite. Both name
+# ed28c1ba666b39581adb860bf51cdde43c84cc89 (`git show`, one line: the
+# comparison becomes `static_cast<int>(length - i) < 10`) as the fix.
+# `pool.tsv` line for rank 1213 corrected in place to that sha.
+#
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 4GB` against the real
+# checkout at the fix's parent commit reports nothing at either the
+# subtraction or the read in src/dns.cpp: no VYQL-MEM-010
+# (FieldDerivedIndexAccess), no VYQL-NUM-003 (TaintedIntegerSizeArithmetic),
+# no VYQL-MEM-016 (there is no memcpy at this site, only the address-of
+# expression `&header.payload[i]` passed to FillResourceRecord). `vyql match`
+# on the isolated function confirms why: `header.payload[i]` is labelled
+# generically as code.IndexAccess/IndexAccessSink (the presence-only
+# `__subscript` binding), but nothing emits code.FieldDerivedIndexAccess, and
+# `vyql resolve` shows FillResourceRecord unresolved (declared, not defined
+# in the isolated snippet, as in the real code where its body lives
+# elsewhere) -- taint has nowhere to terminate in a sink that would matter.
+#
+# ATTENTION, engine gap, root-caused past what the rank 1026/1032/1038 rows
+# already describe. `ccIndexAccessObservations` (c.go:1595) reads a
+# subscript's index by taking the `index` field of a `subscript_expression`
+# node. That works for the C grammar, where `index` is a direct field. The
+# C++ grammar instead wraps the index in an intermediate
+# `subscript_argument_list` child node (to support C++23's multi-argument
+# `operator[]`), so `field(n, "index")` returns nil for every C++ subscript,
+# structured or not -- confirmed by temporarily instrumenting
+# ccIndexAccessObservations: for `payload_start[ctx->section_offset]` parsed
+# as C++, `field(n, "index")` yields an empty string while the node's actual
+# children are `identifier=payload_start` and
+# `subscript_argument_list=[ctx->section_offset]`; the same text parsed as C
+# yields the index directly. The gate `ccStructuredIndex(idxText) &&
+# compactIdx != ""` then fails for every C++ subscript regardless of shape,
+# so code.FieldDerivedIndexAccess can never fire on C++ source at all. This
+# is not specific to this rank's index being a plain local: the isolating
+# pair below indexes with `header->payload[header->pos]`, a genuinely
+# field-derived index the C frontend reports and the C++ frontend, on the
+# same text, does not. Corpus evidence agrees --
+# `coverage_cpp_exhaustive.test.vyql` has zero mentions of
+# FieldDerivedIndexAccess or VYQL-MEM-010, while `coverage_c.test.vyql`
+# exercises both, and grepping every `cve_rank*.test.vyql` for `expect
+# VYQL-MEM-010` beside `lang cpp` returns nothing; every existing expect for
+# it is `lang c`. This also likely explains why ranks 1026 and 1032 (both
+# `lang cpp`, both already recorded ATTENTION for VYQL-MEM-010 not
+# discriminating) never see it fire at all rather than firing on both
+# revisions: the gate those rows blame -- ccHasUpperBoundGuard treating any
+# `< N` mention as a guard -- is downstream of a gate that never opens for
+# C++ in the first place. The fix is mechanical and localised: when
+# `field(n, "index")` is empty, fall back to the `subscript_argument_list`
+# child's first named expression as the index text.
+#
+# The taint-based rule VYQL-NUM-003 (TaintedIntegerSizeArithmetic) was also
+# checked and does not help: adding a taint source (`recv`) ahead of `length`
+# in a standalone variant makes it fire on the subtraction identically in
+# both the vulnerable and the `static_cast<int>`-fixed forms, because no C
+# or C++ binding recognises a cast as covering core.IntegerOverflowGuard --
+# the same "does not separate the revisions" shape already noted for rank
+# 1071. Moot for the real file regardless: `length` there traces to
+# `ServerInstance->SE->RecvFrom`, InspIRCd's own SocketEngine method, which
+# no source binding recognises (`callee.path ~= "recv"` requires a
+# dotted-segment match and does not match `RecvFrom`), so nothing propagates
+# taint to this code in the actual scan.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1213: the remaining-length guard subtracts an attacker-advanced cursor unsigned"
+  lang cpp
+  file src/dns.cpp
+  reject VYQL-MEM-010
+  code
+  ```
+  #include <utility>
+  #include <string>
+
+  typedef std::pair<unsigned char*, std::string> DNSInfo;
+
+  struct ResourceRecord
+  {
+      unsigned int type;
+      unsigned int rr_class;
+      unsigned long ttl;
+      unsigned int rdlength;
+  };
+
+  class DNSHeader
+  {
+   public:
+      unsigned int ancount;
+      unsigned char payload[512];
+  };
+
+  static void FillResourceRecord(ResourceRecord* rr, const unsigned char* input);
+
+  DNSInfo ResultIsReady(DNSHeader &header, unsigned length, unsigned char* res)
+  {
+      unsigned i = 0;
+      int curanswer = 0;
+      ResourceRecord rr;
+
+      while ((unsigned)curanswer < header.ancount)
+      {
+          if (length - i < 10)
+              return std::make_pair((unsigned char*)NULL,"Incorrectly sized DNS reply");
+
+          FillResourceRecord(&rr,&header.payload[i]);
+
+          i += 10;
+          curanswer++;
+      }
+
+      return std::make_pair(res,"No error");
+  }
+  ```
+
+test "rank1213: the guard's subtraction is taken in a signed type before the comparison"
+  lang cpp
+  file src/dns.cpp
+  reject VYQL-MEM-010
+  code
+  ```
+  #include <utility>
+  #include <string>
+
+  typedef std::pair<unsigned char*, std::string> DNSInfo;
+
+  struct ResourceRecord
+  {
+      unsigned int type;
+      unsigned int rr_class;
+      unsigned long ttl;
+      unsigned int rdlength;
+  };
+
+  class DNSHeader
+  {
+   public:
+      unsigned int ancount;
+      unsigned char payload[512];
+  };
+
+  static void FillResourceRecord(ResourceRecord* rr, const unsigned char* input);
+
+  DNSInfo ResultIsReady(DNSHeader &header, unsigned length, unsigned char* res)
+  {
+      unsigned i = 0;
+      int curanswer = 0;
+      ResourceRecord rr;
+
+      while ((unsigned)curanswer < header.ancount)
+      {
+          if (static_cast<int>(length - i) < 10)
+              return std::make_pair((unsigned char*)NULL,"Incorrectly sized DNS reply");
+
+          FillResourceRecord(&rr,&header.payload[i]);
+
+          i += 10;
+          curanswer++;
+      }
+
+      return std::make_pair(res,"No error");
+  }
+  ```
+
+test "rank1213: engine gap isolated -- the same field-derived, unguarded index reports under the C frontend"
+  lang c
+  file src/dns.c
+  expect VYQL-MEM-010
+  code
+  ```
+  struct ResourceRecord
+  {
+      unsigned int type;
+      unsigned int rr_class;
+      unsigned long ttl;
+      unsigned int rdlength;
+  };
+
+  struct DNSHeader
+  {
+      unsigned int ancount;
+      unsigned int pos;
+      unsigned char payload[512];
+  };
+
+  static void FillResourceRecord(struct ResourceRecord* rr, const unsigned char* input);
+
+  unsigned char* ResultIsReady(struct DNSHeader *header, unsigned char* res)
+  {
+      int curanswer = 0;
+      struct ResourceRecord rr;
+
+      while ((unsigned)curanswer < header->ancount)
+      {
+          FillResourceRecord(&rr, &header->payload[header->pos]);
+
+          header->pos += 10;
+          curanswer++;
+      }
+
+      return res;
+  }
+  ```
+
+test "rank1213: engine gap isolated -- identical text under the C++ frontend does not report"
+  lang cpp
+  file src/dns.cpp
+  reject VYQL-MEM-010
+  code
+  ```
+  struct ResourceRecord
+  {
+      unsigned int type;
+      unsigned int rr_class;
+      unsigned long ttl;
+      unsigned int rdlength;
+  };
+
+  struct DNSHeader
+  {
+      unsigned int ancount;
+      unsigned int pos;
+      unsigned char payload[512];
+  };
+
+  static void FillResourceRecord(struct ResourceRecord* rr, const unsigned char* input);
+
+  unsigned char* ResultIsReady(struct DNSHeader *header, unsigned char* res)
+  {
+      int curanswer = 0;
+      struct ResourceRecord rr;
+
+      while ((unsigned)curanswer < header->ancount)
+      {
+          FillResourceRecord(&rr, &header->payload[header->pos]);
+
+          header->pos += 10;
+          curanswer++;
+      }
+
+      return res;
+  }
+  ```
