@@ -1,0 +1,204 @@
+# Rank 1232 / CVE-2019-17638: Jetty's HTTP/1 response generator returns the
+# same pooled response-header ByteBuffer to the buffer pool twice when a
+# response header does not fit, so the pool hands one buffer to two
+# connections at once and one client receives header bytes -- Set-Cookie,
+# Authorization, session identifiers -- belonging to another client's
+# response (CWE-415 double free, whose consequence here is CWE-200 exposure).
+#
+# HttpConnection.SendCallback.process() drives HttpGenerator in a loop. On
+# HEADER_OVERFLOW the vulnerable revision reads _header.capacity(), calls
+# _bufferPool.release(_header) and only then tests whether the buffer was
+# already at the configured response-header size; when it is, the method
+# throws BadMessageException(500) with the _header field still pointing at
+# the buffer it just released. The throw unwinds into the callback's failure
+# path, which runs the callback's own cleanup: `if (_header != null)
+# _bufferPool.release(_header); _header = null;`. The field is not null, so
+# the same buffer is released a second time and sits in the pool twice.
+# Reaching it needs nothing but a response whose headers exceed
+# responseHeaderSize, which an application controls through any header it
+# echoes back.
+#
+# Pool commit ff8ae56fa9 carries no flag; its diff is read anyway and it is
+# the real fix. It moves the size test ahead of the release, extracts
+# releaseHeader()/releaseChunk() helpers that null the field they release,
+# and calls those helpers from both the overflow branch and the cleanup
+# path, so no path can release a buffer the field still points at. The same
+# commit moves _chunk from the connection to the callback, which removes a
+# second copy of the same aliasing problem, and adds LargeHeaderTest.
+#
+# The pool row names eclipse/jetty.project. That organisation redirects to
+# jetty/jetty.project: the project moved organisations and kept its history,
+# so the row and the row that names jetty/jetty.project for CVE-2025-5115
+# are the same repository under its old and current owner, not a mislink.
+# Cloning has to follow the redirect, and ff8ae56fa9 is reachable there.
+#
+# ATTENTION, engine gap. Nothing is labelled on either revision: `vyql match`
+# on a minimal pair reports no source, no sink and no control, and `vyql
+# resolve` shows both `_bufferPool.release` call sites terminating
+# unresolved, because no Java binding names a buffer-pool acquire or release
+# at all. `vyql scan --cache off --max-ram 4GB` over the real jetty-server
+# module (252 java files) reports 165 findings, none of them on
+# HttpConnection.java.
+#
+# Filling the binding gap alone is measured and does not work. A probe
+# binding emitting code.PointerFree at `callee.method == "release"` labels
+# both call sites (`vyql match` confirms), and still reports nothing on
+# either revision, because PotentialDoubleFree (VYQL-MEM-008) asks for one
+# code.PointerFree to reach another and the two releases here sit in
+# different methods joined only by an exception unwinding into a framework
+# callback. The same probe does report VYQL-MEM-008 for two release calls
+# written one after another inside a single method, which places the
+# boundary exactly. It also costs precision immediately: on the real
+# jetty-server module it produces one VYQL-MEM-008, on
+# HttpOutput.java:1081/1091, where the buffer is reassigned (`out = bigger`)
+# between the two releases and the code is correct; and the same rule fires
+# on a two-line method releasing two distinct buffers, which is ordinary
+# pooled-buffer code.
+#
+# The discriminating fact is the one the fix adds: whether the field holding
+# the released buffer is cleared before a path that can leave the method,
+# given a sibling method that releases the same field under a null test.
+# C and C++ have a frontend analysis for the neighbouring shape,
+# `lifetime.release_then_return` (ccLifetimeReleaseReturnObservations in
+# internal/extract/frontend/treesitter/c.go), which is what
+# code.FailurePathOwnedBufferFree / VYQL-MEM-011 is built on; the Java
+# frontend emits no lifetime observation of any kind, and the data layer
+# cannot substitute for one, since the pattern kinds a binding can query are
+# callExpr, binaryExpr, addExpr, isExpr and presenceNode -- none of which
+# states a relation between a release statement, a field assignment that
+# does not follow it, and an exit path. No definition change attempted, per
+# this loop's instruction not to do engine work.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1232: the response header buffer is released with the field still set before a throw"
+  lang java
+  file jetty-server/src/main/java/org/eclipse/jetty/server/HttpConnection.java
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-011
+  code
+  ```
+  package org.eclipse.jetty.server;
+
+  import java.nio.ByteBuffer;
+
+  import org.eclipse.jetty.http.BadMessageException;
+  import org.eclipse.jetty.http.HttpGenerator;
+  import org.eclipse.jetty.io.ByteBufferPool;
+
+  public class HttpConnection
+  {
+      private ByteBufferPool _bufferPool;
+      private HttpConfiguration _config;
+      private HttpGenerator _generator;
+
+      private class SendCallback
+      {
+          private ByteBuffer _header;
+
+          public Action process() throws Exception
+          {
+              while (true)
+              {
+                  HttpGenerator.Result result = _generator.generateResponse(_header);
+                  switch (result)
+                  {
+                      case NEED_HEADER:
+                      {
+                          _header = _bufferPool.acquire(_config.getOutputBufferSize(), true);
+                          continue;
+                      }
+                      case HEADER_OVERFLOW:
+                      {
+                          int capacity = _header.capacity();
+                          _bufferPool.release(_header);
+                          if (capacity >= _config.getResponseHeaderSize())
+                              throw new BadMessageException(500, "Response header too large");
+                          _header = _bufferPool.acquire(_config.getResponseHeaderSize(), true);
+                          continue;
+                      }
+                      default:
+                          return Action.IDLE;
+                  }
+              }
+          }
+
+          protected boolean onCompleteFailure(Throwable failure)
+          {
+              if (_header != null)
+                  _bufferPool.release(_header);
+              _header = null;
+              return true;
+          }
+      }
+  }
+  ```
+
+test "rank1232: the size test runs first and every release clears the field it releases"
+  lang java
+  file jetty-server/src/main/java/org/eclipse/jetty/server/HttpConnection.java
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-011
+  code
+  ```
+  package org.eclipse.jetty.server;
+
+  import java.nio.ByteBuffer;
+
+  import org.eclipse.jetty.http.BadMessageException;
+  import org.eclipse.jetty.http.HttpGenerator;
+  import org.eclipse.jetty.io.ByteBufferPool;
+
+  public class HttpConnection
+  {
+      private ByteBufferPool _bufferPool;
+      private HttpConfiguration _config;
+      private HttpGenerator _generator;
+
+      private class SendCallback
+      {
+          private ByteBuffer _header;
+
+          public Action process() throws Exception
+          {
+              while (true)
+              {
+                  HttpGenerator.Result result = _generator.generateResponse(_header);
+                  switch (result)
+                  {
+                      case NEED_HEADER:
+                      {
+                          _header = _bufferPool.acquire(_config.getOutputBufferSize(), true);
+                          continue;
+                      }
+                      case HEADER_OVERFLOW:
+                      {
+                          if (_header.capacity() >= _config.getResponseHeaderSize())
+                              throw new BadMessageException(500, "Response header too large");
+                          releaseHeader();
+                          _header = _bufferPool.acquire(_config.getResponseHeaderSize(), true);
+                          continue;
+                      }
+                      default:
+                          return Action.IDLE;
+                  }
+              }
+          }
+
+          protected boolean onCompleteFailure(Throwable failure)
+          {
+              releaseHeader();
+              return true;
+          }
+
+          private void releaseHeader()
+          {
+              if (_header != null)
+                  _bufferPool.release(_header);
+              _header = null;
+          }
+      }
+  }
+  ```
