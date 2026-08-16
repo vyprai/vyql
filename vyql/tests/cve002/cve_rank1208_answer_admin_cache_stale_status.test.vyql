@@ -1,0 +1,252 @@
+# Rank 1208 / CVE-2026-25700: apache/answer's AuthService.GetAdminUserCacheInfo
+# (internal/service/auth/auth.go) reads and returns the admin session record
+# that AdminAuth() cached at login time, with nothing that re-checks the
+# underlying account against its live row. AdminAuth() (internal/base/
+# middleware/auth.go) then authorizes every admin request off that cached
+# snapshot, checking only userInfo.UserStatus == UserStatusDeleted. Suspending
+# an admin, deleting the admin, or leaving their email newly unverified after
+# the token was issued changes none of the fields the cached record holds, so
+# a previously issued admin token keeps passing AdminAuth() and reaching every
+# administrative API until it expires on its own (CWE-1259, GHSA-4gw2-vg4x-7p29).
+#
+# Pool row carried the nocommit flag. Read 6fc25c69f4efaac0c4f34ce7401ac3b6baab59df
+# per Step 0 before trusting it: that commit (fix(auth): add API key scope
+# checks) only touches api-key-prefixed ("sk_") bearer tokens in
+# MustAuthWithoutAccountAvailable/MustAuthAndAccountAvailable, a different
+# authorization gap in the same file with no connection to admin-token
+# revocation. Corrected pool.tsv rank 1208 in place to
+# 869b040e92d66f344ca9f581592aa8044d399828 ("fix(auth): enhance admin user
+# cache management and add status checks for email verification and
+# suspension"), confirmed against the GHSA-4gw2-vg4x-7p29 advisory text
+# ("previously issued authentication tokens remained functional" after an
+# admin was "suspended, deleted, or deactivated") and against `git log
+# v2.0.0..v2.0.1` in the real checkout, where it is the only commit touching
+# admin cache/session state. The real fix makes GetAdminUserCacheInfo re-fetch
+# the live user record on every call (via the existing GetUserCacheInfo path),
+# copy its UserStatus/EmailStatus/RoleID/ExternalID onto the cached admin
+# record, and drop the admin cache entry outright once the underlying user is
+# gone; AdminAuth() gains checks for EmailStatusToBeVerified and
+# UserStatusSuspended alongside the existing UserStatusDeleted check.
+#
+# ATTENTION, no taint path. `vyql match` on both the vulnerable and the fixed
+# form of GetAdminUserCacheInfo/AdminAuth labels ctx.GetHeader as a
+# code.HttpInput source (the bearer token) and nothing else at all -- no sink,
+# no control -- identically on both revisions, so no rule downstream of
+# labelling can discriminate the two: the defect is not a value flowing
+# somewhere it shouldn't, it is a cached struct's fields never being
+# refreshed against the account they describe. The closest existing
+# vocabulary is code.SessionHashMissingAuthorizationState (VYQL-AUTH-058,
+# CWE_863/CWE_613, "session validity hashes omit authorization state that can
+# change while a session remains active") and code.ExpiredCachedAuthTokenReuse
+# (VYQL-AUTH-043, CWE_613, cached-token-past-expiry reuse) -- both close in
+# spirit and neither has a Go binding, and forcing either onto this shape
+# would misdescribe it: there is no hash here (SessionHashMissingAuthorizationState's
+# own reviewEvidence text names a session hash derived from a password) and
+# no expiry-timestamp comparison to invert (ExpiredCachedAuthTokenReuse's
+# shape is a timeout field compared against now). A binding precise enough to
+# name this shape without reusing either -- "a getter whose body is a single
+# pass-through of a privileged-session cache lookup, with no call anywhere in
+# the file to a live-status refresh" -- is an absence-of-a-call check no
+# different, structurally, from any ordinary thin delegation wrapper; nearly
+# every cache-backed getter in real code has exactly that shape without being
+# a vulnerability, and there is no local signal that distinguishes "this one
+# needs revalidation" short of knowing that AdminAuth gates privileged routes,
+# which is whole-program authorization-surface reasoning the binding layer
+# does not expose. Weighed per AGENTS.md's precision-cost guidance: a
+# concept that broad would flag ordinary caching code everywhere for a
+# handful of true positives, so it is recorded ATTENTION rather than shipped.
+# Scanning the real checkout (bounded, timeout 180, --max-ram 4GB, --cache off)
+# confirms the same absence at scale: identical finding counts and content on
+# 869b040^ and 869b040, and no finding in either scan touches auth.go's
+# admin-cache functions.
+#
+# verify_current_expected: attention-no-taint-path
+
+test "rank1208: GetAdminUserCacheInfo/AdminAuth authorize off an unrefreshed cached admin record"
+  lang go
+  file auth_vulnerable.go
+  reject VYQL-AUTH-058
+  reject VYQL-AUTH-043
+  code
+  ```
+  package middleware
+
+  import (
+      "context"
+
+      "github.com/gin-gonic/gin"
+  )
+
+  type UserCacheInfo struct {
+      UserID      string
+      UserStatus  int
+      EmailStatus int
+      RoleID      int
+  }
+
+  const (
+      UserStatusSuspended = 2
+      UserStatusDeleted   = 3
+  )
+
+  type AuthRepo interface {
+      GetAdminUserCacheInfo(ctx context.Context, accessToken string) (*UserCacheInfo, error)
+  }
+
+  type AuthService struct {
+      authRepo AuthRepo
+  }
+
+  func (as *AuthService) GetAdminUserCacheInfo(ctx context.Context, accessToken string) (userInfo *UserCacheInfo, err error) {
+      return as.authRepo.GetAdminUserCacheInfo(ctx, accessToken)
+  }
+
+  type AuthUserMiddleware struct {
+      authService *AuthService
+  }
+
+  func ExtractToken(ctx *gin.Context) string {
+      return ctx.GetHeader("Authorization")
+  }
+
+  func (am *AuthUserMiddleware) AdminAuth() gin.HandlerFunc {
+      return func(ctx *gin.Context) {
+          token := ExtractToken(ctx)
+          if len(token) == 0 {
+              ctx.AbortWithStatus(401)
+              return
+          }
+          userInfo, err := am.authService.GetAdminUserCacheInfo(ctx, token)
+          if err != nil || userInfo == nil {
+              ctx.AbortWithStatus(403)
+              return
+          }
+          if userInfo != nil {
+              if userInfo.UserStatus == UserStatusDeleted {
+                  ctx.AbortWithStatus(401)
+                  return
+              }
+              ctx.Set("userInfo", userInfo)
+          }
+          ctx.Next()
+      }
+  }
+  ```
+
+test "rank1208: GetAdminUserCacheInfo/AdminAuth refresh the cached record from the live user before authorizing"
+  lang go
+  file auth_fixed.go
+  reject VYQL-AUTH-058
+  reject VYQL-AUTH-043
+  code
+  ```
+  package middleware
+
+  import (
+      "context"
+
+      "github.com/gin-gonic/gin"
+  )
+
+  type UserCacheInfo struct {
+      UserID      string
+      UserStatus  int
+      EmailStatus int
+      RoleID      int
+      ExternalID  string
+  }
+
+  const (
+      EmailStatusToBeVerified = 1
+      UserStatusSuspended     = 2
+      UserStatusDeleted       = 3
+  )
+
+  type AuthRepo interface {
+      GetAdminUserCacheInfo(ctx context.Context, accessToken string) (*UserCacheInfo, error)
+      SetAdminUserCacheInfo(ctx context.Context, accessToken string, userInfo *UserCacheInfo) error
+      RemoveAdminUserCacheInfo(ctx context.Context, accessToken string) error
+  }
+
+  type AuthService struct {
+      authRepo AuthRepo
+  }
+
+  func (as *AuthService) GetUserCacheInfo(ctx context.Context, accessToken string) (*UserCacheInfo, error) {
+      return nil, nil
+  }
+
+  func (as *AuthService) GetAdminUserCacheInfo(ctx context.Context, accessToken string) (userInfo *UserCacheInfo, err error) {
+      adminCacheInfo, err := as.authRepo.GetAdminUserCacheInfo(ctx, accessToken)
+      if err != nil {
+          return nil, err
+      }
+      if adminCacheInfo == nil {
+          return nil, nil
+      }
+
+      refreshedUserCacheInfo, err := as.GetUserCacheInfo(ctx, accessToken)
+      if err != nil {
+          return nil, err
+      }
+      if refreshedUserCacheInfo == nil {
+          if err = as.authRepo.RemoveAdminUserCacheInfo(ctx, accessToken); err != nil {
+              return nil, err
+          }
+          return nil, nil
+      }
+
+      adminCacheInfo.UserStatus = refreshedUserCacheInfo.UserStatus
+      adminCacheInfo.EmailStatus = refreshedUserCacheInfo.EmailStatus
+      if refreshedUserCacheInfo.RoleID > 0 {
+          adminCacheInfo.RoleID = refreshedUserCacheInfo.RoleID
+      }
+      if len(refreshedUserCacheInfo.ExternalID) > 0 {
+          adminCacheInfo.ExternalID = refreshedUserCacheInfo.ExternalID
+      }
+
+      if err = as.authRepo.SetAdminUserCacheInfo(ctx, accessToken, adminCacheInfo); err != nil {
+          return nil, err
+      }
+      return adminCacheInfo, nil
+  }
+
+  type AuthUserMiddleware struct {
+      authService *AuthService
+  }
+
+  func ExtractToken(ctx *gin.Context) string {
+      return ctx.GetHeader("Authorization")
+  }
+
+  func (am *AuthUserMiddleware) AdminAuth() gin.HandlerFunc {
+      return func(ctx *gin.Context) {
+          token := ExtractToken(ctx)
+          if len(token) == 0 {
+              ctx.AbortWithStatus(401)
+              return
+          }
+          userInfo, err := am.authService.GetAdminUserCacheInfo(ctx, token)
+          if err != nil || userInfo == nil {
+              ctx.AbortWithStatus(403)
+              return
+          }
+          if userInfo != nil {
+              if userInfo.EmailStatus == EmailStatusToBeVerified {
+                  ctx.AbortWithStatus(403)
+                  return
+              }
+              if userInfo.UserStatus == UserStatusSuspended {
+                  ctx.AbortWithStatus(403)
+                  return
+              }
+              if userInfo.UserStatus == UserStatusDeleted {
+                  ctx.AbortWithStatus(401)
+                  return
+              }
+              ctx.Set("userInfo", userInfo)
+          }
+          ctx.Next()
+      }
+  }
+  ```
