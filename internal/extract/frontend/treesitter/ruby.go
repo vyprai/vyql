@@ -767,6 +767,20 @@ func rbSemanticReviewTokens(raw, scope string) []string {
 		!strings.Contains(compact, "shellescape") {
 		add("git_clone_interpolated_branch_option_unescaped")
 	}
+	// A JOSE decoder that chooses its branch from the token's own compact
+	// serialization -- three segments for JWS, five for JWE -- accepts an
+	// encrypted token wherever a signed one is accepted. Encrypting to a
+	// recipient public key proves no identity, so the caller reads claims whose
+	// signature was never verified. The control is a guard on the encrypted
+	// branch: a raise, a return, or a test of what the caller expected, on the
+	// line that follows the branch selector.
+	if scope == "function" &&
+		rbJoseSeparatorCountDispatchRe.MatchString(raw) &&
+		rbJoseSignedDecodeRe.MatchString(raw) &&
+		rbJoseEncryptedDecodeRe.MatchString(raw) &&
+		!rbJoseEncryptedBranchGuardRe.MatchString(raw) {
+		add("jose_compact_decode_accepts_encrypted_serialization")
+	}
 	return out
 }
 
@@ -777,6 +791,10 @@ var (
 	rbBacktickInterpolationRe                  = regexp.MustCompile("`\\s*#\\{[^}]+\\}\\s*`")
 	rbQueryStringJoinInterpolationRe           = regexp.MustCompile(`\?[A-Za-z0-9_%-]+=\s*#\{[^}]+\.join\(`)
 	rbGitCloneInterpolatedBranchOptionRe       = regexp.MustCompile(`--branch#\{[^}]*branch[^}]*\}--single-branch`)
+	rbJoseSeparatorCountDispatchRe             = regexp.MustCompile(`\.count\(\s*['"]\.['"]\s*\)`)
+	rbJoseSignedDecodeRe                       = regexp.MustCompile(`\bJWS[A-Za-z0-9_]*\.decode`)
+	rbJoseEncryptedDecodeRe                    = regexp.MustCompile(`\bJWE[A-Za-z0-9_]*\.decode`)
+	rbJoseEncryptedBranchGuardRe               = regexp.MustCompile(`(?m)^[ \t]*(?:when|if|elsif)\b[^\n]*\bJWE\b[^\n]*\n[ \t]*(?:if|unless|raise|fail|return|next|break)\b`)
 )
 
 func rbPersistentResponseReuse(compact string) bool {
