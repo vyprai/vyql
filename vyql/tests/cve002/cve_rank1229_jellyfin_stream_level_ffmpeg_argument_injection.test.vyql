@@ -1,0 +1,147 @@
+# Rank 1229 / CVE-2026-35033 (GHSA-jh22-fw8w-2v9x): jellyfin/jellyfin ffmpeg
+# argument injection leading to arbitrary file read. The video streaming
+# controllers guard their `level` query parameter with a
+# `[RegularExpression(EncodingHelper.LevelValidationRegex)]` attribute, but
+# Jellyfin.Api/Helpers/StreamingHelpers.cs has a second parser for the same
+# field: ParseStreamOptions copies every query parameter whose name starts
+# with a lowercase letter into a StreamOptions dictionary, and ParseParams
+# assigns segment 15 of the packed `params` value straight to
+# `videoRequest.Level` with no check at all. EncodingHelper.GetVideoQualityParam
+# then concatenates that value into the ffmpeg command line as
+# `param += " -level " + level`, and TranscodeManager.StartFfMpeg hands the
+# finished string to `new ProcessStartInfo { ..., Arguments = commandLineArguments }`.
+# A request carrying `h264-level=51 -vf drawtext=textfile=/etc/shadow` therefore
+# injects its own ffmpeg options; the /Videos/{itemId}/stream endpoint carries
+# no [Authorize] attribute, so the read is unauthenticated (CWE-88, CWE-862).
+# Fix 0bf7653e36 rejects a level that does not match the numeric regex before
+# the assignment and makes NormalizeTranscodingLevel return null when the value
+# does not parse as a double.
+#
+# Pool correction: the pool row named commit d1fd81c382, which is the fix for
+# GHSA-v2jv-54xj-h76w (CVE-2026-35034, a SyncPlay group-name length limit) and
+# has nothing to do with this CVE. The fix for GHSA-jh22-fw8w-2v9x is
+# 0bf7653e3648a86bd0c6f224fcea341a6fdb8a85.
+#
+# FIXED at the binding layer. C# lowers an object-initializer property write
+# (`new T { Prop = value }`) to a collection-shaped argument of the constructor
+# call rather than to a property-write path call, and a sink location without
+# `.collection` deliberately skips a collection-shaped argument. The result was
+# that `psi.Arguments = value` was labelled but the equivalent, and far more
+# common, `new ProcessStartInfo { Arguments = value }` was labelled by nothing,
+# so no rule could see the sink. A `ProcessStartInfo` construction binding that
+# emits code.CommandExecution at `args.any.collection` covers the initializer
+# form. On the real checkout at 0bf7653e36^ this turns up 13 new critical
+# VYQL-INJ-002 findings and removes none, including
+# TranscodeManager.cs:371 -> TranscodeManager.cs:419, which is the
+# `Arguments = commandLineArguments` sink this CVE lands in.
+#
+# The reject case models the fix through the numeric parse the patched
+# NormalizeTranscodingLevel requires, because the patch's other half -- a
+# `Regex.IsMatch` gate that rejects the value before it is assigned -- is not
+# recognised as a control in C#. JavaScript has an engine-computed
+# `javascript.command_argument_regex_guard` tag for exactly this shape and C#
+# has no equivalent, so the literal patched form still reports VYQL-INJ-002.
+
+test "rank1229: a stream option reaches the ffmpeg argument string with no validation"
+  lang csharp
+  file Jellyfin.Api/Helpers/StreamingHelpers.cs
+  expect VYQL-INJ-002
+  code
+  ```
+  using System.Diagnostics;
+  using Microsoft.AspNetCore.Mvc;
+
+  namespace Jellyfin.Api.Helpers;
+
+  public class VideosController : ControllerBase
+  {
+      public IActionResult GetVideoStream([FromQuery] string level)
+      {
+          var videoRequest = new StreamingRequestDto();
+
+          // ParseParams: segment 15 is the requested encoder level and is
+          // assigned with no check, so the controller's RegularExpression
+          // attribute on the same field never runs.
+          videoRequest.Level = level;
+
+          var param = "-i input.mkv -c:v libx264";
+          if (!string.IsNullOrEmpty(videoRequest.Level))
+          {
+              param += " -level " + videoRequest.Level;
+          }
+
+          var process = new Process
+          {
+              StartInfo = new ProcessStartInfo
+              {
+                  UseShellExecute = false,
+                  FileName = "/usr/lib/jellyfin-ffmpeg/ffmpeg",
+                  Arguments = param
+              }
+          };
+
+          process.Start();
+          return Ok();
+      }
+  }
+
+  public class StreamingRequestDto
+  {
+      public string Level { get; set; }
+  }
+  ```
+
+test "rank1229: the fix accepts a level only after it parses as a number"
+  lang csharp
+  file Jellyfin.Api/Helpers/StreamingHelpers.cs
+  reject VYQL-INJ-002
+  code
+  ```
+  using System.Diagnostics;
+  using System.Globalization;
+  using Microsoft.AspNetCore.Mvc;
+
+  namespace Jellyfin.Api.Helpers;
+
+  public class VideosController : ControllerBase
+  {
+      public IActionResult GetVideoStream([FromQuery] string level)
+      {
+          var videoRequest = new StreamingRequestDto();
+
+          // NormalizeTranscodingLevel returns nothing for a level that does
+          // not parse as a double, so only the parsed number reaches the
+          // command line.
+          if (!double.TryParse(level, CultureInfo.InvariantCulture, out double requestLevel))
+          {
+              return BadRequest();
+          }
+
+          videoRequest.Level = requestLevel.ToString(CultureInfo.InvariantCulture);
+
+          var param = "-i input.mkv -c:v libx264";
+          if (!string.IsNullOrEmpty(videoRequest.Level))
+          {
+              param += " -level " + videoRequest.Level;
+          }
+
+          var process = new Process
+          {
+              StartInfo = new ProcessStartInfo
+              {
+                  UseShellExecute = false,
+                  FileName = "/usr/lib/jellyfin-ffmpeg/ffmpeg",
+                  Arguments = param
+              }
+          };
+
+          process.Start();
+          return Ok();
+      }
+  }
+
+  public class StreamingRequestDto
+  {
+      public string Level { get; set; }
+  }
+  ```
