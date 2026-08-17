@@ -1,0 +1,163 @@
+# Rank 1340 / log4net LOG4NET-575: XmlConfigurator.InternalConfigure built the
+# reader for a log4net configuration stream from an XmlReaderSettings that
+# turned DTD processing on:
+#
+#   XmlReaderSettings settings = new XmlReaderSettings();
+#   settings.DtdProcessing = DtdProcessing.Parse;   // ProhibitDtd = false pre-4.0
+#   XmlReader xmlReader = XmlReader.Create(configStream, settings);
+#   doc.Load(xmlReader);
+#
+# DtdProcessing.Parse permits a DOCTYPE declaration, and XmlReaderSettings
+# leaves XmlResolver at the default XmlUrlResolver, so a configuration file the
+# attacker can write declares external entities that the reader then fetches --
+# local files and attacker-chosen URLs read back into the parsed configuration
+# document (CWE-611). The fix sets DtdProcessing.Ignore on the platforms that
+# have the property and ProhibitDtd = true on the older ones, so no DOCTYPE is
+# ever expanded.
+#
+# The advisory database points the CVE id on this row at apache/logging-log4j2:
+# that identifier describes an Rfc5424Layout CRLF log-injection in the Java
+# log4j-core artifact, a different project that only shares the Apache Logging
+# security feed. The pool row's repository, C# language and fix commit agree
+# with each other and with LOG4NET-575, which is CVE-2018-1285, so the row is
+# repointed at that identifier rather than replaced.
+#
+# Detection is a C# presence binding for the two documented DTD-enabling
+# assignments, emitting code.XmlParserCreate for the existing VYQL-DESER-004 to
+# judge. Enabling DTD processing is only unsafe while the reader still has a
+# resolver, which is what makes the neutralising controls part of the binding:
+# an XmlResolver set to null or to an XmlSecureResolver in the same function
+# means no external entity can be fetched, and the binding does not label.
+#
+# On the real checkout the vulnerable parent reports VYQL-DESER-004 at
+# src/log4net/Config/XmlConfigurator.cs:700 (101 findings) and the fixed tree
+# reports no VYQL-DESER-004 (100 findings).
+
+test "rank1340: an XmlReaderSettings that enables DTD processing parses a config stream"
+  lang csharp
+  expect VYQL-DESER-004
+  code
+  ```
+  using System.IO;
+  using System.Xml;
+
+  namespace Log4Net.Config
+  {
+    public class XmlConfigurator
+    {
+      private static void InternalConfigure(ILoggerRepository repository, Stream configStream)
+      {
+        XmlDocument doc = new XmlDocument();
+        XmlReaderSettings settings = new XmlReaderSettings();
+        settings.DtdProcessing = DtdProcessing.Parse;
+        XmlReader xmlReader = XmlReader.Create(configStream, settings);
+        doc.Load(xmlReader);
+        Configure(repository, doc.DocumentElement);
+      }
+    }
+  }
+  ```
+
+test "rank1340: the obsolete ProhibitDtd flag left off is the same enabled DTD"
+  lang csharp
+  expect VYQL-DESER-004
+  code
+  ```
+  using System.IO;
+  using System.Xml;
+
+  namespace Log4Net.Config
+  {
+    public class XmlConfigurator
+    {
+      private static void InternalConfigure(ILoggerRepository repository, Stream configStream)
+      {
+        XmlDocument doc = new XmlDocument();
+        XmlReaderSettings settings = new XmlReaderSettings();
+        settings.ProhibitDtd = false;
+        XmlReader xmlReader = XmlReader.Create(configStream, settings);
+        doc.Load(xmlReader);
+        Configure(repository, doc.DocumentElement);
+      }
+    }
+  }
+  ```
+
+test "rank1340: ignoring the DTD leaves nothing for a DOCTYPE to expand"
+  lang csharp
+  reject VYQL-DESER-004
+  code
+  ```
+  using System.IO;
+  using System.Xml;
+
+  namespace Log4Net.Config
+  {
+    public class XmlConfigurator
+    {
+      private static void InternalConfigure(ILoggerRepository repository, Stream configStream)
+      {
+        XmlDocument doc = new XmlDocument();
+        XmlReaderSettings settings = new XmlReaderSettings();
+        settings.DtdProcessing = DtdProcessing.Ignore;
+        XmlReader xmlReader = XmlReader.Create(configStream, settings);
+        doc.Load(xmlReader);
+        Configure(repository, doc.DocumentElement);
+      }
+    }
+  }
+  ```
+
+test "rank1340: parsing a DTD with the resolver cleared cannot reach an entity"
+  lang csharp
+  reject VYQL-DESER-004
+  code
+  ```
+  using System.IO;
+  using System.Xml;
+
+  namespace Log4Net.Config
+  {
+    public class XmlConfigurator
+    {
+      private static void InternalConfigure(ILoggerRepository repository, Stream configStream)
+      {
+        XmlDocument doc = new XmlDocument();
+        XmlReaderSettings settings = new XmlReaderSettings();
+        settings.DtdProcessing = DtdProcessing.Parse;
+        settings.XmlResolver = null;
+        XmlReader xmlReader = XmlReader.Create(configStream, settings);
+        doc.Load(xmlReader);
+        Configure(repository, doc.DocumentElement);
+      }
+    }
+  }
+  ```
+
+test "rank1340: an XmlSecureResolver bounds what a DTD entity may reach"
+  lang csharp
+  reject VYQL-DESER-004
+  code
+  ```
+  using System.IO;
+  using System.Security;
+  using System.Security.Permissions;
+  using System.Xml;
+
+  namespace Log4Net.Config
+  {
+    public class XmlConfigurator
+    {
+      private static void InternalConfigure(ILoggerRepository repository, Stream configStream, string baseUri)
+      {
+        XmlDocument doc = new XmlDocument();
+        XmlReaderSettings settings = new XmlReaderSettings();
+        settings.DtdProcessing = DtdProcessing.Parse;
+        settings.XmlResolver = new XmlSecureResolver(new XmlUrlResolver(), baseUri);
+        XmlReader xmlReader = XmlReader.Create(configStream, settings);
+        doc.Load(xmlReader);
+        Configure(repository, doc.DocumentElement);
+      }
+    }
+  }
+  ```
