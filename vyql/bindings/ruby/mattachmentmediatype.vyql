@@ -1,0 +1,13 @@
+module bindings.ruby.generated.mattachmentmediatype;
+
+// Paperclip's has_attached_file/validates_attachment option
+// `validate_media_type: false` removes MediaTypeSpoofDetectionValidator from the
+// record's validation chain, so the attachment's declared content type is never
+// compared against the type the file actually has before the post-processors run
+// on it. The option name is Paperclip's own and carries no other meaning, and
+// the token is matched exactly so that leaving the validator enabled reads as
+// what it is.
+binding uncheckedUploadedImageProcessingRubyAttachment {
+  query pattern presenceNode where node.scope == "class" and node.context.language == "ruby" and node.context.field == "validate_media_type=false"
+  emit issue code.UncheckedUploadedImageProcessing at node
+}
