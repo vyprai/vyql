@@ -1,0 +1,119 @@
+# Rank 1382 / CVE-2021-43861: the sequence-diagram renderer put diagram-supplied
+# link targets into the generated SVG's `xlink:href` after passing them through a
+# local `sanitizeUrl` that escaped `&` and `<` and then deleted the literal
+# `javascript:` -- `s.replace(/javascript:/g, '')`. `replace` scans its input
+# once and never looks at what it produced, so a target of
+# `javajavascript:script:alert(1)` has exactly one occurrence of `javascript:`,
+# at offset 4, and removing it joins `java` to `script:alert(1)`: the value
+# written into the attribute is `javascript:alert(1)`, the scheme the filter
+# existed to refuse (CWE-182 collapsing into the unsafe value, reported as
+# CWE-79). Anyone whose diagram source is rendered -- a wiki page, a README, a
+# comment box -- gets script execution when a reader clicks the popup menu entry
+# or the diagram loads the image.
+#
+# src/diagrams/sequence/svgDraw.js defined that `sanitizeUrl` at the top of the
+# module and called it from `drawPopup` (a popup menu `<a xlink:href>`),
+# `drawImage` and `drawEmbeddedImage`. Two other modules in the same tree,
+# src/utils.js and src/diagrams/gantt/ganttDb.js, already imported
+# `@braintree/sanitize-url`, which parses the URL and returns `about:blank`
+# unless the scheme is one it allows; the fix deletes the hand-rolled function
+# from svgDraw.js and imports that one instead, so the patched module contains no
+# scheme substitution at all.
+#
+# The recorded fact is the substitution: a `replace`/`replaceAll` whose pattern
+# names a scheme a browser executes documents from. The replacement is not part
+# of it -- an empty replacement adds the reconstruction above on top of the
+# encoding variants (`java&#9;script:`, `javascript&colon;`, a leading NUL) that
+# any literal denylist misses, and a non-empty replacement still misses those.
+# The third case below is the same escaping chain with the scheme substitution
+# removed, which is what keeps the predicate on scheme filtering rather than on
+# `replace`.
+
+test "rank1382: a diagram link is sanitized by deleting the javascript scheme before it reaches xlink:href"
+  lang javascript
+  file svgDraw.js
+  expect VYQL-INJ-200
+  code
+  ```
+  import common from '../common/common';
+
+  const sanitizeUrl = function (s) {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/javascript:/g, '');
+  };
+
+  export const drawPopup = function (elem, actor, minMenuWidth, textAttrs, forceMenus) {
+    const links = actor.links;
+    const g = elem.append('g');
+    let linkY = 20;
+    for (let key in links) {
+      var linkElem = g.append('a');
+      var sanitizedLink = sanitizeUrl(links[key]);
+      linkElem.attr('xlink:href', sanitizedLink);
+      linkElem.attr('target', '_blank');
+      linkY += 30;
+    }
+    return { height: linkY, width: minMenuWidth };
+  };
+
+  export const drawImage = function (elem, x, y, link) {
+    const imageElem = elem.append('image');
+    imageElem.attr('x', x);
+    imageElem.attr('y', y);
+    var sanitizedLink = sanitizeUrl(link);
+    imageElem.attr('xlink:href', sanitizedLink);
+  };
+  ```
+
+test "rank1382: a diagram link is sanitized by a scheme-allowlisting url sanitizer"
+  lang javascript
+  file svgDraw.js
+  reject VYQL-INJ-200
+  code
+  ```
+  import common from '../common/common';
+  import { sanitizeUrl } from '@braintree/sanitize-url';
+
+  export const drawPopup = function (elem, actor, minMenuWidth, textAttrs, forceMenus) {
+    const links = actor.links;
+    const g = elem.append('g');
+    let linkY = 20;
+    for (let key in links) {
+      var linkElem = g.append('a');
+      var sanitizedLink = sanitizeUrl(links[key]);
+      linkElem.attr('xlink:href', sanitizedLink);
+      linkElem.attr('target', '_blank');
+      linkY += 30;
+    }
+    return { height: linkY, width: minMenuWidth };
+  };
+
+  export const drawImage = function (elem, x, y, link) {
+    const imageElem = elem.append('image');
+    imageElem.attr('x', x);
+    imageElem.attr('y', y);
+    var sanitizedLink = sanitizeUrl(link);
+    imageElem.attr('xlink:href', sanitizedLink);
+  };
+  ```
+
+test "rank1382: an entity-escaping chain that names no url scheme"
+  lang javascript
+  file svgDraw.js
+  reject VYQL-INJ-200
+  code
+  ```
+  const escapeMarkup = function (s) {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  };
+
+  export const drawLabel = function (elem, text) {
+    const labelElem = elem.append('text');
+    labelElem.attr('data-label', escapeMarkup(text));
+  };
+  ```
