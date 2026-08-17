@@ -1,0 +1,137 @@
+# Rank 1355 / CVE-2026-45713: axllent/mailpit accepts SMTP DATA payloads and
+# /api/v1/send request bodies of any size on listeners that bind 0.0.0.0:1025
+# and 0.0.0.0:8025 with no authentication, so one unauthenticated peer can drive
+# the process to an OOM kill -- the advisory measures 25 MiB RSS growing to
+# ~1037 MiB from a single 100 MiB DATA block, roughly ten times amplification
+# through the enmime envelope tree and the search index
+# (GHSA-fpxj-m5q8-fphw, CWE-400/CWE-770).
+#
+# The pool row carries `nocommit`, and the advisory's references genuinely name
+# no commit -- only the advisory itself and the v1.30.0 release tag. The commit
+# the row names, cae0f638af9f14547a56d64f59ead621d846c06a ("Enhance sendmail
+# functionality with message size limit and input validation"), is a different
+# change in the same release: it caps stdin in the `sendmail` client binary and
+# adds CRLF validation to its recipient handling, neither of which is the
+# server-side listener the advisory describes. Corpus correction below repoints
+# the row at 136bdde953966f27f572105f43c9ecdf95a91253, "Security: Set a default
+# 50MB p/m limit to prevent DoS via unlimited SMTP DATA and /api/v1/send body
+# sizes (GHSA-fpxj-m5q8-fphw)", which names the advisory in its own subject and
+# whose diff is exactly the two sites the advisory cites: internal/smtpd/main.go
+# gains `srv.MaxSize = config.MaxMessageSize * 1024 * 1024` and
+# server/apiv1/send.go gains an http.MaxBytesReader wrap.
+#
+# Nothing labelled either revision before this change (`vyql match` on the
+# vulnerable listenAndServe reported no marks at all). The vocabulary was
+# already there: code.UnboundedAllocationReview / VYQL-DOS-041 carries CWE_400
+# and CWE_770, the advisory's own pair, so this reuses it rather than minting.
+# The binding, vyql/bindings/go/smtpdServerWithoutMaxSize.vyql, reads the
+# mhale/smtpd Server literal a caller builds and reports when MaxSize is never
+# given a value, because the library's DATA reader enforces the cap only when
+# the field is above zero and an unset int is no cap. It is answerable to that
+# library's documented field, not to this incident.
+#
+# Measured, with the binding against without, on three real Go trees:
+# mailpit at 136bdde^ reports internal/smtpd/main.go:218, the advisory's primary
+# site, plus one Server literal in internal/smtpd/smtpd_test.go that also sets
+# no MaxSize; mailpit at 136bdde reports the test literal only, so the fix
+# clears the production finding; canonical/lxd stays at its one pre-existing
+# VYQL-DOS-041 and mudler/LocalAI at zero -- no new finding on either.
+#
+# The advisory's HTTP half is deliberately not covered. A binding for the
+# generic Go shape it describes -- r.Body handed to json.NewDecoder or
+# io.ReadAll with no http.MaxBytesReader or io.LimitReader in the function --
+# discriminates the minimal pair correctly and finds mailpit's send.go, but it
+# took canonical/lxd from 1 VYQL-DOS-041 finding to 124 and mailpit from 1 to 7,
+# because decoding a request body without a byte cap is the ordinary form of
+# almost every Go HTTP handler. 123 new high-severity findings on one tree for
+# one advisory site is not a trade worth making, so that form is not shipped.
+
+test "rank1355: the SMTP listener's Server sets no MaxSize, so DATA is unbounded"
+  lang go
+  expect VYQL-DOS-041
+  expect_review code.UnboundedAllocationReview
+  code
+  ```
+  package smtpd
+
+  import "fmt"
+
+  func listenAndServe(addr string, handler MsgIDHandler, authHandler AuthHandler) error {
+  	srv := &Server{
+  		Addr:                     addr,
+  		MsgIDHandler:             handler,
+  		HandlerRcpt:              handlerRcpt,
+  		AppName:                  "Mailpit",
+  		Hostname:                 "",
+  		AuthHandler:              nil,
+  		AuthRequired:             false,
+  		MaxRecipients:            config.SMTPMaxRecipients,
+  		IgnoreRejectedRecipients: config.SMTPIgnoreRejectedRecipients,
+  	}
+
+  	if config.Label != "" {
+  		srv.AppName = fmt.Sprintf("Mailpit (%s)", config.Label)
+  	}
+
+  	return srv.ListenAndServe()
+  }
+  ```
+
+test "rank1355: the fix assigns MaxSize from the configured message-size cap"
+  lang go
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  package smtpd
+
+  import "fmt"
+
+  func listenAndServe(addr string, handler MsgIDHandler, authHandler AuthHandler) error {
+  	srv := &Server{
+  		Addr:                     addr,
+  		MsgIDHandler:             handler,
+  		HandlerRcpt:              handlerRcpt,
+  		AppName:                  "Mailpit",
+  		Hostname:                 "",
+  		AuthHandler:              nil,
+  		AuthRequired:             false,
+  		MaxRecipients:            config.SMTPMaxRecipients,
+  		IgnoreRejectedRecipients: config.SMTPIgnoreRejectedRecipients,
+  	}
+
+  	if config.MaxMessageSize > 0 {
+  		srv.MaxSize = config.MaxMessageSize * 1024 * 1024
+  	}
+
+  	if config.Label != "" {
+  		srv.AppName = fmt.Sprintf("Mailpit (%s)", config.Label)
+  	}
+
+  	return srv.ListenAndServe()
+  }
+  ```
+
+test "rank1355: a Server literal carrying its own MaxSize is bounded"
+  lang go
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  package smtpd
+
+  func listenAndServe(addr string, handler MsgIDHandler, authHandler AuthHandler) error {
+  	srv := &Server{
+  		Addr:                     addr,
+  		MsgIDHandler:             handler,
+  		HandlerRcpt:              handlerRcpt,
+  		AppName:                  "Mailpit",
+  		AuthRequired:             false,
+  		MaxRecipients:            config.SMTPMaxRecipients,
+  		MaxSize:                  50 * 1024 * 1024,
+  		IgnoreRejectedRecipients: config.SMTPIgnoreRejectedRecipients,
+  	}
+
+  	return srv.ListenAndServe()
+  }
+  ```

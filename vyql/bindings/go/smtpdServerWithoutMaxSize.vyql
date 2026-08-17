@@ -1,0 +1,22 @@
+module bindings.go.smtpdServerWithoutMaxSize;
+
+// github.com/mhale/smtpd's Server carries `MaxSize int // Maximum message size
+// allowed, in bytes`, and the DATA reader enforces it only when it is above
+// zero -- an unset field is Go's zero value, which the library documents as no
+// limit at all. A server built that way appends every DATA line into one
+// in-memory buffer until the client sends the terminating dot, so the peer
+// chooses the allocation, and an SMTP listener is reachable by whoever can open
+// the port (CWE-400/CWE-770). The field is also what the EHLO SIZE capability
+// advertises, so leaving it zero additionally tells clients the server accepts
+// unlimited messages.
+//
+// A Server value is recognised by its own field names: HandlerRcpt, AuthMechs
+// and TLSRequired are particular to this library, and the second group pins the
+// literal to a server rather than an unrelated struct that happens to share one
+// name. MaxSize set in the literal, or assigned onto the server afterwards
+// (`srv.MaxSize = n`, which is how a configurable cap is normally wired), means
+// a bound exists, so neither form reports.
+binding goSmtpdServerWithoutMaxSize {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and containsAny(node.context.field, ["HandlerRcpt", "AuthMechs", "TLSRequired"]) and containsAny(node.context.field, ["MaxRecipients", "AuthRequired", "AuthHandler", "TLSListener"]) and not (node.context.field contains "MaxSize") and not (node.context.selector contains "MaxSize")
+  emit issue code.UnboundedAllocationReview at node
+}
