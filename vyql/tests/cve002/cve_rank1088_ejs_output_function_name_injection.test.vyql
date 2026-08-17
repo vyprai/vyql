@@ -113,10 +113,10 @@ test "rank1088: a tainted first argument to Function reaches the sink"
   }
   ```
 
-test "rank1088: the same value as Function's body argument does not"
+test "rank1088: the same value as Function's body argument reports"
   lang javascript
   file args1.js
-  reject VYQL-INJ-003
+  expect VYQL-INJ-003
   code
   ```
   function compile(req) {
