@@ -1,0 +1,530 @@
+# Rank 1377 / CVE-2026-24843 (GHSA-qxx2-7h4c-83f4, CWE-22/CWE-59):
+# chainguard-dev/melange builds APK packages by running a YAML-declared pipeline
+# inside a runner -- a bubblewrap container or, for cross-architecture builds, a
+# QEMU guest -- and then copying the finished /home/build workspace back out. The
+# copy is a tar stream: pkg/container/qemu_runner.go:415 WorkspaceTar runs `tar`
+# *in the guest* over SSH and pipes its stdout to a host file, and
+# pkg/build/build.go:1086 retrieveWorkspace reads that stream on the host with
+# archive/tar and writes every entry:
+#
+#   tr := tar.NewReader(r)                                    // :1105
+#   for {
+#     hdr, err := tr.Next()                                   // :1108
+#     hdr.Name = strings.TrimPrefix(hdr.Name, "./")
+#     switch hdr.Typeflag {
+#     case tar.TypeDir:     fs.MkdirAll(hdr.Name, ...)         // :1136
+#                           fs.Chown(hdr.Name, uid, gid)       // :1140
+#     case tar.TypeReg:     fs.MkdirAll(filepath.Dir(hdr.Name), 0o755)
+#                           fs.OpenFile(hdr.Name, os.O_CREATE|os.O_WRONLY, ...)  // :1149
+#     case tar.TypeSymlink: fs.Symlink(hdr.Linkname, hdr.Name) // :1171
+#     case tar.TypeLink:    fs.Link(hdr.Linkname, hdr.Name)    // :1176
+#     }
+#     ... fs.SetXattr(hdr.Name, attrName, ...)                 // :1194
+#   }
+#
+# Not one of hdr.Name and hdr.Linkname is examined before it becomes a path. The
+# entry names are produced by the guest, which is exactly where the build's own
+# pipeline steps and its fetched source archive already ran, so they are the
+# untrusted side of a privilege boundary: a build that writes a tar entry named
+# `../../../../usr/bin/curl`, or a symlink entry pointing at `/`, makes the host
+# melange process create or overwrite that path with the host's privileges. In a
+# privileged build container that is a container-to-node escape, which is why the
+# advisory scores it 8.2 while noting it should be critical in that context. The
+# weakness is not that the destination filesystem is wrong -- apkofs.FullFS is
+# just a filesystem handle -- it is that an archive entry name from a lower-trust
+# producer is used verbatim as a path, with no containment against the workspace
+# root and no constraint on link targets (CWE-22, and CWE-59 for the link forms).
+#
+# 6e243d0d46699f837d7c392397a694d2bcc7612b adds isValidPath(targetPath, baseDir)
+# -- null-byte rejection, filepath.IsAbs rejection, then filepath.Rel against the
+# cleaned base with a `..` prefix test -- and calls it three times: once on
+# hdr.Name before the type switch, and once on hdr.Linkname in each of the
+# symlink and hardlink arms. The validator returns only an error; the caller
+# returns on it and goes on using hdr.Name unchanged.
+#
+# The pool row is a squash of the fork's PR, so its message carries the linter
+# work that was removed again before merge, but the diff itself is exactly the
+# security fix plus its test: 53 added lines in pkg/build/build.go and 324 in
+# pkg/build/path_validation_test.go, nothing else. The vulnerable loop is present
+# at its parent. No corpus correction.
+#
+# What fires today. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over
+# the vulnerable checkout reports 35 findings, identical across three runs
+# (VYQL-CRY-001 x15, VYQL-DOS-041 x8, VYQL-PATH-001 x4, VYQL-RF-001 x2,
+# VYQL-RES-001 x2, VYQL-CRY-006 x2, VYQL-INJ-005, VYQL-DOS-001) and 203 flags.
+# None of them is in the extraction loop; the only thing labelled anywhere in
+# retrieveWorkspace is core.ResourceRelease on r.Close and f.Close. `vyql match`
+# over a stripped repro of the loop labels nothing at all beyond those two.
+#
+# Vocabulary was checked for reuse first. The rule for this weakness already
+# exists and is language-neutral -- VYQL-PATH-004, `taint core.UserControlledData
+# -> code.ArchiveEntryWrite`, with `unless path coveredBy core.PathCanonicalization`
+# and `unless endpoint coveredBy core.PathAccessCheck`. What Go lacks is both ends
+# of it: code.ArchiveEntryName has Java, Python, JavaScript, PHP and PowerShell
+# forms but no Go form, and Go's code.ArchiveEntryWrite is bound only at
+# zip.File.Open, extractEntry and writeArchiveEntry, while its
+# code.FilePathAccess list (os.Open/OpenFile/ReadFile/Create/Remove/RemoveAll/
+# Mkdir/MkdirAll, ioutil.ReadFile/WriteFile, http.ServeFile, filepath.Walk) has no
+# link-creating or ownership-changing primitive at all. code.ArchiveSymlinkFilterBypass
+# (VYQL-PATH-007) has a Go form, but it asks whether entry *types* are ever looked
+# at and neutralises on tar.TypeSymlink, tar.TypeLink, Linkname or Readlink -- all
+# four of which this loop contains, because it handles those types, it just does
+# not confine them. code.ManualZipEntryFileWrite (VYQL-PATH-014) is the nearest
+# issue concept and is about archive/zip readers joining a member name into a
+# destination. No rule ID and no concept are minted here, because the measurement
+# below says nothing discriminating can be built on top of one.
+#
+# ATTENTION, engine gap: a neutralising control inside a resolved callee is
+# attributed to the caller's sink only when the tainted value flows *through* the
+# callee. melange's fix is an error-returning validator -- hdr.Name is passed in,
+# only an error comes back -- so the control never lands on the caller's path or
+# endpoint, and the fixed loop is indistinguishable from the vulnerable one.
+#
+# Measured, with a throwaway Go binding set emitting code.ArchiveEntryName at
+# tar.Reader.Next's result (via a runtime.ReceiverType fact on tar.NewReader) and
+# code.ArchiveEntryWrite at args[0] of methods named OpenFile and Symlink:
+#
+#   vulnerable retrieveWorkspace         2 x VYQL-PATH-004 (build.go:1149, :1171)
+#   fix as shipped (delegated validator) 2 x VYQL-PATH-004 (build.go:1190, :1218)
+#   same validation inlined in the loop  0
+#
+# On the two real checkouts that is 38 findings before the fix and 38 after, the
+# same two rows at the same two extraction sites -- the 8.2 CVE and its patch
+# score identically, which is the verdict ranks 1331 and 1371 already recorded for
+# a caller-side label against a fix centralised elsewhere. The throwaway set also
+# bought a third row that is false: making tar.Reader.Next a source connects
+# pkg/cli/rebuild.go:183, where the decoded .melange.yaml comes out of an APK, to
+# os.Open(old) at pkg/cli/rebuild.go:257, whose argument is a command-line
+# operand. Two true and one false on the CVE's own tree, with zero discrimination
+# against the patch, is not shippable, so the Go source and sink bindings are held
+# back with the rest.
+#
+# Two other routes were measured and are not it. An `emit check
+# core.PathAccessCheck ... covers endpoint { anchor: call }` at filepath.Rel --
+# the containment primitive the fix is built on -- suppresses the finding when the
+# check is inline and does nothing when the identical check sits in isValidPath
+# one resolved call away; `vyql resolve` over the fixed repro reports 44 call
+# sites resolved and isValidPath is not among the 24 unresolved, so the callee
+# body is reachable and only the attribution is missing. And the caller's own
+# facts cannot see the fix either: Go's function context does emit call-argument
+# tokens (`call_arg:fs.Symlink:hdr.Linkname` matches), but a probe requiring
+# `node.context.callPath contains "filepath.Rel"` does not fire on the fixed
+# function, so the only caller-visible difference between the two revisions is
+# `call_path:isValidPath` -- the fixing commit's own helper name, which is the
+# discriminator rank 1364's four-variant measurement and rank 1372 both had
+# rejected.
+#
+# Behaviour a shippable detector needs: when a tainted value is passed to a
+# resolved callee that carries a `covers endpoint` control over its own
+# parameter, and the caller branches on the callee's error result before the
+# sink, attribute that control to the caller's sink. This is the third language
+# in which the "extract the security check into a sibling function" fix shape has
+# been measured invisible -- Rust at 1364, JavaScript/TypeScript at 1372 -- and
+# the narrowest instance of the three: the call resolves, the control concept
+# exists, and taint already crosses the boundary in the value-returning
+# direction, as case (f) below shows.
+#
+# The six cases are the minimal pair. The first two are the real revisions, and
+# neither reports because the Go archive vocabulary is absent. The last four use
+# only shipped bindings -- code.HttpInput on http.Request.URL.Query().Get,
+# code.FilePathAccess on os.OpenFile, core.PathCanonicalization on filepath.Clean
+# -- and isolate the construct on its own: no check reports, an inline check is
+# suppressed, a value-returning helper is suppressed, and an error-returning
+# helper performing the same check is not. Case (e) pins today's
+# non-discrimination and is expected to flip to a reject when the behaviour above
+# lands.
+#
+# verify_current_expected: attention-engine-gap. (a), (b), (d) and (f) are
+# correct today; (c) and (e) record the gap.
+
+test "rank1377: (a) a workspace tar from the build runner is unpacked entry by entry with no containment on hdr.Name or hdr.Linkname"
+  lang go
+  file pkg/build/build.go
+  reject VYQL-PATH-001
+  reject VYQL-PATH-004
+  reject VYQL-PATH-007
+  reject VYQL-PATH-014
+  code
+  ```
+  package build
+
+  import (
+  	"archive/tar"
+  	"errors"
+  	"fmt"
+  	"io"
+  	"os"
+  	"path/filepath"
+  	"strings"
+
+  	apkofs "chainguard.dev/apko/pkg/apk/fs"
+  )
+
+  func (b *Build) retrieveWorkspace(ctx context.Context, fs apkofs.FullFS) error {
+  	r, err := b.Runner.WorkspaceTar(ctx, b.containerConfig, nil)
+  	if err != nil {
+  		return err
+  	} else if r == nil {
+  		return nil
+  	}
+  	defer r.Close()
+
+  	tr := tar.NewReader(r)
+
+  	for {
+  		hdr, err := tr.Next()
+  		if errors.Is(err, io.EOF) {
+  			break
+  		}
+  		if err != nil {
+  			return err
+  		}
+
+  		hdr.Name = strings.TrimPrefix(hdr.Name, "./")
+
+  		var uid, gid int
+  		fi := hdr.FileInfo()
+  		if stat, ok := fi.Sys().(*tar.Header); ok {
+  			uid = stat.Uid
+  			gid = stat.Gid
+  		}
+
+  		switch hdr.Typeflag {
+  		case tar.TypeDir:
+  			if err := fs.MkdirAll(hdr.Name, hdr.FileInfo().Mode().Perm()); err != nil {
+  				return fmt.Errorf("unable to create directory %s: %w", hdr.Name, err)
+  			}
+
+  			if err := fs.Chown(hdr.Name, uid, gid); err != nil {
+  				return fmt.Errorf("unable to chown directory %s: %w", hdr.Name, err)
+  			}
+
+  		case tar.TypeReg:
+  			parentDir := filepath.Dir(hdr.Name)
+  			if err := fs.MkdirAll(parentDir, 0o755); err != nil {
+  				return fmt.Errorf("unable to create directory %s: %w", hdr.Name, err)
+  			}
+  			f, err := fs.OpenFile(hdr.Name, os.O_CREATE|os.O_WRONLY, hdr.FileInfo().Mode())
+  			if err != nil {
+  				return fmt.Errorf("unable to open file %s: %w", hdr.Name, err)
+  			}
+
+  			if _, err := io.CopyN(f, tr, hdr.Size); err != nil {
+  				return fmt.Errorf("unable to copy file %s: %w", hdr.Name, err)
+  			}
+
+  			if err := f.Close(); err != nil {
+  				return fmt.Errorf("unable to close file %s: %w", hdr.Name, err)
+  			}
+
+  			if err := fs.Chown(hdr.Name, uid, gid); err != nil {
+  				return fmt.Errorf("unable to chown file %s: %w", hdr.Name, err)
+  			}
+
+  		case tar.TypeSymlink:
+  			if target, err := fs.Readlink(hdr.Name); err == nil && target == hdr.Linkname {
+  				continue
+  			}
+
+  			if err := fs.Symlink(hdr.Linkname, hdr.Name); err != nil {
+  				return fmt.Errorf("unable to create symlink %s -> %s: %w", hdr.Name, hdr.Linkname, err)
+  			}
+
+  		case tar.TypeLink:
+  			if err := fs.Link(hdr.Linkname, hdr.Name); err != nil {
+  				return err
+  			}
+
+  		default:
+  			return fmt.Errorf("unexpected tar type %d for %s", hdr.Typeflag, hdr.Name)
+  		}
+
+  		for k, v := range hdr.PAXRecords {
+  			if !strings.HasPrefix(k, "SCHILY.xattr.") {
+  				continue
+  			}
+  			attrName := strings.TrimPrefix(k, "SCHILY.xattr.")
+  			if strings.HasPrefix(attrName, "trusted.") {
+  				continue
+  			}
+  			if err := fs.SetXattr(hdr.Name, attrName, []byte(v)); err != nil {
+  				return fmt.Errorf("unable to set xattr %s on %s: %w", attrName, hdr.Name, err)
+  			}
+  		}
+  	}
+
+  	return nil
+  }
+  ```
+
+test "rank1377: (b) the fix confines every entry name and both link targets to the workspace root through an error-returning validator"
+  lang go
+  file pkg/build/build.go
+  reject VYQL-PATH-001
+  reject VYQL-PATH-004
+  reject VYQL-PATH-007
+  reject VYQL-PATH-014
+  code
+  ```
+  package build
+
+  import (
+  	"archive/tar"
+  	"errors"
+  	"fmt"
+  	"io"
+  	"os"
+  	"path/filepath"
+  	"strings"
+
+  	apkofs "chainguard.dev/apko/pkg/apk/fs"
+  )
+
+  func isValidPath(targetPath, baseDir string) error {
+  	if strings.Contains(targetPath, "\x00") || strings.Contains(baseDir, "\x00") {
+  		return fmt.Errorf("path contains null byte")
+  	}
+
+  	cleanTarget := filepath.Clean(targetPath)
+  	cleanBase := filepath.Clean(baseDir)
+
+  	if filepath.IsAbs(cleanTarget) {
+  		return fmt.Errorf("absolute paths not allowed: %s", targetPath)
+  	}
+
+  	fullTarget := filepath.Join(cleanBase, cleanTarget)
+
+  	relPath, err := filepath.Rel(cleanBase, fullTarget)
+  	if err != nil {
+  		return fmt.Errorf("invalid path: %w", err)
+  	}
+
+  	if strings.HasPrefix(relPath, ".."+string(filepath.Separator)) || relPath == ".." {
+  		return fmt.Errorf("path traversal detected: %s", targetPath)
+  	}
+
+  	return nil
+  }
+
+  func (b *Build) retrieveWorkspace(ctx context.Context, fs apkofs.FullFS) error {
+  	r, err := b.Runner.WorkspaceTar(ctx, b.containerConfig, nil)
+  	if err != nil {
+  		return err
+  	} else if r == nil {
+  		return nil
+  	}
+  	defer r.Close()
+
+  	tr := tar.NewReader(r)
+
+  	for {
+  		hdr, err := tr.Next()
+  		if errors.Is(err, io.EOF) {
+  			break
+  		}
+  		if err != nil {
+  			return err
+  		}
+
+  		hdr.Name = strings.TrimPrefix(hdr.Name, "./")
+
+  		if err := isValidPath(hdr.Name, b.WorkspaceDir); err != nil {
+  			return fmt.Errorf("invalid tar entry path %q: %w", hdr.Name, err)
+  		}
+
+  		var uid, gid int
+  		fi := hdr.FileInfo()
+  		if stat, ok := fi.Sys().(*tar.Header); ok {
+  			uid = stat.Uid
+  			gid = stat.Gid
+  		}
+
+  		switch hdr.Typeflag {
+  		case tar.TypeDir:
+  			if err := fs.MkdirAll(hdr.Name, hdr.FileInfo().Mode().Perm()); err != nil {
+  				return fmt.Errorf("unable to create directory %s: %w", hdr.Name, err)
+  			}
+
+  			if err := fs.Chown(hdr.Name, uid, gid); err != nil {
+  				return fmt.Errorf("unable to chown directory %s: %w", hdr.Name, err)
+  			}
+
+  		case tar.TypeReg:
+  			parentDir := filepath.Dir(hdr.Name)
+  			if err := fs.MkdirAll(parentDir, 0o755); err != nil {
+  				return fmt.Errorf("unable to create directory %s: %w", hdr.Name, err)
+  			}
+  			f, err := fs.OpenFile(hdr.Name, os.O_CREATE|os.O_WRONLY, hdr.FileInfo().Mode())
+  			if err != nil {
+  				return fmt.Errorf("unable to open file %s: %w", hdr.Name, err)
+  			}
+
+  			if _, err := io.CopyN(f, tr, hdr.Size); err != nil {
+  				return fmt.Errorf("unable to copy file %s: %w", hdr.Name, err)
+  			}
+
+  			if err := f.Close(); err != nil {
+  				return fmt.Errorf("unable to close file %s: %w", hdr.Name, err)
+  			}
+
+  			if err := fs.Chown(hdr.Name, uid, gid); err != nil {
+  				return fmt.Errorf("unable to chown file %s: %w", hdr.Name, err)
+  			}
+
+  		case tar.TypeSymlink:
+  			if err := isValidPath(hdr.Linkname, b.WorkspaceDir); err != nil {
+  				return fmt.Errorf("invalid symlink target %q -> %q: %w", hdr.Name, hdr.Linkname, err)
+  			}
+
+  			if target, err := fs.Readlink(hdr.Name); err == nil && target == hdr.Linkname {
+  				continue
+  			}
+
+  			if err := fs.Symlink(hdr.Linkname, hdr.Name); err != nil {
+  				return fmt.Errorf("unable to create symlink %s -> %s: %w", hdr.Name, hdr.Linkname, err)
+  			}
+
+  		case tar.TypeLink:
+  			if err := isValidPath(hdr.Linkname, b.WorkspaceDir); err != nil {
+  				return fmt.Errorf("invalid hardlink target %q -> %q: %w", hdr.Name, hdr.Linkname, err)
+  			}
+
+  			if err := fs.Link(hdr.Linkname, hdr.Name); err != nil {
+  				return err
+  			}
+
+  		default:
+  			return fmt.Errorf("unexpected tar type %d for %s", hdr.Typeflag, hdr.Name)
+  		}
+  	}
+
+  	return nil
+  }
+  ```
+
+test "rank1377: (c) an untrusted path reaching a file write with no containment check is reported"
+  lang go
+  file internal/store/write.go
+  expect VYQL-PATH-001
+  code
+  ```
+  package store
+
+  import (
+  	"net/http"
+  	"os"
+  )
+
+  func handler(w http.ResponseWriter, r *http.Request) {
+  	name := r.URL.Query().Get("f")
+  	f, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY, 0o600)
+  	if err != nil {
+  		return
+  	}
+  	f.Close()
+  }
+  ```
+
+test "rank1377: (d) the same write is cleared when the containment check is written inline"
+  lang go
+  file internal/store/write.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package store
+
+  import (
+  	"net/http"
+  	"os"
+  	"path/filepath"
+  	"strings"
+  )
+
+  func handler(w http.ResponseWriter, r *http.Request) {
+  	name := r.URL.Query().Get("f")
+  	clean := filepath.Clean(name)
+  	if strings.HasPrefix(clean, "..") {
+  		return
+  	}
+  	f, err := os.OpenFile(clean, os.O_CREATE|os.O_WRONLY, 0o600)
+  	if err != nil {
+  		return
+  	}
+  	f.Close()
+  }
+  ```
+
+test "rank1377: (e) the same containment check moved into an error-returning helper still reports, which is the gap"
+  lang go
+  file internal/store/write.go
+  expect VYQL-PATH-001
+  code
+  ```
+  package store
+
+  import (
+  	"fmt"
+  	"net/http"
+  	"os"
+  	"path/filepath"
+  	"strings"
+  )
+
+  func checkContained(name string) error {
+  	clean := filepath.Clean(name)
+  	if strings.HasPrefix(clean, "..") {
+  		return fmt.Errorf("escapes root")
+  	}
+  	return nil
+  }
+
+  func handler(w http.ResponseWriter, r *http.Request) {
+  	name := r.URL.Query().Get("f")
+  	if err := checkContained(name); err != nil {
+  		return
+  	}
+  	f, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY, 0o600)
+  	if err != nil {
+  		return
+  	}
+  	f.Close()
+  }
+  ```
+
+test "rank1377: (f) the same check in a helper that returns the validated path is cleared, because the value crosses the boundary"
+  lang go
+  file internal/store/write.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package store
+
+  import (
+  	"fmt"
+  	"net/http"
+  	"os"
+  	"path/filepath"
+  	"strings"
+  )
+
+  func containedPath(name string) (string, error) {
+  	clean := filepath.Clean(name)
+  	if strings.HasPrefix(clean, "..") {
+  		return "", fmt.Errorf("escapes root")
+  	}
+  	return clean, nil
+  }
+
+  func handler(w http.ResponseWriter, r *http.Request) {
+  	name := r.URL.Query().Get("f")
+  	safe, err := containedPath(name)
+  	if err != nil {
+  		return
+  	}
+  	f, err := os.OpenFile(safe, os.O_CREATE|os.O_WRONLY, 0o600)
+  	if err != nil {
+  		return
+  	}
+  	f.Close()
+  }
+  ```
