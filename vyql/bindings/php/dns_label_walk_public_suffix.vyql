@@ -1,0 +1,9 @@
+module bindings.php.dns_label_walk_public_suffix;
+
+binding dnsLabelWalkMissingPublicSuffixCheck {
+  requires {
+    any(content("DNS_MX"), content("DNS_TXT"), content("getmxrr"), content("checkdnsrr"), content("dns_get_record"))
+  }
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and containsAny(node.token, ["assign_literal:DNS_MX", "assign_literal:DNS_TXT", "call_arg_method:dns_get_record:", "call_arg_method:getmxrr:", "call_arg_method:checkdnsrr:", "assign_call_method:getmxrr", "assign_call_method:checkdnsrr"]) and containsAny(node.token, ["call_arg_method:explode:'.'", "call_arg_method:explode:\".\"", "call_arg_method:strpos:'.'", "call_arg_method:strpos:\".\"", "call_arg_method:strstr:'.'", "call_arg_method:preg_replace:'/^[^.]+", "call_arg_method:preg_replace:\"/^[^.]+"]) and containsAny(node.token, ["call_arg_method:explode:2", "call_arg_method:substr:strpos", "call_arg_method:array_slice:1", "call_arg_method:array_shift:"]) and not containsAny(node.token, ["isSuffix", "isPublicSuffix", "publicSuffix", "public_suffix", "PublicSuffixList", "registrableDomain", "registrable_domain", "getRegistrableDomain", "secondLevelDomain", "effectiveTld", "isTopLevelDomain"])
+  emit issue code.DomainWalkMissingPublicSuffixBoundary at node
+}
