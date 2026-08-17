@@ -1,0 +1,51 @@
+# Rank 1266 / CVE-2026-1709: keylime's registrar built its TLS context with
+# web_util.init_mtls(), which loads the CA and enables mutual TLS with
+# verify_peer_cert=True (CERT_REQUIRED). Server._use_config then overwrote
+# that context's verify_mode to ssl.CERT_OPTIONAL, so the registrar's HTTPS
+# API endpoints (list/get/delete agent, exposing TPM public keys and agent
+# network locations) accepted any client whether or not it presented a
+# certificate — CWE-287/CWE-306. Fix a37fe134e6 removes the override line
+# entirely, leaving init_mtls()'s CERT_REQUIRED value in effect.
+#
+# VYQL-AUTH-106 already flags an assignment of ssl.CERT_NONE to a
+# `verify_mode` attribute (analysis.config.insecure_header /
+# code.InsecureHeaderConfig, via lowering.go's certCheckDisabled), but that
+# check only recognised CERT_NONE. CERT_OPTIONAL is the same documented
+# ssl.SSLContext weakening for a server-side context — it makes the peer
+# certificate optional instead of required — so certCheckDisabled now
+# recognises it too.
+
+test "Server._use_config overrides an mTLS context to CERT_OPTIONAL after init_mtls"
+  lang python
+  file keylime/web/base/server.py
+  expect VYQL-AUTH-106
+  code
+  ```
+  from ssl import CERT_OPTIONAL
+
+  from keylime import config, web_util
+
+
+  class Server:
+      def _use_config(self, component):
+          self._host = config.get(component, "ip")
+          self._https_port = config.getint(component, "tls_port", fallback=0)
+          self._ssl_ctx = web_util.init_mtls(component)
+          self._ssl_ctx.verify_mode = CERT_OPTIONAL
+  ```
+
+test "Server._use_config leaves the mTLS context at the CERT_REQUIRED init_mtls() sets"
+  lang python
+  file keylime/web/base/server.py
+  reject VYQL-AUTH-106
+  code
+  ```
+  from keylime import config, web_util
+
+
+  class Server:
+      def _use_config(self, component):
+          self._host = config.get(component, "ip")
+          self._https_port = config.getint(component, "tls_port", fallback=0)
+          self._ssl_ctx = web_util.init_mtls(component)
+  ```
