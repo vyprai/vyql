@@ -1,0 +1,97 @@
+# Rank 1583 / CVE-2023-3432: PlantUML's URL allowlist matched by
+# string prefix, so a URL carrying userinfo -- https://plantuml.com@
+# attacker.example/ -- passed the check because the prefix matched
+# before the @ while the request went to the host after it (URL
+# allowlist bypass, CWE-918/CWE-706; credit Agasthya Kasturi in the
+# fix). forbiddenURL and isInUrlAllowList in
+# src/net/sourceforge/plantuml/security/SURL.java checked
+# startsWith(cleanPath(allow)) against the full URL string -- with a
+# PATTERN_USERINFO regex that did not anchor its tail -- letting the
+# userinfo segment impersonate the allowed host. Pool commit
+# b32500bb61 is the real fix (COMMIT_OK -- "fix: improve filelist
+# support and nwdiag", carrying the SURL hardening): both methods
+# reject outright `if (full.contains("@"))`, and PATTERN_USERINFO
+# anchors with $. No pool correction.
+#
+# ATTENTION, prefix-matched URL allowlists. The allowlist exists and
+# runs -- its defeat is that string prefixes are not URL structure:
+# userinfo, and any grammar element before the host, matches first,
+# the same normalization-strength family as rank 1522 (bracket-blind
+# hosts) and 1582 (the wildcard pattern). Nothing can ask "does the
+# allowlist compare parsed hosts rather than string prefixes" --
+# that is URL-structure vocabulary. A binding on PlantUML's own
+# SURL would detect this tool rather than the weakness. Measured on
+# the real code: scanning SURL.java reports zero findings at both
+# revisions. No ENGINE-GAPS.md entry. No definition change shipped.
+# Spec cve_rank1583 records the prefix-matched allowlist and the
+# @-rejecting form, both asserting reject VYQL-RF-001: when
+# url-structure vocabulary lands, the prefix form must flip to
+# expect.
+
+test "rank1583: the allowlist matches url prefixes"
+  lang java
+  file src/net/sourceforge/plantuml/security/SURL.java
+  reject VYQL-RF-001
+  code
+  ```
+  import java.util.List;
+
+  public class SURL {
+      private final List<String> urlAllowList;
+
+      private boolean forbiddenURL(String full) {
+          if (full.startsWith("https://") == false && full.startsWith("http://") == false)
+              return true;
+          return false;
+      }
+
+      private boolean isInUrlAllowList() {
+          final String full = internal.toString();
+          for (String allow : urlAllowList)
+              if (full.startsWith(allow))
+                  return true;
+          return false;
+      }
+
+      public boolean isUrlAllowed(String internal) {
+          return forbiddenURL(internal) == false && isInUrlAllowList();
+      }
+  }
+  ```
+
+test "rank1583: the fix rejects userinfo outright"
+  lang java
+  file src/net/sourceforge/plantuml/security/SURL.java
+  reject VYQL-RF-001
+  code
+  ```
+  import java.util.List;
+
+  public class SURL {
+      private final List<String> urlAllowList;
+
+      private boolean forbiddenURL(String full) {
+          // Thanks to Agasthya Kasturi
+          if (full.contains("@"))
+              return true;
+          if (full.startsWith("https://") == false && full.startsWith("http://") == false)
+              return true;
+          return false;
+      }
+
+      private boolean isInUrlAllowList() {
+          final String full = internal.toString();
+          // Thanks to Agasthya Kasturi
+          if (full.contains("@"))
+              return false;
+          for (String allow : urlAllowList)
+              if (full.startsWith(allow))
+                  return true;
+          return false;
+      }
+
+      public boolean isUrlAllowed(String internal) {
+          return forbiddenURL(internal) == false && isInUrlAllowList();
+      }
+  }
+  ```
