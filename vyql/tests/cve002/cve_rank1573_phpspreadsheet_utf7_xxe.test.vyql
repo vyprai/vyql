@@ -1,0 +1,102 @@
+# Rank 1573 / CVE-2024-45048: PhpSpreadsheet's XML scanner disarmed
+# external entities by re-encoding every document it loads, but its
+# charset detection only recognised double-quoted encoding
+# declarations, so a crafted workbook declaring `encoding='UTF-7'`
+# with single quotes skipped the re-encoding and smuggled hidden
+# entities through the reader (XXE via quote-blind detection,
+# CWE-611). The scan in src/PhpSpreadsheet/Reader/Security/
+# XmlScanner.php did `$pattern = '/encoding="(.*?)"/'; $result =
+# preg_match($pattern, $xml, $matches); $charset = strtoupper($result
+# ? $matches[1] : 'UTF-8');` -- XML allows both quote styles in the
+# declaration, and the UTF-7 default let entity-bearing bytes survive
+# to the parser. Pool commit bea2d4b30f is the real fix (COMMIT_OK --
+# "Security: prevent XXE ... by hiding custom entities by using
+# single quote to declare a non-UTF-8 encoding"): a findCharSet
+# helper matches both `encoding="..."` and `encoding='...'`, with
+# regression fixtures for both quote styles. No pool correction.
+#
+# ATTENTION, quote-blind normalization. The guard exists and runs --
+# its defect is that the pattern recognises only one of the two
+# spellings XML permits, the same present-but-incomplete family as
+# ranks 1551 (first-quote-only escaping) and 1522 (bracket-blind
+# hosts): nothing can ask "does this detection pattern cover every
+# syntactic form the grammar allows" -- grammar-completeness
+# vocabulary. A binding on PhpSpreadsheet's own scanner would detect
+# this library rather than the weakness. Measured on the real code:
+# scanning XmlScanner.php reports one finding at both revisions
+# (unchanged; unrelated heuristic). No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1573 records the
+# double-quote-only detection and the both-quotes form, both
+# asserting reject VYQL-DESER-004: when grammar-completeness
+# vocabulary lands, the single-pattern form must flip to expect.
+
+test "rank1573: the charset is detected through one quote style"
+  lang php
+  file src/PhpSpreadsheet/Reader/Security/XmlScanner.php
+  reject VYQL-DESER-004
+  code
+  ```
+  <?php
+
+  class XmlScanner
+  {
+      private function detectCharset(string $xml): string
+      {
+          $pattern = '/encoding="(.*?)"/';
+          $result = preg_match($pattern, $xml, $matches);
+          $charset = strtoupper($result ? $matches[1] : 'UTF-8');
+
+          return $charset === 'UTF-8' ? 'UTF-8' : 'UTF-8';
+      }
+
+      public function scan($xml)
+      {
+          $charset = $this->detectCharset($xml);
+
+          if ($charset !== 'UTF-8') {
+              $xml = mb_convert_encoding($xml, 'UTF-8', $charset);
+          }
+
+          return str_replace('<!DOCTYPE', '<!NOTATION', $xml);
+      }
+  }
+  ```
+
+test "rank1573: the fix detects both quote styles"
+  lang php
+  file src/PhpSpreadsheet/Reader/Security/XmlScanner.php
+  reject VYQL-DESER-004
+  code
+  ```
+  <?php
+
+  class XmlScanner
+  {
+      private function findCharSet(string $xml): string
+      {
+          $patterns = [
+              '/encoding="([^"]*]?)"/',
+              "/encoding='([^']*?)'/",
+          ];
+
+          foreach ($patterns as $pattern) {
+              if (preg_match($pattern, $xml, $matches)) {
+                  return strtoupper($matches[1]);
+              }
+          }
+
+          return 'UTF-8';
+      }
+
+      public function scan($xml)
+      {
+          $charset = $this->findCharSet($xml);
+
+          if ($charset !== 'UTF-8') {
+              $xml = mb_convert_encoding($xml, 'UTF-8', $charset);
+          }
+
+          return str_replace('<!DOCTYPE', '<!NOTATION', $xml);
+      }
+  }
+  ```
