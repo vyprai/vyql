@@ -1,0 +1,513 @@
+# Rank 1388 / CVE-2026-6270 (GHSA-72c6-fx6q-fr5w, critical): @fastify/middie
+# propagated a parent scope's middleware into every child plugin scope by
+# replaying it through its own prefix-prepending `use()`, so the inherited path
+# picked up the child's route prefix a second time and stopped matching any
+# request. Middleware-based authentication, authorization and rate limiting are
+# skipped for every route in the affected child scope and in its nested
+# grandchild scopes, with no crafted request and no configuration involved.
+#
+# The weakness, from index.js at ca42dd7^. `use()` is prefix-relative: it turns
+# the caller's path into an absolute one and stores the absolute form.
+#
+#   function use (path, fn) {
+#     if (typeof path === 'string') {
+#       const prefix = this.prefix
+#       path = prefix + (path === '/' && prefix.length > 0 ? '' : path)
+#     }
+#     this[kMiddlewares].push([path, fn])
+#     ...
+#   }
+#
+# Fastify's `onRegister` hook fires with each newly created encapsulation
+# context, and middie uses it to give the child its own engine, its own store
+# and its own `use` decorator, then to re-register whatever the parent had:
+#
+#   function onRegister (instance) {
+#     const middlewares = instance[kMiddlewares].slice()
+#     instance[kMiddlewares] = []
+#     instance[kMiddie] = Middie(onMiddieEnd, resolveNormalizationOptions(instance))
+#     instance[kMiddieHasMiddlewares] = false
+#     instance.decorate('use', use)
+#     for (const middleware of middlewares) {
+#       instance.use(...middleware)          // <- prefixes an already-absolute path
+#     }
+#   }
+#
+# The entries in `middlewares` are already absolute, because `use()` is what
+# stored them. Feeding them back through `use()` on a child whose `prefix` is
+# `/admin` rewrites `/admin` to `/admin/admin`, and the routes the child
+# actually declares live under `/admin/...`, so the inherited middleware is
+# mounted where nothing is served. The fix hands the inherited pair straight to
+# the child's middleware engine and keeps the store in sync by hand, so no
+# second prefix is applied:
+#
+#   for (const [path, fn] of middlewares) {
+#     instance[kMiddlewares].push([path, fn])
+#     if (fn == null) { instance[kMiddie].use(path) } else { instance[kMiddie].use(path, fn) }
+#     instance[kMiddieHasMiddlewares] = true
+#   }
+#
+# The fix's own regression test is the proof of impact: a `/admin` middleware
+# that answers 403 without an authorization header protects `/admin/root-data`
+# in the root scope and, before the fix, did not protect `/admin/secret` in a
+# child registered with `prefix: '/admin'`.
+#
+# TASKS.md flags the row `nocommit`. That flag is wrong: `git show
+# ca42dd768f64d4fd7cc827a4c415fec546a2c8bb` prints the full patch (index.js 10
+# lines, test/middleware.test.js 318 lines) with no need for the
+# `git diff <parent-or-default-tip> <sha>` workaround that three other rows in
+# this batch needed, and `ca42dd7^` is the fully vulnerable tree. The
+# vulnerable/patched pair below is a real diff, not a reconstruction. No pool
+# correction. The recorded CWE is worth treating as a hint: the advisory files
+# this as CWE-436 (Interpretation Conflict), which describes the path-matching
+# disagreement but not the effect, which is that a present, reached
+# authorization control is mounted where it cannot match — CWE-863.
+#
+# The same defect, same shape, shipped in a sibling package: @fastify/express
+# CVE-2026-33807 / GHSA-hrwm-hgmj-7p9c, fixed in
+# fastify/fastify-express c4e49b5244fcfadb38dc08e9b1808c5d759021a2, whose
+# `onRegister` had the identical `for (const middleware of middlewares) {
+# instance.use(...middleware) }` and whose fix likewise registers on the engine
+# underneath (`instance.express.use(path, fn)`). Both are pinned below.
+#
+# FIXED. Diagnosis: there is no taint path to want. `vyql match` on index.js at
+# ca42dd7^ labels `req.query`/`req.body` as code.HttpInput, three `require`
+# arguments as code.DynamicCodeLoad and seven symbol writes as
+# code.ProtoPollute, and nothing at all in `use` or `onRegister`; a bounded scan
+# of the repository reports one finding, a VYQL-DOS-001 review flag on
+# path-to-regexp in lib/engine.js, at both revisions. This is rank 1348's
+# inversion — the analysed code *is* the control — combined with the fact that
+# the defect is arithmetic on a route path rather than a value reaching a sink.
+# JavaScript's missing call-argument tokens (rank 1360) also rule out reading
+# the `instance.use(...middleware)` spread itself, which is the most direct
+# statement of the bug.
+#
+# New concept code.EncapsulatedMiddlewarePathReprefixed with its review twin
+# and VYQL-AUTH-119 (minted; the pack's previous maximum was VYQL-AUTH-118),
+# plus a JavaScript binding fastifyEncapsulatedMiddlewareReprefix in
+# vyql/bindings/javascript/fastify_encapsulated_middleware_reprefix.vyql. It is
+# a function-scope presence predicate over the plugin function, which is where
+# all four facts are visible at once because `use` and `onRegister` are nested
+# declarations inside it:
+#
+#   * `selector:this.prefix` — the plugin's registration function is
+#     prefix-relative. `instance.prefix` is documented as the route prefix of
+#     the encapsulation context, so a registration path built from it is
+#     absolute once stored.
+#   * `literal:onRegister` — the plugin installs Fastify's encapsulation hook,
+#     documented as firing when a new encapsulation context is created.
+#   * `call:decorate` — and re-decorates that context, which is what a plugin
+#     must do because decorators do not cross an encapsulation boundary.
+#   * `call_path:instance.use` — and then calls the prefix-prepending
+#     registration function on the child context. That is the defect: the
+#     inherited paths are already absolute, so the child's prefix lands on top.
+#
+# The fourth conjunct is the discriminator and it is stated positively, as the
+# call the vulnerable code makes, not as the absence of the shape the fix
+# introduced. Both fixes route the inherited pair to the engine under the
+# instance instead — `instance[kMiddie].use` in middie, `instance.express.use`
+# in fastify-express — so the two-segment `instance.use` path disappears in
+# each without the binding naming either replacement.
+#
+# `==` and not `contains` on every conjunct: `contains` is a substring test, so
+# `call_path:instance.use` would be satisfied by `instance.user` or
+# `instance.useCache`, and `selector:this.prefix` by `this.prefixLength`. The
+# encapsulation parameter is spelled `instance` in Fastify's own onRegister
+# documentation and in all three implementations read here; a plugin that names
+# it something else is not covered, which is the cost of the exact form.
+#
+# Measured (timeout 180, --max-ram 6GB, --cache off; every count a union over
+# three runs, and all of these were stable across the three).
+#
+#   fastify/middie whole tree: 2 findings at ca42dd7^, 1 at ca42dd7. The delta
+#   is the single VYQL-AUTH-119 at index.js:38, on the plugin function; the
+#   other finding is the pre-existing VYQL-DOS-001, unchanged. Nothing fires in
+#   test/middleware.test.js at either revision, which matters because the fix
+#   adds 318 lines of tests that register middleware under overlapping prefixes
+#   and because `inTestOrSeedFile` is not reachable from a binding.
+#
+#   fastify/fastify-express whole tree: 1 finding at c4e49b5^, 0 at c4e49b5 —
+#   the sibling CVE, caught by the same binding without the binding being
+#   written against it.
+#
+# Collateral, enumerated rather than sampled. `literal:onRegister` is the
+# narrowest of the four conjuncts, so the reachable set is every JavaScript or
+# TypeScript file on this machine that mentions `onRegister` at all: 14 files
+# across the campaign's other clones and the benchmark corpora (echarts bundles
+# in microweber, five lollms frontend bundles, a novnc es-module-loader pair, an
+# apollo-server .d.ts, a middie test file, and nest's platform-fastify middie
+# adapter and its spec). Scanned together with --max-file-size 0 so the
+# minified bundles parse: 1054 findings, zero VYQL-AUTH-119. Exactly one of the
+# 14 also mentions `.prefix`, and it is the interesting one:
+# nest/packages/platform-fastify/adapters/middie/fastify-middie.ts is a
+# vendored copy of this very plugin carrying all four ingredients — `use` builds
+# `prefix + path` from `this.prefix`, `addHook('onRegister', onRegister)`,
+# `instance.decorate('use', ...)` — and it is declined, because its onRegister
+# already registers on the engine: `(instance[kMiddie].use as any)(...middleware)`.
+# Rewriting that one call to `(instance.use as any)(...middleware)` and changing
+# nothing else takes the file from 0 findings to 1 VYQL-AUTH-119, which is what
+# makes the decline attributable to the construct rather than to the file
+# failing to parse.
+#
+#   A/B on three real trees, base data directory versus this one:
+#   nest/packages/platform-fastify 1 -> 1, apollo-server 76 -> 76,
+#   lollms 709 -> 709.
+#
+# Neither OWASP corpus can move: the binding is JavaScript-only and the new rule
+# consumes only the new concept, which no other binding emits, while both
+# corpora are Java and Python.
+
+test "rank1388: replaying stored middleware through the prefixing decorator double-prefixes it in a child scope"
+  lang javascript
+  file index.js
+  expect VYQL-AUTH-119
+  expect_review code.EncapsulatedMiddlewarePathReprefixed
+  code
+  ```
+  'use strict'
+
+  const fp = require('fastify-plugin')
+  const Middie = require('./lib/engine')
+  const kMiddlewares = Symbol('fastify-middie-middlewares')
+  const kMiddie = Symbol('fastify-middie-instance')
+  const kMiddieHasMiddlewares = Symbol('fastify-middie-has-middlewares')
+
+  function fastifyMiddie (fastify, options, next) {
+    fastify.decorate('use', use)
+    fastify[kMiddlewares] = []
+    fastify[kMiddieHasMiddlewares] = false
+    fastify[kMiddie] = Middie(onMiddieEnd)
+
+    fastify
+      .addHook('onRequest', runMiddie)
+      .addHook('onRegister', onRegister)
+
+    function use (path, fn) {
+      if (typeof path === 'string') {
+        const prefix = this.prefix
+        path = prefix + (path === '/' && prefix.length > 0 ? '' : path)
+      }
+      this[kMiddlewares].push([path, fn])
+      if (fn == null) {
+        this[kMiddie].use(path)
+      } else {
+        this[kMiddie].use(path, fn)
+      }
+      this[kMiddieHasMiddlewares] = true
+      return this
+    }
+
+    function runMiddie (req, reply, next) {
+      if (this[kMiddieHasMiddlewares]) {
+        this[kMiddie].run(req.raw, reply.raw, next)
+      } else {
+        next()
+      }
+    }
+
+    function onMiddieEnd (err, _req, _res, next) {
+      next(err)
+    }
+
+    function onRegister (instance) {
+      const middlewares = instance[kMiddlewares].slice()
+      instance[kMiddlewares] = []
+      instance[kMiddie] = Middie(onMiddieEnd)
+      instance[kMiddieHasMiddlewares] = false
+      instance.decorate('use', use)
+      for (const middleware of middlewares) {
+        instance.use(...middleware)
+      }
+    }
+
+    next()
+  }
+
+  module.exports = fp(fastifyMiddie, { fastify: '5.x', name: '@fastify/middie' })
+  ```
+
+test "rank1388: the sibling express plugin re-registers through the same prefixing decorator"
+  lang javascript
+  file index.js
+  expect VYQL-AUTH-119
+  expect_review code.EncapsulatedMiddlewarePathReprefixed
+  code
+  ```
+  'use strict'
+
+  const fp = require('fastify-plugin')
+  const Express = require('express')
+  const kMiddlewares = Symbol('fastify-express-middlewares')
+
+  function fastifyExpress (fastify, options, next) {
+    const { expressHook = 'onRequest' } = options
+
+    fastify.decorate('use', use)
+    fastify[kMiddlewares] = []
+    fastify.decorate('express', Express())
+    fastify.express.disable('x-powered-by')
+
+    fastify
+      .addHook(expressHook, runConnect)
+      .addHook('onRegister', onRegister)
+
+    function use (path, fn) {
+      if (typeof path === 'string') {
+        const prefix = this.prefix
+        path = prefix + (path === '/' && prefix.length > 0 ? '' : path)
+      }
+      this[kMiddlewares].push([path, fn])
+      if (fn == null) {
+        this.express.use(path)
+      } else {
+        this.express.use(path, fn)
+      }
+      return this
+    }
+
+    function runConnect (req, reply, next) {
+      if (this[kMiddlewares].length > 0) {
+        this.express(req.raw, reply.raw, next)
+      } else {
+        next()
+      }
+    }
+
+    function onRegister (instance) {
+      const middlewares = instance[kMiddlewares].slice()
+      instance[kMiddlewares] = []
+      instance.decorate('express', Express())
+      instance.express.disable('x-powered-by')
+      instance.decorate('use', use)
+      for (const middleware of middlewares) {
+        instance.use(...middleware)
+      }
+    }
+
+    next()
+  }
+
+  module.exports = fp(fastifyExpress, { fastify: '5.x', name: '@fastify/express' })
+  ```
+
+test "rank1388: handing the inherited pair to the child's own engine keeps the stored path"
+  lang javascript
+  file index.js
+  reject VYQL-AUTH-119
+  reject_review code.EncapsulatedMiddlewarePathReprefixed
+  code
+  ```
+  'use strict'
+
+  const fp = require('fastify-plugin')
+  const Middie = require('./lib/engine')
+  const kMiddlewares = Symbol('fastify-middie-middlewares')
+  const kMiddie = Symbol('fastify-middie-instance')
+  const kMiddieHasMiddlewares = Symbol('fastify-middie-has-middlewares')
+
+  function fastifyMiddie (fastify, options, next) {
+    fastify.decorate('use', use)
+    fastify[kMiddlewares] = []
+    fastify[kMiddieHasMiddlewares] = false
+    fastify[kMiddie] = Middie(onMiddieEnd)
+
+    fastify
+      .addHook('onRequest', runMiddie)
+      .addHook('onRegister', onRegister)
+
+    function use (path, fn) {
+      if (typeof path === 'string') {
+        const prefix = this.prefix
+        path = prefix + (path === '/' && prefix.length > 0 ? '' : path)
+      }
+      this[kMiddlewares].push([path, fn])
+      if (fn == null) {
+        this[kMiddie].use(path)
+      } else {
+        this[kMiddie].use(path, fn)
+      }
+      this[kMiddieHasMiddlewares] = true
+      return this
+    }
+
+    function runMiddie (req, reply, next) {
+      if (this[kMiddieHasMiddlewares]) {
+        this[kMiddie].run(req.raw, reply.raw, next)
+      } else {
+        next()
+      }
+    }
+
+    function onMiddieEnd (err, _req, _res, next) {
+      next(err)
+    }
+
+    function onRegister (instance) {
+      const middlewares = instance[kMiddlewares].slice()
+      instance[kMiddlewares] = []
+      instance[kMiddie] = Middie(onMiddieEnd)
+      instance[kMiddieHasMiddlewares] = false
+      instance.decorate('use', use)
+      for (const [path, fn] of middlewares) {
+        instance[kMiddlewares].push([path, fn])
+        if (fn == null) {
+          instance[kMiddie].use(path)
+        } else {
+          instance[kMiddie].use(path, fn)
+        }
+        instance[kMiddieHasMiddlewares] = true
+      }
+    }
+
+    next()
+  }
+
+  module.exports = fp(fastifyMiddie, { fastify: '5.x', name: '@fastify/middie' })
+  ```
+
+test "rank1388: the sibling express plugin's fix registers on the child's express app"
+  lang javascript
+  file index.js
+  reject VYQL-AUTH-119
+  reject_review code.EncapsulatedMiddlewarePathReprefixed
+  code
+  ```
+  'use strict'
+
+  const fp = require('fastify-plugin')
+  const Express = require('express')
+  const kMiddlewares = Symbol('fastify-express-middlewares')
+
+  function fastifyExpress (fastify, options, next) {
+    const { expressHook = 'onRequest' } = options
+
+    fastify.decorate('use', use)
+    fastify[kMiddlewares] = []
+    fastify.decorate('express', Express())
+    fastify.express.disable('x-powered-by')
+
+    fastify
+      .addHook(expressHook, runConnect)
+      .addHook('onRegister', onRegister)
+
+    function use (path, fn) {
+      if (typeof path === 'string') {
+        const prefix = this.prefix
+        path = prefix + (path === '/' && prefix.length > 0 ? '' : path)
+      }
+      this[kMiddlewares].push([path, fn])
+      if (fn == null) {
+        this.express.use(path)
+      } else {
+        this.express.use(path, fn)
+      }
+      return this
+    }
+
+    function runConnect (req, reply, next) {
+      if (this[kMiddlewares].length > 0) {
+        this.express(req.raw, reply.raw, next)
+      } else {
+        next()
+      }
+    }
+
+    function onRegister (instance) {
+      const middlewares = instance[kMiddlewares].slice()
+      instance[kMiddlewares] = middlewares.slice()
+      instance.decorate('express', Express())
+      instance.express.disable('x-powered-by')
+      instance.decorate('use', use)
+      for (const [path, fn] of middlewares) {
+        if (fn == null) {
+          instance.express.use(path)
+        } else {
+          instance.express.use(path, fn)
+        }
+      }
+    }
+
+    next()
+  }
+
+  module.exports = fp(fastifyExpress, { fastify: '5.x', name: '@fastify/express' })
+  ```
+
+test "rank1388: a plugin that stores relative paths and prefixes only at match time is not re-prefixing"
+  lang javascript
+  file index.js
+  reject VYQL-AUTH-119
+  reject_review code.EncapsulatedMiddlewarePathReprefixed
+  code
+  ```
+  'use strict'
+
+  const fp = require('fastify-plugin')
+  const kMiddlewares = Symbol('scoped-middlewares')
+
+  function scopedMiddleware (fastify, options, next) {
+    fastify.decorate('use', use)
+    fastify[kMiddlewares] = []
+
+    fastify
+      .addHook('onRequest', run)
+      .addHook('onRegister', onRegister)
+
+    function use (path, fn) {
+      this[kMiddlewares].push([path, fn, this.prefix])
+      return this
+    }
+
+    function run (req, reply, next) {
+      for (const [path, fn, prefix] of this[kMiddlewares]) {
+        if (req.raw.url.startsWith(prefix + path)) {
+          fn(req.raw, reply.raw, () => {})
+        }
+      }
+      next()
+    }
+
+    function onRegister (instance) {
+      const middlewares = instance[kMiddlewares].slice()
+      instance.decorate('use', use)
+      instance[kMiddlewares] = middlewares.slice()
+    }
+
+    next()
+  }
+
+  module.exports = fp(scopedMiddleware, { fastify: '5.x', name: 'scoped-middleware' })
+  ```
+
+test "rank1388: a connect-style app mounting middleware on a fixed path is not an encapsulation hook"
+  lang javascript
+  file server.js
+  reject VYQL-AUTH-119
+  reject_review code.EncapsulatedMiddlewarePathReprefixed
+  code
+  ```
+  'use strict'
+
+  const express = require('express')
+
+  function buildAdminRouter (instance, requireAuth) {
+    instance.use('/admin', requireAuth)
+    instance.use('/admin/reports', require('./reports'))
+    return instance
+  }
+
+  function build () {
+    const app = express()
+    buildAdminRouter(app, function requireAuth (req, res, next) {
+      if (!req.headers.authorization) {
+        res.statusCode = 403
+        res.end('forbidden')
+        return
+      }
+      next()
+    })
+    return app
+  }
+
+  module.exports = build
+  ```
