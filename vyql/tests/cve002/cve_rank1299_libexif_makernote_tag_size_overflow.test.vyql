@@ -1,0 +1,283 @@
+# Rank 1299 / CVE-2020-13112: libexif's per-vendor MakerNote loaders (Canon,
+# Fuji, Olympus, Pentax) read each tag entry's `format` and `components`
+# straight out of the file's byte buffer and size the tag's data with
+#
+#   s = exif_format_get_size(entries[tcount].format) * entries[tcount].components;
+#
+# (exif-mnote-data-canon.c, exif_mnote_data_canon_load; the other three
+# vendor loaders repeat the same shape). `exif_format_get_size` returns a
+# small constant (1-8) but `components` is an attacker-controlled 32-bit
+# value read directly from the file, so the product can wrap. The
+# subsequent bounds check on `dataofs + s` then compares against the
+# already-wrapped, too-small `s`, so a crafted MakerNote whose declared
+# `components` overflows the product passes the check and libexif allocates
+# and copies with the wrapped size while later consumers of
+# `entries[i].components` (unwrapped) iterate past the undersized
+# allocation -- a heap buffer over-read/overflow (CWE-190 -> CWE-125/787).
+# Fix 435e21f05001fb03f9f186fa7cbc69454afd00d1 adds an explicit overflow
+# guard ahead of the multiplication in all four vendor loaders --
+# `if (format_size && buf_size / format_size < components) { ...skip...}` --
+# and replaces every `x + n < x` style overflow-prone bounds check with a
+# `CHECKOVERFLOW(offset,datasize,structsize)` macro that subtracts instead
+# of adding, so no comparison can itself overflow.
+#
+# ATTENTION, engine gap already on record at rank 1206
+# (cve_rank1206_imageworsener_le_shift_representability): the C `fread`
+# binding (vyql/bindings/c/mce54b166.vyql, binding httpInput4) is `emit
+# source code.HttpInput at call.result` -- fread's *return value* (a byte
+# count) is tagged attacker-controlled, never the buffer its first argument
+# writes into. libexif's real entrypoint reads the whole MakerNote into a
+# byte buffer with exactly that shape (`exif_data_load_data` ->
+# `exif_mnote_data_load` -> the buffer that already holds the file's bytes,
+# modeled here with fread for a self-contained repro) and every downstream
+# read of that buffer -- including `entries[tcount].components =
+# exif_get_long(buf + o + 4, order)`, which feeds the overflowing
+# multiplication -- carries no taint. `vyql trace -from code.HttpInput -to
+# code.IntegerSizeArithmeticSink` on a repro faithful to
+# exif_mnote_data_canon_load (fread into buf, then the same parse loop)
+# shows the single HttpInput source dead-ending at the fread call itself,
+# reaching no sink, identically on both the vulnerable and the patched
+# revision -- the multiplication itself is unconditionally labelled
+# code.IntegerSizeArithmeticSink on both (`vyql match` confirms), so only
+# the missing source-through-buffer hop separates them.
+#
+# A bounded real-repository scan (timeout 180, --max-ram 5GB, --cache off)
+# over the vulnerable parent commit confirms the same for libexif/ itself:
+# scanning libexif/libexif alone reports zero VYQL-NUM-003 findings, at
+# exif-mnote-data-canon.c:255 (the multiplication) or anywhere else in the
+# vendor loaders. Scanning the whole checkout (libexif/ plus test/) does
+# report VYQL-NUM-003 at exif-mnote-data-canon.c:255, but its source is
+# `code.EnvVariable @ test/test-parse.c:176` through
+# `split_ws_string` -- the test harness's own env-var-driven synthetic tag
+# builder calling exif_mnote_data_canon_load directly, not the real file-read
+# attack surface a crafted JPEG's MakerNote actually uses. That path is
+# incidental test-harness code, not a discriminator between the vulnerable
+# and fixed revisions (the harness calls the same loader either way), so it
+# does not make the real vulnerability's attack surface detectable.
+#
+# No definition change attempted; this is exactly the 1206 gap, not a new
+# one. Recording so the fread source-at-buffer fix's "ranks it blocks" list
+# in ENGINE-GAPS.md includes 1299 alongside 1206.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1299: Canon MakerNote tag size is an unguarded product of a tainted components count"
+  lang c
+  file exif-mnote-data-canon.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  typedef unsigned int ExifLong;
+  typedef unsigned short ExifShort;
+  typedef int ExifByteOrder;
+
+  typedef struct {
+    ExifShort tag;
+    ExifShort format;
+    ExifLong components;
+    ExifByteOrder order;
+    size_t size;
+    unsigned char *data;
+  } MnoteCanonEntry;
+
+  typedef struct {
+    MnoteCanonEntry *entries;
+    size_t count;
+    ExifByteOrder order;
+    unsigned int offset;
+  } ExifMnoteDataCanon;
+
+  extern ExifLong exif_get_long (const unsigned char *b, ExifByteOrder order);
+  extern ExifShort exif_get_short (const unsigned char *b, ExifByteOrder order);
+  extern unsigned char exif_format_get_size (ExifShort format);
+  extern void *exif_mem_alloc (size_t size);
+
+  static void
+  exif_mnote_data_canon_load (ExifMnoteDataCanon *n,
+    const unsigned char *buf, unsigned int buf_size)
+  {
+    ExifShort c;
+    size_t i, tcount, o, datao;
+
+    if (!n || !buf || !buf_size)
+      return;
+    datao = 6 + n->offset;
+    if ((datao + 2 < datao) || (datao + 2 < 2) || (datao + 2 > buf_size))
+      return;
+
+    c = exif_get_short (buf + datao, n->order);
+    datao += 2;
+
+    n->entries = exif_mem_alloc (sizeof (MnoteCanonEntry) * c);
+    if (!n->entries)
+      return;
+
+    tcount = 0;
+    for (i = c, o = datao; i; --i, o += 12) {
+      size_t s;
+      if ((o + 12 < o) || (o + 12 < 12) || (o + 12 > buf_size))
+        break;
+
+      n->entries[tcount].tag        = exif_get_short (buf + o, n->order);
+      n->entries[tcount].format     = exif_get_short (buf + o + 2, n->order);
+      n->entries[tcount].components = exif_get_long (buf + o + 4, n->order);
+      n->entries[tcount].order      = n->order;
+
+      /*
+       * Size? If bigger than 4 bytes, the actual data is not
+       * in the entry but somewhere else (offset).
+       */
+      s = exif_format_get_size (n->entries[tcount].format) *
+          n->entries[tcount].components;
+      n->entries[tcount].size = s;
+      if (!s) {
+        continue;
+      } else {
+        size_t dataofs = o + 8;
+        if (s > 4) dataofs = exif_get_long (buf + dataofs, n->order) + 6;
+        if ((dataofs + s < s) || (dataofs + s < dataofs) || (dataofs + s > buf_size)) {
+          continue;
+        }
+
+        n->entries[tcount].data = exif_mem_alloc (s);
+        if (!n->entries[tcount].data) {
+          continue;
+        }
+        memcpy (n->entries[tcount].data, buf + dataofs, s);
+      }
+
+      ++tcount;
+    }
+    n->count = tcount;
+  }
+
+  int
+  exif_mnote_canon_parse_from_file (FILE *fp, ExifMnoteDataCanon *n)
+  {
+    unsigned char buf[65536];
+    size_t buf_size = fread (buf, 1, sizeof (buf), fp);
+    if (!buf_size) return -1;
+    exif_mnote_data_canon_load (n, buf, (unsigned int) buf_size);
+    return 0;
+  }
+  ```
+
+test "rank1299: Canon MakerNote tag size is guarded by a division check before the same product"
+  lang c
+  file exif-mnote-data-canon.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  #define CHECKOVERFLOW(offset,datasize,structsize) (( offset >= datasize) || (structsize > datasize) || (offset > datasize - structsize ))
+
+  typedef unsigned int ExifLong;
+  typedef unsigned short ExifShort;
+  typedef int ExifByteOrder;
+
+  typedef struct {
+    ExifShort tag;
+    ExifShort format;
+    ExifLong components;
+    ExifByteOrder order;
+    size_t size;
+    unsigned char *data;
+  } MnoteCanonEntry;
+
+  typedef struct {
+    MnoteCanonEntry *entries;
+    size_t count;
+    ExifByteOrder order;
+    unsigned int offset;
+  } ExifMnoteDataCanon;
+
+  extern ExifLong exif_get_long (const unsigned char *b, ExifByteOrder order);
+  extern ExifShort exif_get_short (const unsigned char *b, ExifByteOrder order);
+  extern unsigned char exif_format_get_size (ExifShort format);
+  extern void *exif_mem_alloc (size_t size);
+
+  static void
+  exif_mnote_data_canon_load (ExifMnoteDataCanon *n,
+    const unsigned char *buf, unsigned int buf_size)
+  {
+    ExifShort c;
+    size_t i, tcount, o, datao;
+
+    if (!n || !buf || !buf_size)
+      return;
+    datao = 6 + n->offset;
+    if (CHECKOVERFLOW(datao, buf_size, 2))
+      return;
+
+    c = exif_get_short (buf + datao, n->order);
+    datao += 2;
+
+    n->entries = exif_mem_alloc (sizeof (MnoteCanonEntry) * c);
+    if (!n->entries)
+      return;
+
+    tcount = 0;
+    for (i = c, o = datao; i; --i, o += 12) {
+      size_t s;
+      if (CHECKOVERFLOW(o, buf_size, 12))
+        break;
+
+      n->entries[tcount].tag        = exif_get_short (buf + o, n->order);
+      n->entries[tcount].format     = exif_get_short (buf + o + 2, n->order);
+      n->entries[tcount].components = exif_get_long (buf + o + 4, n->order);
+      n->entries[tcount].order      = n->order;
+
+      /* Check if we overflow the multiplication. Use buf_size as the max
+       * size for integer overflow detection, we will check the buffer
+       * sizes closer later. */
+      if (exif_format_get_size (n->entries[tcount].format) &&
+          buf_size / exif_format_get_size (n->entries[tcount].format) <
+            n->entries[tcount].components) {
+        continue;
+      }
+
+      /*
+       * Size? If bigger than 4 bytes, the actual data is not
+       * in the entry but somewhere else (offset).
+       */
+      s = exif_format_get_size (n->entries[tcount].format) *
+          n->entries[tcount].components;
+      n->entries[tcount].size = s;
+      if (!s) {
+        continue;
+      } else {
+        size_t dataofs = o + 8;
+        if (s > 4) dataofs = exif_get_long (buf + dataofs, n->order) + 6;
+        if (CHECKOVERFLOW(dataofs, buf_size, s)) {
+          continue;
+        }
+
+        n->entries[tcount].data = exif_mem_alloc (s);
+        if (!n->entries[tcount].data) {
+          continue;
+        }
+        memcpy (n->entries[tcount].data, buf + dataofs, s);
+      }
+
+      ++tcount;
+    }
+    n->count = tcount;
+  }
+
+  int
+  exif_mnote_canon_parse_from_file (FILE *fp, ExifMnoteDataCanon *n)
+  {
+    unsigned char buf[65536];
+    size_t buf_size = fread (buf, 1, sizeof (buf), fp);
+    if (!buf_size) return -1;
+    exif_mnote_data_canon_load (n, buf, (unsigned int) buf_size);
+    return 0;
+  }
+  ```
