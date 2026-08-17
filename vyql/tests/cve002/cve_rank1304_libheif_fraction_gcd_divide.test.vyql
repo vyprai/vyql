@@ -1,0 +1,240 @@
+# Rank 1304 / CVE-2020-19498: libheif Fraction constructor floating point
+# exception. Fraction::Fraction(int32_t num, int32_t den) computed
+# g = gcd(num, den), then divided both operands by g with no check that g is
+# nonzero, no bound on num/den's magnitude, and (per gcd's own comment) a
+# guard for the num==INT32_MIN and g==-1 case that runs only *after* gcd()
+# has already executed the trapping modulo internally -- box.cc fields like
+# m_clean_aperture_width are read straight from the file with only a
+# denominator-nonzero check, so a crafted numerator/denominator pair that
+# reaches this constructor produces the reported floating point exception. Fix
+# 2710c93091 removes gcd() and the division entirely, replacing it with a
+# halving loop that only ever divides by the literal 2.
+#
+# ATTENTION, engine gap, two of them stacked.
+#
+# First, and primary: the same captured-return-value gap already on record
+# at rank 1206 (ENGINE-GAPS.md), reached exactly the way libheif's own code
+# hits it. BitstreamRange::read32 (libheif/bitstream.cc) does
+# `bool success = istr->read((char*)buf,4); if (!success) {...}` before
+# returning the four bytes of buf shifted into a uint32_t -- capturing the
+# read's own outcome into `success` is the idiomatic form, and it is what
+# takes the call out of cReaders' reach: `internal/extract/frontend/treesitter/c.go`'s
+# exprStmt only special-cases a reader call sitting in a bare
+# `call_expression` statement; the moment the same call is the right-hand
+# side of an `assignment_expression` (`success = strm->read(...)`, or
+# `n = fread(...)`, or `n = recv(...)` -- confirmed identical for all three),
+# a completely different branch runs and the destination buffer is never
+# connected to the call at all. read32()'s own return value therefore never
+# carries taint, before Fraction is ever reached. `vyql trace -from
+# code.HttpInput -to code.DivisionDenominator` on a repro faithful to
+# read32() and Fraction::Fraction dead-ends immediately after the read.
+# This is the same not-mechanical gap already recorded (new dataflow
+# integration between a compiled `.vyql` binding's `propagate value` action
+# and the runtime, not a lookup-table fix) -- adding rank 1304 to its list
+# of blocked ranks, not duplicating it.
+#
+# Second, and still blocking even if the first were fixed: even with num/den
+# hypothetically tainted, `Fraction(num, den)` is a constructor invoked
+# through parenthesized/list construction syntax
+# (`m_field = Fraction(num, den)`), and separately, box.cc's actual call
+# path reaches the constructor only through Fraction's own
+# operator+/operator-/operator/ overloads (`pcX - (m_clean_aperture_width-1)/2`),
+# each of which constructs a temporary Fraction the same unresolved way.
+# `vyql resolve` on a Fraction(num, den) call site lists it among the
+# unresolved call sites (`analysis.class.context`, `analysis.function.context`);
+# `vyql match` correctly labels both DivisionDenominator sinks inside the
+# constructor (the outer division and gcd's modulo) regardless. Neither
+# constructor-call taint nor operator-overload taint is a missing switch
+# case confined to one function -- both are new interprocedural relations
+# the C++ frontend does not model -- so this half is not mechanical either.
+#
+# Recorded separately (not what blocks this rank, but discovered while
+# diagnosing it, and mechanical on its own): a reader call that does sit in
+# a bare statement -- return value discarded, not captured -- still uses the
+# wrong argument index when the reader is a two-argument call, because
+# cReaders' "read" entry is keyed for the three/four-argument POSIX
+# read(fd,buf,count)/recv(sockfd,buf,len,flags) shape (buffer at arg1);
+# C++'s two-argument istream::read(buf,count) puts the buffer at arg0
+# instead, and its buffer argument is routinely cast ((char*)buf), which
+# destName didn't unwrap either. Fixed here (see the isolating pair below):
+# readArgIndex picks arg0 for "read" specifically when the call has exactly
+# two arguments, and destName unwraps a parenthesized/cast expression the
+# same way c.go's expr() already does elsewhere in this file. Confined to
+# two functions in one file, no new classification, no new dataflow
+# relation, no solver-wide change; recv/recvfrom/pread/fread keep their
+# existing indices. This does not touch either gap above -- both apply
+# regardless of argument index or casting, since the assignment_expression
+# branch that real code hits never reaches cReaders at all -- so it ships
+# on its own merits, not as a fix for this rank.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1304: read32's captured success leaves its return value untainted, so Fraction never sees it"
+  lang cpp
+  reject VYQL-NUM-002
+  code
+  ```
+  #include <cstdint>
+  #include <istream>
+
+  static int32_t gcd(int a, int b)
+  {
+    if (a == 0 && b == 0) {
+      return 1;
+    }
+    if (a == 0) return b;
+    if (b == 0) return a;
+    int32_t h;
+    do {
+      h = a % b;
+      a = b;
+      b = h;
+    } while (b != 0);
+    return a;
+  }
+
+  class Fraction {
+  public:
+    Fraction() { }
+    Fraction(int32_t num, int32_t den);
+    int32_t numerator = 0;
+    int32_t denominator = 1;
+  };
+
+  Fraction::Fraction(int32_t num, int32_t den)
+  {
+    int32_t g = gcd(num, den);
+    numerator = num / g;
+    denominator = den / g;
+  }
+
+  class BitstreamRange {
+  public:
+    BitstreamRange(std::istream* i) : m_istr(i) {}
+
+    uint32_t read32() {
+      uint8_t buf[4];
+      bool success = m_istr->read((char*)buf, 4);
+      if (!success) {
+        return 0;
+      }
+      return ((buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3]);
+    }
+
+  private:
+    std::istream* m_istr;
+  };
+
+  class Box_clap {
+  public:
+    void parse(BitstreamRange& range) {
+      int32_t num = (int32_t) range.read32();
+      int32_t den = (int32_t) range.read32();
+      m_clean_aperture_width = Fraction(num, den);
+    }
+    Fraction m_clean_aperture_width;
+  };
+  ```
+
+test "rank1304: libheif fix replaces the gcd division with a halving loop bounded by a constant"
+  lang cpp
+  reject VYQL-NUM-002
+  code
+  ```
+  #include <cstdint>
+  #include <istream>
+
+  #define MAX_FRACTION_VALUE 0x10000
+
+  class Fraction {
+  public:
+    Fraction() { }
+    Fraction(int32_t num, int32_t den);
+    int32_t numerator = 0;
+    int32_t denominator = 1;
+  };
+
+  Fraction::Fraction(int32_t num, int32_t den)
+  {
+    while (den > MAX_FRACTION_VALUE || den < -MAX_FRACTION_VALUE) {
+      num /= 2;
+      den /= 2;
+    }
+    while (num > MAX_FRACTION_VALUE || num < -MAX_FRACTION_VALUE) {
+      num /= 2;
+      den /= 2;
+    }
+    numerator = num;
+    denominator = den;
+  }
+
+  class BitstreamRange {
+  public:
+    BitstreamRange(std::istream* i) : m_istr(i) {}
+
+    uint32_t read32() {
+      uint8_t buf[4];
+      bool success = m_istr->read((char*)buf, 4);
+      if (!success) {
+        return 0;
+      }
+      return ((buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3]);
+    }
+
+  private:
+    std::istream* m_istr;
+  };
+
+  class Box_clap {
+  public:
+    void parse(BitstreamRange& range) {
+      int32_t num = (int32_t) range.read32();
+      int32_t den = (int32_t) range.read32();
+      m_clean_aperture_width = Fraction(num, den);
+    }
+    Fraction m_clean_aperture_width;
+  };
+  ```
+
+# Isolating pair for the mechanical sub-fix above (CVE-independent, no
+# libheif API named, return value discarded rather than captured so
+# cReaders' bare-statement branch actually runs): a two-argument buffer
+# read differs only in which already-bound reader supplies it. recv's
+# four-argument POSIX shape already has the right argument index and is
+# expected to fire; a two-argument istream::read the C++ frontend has just
+# learned to resolve is expected to fire too, once its buffer argument
+# (arg0, not arg1) and its C-style cast are both handled.
+
+test "rank1304: a four-argument recv() reader, result discarded, keeps tainting its buffer"
+  lang c
+  expect VYQL-NUM-002
+  code
+  ```
+  #include <stdint.h>
+  extern void consume(int32_t);
+
+  void parse(void* sock) {
+      uint8_t buf[4];
+      recv(sock, buf, 4, 0);
+      int32_t g = (int32_t) buf[0];
+      consume(100 / g);
+  }
+  ```
+
+test "rank1304: a two-argument istream::read() reader, result discarded, does not taint its buffer"
+  lang cpp
+  reject VYQL-NUM-002
+  code
+  ```
+  #include <cstdint>
+  #include <istream>
+
+  extern void consume(int32_t);
+
+  void parse(std::istream* strm) {
+      uint8_t buf[4];
+      strm->read((char*)buf, 4);
+      int32_t g = (int32_t) buf[0];
+      consume(100 / g);
+  }
+  ```
