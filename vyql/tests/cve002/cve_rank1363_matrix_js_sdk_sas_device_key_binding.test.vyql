@@ -1,0 +1,123 @@
+# Rank 1363 / CVE-2022-39250: matrix-js-sdk's interactive device verification
+# committed device trust from a Matrix key identifier instead of the key the
+# peer had just proved possession of, so a homeserver that named a device with
+# the same identifier as the user's cross-signing key could have the trust
+# earned in one namespace applied to the other (CWE-287, CWE-322).
+#
+# VerificationBase.verifyKeys in src/crypto/verification/Base.ts walked the
+# MACed key set, split each `<algorithm>:<id>` key identifier to get an id,
+# looked that id up as a stored device with getStoredDevice and, failing that,
+# compared it against getStoredCrossSigningForUser(userId).getId(). Either way
+# it pushed the bare id onto verifiedDevices and finished with
+# `setDeviceVerified(userId, deviceId)` — a call documented to mark a device
+# verified from its identifier alone. The key material the verifier had just
+# checked never reached the trust decision.
+#
+# The fix carries `[deviceId, keyId, key]` through verifiedDevices and commits
+# trust with `crypto.setDeviceVerification(userId, deviceId, true, null, null,
+# { [keyId]: key })`, whose `keys` argument is documented as "the list of keys
+# that was present during the device verification" and is rechecked against the
+# device's stored keys before the device is marked verified.
+#
+# code.SecretComparisonReview already lands on the `crossSigningInfo.getId() ===
+# deviceId` line, but that is a constant-time-comparison review and it fires
+# identically on the patched code, so it cannot tell the two apart. The reject
+# case below is the patched verifyKeys and holds the same comparison.
+
+test "rank1363: interactive verification marks a device verified by identifier alone"
+  lang javascript
+  file Base.ts
+  expect VYQL-AUTH-115
+  expect_review code.DeviceVerificationKeyBindingMissing
+  code
+  ```
+  import { DeviceInfo } from "../deviceinfo";
+
+  export class VerificationBase {
+      protected async verifyKeys(
+          userId: string,
+          keys: Record<string, string>,
+          verifier: KeyVerifier,
+      ): Promise<void> {
+          const verifiedDevices = [];
+
+          for (const [keyId, keyInfo] of Object.entries(keys)) {
+              const deviceId = keyId.split(':', 2)[1];
+              const device = this.baseApis.getStoredDevice(userId, deviceId);
+              if (device) {
+                  verifier(keyId, device, keyInfo);
+                  verifiedDevices.push(deviceId);
+              } else {
+                  const crossSigningInfo =
+                      this.baseApis.crypto.deviceList.getStoredCrossSigningForUser(userId);
+                  if (crossSigningInfo && crossSigningInfo.getId() === deviceId) {
+                      verifier(keyId, DeviceInfo.fromStorage({
+                          keys: {
+                              [keyId]: deviceId,
+                          },
+                      }, deviceId), keyInfo);
+                      verifiedDevices.push(deviceId);
+                  }
+              }
+          }
+
+          if (!verifiedDevices.length) {
+              throw new Error("No devices could be verified");
+          }
+
+          for (const deviceId of verifiedDevices) {
+              await this.baseApis.setDeviceVerified(userId, deviceId);
+          }
+      }
+  }
+  ```
+
+test "rank1363: interactive verification commits trust with the keys it verified"
+  lang javascript
+  file Base.ts
+  reject VYQL-AUTH-115
+  reject_review code.DeviceVerificationKeyBindingMissing
+  code
+  ```
+  import { DeviceInfo } from "../deviceinfo";
+
+  export class VerificationBase {
+      protected async verifyKeys(
+          userId: string,
+          keys: Record<string, string>,
+          verifier: KeyVerifier,
+      ): Promise<void> {
+          const verifiedDevices: [string, string, string][] = [];
+
+          for (const [keyId, keyInfo] of Object.entries(keys)) {
+              const deviceId = keyId.split(':', 2)[1];
+              const device = this.baseApis.getStoredDevice(userId, deviceId);
+              if (device) {
+                  verifier(keyId, device, keyInfo);
+                  verifiedDevices.push([deviceId, keyId, device.keys[keyId]]);
+              } else {
+                  const crossSigningInfo =
+                      this.baseApis.crypto.deviceList.getStoredCrossSigningForUser(userId);
+                  if (crossSigningInfo && crossSigningInfo.getId() === deviceId) {
+                      verifier(keyId, DeviceInfo.fromStorage({
+                          keys: {
+                              [keyId]: deviceId,
+                          },
+                      }, deviceId), keyInfo);
+                      verifiedDevices.push([deviceId, keyId, deviceId]);
+                  }
+              }
+          }
+
+          if (!verifiedDevices.length) {
+              throw new Error("No devices could be verified");
+          }
+
+          for (const [deviceId, keyId, key] of verifiedDevices) {
+              await this.baseApis.crypto.setDeviceVerification(
+                  userId, deviceId, true, null, null, { [keyId]: key },
+              );
+          }
+      }
+  }
+  ```
