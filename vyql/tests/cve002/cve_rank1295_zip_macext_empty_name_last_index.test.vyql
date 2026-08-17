@@ -1,0 +1,141 @@
+# Rank 1295 / CVE-2024-37407: libarchive's ZIP reader, with the mac-ext option
+# enabled, derives a resource-fork name from the entry's filename. To strip a
+# trailing '/' before generating the sibling "._name" resource entry it reads:
+#
+#   size_t tmp_length = filename_length;
+#   if (name[tmp_length - 1] == '/') {
+#
+# filename_length comes straight off the central directory record
+# (archive_le16dec(p + 28)), so a crafted archive with an empty filename makes
+# tmp_length 0. tmp_length - 1 on a size_t wraps to SIZE_MAX, so
+# name[tmp_length - 1] reads far outside the buffer (CWE-125). The fix
+# b6a979481b adds a tmp_length > 0 guard before the subtraction.
+#
+# ATTENTION, engine gap: the "last-element access without a nonzero-count
+# guard" analysis (ccLastElementCountExpr in
+# internal/extract/frontend/treesitter/c.go, feeding
+# code.ZeroCountLastElementAccess / VYQL-MEM-041) only recognizes a subscript
+# of the exact form `X[count-1]` when `count` is struct/field-derived —
+# ccStructuredIndex(count) requires "->" or "." in the count text. Here the
+# count is `tmp_length`, a plain local (`size_t tmp_length = filename_length`)
+# that happens to originate from a field read earlier in the function, so the
+# same class of bug on a locally-copied length is invisible to the analysis.
+# The minimal pair below isolates exactly this: a struct-field count
+# (`s->len - 1`) is reported as code.ZeroCountLastElementAccess, a plain local
+# holding the same value (`tmp_length - 1`, tmp_length copied from a
+# parameter) is not.
+#
+# Not mechanical: broadening ccStructuredIndex/ccLastElementCountExpr to
+# accept bare identifiers as a "count" would also broaden
+# code.FieldDerivedIndexAccess's upper-bound analysis (ccStructuredIndex is
+# shared by both), and `arr[n-1]` / `buf[len-1]` on a plain local is an
+# extremely common, usually-safe C idiom (trailing-char checks, strip a
+# separator, last-byte access after a prior length check earlier in the
+# function). Widening the match to plain locals is a judgment call about how
+# much of that idiom to flag, not a bounded correction to a known-wrong
+# extraction path, so it stays out of this loop.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1295: mac-ext resource name strips a trailing slash by indexing count-1 on a local length copy"
+  lang c
+  file archive_read_support_format_zip.c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  #include <stddef.h>
+
+  static const char *rsrc_basename(const char *name, size_t length) {
+      const char *s = name;
+      return s;
+  }
+
+  static void archive_strncat(void *as, const char *p, size_t n) {}
+  static void archive_strcpy(void *as, const char *p) {}
+  static void archive_strcat(void *as, const char *p) {}
+
+  void mac_ext_resource_name(void *rsrcname, const char *p, size_t filename_length) {
+      const char *name = p;
+      const char *r = rsrc_basename(name, filename_length);
+
+      /* If this is an entry ending with slash, make the resource name
+       * slash-less as the actual resource fork doesn't end with '/'. */
+      size_t tmp_length = filename_length;
+      if (name[tmp_length - 1] == '/') {
+          tmp_length--;
+          r = rsrc_basename(name, tmp_length);
+      }
+
+      archive_strcpy(rsrcname, "__MACOSX/");
+      archive_strncat(rsrcname, name, r - name);
+      archive_strcat(rsrcname, "._");
+      archive_strncat(rsrcname, name + (r - name), tmp_length - (r - name));
+  }
+  ```
+
+test "rank1295: fix guards the subtraction with tmp_length > 0 before indexing"
+  lang c
+  file archive_read_support_format_zip.c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  #include <stddef.h>
+
+  static const char *rsrc_basename(const char *name, size_t length) {
+      const char *s = name;
+      return s;
+  }
+
+  static void archive_strncat(void *as, const char *p, size_t n) {}
+  static void archive_strcpy(void *as, const char *p) {}
+  static void archive_strcat(void *as, const char *p) {}
+
+  void mac_ext_resource_name(void *rsrcname, const char *p, size_t filename_length) {
+      const char *name = p;
+      const char *r = rsrc_basename(name, filename_length);
+
+      /* If this is an entry ending with slash, make the resource name
+       * slash-less as the actual resource fork doesn't end with '/'. */
+      size_t tmp_length = filename_length;
+      if (tmp_length > 0 && name[tmp_length - 1] == '/') {
+          tmp_length--;
+          r = rsrc_basename(name, tmp_length);
+      }
+
+      archive_strcpy(rsrcname, "__MACOSX/");
+      archive_strncat(rsrcname, name, r - name);
+      archive_strcat(rsrcname, "._");
+      archive_strncat(rsrcname, name + (r - name), tmp_length - (r - name));
+  }
+  ```
+
+test "rank1295: minimal pair — struct-field count-1 is caught, a plain local copy of the same count is not"
+  lang c
+  expect VYQL-MEM-041
+  expect_review code.ZeroCountLastElementAccess
+  code
+  ```
+  struct zip_name { unsigned len; const char *name; };
+
+  void field_derived(struct zip_name *z) {
+      if (z->name[z->len - 1] == '/') {
+          z->len--;
+      }
+  }
+  ```
+
+test "rank1295: minimal pair — same count-1 shape through a local copy is invisible to the analysis"
+  lang c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  void local_copy(const char *name, unsigned filename_length) {
+      unsigned tmp_length = filename_length;
+      if (name[tmp_length - 1] == '/') {
+          tmp_length--;
+      }
+  }
+  ```
