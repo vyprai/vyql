@@ -1,0 +1,83 @@
+# Rank 1516 / CVE-2025-54874: upstream OpenJPEG used the image a failed
+# header read left behind (out-of-bounds heap write on a short data
+# stream, CWE-457 use of uninitialized variable in NVD's framing):
+# opj_jp2_read_header in src/lib/openjp2/jp2.c assigned
+# ret = opj_j2k_read_header(p_stream, jp2->j2k, p_image, p_manager) and
+# then branched on `if (p_image && *p_image)` -- the pointers were
+# guarded but the call's status was not, so a read that failed with
+# p_image partially set proceeded to write (*p_image)->color_space from
+# an invalid structure. This is the upstream original of the fix rank
+# 1509 reviewed as OpenCV's cherry-pick (CVE-2025-53644, GHSL-2025-057
+# family): the advisory for this CVE names branch commit f809b80
+# ("opj_jp2_read_header: Check for error after parsing header.") while
+# the pool holds the merge 44119c2 that carries it -- COMMIT_MISMATCH is
+# merge-versus-branch only, the same one-line change (`ret &&` added to
+# the guard), so no pool correction.
+#
+# ATTENTION, the same guard-judgement gap as rank 1509, entered in
+# ENGINE-GAPS.md (Medium: an out-parameter's use is not tied to the
+# producing call's status) which this rank now also blocks: the adjacent
+# deref family cannot distinguish the forms -- scanning the real
+# src/lib/openjp2/jp2.c at both revisions reports the same 25 findings
+# (22 VYQL-MEM-006, 3 VYQL-MEM-016), including code.NullableDeref at
+# jp2.c:2876 and :2879 -- exactly the vulnerable color_space block --
+# at BOTH revisions, because the double-pointer null guard is itself
+# not credited and the same low-confidence report fires on the guarded
+# form. The minimal pair is isolated in this spec's two snippets: they
+# differ only in `ret &&` and report identically. What is missing is a
+# fact tying the use of a call's out-parameter to that call's status
+# variable -- the same "what counts as a guard" judgement family as the
+# lower-bound and macro-body rows in the Medium table. No definition
+# change shipped: the deref family already fires at the site; making it
+# fire for the right reason and suppress on the status gate is the
+# engine change the entry asks for. Spec cve_rank1516 records both
+# forms expecting VYQL-MEM-006 so the pair pins the gap -- when
+# status-gating lands, the fixed form's test must flip to reject.
+
+test "rank1516: the image from an unchecked read is used through its guards"
+  lang c
+  file src/lib/openjp2/jp2.c
+  expect VYQL-MEM-006
+  code
+  ```
+  typedef int OPJ_BOOL;
+  typedef struct { int color_space; } opj_image_t;
+  typedef struct { int dummy; } opj_stream_private_t;
+  typedef struct { int dummy; } opj_jp2_codec;
+
+  OPJ_BOOL opj_j2k_read_header(opj_stream_private_t *stream, opj_jp2_codec *codec, opj_image_t **p_image, int *manager);
+
+  OPJ_BOOL opj_jp2_read_header(opj_stream_private_t *p_stream, opj_jp2_codec *p_codec, opj_image_t **p_image) {
+      int manager = 0;
+      opj_jp2_codec *jp2 = p_codec;
+      OPJ_BOOL ret = opj_j2k_read_header(p_stream, jp2, p_image, &manager);
+      if (p_image && *p_image) {
+          (*p_image)->color_space = 18;
+      }
+      return ret;
+  }
+  ```
+
+test "rank1516: the fix gates the same use on the read status, which today still reports"
+  lang c
+  file src/lib/openjp2/jp2.c
+  expect VYQL-MEM-006
+  code
+  ```
+  typedef int OPJ_BOOL;
+  typedef struct { int color_space; } opj_image_t;
+  typedef struct { int dummy; } opj_stream_private_t;
+  typedef struct { int dummy; } opj_jp2_codec;
+
+  OPJ_BOOL opj_j2k_read_header(opj_stream_private_t *stream, opj_jp2_codec *codec, opj_image_t **p_image, int *manager);
+
+  OPJ_BOOL opj_jp2_read_header(opj_stream_private_t *p_stream, opj_jp2_codec *p_codec, opj_image_t **p_image) {
+      int manager = 0;
+      opj_jp2_codec *jp2 = p_codec;
+      OPJ_BOOL ret = opj_j2k_read_header(p_stream, jp2, p_image, &manager);
+      if (ret && p_image && *p_image) {
+          (*p_image)->color_space = 18;
+      }
+      return ret;
+  }
+  ```
