@@ -1,0 +1,304 @@
+# Rank 1331 / CVE-2025-66581: Frappe LMS enforced several instructor- and
+# moderator-only operations only in its Vue frontend, so any authenticated
+# student could call the corresponding whitelisted endpoint (or insert the
+# corresponding doctype) straight from the REST API and mint a certificate
+# for an uncompleted course, grant themselves or others a badge, enrol other
+# members in a batch, enrol in an unpublished program, or rewrite a course's
+# website meta tags (CWE-863). The advisory names only the release, so the
+# pool row's nocommit flag is real: 87a7b933342084132240f8911c16bfa9445403e6
+# is "chore(release): Bumped to Version 2.41.0", a one-line edit to
+# lms/__init__.py, and OSV's GIT range extracted it because that release is
+# where the fix shipped. The fix itself is
+# 836a6d12035425ba929b7e87a409bad0a6bf46c5 ("fix: misc permission issues"),
+# which adds validate_certification_eligibility() to create_certificate(),
+# validate_meta_data_permissions() to update_meta_info(), validate_owner()
+# to LMSBadgeAssignment and LMSBatchEnrollment, and a published check to
+# enroll_in_program() -- and strips write/delete/export/share from the
+# LMS Student permission rows of lms_badge_assignment.json, lms_batch.json,
+# lms_batch_enrollment.json and lms_program.json.
+#
+# ATTENTION, precision cost. `vyql match` on the vulnerable
+# lms_certificate.py and lms_badge_assignment.py labels nothing at all
+# except one core.PathAccessCheck on an unrelated `in` test: the
+# @frappe.whitelist() decorator is not an entry point, certificate.save(
+# ignore_permissions=True) carries no sink label, and frappe.get_roles /
+# frappe.only_for carry no control label -- so neither VYQL-AUTH-081 (issue
+# code.IdorPolicyReview) nor VYQL-AUTH-002 can see the functions. There is
+# no taint path here in either direction; the missing thing is a judgement
+# about which caller may reach a write.
+#
+# Three candidate shapes were measured over the real checkout at both
+# revisions, and every one of them scores identically on the vulnerable and
+# the patched tree:
+#
+#   * A @frappe.whitelist() function that performs a document write
+#     (.save/.insert/.delete/frappe.db.set_value/frappe.delete_doc/
+#     frappe.new_doc) with no authorization signal in its body -> 36 rows on
+#     the vulnerable revision, 3 of them this CVE (create_certificate,
+#     update_meta_info, enroll_in_program), and 36 rows on the patched
+#     revision with all three of those still matching. Zero discrimination,
+#     because the fix puts its checks in named helpers called from the
+#     endpoint (validate_certification_eligibility,
+#     validate_meta_data_permissions) and in doctype validate() hooks, not in
+#     the endpoint's own body. The 33 non-CVE rows are Frappe's ordinary
+#     self-service endpoints -- autosave_section, submit_solution,
+#     save_current_lesson, mark_as_read, save_progress, capture_interest,
+#     submit_review, track_video_watch_duration -- which are correct as
+#     written because the doctype's declarative permissions and its
+#     has_website_permission hook do the enforcing.
+#   * The narrower form, .save(ignore_permissions=True) with no
+#     authorization signal -> 3 rows on the vulnerable revision, none of them
+#     this CVE (create_certificate is excluded by its own mention of
+#     frappe.session.user), and the same 3 rows on the patched revision.
+#     Zero true positives.
+#   * The declarative layer where most of the patch actually lives: a doctype
+#     JSON permission row granting create/write/delete to a role other than
+#     Administrator or System Manager -> 65 rows across 80 doctypes on the
+#     vulnerable revision and 65 on the patched one, because the rows the fix
+#     narrows are duplicated per role and the surviving duplicate still
+#     matches.
+#
+# The negation is unsound in principle, not only in measurement, and this
+# app shows why twice over: the vulnerable badge controller is the whole of
+# `class LMSBadgeAssignment(Document): pass`, and 46 of this app's 78 doctype
+# controllers are pass-only, so "a doctype controller with no validate()"
+# labels 59% of the application; and LMS Certificate already carries a
+# has_website_permission hook, so "no check in the endpoint" is not the same
+# claim as "no authorization". Nothing in the source text says which
+# operations a student may reach -- that lives in the doctype metadata the
+# fix edits. This is the same measurement recorded at rank 1311 (a write
+# with no ownership key in the filter: 51 high rows for 1 true positive, and
+# the patched revision scoring higher than the vulnerable one) and at rank
+# 1322 (tainting an application's own action parameters: +88 findings for 1
+# true positive). Scanning the two revisions end to end reproduces the
+# inversion here as well: 202 findings / 169 at high on the vulnerable tree,
+# 210 / 174 on the patched tree. The four VYQL-RF-001 and mass-assignment
+# rows that already land on update_meta_info are a different weakness --
+# caller-controlled data reaching a document key and a file path -- and they
+# survive the fix unchanged, so they neither report nor discriminate this
+# authorization defect. No definition change attempted.
+#
+# verify_current_expected: attention-precision-cost, both revisions reject
+# VYQL-AUTH-081 and code.IdorPolicyReview.
+
+test "rank1331: whitelisted certificate endpoint writes with ignore_permissions and no eligibility check"
+  lang python
+  file lms_certificate.py
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  import frappe
+  from frappe.utils import nowdate
+
+
+  @frappe.whitelist()
+  def create_certificate(course):
+      certificate = is_certified(course)
+
+      if certificate:
+          return frappe.db.get_value(
+              "LMS Certificate", certificate, ["name", "course", "template"], as_dict=True
+          )
+
+      else:
+          default_certificate_template = get_default_certificate_template()
+          certificate = frappe.get_doc(
+              {
+                  "doctype": "LMS Certificate",
+                  "member": frappe.session.user,
+                  "course": course,
+                  "issue_date": nowdate(),
+                  "template": default_certificate_template,
+              }
+          )
+          certificate.save(ignore_permissions=True)
+          return certificate
+  ```
+
+test "rank1331: whitelisted certificate endpoint validates enrolment and progress before writing"
+  lang python
+  file lms_certificate.py
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  import frappe
+  from frappe import _
+  from frappe.utils import nowdate
+
+
+  @frappe.whitelist()
+  def create_certificate(course):
+      if is_certified(course):
+          return frappe.db.get_value(
+              "LMS Certificate", certificate, ["name", "course", "template"], as_dict=True
+          )
+
+      else:
+          validate_certification_eligibility(course)
+          default_certificate_template = get_default_certificate_template()
+          certificate = frappe.get_doc(
+              {
+                  "doctype": "LMS Certificate",
+                  "member": frappe.session.user,
+                  "course": course,
+                  "issue_date": nowdate(),
+                  "template": default_certificate_template,
+              }
+          )
+          certificate.save(ignore_permissions=True)
+          return certificate
+
+
+  def validate_certification_eligibility(course):
+      if not frappe.db.exists("LMS Enrollment", {"course": course, "member": frappe.session.user}):
+          frappe.throw(_("You are not enrolled in this course."))
+
+      if not frappe.db.get_value("LMS Course", course, "enable_certification"):
+          frappe.throw(_("Certification is not enabled for this course."))
+
+      progress = frappe.db.get_value(
+          "LMS Enrollment", {"course": course, "member": frappe.session.user}, "progress"
+      )
+      if progress < 100:
+          frappe.throw(_("You have not completed the course yet."))
+  ```
+
+test "rank1331: whitelisted meta-tag endpoint writes website meta documents with no role check"
+  lang python
+  file api.py
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  import frappe
+  from frappe import _
+
+
+  @frappe.whitelist()
+  def update_meta_info(type, route, meta_tags):
+      parent_name = f"{type}/{route}"
+      if not isinstance(meta_tags, list):
+          frappe.throw(_("Meta tags should be a list."))
+
+      for tag in meta_tags:
+          existing_tag = frappe.db.exists(
+              "Website Meta Tag",
+              {
+                  "parent": parent_name,
+                  "parenttype": "Website Route Meta",
+                  "parentfield": "meta_tags",
+                  "key": tag["key"],
+              },
+          )
+          if existing_tag:
+              if not tag.get("value"):
+                  frappe.db.delete("Website Meta Tag", existing_tag)
+                  continue
+              frappe.db.set_value("Website Meta Tag", existing_tag, "value", tag["value"])
+  ```
+
+test "rank1331: whitelisted meta-tag endpoint checks the caller's roles first"
+  lang python
+  file api.py
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  import frappe
+  from frappe import _
+
+
+  @frappe.whitelist()
+  def update_meta_info(meta_type, route, meta_tags):
+      validate_meta_data_permissions(meta_type)
+      validate_meta_tags(meta_tags)
+
+      parent_name = f"{meta_type}/{route}"
+      for tag in meta_tags:
+          existing_tag = frappe.db.exists(
+              "Website Meta Tag",
+              {
+                  "parent": parent_name,
+                  "parenttype": "Website Route Meta",
+                  "parentfield": "meta_tags",
+                  "key": tag["key"],
+              },
+          )
+          if existing_tag:
+              if not tag.get("value"):
+                  frappe.db.delete("Website Meta Tag", existing_tag)
+                  continue
+              frappe.db.set_value("Website Meta Tag", existing_tag, "value", tag["value"])
+
+
+  def validate_meta_data_permissions(meta_type):
+      roles = frappe.get_roles()
+
+      if meta_type == "courses":
+          if not ("Course Creator" in roles or "Moderator" in roles):
+              frappe.throw(_("You do not have permission to update meta tags."))
+
+      elif meta_type == "batches":
+          if not ("Batch Evaluator" in roles or "Moderator" in roles):
+              frappe.throw(_("You do not have permission to update meta tags."))
+  ```
+
+test "rank1331: batch enrollment doctype accepts any owner enrolling another member"
+  lang python
+  file lms_batch_enrollment.py
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  import frappe
+  from frappe.model.document import Document
+
+
+  class LMSBatchEnrollment(Document):
+      def validate(self):
+          self.validate_duplicate_members()
+          self.validate_seat_availability()
+          self.validate_course_enrollment()
+
+      def validate_duplicate_members(self):
+          if frappe.db.exists(
+              "LMS Batch Enrollment", {"batch": self.batch, "member": self.member, "name": ["!=", self.name]}
+          ):
+              frappe.throw(_("Member is already enrolled in this batch."))
+  ```
+
+test "rank1331: batch enrollment doctype requires a privileged role to enrol another member"
+  lang python
+  file lms_batch_enrollment.py
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  import frappe
+  from frappe import _
+  from frappe.model.document import Document
+
+
+  class LMSBatchEnrollment(Document):
+      def validate(self):
+          self.validate_owner()
+          self.validate_duplicate_members()
+          self.validate_seat_availability()
+          self.validate_course_enrollment()
+
+      def validate_owner(self):
+          if self.owner == self.member:
+              return
+
+          roles = frappe.get_roles(self.owner)
+          if not ("Moderator" in roles or "Batch Evaluator" in roles):
+              frappe.throw(_("You must be a Moderator or Batch Evaluator to enroll users in a batch."))
+
+      def validate_duplicate_members(self):
+          if frappe.db.exists(
+              "LMS Batch Enrollment", {"batch": self.batch, "member": self.member, "name": ["!=", self.name]}
+          ):
+              frappe.throw(_("Member is already enrolled in this batch."))
+  ```
