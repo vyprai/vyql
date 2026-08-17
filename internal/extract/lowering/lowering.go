@@ -1695,7 +1695,10 @@ func allowedHostsWildcard(target string, value nir.Expr) bool {
 }
 
 // certCheckDisabled reports whether TLS hostname/certificate checking is turned off via an
-// assignment `ctx.check_hostname = False` / `verify_mode = CERT_NONE` (CWE-295).
+// assignment `ctx.check_hostname = False` / `verify_mode = CERT_NONE` (CWE-295), or weakened via
+// `verify_mode = CERT_OPTIONAL`: the ssl.SSLContext peer certificate becomes optional rather than
+// required, which drops mandatory certificate/client-cert enforcement on the same attribute
+// (CWE-295/CWE-306).
 func certCheckDisabled(target string, value nir.Expr) bool {
 	n := strings.ToLower(target)
 	if strings.HasSuffix(n, "check_hostname") {
@@ -1704,11 +1707,17 @@ func certCheckDisabled(target string, value nir.Expr) bool {
 		}
 	}
 	if strings.HasSuffix(n, "verify_mode") {
-		if v, ok := litVal(value); ok && strings.Contains(strings.ToUpper(v), "CERT_NONE") {
-			return true
+		if v, ok := litVal(value); ok {
+			u := strings.ToUpper(v)
+			if strings.Contains(u, "CERT_NONE") || strings.Contains(u, "CERT_OPTIONAL") {
+				return true
+			}
 		}
-		if nm, ok := value.(nir.Name); ok && strings.Contains(strings.ToUpper(nm.ID), "CERT_NONE") {
-			return true
+		if nm, ok := value.(nir.Name); ok {
+			u := strings.ToUpper(nm.ID)
+			if strings.Contains(u, "CERT_NONE") || strings.Contains(u, "CERT_OPTIONAL") {
+				return true
+			}
 		}
 	}
 	return false
