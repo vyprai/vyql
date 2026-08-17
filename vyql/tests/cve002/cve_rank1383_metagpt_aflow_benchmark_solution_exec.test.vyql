@@ -1,0 +1,250 @@
+# Rank 1383 / CVE-2026-5970 (GHSA-g977-h85w-h2xj): MetaGPT's AFlow evaluation
+# path hands code that arrives from outside the process to `exec()` in the host
+# interpreter. The advisory names `check_solution` of
+# HumanEvalBenchmark/MBPPBenchmark: `metagpt/ext/aflow/benchmark/humaneval.py:45`
+# and `mbpp.py:44` take the model's `solution` and the dataset record's `test`
+# string, build a `global_dict` of a few modules and typing aliases, and run
+# `exec(solution, global_dict)` followed by `exec(test, global_dict)` in-process,
+# then call the `check` the second exec defined through `run_with_timeout`, which
+# is a bare `threading.Thread` plus an `Event.wait` -- a soft deadline that
+# reports a timeout and leaves the thread running. `sanitize(code=solution,
+# entrypoint=entry_point)` on the way in is not a control despite the name: it is
+# evalplus's reachability-based *extractor* (`metagpt/utils/sanitize.py:124`),
+# keeping the imports and definitions reachable from the entry point, so whatever
+# the model emitted inside that function survives verbatim. The same weakness is
+# one function further along the same pipeline, and that is the site the patch
+# touches: `Test.exec_code` in `metagpt/ext/aflow/scripts/operator.py:228` runs
+# `exec(test_code, globals())`, where `test_code` is
+# `test_case_2_test_function(solution, test_case, entry_point)` -- an f-string
+# splicing the model's solution together with a test body read out of
+# `metagpt/ext/aflow/data/*_public_test.jsonl` by
+# `extract_test_cases_from_jsonl`. Passing `globals()` hands the payload the live
+# module namespace of the running operator module, so it can rebind the names the
+# rest of the process resolves through, not merely define its own.
+#
+# Pool row `01a2420583c2b1e4bf2bf3da7ac326ce90089b0b` carries `nocommit`, and the
+# reason is not that it is missing: it resolves, but it is a GitHub merge preview
+# of the advisory's referenced PR #1988 onto `11cdf466`, so it is not on the
+# default branch and its combined diff is empty. `git diff 11cdf466 01a24205`
+# reads it: `metagpt/ext/aflow/scripts/operator.py`, +40/-14, adding a
+# module-level `_run_test_in_subprocess(test_code)` that execs into a fresh `{}`
+# and submitting it to a `concurrent.futures.ProcessPoolExecutor(max_workers=1)`
+# with `future.result(timeout=timeout)`. So the patched form here is a real diff
+# of the referenced proposed fix rather than a reconstruction, but it is a
+# proposal: `check_solution`, the function the advisory names, is untouched by it.
+#
+# CAUGHT by VYQL-INJ-003 at critical, six rows over
+# `metagpt/ext/aflow` (24 Python files, profile auto -> library): source
+# code.ExternalEntryInput on `check_solution#param#solution` at humaneval.py:45
+# reaching code.CodeEval at humaneval.py:77 through the sanitize call
+# (`#param#solution -> Arg -> Call -> Phi -> Arg`), the same parameter at
+# mbpp.py:44 reaching mbpp.py:58, `#param#test` on both reaching humaneval.py:82
+# and mbpp.py:63 directly, `run_code#param#code` at operator.py:119 reaching
+# operator.py:148, and -- interprocedurally across two files --
+# `test_case_2_test_function#param#solution` at scripts/utils.py:112 reaching the
+# `exec(test_code, globals())` at operator.py:228 through
+# `Format -> ret -> Call -> Arg`. Every row records `unless endpoint coveredBy
+# core.CodeExecutionValidation: not satisfied -- no guard on sink`.
+#
+# The pair does not separate the revisions, and that is the correct outcome
+# rather than a gap to close. Scanning the same subtree at the merge preview
+# gives the same 65 findings and the same 37 at or above high, with the sixth
+# CodeEval row moving from operator.py:228 to the new `exec(test_code,
+# isolated_namespace)` at operator.py:171: a fresh dict and a worker process
+# reduce what a payload can reach, they do not stop it running, so a rule about
+# executing untrusted code has nothing to withdraw. Reporting the proposed patch
+# is not a false positive, and no control concept should claim otherwise --
+# `core.CodeExecutionValidation` is validation of what may be executed, which
+# neither revision performs. Rank 1068 measured the same thing on crawl4ai's
+# hook exec, where the fix narrowed the exec namespace's builtins.
+#
+# The reject below therefore discriminates where the rule actually decides: the
+# harness text is the module's own constant instead of a caller- or
+# dataset-supplied string, so no source reaches the sink and the same `exec` in
+# the same shape is not reported. That is what the precision claim is worth here
+# -- the rule keys on where the executed text came from, not on the presence of
+# `exec`.
+
+test "rank1383: a benchmark execs the model's solution and the dataset's test string in the host interpreter"
+  lang python
+  file metagpt/ext/aflow/benchmark/mbpp.py
+  profile library
+  expect VYQL-INJ-003
+  code
+  ```
+  import threading
+  import time
+  from typing import Any, Callable, Dict, List, Optional, Tuple
+
+  from metagpt.utils.sanitize import sanitize
+
+
+  class MBPPBenchmark:
+      PASS = "PASS"
+      FAIL = "FAIL"
+
+      class TimeoutError(Exception):
+          pass
+
+      def run_with_timeout(self, func, timeout):
+          result = []
+          stop_event = threading.Event()
+
+          def target():
+              try:
+                  result.append(func())
+              except Exception as e:
+                  result.append(e)
+              finally:
+                  stop_event.set()
+
+          thread = threading.Thread(target=target)
+          thread.start()
+          is_timeout = not stop_event.wait(timeout)
+
+          if is_timeout:
+              raise self.TimeoutError("Function execution timed out")
+
+          if not result:
+              return None
+          if isinstance(result[0], Exception):
+              raise result[0]
+          return result[0]
+
+      def check_solution(self, solution, test, entry_point):
+          solution = sanitize(code=solution, entrypoint=entry_point)
+          try:
+              global_dict = {
+                  "math": __import__("math"),
+                  "hashlib": __import__("hashlib"),
+                  "re": __import__("re"),
+                  "List": List,
+                  "Dict": Dict,
+                  "Tuple": Tuple,
+                  "Optional": Optional,
+                  "Any": Any,
+              }
+
+              exec(solution, global_dict)
+
+              if entry_point not in global_dict:
+                  raise ValueError(f"Function {entry_point} is not defined in the solution.")
+
+              exec(test, global_dict)
+
+              check = global_dict["check"]
+
+              result = self.run_with_timeout(check, 15)
+
+              if result is None:
+                  result = (self.PASS, "The solution passed all test cases.")
+
+          except self.TimeoutError:
+              result = (self.FAIL, "Execution timed out.")
+          except Exception as e:
+              result = (self.FAIL, f"Error: {str(e)}.\n Solution: {solution}.\n Test: {test}")
+
+          return result
+
+      async def evaluate_problem(self, data: dict, graph: Callable):
+          input_text = data["prompt"]
+          prediction, cost = await graph(input_text, data["entry_point"])
+          ret = self.check_solution(prediction, data["test"], data["entry_point"])
+          score = 1.0 if ret[0] == self.PASS else 0.0
+          return input_text, prediction, ret[1], score, cost
+  ```
+
+test "rank1383: a test operator execs a harness spliced from the solution and a dataset test case against the module globals"
+  lang python
+  file metagpt/ext/aflow/scripts/operator.py
+  profile library
+  expect VYQL-INJ-003
+  code
+  ```
+  import json
+  import sys
+  import traceback
+
+
+  def extract_test_cases_from_jsonl(entry_point: str):
+      file_path = "metagpt/ext/aflow/data/humaneval_public_test.jsonl"
+      with open(file_path, "r") as file:
+          for line in file:
+              data = json.loads(line)
+              if data.get("entry_point") == entry_point:
+                  return data.get("test")
+      return None
+
+
+  def test_case_2_test_function(solution: str, test_case: str, entry_point: str):
+      tester_function = f"""
+  {solution}
+
+
+  def check(candidate):
+      {test_case}
+
+  def test_check():
+      check({entry_point})
+
+  test_check()
+  """
+      return tester_function
+
+
+  class Test:
+      def exec_code(self, solution, entry_point):
+          test_cases = extract_test_cases_from_jsonl(entry_point)
+
+          fail_cases = []
+          for test_case in test_cases:
+              test_code = test_case_2_test_function(solution, test_case, entry_point)
+              try:
+                  exec(test_code, globals())
+              except AssertionError as e:
+                  exc_type, exc_value, exc_traceback = sys.exc_info()
+                  tb_str = traceback.format_exception(exc_type, exc_value, exc_traceback)
+                  fail_cases.append({"test_case": test_case, "traceback": tb_str})
+              except Exception as e:
+                  return {"exec_fail_case": str(e)}
+          if fail_cases != []:
+              return fail_cases
+          return "no error"
+  ```
+
+test "rank1383: the same operator running a harness the module itself defines"
+  lang python
+  file metagpt/ext/aflow/scripts/operator.py
+  profile library
+  reject VYQL-INJ-003
+  code
+  ```
+  import sys
+  import traceback
+
+  SMOKE_HARNESS = """
+  def check(candidate):
+      assert candidate is not None
+
+  def test_check():
+      check(len)
+
+  test_check()
+  """
+
+
+  class Test:
+      def exec_code(self, solution, entry_point):
+          fail_cases = []
+          try:
+              exec(SMOKE_HARNESS, globals())
+          except AssertionError as e:
+              exc_type, exc_value, exc_traceback = sys.exc_info()
+              tb_str = traceback.format_exception(exc_type, exc_value, exc_traceback)
+              fail_cases.append({"test_case": entry_point, "traceback": tb_str})
+          except Exception as e:
+              return {"exec_fail_case": str(e)}
+          if fail_cases != []:
+              return fail_cases
+          return "no error"
+  ```
