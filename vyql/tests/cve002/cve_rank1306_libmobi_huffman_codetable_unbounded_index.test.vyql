@@ -1,0 +1,214 @@
+# Rank 1306 / CVE-2021-3881: libmobi's Huffman decompressor
+# (mobi_decompress_huffman_internal, src/compression.c) reads a code length
+# out of a fixed 256-entry lookup (`code_length = t1 & 0x1f`, where `t1 =
+# huffcdic->table1[code >> 24]`, itself populated verbatim from the HUFF
+# record's file data) and then, when the termination bit is clear, walks it
+# forward with no cap at all:
+#
+#   while (code < huffcdic->mincode_table[code_length]) {
+#       code_length++;
+#   }
+#   maxcode = huffcdic->maxcode_table[code_length];
+#
+# `mincode_table`/`maxcode_table` are fixed 33-entry arrays
+# (`MOBIHuffCdic`, compression.h). Because `code` and the table's own
+# contents both come from the same crafted file, an attacker can arrange for
+# the loop condition to keep holding past index 32, walking `code_length`
+# arbitrarily far and reading out of bounds both inside the loop's own
+# comparison (`mincode_table[code_length]`) and in the following statement
+# (`maxcode_table[code_length]`) -- CWE-125, closes bfabiszewski/libmobi#35
+# and #36. The fix, bec783e6212439a335ba6e8df7ab8ed610ca9a21, adds
+# `HUFF_CODETABLE_SIZE` (33) and caps the increment:
+# `if (++code_length >= HUFF_CODETABLE_SIZE) { ...; return MOBI_DATA_CORRUPT; }`.
+#
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` against the real
+# checkout at the fix's parent commit reports nothing for
+# mobi_decompress_huffman_internal: no VYQL-MEM-005 (TaintedIndexAccess), no
+# VYQL-MEM-010 (FieldDerivedIndexAccess), no VYQL-MEM-017
+# (CountDerivedElementAccess). `vyql match` on an isolated repro of the same
+# shape shows why: `huffcdic->mincode_table[code_length]` (inside the
+# `while` condition) carries no concept at all, not even the generic
+# code.IndexAccess presence label that an identical subscript gets in
+# statement position -- the subscript nested inside a loop's own condition
+# is invisible to the extractor. `code_length` also never satisfies
+# FieldDerivedIndexAccess's own gate on either side, since that analysis
+# requires the *index* text itself to be struct/field-derived
+# (`ccStructuredIndex`, e.g. `arr[s->count]`); here the index is a bare
+# scalar local that a loop increments without any upper bound, not a field
+# access.
+#
+# ATTENTION, engine gap. This needs a new classification, not a bounded
+# correction to an existing one: "a scalar local with no upper-bound check
+# anywhere, incremented solely by a loop condition that compares it against
+# an element of the very array it indexes, then used to subscript that (or a
+# same-shaped) fixed-size array" -- a self-terminating unbounded table walk.
+# Neither existing index analysis covers it: VYQL-MEM-010 needs the index
+# itself to be field-derived text, and VYQL-MEM-017 (CountDerivedElementAccess)
+# needs a *count* value bounding the access, not a self-referential
+# loop-carried increment with no count in sight at all. Recognising this
+# would mean correlating a loop condition's own subscript with the loop
+# variable's unconditional increment and the array it indexes -- a new
+# dataflow relation, not a fix to `ccStructuredIndex`'s existing text check
+# -- and "walk forward while a sorted/sentinel-terminated table's current
+# entry satisfies some comparison" is a common, usually-safe C idiom
+# (binary/linear search through a lookup table with a known-good sentinel);
+# a rule broad enough to catch this shape without that correlation would
+# flag ordinary table-walk code broadly. Confirmed against the real
+# repository: scanning src/compression.c and src/read.c at the fix's parent
+# commit produces 0 findings at mobi_decompress_huffman_internal or
+# mobi_parse_huff. Spec: this file's third and fourth snippets (the minimal
+# pair) differ only in whether the array is indexed by a field-derived
+# expression (caught) or by a local scalar a loop increments without bound,
+# tested only against the very array it indexes (not caught).
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1306: code_length walks mincode_table/maxcode_table with no upper cap"
+  lang c
+  file compression.c
+  reject VYQL-MEM-005
+  reject VYQL-MEM-010
+  reject VYQL-MEM-017
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  #include <stdint.h>
+  #include <stddef.h>
+
+  typedef struct {
+      uint32_t table1[256];
+      uint32_t mincode_table[33];
+      uint32_t maxcode_table[33];
+  } MOBIHuffCdic;
+
+  typedef struct {
+      unsigned char *data;
+      size_t offset;
+      size_t maxlen;
+      int error;
+  } MOBIBuffer;
+
+  uint64_t mobi_buffer_fill64(MOBIBuffer *buf_in);
+
+  int mobi_decompress_huffman_internal(MOBIBuffer *buf_out, MOBIBuffer *buf_in, const MOBIHuffCdic *huffcdic, size_t depth) {
+      int ret = 0;
+      int8_t bitcount = 32;
+      uint8_t code_length = 0;
+      uint64_t buffer = mobi_buffer_fill64(buf_in);
+      while (ret == 0) {
+          if (bitcount <= 0) {
+              bitcount += 32;
+              buffer = mobi_buffer_fill64(buf_in);
+          }
+          uint32_t code = (buffer >> bitcount) & 0xffffffffU;
+          uint32_t t1 = huffcdic->table1[code >> 24];
+          code_length = t1 & 0x1f;
+          uint32_t maxcode = (((t1 >> 8) + 1) << (32 - code_length)) - 1;
+          if (!(t1 & 0x80)) {
+              while (code < huffcdic->mincode_table[code_length]) {
+                  code_length++;
+              }
+              maxcode = huffcdic->maxcode_table[code_length];
+          }
+          bitcount -= code_length;
+          if (maxcode == 0) {
+              break;
+          }
+      }
+      return ret;
+  }
+  ```
+
+test "rank1306: fix caps code_length against HUFF_CODETABLE_SIZE before it indexes either table"
+  lang c
+  file compression.c
+  reject VYQL-MEM-005
+  reject VYQL-MEM-010
+  reject VYQL-MEM-017
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  #include <stdint.h>
+  #include <stddef.h>
+
+  #define HUFF_CODETABLE_SIZE 33
+
+  typedef struct {
+      uint32_t table1[256];
+      uint32_t mincode_table[HUFF_CODETABLE_SIZE];
+      uint32_t maxcode_table[HUFF_CODETABLE_SIZE];
+  } MOBIHuffCdic;
+
+  typedef struct {
+      unsigned char *data;
+      size_t offset;
+      size_t maxlen;
+      int error;
+  } MOBIBuffer;
+
+  uint64_t mobi_buffer_fill64(MOBIBuffer *buf_in);
+
+  int mobi_decompress_huffman_internal(MOBIBuffer *buf_out, MOBIBuffer *buf_in, const MOBIHuffCdic *huffcdic, size_t depth) {
+      int ret = 0;
+      int8_t bitcount = 32;
+      uint8_t code_length = 0;
+      uint64_t buffer = mobi_buffer_fill64(buf_in);
+      while (ret == 0) {
+          if (bitcount <= 0) {
+              bitcount += 32;
+              buffer = mobi_buffer_fill64(buf_in);
+          }
+          uint32_t code = (buffer >> bitcount) & 0xffffffffU;
+          uint32_t t1 = huffcdic->table1[code >> 24];
+          code_length = t1 & 0x1f;
+          uint32_t maxcode = (((t1 >> 8) + 1) << (32 - code_length)) - 1;
+          if (!(t1 & 0x80)) {
+              while (code < huffcdic->mincode_table[code_length]) {
+                  if (++code_length >= HUFF_CODETABLE_SIZE) {
+                      return -1;
+                  }
+              }
+              maxcode = huffcdic->maxcode_table[code_length];
+          }
+          bitcount -= code_length;
+          if (maxcode == 0) {
+              break;
+          }
+      }
+      return ret;
+  }
+  ```
+
+test "rank1306: minimal pair -- a struct-field count used directly as an index is caught"
+  lang c
+  file huffcdic.c
+  expect VYQL-MEM-010
+  expect_review code.FieldDerivedIndexAccess
+  code
+  ```
+  struct hrd_state { unsigned cpb_cnt; int rate[32]; };
+
+  void direct_index(struct hrd_state *s) {
+      s->rate[s->cpb_cnt] = 1;
+  }
+  ```
+
+test "rank1306: minimal pair -- a local scalar a loop increments without bound, tested only against the array it indexes, is not"
+  lang c
+  file huffcdic.c
+  reject VYQL-MEM-005
+  reject VYQL-MEM-010
+  reject VYQL-MEM-017
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  struct hrd_state { int mincode[33]; int maxcode[33]; };
+
+  void unbounded_table_walk(struct hrd_state *s, int code) {
+      unsigned char idx = 0;
+      while (code < s->mincode[idx]) {
+          idx++;
+      }
+      int v = s->maxcode[idx];
+  }
+  ```
