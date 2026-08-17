@@ -1,0 +1,81 @@
+# Rank 1519 / CVE-2023-28326: OpenMeetings' invitation dialog enabled
+# its personal-URL generate button whenever exactly one recipient was
+# selected, without checking who the recipient was, so an inviter
+# could generate a personal access URL for an ordinary user and
+# bypass the intended permission path (broken access control,
+# CWE-863; OPENMEETINGS-2739). updateButtons in
+# openmeetings-web/src/main/java/org/apache/openmeetings/web/common/
+# InvitationForm.java did `dialog.getGenerate().setEnabled(recpnts.
+# size() == 1)` -- the condition covers the count but not the
+# principal: generating a URL is legitimate only for the inviter's
+# own account or a CONTACT-type user. Pool commit 1fb71af36 is the
+# real fix (COMMIT_OK -- "[OPENMEETINGS-2739] generate URL is
+# disabled if non-contact is selected"): generateEnabled starts
+# false and turns true only when the single recipient satisfies
+# `getUserId().equals(u.getId()) || User.Type.CONTACT ==
+# u.getType()`. No pool correction.
+#
+# ATTENTION, capability-gate completeness. The guard exists and runs
+# -- its condition names the wrong principal vocabulary (count, not
+# type/identity), the same decision-completeness family as ranks
+# 1540 (permission-switch branches), 1556 (sibling route groups) and
+# 1567 (submit paths without the form token): nothing can ask "does
+# the enabled-state condition of a capability cover the principal
+# types allowed to exercise it" -- UI component state is not
+# authorization vocabulary anywhere in the corpus. A binding on
+# OpenMeetings' own dialog would detect this application rather than
+# the weakness. Measured on the real code: scanning
+# InvitationForm.java reports zero findings at both revisions. No
+# ENGINE-GAPS.md entry: the piece is ontology design
+# (capability-gate completeness), not a localised construct. No
+# definition change shipped. Spec cve_rank1519 records the
+# count-only condition and the principal-checked form, both
+# asserting reject VYQL-AUTH-079: when capability-gate vocabulary
+# lands, the count-only form must flip to expect.
+
+test "rank1519: the generate button trusts the count alone"
+  lang java
+  file openmeetings-web/src/main/java/org/apache/openmeetings/web/common/InvitationForm.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.apache.openmeetings.web.common;
+
+  import java.util.Collection;
+
+  public abstract class InvitationForm extends Form<Invitation> {
+      protected void updateButtons(AjaxRequestTarget target) {
+          Collection<User> recpnts = recipients.getModelObject();
+          target.add(
+                  dialog.getSend().setEnabled(!recpnts.isEmpty())
+                  , dialog.getGenerate().setEnabled(recpnts.size() == 1)
+                  );
+      }
+  }
+  ```
+
+test "rank1519: the fix gates the button on the principal"
+  lang java
+  file openmeetings-web/src/main/java/org/apache/openmeetings/web/common/InvitationForm.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.apache.openmeetings.web.common;
+
+  import java.util.Collection;
+
+  public abstract class InvitationForm extends Form<Invitation> {
+      protected void updateButtons(AjaxRequestTarget target) {
+          Collection<User> recpnts = recipients.getModelObject();
+          boolean generateEnabled = false;
+          if (recpnts.size() == 1) {
+              User u = recpnts.iterator().next();
+              generateEnabled = getUserId().equals(u.getId()) || User.Type.CONTACT == u.getType();
+          }
+          target.add(
+                  dialog.getSend().setEnabled(!recpnts.isEmpty())
+                  , dialog.getGenerate().setEnabled(generateEnabled)
+                  );
+      }
+  }
+  ```
