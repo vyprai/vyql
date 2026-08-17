@@ -1,0 +1,410 @@
+# Rank 1394 / CVE-2026-10611 (GHSA-679g-pp8v-jvg4, CWE-287):
+# MISP is a CakePHP 2 application. Its AppController::beforeFilter() calls
+# _loadAuthenticationPlugins() on every request, which installs whatever
+# authentication plugins `Security.auth` names (LDAP being the deployed case) and
+# then, at app/Controller/AppController.php:1403-1411, promotes the request to a
+# fully authenticated session the moment a plugin returns a user record:
+#
+#   if ($this->Auth->startup($this)) {
+#       $user = $this->Auth->user();
+#       if ($user) {
+#           $this->User->updateLoginTimes($user);
+#           // User found in the db, add the user info to the session
+#           $this->Session->renew();
+#           $this->Session->write(AuthComponent::$sessionKey, $user);
+#       }
+#   }
+#
+# The weakness, stated from the diff rather than from the advisory: the second
+# factor is enforced in one place only -- UsersController::login(), which on
+# `Security.otp_disabled == false && $user['totp']` writes the identity to a
+# *pending* session slot (`otp_user`) and redirects to /users/otp instead of
+# writing AuthComponent::$sessionKey. The plugin path above skips that step
+# entirely. It writes the real auth session key directly, from beforeFilter,
+# before UsersController::login() ever runs. With `LdapAuth.mixedAuth=true` and
+# `Security.require_otp=true` the first factor alone therefore produces a session
+# that every subsequent request accepts: the browser sits on the OTP form, but any
+# other URL is already authenticated. The authentication decision is completed on
+# one factor, in a request-lifecycle hook, using the framework's internal session
+# slot rather than its login API -- so nothing that the login action enforces
+# after the password check applies.
+#
+# 39b3cb15aac4318afdd2ab63b96c2eac12b271fe adds 54 lines to that one file: a new
+# private __pluginLoginRequiresOtp($user) that re-implements the login action's OTP
+# branch (TOTP/HOTP under `Security.otp_disabled` and `class_exists('\OTPHP\TOTP')`,
+# e-mail OTP under `Security.email_otp_enabled`), writes the pending slot,
+# redirects unless the current action already is `otp`/`email_otp`, and returns
+# true; and, in _loadAuthenticationPlugins, a three-line guard that returns before
+# the session is established:
+#
+#   +   if ($this->__pluginLoginRequiresOtp($user)) {
+#   +       return;
+#   +   }
+#
+# The pool row is correct as written. Metadata says REPO_IN_REFS / COMMIT_OK and
+# both hold: MISP/MISP resolves, 39b3cb15aa is a single-file security fix by a MISP
+# core maintainer whose subject names this exact bypass, and the vulnerable
+# construct is present at 39b3cb15aa^ -- _loadAuthenticationPlugins contains no
+# OTP, TOTP or second-factor reference of any kind. The recorded CWE-287 is
+# defensible; CWE-288 (bypass using an alternate path) is the tighter fit, since
+# the control exists and this path goes around it. No corpus correction.
+#
+# MISP does not finish inside the loop's bound: `timeout 180 ./bin/vyql scan
+# --cache off --max-ram 6GB` over the whole checkout (2608 files, 522 .php and
+# 1145 .ctp) is killed at 180s. Measurements below are therefore a bounded subtree
+# scan of app/Controller (91 PHP files, 10.7s) plus an exhaustive grep enumeration
+# of the shape's reachable set. The enumeration is decisive and small:
+# `AuthComponent::$sessionKey` appears six times in the entire repository, all but
+# one in app/Controller/AppController.php -- three writes (:564 in
+# __loginByAuthKey, :1323 in __customAuthentication, :1409 in
+# _loadAuthenticationPlugins), one read at :271, one reset at :1743, and one
+# doc-comment mention in app/Controller/Component/ApacheSecureAuthComponent.php.
+# `Auth->startup(` occurs exactly once, at :1403. So the whole reachable set of
+# "hand-written CakePHP auth session" in MISP is three sites in one file, all
+# inside the bounded subtree, and the fix touches one of the three.
+#
+# What fires today: app/Controller at 39b3cb15aa^ and at 39b3cb15aa each report
+# **356 findings, three runs apiece, and `vyql diff` of the two JSON reports says
+# `identical -- finding-set preserved` (0 added, 0 removed)**. Nothing lands in
+# _loadAuthenticationPlugins in either revision; AppController.php's own rows are
+# VYQL-CRY-003 at :465 and VYQL-INJ-004 / VYQL-RF-003 clusters at :1075, :1615 and
+# :1759. `vyql match` over the vulnerable file labels the whole method not at all
+# except for one incidental `code.HtmlRender` -- `unset($this->Auth->authenticate
+# ['Form'])` lowers as `path=echo`, which is a separate cosmetic defect worth
+# knowing about. `-flags only` yields three flags for the file, none of them here.
+#
+# ATTENTION. The construct is bindable; the fix is not discriminable. Both halves
+# were measured with throwaway PHP presence bindings emitting the existing
+# code.AuthFlowBypassReview (CWE-287, `expected: [core.AuthenticationCheck]`),
+# scored with `-flags only` against both revisions.
+#
+# 1. The construct alone, function scope:
+#      node.scope == "function" and node.context.language == "php"
+#      and node.context.callPath contains "$this.Session.write"
+#      and node.context.callArg contains "$this.Session.write:AuthComponent::$sessionKey"
+#    fires on both revisions, as it must -- the patched method still writes the key.
+#    On the app/Controller subtree it is 5 flags at 39b3cb15aa^ and 6 at
+#    39b3cb15aa, and only three of those are write sites: :497 __loginByAuthKey,
+#    :1286 __customAuthentication, :1388 _loadAuthenticationPlugins, plus :110
+#    beforeFilter and :597 __verifyUser, which contain no such write at all, plus
+#    :1431 __pluginLoginRequiresOtp on the fixed revision. That over-attribution is
+#    the routing leak recorded in this campaign's PHP notes, measured again here:
+#    `call_arg:` and `call_path:` are both in flagASTRoutingValuePrefixes
+#    (internal/bindings/bindings_match.go:730), so the clause matches through the
+#    file-wide AST path rather than the node's own str_args. There is no confined
+#    substitute for this particular fact: `call_arg_method:write:AuthComponent::
+#    $sessionKey` is emitted by the frontend (php.go:610) and would be confined,
+#    but no presence-context field maps to that prefix -- v2PresenceValuePrefix
+#    (internal/bindings/compile_presence.go:380) exposes assignCallMethod and not
+#    callArgMethod.
+#
+# 2. The same clause with the second factor negated over the node's own text:
+#      and not containsAny(node.token, ["otp", "OTP", "Otp", "mfa", "Mfa",
+#                                       "twoFactor", "two_factor"])
+#    does discriminate the minimal pair -- 1 flag on the vulnerable method, 0 on
+#    the patched one -- and on the real files it is 3 flags at 39b3cb15aa^ and 2 at
+#    39b3cb15aa. It is still not shippable, for two independent reasons, and the
+#    third case below pins the first of them:
+#
+#    (a) **the only thing it discriminates on is the fix's own method name.**
+#        Renaming __pluginLoginRequiresOtp to __pluginLoginRequiresSecondFactor,
+#        changing nothing else, restores the flag on the patched file (0 -> 1). The
+#        negation is reading the substring "Otp" out of the identifier in
+#        `if ($this->__pluginLoginRequiresOtp($user))`; the whole OTP vocabulary
+#        the fix actually adds -- Configure::read('Security.otp_disabled'),
+#        $user['totp'], class_exists('\OTPHP\TOTP'), Session->write('otp_user'),
+#        the redirect -- lives in the callee's body, which the calling function's
+#        context facts do not include. That is the engine gap below, and keying on
+#        the predicate's name instead is the "fixing commit's own layout"
+#        discriminator this campaign has had rejected before.
+#
+#    (b) **even with that fact, the label is 1-in-3 on the vulnerable tree.** The
+#        two survivors at 39b3cb15aa are __loginByAuthKey (:497, API key
+#        authentication) and __customAuthentication (:1286, header
+#        authentication). Both write AuthComponent::$sessionKey with no OTP
+#        anywhere near them, both are still there after the fix, and MISP left
+#        them alone deliberately -- an OTP challenge is meaningless for a
+#        non-interactive API key. Case 4 below is __loginByAuthKey, so this is
+#        pinned rather than asserted.
+#
+# 3. Class scope, the only scope that holds both the write and the OTP vocabulary
+#    on the patched revision, is dead in the other direction: the same negation
+#    yields 0 flags on *both* revisions, because the vulnerable AppController
+#    already says `otp` at :409 (preAuthActions), :410
+#    (Security.email_otp_enabled) and :735 (Security.otp_required). Co-membership
+#    in an 1800-line controller proves nothing about the path, which is the
+#    whole-file-text trap this campaign has had rejected twice.
+#
+# Engine gap, not mechanical: PHP is the third language in which "the fix extracts
+# the security check into a sibling method and calls it" is invisible to the
+# calling function's context facts -- Rust at 1364 (where the delegated call also
+# does not resolve), JavaScript/TypeScript at 1372 (where it does), and PHP here,
+# where it is worse than either: phpFunctionContext walks only the declaring
+# function's body, *and* `$this->__pluginLoginRequiresOtp(...)` does not resolve at
+# all, for the reason localised at 1376 -- the frontend declares SelfName "this"
+# while the receiver text is `$this`, so `sc.typ` has no self entry and resolution
+# falls back to program-wide short-name matching. Closing it needs a design
+# decision about attributing a callee's facts to its caller across every PHP scan,
+# and per measurement 2(b) it is necessary but not sufficient for this rank.
+#
+# The four cases are the pinned miss and the pair that isolates its cause. Case 1
+# is the real vulnerable method and case 2 the real patched one, both rejected
+# today. Case 3 is case 2 with the helper renamed so that no "otp" substring
+# survives in the guarded method: any binding that separated case 1 from case 2
+# would report case 3, which is the same fix. Case 4 is the sibling API-key path
+# from the same class, which carries the identical construct and is correct as
+# written.
+#
+# verify_current_expected: attention-engine-gap, all four forms rejected.
+
+test "rank1394: an authentication plugin's user record establishes the CakePHP auth session during beforeFilter with no second-factor challenge"
+  lang php
+  file app/Controller/AppController.php
+  reject VYQL-AUTH-004
+  reject_review code.AuthFlowBypassReview
+  reject_review code.MissingSessionRotationAfterAuthentication
+  code
+  ```
+  <?php
+  App::uses('Controller', 'Controller');
+
+  class AppController extends Controller
+  {
+      public function beforeFilter()
+      {
+          if (!$this->Session->read(AuthComponent::$sessionKey)) {
+              $this->_loadAuthenticationPlugins();
+          }
+      }
+
+      /**
+       * @throws Exception
+       */
+      protected function _loadAuthenticationPlugins()
+      {
+          // load authentication plugins from Configure::read('Security.auth')
+          $auth = Configure::read('Security.auth');
+          if (!$auth) {
+              return;
+          }
+          if (!is_array($auth)) {
+              throw new Exception("`Security.auth` config value must be array.");
+          }
+          $this->Auth->authenticate = array_merge($auth, $this->Auth->authenticate);
+          // Disable Form authentication
+          if (Configure::read('Security.auth_enforced')) {
+              unset($this->Auth->authenticate['Form']);
+          }
+          if ($this->Auth->startup($this)) {
+              $user = $this->Auth->user();
+              if ($user) {
+                  $this->User->updateLoginTimes($user);
+                  // User found in the db, add the user info to the session
+                  $this->Session->renew();
+                  $this->Session->write(AuthComponent::$sessionKey, $user);
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1394: the same plugin login refuses to establish the session while an OTP challenge is outstanding"
+  lang php
+  file app/Controller/AppController.php
+  reject VYQL-AUTH-004
+  reject_review code.AuthFlowBypassReview
+  reject_review code.MissingSessionRotationAfterAuthentication
+  code
+  ```
+  <?php
+  App::uses('Controller', 'Controller');
+
+  class AppController extends Controller
+  {
+      public function beforeFilter()
+      {
+          if (!$this->Session->read(AuthComponent::$sessionKey)) {
+              $this->_loadAuthenticationPlugins();
+          }
+      }
+
+      /**
+       * @throws Exception
+       */
+      protected function _loadAuthenticationPlugins()
+      {
+          // load authentication plugins from Configure::read('Security.auth')
+          $auth = Configure::read('Security.auth');
+          if (!$auth) {
+              return;
+          }
+          if (!is_array($auth)) {
+              throw new Exception("`Security.auth` config value must be array.");
+          }
+          $this->Auth->authenticate = array_merge($auth, $this->Auth->authenticate);
+          // Disable Form authentication
+          if (Configure::read('Security.auth_enforced')) {
+              unset($this->Auth->authenticate['Form']);
+          }
+          if ($this->Auth->startup($this)) {
+              $user = $this->Auth->user();
+              if ($user) {
+                  // A user authenticated by an authentication plugin (e.g. LDAP) gets
+                  // logged in here, during beforeFilter, before UsersController::login()
+                  // runs. If the user has OTP enabled we must enforce the OTP challenge at
+                  // this point too.
+                  if ($this->__pluginLoginRequiresOtp($user)) {
+                      return;
+                  }
+                  $this->User->updateLoginTimes($user);
+                  // User found in the db, add the user info to the session
+                  $this->Session->renew();
+                  $this->Session->write(AuthComponent::$sessionKey, $user);
+              }
+          }
+      }
+
+      /**
+       * @param array $user The user record returned by the authentication plugin
+       * @return bool True if the user still needs to pass an OTP challenge.
+       */
+      private function __pluginLoginRequiresOtp(array $user)
+      {
+          if (!empty($user['disabled'])) {
+              return false;
+          }
+
+          $otpAction = null;
+          // TOTP / HOTP
+          if (
+              !Configure::read('Security.otp_disabled') &&
+              !empty($user['totp']) &&
+              class_exists('\OTPHP\TOTP')
+          ) {
+              $this->Session->write('otp_user', $user);
+              $otpAction = 'otp';
+          // E-mail OTP
+          } elseif (Configure::read('Security.email_otp_enabled')) {
+              $this->Session->write('email_otp_user', $user);
+              $otpAction = 'email_otp';
+          }
+
+          if ($otpAction === null) {
+              return false;
+          }
+
+          $currentAction = isset($this->request->params['action']) ?
+              $this->request->params['action'] : null;
+          if (!in_array($currentAction, ['otp', 'email_otp'], true)) {
+              $this->redirect(['controller' => 'users', 'action' => $otpAction]);
+          }
+          return true;
+      }
+  }
+  ```
+
+test "rank1394: the same guard under a helper name carrying no second-factor vocabulary"
+  lang php
+  file app/Controller/AppController.php
+  reject VYQL-AUTH-004
+  reject_review code.AuthFlowBypassReview
+  reject_review code.MissingSessionRotationAfterAuthentication
+  code
+  ```
+  <?php
+  App::uses('Controller', 'Controller');
+
+  class AppController extends Controller
+  {
+      protected function _loadAuthenticationPlugins()
+      {
+          $auth = Configure::read('Security.auth');
+          if (!$auth) {
+              return;
+          }
+          $this->Auth->authenticate = array_merge($auth, $this->Auth->authenticate);
+          if (Configure::read('Security.auth_enforced')) {
+              unset($this->Auth->authenticate['Form']);
+          }
+          if ($this->Auth->startup($this)) {
+              $user = $this->Auth->user();
+              if ($user) {
+                  if ($this->__pluginLoginRequiresSecondFactor($user)) {
+                      return;
+                  }
+                  $this->User->updateLoginTimes($user);
+                  $this->Session->renew();
+                  $this->Session->write(AuthComponent::$sessionKey, $user);
+              }
+          }
+      }
+
+      private function __pluginLoginRequiresSecondFactor(array $user)
+      {
+          if (!empty($user['disabled'])) {
+              return false;
+          }
+
+          $challenge = null;
+          if (
+              !Configure::read('Security.otp_disabled') &&
+              !empty($user['totp']) &&
+              class_exists('\OTPHP\TOTP')
+          ) {
+              $this->Session->write('otp_user', $user);
+              $challenge = 'otp';
+          } elseif (Configure::read('Security.email_otp_enabled')) {
+              $this->Session->write('email_otp_user', $user);
+              $challenge = 'email_otp';
+          }
+
+          if ($challenge === null) {
+              return false;
+          }
+
+          $currentAction = isset($this->request->params['action']) ?
+              $this->request->params['action'] : null;
+          if (!in_array($currentAction, ['otp', 'email_otp'], true)) {
+              $this->redirect(['controller' => 'users', 'action' => $challenge]);
+          }
+          return true;
+      }
+  }
+  ```
+
+test "rank1394: an API key authentication path establishes the same session key and needs no second factor"
+  lang php
+  file app/Controller/AppController.php
+  reject VYQL-AUTH-004
+  reject_review code.AuthFlowBypassReview
+  reject_review code.MissingSessionRotationAfterAuthentication
+  code
+  ```
+  <?php
+  App::uses('Controller', 'Controller');
+
+  class AppController extends Controller
+  {
+      private function __loginByAuthKey()
+      {
+          $authKey = $this->_readHttpAuthorizationHeader();
+          if (empty($authKey)) {
+              return false;
+          }
+          $user = $this->checkAuthUser($authKey);
+          if ($user) {
+              $start = substr($authKey, 0, 4);
+              $end = substr($authKey, -4);
+              $this->__logApiKeyUse($start . $end);
+              $this->User->updateAPIAccessTime($user);
+              $this->Session->renew();
+              $this->Session->write(AuthComponent::$sessionKey, $user);
+              $this->isApiAuthed = true;
+              return true;
+          }
+          // User not authenticated correctly: reset the session information
+          $this->Session->destroy();
+          return false;
+      }
+  }
+  ```
