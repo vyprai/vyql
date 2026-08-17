@@ -1,0 +1,94 @@
+# Rank 1586 / CVE-2022-31018: Play Framework's JSON form binding
+# recursed into nested objects and arrays with no depth limit, so a
+# deeply nested JSON body threw a StackOverflowError and took the
+# request thread down (denial of service through unbounded recursion,
+# CWE-1327/CWE-400; PR #11301, backported to 2.8.16). doFromJson in
+# core/play/src/main/scala/play/api/data/Form.scala flattened a
+# JsValue into the form's key-value map by recursing at every
+# JsObject/JsArray node, bounded only by the max-chars budget of the
+# produced map -- nesting depth itself was unbounded. Pool commit
+# f6722f1e57 is the real fix (COMMIT_OK -- the merge "[2.8.x] add
+# depth limit for JSON form binding"): a new
+# Form.FromJsonMaxDepth = 64 (an InternalApi constant), fromJson
+# overloads carrying maxDepth, and the recursion throwing once its
+# level exceeds the bound. No pool correction.
+#
+# ATTENTION, recursion depth budgets. The sibling budget (maxChars)
+# existed -- the depth of the walked structure was unbounded, the
+# same cross-iteration budget family as ranks 1534 (header
+# accumulation) and 1559 (wire length): the corpus's CWE-400 rules
+# judge per-iteration progress, not a depth carried through
+# recursion, so nothing can ask "does the JSON walk stop at a depth
+# cap". A binding on Play's own FormUtils would detect this
+# framework rather than the weakness. Measured on the real code:
+# scanning Form.scala reports zero findings at both revisions. No
+# ENGINE-GAPS.md entry: the piece is depth-budget vocabulary, not a
+# localised construct. No definition change shipped. Spec
+# cve_rank1586 records the unbounded recursion and the depth-capped
+# form, both asserting reject VYQL-DOS-029: when depth-budget
+# vocabulary lands, the unbounded form must flip to expect.
+
+test "rank1586: the json walk recurses without a depth cap"
+  lang scala
+  file core/play/src/main/scala/play/api/data/Form.scala
+  reject VYQL-DOS-029
+  code
+  ```
+  import play.api.libs.json._
+
+  object FormUtils {
+    def fromJson(js: JsValue, maxChars: Long): Map[String, String] =
+      doFromJson(Root(js), Map.empty, 0, maxChars)
+
+    private def doFromJson(node: Node, out: Map[String, String], level: Int, maxChars: Long): Map[String, String] = {
+      val result = node match {
+        case Object(fields) =>
+          fields.flatMap { case (key, value) =>
+            doFromJson(Field(key, value), out, level + 1, maxChars)
+          }.toMap
+        case Array(elements) =>
+          elements.zipWithIndex.flatMap { case (value, index) =>
+            doFromJson(Element(index, value), out, level + 1, maxChars)
+          }.toMap
+        case Leaf(key, value) =>
+          Map(key -> value)
+      }
+      result
+    }
+  }
+  ```
+
+test "rank1586: the fix caps the recursion depth"
+  lang scala
+  file core/play/src/main/scala/play/api/data/Form.scala
+  reject VYQL-DOS-029
+  code
+  ```
+  import play.api.libs.json._
+
+  object FormUtils {
+    final val MaxDepth: Int = 64
+
+    def fromJson(js: JsValue, maxChars: Long, maxDepth: Int): Map[String, String] =
+      doFromJson(Root(js), Map.empty, 0, maxChars, maxDepth)
+
+    private def doFromJson(node: Node, out: Map[String, String], level: Int, maxChars: Long, maxDepth: Int): Map[String, String] = {
+      if (level > maxDepth) {
+        throw new RuntimeException("JSON form binding exceeded max depth")
+      }
+      val result = node match {
+        case Object(fields) =>
+          fields.flatMap { case (key, value) =>
+            doFromJson(Field(key, value), out, level + 1, maxChars, maxDepth)
+          }.toMap
+        case Array(elements) =>
+          elements.zipWithIndex.flatMap { case (value, index) =>
+            doFromJson(Element(index, value), out, level + 1, maxChars, maxDepth)
+          }.toMap
+        case Leaf(key, value) =>
+          Map(key -> value)
+      }
+      result
+    }
+  }
+  ```
