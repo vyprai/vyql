@@ -1,0 +1,122 @@
+# Rank 1559 / CVE-2016-5426: PowerDNS's DNS name parser accepted
+# qnames whose wire length exceeded the 255-byte protocol limit, so a
+# crafted query with many labels (or compression chains) drove
+# oversized names into downstream handling (improper input validation,
+# CWE-128/CWE-400 family). getLabelFromContent in pdns/dnsparser.cc
+# walked the packet's labels recursively -- `getLabelFromContent(
+# d_content, d_pos, ret, recurs++)` with only a recursion counter --
+# accumulating the name string with no total wire-length budget, and
+# the compression-pointer branch (`return getLabelFromContent(content,
+# offset, ret, ++recurs)`) resumed from arbitrary offsets. Pool
+# commit 881b5b03a5 is the real fix (COMMIT_OK -- "Reject qname's
+# wirelength > 255, chopOff() handle dot inside labels"): a
+# wirelength reference threads through the walk, incrementing per
+# label byte and adding labellen with `if (wirelength + labellen >
+# 255) throw MOADNSException("Overly long DNS name ...")`, and the
+# compression branch decrements first because pointers do not count
+# into the wire length; chopOff additionally handles dots inside
+# labels. No pool correction.
+#
+# ATTENTION, parser wire-budget vocabulary. The defect is a recursive
+# label walk whose only bound is a recursion counter, not the
+# protocol's wire budget -- the same loop-carried budget family as
+# ranks 1517 (aggregate caps) and 1534 (header accumulation), here as
+# an accumulator threaded through recursion: the corpus's parser
+# progress rules (VYQL-DOS-029) judge per-iteration advancement, not
+# cumulative length against a protocol limit, so nothing can ask
+# "does the name walk stop at 255 wire bytes". A binding on
+# PowerDNS's own getLabelFromContent would detect this application
+# rather than the weakness. Measured on the real code: scanning
+# pdns/dnsparser.cc reports the same 17 findings at both revisions
+# (memory-family deref and copy heuristics; nothing changes with the
+# fix). No ENGINE-GAPS.md entry: the piece is budget-vocabulary
+# design, not a localised construct. No definition change shipped.
+# Spec cve_rank1559 records the unbounded label walk and the
+# wire-capped form, both asserting reject VYQL-DOS-029: when
+# wire-budget vocabulary lands, the unbounded walk must flip to
+# expect.
+
+test "rank1559: the label walk carries no wire budget"
+  lang cpp
+  file pdns/dnsparser.cc
+  reject VYQL-DOS-029
+  code
+  ```
+  #include <cstdint>
+  #include <string>
+  #include <vector>
+
+  void getLabelFromContent(const std::vector<uint8_t>& content, uint16_t& frompos,
+                           std::string& ret, int recurs);
+
+  std::string parseName(const std::vector<uint8_t>& content, uint16_t d_pos) {
+      std::string ret;
+      uint16_t pos = d_pos;
+      getLabelFromContent(content, pos, ret, 0);
+      return ret;
+  }
+
+  void getLabelFromContent(const std::vector<uint8_t>& content, uint16_t& frompos,
+                           std::string& ret, int recurs)
+  {
+      if (recurs > 12)
+          return;
+
+      uint8_t labellen = content[frompos++];
+      if (labellen == 0)
+          return;
+
+      ret.append(1, '.');
+      ret.append(reinterpret_cast<const char*>(&content[frompos]), labellen);
+      frompos += labellen;
+      getLabelFromContent(content, frompos, ret, recurs + 1);
+  }
+  ```
+
+test "rank1559: the fix threads a wire budget through the walk"
+  lang cpp
+  file pdns/dnsparser.cc
+  reject VYQL-DOS-029
+  code
+  ```
+  #include <cstdint>
+  #include <string>
+  #include <vector>
+
+  void getLabelFromContent(const std::vector<uint8_t>& content, uint16_t& frompos,
+                           std::string& ret, int recurs, size_t& wirelength);
+
+  std::string parseName(const std::vector<uint8_t>& content, uint16_t d_pos) {
+      std::string ret;
+      uint16_t pos = d_pos;
+      size_t wirelength = 0;
+      getLabelFromContent(content, pos, ret, 0, wirelength);
+      return ret;
+  }
+
+  void getLabelFromContent(const std::vector<uint8_t>& content, uint16_t& frompos,
+                           std::string& ret, int recurs, size_t& wirelength)
+  {
+      if (recurs > 12)
+          return;
+
+      uint8_t labellen = content[frompos++];
+      if (labellen == 0)
+          return;
+
+      wirelength++;
+      if (wirelength > 255) {
+          throw std::string("Overly long DNS name");
+      }
+
+      if (wirelength + labellen > 255) {
+          throw std::string("Overly long DNS name");
+      }
+      wirelength += labellen;
+
+      ret.append(1, '.');
+      ret.append(reinterpret_cast<const char*>(&content[frompos]), labellen);
+      frompos += labellen;
+      getLabelFromContent(content, frompos, ret, recurs + 1, wirelength);
+  }
+  ```
