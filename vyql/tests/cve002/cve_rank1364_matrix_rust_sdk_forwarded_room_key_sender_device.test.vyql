@@ -1,0 +1,349 @@
+# Rank 1364 / CVE-2022-39252 (GHSA-vp68-2wrm-69qm, RUSTSEC-2022-0085, CWE-287):
+# matrix-sdk-crypto accepted an `m.forwarded_room_key` from whichever device the
+# homeserver chose to deliver it from, as long as the key answered some room-key
+# request the client had made. A malicious homeserver could therefore inject
+# megolm session keys of its own into the store and have later events in the room
+# attributed to whoever the injected session claimed, which is impersonation.
+#
+# GossipMachine::receive_supported_keys in
+# crates/matrix-sdk-crypto/src/gossiping/machine.rs made exactly one check before
+# committing the key: `if let Some(info) = self.get_key_info(event).await?`, which
+# is `Store::get_secret_request_by_info` -- did we ask for a key with this room
+# id, session id and algorithm. It matched the request record, not the responder.
+# `info.request_recipient`, the device the request was actually sent to, was never
+# read, and the Olm envelope's own Curve25519 identity key -- the only field that
+# identifies the sender, as opposed to `content.claimed_sender_key`, which the
+# sender writes itself -- was passed straight through to
+# accept_forwarded_room_key as the identity to store the session under. The same
+# file already did this correctly one protocol path over: receive_secret resolves
+# the envelope key with `self.store.get_device_from_curve_key(&event.sender,
+# sender_key)` and requires `device.user_id() == self.user_id() &&
+# device.is_verified()` before accepting an `m.secret.send`. The forwarded
+# room-key path had no equivalent.
+#
+# Corpus correction. The pool named 41449d2cc360e347f5d4e1c154ec1e3185f11acd,
+# which is `test(crypto): Test that we reject forwarded room keys from other
+# users` -- 60 added lines, all of them a `#[async_test]` in the same file. The
+# advisory references two commits and the fix is the other one, its parent
+# 093fb5d0aa21c0b5eaea6ec96b477f1075271cbb, `fix(crypto): Only accept forwarded
+# room keys from our own trusted devices`. That commit adds
+# GossipMachine::should_accept_forward, which performs the lookup receive_secret
+# already performed, and wraps the acceptance in it:
+#
+#   if self.should_accept_forward(&info, sender_key).await? {
+#       self.accept_forwarded_room_key(&info, &event.sender, sender_key, algorithm, content).await
+#   } else { warn!(..); Ok(None) }
+#
+# ATTENTION, engine gap: no cross-procedural view of a neutralising control in
+# Rust. The concept is not the problem -- code.ProtocolStateReview (VYQL-AUTH-082,
+# CWE_287 among its five) covers unauthenticated protocol data accepted without
+# the state check that was supposed to gate it, and a Kotlin binding for this
+# exact weakness in another Matrix SDK already emits it. The problem is that the
+# fix is a delegation: inside receive_supported_keys, the entire local footprint
+# of the patch is one call to a newly added private method. Every fact the Rust
+# frontend offers about a function is confined to that function's own body --
+# rsFunctionContext in internal/extract/frontend/treesitter/rust.go emits one
+# `analysis.function.context` node per function whose `call_path:`, `call_arg:`
+# and `selector:` tokens come from walking that body, and Rust emits no
+# `analysis.class.context` node for an `impl` block at all -- so the store lookup
+# and verification state that now gate the acceptance are, to a binding, simply
+# absent from the function that accepts.
+#
+# Measured. A function-scoped binding for the shape was written and run against
+# both revisions of the real repository with
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB -flags only`:
+#
+#   node.scope == "function"
+#   and containsAny(node.context.callPath, ["accept_forwarded_room_key", "from_forwarded_key"])
+#   and not (containsAny(node.context.callPath, ["get_device_from_curve_key", "is_verified", "get_device"]))
+#
+# It reports two flags at 093fb5d0^ -- machine.rs:950, receive_supported_keys,
+# the vulnerable function, and machine.rs:874, accept_forwarded_room_key -- and
+# two flags at 093fb5d0, the same two functions at 874 and 965. Identical output
+# on the vulnerable and the fixed revision: no discrimination whatever. Adding
+# `should_accept_forward` to the negation drops the fixed revision to one flag,
+# which is what the absence of any generic fact costs -- the only thing that
+# separates the two revisions inside the accepting function is one crate-private
+# method name, and a binding naming it recognises this patch rather than the
+# weakness. machine.rs:874 also stays flagged on both revisions either way,
+# because accept_forwarded_room_key is where `InboundGroupSession::from_forwarded_key`
+# is called -- the documented API that turns a forwarded payload into a stored
+# session, and therefore the only anchor for this shape derivable from
+# matrix-sdk-crypto's documentation -- and the fix does not touch that function;
+# it is the caller that had to authenticate.
+#
+# The minimal pair below isolates the construct. Both fixed forms perform the
+# same two lookups on the same two values and reach the same acceptance call; they
+# differ only in whether the lookups sit in the accepting function or one call
+# away in a sibling `impl` method. The inline one is discriminated correctly, the
+# delegated one is not, and the delegated one is what the fix actually shipped.
+# Widening the neutralising scope from the function to the `impl` block or the
+# file is measured wrong rather than merely coarse: machine.rs's own receive_secret
+# performs `get_device_from_curve_key` and `is_verified` for `m.secret.send` in
+# the same `impl` as the vulnerable function, so a scope that reaches it suppresses
+# the true positive. The fourth case pins that -- an authenticated sibling path for
+# a different protocol message does not authenticate this one.
+#
+# Behaviour a shippable fact needs: the structured context tokens of an
+# intra-file resolved callee attributed to the caller's function context, one hop
+# and bounded, so a check factored into a helper reads as present in the function
+# that calls it. `vyql resolve` over the fixed form reports
+# `self.should_accept_forward` unresolved, so the hop is not available from call
+# resolution either.
+#
+# No definition change attempted. Nothing is reported for any of the four forms
+# today, and the cases pin that.
+#
+# verify_current_expected: attention-engine-gap, all four forms rejected.
+
+test "rank1364: a forwarded room key is accepted on a request match alone, with no check on the sending device"
+  lang rust
+  file crates/matrix-sdk-crypto/src/gossiping/machine.rs
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  impl GossipMachine {
+      async fn accept_forwarded_room_key(
+          &self,
+          info: &GossipRequest,
+          sender: &UserId,
+          sender_key: Curve25519PublicKey,
+          algorithm: EventEncryptionAlgorithm,
+          content: &ForwardedMegolmV1AesSha2Content,
+      ) -> Result<Option<InboundGroupSession>, CryptoStoreError> {
+          match InboundGroupSession::from_forwarded_key(&algorithm, content) {
+              Ok(session) => {
+                  let old_session = self
+                      .store
+                      .get_inbound_group_session(
+                          session.room_id(),
+                          &session.sender_key.to_base64(),
+                          session.session_id(),
+                      )
+                      .await?;
+
+                  let session = if let Some(old_session) = old_session {
+                      if session.compare(&old_session).await == SessionOrdering::Better {
+                          self.mark_as_done(info).await?;
+                          Some(session)
+                      } else {
+                          None
+                      }
+                  } else {
+                      self.mark_as_done(info).await?;
+                      Some(session)
+                  };
+
+                  Ok(session)
+              }
+              Err(e) => {
+                  warn!(
+                      %sender,
+                      sender_key = sender_key.to_base64(),
+                      claimed_sender_key = content.claimed_sender_key.to_base64(),
+                      "Couldn't create a group session from a received room key"
+                  );
+                  Err(e.into())
+              }
+          }
+      }
+
+      /// Receive a forwarded room key event that was sent using any of our
+      /// supported content types.
+      async fn receive_supported_keys(
+          &self,
+          sender_key: Curve25519PublicKey,
+          event: &DecryptedForwardedRoomKeyEvent,
+          content: &ForwardedMegolmV1AesSha2Content,
+      ) -> Result<Option<InboundGroupSession>, CryptoStoreError> {
+          let algorithm = event.content.algorithm();
+
+          if let Some(info) = self.get_key_info(event).await? {
+              self.accept_forwarded_room_key(&info, &event.sender, sender_key, algorithm, content)
+                  .await
+          } else {
+              warn!(
+                  sender = %event.sender,
+                  sender_key = %sender_key,
+                  room_id = %content.room_id,
+                  session_id = content.session_id.as_str(),
+                  claimed_sender_key = %content.claimed_sender_key,
+                  algorithm = %algorithm,
+                  "Received a forwarded room key that we didn't request",
+              );
+
+              Ok(None)
+          }
+      }
+  }
+  ```
+
+test "rank1364: acceptance gated by a sender-device check factored into a sibling impl method"
+  lang rust
+  file crates/matrix-sdk-crypto/src/gossiping/machine.rs
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  impl GossipMachine {
+      async fn should_accept_forward(
+          &self,
+          info: &GossipRequest,
+          sender_key: Curve25519PublicKey,
+      ) -> Result<bool, CryptoStoreError> {
+          let device =
+              self.store.get_device_from_curve_key(&info.request_recipient, sender_key).await?;
+
+          if let Some(device) = device {
+              Ok(device.user_id() == self.user_id() && device.is_verified())
+          } else {
+              Ok(false)
+          }
+      }
+
+      /// Receive a forwarded room key event that was sent using any of our
+      /// supported content types.
+      async fn receive_supported_keys(
+          &self,
+          sender_key: Curve25519PublicKey,
+          event: &DecryptedForwardedRoomKeyEvent,
+          content: &ForwardedMegolmV1AesSha2Content,
+      ) -> Result<Option<InboundGroupSession>, CryptoStoreError> {
+          let algorithm = event.content.algorithm();
+
+          if let Some(info) = self.get_key_info(event).await? {
+              if self.should_accept_forward(&info, sender_key).await? {
+                  self.accept_forwarded_room_key(&info, &event.sender, sender_key, algorithm, content)
+                      .await
+              } else {
+                  warn!(
+                      sender = %event.sender,
+                      %sender_key,
+                      room_id = %content.room_id,
+                      session_id = content.session_id.as_str(),
+                      claimed_sender_key = %content.claimed_sender_key,
+                      "Received a forwarded room key from an unknown device, or \
+                       from a device that the key request recipient doesn't own",
+                  );
+
+                  Ok(None)
+              }
+          } else {
+              warn!(
+                  sender = %event.sender,
+                  sender_key = %sender_key,
+                  room_id = %content.room_id,
+                  session_id = content.session_id.as_str(),
+                  claimed_sender_key = %content.claimed_sender_key,
+                  algorithm = %algorithm,
+                  "Received a forwarded room key that we didn't request",
+              );
+
+              Ok(None)
+          }
+      }
+  }
+  ```
+
+test "rank1364: the same sender-device check performed inline in the accepting function"
+  lang rust
+  file crates/matrix-sdk-crypto/src/gossiping/machine.rs
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  impl GossipMachine {
+      /// Receive a forwarded room key event that was sent using any of our
+      /// supported content types.
+      async fn receive_supported_keys(
+          &self,
+          sender_key: Curve25519PublicKey,
+          event: &DecryptedForwardedRoomKeyEvent,
+          content: &ForwardedMegolmV1AesSha2Content,
+      ) -> Result<Option<InboundGroupSession>, CryptoStoreError> {
+          let algorithm = event.content.algorithm();
+
+          if let Some(info) = self.get_key_info(event).await? {
+              let device =
+                  self.store.get_device_from_curve_key(&info.request_recipient, sender_key).await?;
+
+              if let Some(device) = device {
+                  if device.user_id() == self.user_id() && device.is_verified() {
+                      return self
+                          .accept_forwarded_room_key(
+                              &info,
+                              &event.sender,
+                              sender_key,
+                              algorithm,
+                              content,
+                          )
+                          .await;
+                  }
+              }
+
+              warn!(
+                  sender = %event.sender,
+                  %sender_key,
+                  room_id = %content.room_id,
+                  "Received a forwarded room key from an unknown device, or \
+                   from a device that the key request recipient doesn't own",
+              );
+
+              Ok(None)
+          } else {
+              Ok(None)
+          }
+      }
+  }
+  ```
+
+test "rank1364: a sibling protocol path authenticates its own sender and the forwarded-key path still does not"
+  lang rust
+  file crates/matrix-sdk-crypto/src/gossiping/machine.rs
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  impl GossipMachine {
+      async fn receive_secret(
+          &self,
+          sender_key: Curve25519PublicKey,
+          event: &DecryptedSecretSendEvent,
+          request: &GossipRequest,
+          secret_name: &SecretName,
+      ) -> Result<(), CryptoStoreError> {
+          if let Some(device) =
+              self.store.get_device_from_curve_key(&event.sender, sender_key).await?
+          {
+              // Only accept secrets from one of our own trusted devices.
+              if device.user_id() == self.user_id() && device.is_verified() {
+                  self.accept_secret(event, request, secret_name).await?;
+              } else {
+                  warn!(
+                      sender = event.sender.as_str(),
+                      secret_name = secret_name.as_ref(),
+                      "Received a m.secret.send event from another user or from \
+                      unverified device"
+                  );
+              }
+          }
+
+          Ok(())
+      }
+
+      /// Receive a forwarded room key event that was sent using any of our
+      /// supported content types.
+      async fn receive_supported_keys(
+          &self,
+          sender_key: Curve25519PublicKey,
+          event: &DecryptedForwardedRoomKeyEvent,
+          content: &ForwardedMegolmV1AesSha2Content,
+      ) -> Result<Option<InboundGroupSession>, CryptoStoreError> {
+          let algorithm = event.content.algorithm();
+
+          if let Some(info) = self.get_key_info(event).await? {
+              self.accept_forwarded_room_key(&info, &event.sender, sender_key, algorithm, content)
+                  .await
+          } else {
+              Ok(None)
+          }
+      }
+  }
+  ```
