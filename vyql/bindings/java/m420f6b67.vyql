@@ -2728,3 +2728,19 @@ binding jenkinsRemotingCallableMissingRoleCheck468 {
   query pattern presenceNode where node.scope == "class" and node.context.classBase contains "Callable" and node.context.functionName contains "call" and node.context.functionName contains "checkRoles" and not (node.context.classBase contains "MasterToSlaveCallable") and not (node.context.scopeCall contains ".check")
   emit issue code.JenkinsRemotingCallableMissingRoleCheck at node
 }
+
+// A redirect/callback URL validation class whose wildcard matcher strips a
+// trailing '*' and then only checks the candidate URI's remaining prefix
+// (endsWith/startsWith) treats the scheme as just more prefix text, so a
+// registered "*" or "https://host/*" pattern matches "javascript:..." exactly
+// as well as it matches an http(s) URL. Scoping to the class instead of the
+// single matching function lets the scheme check live in whichever method
+// actually holds the final accept/reject decision, since callers commonly
+// call the wildcard matcher and decide validity themselves. Requiring the
+// whole class to be free of any getScheme() call is what turns "matches by
+// prefix" into "matches by prefix without ever looking at the scheme";
+// once a scheme is read and compared, the finding stops.
+binding redirectUriWildcardSchemeBypass468 {
+  query pattern presenceNode where node.scope == "class" and node.context.className contains "edirect" and node.context.call contains "endsWith" and node.context.call contains "startsWith" and node.context.literal contains "*" and not (node.context.call contains "getScheme")
+  emit issue code.RedirectUriWildcardSchemeBypass at node
+}
