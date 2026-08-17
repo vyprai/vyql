@@ -1,0 +1,85 @@
+# Rank 1543 / CVE-2025-67221: orjson closed serialized objects with a
+# write whose capacity guard existed only in debug builds, so a
+# release-mode serialization that ended exactly at the buffer
+# boundary wrote its closing brace past the allocation and crashed
+# sporadically (out-of-bounds write, CWE-787/CWE-131). The object
+# close in src/serialize/writer/formatter.rs did
+# `debug_assert_has_capacity!(writer); unsafe { writer.put_u8(b'}');
+# }` -- debug_assert compiles to nothing under --release, and the
+# recursive list/dict shapes in the new test (deep nesting with
+# long keys) reach the exact-capacity state where the brace write
+# overflows. Pool commit 62bb185b70 is the real fix (COMMIT_OK --
+# "Fix sporadic crash on serializing object close"): the guard
+# becomes `reserve_minimum!(writer);` -- an unconditional reservation
+# that grows the buffer in every build before the byte is written --
+# plus test_recursion.py exercising the boundary. No pool
+# correction.
+#
+# ATTENTION, debug-only capacity guards. The defect is a bounds
+# check that evaporates in release builds -- debug_assert! is
+# development tooling, not a guard, and no observation distinguishes
+# an enforced reservation from a debug assertion: the memory rules
+# label derefs and frees, and rust's unsafe put_u8 inside a
+# debug-asserted region is indistinguishable from a checked one to
+# every current rule. A binding on orjson's own macros would detect
+# this crate rather than the weakness. Measured on the real code:
+# scanning formatter.rs reports zero findings at both revisions. No
+# ENGINE-GAPS.md entry: the piece is release-mode guard vocabulary
+# (which macro families enforce in release), not a localised
+# construct. No definition change shipped. Spec cve_rank1543 records
+# the debug-asserted close and the reserved form, both asserting
+# reject VYQL-MEM-006: when release-guard vocabulary lands, the
+# debug-asserted form must flip to expect.
+
+test "rank1543: the closing brace is guarded only in debug"
+  lang rust
+  file src/serialize/writer/formatter.rs
+  reject VYQL-MEM-006
+  code
+  ```
+  pub(crate) trait Formatter {
+      unsafe fn end_object<W>(&mut self, writer: &mut W)
+      where
+          W: ?Sized + WriteExt + bytes::BufMut,
+      {
+          debug_assert_has_capacity!(writer);
+          unsafe {
+              writer.put_u8(b'}');
+          }
+      }
+  }
+
+  macro_rules! debug_assert_has_capacity {
+      ($writer:expr) => {
+          #[cfg(debug_assertions)]
+          assert!($writer.remaining_mut() >= 1);
+      };
+  }
+  ```
+
+test "rank1543: the fix reserves before every close"
+  lang rust
+  file src/serialize/writer/formatter.rs
+  reject VYQL-MEM-006
+  code
+  ```
+  pub(crate) trait Formatter {
+      unsafe fn end_object<W>(&mut self, writer: &mut W)
+      where
+          W: ?Sized + WriteExt + bytes::BufMut,
+      {
+          reserve_minimum!(writer);
+          unsafe {
+              writer.put_u8(b'}');
+          }
+      }
+  }
+
+  macro_rules! reserve_minimum {
+      ($writer:expr) => {
+          if $writer.remaining_mut() < 1 {
+              $writer.reserve(1);
+          }
+      };
+  }
+  ```
