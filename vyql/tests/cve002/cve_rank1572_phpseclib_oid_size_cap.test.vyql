@@ -1,0 +1,94 @@
+# Rank 1572 / CVE-2026-44167: phpseclib's ASN.1 decoder accepted
+# object identifiers up to 4096 bytes, so a certificate carrying
+# near-4KB OIDs drove outsized parsing work in every chain-verification
+# consumer (resource exhaustion through an over-generous cap,
+# CWE-400/CWE-770). _decodeOID in phpseclib/File/ASN1.php did `$len
+# = strlen($content); if ($len > 4096) { return false; }` -- the cap
+# existed but sat far above the largest real-world OIDs, and the
+# decoder's per-byte arithmetic multiplies the cost. Pool commit
+# d53d2021bc is the real fix (COMMIT_OK -- "ASN1: reduce length of
+# supported OIDs from 4096 bytes to 128 bytes", citing OpenJDK's
+# ObjectIdentifier limit): the threshold becomes `if ($len > 128)` --
+# the constant alone changes, matching JDK behaviour. No pool
+# correction.
+#
+# ATTENTION, threshold adequacy. The guard exists and runs on both
+# sides -- the defect is only that its constant is larger than any
+# legitimate input needs, the budget family of ranks 1534 and 1559
+# from the other side: no rule can ask "is this parser's size cap
+# within the protocol's realistic range" -- threshold adequacy is a
+# domain judgement (the fix cites OpenJDK's 128-byte limit as the
+# reference point). A binding on phpseclib's own OID decoder would
+# detect this library rather than the weakness. Measured on the real
+# code: scanning ASN1.php reports one finding at both revisions
+# (unchanged; unrelated heuristic). No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1572 records the 4096-byte
+# cap and the 128-byte form, both asserting reject VYQL-DOS-029:
+# when threshold-adequacy vocabulary lands, the over-generous form
+# must flip to expect.
+
+test "rank1572: the oid cap sits at four kilobytes"
+  lang php
+  file phpseclib/File/ASN1.php
+  reject VYQL-DOS-029
+  code
+  ```
+  <?php
+
+  class File_ASN1
+  {
+      function _decodeOID($content)
+      {
+          $pos = 0;
+          $len = strlen($content);
+
+          if ($len > 4096) {
+              //user_error('Object Identifier size is limited to 4096 bytes');
+              return false;
+          }
+
+          $oid = '';
+          while ($pos < $len) {
+              $byte = ord($content[$pos++]);
+              $oid .= dechex($byte >> 7);
+              if (~$byte & 0x80) {
+                  $oid .= '.';
+              }
+          }
+          return $oid;
+      }
+  }
+  ```
+
+test "rank1572: the fix tightens the cap to the jdk limit"
+  lang php
+  file phpseclib/File/ASN1.php
+  reject VYQL-DOS-029
+  code
+  ```
+  <?php
+
+  class File_ASN1
+  {
+      function _decodeOID($content)
+      {
+          $pos = 0;
+          $len = strlen($content);
+
+          if ($len > 128) {
+              //user_error('Object Identifier size is limited to 128 bytes');
+              return false;
+          }
+
+          $oid = '';
+          while ($pos < $len) {
+              $byte = ord($content[$pos++]);
+              $oid .= dechex($byte >> 7);
+              if (~$byte & 0x80) {
+                  $oid .= '.';
+              }
+          }
+          return $oid;
+      }
+  }
+  ```
