@@ -1,0 +1,195 @@
+# Rank 1293 / CVE-2026-28499: leaf-kit's own HTML-escaping helper skips
+# escaping for every LeafData value that is not already a plain `.string`.
+# `htmlEscaped()` (Sources/LeafKit/LeafData/LeafData.swift) is what every
+# `#(expr)` output goes through before being written to the render buffer
+# (LeafSerializer.serialize(expression:) calls `leafData.htmlEscaped()`
+# unconditionally):
+#
+#   func htmlEscaped() -> LeafData {
+#       guard let string = self.string else {
+#           return self
+#       }
+#       return string.htmlEscaped().leafData
+#   }
+#
+# `self.string` (LeafData.swift's `string` computed property) internally
+# calls `self.convert(to: .string)`, which defaults to the `.castable`
+# convertibility level. Arrays, dictionaries and `Data` are only
+# `.ambiguous`ly convertible to string (a debug-description-style rendering,
+# not a well-defined cast), so `self.string` returns `nil` for them and the
+# guard's `else` branch returns `self` -- the original, completely
+# unescaped LeafData -- straight back to the caller. LeafDataStorage.
+# serialize(buffer:) then writes that value's own string form (or, for
+# `.data`, the raw bytes) directly into the response buffer with no
+# escaping at all. A template rendering `#(items)` where `items` is an
+# array or dictionary containing attacker-controlled strings (e.g. a
+# comment thread's tags, or a JSON-decoded request body reflected into a
+# template) reproduces the CWE-79 stored/reflected XSS the fix's own test
+# demonstrates: `render("#(foo)", ["foo": ["<img src=x onerror=alert(1337)>"]])`
+# renders the payload unescaped before the fix, `[&quot;&lt;img ... &gt;&quot;]`
+# after. Confirmed against `git show 6044b84`: the fix changes exactly one
+# line, `self.string` -> `self.convert(to: .string, .ambiguous).string`,
+# which lowers the required convertibility level so the same guard now
+# succeeds for arrays/dictionaries/data too and their (now-computed) string
+# form gets escaped like any other value.
+#
+# ATTENTION, precision cost. `vyql match` on a repro built from the real
+# LeafData.swift/LeafSerializer.swift bodies (both revisions) labels
+# nothing at all -- no source, no sink, no check -- confirming no existing
+# rule could ever have fired here; `vyql scan` against the full checkout at
+# the pre-fix parent commit reports only unrelated LIFE-001 lock findings,
+# nothing XSS-shaped. Evaluated and rejected two paths toward shipping
+# something:
+#
+# 1. A generic taint path (core.UserControlledData -> code.HtmlRender,
+#    unless coveredBy core.HtmlEscape, VYQL-INJ-004's own shape). This
+#    needs a source: leaf-kit is a template *library*, not an app -- the
+#    `context data: [String: LeafData]` handed to LeafSerializer never
+#    itself touches an HTTP request or any other recognizable input
+#    vocabulary anywhere in this repository, so treating it as tainted
+#    would mean labelling every LeafRenderer.render(...) call as an XSS
+#    source unconditionally, a claim about every possible caller with
+#    nothing here to ground it. It also needs a sink: the buffer write is
+#    `buffer.writeString(...)`/`buffer.writeData(...)` on NIO's ByteBuffer,
+#    a general-purpose byte buffer type used constantly for reasons with no
+#    connection to HTTP responses; binding `writeString`/`writeData` to
+#    code.HtmlRender would fire on every NIO buffer write in any Swift
+#    codebase using SwiftNIO, not just template output. Even granting both,
+#    the rule's own `unless path coveredBy core.HtmlEscape` clause would
+#    still need something recognizing `.htmlEscaped()` as the neutralizing
+#    control -- and `.htmlEscaped()` genuinely is called, unchanged, on
+#    both the vulnerable and the patched revision, so that binding would
+#    suppress the finding identically on both, discriminating nothing.
+# 2. Reusing code.HtmlSanitizerLogicReview (an existing "review" concept for
+#    exactly this class of bug -- an escaping/sanitizer implementation with
+#    incomplete type coverage) with a new Swift binding fingerprinting
+#    leaf-kit's own API shape. Rejected on two independent grounds: (a) the
+#    only thing that changed between the vulnerable and patched revision is
+#    which convertibility level (`.ambiguous` vs the `.castable` default) a
+#    private enum argument passes to LeafData's own internal `convert(to:)`
+#    -- a value-level fact with no dataflow or vocabulary representation,
+#    not a construct any binding can name; a presence-only fingerprint (e.g.
+#    "a function named htmlEscaped contains `self.string`") cannot tell the
+#    two revisions apart by structure at all, only by literal source text
+#    unique to this one diff, and even that only works file-scoped since
+#    Swift's frontend (unlike JavaScript's) does not populate per-function
+#    ContextTokens for `function_declaration` (confirmed in swift.go: only
+#    swModuleContext emits structured tokens, at module/file granularity).
+#    (b) `.string`, `.convert(to:_:)`, `.ambiguous`/`.castable` are LeafData's
+#    own private vocabulary, not anything derivable from Swift, SwiftNIO, or
+#    Leaf's own public template-authoring documentation -- the genericity
+#    test AGENTS.md sets (would someone who never saw this CVE write the
+#    same binding from documentation alone) fails outright, and the next
+#    templating library with the same class of bug, under any other
+#    property or method name, walks straight past it.
+#
+# No definition change. OWASP Java and Python unchanged at +1.00 and +0.90.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1293: htmlEscaped() falls back to the unescaped original when self.string is nil"
+  lang swift
+  file Sources/LeafKit/LeafData/LeafData.swift
+  reject VYQL-INJ-004
+  code
+  ```
+  public struct LeafData {
+      var storage: LeafDataStorage
+
+      public var string: String? {
+          if case .string(let s) = self.storage { return s }
+          guard case .string(let s) = self.convert(to: .string).storage else { return nil }
+          return s
+      }
+
+      func convert(to output: NaturalType, _ level: DataConvertible = .castable) -> LeafData {
+          guard celf != output else { return self }
+          guard let input = self.storage.unwrap,
+                let conversion = ConverterMap.symbols.get(input.concreteType, output),
+                conversion.is >= level
+          else {
+              return .trampoline
+          }
+          return conversion.via(input)
+      }
+
+      func htmlEscaped() -> LeafData {
+          guard let string = self.string else {
+              return self
+          }
+          return LeafData(.string(string.htmlEscaped()))
+      }
+  }
+
+  extension LeafDataStorage {
+      func serialize(buffer: inout ByteBuffer) throws {
+          switch self {
+          case .bool, .int, .double, .string, .optional, .array, .dictionary:
+              try buffer.writeString(self.serialize(), encoding: .utf8)
+          case .data(let d):
+              buffer.writeData(d)
+          }
+      }
+  }
+
+  extension LeafSerializer {
+      mutating func serialize(expression: [ParameterDeclaration], context data: [String: LeafData]) throws {
+          let resolved = try self.resolve(parameters: [.expression(expression)], context: data)
+          guard resolved.count == 1, let leafData = resolved.first else {
+              throw LeafError(.unknownError("expressions should resolve to single value"))
+          }
+          try? leafData.htmlEscaped().serialize(buffer: &self.buffer)
+      }
+  }
+  ```
+
+test "rank1293: htmlEscaped() lowers the conversion level so non-string data is escaped too"
+  lang swift
+  file Sources/LeafKit/LeafData/LeafData.swift
+  reject VYQL-INJ-004
+  code
+  ```
+  public struct LeafData {
+      var storage: LeafDataStorage
+
+      public var string: String? {
+          if case .string(let s) = self.storage { return s }
+          guard case .string(let s) = self.convert(to: .string).storage else { return nil }
+          return s
+      }
+
+      func convert(to output: NaturalType, _ level: DataConvertible = .castable) -> LeafData {
+          guard celf != output else { return self }
+          guard let input = self.storage.unwrap,
+                let conversion = ConverterMap.symbols.get(input.concreteType, output),
+                conversion.is >= level
+          else {
+              return .trampoline
+          }
+          return conversion.via(input)
+      }
+
+      func htmlEscaped() -> LeafData {
+          guard let string = self.convert(to: .string, .ambiguous).string else {
+              return self
+          }
+          return LeafData(.string(string.htmlEscaped()))
+      }
+  }
+
+  extension LeafDataStorage {
+      func serialize(buffer: inout ByteBuffer) throws {
+          try buffer.writeString(self.serialize(), encoding: .utf8)
+      }
+  }
+
+  extension LeafSerializer {
+      mutating func serialize(expression: [ParameterDeclaration], context data: [String: LeafData]) throws {
+          let resolved = try self.resolve(parameters: [.expression(expression)], context: data)
+          guard resolved.count == 1, let leafData = resolved.first else {
+              throw LeafError(.unknownError("expressions should resolve to single value"))
+          }
+          try? leafData.htmlEscaped().serialize(buffer: &self.buffer)
+      }
+  }
+  ```
