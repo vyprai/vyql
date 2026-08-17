@@ -1,0 +1,114 @@
+# DefaultJwtValidator.configure() picked its delegate solely from whether a
+# CloseableVerificationKeyResolver object had been passed to its constructor.
+# The broker instantiates the configured sasl.oauthbearer.jwt.validator.class
+# through reflection (Utils.newInstance / getConfiguredInstance), which always
+# uses the no-arg constructor, so verificationKeyResolver was always
+# Optional.empty() there -- delegate always became ClientJwtValidator, which
+# performs no signature check at all (it only pulls scope/exp/sub/iat out of
+# the decoded payload). This held even when the operator had set
+# sasl.oauthbearer.jwks.endpoint.url, so the broker accepted any JWT with any
+# claims, from any issuer, as long as it was well-formed. The fix reads the
+# configs for SASL_OAUTHBEARER_JWKS_ENDPOINT_URL before falling back, and picks
+# BrokerJwtValidator (which builds its own key resolver and does full jose4j
+# signature/issuer/audience validation) whenever that key is present.
+
+test "rank1254: default JWT validator ignores a configured JWKS endpoint"
+  lang java
+  profile api
+  file DefaultJwtValidator.java
+  expect VYQL-AUTH-108
+  code
+  ```
+  package org.apache.kafka.common.security.oauthbearer;
+
+  import java.util.List;
+  import java.util.Map;
+  import java.util.Optional;
+  import javax.security.auth.login.AppConfigurationEntry;
+
+  public class DefaultJwtValidator implements JwtValidator {
+
+      private final Optional<CloseableVerificationKeyResolver> verificationKeyResolver;
+
+      private JwtValidator delegate;
+
+      public DefaultJwtValidator() {
+          this.verificationKeyResolver = Optional.empty();
+      }
+
+      public DefaultJwtValidator(CloseableVerificationKeyResolver verificationKeyResolver) {
+          this.verificationKeyResolver = Optional.of(verificationKeyResolver);
+      }
+
+      @Override
+      public void configure(Map<String, ?> configs, String saslMechanism, List<AppConfigurationEntry> jaasConfigEntries) {
+          if (verificationKeyResolver.isPresent()) {
+              delegate = new BrokerJwtValidator(verificationKeyResolver.get());
+          } else {
+              delegate = new ClientJwtValidator();
+          }
+
+          delegate.configure(configs, saslMechanism, jaasConfigEntries);
+      }
+
+      @Override
+      public OAuthBearerToken validate(String accessToken) throws JwtValidatorException {
+          return delegate.validate(accessToken);
+      }
+  }
+  ```
+
+test "rank1254: default JWT validator honors a configured JWKS endpoint"
+  lang java
+  profile api
+  file DefaultJwtValidator.java
+  reject VYQL-AUTH-108
+  code
+  ```
+  package org.apache.kafka.common.security.oauthbearer;
+
+  import org.apache.kafka.common.config.SaslConfigs;
+  import org.apache.kafka.common.security.oauthbearer.internals.secured.ConfigurationUtils;
+
+  import java.util.List;
+  import java.util.Map;
+  import java.util.Optional;
+  import javax.security.auth.login.AppConfigurationEntry;
+
+  public class DefaultJwtValidator implements JwtValidator {
+
+      private final Optional<CloseableVerificationKeyResolver> verificationKeyResolver;
+
+      private JwtValidator delegate;
+
+      public DefaultJwtValidator() {
+          this.verificationKeyResolver = Optional.empty();
+      }
+
+      public DefaultJwtValidator(CloseableVerificationKeyResolver verificationKeyResolver) {
+          this.verificationKeyResolver = Optional.of(verificationKeyResolver);
+      }
+
+      @Override
+      public void configure(Map<String, ?> configs, String saslMechanism, List<AppConfigurationEntry> jaasConfigEntries) {
+          if (verificationKeyResolver.isPresent()) {
+              delegate = new BrokerJwtValidator(verificationKeyResolver.get());
+          } else {
+              ConfigurationUtils cu = new ConfigurationUtils(configs, saslMechanism);
+
+              if (cu.containsKey(SaslConfigs.SASL_OAUTHBEARER_JWKS_ENDPOINT_URL)) {
+                  delegate = new BrokerJwtValidator();
+              } else {
+                  delegate = new ClientJwtValidator();
+              }
+          }
+
+          delegate.configure(configs, saslMechanism, jaasConfigEntries);
+      }
+
+      @Override
+      public OAuthBearerToken validate(String accessToken) throws JwtValidatorException {
+          return delegate.validate(accessToken);
+      }
+  }
+  ```

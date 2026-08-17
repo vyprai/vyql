@@ -2696,3 +2696,19 @@ binding argumentFileExpansionControl466 {
     }
   }
 }
+
+// A JwtValidator's own configure() picking ClientJwtValidator (Kafka's own
+// class, documented as doing "rudimentary validation" of the payload -- no
+// signature check at all, per its own class Javadoc) as the delegate that
+// will run the actual token validation, without an accompanying check for a
+// configured JWKS/verification-key source in the same branch, is the general
+// shape of a validator whose signature-checking half never runs: whatever
+// caller reads its own field's default state is left decoding an unverified
+// JWT. Requiring the branch to be free of any "containsKey"/"contains" probe
+// of the configuration keeps this from firing once that check is present,
+// since the check is exactly what turns "always unverified" into
+// "unverified only when nothing else can verify it".
+binding jwtSignatureCheckDroppedByDelegateSelection467 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "configure" and node.context.call contains "ClientJwtValidator" and not (node.context.call contains "containsKey") and not (node.context.call contains "contains")
+  emit issue code.UnverifiedJwt at node
+}
