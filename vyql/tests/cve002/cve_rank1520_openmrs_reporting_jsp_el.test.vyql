@@ -1,0 +1,72 @@
+# Rank 1520 / CVE-2017-7990: OpenMRS' reporting module interpolated
+# report metadata straight into markup with raw JSP EL, so a report
+# name or description carrying markup executed in an administrator's
+# browser (cross-site scripting, CWE-79; RA-452; the task list's
+# commit? flag resolves COMMIT_OK -- the merge is the patch). The
+# portlet omod/src/main/webapp/portlets/baseMetadata.jsp rendered
+# `value="${model.obj.name}"` and
+# `<textarea ...>${model.obj.description}</textarea>`, and
+# omod/src/main/webapp/reports/manageReports.jsp rendered
+# `${reportDefinition.creator}` plus a `javascript:confirmDelete(
+# '${reportDefinition.name}', ...)` link -- all raw EL into HTML or a
+# javascript: URL. Pool commit 079977276f is the real fix (merge of
+# RA-452 "Patch XSS in reporting"): every value interpolation is
+# wrapped in JSTL's escaping tag `<c:out value='...'/>`, and the
+# javascript:-URL name additionally passes through OpenMRS'
+# openmrs:getSafeJsString helper. No pool correction.
+#
+# CAUGHT by VYQL-INJ-004. The jsp path of the XSS rule covers the
+# shape end to end: raw `${...}` EL in markup is the HtmlRender sink
+# and <c:out> is the credited escaping control. Measured on the real
+# code: at the fix parent the two files carry 11 INJ-004 HIGH rows --
+# baseMetadata.jsp at :38 :45 :50 :93 and manageReports.jsp at :22
+# :38 :57 :60 :73 :85 -- and at the fix the patched lines clear
+# exactly: baseMetadata.jsp:45 (the value="${model.obj.name}" input)
+# and manageReports.jsp:85 (the javascript:confirmDelete link) are
+# gone, while the nine other rows persist on sites the patch did not
+# touch (e.g. fix :87's `href="...runReport.form?reportId=${
+# reportDefinition.uuid}"`), so the rule discriminates the escaped
+# form from the raw one in the real files. No definition change
+# shipped, no benchmark impact. Spec cve_rank1520 records the raw EL
+# input expecting VYQL-INJ-004 and the c:out-wrapped form rejecting
+# it.
+
+test "rank1520: report metadata renders through raw el"
+  lang java
+  file omod/src/main/webapp/portlets/baseMetadata.jsp
+  expect VYQL-INJ-004
+  code
+  ```
+  <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+  <%@ taglib prefix="openmrs" uri="/openmrs" %>
+
+  <form method="post">
+      <input type="text" id="name" tabindex="1" name="name" value="${model.obj.name}" size="50"/>
+
+      <textarea id="description" cols="80" rows="10" tabindex="2" name="description">${model.obj.description}</textarea>
+
+      <a href="javascript:confirmDelete('${reportDefinition.name}','${reportDefinition.uuid}');">
+          <img src="<c:url value='/images/trash.gif'/>" border="0"/>
+      </a>
+  </form>
+  ```
+
+test "rank1520: the fix escapes every interpolation"
+  lang java
+  file omod/src/main/webapp/portlets/baseMetadata.jsp
+  reject VYQL-INJ-004
+  code
+  ```
+  <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+  <%@ taglib prefix="openmrs" uri="/openmrs" %>
+
+  <form method="post">
+      <input type="text" id="name" tabindex="1" name="name" value="<c:out value='${model.obj.name}' />" size="50"/>
+
+      <textarea id="description" cols="80" rows="10" tabindex="2" name="description"><c:out value='${model.obj.description}' /></textarea>
+
+      <a href="javascript:confirmDelete('<c:out value="${openmrs:getSafeJsString(reportDefinition.name)}" />','${reportDefinition.uuid}');">
+          <img src="<c:url value='/images/trash.gif'/>" border="0"/>
+      </a>
+  </form>
+  ```
