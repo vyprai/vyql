@@ -1,0 +1,472 @@
+# Rank 1372 / CVE-2026-46519 (GHSA-cr22-wjx7-2w6m, CWE-863):
+# Flux159/mcp-server-kubernetes exposes kubectl and helm operations to an LLM over
+# MCP, and documents three server-side restrictions on which of those operations a
+# client may reach: ALLOWED_TOOLS (a comma-separated allowlist),
+# ALLOW_ONLY_READONLY_TOOLS, and ALLOW_ONLY_NON_DESTRUCTIVE_TOOLS. All three were
+# applied in exactly one place -- the `ListToolsRequestSchema` handler, which
+# computes the catalogue the server *advertises*:
+#
+#   server.setRequestHandler(ListToolsRequestSchema, async () => {
+#     let tools;
+#     if (allowedToolsEnv) { ... tools = allTools.filter(...) }
+#     else if (allowOnlyReadonlyTools) { tools = readonlyTools; }
+#     else if (nonDestructiveTools) { tools = allTools.filter(...) }
+#     else { tools = allTools; }
+#     return { tools };
+#   });
+#
+# `tools/list` is advertisement, not authorization: MCP places no constraint on
+# what tool name a `tools/call` request may carry, and the client is the untrusted
+# side. The `CallToolRequestSchema` handler destructured `request.params` and
+# dispatched straight into the Kubernetes operation --
+#
+#   const { name, arguments: input = {} } = request.params;
+#   if (name === "kubectl_context") { return await kubectlContext(k8sManager, input); }
+#   ...
+#   if (name === "kubectl_delete") { return await kubectlDelete(k8sManager, input); }
+#
+# -- with no reference to any of the three restrictions. A client that knew or
+# guessed a withheld tool's name invoked it, so a server started with
+# ALLOW_ONLY_READONLY_TOOLS=true still served kubectl_delete, kubectl_generic,
+# helm uninstall, cleanup and node drain. The weakness is not a missing check: the
+# check exists, and is enforced at the wrong layer -- catalogue enumeration
+# instead of dispatch.
+#
+# 461b50c5beff2fbcba79e07f3ecb95746b82a093 ("Enforce tool restrictions at
+# tools/call layer") centralizes all three into one predicate and gates the call
+# handler with it:
+#
+#   const isToolAllowed = (name: string): boolean => {
+#     if (explicitlyAllowedToolNames) { return explicitlyAllowedToolNames.has(name); }
+#     if (allowOnlyReadonlyTools) { return readonlyTools.some((t) => t.name === name); }
+#     if (nonDestructiveTools) { return !destructiveTools.some((dt) => dt.name === name); }
+#     return true;
+#   };
+#   ...
+#   if (!isToolAllowed(name)) {
+#     throw new McpError(ErrorCode.InvalidRequest, `Tool '${name}' is not allowed ...`);
+#   }
+#
+# The pool row's metadata flag is `COMMIT_NONE` -- the advisory names no commit --
+# but the row's commit is the real fix (41 changed lines in src/index.ts plus a
+# call-time integration test), the repository matches, and the vulnerable
+# construct is present at its parent, 74cd11c. No corpus correction.
+#
+# Vocabulary was checked for reuse before anything was written.
+# code.LlmToolRegistrationMissingAuthorization (VYQL-AUTH-112) is a tool
+# *registry* with no caller-privilege check, not a restriction enforced at the
+# wrong layer; code.McpToolSchemaSecretParameter and
+# code.McpToolCommandTemplateExecution are different weaknesses on the same
+# surface; core.AllowlistValidation neutralises only command injection and SSRF
+# and widening it was refused at ranks 1046, 1051 and 1216. No rule ID or concept
+# is minted here, because nothing discriminating can be built on top of one --
+# see below.
+#
+# What fires today. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over
+# the vulnerable checkout reports 42 findings and 1 flag; nothing addresses this
+# weakness. Nine of the 42 do read src/index.ts:212 -- `request.params` is already
+# labelled code.HttpInput -- but every one of them is tool-*argument* taint
+# (VYQL-DESER-001 into kubectl-get.ts:504, VYQL-INJ-013 into the secret-masking
+# walker, VYQL-INJ-009 into log formatting) reported in the tool implementations,
+# not the tool *name* reaching a dispatch it was not authorized for. The single
+# flag is code.ResourceReview on child_process.spawn in port_forward.ts. Findings
+# land in source; the repository ships no built dist/.
+#
+# ATTENTION, engine gap: JavaScript has no cross-procedural view of a
+# neutralising control, and no scope between a function body and whole-module
+# text. Three separate things were measured, each against both revisions of the
+# real src/index.ts with `-flags only`, emitting code.RequestScopePolicyReview
+# (CWE_863, the nearest existing vehicle) from a throwaway javascript binding.
+#
+# 1. The handler cannot be identified as the tools/call handler. A lambda passed
+#    as a call argument gets `call_method:<enclosing method>` in its function
+#    context, so in a stripped repro the handler carries
+#    `call_method:setRequestHandler`. In the real file the handler is wrapped --
+#    `server.setRequestHandler(CallToolRequestSchema, withTelemetry(async (request) => {...}))`
+#    -- and its only enclosing-call fact is `call_method:withTelemetry`, a
+#    project-local middleware name. Keying on `call_method:setRequestHandler`
+#    reports one flag on the real file, at index.ts:186 -- the tools/*list*
+#    handler, which is unwrapped -- and nothing at the vulnerable handler. Which
+#    schema a handler is registered for is a call argument, and per rank 1360 the
+#    JavaScript frontend emits no call-argument tokens at all.
+#
+# 2. Function scope cannot see the fix. Dumping `str_args` of the
+#    `analysis.function.context` node for the tools/call handler on both
+#    revisions and diffing them, the *entire* difference is four tokens:
+#    `call:isToolAllowed`, `call_path:isToolAllowed`, `identifier:isToolAllowed`
+#    and the literal of the rejection message. Every fact about the decision
+#    itself -- the Set membership test, the readonly and destructive list
+#    lookups, the env reads -- is in a sibling arrow function and in module
+#    scope, invisible from the handler. So:
+#      node.scope == "function" and node.context.selector contains "request.params"
+#      and node.context.identifier == "name"
+#      and not (containsAny(node.context.callPath, [".has", ".includes", ".some", ".indexOf", ".find"]))
+#    reports 1 flag on the vulnerable revision (index.ts:207) and 1 flag on the
+#    fixed revision (index.ts:211) -- the same handler, identical output, no
+#    discrimination. Adding "Allowed"/"allowed"/"authorize"/"permit" to the
+#    negation does drop the fixed revision to zero, but that is a substring of
+#    the fixing commit's own predicate name: a fix reading
+#    `if (!withinConfiguredToolSet(name))` scores as unpatched, which is the
+#    failure ranks 1364 and the four-variant measurement there already recorded.
+#
+# 3. Function scope also cannot see that a restriction exists at all, which is
+#    what makes the finding a finding. An MCP server with no tool-restriction
+#    feature has nothing to bypass, and its tools/call handler is *correctly*
+#    ungated -- but the two are indistinguishable, because the env reads and the
+#    filtered catalogue live in module scope. The variant in (2) reports 5 flags
+#    of its own over the whole repository (the scan totals 6; the sixth is the
+#    pre-existing code.ResourceReview on port_forward.ts): the true one at
+#    src/index.ts:207 plus src/prompts/index.ts:32 (the prompts/get handler,
+#    which has no allowlist because prompts are not restricted at all),
+#    src/prompts/index.ts:5 (registerPromptHandlers, the exported wrapper that
+#    merely contains that handler -- a function context inherits its nested
+#    functions' tokens, so one handler is charged twice) and tests/sse.test.ts:80
+#    and :103, both inside test fixtures. One true, four false, on the
+#    repository the CVE is in. Over modelcontextprotocol/servers (65 JavaScript
+#    and TypeScript files, 14 Python) it reports 0, but that is not evidence of
+#    precision: those servers use the SDK's high-level `server.registerTool(name,
+#    config, handler)` form, one handler per tool, so they have no central
+#    `tools/call` dispatch function for a binding to sit on at all. The corpus
+#    that would show the cost is low-level `setRequestHandler` servers, and this
+#    repository is the one of those measured -- 1 true, 4 false. Narrowing the
+#    positive further to the `name === "..."` if-chain (the real handler mixes an
+#    if-chain and a trailing `switch (name)`) would be matching one codebase's
+#    dispatch style rather than the weakness.
+#
+# Module scope, the only scope that holds both halves, cannot discriminate
+# either, and not merely because whole-file facts combine by co-membership. Both
+# revisions' module contexts carry `call_path:destructiveTools.some` and a
+# `.includes`/`.filter` membership test over tool names -- the vulnerable one
+# because the tools/list handler tests `allowedToolNames.includes(tool.name)`.
+# The semantic difference is *which value* is tested: the vulnerable module only
+# ever compares a catalogue element against another catalogue element
+# (`expr:dt.name===tool.name`), while the fix compares catalogue elements against
+# the requested scalar (`expr:t.name===name`, `expr:dt.name===name`) and, on its
+# primary branch, calls `explicitlyAllowedToolNames.has(name)` -- a Set lookup
+# that emits no `expr:` token and, again per rank 1360, no call-argument token.
+# Measured:
+#   node.scope == "module" and node.context.identifier == "CallToolRequestSchema"
+#   and node.context.identifier == "ListToolsRequestSchema"
+#   and node.context.call == "setRequestHandler"
+# matches both revisions (1 flag each at index.ts:1); adding the membership-test
+# negation takes both to 0. Identical either way.
+#
+# Behaviour a shippable fact needs, in order of how much it unblocks:
+#  a. JavaScript call-argument tokens (rank 1360's gap, `jsStructuredContextTokens`
+#     in internal/extract/frontend/treesitter/javascript.go), so that a handler
+#     lambda can be identified by the request schema it is registered for and a
+#     membership test can be attributed to the value it tests.
+#  b. The structured context tokens of an intra-file resolved callee attributed,
+#     one hop and bounded, to the calling function's context -- the same
+#     behaviour rank 1364 needed for Rust, and here strictly narrower: unlike
+#     that Rust case the hop already resolves. `vyql query -call isToolAllowed`
+#     over the fixed file returns both call sites (index.ts:205 and :218) and
+#     neither appears in `vyql resolve`'s unresolved list, so the callee body is
+#     reachable; what is missing is only that its facts are not attributed to the
+#     caller's `analysis.function.context`, which is where a binding reads them.
+# Only with both does "the restriction the tools/list handler applies is not
+# applied by the tools/call handler" become expressible without naming this
+# fix's predicate.
+#
+# The four cases below are the minimal pair, all four rejected today. They differ
+# only in where the allowlist decision sits: absent, delegated to a sibling
+# predicate, written inline in the handler, and absent-but-correct because the
+# server has no restriction to enforce. The delegated form is what the fix
+# shipped, and the fourth is the false positive any function-scoped shape buys.
+#
+# verify_current_expected: attention-engine-gap, all four forms rejected.
+
+test "rank1372: an MCP tools/call handler dispatches a client-named tool with the configured tool restriction applied only to tools/list"
+  lang javascript
+  file src/index.ts
+  reject_review code.RequestScopePolicyReview
+  code
+  ```
+  const allowOnlyReadonlyTools = process.env.ALLOW_ONLY_READONLY_TOOLS === "true";
+  const allowedToolsEnv = process.env.ALLOWED_TOOLS;
+  const nonDestructiveTools =
+    process.env.ALLOW_ONLY_NON_DESTRUCTIVE_TOOLS === "true";
+
+  const readonlyTools = [kubectlGetSchema, kubectlDescribeSchema, kubectlLogsSchema];
+  const destructiveTools = [kubectlDeleteSchema, uninstallHelmChartSchema, cleanupSchema];
+  const allTools = [
+    kubectlGetSchema,
+    kubectlDescribeSchema,
+    kubectlLogsSchema,
+    kubectlDeleteSchema,
+    uninstallHelmChartSchema,
+    cleanupSchema,
+  ];
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    let tools;
+
+    if (allowedToolsEnv) {
+      const allowedToolNames = allowedToolsEnv.split(",").map((t) => t.trim());
+      tools = allTools.filter((tool) => allowedToolNames.includes(tool.name));
+    } else if (allowOnlyReadonlyTools) {
+      tools = readonlyTools;
+    } else if (nonDestructiveTools) {
+      tools = allTools.filter(
+        (tool) => !destructiveTools.some((dt) => dt.name === tool.name)
+      );
+    } else {
+      tools = allTools;
+    }
+
+    return { tools };
+  });
+
+  server.setRequestHandler(
+    CallToolRequestSchema,
+    withTelemetry(async (request: {
+      params: { name: string; _meta?: any; arguments?: Record<string, any> };
+      method: string;
+    }) => {
+      try {
+        const { name, arguments: input = {} } = request.params;
+
+        if (name === "kubectl_get") {
+          return await kubectlGet(k8sManager, input as { resourceType: string });
+        }
+
+        if (name === "kubectl_describe") {
+          return await kubectlDescribe(k8sManager, input as { resourceType: string });
+        }
+
+        if (name === "kubectl_delete") {
+          return await kubectlDelete(k8sManager, input as { resourceType: string });
+        }
+
+        if (name === "uninstall_helm_chart") {
+          return await uninstallHelmChart(input as { name: string; namespace: string });
+        }
+
+        switch (name) {
+          case "cleanup": {
+            await k8sManager.cleanup();
+            return { content: [{ type: "text", text: "cleaned up" }] };
+          }
+
+          default:
+            throw new McpError(ErrorCode.InvalidRequest, `Unknown tool: ${name}`);
+        }
+      } catch (error) {
+        if (error instanceof McpError) throw error;
+        throw new McpError(ErrorCode.InternalError, `Tool execution failed: ${error}`);
+      }
+    })
+  );
+  ```
+
+test "rank1372: the same handler gated by a tool allowlist predicate factored into a sibling function"
+  lang javascript
+  file src/index.ts
+  reject_review code.RequestScopePolicyReview
+  code
+  ```
+  const allowOnlyReadonlyTools = process.env.ALLOW_ONLY_READONLY_TOOLS === "true";
+  const allowedToolsEnv = process.env.ALLOWED_TOOLS;
+  const nonDestructiveTools =
+    process.env.ALLOW_ONLY_NON_DESTRUCTIVE_TOOLS === "true";
+
+  const explicitlyAllowedToolNames = allowedToolsEnv
+    ? new Set(allowedToolsEnv.split(",").map((t) => t.trim()).filter(Boolean))
+    : null;
+
+  const isToolAllowed = (name: string): boolean => {
+    if (explicitlyAllowedToolNames) {
+      return explicitlyAllowedToolNames.has(name);
+    }
+    if (allowOnlyReadonlyTools) {
+      return readonlyTools.some((t) => t.name === name);
+    }
+    if (nonDestructiveTools) {
+      return !destructiveTools.some((dt) => dt.name === name);
+    }
+    return true;
+  };
+
+  const readonlyTools = [kubectlGetSchema, kubectlDescribeSchema, kubectlLogsSchema];
+  const destructiveTools = [kubectlDeleteSchema, uninstallHelmChartSchema, cleanupSchema];
+  const allTools = [
+    kubectlGetSchema,
+    kubectlDescribeSchema,
+    kubectlLogsSchema,
+    kubectlDeleteSchema,
+    uninstallHelmChartSchema,
+    cleanupSchema,
+  ];
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    const baseTools = allowOnlyReadonlyTools ? readonlyTools : allTools;
+    const tools = baseTools.filter((tool) => isToolAllowed(tool.name));
+    return { tools };
+  });
+
+  server.setRequestHandler(
+    CallToolRequestSchema,
+    withTelemetry(async (request: {
+      params: { name: string; _meta?: any; arguments?: Record<string, any> };
+      method: string;
+    }) => {
+      try {
+        const { name, arguments: input = {} } = request.params;
+
+        if (!isToolAllowed(name)) {
+          throw new McpError(
+            ErrorCode.InvalidRequest,
+            `Tool '${name}' is not allowed under the current server configuration`
+          );
+        }
+
+        if (name === "kubectl_get") {
+          return await kubectlGet(k8sManager, input as { resourceType: string });
+        }
+
+        if (name === "kubectl_describe") {
+          return await kubectlDescribe(k8sManager, input as { resourceType: string });
+        }
+
+        if (name === "kubectl_delete") {
+          return await kubectlDelete(k8sManager, input as { resourceType: string });
+        }
+
+        if (name === "uninstall_helm_chart") {
+          return await uninstallHelmChart(input as { name: string; namespace: string });
+        }
+
+        switch (name) {
+          case "cleanup": {
+            await k8sManager.cleanup();
+            return { content: [{ type: "text", text: "cleaned up" }] };
+          }
+
+          default:
+            throw new McpError(ErrorCode.InvalidRequest, `Unknown tool: ${name}`);
+        }
+      } catch (error) {
+        if (error instanceof McpError) throw error;
+        throw new McpError(ErrorCode.InternalError, `Tool execution failed: ${error}`);
+      }
+    })
+  );
+  ```
+
+test "rank1372: the same allowlist decision written inline in the tools/call handler"
+  lang javascript
+  file src/index.ts
+  reject_review code.RequestScopePolicyReview
+  code
+  ```
+  const allowOnlyReadonlyTools = process.env.ALLOW_ONLY_READONLY_TOOLS === "true";
+  const allowedToolsEnv = process.env.ALLOWED_TOOLS;
+
+  const readonlyTools = [kubectlGetSchema, kubectlDescribeSchema, kubectlLogsSchema];
+  const allTools = [
+    kubectlGetSchema,
+    kubectlDescribeSchema,
+    kubectlLogsSchema,
+    kubectlDeleteSchema,
+    uninstallHelmChartSchema,
+    cleanupSchema,
+  ];
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    const tools = allowOnlyReadonlyTools ? readonlyTools : allTools;
+    return { tools };
+  });
+
+  server.setRequestHandler(
+    CallToolRequestSchema,
+    withTelemetry(async (request: {
+      params: { name: string; _meta?: any; arguments?: Record<string, any> };
+      method: string;
+    }) => {
+      try {
+        const { name, arguments: input = {} } = request.params;
+
+        if (allowedToolsEnv) {
+          const allowedToolNames = allowedToolsEnv.split(",").map((t) => t.trim());
+          if (!allowedToolNames.includes(name)) {
+            throw new McpError(
+              ErrorCode.InvalidRequest,
+              `Tool '${name}' is not allowed under the current server configuration`
+            );
+          }
+        } else if (allowOnlyReadonlyTools && !readonlyTools.some((t) => t.name === name)) {
+          throw new McpError(
+            ErrorCode.InvalidRequest,
+            `Tool '${name}' is not allowed under the current server configuration`
+          );
+        }
+
+        if (name === "kubectl_get") {
+          return await kubectlGet(k8sManager, input as { resourceType: string });
+        }
+
+        if (name === "kubectl_delete") {
+          return await kubectlDelete(k8sManager, input as { resourceType: string });
+        }
+
+        switch (name) {
+          case "cleanup": {
+            await k8sManager.cleanup();
+            return { content: [{ type: "text", text: "cleaned up" }] };
+          }
+
+          default:
+            throw new McpError(ErrorCode.InvalidRequest, `Unknown tool: ${name}`);
+        }
+      } catch (error) {
+        if (error instanceof McpError) throw error;
+        throw new McpError(ErrorCode.InternalError, `Tool execution failed: ${error}`);
+      }
+    })
+  );
+  ```
+
+test "rank1372: an MCP server with no tool restriction to enforce dispatches the tools it advertises"
+  lang javascript
+  file src/prompts/index.ts
+  reject_review code.RequestScopePolicyReview
+  code
+  ```
+  const allTools = [kubectlGetSchema, kubectlDescribeSchema, kubectlLogsSchema];
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    return { tools: allTools };
+  });
+
+  server.setRequestHandler(
+    CallToolRequestSchema,
+    withTelemetry(async (request: {
+      params: { name: string; _meta?: any; arguments?: Record<string, any> };
+      method: string;
+    }) => {
+      try {
+        const { name, arguments: input = {} } = request.params;
+
+        if (name === "kubectl_get") {
+          return await kubectlGet(k8sManager, input as { resourceType: string });
+        }
+
+        if (name === "kubectl_describe") {
+          return await kubectlDescribe(k8sManager, input as { resourceType: string });
+        }
+
+        switch (name) {
+          case "kubectl_logs": {
+            return await kubectlLogs(k8sManager, input as { resourceType: string });
+          }
+
+          default:
+            throw new McpError(ErrorCode.InvalidRequest, `Unknown tool: ${name}`);
+        }
+      } catch (error) {
+        if (error instanceof McpError) throw error;
+        throw new McpError(ErrorCode.InternalError, `Tool execution failed: ${error}`);
+      }
+    })
+  );
+  ```
