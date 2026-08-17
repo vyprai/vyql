@@ -1,0 +1,99 @@
+# Rank 1547 / CVE-2021-38383: OwnTone's net_bind() read its bound
+# address out of the addrinfo chain after the sockets built from it
+# were finished with the chain's storage, so a crafted service
+# configuration could make the port/address read touch freed memory
+# (use-after-free, CWE-416; reported by Ba Jinsheng). The tail of
+# net_bind() in src/misc.c did `ret = getsockname(fd, ptr->ai_addr,
+# &ptr->ai_addrlen);` and then `net_port_get(port, (union
+# net_sockaddr *)ptr->ai_addr); net_address_get(addr, sizeof(addr),
+# (union net_sockaddr *)ptr->ai_addr);` -- writing through and
+# reading from the addrinfo's own address storage on a path where
+# the chain's lifetime is the caller's, not the function's. Pool
+# commit 246d8ae0ce is the real fix (COMMIT_OK -- "[misc] Fix
+# use-after-free in net_bind()"): getsockname writes into a local
+# `union net_sockaddr naddr = { 0 }` with its own `socklen_t
+# naddr_len`, an over-long result is rejected (`else if (naddr_len >
+# sizeof(naddr)) goto error`), and the port/address readers take
+# &naddr -- no addrinfo dereference survives the bind. No pool
+# correction.
+#
+# ATTENTION, free-then-use lifetime. The freed storage belongs to
+# the getaddrinfo chain the caller owns -- the dereference is legal
+# by shape and fatal by lifetime, and no observation connects a
+# freeaddrinfo (or the chain's scope exit) to the later member
+# reads: that is cross-statement lifetime vocabulary the corpus's
+# memory rules do not carry (they label the deref, not its
+# relation to the storage's end). Recorded as an ENGINE-GAPS.md
+# Medium row (free-then-use over caller-owned storage), Blocks
+# 1547. A binding on owntone's own net_bind would detect this
+# server rather than the weakness. Measured on the real code:
+# scanning src/misc.c reports 56 findings at both revisions (9 at
+# high; none change with the fix). No definition change shipped.
+# Spec cve_rank1547 records the addrinfo-dereferencing tail and the
+# local-copy form, both asserting reject VYQL-MEM-006: when
+# lifetime vocabulary lands, the dereferencing form must flip to
+# expect.
+
+test "rank1547: the bound address is read through the addrinfo"
+  lang c
+  file src/misc.c
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <sys/socket.h>
+  #include <netdb.h>
+
+  typedef union net_sockaddr { struct sockaddr sa; } net_sockaddr_t;
+
+  int getsockname(int fd, struct sockaddr *addr, socklen_t *len);
+  void net_port_get(int *port, net_sockaddr_t *sa);
+  void net_address_get(char *addr, int size, net_sockaddr_t *sa);
+
+  int net_bind(int fd, struct addrinfo *ptr, int *port, char *addr)
+  {
+      int ret;
+
+      // Get the port that was assigned
+      ret = getsockname(fd, ptr->ai_addr, &ptr->ai_addrlen);
+      if (ret < 0)
+          return -1;
+
+      net_port_get(port, (net_sockaddr_t *)ptr->ai_addr);
+      net_address_get(addr, sizeof(char[50]), (net_sockaddr_t *)ptr->ai_addr);
+      return 0;
+  }
+  ```
+
+test "rank1547: the fix reads the address from a local copy"
+  lang c
+  file src/misc.c
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <sys/socket.h>
+  #include <netdb.h>
+
+  typedef union net_sockaddr { struct sockaddr sa; } net_sockaddr_t;
+
+  int getsockname(int fd, struct sockaddr *addr, socklen_t *len);
+  void net_port_get(int *port, net_sockaddr_t *sa);
+  void net_address_get(char *addr, int size, net_sockaddr_t *sa);
+
+  int net_bind(int fd, struct addrinfo *ptr, int *port, char *addr)
+  {
+      int ret;
+      union net_sockaddr naddr = { 0 };
+      socklen_t naddr_len = sizeof(naddr);
+
+      // Get our address (as string) and the port that was assigned
+      ret = getsockname(fd, &naddr.sa, &naddr_len);
+      if (ret < 0)
+          return -1;
+      else if (naddr_len > sizeof(naddr))
+          return -1;
+
+      net_port_get(port, &naddr);
+      net_address_get(addr, sizeof(char[50]), &naddr);
+      return 0;
+  }
+  ```
