@@ -1,0 +1,53 @@
+module bindings.python.redis_client_reads;
+
+// redis-py's documented entry points all hand back a client object:
+// `Redis(...)`, its `StrictRedis` alias, `RedisCluster(...)`, the
+// `from_url(...)` helpers, and the `redis.asyncio` mirrors of each. Recording
+// the returned type lets a read on that client be recognised by receiver type
+// rather than by method name -- `get`, `mget`, `lrange` and friends are far too
+// common as bare method names (dict, os.environ, a mapping wrapper) to label on
+// the name alone.
+//
+// A value a Redis command returns is data some other writer put in the store,
+// not a value this program computed, so every read command is a
+// `code.StoredDataRead` source -- the same treatment object stores, key/value
+// caches and shelve-style stores already get. Redis is routinely the channel
+// between an administrative front end and a background worker, which is exactly
+// how a value that looks like configuration arrives at a template compiler, a
+// shell command or a query.
+//
+// Only the commands that return caller-written payload are sources. The
+// commands that return the store's own bookkeeping (`exists`, `ttl`, `dbsize`,
+// `scan` cursors) carry nothing an outside writer chose, so they are not.
+
+binding redisClientReceiverType {
+  query pattern callExpr where callee.path in ["redis.Redis", "redis.StrictRedis", "redis.RedisCluster", "redis.from_url", "redis.Redis.from_url", "redis.StrictRedis.from_url", "redis.RedisCluster.from_url", "redis.client.Redis", "redis.client.StrictRedis", "redis.cluster.RedisCluster", "redis.asyncio.Redis", "redis.asyncio.StrictRedis", "redis.asyncio.RedisCluster", "redis.asyncio.from_url", "redis.asyncio.client.Redis", "redis.asyncio.cluster.RedisCluster"]
+  emit fact runtime.ReceiverType at call.result {
+    about: redis.Redis
+  }
+}
+
+binding redisStringReadStoredData {
+  query pattern callExpr where callee.method in ["get", "getdel", "getex", "getrange", "getset", "mget", "substr"] and callee.receiver.type == "redis.Redis"
+  emit source code.StoredDataRead at call.result
+}
+
+binding redisHashReadStoredData {
+  query pattern callExpr where callee.method in ["hget", "hmget", "hgetall", "hvals", "hrandfield"] and callee.receiver.type == "redis.Redis"
+  emit source code.StoredDataRead at call.result
+}
+
+binding redisListReadStoredData {
+  query pattern callExpr where callee.method in ["lindex", "lrange", "lpop", "rpop", "blpop", "brpop", "lmpop", "rpoplpush"] and callee.receiver.type == "redis.Redis"
+  emit source code.StoredDataRead at call.result
+}
+
+binding redisSetReadStoredData {
+  query pattern callExpr where callee.method in ["smembers", "srandmember", "spop", "sunion", "sinter", "sdiff"] and callee.receiver.type == "redis.Redis"
+  emit source code.StoredDataRead at call.result
+}
+
+binding redisSortedSetReadStoredData {
+  query pattern callExpr where callee.method in ["zrange", "zrevrange", "zrangebyscore", "zrevrangebyscore", "zrangebylex", "zpopmin", "zpopmax", "zrandmember"] and callee.receiver.type == "redis.Redis"
+  emit source code.StoredDataRead at call.result
+}
