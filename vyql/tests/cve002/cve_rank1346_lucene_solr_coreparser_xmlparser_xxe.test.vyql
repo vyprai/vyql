@@ -1,0 +1,254 @@
+# Rank 1346 / CVE-2017-12629: the CVE bundles two unrelated Solr issues under
+# one id -- an RCE through the RunExecutableListener reachable from the config
+# API, and an XXE in the XML query parser. Pool commit d8000beebf (SOLR-11477,
+# "Disallow resolving of external entities in Lucene queryparser/xml/CoreParser
+# and SolrCoreParser") is the *XXE* half, and that is the half this spec
+# encodes; the RunExecutableListener half is a different commit and a different
+# weakness class (CWE-502/CWE-78), not this one (CWE-611).
+#
+# Step 0, `repo!` flag: the advisory names `apache/lucene` while the pool row
+# says `apache/lucene-solr`. This is a split artefact, not a dependency
+# mislink. `apache/lucene-solr` was the combined Lucene+Solr repository, later
+# split into `apache/lucene` and `apache/solr`, and `apache/lucene` kept the
+# full pre-split history: `gh api repos/apache/lucene-solr/commits/d8000beebf`
+# and `gh api repos/apache/lucene/commits/d8000beebf` both resolve to the same
+# object, d8000beebfb13ba0b6e754f84c760e11592d8d14. The pool row is the better
+# scan target of the two, because the fix touches
+# `solr/core/src/java/org/apache/solr/search/SolrCoreParser.java` as well as
+# `lucene/queryparser/.../CoreParser.java`, and the `solr/` tree exists only in
+# `lucene-solr` -- it moved to `apache/solr` at the split, so a scan of
+# `apache/lucene` can never see half of this fix. No pool row replacement.
+#
+# `CoreParser.parseXML` built a stock JAXP DocumentBuilder and parsed the
+# caller's stream with it:
+#
+#   private static Document parseXML(InputStream pXmlFile) throws ParserException {
+#     DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+#     DocumentBuilder db = dbf.newDocumentBuilder();
+#     return db.parse(pXmlFile);
+#   }
+#
+# A default DocumentBuilderFactory resolves DOCTYPE-declared external entities
+# and external DTDs. Solr's `SolrCoreParser` extends `CoreParser`, and
+# `defType=xmlparser` / `{!xmlparser ...}` routes the request's own query
+# string into `parse()`, so a query carrying
+# `<!DOCTYPE x [<!ENTITY e SYSTEM "file:///etc/passwd">]>` makes the server
+# read local files and fetch attacker-chosen URLs -- CWE-611.
+#
+# The fix hardens the factory before building (`dbf.setValidating(false)` plus
+# `dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)`) and installs
+# an overridable `EntityResolver` on the builder that throws on any external
+# entity (`DISALLOW_EXTERNAL_ENTITY_RESOLVER`); `SolrCoreParser` additionally
+# overrides `getErrorHandler()` to route parse warnings to Solr's log.
+#
+# CAUGHT by VYQL-DESER-004 (code.XmlParserCreate, medium/high-confidence), and
+# this rank separates the revisions on the real checkout. Scanning
+# `lucene/queryparser` plus `SolrCoreParser.java` at d8000beebf^ reports 12
+# findings including `code.XmlParserCreate @ CoreParser.java:137` -- the CVE's
+# own `dbf.newDocumentBuilder()` line -- with both
+# `unless endpoint coveredBy core.XmlHardening` and
+# `unless sameReceiver coveredBy core.XmlHardening` unsatisfied. At d8000beebf
+# that row is gone: binding xmlHardening272 matches `setFeature` with an
+# argument naming FEATURE_SECURE_PROCESSING and covers `sameReceiver` anchored
+# on the callee's receiver, which the fix supplies on the same `dbf` local.
+#
+# Note which control gets the credit, because it is not the one the advisory
+# talks about. `db.setEntityResolver(getEntityResolver())` is this fix's actual
+# XXE defence, and it has no binding in any language: `setEntityResolver` is
+# ambiguous from the JAXP documentation alone -- a resolver can just as easily
+# be installed to *enable* custom entity fetching as to refuse it, so binding
+# it to core.XmlHardening would fail the genericity test. The suppression here
+# rides entirely on the incidental FEATURE_SECURE_PROCESSING call, and it also
+# sits on the wrong object for `sameReceiver` anyway (the builder `db`, not the
+# factory `dbf`).
+#
+# The same scan pair exposed a second thing, unrelated to this CVE and pinned
+# by the last two cases below: `sameReceiver` coverage is matched on the
+# receiver's *identifier text*, scan-wide, with no file or scope qualification.
+# `Engine.sameReceiverGuardReceivers` (internal/engine/engine.go:1295) folds
+# every guard node carrying a concrete `sameReceiver` coverage into one
+# `map[receiverName]bool` cached per control, and `Engine.sameReceiverGuarded`
+# (engine.go:1245) consults it by name whenever the sink's own `recv` node
+# carries no coverage. So one hardening call on a local named `dbf` suppresses
+# every `code.XmlParserCreate` whose receiver is also named `dbf`, anywhere in
+# the scan. That is why the fixed revision reports 7 rather than the 11 the
+# CVE line's removal alone would leave: `DOMUtils.java:195`,
+# `QueryTemplateManager.java:148`, `:173` and `:197` are byte-identical between
+# the two revisions and each calls `dbf.newDocumentBuilder()` on an unhardened
+# factory, yet all four go quiet the moment the fixed `CoreParser` hardens its
+# own `dbf`. Confirmed minimal: two classes in separate packages and separate
+# directories, one hardening a `dbf` and one not, report nothing; renaming the
+# unhardened local restores the finding. Scoping the name fallback is not a
+# mechanical correction -- the map is deliberately unscoped so a factory
+# hardened in an initialiser and used in another method still counts, several
+# languages share the mechanism through core.XmlHardening and every other
+# `same_receiver_guard` control, and narrowing it trades recall for precision
+# on every one of them. Entered in ENGINE-GAPS.md rather than attempted here.
+#
+# verify_current_expected: caught, both real revisions separated
+#
+# Spec only; no definition change. OWASP Java and Python unchanged at +1.00
+# and +0.90.
+
+test "rank1346: CoreParser.parseXML builds a DocumentBuilder from an unhardened factory"
+  lang java
+  file lucene/queryparser/src/java/org/apache/lucene/queryparser/xml/CoreParser.java
+  expect VYQL-DESER-004
+  code
+  ```
+  package org.apache.lucene.queryparser.xml;
+
+  import java.io.InputStream;
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.w3c.dom.Document;
+
+  public class CoreParser {
+
+    private static Document parseXML(InputStream pXmlFile) throws ParserException {
+      DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+      DocumentBuilder db = null;
+      try {
+        db = dbf.newDocumentBuilder();
+      }
+      catch (Exception se) {
+        throw new ParserException("XML Parser configuration error", se);
+      }
+      org.w3c.dom.Document doc = null;
+      try {
+        doc = db.parse(pXmlFile);
+      }
+      catch (Exception se) {
+        throw new ParserException("Error parsing XML stream:" + se, se);
+      }
+      return doc;
+    }
+  }
+  ```
+
+test "rank1346: the fix hardens the factory and refuses external entities on the builder"
+  lang java
+  file lucene/queryparser/src/java/org/apache/lucene/queryparser/xml/CoreParser.java
+  reject VYQL-DESER-004
+  code
+  ```
+  package org.apache.lucene.queryparser.xml;
+
+  import java.io.IOException;
+  import java.io.InputStream;
+  import java.util.Locale;
+  import javax.xml.XMLConstants;
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import javax.xml.parsers.ParserConfigurationException;
+  import org.w3c.dom.Document;
+  import org.xml.sax.EntityResolver;
+  import org.xml.sax.ErrorHandler;
+  import org.xml.sax.InputSource;
+  import org.xml.sax.SAXException;
+
+  public class CoreParser {
+
+    protected EntityResolver getEntityResolver() {
+      return DISALLOW_EXTERNAL_ENTITY_RESOLVER;
+    }
+
+    protected ErrorHandler getErrorHandler() {
+      return null;
+    }
+
+    private Document parseXML(InputStream pXmlFile) throws ParserException {
+      final DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+      dbf.setValidating(false);
+      try {
+        dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      } catch (ParserConfigurationException e) {
+      }
+      final DocumentBuilder db;
+      try {
+        db = dbf.newDocumentBuilder();
+      } catch (Exception se) {
+        throw new ParserException("XML Parser configuration error.", se);
+      }
+      try {
+        db.setEntityResolver(getEntityResolver());
+        db.setErrorHandler(getErrorHandler());
+        return db.parse(pXmlFile);
+      } catch (Exception se) {
+        throw new ParserException("Error parsing XML stream: " + se, se);
+      }
+    }
+
+    public static final EntityResolver DISALLOW_EXTERNAL_ENTITY_RESOLVER =
+        new EntityResolver() {
+          @Override
+          public InputSource resolveEntity(String publicId, String systemId) throws SAXException, IOException {
+            throw new SAXException(String.format(Locale.ENGLISH,
+                "External Entity resolving unsupported:  publicId=\"%s\" systemId=\"%s\"",
+                publicId, systemId));
+          }
+        };
+  }
+  ```
+
+test "rank1346: a hardened factory suppresses an unrelated unhardened one that happens to share its local's name"
+  lang java
+  file lucene/queryparser/src/java/org/apache/lucene/queryparser/xml/DOMUtils.java
+  reject VYQL-DESER-004
+  code
+  ```
+  package org.apache.lucene.queryparser.xml;
+
+  import java.io.InputStream;
+  import javax.xml.XMLConstants;
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.w3c.dom.Document;
+
+  public class DOMUtils {
+
+    public static Document parseHardened(InputStream is) throws Exception {
+      DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+      dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      DocumentBuilder db = dbf.newDocumentBuilder();
+      return db.parse(is);
+    }
+
+    public static Document loadXML(InputStream is) throws Exception {
+      DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+      DocumentBuilder db = dbf.newDocumentBuilder();
+      return db.parse(is);
+    }
+  }
+  ```
+
+test "rank1346: renaming the unhardened factory's local, and nothing else, restores the finding"
+  lang java
+  file lucene/queryparser/src/java/org/apache/lucene/queryparser/xml/DOMUtils.java
+  expect VYQL-DESER-004
+  code
+  ```
+  package org.apache.lucene.queryparser.xml;
+
+  import java.io.InputStream;
+  import javax.xml.XMLConstants;
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.w3c.dom.Document;
+
+  public class DOMUtils {
+
+    public static Document parseHardened(InputStream is) throws Exception {
+      DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+      dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      DocumentBuilder db = dbf.newDocumentBuilder();
+      return db.parse(is);
+    }
+
+    public static Document loadXML(InputStream is) throws Exception {
+      DocumentBuilderFactory plainFactory = DocumentBuilderFactory.newInstance();
+      DocumentBuilder db = plainFactory.newDocumentBuilder();
+      return db.parse(is);
+    }
+  }
+  ```
