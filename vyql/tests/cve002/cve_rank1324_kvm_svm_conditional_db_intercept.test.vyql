@@ -1,0 +1,250 @@
+# Rank 1324 / CVE-2015-8104: KVM's AMD SVM backend intercepted the #DB
+# (debug) exception only while the host had a reason to look at it. init_vmcb()
+# armed PF, UD, MC and AC unconditionally, and DB was left to
+# update_db_bp_intercept(), which armed it only for NMI single-stepping or a
+# host debugger:
+#
+#   clr_exception_intercept(svm, DB_VECTOR);
+#   clr_exception_intercept(svm, BP_VECTOR);
+#   if (svm->nmi_singlestep)
+#     set_exception_intercept(svm, DB_VECTOR);
+#   if (vcpu->guest_debug & KVM_GUESTDBG_ENABLE) {
+#     if (vcpu->guest_debug & (KVM_GUESTDBG_SINGLESTEP | KVM_GUESTDBG_USE_HW_BP))
+#       set_exception_intercept(svm, DB_VECTOR);
+#     ...
+#
+# With the intercept cleared, a #DB raised inside the guest is delivered by the
+# hardware without a VM exit, so a guest that arranges for its own #DB handler
+# to fault again -- a debug register armed on the handler's own stack, or MOV to
+# a %ss-relative operand -- produces an unbroken stream of debug exceptions that
+# never returns control to the host. The vCPU thread stops taking signals and
+# stops being preemptible, hanging the host CPU: a guest-triggerable host
+# denial of service, CWE-835 by way of CWE-400. VMX is unaffected for an
+# unrelated reason -- it does not save DR6 in the VMCS, so it already
+# intercepts #DB always. The fix cbdb967af3 adds
+# `set_exception_intercept(svm, DB_VECTOR)` to init_vmcb() so the intercept is
+# permanent, renames the helper to update_bp_intercept(), and drops the DB arms
+# and the two calls that existed only to re-evaluate them.
+#
+# ATTENTION, precision cost, because the patched form is structurally identical
+# to the vulnerable one and the discriminator is an absent statement. What the
+# fix changes is a *missing* entry in an initialisation list; nothing in the
+# vulnerable code is a dangerous construct on its own. Both revisions still
+# contain `clr_exception_intercept(svm, BP_VECTOR)` followed by a conditional
+# `set_exception_intercept(svm, BP_VECTOR)` -- the exact shape of the bug,
+# correct for #BP because a breakpoint exception cannot re-raise itself -- so
+# any label placed on "an exception intercept is cleared and only conditionally
+# restored" reports the fix as well as the flaw, and the reject block can never
+# pass. Counted in the file itself: 12 set/clr_exception_intercept call sites at
+# the parent of the fix, 10 at the fix, and the two the CVE is about are
+# indistinguishable from the eight that are correct. Keying on the vector
+# instead fails the genericity test outright -- DB_VECTOR is a KVM-internal
+# macro appearing 20 times across arch/x86/kvm at this revision (svm.c 6,
+# x86.c 7, vmx.c 6, emulate.c 1), all correct but one, and vmx.c's uses are
+# correct by construction. Separating them needs the x86 fact that #DB is the
+# one vector whose own handler can re-raise it, which is neither an API
+# property a binding may state nor a combination of concepts a rule may judge.
+#
+# There is no engine gap here: `vyql match` on a faithful repro resolves every
+# call and expands both macros, labelling the `1U << bit` in the two intercept
+# helpers code.IntegerSizeArithmetic and the else-arm assignment
+# code.OwnerFieldClear, and reports `== source == (none)`. There is no taint
+# path to find -- the guest input is an architectural exception, not a value
+# this code reads -- so nothing is stopping short of a sink. `vyql explain`
+# returns "No findings" on both revisions.
+#
+# A bounded real-repository scan (timeout 180, --max-ram 6GB, --cache off) of
+# arch/x86/kvm at the parent of the fix confirms it: 489 findings over 32 C
+# files, of which svm.c carries 8, all code.NullableDeref (lines 1451, 1453,
+# 1458, 2045, 3422, 3423, 3988) plus one code.FieldDerivedIndexAccess at 4154.
+# Nothing fires in init_vmcb (1006-1100), update_db_bp_intercept (1557-1575),
+# db_interception (1660-1689) or enable_nmi_window (3650-3665) on either
+# revision.
+#
+# No definition change attempted. Kernel and driver code is the worst place to
+# ship a broad label, and the only label that would reach this one is one that
+# also reports its own fix.
+#
+# verify_current_expected: attention-precision-cost, both revisions rejected.
+
+test "rank1324: SVM clears the #DB intercept and restores it only for NMI single-step or a host debugger"
+  lang c
+  file arch/x86/kvm/svm.c
+  reject VYQL-DOS-042
+  code
+  ```
+  #include <linux/kvm_host.h>
+
+  #define DB_VECTOR 1
+  #define BP_VECTOR 3
+  #define PF_VECTOR 14
+  #define UD_VECTOR 6
+  #define MC_VECTOR 18
+  #define AC_VECTOR 17
+
+  #define KVM_GUESTDBG_ENABLE     0x00000001
+  #define KVM_GUESTDBG_SINGLESTEP 0x00000002
+  #define KVM_GUESTDBG_USE_SW_BP  0x00010000
+  #define KVM_GUESTDBG_USE_HW_BP  0x00020000
+
+  struct vmcb_control_area { unsigned int intercept_exceptions; };
+  struct vmcb { struct vmcb_control_area control; };
+
+  struct vcpu_svm {
+      struct kvm_vcpu vcpu;
+      struct vmcb *vmcb;
+      int nmi_singlestep;
+  };
+
+  extern struct vcpu_svm *to_svm(struct kvm_vcpu *vcpu);
+  extern void recalc_intercepts(struct vcpu_svm *svm);
+  extern void kvm_queue_exception(struct kvm_vcpu *vcpu, unsigned int nr);
+
+  static inline void set_exception_intercept(struct vcpu_svm *svm, int bit)
+  {
+      struct vmcb *vmcb = svm->vmcb;
+
+      vmcb->control.intercept_exceptions |= (1U << bit);
+      recalc_intercepts(svm);
+  }
+
+  static inline void clr_exception_intercept(struct vcpu_svm *svm, int bit)
+  {
+      struct vmcb *vmcb = svm->vmcb;
+
+      vmcb->control.intercept_exceptions &= ~(1U << bit);
+      recalc_intercepts(svm);
+  }
+
+  static void init_vmcb(struct vcpu_svm *svm)
+  {
+      set_exception_intercept(svm, PF_VECTOR);
+      set_exception_intercept(svm, UD_VECTOR);
+      set_exception_intercept(svm, MC_VECTOR);
+      set_exception_intercept(svm, AC_VECTOR);
+  }
+
+  static void update_db_bp_intercept(struct kvm_vcpu *vcpu)
+  {
+      struct vcpu_svm *svm = to_svm(vcpu);
+
+      clr_exception_intercept(svm, DB_VECTOR);
+      clr_exception_intercept(svm, BP_VECTOR);
+
+      if (svm->nmi_singlestep)
+          set_exception_intercept(svm, DB_VECTOR);
+
+      if (vcpu->guest_debug & KVM_GUESTDBG_ENABLE) {
+          if (vcpu->guest_debug &
+              (KVM_GUESTDBG_SINGLESTEP | KVM_GUESTDBG_USE_HW_BP))
+              set_exception_intercept(svm, DB_VECTOR);
+          if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP)
+              set_exception_intercept(svm, BP_VECTOR);
+      } else
+          vcpu->guest_debug = 0;
+  }
+
+  static int db_interception(struct vcpu_svm *svm)
+  {
+      if (!(svm->vcpu.guest_debug &
+            (KVM_GUESTDBG_SINGLESTEP | KVM_GUESTDBG_USE_HW_BP)) &&
+          !svm->nmi_singlestep) {
+          kvm_queue_exception(&svm->vcpu, DB_VECTOR);
+          return 1;
+      }
+
+      if (svm->nmi_singlestep) {
+          svm->nmi_singlestep = 0;
+          update_db_bp_intercept(&svm->vcpu);
+      }
+
+      return 1;
+  }
+  ```
+
+test "rank1324: the fix arms the #DB intercept in init_vmcb so it is never cleared"
+  lang c
+  file arch/x86/kvm/svm.c
+  reject VYQL-DOS-042
+  code
+  ```
+  #include <linux/kvm_host.h>
+
+  #define DB_VECTOR 1
+  #define BP_VECTOR 3
+  #define PF_VECTOR 14
+  #define UD_VECTOR 6
+  #define MC_VECTOR 18
+  #define AC_VECTOR 17
+
+  #define KVM_GUESTDBG_ENABLE     0x00000001
+  #define KVM_GUESTDBG_SINGLESTEP 0x00000002
+  #define KVM_GUESTDBG_USE_SW_BP  0x00010000
+  #define KVM_GUESTDBG_USE_HW_BP  0x00020000
+
+  struct vmcb_control_area { unsigned int intercept_exceptions; };
+  struct vmcb { struct vmcb_control_area control; };
+
+  struct vcpu_svm {
+      struct kvm_vcpu vcpu;
+      struct vmcb *vmcb;
+      int nmi_singlestep;
+  };
+
+  extern struct vcpu_svm *to_svm(struct kvm_vcpu *vcpu);
+  extern void recalc_intercepts(struct vcpu_svm *svm);
+  extern void kvm_queue_exception(struct kvm_vcpu *vcpu, unsigned int nr);
+
+  static inline void set_exception_intercept(struct vcpu_svm *svm, int bit)
+  {
+      struct vmcb *vmcb = svm->vmcb;
+
+      vmcb->control.intercept_exceptions |= (1U << bit);
+      recalc_intercepts(svm);
+  }
+
+  static inline void clr_exception_intercept(struct vcpu_svm *svm, int bit)
+  {
+      struct vmcb *vmcb = svm->vmcb;
+
+      vmcb->control.intercept_exceptions &= ~(1U << bit);
+      recalc_intercepts(svm);
+  }
+
+  static void init_vmcb(struct vcpu_svm *svm)
+  {
+      set_exception_intercept(svm, PF_VECTOR);
+      set_exception_intercept(svm, UD_VECTOR);
+      set_exception_intercept(svm, MC_VECTOR);
+      set_exception_intercept(svm, AC_VECTOR);
+      set_exception_intercept(svm, DB_VECTOR);
+  }
+
+  static void update_bp_intercept(struct kvm_vcpu *vcpu)
+  {
+      struct vcpu_svm *svm = to_svm(vcpu);
+
+      clr_exception_intercept(svm, BP_VECTOR);
+
+      if (vcpu->guest_debug & KVM_GUESTDBG_ENABLE) {
+          if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP)
+              set_exception_intercept(svm, BP_VECTOR);
+      } else
+          vcpu->guest_debug = 0;
+  }
+
+  static int db_interception(struct vcpu_svm *svm)
+  {
+      if (!(svm->vcpu.guest_debug &
+            (KVM_GUESTDBG_SINGLESTEP | KVM_GUESTDBG_USE_HW_BP)) &&
+          !svm->nmi_singlestep) {
+          kvm_queue_exception(&svm->vcpu, DB_VECTOR);
+          return 1;
+      }
+
+      if (svm->nmi_singlestep)
+          svm->nmi_singlestep = 0;
+
+      return 1;
+  }
+  ```
