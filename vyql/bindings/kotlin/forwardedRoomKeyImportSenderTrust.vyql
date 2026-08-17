@@ -1,0 +1,29 @@
+module bindings.kotlin.forwardedRoomKeyImportSenderTrust;
+
+// An `m.forwarded_room_key` to-device payload is entirely attacker-shaped: the
+// Matrix end-to-end-encryption specification defines it as a key another device
+// volunteers, carrying its own `sender_key` and `sender_claimed_ed25519_key`
+// fields, and states that a client only acts on one when it answers a
+// `m.room_key_request` the client itself sent and comes from a device the client
+// already trusts. The claimed fields are not proof of anything on their own --
+// only the Curve25519 identity key the Olm envelope was actually encrypted under
+// identifies the sender.
+//
+// In the matrix-android-sdk2 crypto module, MXOlmDevice.addInboundGroupSession is
+// the step that commits such a key: it stores the megolm session under the
+// claimed `senderKey` and `keysClaimed`, after which every event that session
+// decrypts is attributed to that identity. OutgoingKeyRequestManager's
+// onRoomKeyForwarded marks the surrounding handler as the forwarded-key path
+// rather than the `m.room_key` path a session's own creator sends.
+//
+// The two store lookups that turn the payload's claims into an authenticated
+// decision are IMXCryptoStore.getOutgoingRoomKeyRequest -- was this key ever
+// requested -- and IMXCryptoStore.deviceWithIdentityKey, which resolves the
+// envelope's identity key to a known device whose verification state can then be
+// consulted. A handler that imports a forwarded megolm session without either one
+// accepts session key material, and the sender identity bound to it, from
+// whichever device the homeserver chooses to deliver (CWE-287, CWE-322).
+binding kotlinForwardedMegolmKeyImportWithoutSenderAuthentication {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "addInboundGroupSession" and containsAny(node.context.scopeCall, ["onRoomKeyForwarded"]) and not (containsAny(node.context.scopeCall, ["getOutgoingRoomKeyRequest", "deviceWithIdentityKey"]))
+  emit issue code.ProtocolStateReview at node
+}
