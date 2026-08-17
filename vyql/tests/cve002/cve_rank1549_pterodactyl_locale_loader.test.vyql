@@ -1,0 +1,96 @@
+# Rank 1549 / CVE-2025-49132: Pterodactyl's locale endpoint fed raw
+# request values into the translation file loader, so a crafted
+# namespace or locale traversed out of the language directory and
+# read arbitrary .php files (path traversal to local file
+# inclusion, CWE-22/CWE-434; fixed quietly as "fix: add additional
+# input validation"). __invoke in app/Http/Controllers/Base/
+# LocaleController.php did `$locales = explode(' ',
+# $request->input('locale') ?? ''); $namespaces = explode(' ',
+# $request->input('namespace') ?? ''); ... $this->loader->load(
+# $locale, str_replace('.', '/', $namespace))` -- the loader reads
+# lang/<locale>/<namespace>.php under the project root, and both path
+# segments arrive unvalidated. Pool commit 24c82b0e33 is the real
+# fix: a LocaleRequest FormRequest gates the endpoint with
+# `['locale' => ['required', 'string', 'regex:/^[a-z][a-z]$/'],
+# 'namespace' => ['required', 'string', 'regex:/^[a-z]{1,191}$/']]`
+# -- character allowlists that make traversal spellings unspellable
+# -- and the controller takes LocaleRequest instead of Request. No
+# pool correction.
+#
+# ATTENTION, framework-loader path injection. The traversal crosses
+# into Laravel's FileLoader, whose arguments become file paths
+# inside the framework -- the same project-API boundary as ranks
+# 1545 (osTicket's ORM lookup) and 1526 (openrefine's config
+# getters): no binding labels a framework loader's load as a
+# FilePathAccess, so the taint from the request stops at the call.
+# Measured on the real code: scanning LocaleController.php reports
+# one VYQL-CRY-001 row (an unrelated weak-hash flag at :43) at both
+# revisions. The fix's control -- regex allowlists in a FormRequest
+# -- is Laravel's own validation vocabulary; crediting request-class
+# rules as guards is the corpus-level piece. No ENGINE-GAPS.md
+# entry. No definition change shipped. Spec cve_rank1549 records the
+# raw loader feed and the validated form, both asserting reject
+# VYQL-PATH-001: when framework-boundary vocabulary lands, the raw
+# form must flip to expect.
+
+test "rank1549: the loader is fed raw request segments"
+  lang php
+  file app/Http/Controllers/Base/LocaleController.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  namespace Pterodactyl\Http\Controllers\Base;
+
+  use Illuminate\Http\Request;
+
+  class LocaleController extends Controller
+  {
+      public function __invoke(Request $request)
+      {
+          $locales = explode(' ', $request->input('locale') ?? '');
+          $namespaces = explode(' ', $request->input('namespace') ?? '');
+
+          $response = [];
+          foreach ($locales as $locale) {
+              $response[$locale] = [];
+              foreach ($namespaces as $namespace) {
+                  $response[$locale][$namespace] = $this->i18n(
+                      $this->loader->load($locale, str_replace('.', '/', $namespace))
+                  );
+              }
+          }
+
+          return response()->json($response);
+      }
+  }
+  ```
+
+test "rank1549: the fix allowlists both segments"
+  lang php
+  file app/Http/Controllers/Base/LocaleController.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  namespace Pterodactyl\Http\Controllers\Base;
+
+  use Pterodactyl\Http\Requests\Base\LocaleRequest;
+
+  class LocaleController extends Controller
+  {
+      public function __invoke(LocaleRequest $request)
+      {
+          $locale = $request->input('locale');
+          $namespace = $request->input('namespace');
+
+          $response[$locale][$namespace] = $this->i18n(
+              $this->loader->load($locale, $namespace)
+          );
+
+          return response()->json($response);
+      }
+  }
+  ```
