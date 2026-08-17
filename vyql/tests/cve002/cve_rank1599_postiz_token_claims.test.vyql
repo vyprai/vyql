@@ -1,0 +1,100 @@
+# Rank 1599 / CVE-2026-48781: Postiz's auth middleware treated the
+# verified JWT payload as the user object itself, so authorization
+# attributes inside the token body -- isSuperAdmin, activated -- were
+# trusted without re-resolving the account (privilege escalation
+# through trusted token claims, CWE-345/CWE-287; the release commit
+# "feat: security fixes" also strips stored integration credentials
+# -- token, refreshToken, customInstanceDetails -- from the no-auth
+# integrations response, and deletes the NowPayments crypto
+# endpoints). AuthMiddleware in apps/backend/src/services/auth/
+# auth.middleware.ts did `let user = AuthService.verifyJWT(auth) as
+# User | null;` -- the signed body becomes the User, claims and all.
+# Pool commit 23696d2973 is the real fix (COMMIT_OK): the middleware
+# verifies the signature only, requires payload.id, and re-resolves
+# `let user = await this._userService.getUserById(payload.id)` --
+# the database is the authority, the token merely names the account.
+# No pool correction.
+#
+# ATTENTION, claim-to-principal resolution. The signature check
+# exists and runs -- the defect is treating the verified payload as
+# the principal rather than as a lookup key, the same
+# unverified-claims family as rank 1546 (rate limiting on a decoded
+# claim) with the trust inverted: nothing can ask "are authorization
+# attributes re-resolved from the store rather than read from the
+# token" -- session-resolution vocabulary. A binding on Postiz's own
+# AuthMiddleware would detect this application rather than the
+# weakness. Measured on the real code: scanning auth.middleware.ts
+# reports zero findings at both revisions. No ENGINE-GAPS.md entry.
+# No definition change shipped. Spec cve_rank1599 records the
+# payload-as-user form and the re-resolved form, both asserting
+# reject VYQL-AUTH-079: when session-resolution vocabulary lands, the
+# payload-as-user form must flip to expect.
+
+test "rank1599: the token payload becomes the user"
+  lang javascript
+  file apps/backend/src/services/auth/auth.middleware.ts
+  reject VYQL-AUTH-079
+  code
+  ```
+  export class AuthMiddleware {
+    async use(req, res, next) {
+      const auth = req.cookies.auth || req.headers.authorization;
+      if (!auth) {
+        throw new Error('Forbidden');
+      }
+      try {
+        let user = AuthService.verifyJWT(auth);
+
+        if (!user) {
+          throw new Error('Forbidden');
+        }
+
+        req.user = user;
+        next();
+      } catch (err) {
+        throw new Error('Forbidden');
+      }
+    }
+  }
+  ```
+
+test "rank1599: the fix re-resolves the user from the database"
+  lang javascript
+  file apps/backend/src/services/auth/auth.middleware.ts
+  reject VYQL-AUTH-079
+  code
+  ```
+  export class AuthMiddleware {
+    constructor(userService) {
+      this._userService = userService;
+    }
+
+    async use(req, res, next) {
+      const auth = req.cookies.auth || req.headers.authorization;
+      if (!auth) {
+        throw new Error('Forbidden');
+      }
+      try {
+        // Verify the JWT signature only. Never trust authorization-relevant
+        // claims (id, isSuperAdmin, activated) from the token body — always
+        // re-resolve the user from the database using the id.
+        const payload = AuthService.verifyJWT(auth);
+
+        if (!payload?.id) {
+          throw new Error('Forbidden');
+        }
+
+        let user = await this._userService.getUserById(payload.id);
+
+        if (!user) {
+          throw new Error('Forbidden');
+        }
+
+        req.user = user;
+        next();
+      } catch (err) {
+        throw new Error('Forbidden');
+      }
+    }
+  }
+  ```
