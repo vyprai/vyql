@@ -1,0 +1,123 @@
+# Rank 1585 / CVE-2023-22731: Shopware's SEO URL twig environment
+# exposed array filters that invoked callables taken from template
+# data, so a merchant-controlled template expression called any PHP
+# function (code execution through unvalidated callables,
+# CWE-94/CWE-96; NEXT-24667). The map/reduce/filter/sort filters in
+# src/Core/Framework/Adapter/Twig/ executed `$function($value)` --
+# with the callable arriving as the filter argument -- and the SEO
+# URL and script environments registered them without restriction.
+# Pool commit 89d1ea1546 is the real fix (COMMIT_OK -- "NEXT-24667 -
+# Add twig improvements", adding
+# src/Core/Framework/Adapter/Twig/SecurityExtension.php): every
+# filter first checks `if (\is_string($function) &&
+# !\in_array($function, $this->allowedPHPFunctions, true)) { throw
+# new \RuntimeException(...) }`, ScriptExecutor and SeoUrlTwigFactory
+# register `new SecurityExtension([])` (an empty allowlist by
+# default), and shopware.yaml/configuration expose the allowed list.
+# No pool correction.
+#
+# ATTENTION, callable arguments at template boundaries. The sink is
+# a variable-function call -- $function($value) -- whose argument
+# crosses from template data through twig filters; the corpus's
+# CodeEval bindings anchor eval and the Function constructor, not
+# PHP's callable-by-name form, and the twig filter boundary is the
+# project-API family of ranks 1577 (pimcore's sandbox) with the
+# allowlist as the control. A binding on Shopware's own
+# SecurityExtension would detect this platform rather than the
+# weakness. Measured on the real code: scanning the new
+# SecurityExtension.php (and the parent's filter code) reports no
+# findings either side (the file is new at the fix; the vulnerable
+# filters lived in the twig environment's setup). No ENGINE-GAPS.md
+# entry. No definition change shipped. Spec cve_rank1585 records the
+# ungated variable-function filter and the allowlist-gated form,
+# both asserting reject VYQL-INJ-003: when callable-argument
+# vocabulary lands, the ungated form must flip to expect.
+
+test "rank1585: the filter invokes any callable it is handed"
+  lang php
+  file src/Core/Framework/Adapter/Twig/SecurityExtension.php
+  reject VYQL-INJ-003
+  code
+  ```
+  <?php
+
+  class TwigArrayFilters extends \Twig\Extension\AbstractExtension
+  {
+      public function getFilters(): array
+      {
+          return [
+              new \Twig\TwigFilter('map', [$this, 'map']),
+              new \Twig\TwigFilter('sort', [$this, 'sort']),
+          ];
+      }
+
+      public function map(iterable $array, $function): array
+      {
+          $result = [];
+          foreach ($array as $key => $value) {
+              $result[$key] = $function($value);
+          }
+
+          return $result;
+      }
+
+      public function sort(array $array, $function): array
+      {
+          usort($array, $function);
+
+          return $array;
+      }
+  }
+  ```
+
+test "rank1585: the fix gates callables on an allowlist"
+  lang php
+  file src/Core/Framework/Adapter/Twig/SecurityExtension.php
+  reject VYQL-INJ-003
+  code
+  ```
+  <?php
+
+  class SecurityExtension extends \Twig\Extension\AbstractExtension
+  {
+      private array $allowedPHPFunctions;
+
+      public function __construct(array $allowedPHPFunctions)
+      {
+          $this->allowedPHPFunctions = $allowedPHPFunctions;
+      }
+
+      public function getFilters(): array
+      {
+          return [
+              new \Twig\TwigFilter('map', [$this, 'map']),
+              new \Twig\TwigFilter('sort', [$this, 'sort']),
+          ];
+      }
+
+      public function map(iterable $array, $function): array
+      {
+          if (\is_string($function) && !\in_array($function, $this->allowedPHPFunctions, true)) {
+              throw new \RuntimeException(sprintf('Function "%s" is not allowed', $function));
+          }
+
+          $result = [];
+          foreach ($array as $key => $value) {
+              $result[$key] = $function($value);
+          }
+
+          return $result;
+      }
+
+      public function sort(array $array, $function): array
+      {
+          if (\is_string($function) && !\in_array($function, $this->allowedPHPFunctions, true)) {
+              throw new \RuntimeException(sprintf('Function "%s" is not allowed', $function));
+          }
+
+          usort($array, $function);
+
+          return $array;
+      }
+  }
+  ```
