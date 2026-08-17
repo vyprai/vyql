@@ -1,0 +1,101 @@
+# Rank 1575 / CVE-2026-53874: picklescan's unsafe-global list omitted
+# the cloudpickle reconstruction primitives, so a malicious pickle
+# that rebuilt arbitrary callables through types.CodeType and
+# _make_function sailed through the scanner (security-tool bypass,
+# CWE-693/CWE-184; GHSA-9m3x-qqw2-h32h). The globals table in
+# src/picklescan/scanner.py named eval/exec/os.system and friends but
+# not cloudpickle.cloudpickle's _builtin_type, _make_function,
+# _function_setstate, _make_cell, _make_empty_cell, subimport, nor
+# types.CodeType -- together these reconstruct functions from raw
+# code objects, which is arbitrary execution by construction. Pool
+# commit 173c8f2a86 is the real fix (COMMIT_OK -- the message names
+# the GHSA): the table gains the cloudpickle==3.1.1 entries and
+# {"types": {"CodeType"}}, plus generator tests building the exploit
+# pickle with cloudpickle itself. No pool correction.
+#
+# ATTENTION, blocklist completeness. The scanner exists and its list
+# runs -- the defect is that the list's coverage misses a
+# reconstruction path the evaluator permits, the same
+# enumeration-completeness family as ranks 1540 (permission branches)
+# and 1544 (certificate extensions): nothing can ask "does the
+# dangerous-globals table cover every callable that can execute
+# code" -- that is evaluator-semantics knowledge (the fix derives it
+# from cloudpickle's own machinery). A binding on picklescan's own
+# table would detect this scanner rather than the weakness. Measured
+# on the real code: scanning scanner.py reports 4 findings at both
+# revisions (its own heuristics over the module; unchanged by the
+# fix). No ENGINE-GAPS.md entry. No definition change shipped. Spec
+# cve_rank1575 records the scanner without the CodeType entries and
+# the completed table, both asserting reject VYQL-DESER-001: when
+# blocklist-completeness vocabulary lands, the missing-entry form
+# must flip to expect.
+
+test "rank1575: the scanner's list misses the reconstruction path"
+  lang python
+  file src/picklescan/scanner.py
+  reject VYQL-DESER-001
+  code
+  ```
+  UNSAFE_GLOBALS = {
+      "builtins": {
+          "eval",
+          "exec",
+          "compile",
+          "__import__",
+      },
+      "os": {
+          "system",
+          "popen",
+      },
+      "subprocess": {
+          "Popen",
+          "run",
+      },
+  }
+
+
+  def scan_global(module, name):
+      if module in UNSAFE_GLOBALS and name in UNSAFE_GLOBALS[module]:
+          return 'dangerous'
+      return 'safe'
+  ```
+
+test "rank1575: the fix lists the code-object machinery"
+  lang python
+  file src/picklescan/scanner.py
+  reject VYQL-DESER-001
+  code
+  ```
+  UNSAFE_GLOBALS = {
+      "builtins": {
+          "eval",
+          "exec",
+          "compile",
+          "__import__",
+      },
+      "os": {
+          "system",
+          "popen",
+      },
+      "subprocess": {
+          "Popen",
+          "run",
+      },
+      # cloudpickle can reconstruct arbitrary callables via CodeType, enabling code execution
+      "cloudpickle.cloudpickle": {
+          "_builtin_type",  # Used to access CodeType for arbitrary code construction
+          "_make_function",  # Creates functions from code objects
+          "_function_setstate",  # Sets internal function state
+          "_make_cell",  # Creates closure cells
+          "_make_empty_cell",  # Creates empty closure cells
+          "subimport",  # Imports arbitrary modules
+      },
+      "types": {"CodeType"},  # Can construct arbitrary code objects for execution
+  }
+
+
+  def scan_global(module, name):
+      if module in UNSAFE_GLOBALS and name in UNSAFE_GLOBALS[module]:
+          return 'dangerous'
+      return 'safe'
+  ```
