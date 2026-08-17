@@ -1,0 +1,155 @@
+# Rank 1366 / CVE-2025-41395: the Playbooks webapp plugin rendered its
+# retrospective custom post by JSON.parse-ing two entries out of the post's
+# props bag and iterating the results, so any member able to create such a post
+# could put a non-string, unparseable or wrong-shaped value in `metricsConfigs`
+# and make the component throw inside its own render -- taking the channel view
+# down for every web app user, not just the post's author (CWE-1287).
+#
+# RetrospectivePost in webapp/src/components/retrospective_post.tsx did
+# `const metricsConfigs: Array<Metric> = JSON.parse(props.post.props.metricsConfigs)`
+# and then `metricsConfigs.map(...)`. The `Array<Metric>` annotation is erased
+# before the code runs, so nothing stood between the props entry and the
+# iteration: JSON.parse throws SyntaxError on malformed input and returns `any`
+# on everything else.
+#
+# The fix routes both entries through `safeJSONParse`, which returns null rather
+# than throwing, and gates the result on `isArrayOf(parsed, isMetric)` before
+# assigning the typed array, falling back to `[]`. Both guards live in
+# src/utils.ts, so the patched component contains neither a JSON.parse call nor
+# an inline array check -- the reject case below is that component verbatim, and
+# it still reads the same props paths and still maps the same arrays.
+
+test "rank1366: a custom post component parses its post props and iterates the result"
+  lang javascript
+  file retrospective_post.tsx
+  expect VYQL-VAL-021
+  expect_review code.UnvalidatedDeserializedCollection
+  code
+  ```
+  import React from 'react';
+
+  import {Post} from '@mattermost/types/posts';
+
+  import {Metric} from 'src/types/playbook';
+  import {RunMetricData} from 'src/types/playbook_run';
+
+  interface Props {
+      post: Post;
+  }
+
+  export const RetrospectivePost = (props: Props) => {
+      const metricsConfigs: Array<Metric> = JSON.parse(props.post.props.metricsConfigs);
+      const metricsData: Array<RunMetricData> = JSON.parse(props.post.props.metricsData);
+
+      return (
+          <>
+              <TextBody>{mdText(props.post.message)}</TextBody>
+              <CustomPostContainerVertical>
+                  {metricsConfigs &&
+                  <HeaderGrid>
+                      {
+                          metricsConfigs.map((mc) => {
+                              const md = metricsData.find((metric) => metric.metric_config_id === mc.id);
+
+                              return (md &&
+                                  <MetricInfo key={mc.id}>
+                                      <Title>{mc.title}</Title>
+                                      <Value>{metricToString(md.value, mc.type, true)}</Value>
+                                  </MetricInfo>
+                              );
+                          })
+                      }
+                  </HeaderGrid>}
+              </CustomPostContainerVertical>
+          </>
+      );
+  };
+  ```
+
+test "rank1366: a custom post component gates its parsed post props on a shape check"
+  lang javascript
+  file retrospective_post.tsx
+  reject VYQL-VAL-021
+  reject_review code.UnvalidatedDeserializedCollection
+  code
+  ```
+  import React from 'react';
+
+  import {Post} from '@mattermost/types/posts';
+
+  import {Metric} from 'src/types/playbook';
+  import {RunMetricData} from 'src/types/playbook_run';
+
+  import {
+      isArrayOf,
+      isMetric,
+      isMetricData,
+      safeJSONParse,
+  } from 'src/utils';
+
+  interface Props {
+      post: Post;
+  }
+
+  export const RetrospectivePost = (props: Props) => {
+      const parsedMetricsConfigs = safeJSONParse<unknown>(props.post.props?.metricsConfigs);
+      const parsedMetricsData = safeJSONParse<unknown>(props.post.props?.metricsData);
+
+      const metricsConfigs: Array<Metric> = isArrayOf(parsedMetricsConfigs, isMetric) ? parsedMetricsConfigs : [];
+      const metricsData: Array<RunMetricData> = isArrayOf(parsedMetricsData, isMetricData) ? parsedMetricsData : [];
+
+      return (
+          <>
+              <TextBody>{mdText(props.post.message)}</TextBody>
+              <CustomPostContainerVertical>
+                  {metricsConfigs &&
+                  <HeaderGrid>
+                      {
+                          metricsConfigs.map((mc) => {
+                              const md = metricsData.find((metric) => metric.metric_config_id === mc.id);
+
+                              return (md &&
+                                  <MetricInfo key={mc.id}>
+                                      <Title>{mc.title}</Title>
+                                      <Value>{metricToString(md.value, mc.type, true)}</Value>
+                                  </MetricInfo>
+                              );
+                          })
+                      }
+                  </HeaderGrid>}
+              </CustomPostContainerVertical>
+          </>
+      );
+  };
+  ```
+
+test "rank1366: a custom post component that checks the parsed value is an array"
+  lang javascript
+  file custom_metrics_post.tsx
+  reject VYQL-VAL-021
+  reject_review code.UnvalidatedDeserializedCollection
+  code
+  ```
+  import React from 'react';
+
+  import {Post} from '@mattermost/types/posts';
+
+  import {Metric} from 'src/types/playbook';
+
+  interface Props {
+      post: Post;
+  }
+
+  export const CustomMetricsPost = (props: Props) => {
+      const parsed = JSON.parse(props.post.props.metricsConfigs);
+      const metricsConfigs: Array<Metric> = Array.isArray(parsed) ? parsed : [];
+
+      return (
+          <HeaderGrid>
+              {metricsConfigs.map((mc) => (
+                  <Title key={mc.id}>{mc.title}</Title>
+              ))}
+          </HeaderGrid>
+      );
+  };
+  ```
