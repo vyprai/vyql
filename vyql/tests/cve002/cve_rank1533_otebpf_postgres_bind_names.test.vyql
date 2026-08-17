@@ -1,0 +1,87 @@
+# Rank 1533 / CVE-2026-45678: OpenTelemetry eBPF Instrumentation's
+# Postgres protocol parser assumed BIND message payloads carry a
+# valid NUL-terminated portal name, so a crafted empty or
+# unterminated payload sliced past the captured buffer and panicked
+# the instrumentation (improper input validation to denial of
+# service, CWE-20/CWE-754; GHSA-pgvv-q3wf-mm9m, patched in 0.9.0).
+# The BIND branch in pkg/ebpf/common/sql_detect_postgres.go did
+# `portal := strings.Clone(unix.ByteSliceToString(msg.data));
+# portalLen := len(portal) + 1; stmtName := strings.Clone(
+# unix.ByteSliceToString(msg.data[portalLen:]))` -- ByteSliceToString
+# reads to the first NUL or the buffer end, so a payload without a
+# terminator makes portalLen exceed the buffer and the slice
+# expression panics. POOL CORRECTION applied in place: the row held
+# e92b0c2dd4 (the v0.9.0 release commit -- the nocommit flag was
+# right); the real fix is 8ac96fa, "Merge commit from fork --
+# postgres: guard BIND name parsing against malformed payloads",
+# found from the advisory's release reference. The fix adds
+# parsePostgresBindNames, which rejects payloads with no NUL byte
+# (bytes.IndexByte < 0) and checks stmtStart against len(data)
+# before slicing. No further pool correction.
+#
+# ATTENTION, parser NUL and bounds guards. The defect is a slice
+# whose offset derives from a string length the buffer never
+# guaranteed -- the parser-progress family VYQL-DOS-029 names for
+# numeric parsers, but its bindings are progress-shaped and nothing
+# observes a length-derived slice index against its buffer (the same
+# loop-carried bound gap as ranks 1527 and 1528). A binding on
+# OBI's own sql_detect_postgres would detect this project rather
+# than the weakness. Measured on the real code: scanning
+# sql_detect_postgres.go reports zero findings at both revisions.
+# No ENGINE-GAPS.md entry. No definition change shipped. Spec
+# cve_rank1533 records the assumption-based slice and the guarded
+# parser, both asserting reject VYQL-DOS-029: when bounds-guard
+# vocabulary lands, the unguarded form must flip to expect.
+
+test "rank1533: the bind names are sliced on an assumed terminator"
+  lang go
+  file pkg/ebpf/common/sql_detect_postgres.go
+  reject VYQL-DOS-029
+  code
+  ```
+  package common
+
+  import (
+      "strings"
+
+      "golang.org/x/sys/unix"
+  )
+
+  func processBind(msg *pgMessage) (string, string) {
+      portal := strings.Clone(unix.ByteSliceToString(msg.data))
+      portalLen := len(portal) + 1 // +1 for the null terminator
+      stmtName := strings.Clone(unix.ByteSliceToString(msg.data[portalLen:]))
+      return portal, stmtName
+  }
+  ```
+
+test "rank1533: the fix verifies the terminator and the bounds"
+  lang go
+  file pkg/ebpf/common/sql_detect_postgres.go
+  reject VYQL-DOS-029
+  code
+  ```
+  package common
+
+  import (
+      "bytes"
+
+      "golang.org/x/sys/unix"
+  )
+
+  func processBind(msg *pgMessage) (string, string, bool) {
+      data := msg.data
+
+      portalEnd := bytes.IndexByte(data, 0)
+      if portalEnd < 0 {
+          return "", "", false
+      }
+
+      stmtStart := portalEnd + 1
+      if stmtStart >= len(data) {
+          return "", "", false
+      }
+
+      return string(data[:portalEnd]), unix.ByteSliceToString(data[stmtStart:]), true
+  }
+  ```
