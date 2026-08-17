@@ -1,0 +1,129 @@
+# Rank 1564 / CVE-2024-1597: pgjdbc's simple-query-mode parameter
+# stringification left numeric and NULL binds outside the quoting
+# wrapper every other type passes through, so crafted values could
+# re-parse as separate statements (SQL injection in simple query
+# mode, CWE-89; GHSA-24rp-q3w6-vc56 -- with preferQueryMode=simple,
+# a PreparedStatement's binds are inlined into the query text).
+# toString(index) in
+# pgjdbc/src/main/java/org/postgresql/core/v3/SimpleParameterList.java
+# quoted most values through quoteAndCast (which emits ('...'::type)
+# with standard-conforming-string escaping), but the NUMERIC case
+# returned `n.toString()` raw with no quotes or parentheses, and NULL
+# rendered as the un-parenthesized NULL -- both shapes let hostile
+# text fuse with the surrounding statement structure. Pool commit
+# 06abfb78a6 is the real fix (COMMIT_OK -- merge of GHSA-24rp-
+# q3w6-vc56's branch: "remove repeated quoteAndCast calls, and ensure
+# numerics are quoted as well", "Add parentheses around NULL
+# parameter values in simple query mode"): every type now assigns
+# textValue/type through one exit `return quoteAndCast(textValue,
+# type, standardConformingStrings)`, numerics included, and NULL
+# renders as (NULL). No pool correction.
+#
+# ATTENTION, escaping-completeness at the driver boundary. The
+# sanitizer exists and is correct -- the defect is a type branch that
+# bypasses it -- the same present-but-incomplete family as rank 1551's
+# flagless regex and 1522's bracket-blind host checks, here inside
+# the driver's parameter stringification where no SqlExecution sink is
+# bound at all (the query text assembles in QueryExecutorImpl; the
+# scan of SimpleParameterList.java reports zero findings at both
+# revisions). Nothing can ask "does every parameter type pass through
+# the quoting wrapper" -- type-switch completeness over an escaping
+# helper is vocabulary design. A binding on pgjdbc's own quoteAndCast
+# would detect this driver rather than the weakness. No
+# ENGINE-GAPS.md entry. No definition change shipped. Spec
+# cve_rank1564 records the raw numeric return beside the quoted
+# siblings and the all-quoted form, both asserting reject
+# VYQL-INJ-001: when escaping-completeness vocabulary lands, the raw
+# branch must flip to expect.
+
+test "rank1564: the numeric bind returns outside the quoting wrapper"
+  lang java
+  file pgjdbc/src/main/java/org/postgresql/core/v3/SimpleParameterList.java
+  reject VYQL-INJ-001
+  code
+  ```
+  public class SimpleParameterList {
+    private static String quoteAndCast(String text, String type, boolean standardConformingStrings) {
+      StringBuilder sb = new StringBuilder((text.length() + 10) / 10 * 11);
+      sb.append("('");
+      sb.append(text);
+      sb.append('\'');
+      if (type != null) {
+        sb.append("::");
+        sb.append(type);
+      }
+      sb.append(')');
+      return sb.toString();
+    }
+
+    public String toString(int index, boolean standardConformingStrings, int paramType, Object paramValue) {
+      if (paramValue == NULL_OBJECT) {
+        return "NULL";
+      }
+      if (paramType == Oid.INT4) {
+        int i = ByteConverter.int4((byte[]) paramValue, 0);
+        return quoteAndCast(Integer.toString(i), "int4", standardConformingStrings);
+      }
+      if (paramType == Oid.NUMERIC) {
+        Number n = ByteConverter.numeric((byte[]) paramValue);
+        return n.toString();
+      }
+      if (paramType == Oid.UUID) {
+        String uuid = new UUIDArrayAssistant().buildElement((byte[]) paramValue, 0, 16).toString();
+        return quoteAndCast(uuid, "uuid", standardConformingStrings);
+      }
+      String param = paramValue.toString();
+      return quoteAndCast(param, null, standardConformingStrings);
+    }
+
+    private static final Object NULL_OBJECT = new Object();
+  }
+  ```
+
+test "rank1564: the fix routes every type through the wrapper"
+  lang java
+  file pgjdbc/src/main/java/org/postgresql/core/v3/SimpleParameterList.java
+  reject VYQL-INJ-001
+  code
+  ```
+  public class SimpleParameterList {
+    private static String quoteAndCast(String text, String type, boolean standardConformingStrings) {
+      StringBuilder sb = new StringBuilder((text.length() + 10) / 10 * 11);
+      sb.append("('");
+      sb.append(text);
+      sb.append('\'');
+      if (type != null) {
+        sb.append("::");
+        sb.append(type);
+      }
+      sb.append(')');
+      return sb.toString();
+    }
+
+    public String toString(int index, boolean standardConformingStrings, int paramType, Object paramValue) {
+      if (paramValue == NULL_OBJECT) {
+        return "(NULL)";
+      }
+      String textValue;
+      String type;
+      if (paramType == Oid.INT4) {
+        int i = ByteConverter.int4((byte[]) paramValue, 0);
+        textValue = Integer.toString(i);
+        type = "int4";
+      } else if (paramType == Oid.NUMERIC) {
+        Number n = ByteConverter.numeric((byte[]) paramValue);
+        textValue = n.toString();
+        type = "numeric";
+      } else if (paramType == Oid.UUID) {
+        textValue = new UUIDArrayAssistant().buildElement((byte[]) paramValue, 0, 16).toString();
+        type = "uuid";
+      } else {
+        textValue = paramValue.toString();
+        type = null;
+      }
+      return quoteAndCast(textValue, type, standardConformingStrings);
+    }
+
+    private static final Object NULL_OBJECT = new Object();
+  }
+  ```
