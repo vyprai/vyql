@@ -1,0 +1,294 @@
+# Rank 1357 / CVE-2015-3296: markdown-it's own link validator refused three URL
+# schemes and not the data: scheme, so a `data:text/html;base64,...` link
+# rendered by the library became script execution in the browser (CWE-79).
+#
+# lib/index.js at f76d3be^ is:
+#
+#   var BAD_PROTOCOLS = [ 'vbscript', 'javascript', 'file' ];
+#
+#   function validateLink(url) {
+#     var str = url.trim().toLowerCase();
+#     if (str.indexOf(':') >= 0 && BAD_PROTOCOLS.indexOf(str.split(':')[0]) >= 0) {
+#       return false;
+#     }
+#     return true;
+#   }
+#
+# The filter is present, is reached by every link and image the renderer emits,
+# and is wrong: `data:` is the fourth scheme a browser executes documents from,
+# and `[xss](data:text/html;base64,PHNjcmlwdD5hbGVydCgnWFNTJyk8L3NjcmlwdD4K)`
+# passed the check untouched. The fix adds 'data' to the denylist and carves
+# out only four raster media types, `data:image/gif|png|jpeg|webp`, so an
+# inline image still works while `data:text/html` and `data:image/svg+xml` do
+# not; the fix's own test fixture asserts the text/html link is left unlinked.
+#
+# Pool commit f76d3beb46abd121892a2e2e5c78376354c214e3 is the real fix, not a
+# release bump: it is 31 changed lines in lib/index.js plus the xss.txt
+# fixture, and it shipped as markdown-it 4.1.0. No pool correction. Worth
+# knowing about the row, though: GHSA-9g4f-5rpg-4948 records CVE-2015-3296
+# against NodeBB and nodebb-plugin-markdown -- "XSS ... via vectors related to
+# (1) javascript: or (2) data: URLs" -- and lists this markdown-it commit as
+# the upstream fix reference alongside nodebb-plugin-markdown@ab7f268. The
+# vulnerable code is here, so markdown-it is the right scan target; the CVE id
+# belongs to the consumer that shipped it.
+#
+# FIXED. Diagnosis: `vyql match` on lib/index.js at f76d3be^ labels nothing in
+# or around validateLink -- only `require` arguments as code.DynamicCodeLoad and
+# mdurl.encode as core.HtmlEscape -- and a bounded scan of the whole repository
+# reports 42 findings, none of them in lib/index.js, at either revision. The
+# inversion is the one recorded at rank 1348: the analysed code *is* the
+# control, so there is no source and no sink. code.HtmlEscape and VYQL-INJ-004
+# describe a caller that fails to wrap a render, and VYQL-INJ-023's
+# advisory-guard mechanism decides whether a guard at a caller suppresses a
+# taint finding; neither can express a filter that is present, reached and
+# incomplete.
+#
+# Reused code.HtmlSanitizerLogicReview / VYQL-INJ-200, the existing concept for
+# a sanitizer whose own logic carries the bypass (Python and C# bindings
+# already emit it), so no concept, no rule and no rule id is added. New
+# JavaScript binding linkSchemeDenylistMissingDataScheme in
+# vyql/bindings/javascript/link_scheme_denylist_missing_data_scheme.vyql, a
+# module-scope presence predicate:
+#
+#   * the module spells both `javascript` and `vbscript` as data -- quoted, or
+#     quote-then-colon, or a `|`-delimited branch of a scheme alternation.
+#     vbscript is not a scheme anyone writes by accident; a module listing it
+#     beside javascript is enumerating what a browser executes.
+#   * a `toLowerCase` call, which is what a case-insensitive scheme comparison
+#     needs and a language-name registry does not, plus a URL-ish identifier
+#     (url/uri/href/link) so the enumeration is being applied to a URL.
+#   * no spelling of the data scheme anywhere in the module: no `data:` prefix,
+#     no quoted `'data'`/`"data"` entry, no `|data`/`data|` alternation branch.
+#     Every form of handling it names it, so the absence says the scheme was
+#     never considered.
+#
+# Module scope, not function scope: BAD_PROTOCOLS is a module-level array and
+# validateLink is a five-line function, so a function-scope predicate sees
+# `call:indexOf`, `call:split` and the single `:` literal and none of the scheme
+# names it has to read.
+#
+# Every scheme name is matched in a quoted or delimiter-adjacent spelling rather
+# than as a bare word, because a module-scope context carries the module's own
+# source text -- comments included -- alongside its structured tokens. Written
+# with bare words the predicate is wrong in both directions, and both were
+# measured here: `literal contains "javascript"` plus `literal contains
+# "vbscript"` fires on a safe-scheme allowlist whose comment merely says which
+# schemes it refuses, and `not (literal contains "data")` declines the real
+# vulnerable lib/index.js, whose render() doc comment talks about passing data
+# between rules and metadata like reference info. The negative direction is the
+# dangerous one: it silently returns nothing, which is what a spec that only
+# tests hand-written snippets will report as a pass. The two expect blocks pin
+# both, one carrying that doc comment verbatim.
+#
+# Measured (timeout 180, --max-ram 6GB, --cache off). The whole markdown-it
+# repository goes 42 findings before the binding to 44 at f76d3be^ and 43 at
+# f76d3be. Both additions are true positives and both are VYQL-INJ-200: one at
+# lib/index.js:1, which the fix removes, and one at
+# benchmark/implementations/markdown-it-2.2.1-commonmark/src/lib/parser_inline.js:1,
+# a vendored markdown-it 2.2.1 carrying the identical three-entry BAD_PROTOCOLS
+# that the fix does not touch and that therefore still reports at f76d3be.
+# The finding lands in hand-written source, not generated output:
+# dist/markdown-it.js and dist/markdown-it.min.js carry the same vulnerable
+# validateLink, and they are the two of the repository's 131 .js files that are
+# not analysed at either revision -- 129 parse, dist/ does not.
+#
+# False positives: the adversary for a javascript-plus-vbscript pair is a
+# syntax-highlighter language registry, which is why toLowerCase and a URL-ish
+# identifier are required. VYQL-INJ-200 is reported zero times across nine
+# JavaScript trees -- marked, showdown, sanitize-html, DOMPurify, highlight.js,
+# js-xss, braintree/sanitize-url and remarkable, plus a nine-file sweep of every
+# quoted-vbscript JavaScript file found in this machine's other corpus clones
+# (two ace vbscript snippet files, two swagger-ui bundles, two minified
+# vite/vue bundles, a highlight.js copy, a language-name list), scanned with
+# --max-file-size 0 so the 3MB bundles parse too. Six of those trees do carry a
+# vbscript literal, and the declines are the intended ones: remarkable's
+# validateLink is this very function's descendant and lists 'data', showdown's
+# safeMode guard names data:text/html, sanitize-url's invalid-protocol regex has
+# a |data| branch. Neither OWASP corpus can move: the binding is JavaScript-only
+# and adds no concept and no rule, and both corpora are Java and Python.
+# `go test -count=1 ./cmd/vyql/ -run TestVyqlSpecs` passes, 4757 specs from 1502
+# files.
+
+test "rank1357: a browser-executable-scheme denylist that omits data: leaves data:text/html linkable"
+  lang javascript
+  file index.js
+  expect VYQL-INJ-200
+  expect_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  'use strict';
+
+  var mdurl = require('mdurl');
+
+  var BAD_PROTOCOLS = [ 'vbscript', 'javascript', 'file' ];
+
+  function validateLink(url) {
+    // url should be normalized at this point, and existing entities are decoded
+    //
+    var str = url.trim().toLowerCase();
+
+    if (str.indexOf(':') >= 0 && BAD_PROTOCOLS.indexOf(str.split(':')[0]) >= 0) {
+      return false;
+    }
+    return true;
+  }
+
+  var RECODE_HOSTNAME_FOR = [ 'http:', 'https:', 'mailto:' ];
+
+  function normalizeLink(url) {
+    var parsed = mdurl.parse(url, true);
+    return mdurl.encode(mdurl.format(parsed));
+  }
+
+  module.exports = { validateLink: validateLink, normalizeLink: normalizeLink };
+  ```
+
+test "rank1357: prose about metadata is not the data scheme being handled"
+  lang javascript
+  file index.js
+  expect VYQL-INJ-200
+  expect_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  'use strict';
+
+  var BAD_PROTOCOLS = [ 'vbscript', 'javascript', 'file' ];
+
+  function validateLink(url) {
+    var str = url.trim().toLowerCase();
+
+    if (str.indexOf(':') >= 0 && BAD_PROTOCOLS.indexOf(str.split(':')[0]) >= 0) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Render markdown string into html.
+   *
+   * `env` is used to pass data between "distributed" rules and return additional
+   * metadata like reference info, needed for the renderer. It also can be used
+   * to inject data in specific cases.
+   **/
+  function render(src, env) {
+    return this.renderer.render(this.parse(src, env || {}), this.options, env);
+  }
+
+  module.exports = { validateLink: validateLink, render: render };
+  ```
+
+test "rank1357: a scheme alternation that branches on data covers it"
+  lang javascript
+  file url_filter.js
+  reject VYQL-INJ-200
+  reject_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  'use strict';
+
+  var UNSAFE_SCHEME = /^(javascript|vbscript|livescript|data|file):/i;
+
+  function isUnsafeUrl(url) {
+    var str = String(url).trim().toLowerCase();
+    return UNSAFE_SCHEME.test(str);
+  }
+
+  module.exports = isUnsafeUrl;
+  ```
+
+test "rank1357: denying the data scheme with a raster media-type carve-out closes it"
+  lang javascript
+  file index.js
+  reject VYQL-INJ-200
+  reject_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  'use strict';
+
+  var mdurl = require('mdurl');
+
+  var BAD_PROTOCOLS      = [ 'vbscript', 'javascript', 'file', 'data' ];
+  var ALLOWED_DATA_MIMES = [
+    'data:image/gif',
+    'data:image/png',
+    'data:image/jpeg',
+    'data:image/webp'
+  ];
+
+  function validateLink(url) {
+    // url should be normalized at this point, and existing entities are decoded
+
+    var str      = url.trim().toLowerCase(),
+        protocol = str.split(':')[0];
+
+    if (str.indexOf(':') >= 0 && BAD_PROTOCOLS.indexOf(protocol) >= 0) {
+      if (protocol === 'data' && ALLOWED_DATA_MIMES.indexOf(str.split(';')[0]) >= 0) {
+        return true;
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  var RECODE_HOSTNAME_FOR = [ 'http:', 'https:', 'mailto:' ];
+
+  function normalizeLink(url) {
+    var parsed = mdurl.parse(url, true);
+    return mdurl.encode(mdurl.format(parsed));
+  }
+
+  module.exports = { validateLink: validateLink, normalizeLink: normalizeLink };
+  ```
+
+test "rank1357: a safe-scheme allowlist needs no denylist entry per scheme"
+  lang javascript
+  file sanitize_url.js
+  reject VYQL-INJ-200
+  reject_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  'use strict';
+
+  var SAFE_PROTOCOLS = [ 'http:', 'https:', 'mailto:', 'tel:' ];
+
+  // javascript: and vbscript: are not enumerated: anything that is not on the
+  // allowlist is refused, whatever scheme it names.
+  function sanitizeUrl(url) {
+    var str = String(url).trim().toLowerCase();
+    var colon = str.indexOf(':');
+    if (colon < 0) { return url; }
+    if (SAFE_PROTOCOLS.indexOf(str.slice(0, colon + 1)) >= 0) { return url; }
+    return 'about:blank';
+  }
+
+  module.exports = sanitizeUrl;
+  ```
+
+test "rank1357: a language-name registry naming javascript and vbscript is not scheme filtering"
+  lang javascript
+  file languages.js
+  reject VYQL-INJ-200
+  reject_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  'use strict';
+
+  var GRAMMARS = [
+    'bash',
+    'c',
+    'javascript',
+    'python',
+    'ruby',
+    'vbscript',
+    'xml'
+  ];
+
+  function registerAll(highlighter) {
+    GRAMMARS.forEach(function (name) {
+      highlighter.registerLanguage(name, require('./grammars/' + name));
+    });
+  }
+
+  module.exports = registerAll;
+  ```
