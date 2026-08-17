@@ -1,0 +1,113 @@
+# Rank 1541 / CVE-2022-0821: OrchardCore's localization-set content
+# picker enumerated every content item in a set and returned it to
+# the admin UI without checking the querying user's permission on
+# each item, so authenticated users without content permissions
+# could list entries they must not see (broken access control /
+# information exposure, CWE-862/CWE-200; PR #11344 "Fix missing
+# permission checks and encoding"). The loop in
+# src/OrchardCore.Modules/OrchardCore.ContentFields/Controllers/
+# LocalizationSetContentPickerAdminController.cs did `foreach (var
+# contentItem in localizations) { results.Add(new
+# VueMultiselectItemViewModel { Id = contentItem.Key, DisplayText =
+# contentItem.Value.ToString(), HasPublished = await
+# _contentManager.HasPublishedVersionAsync(contentItem.Value) }); }`
+# -- no authorization anywhere in the enumeration. Pool commit
+# b7096af102 is the real fix (COMMIT_OK): the controller takes
+# IAuthorizationService and IHttpContextAccessor, and every iteration
+# runs `if (await _authorizationService.AuthorizeAsync(
+# _httpContextAccessor.HttpContext.User, CommonPermissions.ViewContent,
+# contentItem))` before adding the item -- the per-item gate. No pool
+# correction.
+#
+# ATTENTION, per-item authorization in enumeration. The defect is a
+# loop that materialises protected resources with no decision per
+# item -- the same decision-completeness family as ranks 1540
+# (permission branches) and 1519 (capability gates), here
+# distributed across iterations: no rule can ask "does each
+# enumerated item pass an authorization check before it is
+# returned" -- enumeration bodies are not guard vocabulary. A
+# binding on OrchardCore's own AuthorizeAsync would detect this
+# platform rather than the weakness. Measured on the real code:
+# scanning the controller reports one finding at both revisions
+# (unchanged; unrelated heuristic). No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1541 records the ungated
+# enumeration and the per-item-gated form, both asserting reject
+# VYQL-AUTH-079: when per-item-decision vocabulary lands, the ungated
+# form must flip to expect.
+
+test "rank1541: every localization set is listed without a check"
+  lang csharp
+  file src/OrchardCore.Modules/OrchardCore.ContentFields/Controllers/LocalizationSetContentPickerAdminController.cs
+  reject VYQL-AUTH-079
+  code
+  ```
+  using System.Collections.Generic;
+  using System.Threading.Tasks;
+  using Microsoft.AspNetCore.Mvc;
+
+  public class LocalizationSetContentPickerAdminController : Controller
+  {
+      private readonly IContentManager _contentManager;
+      private readonly ISession _session;
+
+      public async Task<IActionResult> Localizations(string part, string field)
+      {
+          var localizations = await GetLocalizationSetsAsync(part, field);
+
+          var results = new List<VueMultiselectItemViewModel>();
+          foreach (var contentItem in localizations)
+          {
+              results.Add(new VueMultiselectItemViewModel
+              {
+                  Id = contentItem.Key,
+                  DisplayText = contentItem.Value.ToString(),
+                  HasPublished = await _contentManager.HasPublishedVersionAsync(contentItem.Value)
+              });
+          }
+
+          return Json(results);
+      }
+  }
+  ```
+
+test "rank1541: the fix gates each item on its own permission"
+  lang csharp
+  file src/OrchardCore.Modules/OrchardCore.ContentFields/Controllers/LocalizationSetContentPickerAdminController.cs
+  reject VYQL-AUTH-079
+  code
+  ```
+  using System.Collections.Generic;
+  using System.Threading.Tasks;
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Http;
+  using Microsoft.AspNetCore.Mvc;
+
+  public class LocalizationSetContentPickerAdminController : Controller
+  {
+      private readonly IContentManager _contentManager;
+      private readonly ISession _session;
+      private readonly IAuthorizationService _authorizationService;
+      private readonly IHttpContextAccessor _httpContextAccessor;
+
+      public async Task<IActionResult> Localizations(string part, string field)
+      {
+          var localizations = await GetLocalizationSetsAsync(part, field);
+
+          var results = new List<VueMultiselectItemViewModel>();
+          foreach (var contentItem in localizations)
+          {
+              if (await _authorizationService.AuthorizeAsync(_httpContextAccessor.HttpContext.User, CommonPermissions.ViewContent, contentItem))
+              {
+                  results.Add(new VueMultiselectItemViewModel
+                  {
+                      Id = contentItem.Key,
+                      DisplayText = contentItem.Value.ToString(),
+                      HasPublished = await _contentManager.HasPublishedVersionAsync(contentItem.Value)
+                  });
+              }
+          }
+
+          return Json(results);
+      }
+  }
+  ```
