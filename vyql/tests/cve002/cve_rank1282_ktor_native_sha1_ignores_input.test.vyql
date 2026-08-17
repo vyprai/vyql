@@ -1,0 +1,129 @@
+# Rank 1282 / CVE-2022-29930: the Kotlin/Native (`posix`) implementation of
+# `sha1(bytes: ByteArray): ByteArray` in ktor-utils computed the digest of an
+# empty message regardless of its argument, so every caller on that target
+# got the same, input-independent SHA-1 output (CWE-330/CWE-342).
+#
+# Pool commit 52b894749b7b6895e3346910305d41d1b7a8e81e carries nocommit; read
+# per Step 0. Its diff is exactly one line in
+# ktor-utils/posix/src/io/ktor/util/CryptoNative.kt:
+#   -public actual fun sha1(bytes: ByteArray): ByteArray = Sha1().digest()
+#   +public actual fun sha1(bytes: ByteArray): ByteArray = Sha1().digest(bytes)
+# plus a regression test (HashFunctionTest.kt) asserting a fixed input hashes
+# to a fixed, non-empty-input digest. NVD/JetBrains's own description --
+# "SHA1 implementation in JetBrains Ktor Native 2.0.0 was returning the same
+# value" -- and PR ktorio/ktor#2966 both match this diff exactly, confirming
+# 52b894749b is the real fix despite the flag; no pool correction needed.
+#
+# The bug is a Kotlin overload-resolution footgun, not a usage mistake:
+# `HashFunction` declares a member `fun digest(): ByteArray` (finalize using
+# whatever was already fed via `update`), and a same-named *extension*
+# `fun HashFunction.digest(input: ByteArray, ...): ByteArray` calls
+# `update(input); return digest()` as sugar for the common case. Calling
+# `Sha1().digest()` with no arguments binds to the member overload -- which
+# is entirely legitimate when `update()` was already called earlier -- not
+# the extension; here it was the *only* call, so `update()` never ran and
+# the digest is always of the empty message. `Sha1().digest(bytes)` binds to
+# the extension and is correct. The real-world exposure is
+# ktor-http/common/src/io/ktor/http/websocket/Utils.kt's
+# `websocketServerAccept(nonce)`, which computes
+# `sha1(nonce + magic).encodeBase64()` for the `Sec-WebSocket-Accept`
+# header -- on the broken Native target this becomes a constant value no
+# matter what nonce the client sent, defeating the handshake's anti-replay
+# purpose. That call site is untouched by the fix and reads as entirely
+# correct code; the defect is invisible there and lives only in the
+# posix-target `sha1()` definition itself.
+#
+# ATTENTION, no taint-flow shape and no vocabulary that would not be a
+# repro-shaped patch. `vyql match` on both revisions below labels nothing at
+# all (no source, sink, or control) -- confirmed with `./bin/vyql match`.
+# There is no taint source or sink to connect: `bytes` is a plain function
+# parameter, not attacker-controlled input by any binding, and `Sha1().digest()`
+# is not a labelled sink. Reusing the nearest thematic concepts doesn't fit
+# either: code.WeakHash (CWE_327) is about choosing a *broken algorithm*
+# (MD5/SHA1/DES/RC4/ECB) -- SHA-1 is the RFC 6455-mandated, entirely correct
+# choice for a WebSocket accept-key, so that concept does not describe this
+# bug even thematically. The defect is a typestate/precondition fact --
+# "was `update()` called on this receiver before this `digest()` call" --
+# not a source-to-sink data flow, so it doesn't fit any `code.*Review`
+# taint concept either. A binding cannot express it without naming the bare
+# no-arg `.digest()` call as suspicious, and that call is the idiomatic,
+# universally correct way to finalize *any* streaming hash (Java's
+# `MessageDigest.update()...digest()` is the same two-call pattern) once
+# `update()` has actually run first -- flagging every no-arg `.digest()`
+# call would fire on essentially all correct streaming-hash code and name
+# zero real defects beyond this one incident. No binding, concept, or rule
+# added.
+#
+# verify_current_expected: attention-no-taint-shape, both revisions reject
+# VYQL-CRY-003 (weak randomness) and reject_review code.WeakHash (nearest
+# thematic concept, still the wrong one) since neither fires on either form.
+
+test "rank1282: Kotlin/Native sha1() calls the no-arg digest(), ignoring its own input"
+  lang kotlin
+  file CryptoNative.kt
+  reject VYQL-CRY-003
+  reject_review code.WeakHash
+  code
+  ```
+  package io.ktor.util
+
+  internal interface HashFunction {
+      fun update(input: ByteArray, offset: Int = 0, length: Int = input.size)
+      fun digest(): ByteArray
+  }
+
+  internal fun HashFunction.digest(input: ByteArray, offset: Int = 0, length: Int = input.size): ByteArray {
+      update(input, offset, length)
+      return digest()
+  }
+
+  internal class Sha1 : HashFunction {
+      override fun update(input: ByteArray, offset: Int, length: Int) {
+          // records the message bytes into internal digest state
+      }
+
+      override fun digest(): ByteArray {
+          return ByteArray(20)
+      }
+  }
+
+  /**
+   * Compute SHA-1 hash for the specified [bytes]
+   */
+  public actual fun sha1(bytes: ByteArray): ByteArray = Sha1().digest()
+  ```
+
+test "rank1282: Kotlin/Native sha1() forwards bytes to the extension digest(input)"
+  lang kotlin
+  file CryptoNative.kt
+  reject VYQL-CRY-003
+  reject_review code.WeakHash
+  code
+  ```
+  package io.ktor.util
+
+  internal interface HashFunction {
+      fun update(input: ByteArray, offset: Int = 0, length: Int = input.size)
+      fun digest(): ByteArray
+  }
+
+  internal fun HashFunction.digest(input: ByteArray, offset: Int = 0, length: Int = input.size): ByteArray {
+      update(input, offset, length)
+      return digest()
+  }
+
+  internal class Sha1 : HashFunction {
+      override fun update(input: ByteArray, offset: Int, length: Int) {
+          // records the message bytes into internal digest state
+      }
+
+      override fun digest(): ByteArray {
+          return ByteArray(20)
+      }
+  }
+
+  /**
+   * Compute SHA-1 hash for the specified [bytes]
+   */
+  public actual fun sha1(bytes: ByteArray): ByteArray = Sha1().digest(bytes)
+  ```
