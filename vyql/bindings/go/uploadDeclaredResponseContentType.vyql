@@ -1,0 +1,31 @@
+module bindings.go.uploadDeclaredResponseContentType;
+
+// google.api.HttpBody -- `httpbody.HttpBody` from
+// google.golang.org/genproto/googleapis/api/httpbody -- is the documented way for a
+// gRPC method exposed over grpc-gateway to return a raw HTTP payload, and its own
+// documentation describes ContentType as "the HTTP Content-Type header value
+// specifying the content type of the body". Whatever a handler puts in that field is
+// what the browser is told the bytes are, so a handler that fills it from a runtime
+// value is letting whoever supplied that value pick how the response is parsed.
+//
+// For a download endpoint the runtime value is the content type recorded when the
+// file was stored, which for an upload API is the type the uploader declared. Three
+// content types are active: text/html, application/xhtml+xml and image/svg+xml are
+// parsed as markup and run script in the serving origin, so an attachment stored
+// under one of them and served inline is stored XSS (CWE-79/CWE-434), not a download.
+//
+// This is that shape: a ContentType field whose value is not a string literal, on a
+// body whose Data is not a literal either, in a function that says nothing anywhere
+// about active content. Any of the documented ways of saying it neutralises the
+// flag -- forcing an inert type (application/octet-stream, text/plain), sending the
+// bytes as an attachment via Content-Disposition, marking the response nosniff, or
+// naming the renderable content types at all in order to branch on them.
+//
+// A literal content type is not this: `httpbody.HttpBody{ContentType: "text/csv"}`
+// carries a field:ContentType=text/csv token and the field-value clause declines it,
+// which is also why the same handler serving one literal-typed body anywhere in its
+// own body is declined rather than reported.
+binding goUploadDeclaredResponseContentType {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.selector contains "httpbody.HttpBody" and node.context.field contains "ContentType" and node.context.field contains "Data" and not (node.context.field contains "ContentType=") and not (node.context.field contains "Data=") and not containsAny(node.context.literal, ["application/octet-stream", "text/plain", "attachment", "nosniff", "image/svg+xml", "text/html", "application/xhtml+xml"])
+  emit issue code.UploadDeclaredResponseContentType at node
+}

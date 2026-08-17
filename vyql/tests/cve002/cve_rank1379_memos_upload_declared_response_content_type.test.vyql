@@ -1,0 +1,348 @@
+# Rank 1379 / CVE-2025-50738 (GHSA-hfcf-79gh-f3jc, CWE-79/CWE-200): memos stores
+# uploaded attachments through CreateResource, which copies the MIME type straight
+# off the request -- `Type: request.Resource.Type` -- into the resource row. The
+# download endpoint then hands that stored type back as the response content type:
+#
+#	contentType := resource.Type
+#	if strings.HasPrefix(contentType, "text/") {
+#		contentType += "; charset=utf-8"
+#	}
+#	return &httpbody.HttpBody{ContentType: contentType, Data: blob}, nil
+#
+# So the browser is told what the uploader said the bytes were. Three content types
+# are active: text/html, application/xhtml+xml and image/svg+xml are parsed as
+# markup and run script in the serving origin. Upload a file declaring one of them,
+# hand anyone the attachment link, and the payload executes as memos -- stored XSS
+# reaching whatever the viewer's session can reach, which is the CWE-200 half the
+# advisory records. The weakness is not the upload and not the bytes; it is that a
+# download response reuses an uploader-declared content type with nothing forcing
+# renderable types to something inert.
+#
+# The fix (46d5307d7f, "fix: prevent XSS for specific content types", the whole of
+# it, six lines in one file) rewrites exactly those three to
+# application/octet-stream before the body is returned, so the browser downloads
+# instead of parsing. The vulnerable construct is present at the parent, and the
+# language is Go -- memos ships a TypeScript frontend under web/, but both the flaw
+# and the fix are in server/router/api/v1/resource_service.go. No pool correction.
+#
+# `vyql match` over the vulnerable file labelled nothing at all: no source, no sink,
+# no control, and the full scan's 38 findings named neither resource_service.go nor
+# any content-type fact anywhere. A taint route cannot discriminate this fix in any
+# case, and rank 1176 measured why on the JavaScript form of the same class: the
+# patch does not change how the stored bytes reach the response, only what the
+# response calls them, so a stored-read-to-response-body rule scores identically
+# before and after. What separates the two revisions is a value fact about the
+# content type, and 1176 recorded that no concept stated it -- core.SafeResponseContentType
+# covers only "the content type is a hardcoded safe literal", which is precisely
+# what this handler does not do.
+#
+# Detection is code.UploadDeclaredResponseContentType (VYQL-INJ-246, CWE-79/CWE-434),
+# emitted by goUploadDeclaredResponseContentType on a Go function that builds a
+# google.api.HttpBody whose ContentType and Data are both runtime values rather than
+# string literals and that names no active-content control anywhere in its body. The
+# anchor is that type's own documentation -- httpbody.HttpBody is grpc-gateway's
+# documented way to return a raw payload and its ContentType field is documented as
+# the Content-Type header value -- not this handler. The neutralisers are the
+# documented ways of answering the question: force an inert type
+# (application/octet-stream, text/plain), send the bytes as an attachment, mark the
+# response nosniff, or name the renderable content types in order to branch on them,
+# which is the form this fix takes.
+#
+# Measured. On the vulnerable revision, 2 flags: resource_service.go:131, the CVE,
+# and user_service.go:84. The second is not collateral -- GetUserAvatarBinary serves
+# the avatar with the content type parsed out of the `data:<type>;base64,` URI the
+# user set through UpdateUser, so a user whose avatar is a data URI declaring
+# image/svg+xml gets scriptable markup served under it, the same weakness at a
+# second endpoint that this commit does not touch. On the patched revision the
+# resource_service.go flag is gone and the avatar one remains, which is correct.
+# Elsewhere: 0 on grpc-gateway, which is the tree that exercises the shape without
+# the weakness -- its three httpbody.HttpBody constructions are the streaming
+# Download example's two literal `ContentType: "text/html"` bodies and two marshaler
+# tests that set one field and not the other, all declined -- and 0 on argo-cd
+# (1027 Go files, 7296 findings) and on four further Go trees that never import the
+# package. A literal content type in a sibling function in the same file does not
+# silence the flag: the fourth case below pins that, since `literal:` routes through
+# the AST path and Go's function contexts carry a real lexical scope.
+
+test "rank1379: an attachment is served with the content type recorded at upload"
+  lang go
+  file server/router/api/v1/resource_service.go
+  expect VYQL-INJ-246
+  expect_review code.UploadDeclaredResponseContentType
+  code
+  ```
+  package v1
+
+  import (
+  	"context"
+  	"strings"
+
+  	"google.golang.org/genproto/googleapis/api/httpbody"
+  	"google.golang.org/grpc/codes"
+  	"google.golang.org/grpc/status"
+  )
+
+  func (s *APIV1Service) GetResourceBinary(ctx context.Context, request *v1pb.GetResourceBinaryRequest) (*httpbody.HttpBody, error) {
+  	resourceUID, err := ExtractResourceUIDFromName(request.Name)
+  	if err != nil {
+  		return nil, status.Errorf(codes.InvalidArgument, "invalid resource id: %v", err)
+  	}
+  	resource, err := s.Store.GetResource(ctx, &store.FindResource{UID: &resourceUID})
+  	if err != nil {
+  		return nil, status.Errorf(codes.Internal, "failed to get resource: %v", err)
+  	}
+  	if resource == nil {
+  		return nil, status.Errorf(codes.NotFound, "resource not found")
+  	}
+
+  	blob, err := s.GetResourceBlob(resource)
+  	if err != nil {
+  		return nil, status.Errorf(codes.Internal, "failed to get resource blob: %v", err)
+  	}
+
+  	contentType := resource.Type
+  	if strings.HasPrefix(contentType, "text/") {
+  		contentType += "; charset=utf-8"
+  	}
+
+  	return &httpbody.HttpBody{
+  		ContentType: contentType,
+  		Data:        blob,
+  	}, nil
+  }
+  ```
+
+test "rank1379: renderable content types are rewritten to an inert one before the body is returned"
+  lang go
+  file server/router/api/v1/resource_service.go
+  reject VYQL-INJ-246
+  code
+  ```
+  package v1
+
+  import (
+  	"context"
+  	"strings"
+
+  	"google.golang.org/genproto/googleapis/api/httpbody"
+  	"google.golang.org/grpc/codes"
+  	"google.golang.org/grpc/status"
+  )
+
+  func (s *APIV1Service) GetResourceBinary(ctx context.Context, request *v1pb.GetResourceBinaryRequest) (*httpbody.HttpBody, error) {
+  	resourceUID, err := ExtractResourceUIDFromName(request.Name)
+  	if err != nil {
+  		return nil, status.Errorf(codes.InvalidArgument, "invalid resource id: %v", err)
+  	}
+  	resource, err := s.Store.GetResource(ctx, &store.FindResource{UID: &resourceUID})
+  	if err != nil {
+  		return nil, status.Errorf(codes.Internal, "failed to get resource: %v", err)
+  	}
+  	if resource == nil {
+  		return nil, status.Errorf(codes.NotFound, "resource not found")
+  	}
+
+  	blob, err := s.GetResourceBlob(resource)
+  	if err != nil {
+  		return nil, status.Errorf(codes.Internal, "failed to get resource blob: %v", err)
+  	}
+
+  	contentType := resource.Type
+  	if strings.HasPrefix(contentType, "text/") {
+  		contentType += "; charset=utf-8"
+  	}
+  	// Prevent XSS attacks by serving potentially unsafe files with a content type that prevents script execution.
+  	if strings.EqualFold(contentType, "image/svg+xml") ||
+  		strings.EqualFold(contentType, "text/html") ||
+  		strings.EqualFold(contentType, "application/xhtml+xml") {
+  		contentType = "application/octet-stream"
+  	}
+
+  	return &httpbody.HttpBody{
+  		ContentType: contentType,
+  		Data:        blob,
+  	}, nil
+  }
+  ```
+
+test "rank1379: the same class at a second endpoint -- an avatar data URI's declared type"
+  lang go
+  file server/router/api/v1/user_service.go
+  expect VYQL-INJ-246
+  expect_review code.UploadDeclaredResponseContentType
+  code
+  ```
+  package v1
+
+  import (
+  	"context"
+  	"encoding/base64"
+  	"regexp"
+
+  	"github.com/pkg/errors"
+  	"google.golang.org/genproto/googleapis/api/httpbody"
+  	"google.golang.org/grpc/codes"
+  	"google.golang.org/grpc/status"
+  )
+
+  func (s *APIV1Service) GetUserAvatarBinary(ctx context.Context, request *v1pb.GetUserAvatarBinaryRequest) (*httpbody.HttpBody, error) {
+  	userID, err := ExtractUserIDFromName(request.Name)
+  	if err != nil {
+  		return nil, status.Errorf(codes.InvalidArgument, "invalid user name: %v", err)
+  	}
+  	user, err := s.Store.GetUser(ctx, &store.FindUser{ID: &userID})
+  	if err != nil {
+  		return nil, status.Errorf(codes.Internal, "failed to get user: %v", err)
+  	}
+  	if user == nil || user.AvatarURL == "" {
+  		return nil, status.Errorf(codes.NotFound, "avatar not found")
+  	}
+
+  	imageType, base64Data, err := extractImageInfo(user.AvatarURL)
+  	if err != nil {
+  		return nil, status.Errorf(codes.Internal, "failed to extract image info: %v", err)
+  	}
+  	imageData, err := base64.StdEncoding.DecodeString(base64Data)
+  	if err != nil {
+  		return nil, status.Errorf(codes.Internal, "failed to decode string: %v", err)
+  	}
+  	httpBody := &httpbody.HttpBody{
+  		ContentType: imageType,
+  		Data:        imageData,
+  	}
+  	return httpBody, nil
+  }
+
+  func extractImageInfo(dataURI string) (string, string, error) {
+  	dataURIRegex := regexp.MustCompile(`^data:(?P<type>.+);base64,(?P<base64>.+)`)
+  	matches := dataURIRegex.FindStringSubmatch(dataURI)
+  	if len(matches) != 3 {
+  		return "", "", errors.New("Invalid data URI format")
+  	}
+  	return matches[1], matches[2], nil
+  }
+  ```
+
+test "rank1379: an inert literal content type in a sibling handler does not excuse the download"
+  lang go
+  file server/router/api/v1/resource_service.go
+  expect VYQL-INJ-246
+  code
+  ```
+  package v1
+
+  import (
+  	"context"
+  	"strings"
+
+  	"google.golang.org/genproto/googleapis/api/httpbody"
+  )
+
+  func (s *APIV1Service) ExportMemos(ctx context.Context, request *v1pb.ExportMemosRequest) (*httpbody.HttpBody, error) {
+  	buf, err := s.buildZip(ctx)
+  	if err != nil {
+  		return nil, err
+  	}
+  	return &httpbody.HttpBody{
+  		ContentType: "application/octet-stream",
+  		Data:        buf,
+  	}, nil
+  }
+
+  func (s *APIV1Service) GetResourceBinary(ctx context.Context, request *v1pb.GetResourceBinaryRequest) (*httpbody.HttpBody, error) {
+  	resource, err := s.Store.GetResource(ctx, &store.FindResource{UID: &request.Uid})
+  	if err != nil {
+  		return nil, err
+  	}
+  	blob, err := s.GetResourceBlob(resource)
+  	if err != nil {
+  		return nil, err
+  	}
+  	contentType := resource.Type
+  	if strings.HasPrefix(contentType, "text/") {
+  		contentType += "; charset=utf-8"
+  	}
+  	return &httpbody.HttpBody{
+  		ContentType: contentType,
+  		Data:        blob,
+  	}, nil
+  }
+  ```
+
+test "rank1379: a hardcoded content type on a raw body is grpc-gateway's own documented example"
+  lang go
+  file examples/internal/server/a_bit_of_everything.go
+  reject VYQL-INJ-246
+  code
+  ```
+  package server
+
+  import (
+  	"time"
+
+  	"google.golang.org/genproto/googleapis/api/httpbody"
+  	"google.golang.org/grpc/metadata"
+  )
+
+  func (s *_ABitOfEverythingServer) Download(opt *examples.Options, stream examples.StreamService_DownloadServer) error {
+  	msgs := []*httpbody.HttpBody{{
+  		ContentType: "text/html",
+  		Data:        []byte("Hello 1"),
+  	}, {
+  		ContentType: "text/html",
+  		Data:        []byte("Hello 2"),
+  	}}
+
+  	for _, msg := range msgs {
+  		if err := stream.Send(msg); err != nil {
+  			return err
+  		}
+  		time.Sleep(5 * time.Millisecond)
+  	}
+
+  	if opt.Error {
+  		stream.SetTrailer(metadata.New(map[string]string{"error": "error"}))
+  	}
+  	return nil
+  }
+  ```
+
+test "rank1379: a stored content type served as an attachment is a download, not a render"
+  lang go
+  file server/router/api/v1/resource_service.go
+  reject VYQL-INJ-246
+  code
+  ```
+  package v1
+
+  import (
+  	"context"
+  	"fmt"
+
+  	"google.golang.org/genproto/googleapis/api/httpbody"
+  	"google.golang.org/grpc/grpclog"
+  	"google.golang.org/grpc/metadata"
+  )
+
+  func (s *APIV1Service) GetResourceBinary(ctx context.Context, request *v1pb.GetResourceBinaryRequest) (*httpbody.HttpBody, error) {
+  	resource, err := s.Store.GetResource(ctx, &store.FindResource{UID: &request.Uid})
+  	if err != nil {
+  		return nil, err
+  	}
+  	blob, err := s.GetResourceBlob(resource)
+  	if err != nil {
+  		return nil, err
+  	}
+  	if err := grpc.SetHeader(ctx, metadata.Pairs(
+  		"Content-Disposition", fmt.Sprintf("attachment; filename=%q", resource.Filename),
+  		"X-Content-Type-Options", "nosniff",
+  	)); err != nil {
+  		grpclog.Error(err)
+  	}
+  	contentType := resource.Type
+  	return &httpbody.HttpBody{
+  		ContentType: contentType,
+  		Data:        blob,
+  	}, nil
+  }
+  ```
