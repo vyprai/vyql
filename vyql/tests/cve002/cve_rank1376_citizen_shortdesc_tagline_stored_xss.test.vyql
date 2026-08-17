@@ -1,0 +1,429 @@
+# Rank 1376 / CVE-2025-53370 (GHSA-prmv-7r8c-794g, CWE-79):
+# StarCitizenTools/mediawiki-skins-Citizen is a MediaWiki skin. Its page-heading
+# component builds the string the skin renders under the page title -- the
+# "tagline" -- and prefers a short description supplied by Extension:ShortDescription
+# or by Wikibase over its own computed one:
+#
+#   private function getTagline(): string {
+#     $shortdesc = $this->out->getProperty( 'shortdesc' );
+#     if ( $shortdesc ) {
+#       $tagline = $shortdesc;
+#     } else {
+#       $tagline = $this->determineTagline();
+#     }
+#     if ( $tagline !== '' ) { $tagline = $langConv->convert( $tagline ); }
+#     return $tagline;
+#   }
+#
+#   public function getTemplateData(): array {
+#     return [ 'html-tagline' => $this->getTagline(), ... ];
+#   }
+#
+# The weakness, stated from the diff rather than the advisory: `getTagline()` mixes
+# two kinds of string into one variable and then hands the result to a template key
+# that is by convention raw HTML. The `else` branch is markup on purpose --
+# `determineTagline()` returns `Html::rawElement(...)` output or a parsed interface
+# message -- so `html-tagline` is consumed unescaped:
+# templates/PageHeading.mustache renders it as `{{{html-tagline}}}`. The `if` branch
+# is not markup: `OutputPage::getProperty( 'shortdesc' )` returns a page property an
+# extension set from the page's own wikitext, so it is text any user who can edit a
+# page (or an item on a connected Wikibase repository) controls. Assigning it into
+# the same raw-HTML slot stores attacker markup in every page view. Two branches
+# feed one variable, one of them is trusted to be HTML and the other is not, and the
+# variable's consumer trusts both.
+#
+# c85a40bddc8651fff66df83a72debddcb34f0521 escapes exactly the untrusted branch and
+# leaves the markup branch alone:
+#
+#   -   $tagline = $shortdesc;
+#   +   $tagline = htmlspecialchars( $shortdesc, ENT_QUOTES );
+#
+# The pool row is correct: REPO_OK, COMMIT_OK, and the single-line change above is
+# the whole fix. The vulnerable construct is present at the parent, c85a40bddc^,
+# at includes/Components/CitizenComponentPageHeading.php:251. The recorded CWE-79
+# is right. No corpus correction.
+#
+# The vulnerable file is PHP. A skin also ships client JavaScript and Mustache
+# templates, and both matter here: findings land in source, since the repository
+# commits no built assets (`resources/` is ResourceLoader source, bundled at request
+# time), but the raw-HTML boundary this weakness crosses is in
+# templates/PageHeading.mustache -- and `.mustache` matches no frontend at all. A
+# bounded scan of the vulnerable checkout reports `908 file(s) matched no frontend`,
+# 45 of them `.mustache`. PHP alternative-syntax view code (the `colon_block` gap
+# from rank 1328) is *not* a factor: Citizen's views are Mustache, and its PHP
+# contains no `if (...):`/`endif` bodies at all.
+#
+# What fires today, union over three `timeout 180 ./bin/vyql scan --cache off
+# --max-ram 6GB` runs of the vulnerable checkout (identical all three, so the
+# nondeterminism band is not in play): 7 findings and 2 flags, none of them about
+# the tagline. Four are in .github/workflows/installWiki.sh (2x VYQL-PATH-001,
+# 2x VYQL-RF-001, all from a bash source), one is VYQL-DOS-001 on a regex built
+# from DOM input in resources/skins.citizen.scripts/inline.js:19, and the last two
+# are the flag pair: VYQL-INJ-134 / code.NestedPathInheritedPropertyPrototypePollution
+# on resources/skins.citizen.search/searchClients/mwActionApi.js:85 and VYQL-INJ-115 /
+# code.UnsanitizedSvgUpload on includes/Api/ApiWebappManifest.php:43. `vyql match`
+# on the vulnerable file lists eleven sinks (five `Html::rawElement` argument
+# positions in the *user* tagline builders, one `preg_replace`) and, decisively,
+# `== source == (none)`: the page-property read is unlabelled.
+#
+# Vocabulary was checked for reuse before anything was written, and nothing needed
+# minting. code.HtmlRender already carries CWE-79 with excludedChars "<>\"'";
+# core.HtmlEscape already binds `htmlspecialchars` and already neutralises
+# injection.Xss, so VYQL-INJ-004 (`core.UserControlledData -> code.HtmlRender unless
+# path coveredBy core.HtmlEscape`) is exactly the rule this fix satisfies. For the
+# no-taint-path route, code.StoredHtmlWrite is the existing review concept whose
+# `expected: [core.HtmlEscape]` and reviewCondition ("stored HTML is written without
+# a proven sanitizer before later rendering") describe this weakness verbatim. No
+# rule ID and no concept is minted here; the two cases below that pin the review
+# concept use code.StoredHtmlWrite, and the two that pin the taint miss use
+# VYQL-INJ-004.
+#
+# ATTENTION, engine gap. Two independent blockers, both measured.
+#
+# Blocker 1 -- there is no node the raw-HTML sink can attach to. The value becomes
+# HTML at `{{{html-tagline}}}` in a Mustache template, and the PHP-side handoff is
+# an array-literal entry, `'html-tagline' => $this->getTagline()`. `vyql graph` over
+# the vulnerable file shows what survives lowering for that array: one
+# `Seq path=__object_literal` and one `CollectionElement vkind=Seq` per entry,
+# holding the entry *values* only. The key text is nowhere in the USG, so the one
+# fact that says "this slot is raw HTML" -- MediaWiki's documented skin convention
+# that template-data keys prefixed `html-` are inserted unescaped -- is unreadable.
+# And a sink can only be emitted from a `callExpr` binding: across all 30810
+# bindings in the tree, 29078 use `callExpr` and 1732 use `presenceNode`, and every
+# one of the latter emits `issue` (1720), `check` (7) or `source` (1) -- never
+# `sink`. There is no call at the boundary, so there is no position to bind. The
+# whole XSS taint apparatus therefore cannot reach this fix even though every other
+# piece of it is already present and correct.
+#
+# Blocker 2 -- interprocedural return flow through `$this->method()` in PHP is
+# resolved by method name across the whole program, so a same-named method on any
+# other class silences it. This is separable from blocker 1 and is what the second
+# pair below pins. Cases 3 and 4 are one file each, differing in exactly one token:
+# the *sibling* class's method is named `getTagline` in case 3 and `getFooter` in
+# case 4. Case 4 reports VYQL-INJ-004; case 3 reports nothing, and
+# `vyql trace -from code.HttpInput -to code.HtmlRender` on it says
+# `taint stops at ... call=analysis.function.return -- no outgoing flow (callee not
+# traced -- external or cross-package)`. Replacing `$this->getTagline()` with
+# `self::getTagline()` in case 3, changing nothing else, restores the finding, which
+# localises the defect to the `$this` receiver rather than to the collision.
+#
+# The cause is a receiver-name mismatch in
+# internal/extract/lowering/lowering.go. `resolveCalleeInfos`' `nir.Attr` arm takes
+# `obj := base.ID`, which for PHP is the literal text `$this`, and looks up
+# `sc.typ[obj]` to find the receiver's class. The scope's self entry is keyed
+# `this`, without the sigil: the PHP frontend declares `nir.Program{SelfName:
+# "this"}` (php.go:42), and both places that seed a self type -- `inner.setTyp(
+# l.selfName, ...)` at lowering.go:3028, gated on the method declaring self as its
+# first parameter, which PHP methods do not, and the C#-only implicit-`this` block
+# at 3037-3041, gated on `ClassDef.Members` being populated, which the PHP frontend
+# never does -- leave it unset for PHP either way. The `obj == "super"` case two
+# lines above is handled explicitly; `$this` is the missing sibling. With the
+# receiver class unknown, resolution falls through to the cross-file fallback at
+# lowering.go:5112, `l.uniqueTechFuncInfo(l.funcShort[c.Attr])`, which by design
+# refuses to resolve when two tech-compatible definitions share the short name
+# (lowering.go:5152, "ambiguous -- second compatible match"). Citizen declares
+# `getTemplateData()` on seventeen classes, so even with blocker 1 removed no path
+# out of a skin component would survive. This is *not* recorded as mechanical: the
+# repair needs the frontend to declare or synthesize a typed self for PHP, not a
+# single missing case, and it changes which body every `$this->m()` in every PHP
+# scan routes through -- routing through a concrete body also starts honouring
+# in-body sanitizers, so it can delete findings as well as add them, which is the
+# bidirectional hazard rank 1346's `sameReceiver` measurement and the rejected
+# declared-type-chain change both ran into.
+#
+# What was tried and measured, so the next session does not re-derive it. Both
+# variants below emit an existing review concept from a throwaway PHP binding,
+# scored with `-flags only` against both revisions of the real repository.
+#
+# 1. Function-confined, keyed on the property read:
+#      node.scope == "function" and node.context.language == "php"
+#      and node.context.assignCallMethod contains "getProperty"
+#      and not (containsAny(node.context.assignCallMethod,
+#          ["htmlspecialchars", "htmlentities", "escapeHtml", "strip_tags", "esc_html"]))
+#    discriminates perfectly -- 1 flag on the vulnerable revision, at
+#    CitizenComponentPageHeading.php:246, and 0 on the fixed one -- and the clause is
+#    genuinely function-confined, because `assign_call_method:` is absent from
+#    flagASTRoutingValuePrefixes (internal/bindings/bindings_match.go:730) so it stays
+#    on the node's own `str_args`. It is still not shippable. Its entire
+#    discriminating power is that `getProperty` happens to be assigned exactly once
+#    in this repository: the clause says nothing about the value being rendered as
+#    HTML, which is the review concept's stated assumption, and `getProperty` is an
+#    ordinary getter name. Nobody reading MediaWiki's documentation would write it,
+#    which is the genericity test in AGENTS.md, and the next variant of this weakness
+#    -- a short description arriving from a hook or from `ParserOutput` rather than
+#    from `getProperty` -- walks straight past it.
+#
+# 2. The honest generalisation, anchored on the raw-HTML key instead of the getter,
+#    at class scope because the key and the read are in different methods:
+#      node.scope == "class" and node.context.language == "php"
+#      and node.context.literal contains "html-"
+#      and not (containsAny(node.context.assignCallMethod, [<the same escapers>]))
+#    reports 7 flags on the vulnerable revision and 6 on the fixed one: 1 true and 6
+#    false on the repository the CVE is in, the false ones being
+#    CitizenComponentLink.php:14, CitizenComponentMenu.php:12,
+#    CitizenComponentSearchBox.php:14, SkinCitizen.php:47 and two test fixtures,
+#    CitizenComponentLinkTest.php:17 and CitizenComponentMenuTest.php:15 -- every
+#    component that legitimately assembles markup with `Html::rawElement` before
+#    putting it in an `html-` key, which is the correct use of the convention. 1-in-7
+#    on the vulnerable tree is the shape ranks 1311, 1331 and 1343 already measured
+#    unshippable. Class scope is also the co-membership trap from the rejected
+#    whole-file computations: with one class per file it is file scope, and
+#    `literal:` routes through the AST path file-wide regardless.
+#
+# Behaviour a shippable fact needs, in order of how much it unblocks:
+#  a. Array/object-literal *keys* represented in the USG, and a binding position
+#     that can attach a sink to a literal entry's value. Then MediaWiki's `html-`
+#     prefix convention becomes one ordinary PHP sink binding emitting
+#     code.HtmlRender, and VYQL-INJ-004 covers this class of skin and extension
+#     stored XSS with no new concept and no new rule. This is the general form of a
+#     gap that any template-data-array framework hits, not a MediaWiki one.
+#  b. A typed self for PHP so `$this->m()` resolves through its own class
+#     (blocker 2 above), without which (a) alone still yields nothing on a real
+#     skin.
+#
+# The four cases below are the two minimal pairs. Cases 1 and 2 are the real
+# vulnerable and patched `getTagline()`, both rejected today, pinning the review
+# miss. Cases 3 and 4 differ only in the sibling class's method name and isolate the
+# `$this` resolution gap.
+#
+# verify_current_expected: attention-engine-gap; cases 1-3 rejected, case 4 expected.
+
+test "rank1376: a skin page-heading component assigns an extension-supplied short description into the raw-HTML tagline key"
+  lang php
+  file includes/Components/CitizenComponentPageHeading.php
+  reject_review code.StoredHtmlWrite
+  code
+  ```
+  <?php
+
+  declare( strict_types=1 );
+
+  namespace MediaWiki\Skins\Citizen\Components;
+
+  use MediaWiki\Html\Html;
+  use MediaWiki\MediaWikiServices;
+  use MediaWiki\Output\OutputPage;
+  use MessageLocalizer;
+
+  class CitizenComponentPageHeading {
+
+  	public function __construct(
+  		private MediaWikiServices $services,
+  		private MessageLocalizer $localizer,
+  		private OutputPage $out,
+  		private string $titleData
+  	) {
+  	}
+
+  	private function getCitizenTagline( string $msgKey ): string {
+  		$msg = $this->localizer->msg( $msgKey );
+  		if ( $msg->isDisabled() ) {
+  			$msg = $this->localizer->msg( 'tagline' );
+  		}
+  		return $msg->parse();
+  	}
+
+  	private function determineTagline(): string {
+  		return Html::rawElement(
+  			'div',
+  			[ 'id' => 'citizen-tagline-user' ],
+  			$this->getCitizenTagline( 'citizen-tagline' )
+  		);
+  	}
+
+  	/**
+  	 * Return the page tagline based on the current page
+  	 */
+  	private function getTagline(): string {
+  		// Use short description if there is any
+  		// from Extension:ShortDescription
+  		$shortdesc = $this->out->getProperty( 'shortdesc' );
+  		if ( $shortdesc ) {
+  			$tagline = $shortdesc;
+  		} else {
+  			$tagline = $this->determineTagline();
+  		}
+
+  		if ( $tagline !== '' ) {
+  			// Apply language variant conversion
+  			$langConv = $this->services
+  				->getLanguageConverterFactory()
+  				->getLanguageConverter( $this->services->getContentLanguage() );
+  			$tagline = $langConv->convert( $tagline );
+  		}
+
+  		return $tagline;
+  	}
+
+  	/**
+  	 * @inheritDoc
+  	 */
+  	public function getTemplateData(): array {
+  		return [
+  			'html-tagline' => $this->getTagline(),
+  			'html-title-heading' => $this->titleData
+  		];
+  	}
+  }
+  ```
+
+test "rank1376: the same component escaping the short description before it reaches the raw-HTML tagline key"
+  lang php
+  file includes/Components/CitizenComponentPageHeading.php
+  reject_review code.StoredHtmlWrite
+  code
+  ```
+  <?php
+
+  declare( strict_types=1 );
+
+  namespace MediaWiki\Skins\Citizen\Components;
+
+  use MediaWiki\Html\Html;
+  use MediaWiki\MediaWikiServices;
+  use MediaWiki\Output\OutputPage;
+  use MessageLocalizer;
+
+  class CitizenComponentPageHeading {
+
+  	public function __construct(
+  		private MediaWikiServices $services,
+  		private MessageLocalizer $localizer,
+  		private OutputPage $out,
+  		private string $titleData
+  	) {
+  	}
+
+  	private function getCitizenTagline( string $msgKey ): string {
+  		$msg = $this->localizer->msg( $msgKey );
+  		if ( $msg->isDisabled() ) {
+  			$msg = $this->localizer->msg( 'tagline' );
+  		}
+  		return $msg->parse();
+  	}
+
+  	private function determineTagline(): string {
+  		return Html::rawElement(
+  			'div',
+  			[ 'id' => 'citizen-tagline-user' ],
+  			$this->getCitizenTagline( 'citizen-tagline' )
+  		);
+  	}
+
+  	/**
+  	 * Return the page tagline based on the current page
+  	 */
+  	private function getTagline(): string {
+  		// Use short description if there is any
+  		// from Extension:ShortDescription
+  		$shortdesc = $this->out->getProperty( 'shortdesc' );
+  		if ( $shortdesc ) {
+  			$tagline = htmlspecialchars( $shortdesc, ENT_QUOTES );
+  		} else {
+  			$tagline = $this->determineTagline();
+  		}
+
+  		if ( $tagline !== '' ) {
+  			// Apply language variant conversion
+  			$langConv = $this->services
+  				->getLanguageConverterFactory()
+  				->getLanguageConverter( $this->services->getContentLanguage() );
+  			$tagline = $langConv->convert( $tagline );
+  		}
+
+  		return $tagline;
+  	}
+
+  	/**
+  	 * @inheritDoc
+  	 */
+  	public function getTemplateData(): array {
+  		return [
+  			'html-tagline' => $this->getTagline(),
+  			'html-title-heading' => $this->titleData
+  		];
+  	}
+  }
+  ```
+
+test "rank1376: taint returned through a component's own $this->getTagline() while a second class declares a method of the same name"
+  lang php
+  file includes/Components/Taglines.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  namespace MediaWiki\Skins\Citizen\Components;
+
+  use MediaWiki\Html\Html;
+
+  class CitizenComponentPageFooter {
+
+  	private function getTagline(): string {
+  		return 'static';
+  	}
+
+  	public function getTemplateData(): array {
+  		return [ 'html-footer-tagline' => $this->getTagline() ];
+  	}
+  }
+
+  class CitizenComponentPageHeading {
+
+  	private function getTagline(): string {
+  		$shortdesc = $_GET['shortdesc'];
+  		if ( $shortdesc ) {
+  			$tagline = $shortdesc;
+  		} else {
+  			$tagline = '';
+  		}
+  		return $tagline;
+  	}
+
+  	public function renderHeading(): string {
+  		return Html::rawElement( 'div', [ 'id' => 'siteSub' ], $this->getTagline() );
+  	}
+  }
+  ```
+
+test "rank1376: the same taint with the second class's method named differently"
+  lang php
+  file includes/Components/Taglines.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  namespace MediaWiki\Skins\Citizen\Components;
+
+  use MediaWiki\Html\Html;
+
+  class CitizenComponentPageFooter {
+
+  	private function getFooter(): string {
+  		return 'static';
+  	}
+
+  	public function getTemplateData(): array {
+  		return [ 'html-footer-tagline' => $this->getFooter() ];
+  	}
+  }
+
+  class CitizenComponentPageHeading {
+
+  	private function getTagline(): string {
+  		$shortdesc = $_GET['shortdesc'];
+  		if ( $shortdesc ) {
+  			$tagline = $shortdesc;
+  		} else {
+  			$tagline = '';
+  		}
+  		return $tagline;
+  	}
+
+  	public function renderHeading(): string {
+  		return Html::rawElement( 'div', [ 'id' => 'siteSub' ], $this->getTagline() );
+  	}
+  }
+  ```
