@@ -1,0 +1,90 @@
+# Rank 1571 / CVE-2026-46364: phpMyFAQ's FAQ listing interpolated the
+# raw sort-order request parameter into its ORDER BY clause, so a
+# crafted sorting value injected SQL (SQL injection, CWE-89; the task
+# list's commit? flag resolves COMMIT_OK -- the commit is the fix,
+# "fix: improved queries"). The match arm in
+# phpmyfaq/src/phpMyFAQ/Faq.php did `FAQ_SORTING_TYPE_CATID_FAQID =>
+# sprintf('ORDER BY fcr.category_id, fd.id %s', $sortOrder)` and
+# three siblings -- $sortOrder arrives from the listing request
+# through the controller, unvalidated, straight into the clause. Pool
+# commit 05f83bf4e5 is the real fix: every arm passes
+# normalizeSortDirection((string) $sortOrder) -- a whitelist that
+# maps to ASC or DESC -- into the sprintf, and Tags.php/
+# SearchDatabase.php drop redundant quote-wrapping beside it. No
+# pool correction.
+#
+# ATTENTION, param-provenance at the ORDER BY boundary. The sink half
+# exists -- sprintf-built ORDER BY into the db query is the
+# code.SqlExecution shape -- but $sortOrder reaches Faq.php as a
+# public API parameter whose caller lives outside the file, so no
+# source label forms on the real code (scanning Faq.php reports
+# three INJ-001 rows at both revisions on the QueryHelper flow at
+# :1530-:1531, line-shifted at the fix, none on the ORDER BY arms at
+# :1353). The fix's control -- a direction whitelist before the
+# interpolation -- is the general allowlist shape; the missing piece
+# is entry-param provenance, the same family as ranks 1548 (paddle's
+# window name) and 1529 (argv values). No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1571 records a
+# request-driven sort parameter reaching the ORDER BY sprintf
+# expecting VYQL-INJ-001 and the normalizeSortDirection form
+# rejecting it.
+
+test "rank1571: the sort order is interpolated raw"
+  lang php
+  file phpmyfaq/src/phpMyFAQ/Faq.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class FaqController
+  {
+      public function listing(Request $request, Database $db)
+      {
+          $sortOrder = $request->query->get('sortorder');
+          $sortingType = 0;
+
+          $order = match ($sortingType) {
+              0 => sprintf('ORDER BY fcr.category_id, fd.id %s', $sortOrder),
+              1 => sprintf('ORDER BY fd.id %s', $sortOrder),
+              default => 'ORDER BY fd.id ASC',
+          };
+
+          $query = 'SELECT fd.id, fd.thema FROM faqdata fd ' . $order;
+          return $db->query($query);
+      }
+  }
+  ```
+
+test "rank1571: the fix whitelists the direction first"
+  lang php
+  file phpmyfaq/src/phpMyFAQ/Faq.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class FaqController
+  {
+      public function listing(Request $request, Database $db)
+      {
+          $sortOrder = $request->query->get('sortorder');
+          $sortingType = 0;
+
+          $sortDirection = normalizeSortDirection((string) $sortOrder);
+          $order = match ($sortingType) {
+              0 => sprintf('ORDER BY fcr.category_id, fd.id %s', $sortDirection),
+              1 => sprintf('ORDER BY fd.id %s', $sortDirection),
+              default => 'ORDER BY fd.id ASC',
+          };
+
+          $query = 'SELECT fd.id, fd.thema FROM faqdata fd ' . $order;
+          return $db->query($query);
+      }
+  }
+
+  function normalizeSortDirection(string $sortOrder): string
+  {
+      return strtoupper($sortOrder) === 'DESC' ? 'DESC' : 'ASC';
+  }
+  ```
