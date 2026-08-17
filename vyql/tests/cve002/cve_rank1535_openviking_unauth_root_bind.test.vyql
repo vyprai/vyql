@@ -1,0 +1,90 @@
+# Rank 1535 / CVE-2026-22207: OpenViking's server ran
+# unauthenticated with administrator identity whenever no root API
+# key was configured, and its default bind address was 0.0.0.0, so
+# any network request to a default deployment executed ROOT
+# operations (missing authentication on an exposed endpoint,
+# CWE-306/CWE-862; PR #310). resolve_identity in
+# openviking/server/auth.py resolves every request to ROOT when
+# root_api_key is unset ("dev mode"), and openviking/server/app.py
+# started that mode on 0.0.0.0 with only an info log. Pool commit
+# 9e69113ad0 is the real fix (COMMIT_OK -- "fix(server): when
+# root_api_key is not configured only allow localhost binding";
+# the task list's commit? flag resolves to the same commit). The fix
+# adds validate_server_config in openviking/server/config.py: with
+# no root_api_key and a host outside _LOCALHOST_HOSTS the server
+# refuses to start (logger.error + SystemExit), the default host
+# becomes 127.0.0.1, and dev mode logs a warning naming the loopback
+# bind. No pool correction.
+#
+# ATTENTION, secure-default startup guard. The defect is a
+# configuration-pair invariant -- unauthenticated admin mode is only
+# safe on a loopback bind -- and nothing in the corpus can ask "is
+# the auth-disabled mode constrained to safe network bindings", the
+# same decision-completeness family as ranks 1519 (capability gates)
+# and 1556 (route groups): the guard lives at startup, before any
+# request path the auth rules observe. A binding on OpenViking's own
+# validate_server_config would detect this application rather than
+# the weakness. Measured on the real code: scanning app.py and
+# config.py reports 3 findings (VYQL-SEC-042, two VYQL-SEC-045 --
+# secrets heuristics) at both revisions, unchanged by the fix. No
+# ENGINE-GAPS.md entry. No definition change shipped. Spec
+# cve_rank1535 records the unguarded dev-mode startup and the
+# validated form, both asserting reject VYQL-AUTH-079: when
+# secure-default vocabulary lands, the unguarded form must flip to
+# expect.
+
+test "rank1535: unauthenticated root mode starts on every interface"
+  lang python
+  file openviking/server/app.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  import logging
+
+  logger = logging.getLogger(__name__)
+
+  def serve(config):
+      if not config.root_api_key:
+          logger.info("Dev mode: no root_api_key configured, authentication disabled")
+
+      uvicorn.run(app, host=config.host, port=config.port)
+  ```
+
+test "rank1535: the fix refuses unsafe binds at startup"
+  lang python
+  file openviking/server/app.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  import logging
+  import sys
+
+  logger = logging.getLogger(__name__)
+
+  _LOCALHOST_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+  def _is_localhost(host):
+      return host in _LOCALHOST_HOSTS
+
+  def validate_server_config(config):
+      if config.root_api_key:
+          return
+
+      if not _is_localhost(config.host):
+          logger.error(
+              "SECURITY: server.root_api_key is not configured and server.host "
+              "is '%s' (non-localhost). This would expose an unauthenticated "
+              "ROOT endpoint to the network.", config.host)
+          sys.exit(1)
+
+  def serve(config):
+      validate_server_config(config)
+
+      if not config.root_api_key:
+          logger.warning(
+              "Dev mode: no root_api_key configured, authentication disabled. "
+              "This is allowed because the server is bound to localhost (%s).",
+              config.host)
+
+      uvicorn.run(app, host=config.host, port=config.port)
+  ```
