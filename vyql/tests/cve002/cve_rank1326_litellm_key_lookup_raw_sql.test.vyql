@@ -1,0 +1,260 @@
+# Rank 1326 / CVE-2026-42208 BerriAI/litellm: the proxy's virtual-key lookup
+# builds its SQL by interpolation. PrismaClient.get_data(table_name=
+# "combined_view") formats the caller's key straight into the query text --
+# WHERE v.token = '{token}' -- and hands the string to
+# _query_first_with_cached_plan_fallback, which calls Prisma Client Python's
+# db.query_first(query=sql_query). The value comes from the Authorization
+# header of any LLM API route and is only hashed when it starts with "sk-", so
+# an unauthenticated caller controls the query text and reads or writes the
+# table holding every virtual key and its budget (CWE-89).
+#
+# Pool correction. Pool commit 5e2d75d75db745d5ef8164ff29ed10bdbd4877a6 is a
+# dependency bump ("bump deps") that names this CVE only in passing, as the
+# reason a semantic-router release was yanked; it changes uv.lock and
+# pyproject.toml and no proxy code. The real fix is
+# 4dc416ee749122ca91e3bca095217478663419e7, "fix(proxy): use parameterized
+# query for combined_view token lookup": WHERE v.token = $1, the value passed
+# to query_first as a separate argument, and *args threaded through the
+# cached-plan fallback so the retry binds it too. Follow-up
+# 9a4f5d73169408c44177fca411c80aa628048917 drops the now-pointless f prefix.
+# The advisory's own OSV "fixed" event, e0d5c28db02b3219dbd944666a55f49732197922,
+# is an unrelated MCP PKCE change that happens to sit at the release boundary.
+#
+# FIXED. Nothing labelled the sink: Prisma Client Python's raw-query API had no
+# binding, so `vyql match` reported the Authorization-header source and no sink
+# at all. Added a Python binding naming the three documented raw-query methods
+# -- query_raw, query_first and execute_raw -- as code.SqlExecution at the
+# query-text argument. The library binds every trailing positional argument to
+# a $1, $2, ... placeholder, so those arguments are deliberately not sinks,
+# which is what separates the patched form from the vulnerable one. Each method
+# needs a second binding at args[0].collection because `query` is a named
+# parameter and the vulnerable call spells it query=sql_query, which arg-slot
+# selection treats as a structured argument.
+#
+# Measured on the real checkout, bounded (timeout 180, --max-ram 6GB,
+# --cache off). litellm/proxy/auth plus litellm/proxy/utils.py at the fix's
+# parent (15 python files) reports 25 findings and no VYQL-INJ-001 before the
+# binding, and 27 after -- the two new ones are VYQL-INJ-001 from
+# user_api_key_auth.py:469 to utils.py:2667 and :2682, the full path through
+# get_key_object, _fetch_key_object_from_db_with_reconnect,
+# PrismaClient.get_data and the cached-plan fallback. The same files at
+# 9a4f5d73169408c44177fca411c80aa628048917 report 25 again and no
+# VYQL-INJ-001. The whole repository, and even litellm/proxy alone, exceeds the
+# 180s bound, so the auth package plus the changed file is the real-checkout
+# evidence.
+#
+# Precision cost, measured. litellm's own proxy reports eight further
+# VYQL-INJ-001 from this binding -- one in spend_tracking, seven in
+# management_endpoints -- and all eight are the same safe idiom: a
+# parameterized query whose placeholder number is built from the bound-argument
+# list, f"key_alias ILIKE ${len(query_params)}". Taint survives len(), so the
+# integer carries the tainted mark into the query text. That imprecision is not
+# this binding's: the same idiom already reports today through the shipped
+# psycopg cursor.execute and asyncpg fetch sinks. The last two tests below are
+# the minimal pair isolating it, and they pin present behaviour rather than
+# desired behaviour: they differ only in whether the placeholder number comes
+# from len() of the bound-argument list, and a len() taint barrier in the
+# engine would turn the first of them into a reject. Joining a list of literal
+# WHERE fragments while the values go to a separate parameter list already does
+# not report, so the imprecision is confined to len().
+
+test "rank1326: the combined_view key lookup formats the caller's key into the query text"
+  lang python
+  file utils.py
+  expect VYQL-INJ-001
+  code
+  ```
+  from typing import Any, Literal, Optional, Union
+
+  from fastapi import HTTPException, Request
+
+
+  class PrismaClient:
+      def __init__(self, db):
+          self.db = db
+
+      async def _query_first_with_cached_plan_fallback(
+          self, sql_query: str
+      ) -> Optional[dict]:
+          try:
+              return await self.db.query_first(query=sql_query)
+          except Exception as e:
+              if "cached plan must not change result type" in str(e):
+                  sql_query_retry = f"/* fresh */ {sql_query}"
+                  return await self.db.query_first(query=sql_query_retry)
+              raise
+
+      async def get_data(
+          self,
+          token: Optional[Union[str, list]] = None,
+          table_name: Optional[Literal["key", "combined_view"]] = None,
+          query_type: Literal["find_unique", "find_all"] = "find_unique",
+      ):
+          response: Any = None
+          if table_name == "combined_view":
+              if query_type == "find_unique":
+                  if token is None:
+                      raise HTTPException(status_code=400, detail={"error": "no token"})
+
+                  sql_query = f"""
+                      SELECT
+                          v.*,
+                          t.spend AS team_spend,
+                          t.max_budget AS team_max_budget
+                      FROM "LiteLLM_VerificationToken" AS v
+                      LEFT JOIN "LiteLLM_TeamTable" AS t ON v.team_id = t.team_id
+                      WHERE v.token = '{token}'
+                  """
+
+                  response = await self._query_first_with_cached_plan_fallback(sql_query)
+          return response
+
+
+  async def user_api_key_auth(request: Request, prisma_client: PrismaClient) -> dict:
+      api_key = request.headers.get("Authorization") or ""
+      api_key = api_key.replace("Bearer ", "")
+      return await prisma_client.get_data(
+          token=api_key, table_name="combined_view", query_type="find_unique"
+      )
+  ```
+
+test "rank1326: the fix binds the key to a placeholder and threads it through the cached-plan retry"
+  lang python
+  file utils.py
+  reject VYQL-INJ-001
+  code
+  ```
+  from typing import Any, Literal, Optional, Union
+
+  from fastapi import HTTPException, Request
+
+
+  class PrismaClient:
+      def __init__(self, db):
+          self.db = db
+
+      async def _query_first_with_cached_plan_fallback(
+          self, sql_query: str, *args
+      ) -> Optional[dict]:
+          try:
+              return await self.db.query_first(sql_query, *args)
+          except Exception as e:
+              if "cached plan must not change result type" in str(e):
+                  sql_query_retry = f"/* fresh */ {sql_query}"
+                  return await self.db.query_first(sql_query_retry, *args)
+              raise
+
+      async def get_data(
+          self,
+          token: Optional[Union[str, list]] = None,
+          table_name: Optional[Literal["key", "combined_view"]] = None,
+          query_type: Literal["find_unique", "find_all"] = "find_unique",
+      ):
+          response: Any = None
+          if table_name == "combined_view":
+              hashed_token = _hash_token_if_needed(token=token) if isinstance(token, str) else None
+              if query_type == "find_unique":
+                  if token is None:
+                      raise HTTPException(status_code=400, detail={"error": "no token"})
+
+                  sql_query = """
+                      SELECT
+                          v.*,
+                          t.spend AS team_spend,
+                          t.max_budget AS team_max_budget
+                      FROM "LiteLLM_VerificationToken" AS v
+                      LEFT JOIN "LiteLLM_TeamTable" AS t ON v.team_id = t.team_id
+                      WHERE v.token = $1
+                  """
+
+                  response = await self._query_first_with_cached_plan_fallback(sql_query, hashed_token)
+          return response
+
+
+  def _hash_token_if_needed(token: str) -> str:
+      import hashlib
+
+      if token.startswith("sk-"):
+          return hashlib.sha256(token.encode()).hexdigest()
+      return token
+
+
+  async def user_api_key_auth(request: Request, prisma_client: PrismaClient) -> dict:
+      api_key = request.headers.get("Authorization") or ""
+      api_key = api_key.replace("Bearer ", "")
+      return await prisma_client.get_data(
+          token=api_key, table_name="combined_view", query_type="find_unique"
+      )
+  ```
+
+test "rank1326: a request-supplied page size reaching query_raw as a bound argument stays silent"
+  lang python
+  file utils.py
+  reject VYQL-INJ-001
+  code
+  ```
+  from typing import Optional
+
+  from fastapi import Request
+
+
+  class PrismaClient:
+      def __init__(self, db):
+          self.db = db
+
+      async def get_users(
+          self, offset: Optional[int] = None, limit: Optional[int] = None
+      ):
+          sql_query = """
+          SELECT
+              u.*,
+              json_agg(v.key_alias) AS key_aliases
+          FROM
+              "LiteLLM_UserTable" u
+          LEFT JOIN "LiteLLM_VerificationToken" v ON u.user_id = v.user_id
+          GROUP BY
+              u.user_id
+          ORDER BY u.spend DESC
+          LIMIT $1
+          OFFSET $2
+          """
+          return await self.db.query_raw(sql_query, limit, offset)
+
+
+  async def list_users(request: Request, prisma_client: PrismaClient):
+      page = request.query_params.get("page")
+      page_size = request.query_params.get("page_size")
+      return await prisma_client.get_users(offset=page, limit=page_size)
+  ```
+
+test "rank1326: a placeholder number taken from len() of the bound-argument list carries taint into the query text"
+  lang python
+  file analytics.py
+  expect VYQL-INJ-001
+  code
+  ```
+  from fastapi import Request
+
+
+  async def key_aliases(request: Request, db):
+      search = request.query_params.get("search")
+      query_params = [search]
+      count_sql = f'SELECT COUNT(*) FROM "LiteLLM_VerificationToken" WHERE key_alias ILIKE ${len(query_params)}'
+      return await db.query_raw(count_sql, *query_params)
+  ```
+
+test "rank1326: the same query with a literal placeholder number stays silent"
+  lang python
+  file analytics.py
+  reject VYQL-INJ-001
+  code
+  ```
+  from fastapi import Request
+
+
+  async def key_aliases(request: Request, db):
+      search = request.query_params.get("search")
+      query_params = [search]
+      count_sql = 'SELECT COUNT(*) FROM "LiteLLM_VerificationToken" WHERE key_alias ILIKE $1'
+      return await db.query_raw(count_sql, *query_params)
+  ```

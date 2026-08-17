@@ -1,0 +1,47 @@
+module bindings.python.prisma_raw_queries;
+
+// Prisma Client Python documents three raw-query methods as the escape hatch
+// from its generated query API: query_raw(query, *args) and
+// query_first(query, *args) for reads, execute_raw(query, *args) for writes.
+// The `query` parameter is the SQL text the database receives verbatim, so it
+// is the sink; every trailing positional argument is bound to a $1, $2, …
+// placeholder by the query engine, so a value handed over there is already
+// parameterized and is deliberately not a sink.
+//
+// The methods live on the client, on a transaction and on a batcher, so match
+// on the method name rather than on a receiver path.
+//
+// Each method needs two bindings because `query` is a named parameter and both
+// spellings occur: passed positionally it lands in the args[0] slot, passed as
+// query=... it lands there as a keyword entry, which arg-slot selection treats
+// as a structured argument and reaches through .collection.
+
+binding prismaQueryRawSqlExecution {
+  query pattern callExpr where callee.method == "query_raw"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding prismaQueryRawKeywordSqlExecution {
+  query pattern callExpr where callee.method == "query_raw"
+  emit sink code.SqlExecution at args[0].collection
+}
+
+binding prismaQueryFirstSqlExecution {
+  query pattern callExpr where callee.method == "query_first"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding prismaQueryFirstKeywordSqlExecution {
+  query pattern callExpr where callee.method == "query_first"
+  emit sink code.SqlExecution at args[0].collection
+}
+
+binding prismaExecuteRawSqlExecution {
+  query pattern callExpr where callee.method == "execute_raw"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding prismaExecuteRawKeywordSqlExecution {
+  query pattern callExpr where callee.method == "execute_raw"
+  emit sink code.SqlExecution at args[0].collection
+}
