@@ -4025,3 +4025,8 @@ binding openedWindowConcatenatedDocumentWrite961 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "document.write" and node.context.callPath contains "open" and containsAny(node.context.literal, ["src=\"", "href=\"", "src='", "href='"]) and not (node.context.callPath contains "createElement")
   emit issue code.OpenedWindowConcatenatedDocumentWrite at node
 }
+
+binding nestedPathInheritedPropertyPrototypePollution962 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.dynamicPropertyWrite == "true" and node.context.callPath contains "regex.exec" and not (containsAny(node.context.callPath, ["Object.hasOwn", "hasOwnProperty"])) and not (node.context.prototypeKeyGuard == "true")
+  emit issue code.NestedPathInheritedPropertyPrototypePollution at node
+}

@@ -1,0 +1,89 @@
+# CVE-2019-7609: Timelion's props series function unflattened caller-supplied
+# argument keys by walking regex-matched path segments and writing each one
+# into a plain object with `cur[prop] || (cur[prop] = ...)`, never checking
+# that the segment was the object's own property. A path segment of
+# `__proto__` or `constructor.prototype` therefore wrote through the
+# inherited chain, polluting Object.prototype and, combined with later code
+# that reads polluted properties, reaching remote code execution.
+
+test "rank1270: regex-walked path unflatten writes dynamic property without own-property guard"
+  lang javascript
+  file index.js
+  expect VYQL-INJ-134
+  expect_review code.NestedPathInheritedPropertyPrototypePollution
+  code
+  ```
+  function unflatten(data) {
+    if (Object(data) !== data || Array.isArray(data)) return data;
+
+    const regex = new RegExp(/\.?([^.\[\]]+)|\[(\d+)\]/g);
+    const result = {};
+    _.each(data, function (val, p) {
+      let cur = result;
+      let prop = '';
+      let m;
+      while (m = regex.exec(p)) {
+        cur = cur[prop] || (cur[prop] = (m[2] ? [] : {}));
+        prop = m[2] || m[1];
+      }
+      cur[prop] = data[p];
+    });
+
+    return result[''] || result;
+  }
+
+  export default function propsFn(args) {
+    const properties = unflatten(_.omit(args.byName, 'inputSeries', 'global'));
+
+    if (args.byName.global) {
+      _.assign(args.byName.inputSeries, properties);
+      return args.byName.inputSeries;
+    } else {
+      return args.byName.inputSeries.map(function (eachSeries) {
+        _.assign(eachSeries, properties);
+        return eachSeries;
+      });
+    }
+  }
+  ```
+
+test "rank1270: regex-walked path unflatten rejects when the current segment is checked as an own property"
+  lang javascript
+  file index.js
+  reject VYQL-INJ-134
+  reject_review code.NestedPathInheritedPropertyPrototypePollution
+  code
+  ```
+  function unflatten(data) {
+    if (Object(data) !== data || Array.isArray(data)) return data;
+
+    const regex = new RegExp(/\.?([^.\[\]]+)|\[(\d+)\]/g);
+    const result = {};
+    _.each(data, function (val, p) {
+      let cur = result;
+      let prop = '';
+      let m;
+      while (m = regex.exec(p)) {
+        cur = (cur.hasOwnProperty(prop) && cur[prop]) || (cur[prop] = (m[2] ? [] : {}));
+        prop = m[2] || m[1];
+      }
+      cur[prop] = data[p];
+    });
+
+    return result[''] || result;
+  }
+
+  export default function propsFn(args) {
+    const properties = unflatten(_.omit(args.byName, 'inputSeries', 'global'));
+
+    if (args.byName.global) {
+      _.assign(args.byName.inputSeries, properties);
+      return args.byName.inputSeries;
+    } else {
+      return args.byName.inputSeries.map(function (eachSeries) {
+        _.assign(eachSeries, properties);
+        return eachSeries;
+      });
+    }
+  }
+  ```
