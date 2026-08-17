@@ -1,0 +1,151 @@
+# A Next.js App Router route handler that exists only to relay a caller-
+# supplied URL: the request body is the URL and the handler fetches it
+# server-side. The first attempt at a guard resolved the hostname with
+# dns.lookup and rejected the answer when `ip`'s isPrivate() called it
+# internal. That test runs against an address the fetch never uses, because
+# the fetch resolves the name again itself, so a name answering with a public
+# address once and a loopback address on the second query walks straight
+# through, as does any redirect the fetched origin returns. A pre-resolution
+# address test is therefore not a control on this flow.
+#
+# The handler's entire input is its body, and a body read was labelled
+# nowhere: the shipped Next.js source binding covers `searchParams` only, so
+# a handler taking `POST(request: Request)` and reading `await request.json()`
+# or `await request.text()` -- the way the framework documents receiving a
+# payload -- had no source at all and the fetch sink was unreachable.
+#
+# request-filtering-agent is the control the fix adopts: useAgent(url) returns
+# the http or https agent for the URL's scheme, and that agent applies the
+# private, loopback, link-local and reserved-range test at connect time on the
+# address the socket actually dials, refusing the connection there. Passing one
+# to a request as its `agent` option is what neutralises the flow, so the
+# binding labels the agent factory and the two agent constructors -- the
+# package's whole documented surface -- and labels no address predicate a
+# caller may have run beforehand.
+#
+# The last two cases are an isolating pair, not two revisions: they differ
+# only in whether the agent call sits inline in the request's own argument
+# list or is bound to a local first. A control covers an endpoint by
+# dominating it, and dominance follows the order lowering assigns regions; a
+# call nested in one argument of a call is lowered after the sibling argument
+# the sink is anchored on, so the guard's region follows the sink's and
+# dominance fails even though argument evaluation guarantees the guard ran
+# first. Inline is the spelling the package's own README documents and the
+# spelling the fix uses, so the gap costs a false positive on correct code.
+
+test "rank1332 lobe-chat: the proxy route fetches the request-body URL after a pre-resolution private-address test"
+  lang javascript
+  file package.json
+  code
+  ```
+  {
+    "name": "@lobehub/chat",
+    "dependencies": {
+      "ip": "^2.0.1",
+      "next": "14.2.8"
+    }
+  }
+  ```
+  file src/app/api/proxy/route.ts
+  expect VYQL-RF-001
+  code
+  ```
+  import { isPrivate } from 'ip';
+  import { NextResponse } from 'next/server';
+  import dns from 'node:dns';
+  import { promisify } from 'node:util';
+
+  const lookupAsync = promisify(dns.lookup);
+
+  export const runtime = 'nodejs';
+
+  export const POST = async (req: Request) => {
+    const url = new URL(await req.text());
+    let address;
+
+    try {
+      const lookupResult = await lookupAsync(url.hostname);
+      address = lookupResult.address;
+    } catch (err) {
+      return NextResponse.json({ error: 'DNS parser error' }, { status: 504 });
+    }
+
+    const isInternalHost = isPrivate(address);
+
+    if (isInternalHost)
+      return NextResponse.json({ error: 'Not support internal host proxy' }, { status: 400 });
+
+    const res = await fetch(url.toString());
+
+    return new Response(res.body, { headers: res.headers });
+  };
+  ```
+
+test "rank1332 lobe-chat: the proxy route dials the request-body URL through a request-filtering agent held in a local"
+  lang javascript
+  file package.json
+  code
+  ```
+  {
+    "name": "@lobehub/chat",
+    "dependencies": {
+      "next": "14.2.8",
+      "request-filtering-agent": "^2.0.1"
+    }
+  }
+  ```
+  file src/app/webapi/proxy/route.ts
+  reject VYQL-RF-001
+  code
+  ```
+  import { NextResponse } from 'next/server';
+  import fetch from 'node-fetch';
+  import { useAgent as ssrfAgent } from 'request-filtering-agent';
+
+  export const POST = async (req: Request) => {
+    const url = await req.text();
+
+    try {
+      const agent = ssrfAgent(url);
+      const res = await fetch(url, { agent });
+
+      return new Response(await res.arrayBuffer(), { headers: { ...res.headers } });
+    } catch (err) {
+      return NextResponse.json({ error: 'Not support internal host proxy' }, { status: 400 });
+    }
+  };
+  ```
+
+test "rank1332 lobe-chat: the same request-filtering agent inline in the request's argument list does not cover the fetch"
+  lang javascript
+  file package.json
+  code
+  ```
+  {
+    "name": "@lobehub/chat",
+    "dependencies": {
+      "next": "14.2.8",
+      "request-filtering-agent": "^2.0.1"
+    }
+  }
+  ```
+  file src/app/webapi/proxy/route.ts
+  expect VYQL-RF-001
+  code
+  ```
+  import { NextResponse } from 'next/server';
+  import fetch from 'node-fetch';
+  import { useAgent as ssrfAgent } from 'request-filtering-agent';
+
+  export const POST = async (req: Request) => {
+    const url = await req.text();
+
+    try {
+      const res = await fetch(url, { agent: ssrfAgent(url) });
+
+      return new Response(await res.arrayBuffer(), { headers: { ...res.headers } });
+    } catch (err) {
+      return NextResponse.json({ error: 'Not support internal host proxy' }, { status: 400 });
+    }
+  };
+  ```
