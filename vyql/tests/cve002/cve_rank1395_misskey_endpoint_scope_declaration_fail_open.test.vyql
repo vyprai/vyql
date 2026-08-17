@@ -1,0 +1,363 @@
+# Rank 1395 / CVE-2023-52139 (GHSA-7pxq-6xx9-xpgm, CWE-285):
+# misskey-dev/misskey issues third-party applications OAuth-style access tokens
+# whose granted scopes are a list of permission strings (`read:account`,
+# `write:notes`, ...), and each API endpoint declares the one scope it requires in
+# its own descriptor as `meta.kind`. `ApiCallService.call` is the single place that
+# enforces the pairing, and it enforced it like this
+# (packages/backend/src/server/api/ApiCallService.ts:332 at c96bc36f^):
+#
+#   if (token && ep.meta.kind && !token.permission.some(p => p === ep.meta.kind)) {
+#     throw new ApiError({ code: 'PERMISSION_DENIED', ... });
+#   }
+#
+# The endpoint's own requirement declaration is a *conjunct of the guard that
+# enforces it*. An endpoint that declares no `kind` therefore skips scope
+# enforcement entirely, and the preceding guards in the same method only establish
+# that *a user* is authenticated (`requireCredential`) or holds a role
+# (`requireModerator` / `requireAdmin`) -- never that the application acting on
+# that user's behalf was granted anything. So any third-party app token, whatever
+# scopes the user actually approved, could call every privileged endpoint that
+# happened to omit `kind`: 70 of the 357 endpoint descriptors at c96bc36f^,
+# including `i/delete-account`, `i/update-email`, `i/revoke-token`,
+# `i/authorized-apps`, `i/move` and `i/import-following`. The weakness is not a
+# missing check. The check is present, correct, and conditioned on the presence of
+# the very policy field it consults -- an authorization decision that fails open
+# on an unset requirement.
+#
+# c96bc36f ("Merge pull request from GHSA-7pxq-6xx9-xpgm") closes it by denying
+# instead of skipping when the declaration is absent:
+#
+#   if (token && ((ep.meta.kind && !token.permission.some(p => p === ep.meta.kind))
+#     || (!ep.meta.kind && (ep.meta.requireCredential || ep.meta.requireModerator || ep.meta.requireAdmin)))) {
+#
+# and hardens three other surfaces of the same model: `IEndpointMeta` becomes a
+# discriminated union in which `requireCredential: true`, `requireModerator: true`
+# and `requireAdmin: true` each *imply* a `kind`, so the omission becomes a type
+# error; the admin scopes are split from two coarse values (`read:admin`,
+# `write:admin`) into 44 per-area ones; and the streaming endpoint, which had no
+# app-scope check at all, gains `if (app !== null && !app.permission.some(p => p
+# === 'read:account')) throw new AuthenticationError(...)`.
+#
+# The pool row is the GHSA merge commit and its metadata reads COMMIT_OK. `git
+# show` does print the combined diff here (148 files), so this is not the
+# empty-combined-diff symptom; the row is correct, the repository is correct, and
+# the vulnerable guard is present verbatim at the parent. No corpus correction.
+# The recorded CWE-285 is right for once.
+#
+# What fires today. The whole tree scans inside the bound -- `timeout 180
+# ./bin/vyql scan --cache off --max-ram 6GB` covers all 1809 JavaScript/TypeScript
+# files plus 103 config and 1439 textpattern files -- and reports 613 findings and
+# 74 flags on the vulnerable checkout, 613 findings and 78 flags on the patched
+# one, both stable over three `--cache off` runs. Nothing on either side addresses
+# this weakness. One finding does land inside the vulnerable guard:
+# VYQL-CRY-006 reports code.SecretComparisonReview at ApiCallService.ts:333, which
+# is `p === ep.meta.kind` read as a secret compared with `===` -- a known
+# precision defect, not coverage, and it fires identically after the fix. The four
+# extra flags on the patched tree are code.ResourceReview on the socket writes the
+# streaming fix adds.
+#
+# ATTENTION, engine gap. The discriminating property of the vulnerable guard is a
+# *self-reference*: the expression `ep.meta.kind` appears both as a bare
+# truthiness conjunct of the `&&` chain and as the compared-against operand inside
+# the negated membership test in the same chain, and nothing anywhere denies when
+# it is absent. Nothing in the binding language can express that, because nothing
+# in the frontend records it. Four things were measured, each against both
+# revisions of the real tree with `-flags only`, emitting
+# code.RequestScopePolicyReview (CWE_863, the nearest existing vehicle) from a
+# throwaway javascript binding.
+#
+# 1. The facts available are text, and the two revisions' text differs only in the
+#    fix's own field name. Dumping the `analysis.module.context` tokens for a
+#    stripped copy of the method on both revisions, the entire difference is four
+#    `expr:` tokens. The vulnerable one carries
+#    `expr:token&&ep.meta.kind&&!token.permission.some(p=>p===ep.meta.kind)` and
+#    `expr:token&&ep.meta.kind`; the patched one carries the same inner
+#    `expr:ep.meta.kind&&!token.permission.some(p=>p===ep.meta.kind)` -- verbatim,
+#    it is a nested binary_expression and gets its own token -- plus
+#    `expr:(...)||(!ep.meta.kind&&(...))`, `expr:!ep.meta.kind&&(...)` and
+#    `expr:ep.meta.requireCredential||ep.meta.requireModerator||ep.meta.requireAdmin`.
+#    The comparison `p === ep.meta.kind` is a separate `expr:` token with no link
+#    to the `.some()` call it is the predicate of, because JavaScript emits no
+#    call-argument tokens (rank 1360). So the vulnerable shape's own token is
+#    present in the patched file, and any binding keyed on it matches both.
+#
+# 2. The generic positive half fires *more* after the fix, not less. A
+#    function-scoped binding for "a scope-membership test over a token's granted
+#    permissions",
+#      node.scope == "function" and node.context.language == "javascript"
+#      and containsAny(node.context.selector, ["token.permission", "token.scopes",
+#            "token.scope", "app.permission", "app.scopes",
+#            "accessToken.permission", "accessToken.scopes"])
+#      and containsAny(node.context.call, ["some", "includes", "indexOf", "has"])
+#    reports 3 flags on the vulnerable tree (ApiCallService.ts:223 plus
+#    test/e2e/oauth.ts:149 and :186) and 6 on the patched one -- the same three
+#    plus StreamingApiServerService.ts:48 and :53 and stream/Connection.ts:244,
+#    every one of them a check the *fix* added. Restricting the positive to the
+#    fail-open spelling itself,
+#      containsAny(node.context.expr, ["&&!token.permission.some(",
+#        "&&!token.scopes.includes(", "&&!token.scope.includes(",
+#        "&&!app.permission.some("])
+#    gives 1 flag on the vulnerable tree and 3 on the patched one: the same
+#    ApiCallService.ts:223 on both, identical, plus the two the streaming fix
+#    added. The presence of a scope-membership test is evidence of enforcement;
+#    the direction of that signal is inverted from what a finding needs, which is
+#    the same failure rank 1311 measured when a patched revision scored higher.
+#    Two of the three vulnerable-side hits are e2e test fixtures, and per rank
+#    1381 `inTestOrSeedFile` is inert, so they cannot be excluded by file path
+#    either.
+#
+# 3. Adding the fail-closed negation does discriminate, and only by naming one
+#    application's field. Extending (2) with
+#      not containsAny(node.context.expr, ["!ep.meta.kind&&", "!app.permission.some"])
+#    reports 1 flag on the vulnerable tree (ApiCallService.ts:223) and 0 on the
+#    patched one. That is the measurement, and it is also the reason this is not
+#    shippable: `ep.meta.kind` is misskey's own endpoint-descriptor field, not an
+#    API anybody could write this binding from documentation for, and a fix
+#    spelling the same denial `ep.meta.kind == null` or renaming the field scores
+#    as unpatched. AGENTS.md's genericity test refuses it, and section 5 of the
+#    accumulated context records four rejections of exactly this move.
+#
+# 4. The descriptor side cannot carry it either, and costs 70 flags to prove it.
+#    The endpoint descriptors are where the omission physically is, so
+#      node.scope == "module" and node.context.language == "javascript"
+#      and containsAny(node.context.prop, ["requireCredential=true",
+#            "requireAdmin=true", "requireModerator=true"])
+#      and not containsAny(node.context.prop, ["kind="])
+#    is the obvious shape. It reports 70 flags on the vulnerable tree and 39 on
+#    the patched one -- the scanner's own count agreeing exactly with a text
+#    enumeration of the 357 descriptors. It does not discriminate because the fix
+#    did not add `kind` to those endpoints: it made the dispatcher refuse app
+#    tokens on them. A descriptor with no scope declaration is not a defect, and
+#    39 of them ship in the fixed release. This is the shape section 9 already
+#    records as unshippable at ranks 1311 and 1331, re-measured on a fifth
+#    codebase.
+#
+# Two known JavaScript/TypeScript gaps were checked and are *not* what blocks
+# this. Rank 1381's `module.exports = class X` gap does not apply: misskey writes
+# `export class ApiCallService implements OnApplicationShutdown`, and `vyql query
+# -type Call` on the repro reports `analysis.function.context` for the method at
+# its own line, so function-scoped facts exist. Rank 1377's validator-returns-only-
+# an-error gap does not apply either: this guard throws.
+#
+# Behaviour a shippable fact needs. In
+# internal/extract/frontend/treesitter/javascript.go, the `binary_expression` case
+# of `jsStructuredContextTokens` emits only `expr:<compacted text>`. What is
+# missing is a structural fact over one `&&` chain: when a conjunct is a bare
+# member-access read `X` (no comparison, no negation) and another conjunct of the
+# same chain is a negated membership call whose compared operand is textually `X`,
+# and no branch of the enclosing condition tests `!X` or `X == null`, emit one
+# boolean -- `fail_open_policy_declaration_guard=true`, in the register the file
+# already uses for `prototype_key_guard=true`, `own_property_key_guard=true` and
+# `path_segment_type_guard=true`. Keying the fact on the relation rather than on
+# `X`'s spelling is the whole point: a binding can then require the fail-open
+# form and pair it with a documented permission-collection API without knowing
+# what any application calls its policy field. This is not mechanical -- it is a
+# new classification and a new relation between sibling conjuncts, not a missing
+# switch case -- so nothing is fixed here. It shares its root with rank 1360 (no
+# call-argument tokens, which is why the `.some()` predicate's comparison is an
+# orphan token) and rank 1373 (`expr:` is in flagASTRoutingValuePrefixes, so it
+# routes AST-wide with a case-sensitive substring fallback rather than staying on
+# the node).
+#
+# Vocabulary was checked for reuse before anything was written. No concept and no
+# rule ID is minted, because nothing discriminating can be built on top of one.
+# code.OptionalTokenClaimValidation (VYQL-AUTH-118, rank 1373) is the closest
+# relative and is the mirror image of this: there the *token* supplies a claim the
+# validator treats as optional, and its Go binding names the issuer claim on both
+# sides of the comparison; here the *server* supplies the requirement and the
+# token side is fully present. code.RequestScopePolicyReview is the review vehicle
+# the measurements above borrow, not a fit -- it is about request and resource
+# metadata used without a scope comparison, and a comparison is exactly what this
+# code does. code.MemberStoreMissingCreateAuthorization,
+# code.FlaskEntityDetailMissingAuthorization and
+# code.WordPressMediaMutationMissingObjectPermission are all "handler with no
+# authorization signal", which section 9 records as measured unshippable.
+#
+# The three cases below are the minimal pair plus the inverted-signal case, all
+# three rejected today. The first two differ only in whether the guard denies when
+# the endpoint declares no required scope. The third is the streaming handshake
+# check the fix *added*, which every candidate binding in (2) flags -- a check
+# introduced as remediation, scored as the defect.
+#
+# verify_current_expected: attention-engine-gap, all three forms rejected.
+
+test "rank1395: an API dispatcher enforces an app token's scope only when the endpoint declares one, so a privileged endpoint that declares none skips the check"
+  lang javascript
+  file packages/backend/src/server/api/ApiCallService.ts
+  reject_review code.RequestScopePolicyReview
+  code
+  ```
+  import type { IEndpoint } from './endpoints.js';
+
+  export class ApiCallService implements OnApplicationShutdown {
+    private async call(
+      ep: IEndpoint,
+      token: MiAccessToken | null,
+      user: MiLocalUser | null | undefined,
+      data: any,
+      file?: { name: string; path: string },
+    ) {
+      if (ep.meta.requireCredential && user == null) {
+        throw new ApiError({
+          message: 'Credential required.',
+          code: 'CREDENTIAL_REQUIRED',
+          kind: 'permission',
+          id: '1384574d-a912-4b81-8601-c7b1c4085df1',
+        });
+      }
+
+      if (token && ep.meta.secure) {
+        throw new ApiError({
+          message: 'The request requires an accessible credential.',
+          code: 'ACCESS_DENIED',
+          kind: 'permission',
+          id: '56f35758-7dd5-468b-8439-5d6fb8ec9b8e',
+        });
+      }
+
+      if ((ep.meta.requireModerator || ep.meta.requireAdmin) && !user!.isRoot) {
+        const myRoles = await this.roleService.getUserRoles(user!.id);
+        if (ep.meta.requireModerator && !myRoles.some(r => r.isModerator || r.isAdministrator)) {
+          throw new ApiError({
+            message: 'You are not assigned to a moderator role.',
+            code: 'ROLE_PERMISSION_DENIED',
+            kind: 'permission',
+            id: 'd33d5333-db36-423d-a8f9-1a2b9549da41',
+          });
+        }
+        if (ep.meta.requireAdmin && !myRoles.some(r => r.isAdministrator)) {
+          throw new ApiError({
+            message: 'You are not assigned to an administrator role.',
+            code: 'ROLE_PERMISSION_DENIED',
+            kind: 'permission',
+            id: 'c3d38592-54c0-429d-be96-5636b0431a61',
+          });
+        }
+      }
+
+      if (token && ep.meta.kind && !token.permission.some(p => p === ep.meta.kind)) {
+        throw new ApiError({
+          message: 'Your app does not have the necessary permissions to use this endpoint.',
+          code: 'PERMISSION_DENIED',
+          kind: 'permission',
+          id: '1370e5b7-d4eb-4566-bb1d-7748ee6a1838',
+        });
+      }
+
+      return await ep.exec(data, user, token, file, request.ip, request.headers);
+    }
+  }
+  ```
+
+test "rank1395: the same dispatcher denying an app token outright when a privileged endpoint declares no required scope"
+  lang javascript
+  file packages/backend/src/server/api/ApiCallService.ts
+  reject_review code.RequestScopePolicyReview
+  code
+  ```
+  import type { IEndpoint } from './endpoints.js';
+
+  export class ApiCallService implements OnApplicationShutdown {
+    private async call(
+      ep: IEndpoint,
+      token: MiAccessToken | null,
+      user: MiLocalUser | null | undefined,
+      data: any,
+      file?: { name: string; path: string },
+    ) {
+      if (ep.meta.requireCredential && user == null) {
+        throw new ApiError({
+          message: 'Credential required.',
+          code: 'CREDENTIAL_REQUIRED',
+          kind: 'permission',
+          id: '1384574d-a912-4b81-8601-c7b1c4085df1',
+        });
+      }
+
+      if (token && ep.meta.secure) {
+        throw new ApiError({
+          message: 'The request requires an accessible credential.',
+          code: 'ACCESS_DENIED',
+          kind: 'permission',
+          id: '56f35758-7dd5-468b-8439-5d6fb8ec9b8e',
+        });
+      }
+
+      if ((ep.meta.requireModerator || ep.meta.requireAdmin) && !user!.isRoot) {
+        const myRoles = await this.roleService.getUserRoles(user!.id);
+        if (ep.meta.requireModerator && !myRoles.some(r => r.isModerator || r.isAdministrator)) {
+          throw new ApiError({
+            message: 'You are not assigned to a moderator role.',
+            code: 'ROLE_PERMISSION_DENIED',
+            kind: 'permission',
+            id: 'd33d5333-db36-423d-a8f9-1a2b9549da41',
+          });
+        }
+        if (ep.meta.requireAdmin && !myRoles.some(r => r.isAdministrator)) {
+          throw new ApiError({
+            message: 'You are not assigned to an administrator role.',
+            code: 'ROLE_PERMISSION_DENIED',
+            kind: 'permission',
+            id: 'c3d38592-54c0-429d-be96-5636b0431a61',
+          });
+        }
+      }
+
+      if (token && ((ep.meta.kind && !token.permission.some(p => p === ep.meta.kind))
+        || (!ep.meta.kind && (ep.meta.requireCredential || ep.meta.requireModerator || ep.meta.requireAdmin)))) {
+        throw new ApiError({
+          message: 'Your app does not have the necessary permissions to use this endpoint.',
+          code: 'PERMISSION_DENIED',
+          kind: 'permission',
+          id: '1370e5b7-d4eb-4566-bb1d-7748ee6a1838',
+        });
+      }
+
+      return await ep.exec(data, user, token, file, request.ip, request.headers);
+    }
+  }
+  ```
+
+test "rank1395: a streaming handshake that rejects an application token lacking the minimum scope"
+  lang javascript
+  file packages/backend/src/server/api/StreamingApiServerService.ts
+  reject_review code.RequestScopePolicyReview
+  code
+  ```
+  export class StreamingApiServerService {
+    private attach(server: http.Server): void {
+      this.#wss = new WebSocket.Server({ noServer: true });
+
+      server.on('upgrade', async (request, socket, head) => {
+        const q = new URL(request.url!, `http://${request.headers.host}`).searchParams;
+        const token = q.get('i');
+
+        let user: MiLocalUser | null = null;
+        let app: MiAccessToken | null = null;
+
+        try {
+          [user, app] = await this.authenticateService.authenticate(token);
+
+          if (app !== null && !app.permission.some(p => p === 'read:account')) {
+            throw new AuthenticationError('Your app does not have necessary permissions to use websocket API.');
+          }
+        } catch (e) {
+          if (e instanceof AuthenticationError) {
+            socket.write([
+              'HTTP/1.1 401 Unauthorized',
+              'WWW-Authenticate: Bearer realm="Misskey", error="invalid_token"',
+            ].join('\r\n') + '\r\n\r\n');
+          } else {
+            socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
+          }
+          socket.destroy();
+          return;
+        }
+
+        this.#wss.handleUpgrade(request, socket, head, (ws) => {
+          this.#wss.emit('connection', ws, request, { user, app });
+        });
+      });
+    }
+  }
+  ```
