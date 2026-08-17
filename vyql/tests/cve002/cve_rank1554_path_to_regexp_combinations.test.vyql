@@ -1,0 +1,123 @@
+# Rank 1554 / CVE-2026-4926: path-to-regexp expanded every combination
+# of optional route groups before building its pattern, so a route with
+# many optional segments (`{/x}{/x}{/x}...`, ten suffices) drove
+# exponential work parsing one route string (resource exhaustion,
+# CWE-400/CWE-1333 family; the nocommit flag was advisory-side
+# absence). pathToRegexp in src/index.ts ran flatten(data.tokens, 0,
+# [], callback) whose group branch recurses `flatten(token.tokens, 0,
+# result.slice(), seq => flatten(tokens, index, seq, callback))` --
+# each optional group doubles the callback invocations, with no bound
+# on how many combinations are materialised before the regex is
+# assembled. Pool commit 22a967901a is the real fix (COMMIT_OK by
+# diff, "Reject large optional route combinations (#424)"): a
+# combinations counter increments in the flatten callback and throws
+# PathError("Too many path combinations", data.originalPath) once it
+# passes 256, with a spec asserting that ten `{/x}` segments throw;
+# the commit also tightens toRegExp's single-child parenthesisation
+# (children.length < 2). No pool correction.
+#
+# ATTENTION, combinatorial-cap vocabulary. The defect is recursion
+# whose branching factor is attacker-chosen and whose only bound is
+# the input's group count -- the same cross-iteration budget family
+# as rank 1534's header accumulation, here inside a recursive
+# expansion: the corpus's CWE-400 rules judge per-iteration progress
+# (VYQL-DOS-029 parsers, VYQL-DOS-028 buffered reads) but no concept
+# names a branching budget on recursive expansion, so nothing can ask
+# "does the flatten of optional groups stop at a cap". A binding on
+# path-to-regexp's own flatten would detect this library rather than
+# the weakness. Measured on the real code: scanning src/ reports one
+# finding at both revisions (VYQL-INJ-013 on index.ts:456 -> :446, a
+# prototype-pollution heuristic over the library's options parameter,
+# untouched by the fix). No ENGINE-GAPS.md entry: the piece is
+# budget-vocabulary design, not a localised construct. No definition
+# change shipped. Spec cve_rank1554 records the unbounded group
+# flatten and the counter-capped form, both asserting reject
+# VYQL-DOS-029: when combinatorial-cap vocabulary lands, the unbounded
+# form must flip to expect.
+
+test "rank1554: optional groups expand every combination unbounded"
+  lang javascript
+  file src/index.ts
+  reject VYQL-DOS-029
+  code
+  ```
+  export function pathToRegexp(path, options) {
+    const root = new SourceNode("^");
+    const paths = [path];
+
+    while (paths.length) {
+      const data = typeof path === "object" ? path : parse(path, options);
+
+      flatten(data.tokens, 0, [], (tokens) => {
+        let node = root;
+        for (const part of toRegExpSource(tokens, "/", data.originalPath)) {
+          node = node.child(part);
+        }
+      });
+    }
+
+    return { regexp: new RegExp(String(root)), keys: [] };
+  }
+
+  function flatten(tokens, index, result, callback) {
+    while (index < tokens.length) {
+      const token = tokens[index++];
+
+      if (token.type === "group") {
+        flatten(token.tokens, 0, result.slice(), (seq) => {
+          flatten(tokens, index, seq, callback);
+        });
+      } else {
+        result.push(token);
+      }
+    }
+
+    callback(result);
+  }
+  ```
+
+test "rank1554: the fix refuses combinations past a budget"
+  lang javascript
+  file src/index.ts
+  reject VYQL-DOS-029
+  code
+  ```
+  export function pathToRegexp(path, options) {
+    const root = new SourceNode("^");
+    const paths = [path];
+    let combinations = 0;
+
+    while (paths.length) {
+      const data = typeof path === "object" ? path : parse(path, options);
+
+      flatten(data.tokens, 0, [], (tokens) => {
+        if (combinations++ >= 256) {
+          throw new PathError("Too many path combinations", data.originalPath);
+        }
+
+        let node = root;
+        for (const part of toRegExpSource(tokens, "/", data.originalPath)) {
+          node = node.child(part);
+        }
+      });
+    }
+
+    return { regexp: new RegExp(String(root)), keys: [] };
+  }
+
+  function flatten(tokens, index, result, callback) {
+    while (index < tokens.length) {
+      const token = tokens[index++];
+
+      if (token.type === "group") {
+        flatten(token.tokens, 0, result.slice(), (seq) => {
+          flatten(tokens, index, seq, callback);
+        });
+      } else {
+        result.push(token);
+      }
+    }
+
+    callback(result);
+  }
+  ```
