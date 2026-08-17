@@ -1,0 +1,94 @@
+# Rank 1584 / CVE-2021-43852: Oro's URL-query parser wrote query
+# keys into nested objects without rejecting special property names,
+# so a query like ?__proto__[polluted]=1 set properties on
+# Object.prototype for every consumer of the parsed result
+# (prototype pollution, CWE-1321; BAP-21092). setValue in
+# src/Oro/Bundle/UIBundle/Resources/public/js/tools.js walked the
+# key path and assigned `root[dir] = value` -- the __proto__ segment
+# reached the language's prototype machinery unchecked. Pool commit
+# 62c26936b3 is the real fix (COMMIT_OK -- "BAP-21092: JavaScript
+# Prototype Pollution (#31464)", +4 lines): setValue returns early
+# `if (path[0] === '__proto__')` with the comment "Prevent
+# Object.prototype pollution". No pool correction.
+#
+# ATTENTION, special-name guards at deep-set boundaries. The corpus
+# has the ProtoPollute sink concept (VYQL-INJ-013 fires on
+# member-assignment shapes) but nothing observes a recursive
+# deep-set utility whose path segments come from a URL query -- the
+# same member-field/query provenance boundary as ranks 1518 and
+# 1521, with the __proto__ guard as the control half (openmct's
+# JSON reviver at rank 1518 is the sibling fix). A binding on Oro's
+# own setValue would detect this platform rather than the weakness.
+# Measured on the real code: scanning tools.js reports zero findings
+# at both revisions. No ENGINE-GAPS.md entry. No definition change
+# shipped. Spec cve_rank1584 records the ungated deep-set and the
+# __proto__-rejecting form, both asserting reject VYQL-INJ-013: when
+# deep-set provenance lands, the ungated form must flip to expect.
+
+test "rank1584: the query parser writes any key it is given"
+  lang javascript
+  file src/Oro/Bundle/UIBundle/Resources/public/js/tools.js
+  reject VYQL-INJ-013
+  code
+  ```
+  function parametersFromQueryString(query) {
+      if (query.charAt(0) === '?') {
+          query = query.slice(1);
+      }
+      const setValue = function(root, path, value) {
+          if (path.length > 1) {
+              const dir = path.shift();
+              if (typeof root[dir] === 'undefined') {
+                  root[dir] = {};
+              }
+              setValue(root[dir], path, value);
+          } else {
+              const key = path.shift();
+              root[key] = value;
+          }
+      };
+
+      const result = {};
+      query.split('&').forEach(pair => {
+          const [key, value] = pair.split('=');
+          setValue(result, key.replace(/\]/g, '').split('['), decodeURIComponent(value));
+      });
+      return result;
+  }
+  ```
+
+test "rank1584: the fix refuses the proto key"
+  lang javascript
+  file src/Oro/Bundle/UIBundle/Resources/public/js/tools.js
+  reject VYQL-INJ-013
+  code
+  ```
+  function parametersFromQueryString(query) {
+      if (query.charAt(0) === '?') {
+          query = query.slice(1);
+      }
+      const setValue = function(root, path, value) {
+          if (path[0] === '__proto__') {
+              // Prevent Object.prototype pollution
+              return;
+          }
+          if (path.length > 1) {
+              const dir = path.shift();
+              if (typeof root[dir] === 'undefined') {
+                  root[dir] = {};
+              }
+              setValue(root[dir], path, value);
+          } else {
+              const key = path.shift();
+              root[key] = value;
+          }
+      };
+
+      const result = {};
+      query.split('&').forEach(pair => {
+          const [key, value] = pair.split('=');
+          setValue(result, key.replace(/\]/g, '').split('['), decodeURIComponent(value));
+      });
+      return result;
+  }
+  ```
