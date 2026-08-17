@@ -1,0 +1,397 @@
+# Rank 1393 / CVE-2024-27308 (GHSA-r8w9-5wcg-vfj7, recorded CWE-416/CWE-672):
+# tokio-rs/mio is the non-blocking IO layer under tokio. On Windows its
+# `NamedPipe` is driven by an I/O completion port: each overlapped operation
+# hands the kernel a raw pointer to one of three `Overlapped` fields embedded in
+# a leaked `Arc<Inner>`, and the selector recovers the object from that pointer
+# and dispatches to the field's callback. Readiness that is *synthesised* rather
+# than completed -- an error stored into `io.read`, a write that finished
+# inline, a fresh registration -- took a different route:
+#
+#   fn notify_readable(&self, events: Option<&mut Vec<Event>>) {
+#       if let Some(token) = self.token {                    // named_pipe.rs:941
+#           let mut ev = Event::new(token);
+#           ev.set_readable();
+#           if let Some(events) = events {
+#               events.push(ev);
+#           } else {
+#               let _ = self.cp.as_ref().unwrap().post(ev.to_completion_status());
+#           }                                                // named_pipe.rs:949
+#       }
+#   }
+#
+# and `Event::to_completion_status` builds the packet with **no** overlapped:
+#
+#   CompletionStatus::new(self.flags, self.data as usize, std::ptr::null_mut())
+#                                                            // event.rs:42
+#
+# A null `lpOverlapped` is the selector's "deliver verbatim" path --
+# selector.rs:494 is `if iocp_event.overlapped().is_null() { events.push(
+# Event::from_completion_status(iocp_event)) }` -- so the packet reaches the
+# caller with no callback consulted and no object recovered.
+#
+# The weakness is a stale registration token, not a dangling Rust reference.
+# `NamedPipe::deregister` (named_pipe.rs:643) only does `io.token = None`; it
+# neither cancels nor drains packets already sitting in the port's queue, and
+# `Drop for NamedPipe` cancels the pending read and connect but likewise cannot
+# recall a posted packet. So the token is captured when readiness is noticed and
+# validated only then, while the packet is consumed an unbounded time later. In
+# between, the pipe can be deregistered -- or dropped, since nothing holds a
+# reference on `Inner` for the queued packet's lifetime -- and `Poll` can hand
+# the same `Token` to a different source. The event is delivered anyway, and the
+# consumer attributes readiness to whatever now owns that token: tokio then
+# polls or wakes a resource that has been released. That is the CWE-672 reading;
+# the CWE-416 label is the effect one level up, and inside mio itself no freed
+# memory is ever dereferenced, because the packet carries no pointer at all.
+#
+# 90d4fe00df fixes it by giving the synthetic event the same machinery the real
+# operations have: a fourth `event: Overlapped` field on `Inner` with an
+# `event_done` callback and a `ptr_from_event_overlapped` un-projection, a new
+# `Event::to_completion_status_with_overlapped` so the packet carries that
+# field's address, `mem::forget(me.clone())` on a successful post so the packet
+# owns a refcount, and -- the actual security content -- a second look at the
+# registration when the packet comes back out:
+#
+#   let io = me.io.lock().unwrap();
+#   if io.token.is_some() { ... events.push(ev) }              // named_pipe.rs:945
+#
+# The `data <<= 1; data += 1` shift is only a tag so the selector routes the
+# packet as a named-pipe event and not an AFD poll result.
+#
+# The pool row is correct in every field: 90d4fe00df is a real, readable,
+# non-merge commit on mio's 0.8.x maintenance line (it is the backport of
+# 04c3bb6e, dc3b3f63 and 6fd5dd0d), it touches only src/sys/windows/event.rs and
+# src/sys/windows/named_pipe.rs, and the vulnerable `notify_readable` /
+# `notify_writable` / `to_completion_status` bodies are all present at its
+# parent. No corpus correction.
+#
+# What fires today. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`
+# reports 33 findings on the vulnerable checkout and 33 on the patched one,
+# stable over three runs each -- VYQL-MEM-006 x22, VYQL-RACE-003 x9,
+# VYQL-CRY-003 x2 -- and not one of them is in src/sys/windows/named_pipe.rs.
+# The only row naming a named pipe at all is a code.WeakRandomValue on the
+# random pipe name in tests/win_named_pipe.rs:31. The pattern ranks 1370, 1371
+# and 1378 recorded holds again: VYQL-MEM-006 fires on
+# src/sys/windows/selector.rs:500, which is the *non-null* overlapped branch, the
+# one the fix makes named pipes take. `vyql match` and `scan -flags with` over
+# faithful repros of all three revisions below label nothing and emit no flag.
+#
+# Vocabulary was checked for reuse first, and the gap is wider than a binding.
+# CWE-672 appears in vyql/taxonomy/cwe.json and in no concept or rule anywhere.
+# The CWE-416 rule, VYQL-MEM-007, is `code.PointerFree reaches code.PointerUse`,
+# and both concepts are bound only for C, C++ and Objective-C; they are the wrong
+# vocabulary for Rust regardless, where what is released is an `Arc` refcount
+# rather than an allocation. The nearest issue concept is
+# code.ReentrantQueueCleanupReview (VYQL-MEM-019, CWE-415/416, C-only), whose
+# condition is "queue cleanup and cancellation can both own queued entries
+# without an observed reentrant cleanup guard" -- adjacent, but about a cleanup
+# traversal racing a cancel, not about a queued notification outliving the
+# registration it names. No concept and no rule ID are minted here, because the
+# measurement below says nothing discriminating can be built on top of one.
+#
+# ATTENTION, no discrimination: every anchor a binding could key on is present
+# unchanged in the patched tree, and the one that does move is the fixing
+# commit's own naming. Counted with `vyql query -call` over both real checkouts:
+#
+#   CompletionStatus.new with a null overlapped   1 before (event.rs:42)
+#                                                 1 after  (event.rs:42, same site)
+#   CompletionPort::post in sys/windows           waker.rs:27, iocp.rs:255/256,
+#                                                 named_pipe.rs -- before and after
+#   ev.to_completion_status (mio-private)         3 before  1 after
+#
+# The documented API -- `CompletionStatus::new(bytes, token, lpOverlapped)`, and
+# under it `PostQueuedCompletionStatus` -- scores 1 to 1 on the identical site,
+# because the fix never removes the null-overlapped constructor: the waker still
+# needs it. Posting a packet with a null `lpOverlapped` is the ordinary IOCP
+# wakeup idiom, documented as such, so labelling it is both non-discriminating
+# and broad.
+#
+# The maximally repro-shaped key, mio's own `pub(super) to_completion_status`,
+# goes 3 to 1 -- and the surviving site is case (c) below,
+# src/sys/windows/waker.rs:27, whose body is the vulnerable idiom
+# character-for-character (`Event::new(token)`, `set_readable()`,
+# `port.post(ev.to_completion_status())`) and is correct in both revisions,
+# because a `Waker`'s token is fixed for the life of the `Poll` and is never
+# deregistered. So the crate contains a correct instance of the exact expression
+# being detected, in the same module, before and after: 2 true and 1 false on the
+# CVE's own tree, from a binding naming a `pub(super)` method that exists only
+# inside mio and that no library documentation could produce. That is the
+# genericity test in AGENTS.md failing outright.
+#
+# The two places the invariant is actually broken are byte-identical across the
+# fix: `deregister` clearing `io.token` without cancelling in-flight posts, and
+# selector.rs:494 pushing a null-overlapped packet with no registration re-check.
+# The fix works by never taking that branch for named pipes, not by changing it.
+# What is left as a separator is the existence of `schedule_event` / `event_done`
+# and the `mem::forget(me.clone())` inside them -- the fixing commit's own
+# layout, which is standing rejection grounds.
+#
+# The delegated-check family was tested, not assumed, in both directions. Rank
+# 1380's counterweight comes out negative: the patched `notify_readable` retains
+# only `Event::new`, `set_readable` and `events.push`, every one of which the
+# vulnerable form also has, so the fix left no API-documented call inside the
+# method it guards to key on -- the call that moved, `post`, is still made one
+# frame down. And rank 1364's resolution half does not hold on this tree:
+# `self.schedule_event` is not among the 2983 unresolved call sites mio reports,
+# so the delegated call resolves. Landing the caller-side control attribution
+# ranks 1364, 1372 and 1377 are blocked on would therefore not unblock this rank
+# -- with it, both revisions attribute the same `post` to `notify_readable`. No
+# new engine gap is filed.
+#
+# The three cases are the pair, plus the instance that makes it a pair. (a) and
+# (b) are the two real revisions and record the miss. (c) is the untouched
+# `Waker::wake`: it must stay a reject, and it is the reason (a) cannot be turned
+# into an expect by keying on the idiom.
+#
+# verify_current_expected: attention-no-discrimination, all three revisions
+# rejected. (c) is correct today and must remain a reject.
+
+test "rank1393: (a) a named-pipe readiness event is posted to the completion port with no overlapped, so the token it captured is delivered whether or not the pipe is still registered"
+  lang rust
+  file src/sys/windows/named_pipe.rs
+  reject VYQL-MEM-006
+  reject VYQL-MEM-007
+  reject VYQL-MEM-019
+  reject VYQL-RACE-003
+  code
+  ```
+  use std::io;
+  use std::mem;
+  use std::sync::atomic::AtomicBool;
+  use std::sync::{Arc, Mutex};
+
+  use crate::event::Event;
+  use crate::sys::windows::iocp::{CompletionPort, CompletionStatus};
+  use crate::sys::windows::{Handle, Overlapped};
+  use crate::{Registry, Token};
+  use windows_sys::Win32::System::IO::{OVERLAPPED, OVERLAPPED_ENTRY};
+
+  struct Inner {
+      connect: Overlapped,
+      read: Overlapped,
+      write: Overlapped,
+      handle: Handle,
+      connecting: AtomicBool,
+      io: Mutex<Io>,
+  }
+
+  struct Io {
+      cp: Option<Arc<CompletionPort>>,
+      token: Option<Token>,
+      read: State,
+      write: State,
+      connect_error: Option<io::Error>,
+  }
+
+  impl NamedPipe {
+      fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
+          let mut io = self.inner.io.lock().unwrap();
+          io.check_association(registry, true)?;
+          if io.token.is_none() {
+              return Err(io::Error::new(
+                  io::ErrorKind::NotFound,
+                  "I/O source not registered with `Registry`",
+              ));
+          }
+          io.token = None;
+          Ok(())
+      }
+  }
+
+  fn read_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
+      let status = CompletionStatus::from_entry(status);
+      let me = unsafe { Arc::from_raw(Inner::ptr_from_read_overlapped(status.overlapped())) };
+      let mut io = me.io.lock().unwrap();
+      let mut buf = match mem::replace(&mut io.read, State::None) {
+          State::Pending(buf, _) => buf,
+          _ => unreachable!(),
+      };
+      unsafe {
+          match me.result(status.overlapped()) {
+              Ok(n) => {
+                  buf.set_len(status.bytes_transferred() as usize);
+                  io.read = State::Ok(buf, 0);
+              }
+              Err(e) => {
+                  io.read = State::Err(e);
+              }
+          }
+      }
+      io.notify_readable(events);
+  }
+
+  impl Io {
+      fn notify_readable(&self, events: Option<&mut Vec<Event>>) {
+          if let Some(token) = self.token {
+              let mut ev = Event::new(token);
+              ev.set_readable();
+
+              if let Some(events) = events {
+                  events.push(ev);
+              } else {
+                  let _ = self.cp.as_ref().unwrap().post(ev.to_completion_status());
+              }
+          }
+      }
+
+      fn notify_writable(&self, events: Option<&mut Vec<Event>>) {
+          if let Some(token) = self.token {
+              let mut ev = Event::new(token);
+              ev.set_writable();
+
+              if let Some(events) = events {
+                  events.push(ev);
+              } else {
+                  let _ = self.cp.as_ref().unwrap().post(ev.to_completion_status());
+              }
+          }
+      }
+  }
+
+  impl Event {
+      pub(super) fn to_completion_status(&self) -> CompletionStatus {
+          CompletionStatus::new(self.flags, self.data as usize, std::ptr::null_mut())
+      }
+  }
+  ```
+
+test "rank1393: (b) the fix routes the same event through an owned overlapped whose callback re-reads the registration before delivering it"
+  lang rust
+  file src/sys/windows/named_pipe.rs
+  reject VYQL-MEM-006
+  reject VYQL-MEM-007
+  reject VYQL-MEM-019
+  reject VYQL-RACE-003
+  code
+  ```
+  use std::io;
+  use std::mem;
+  use std::sync::{Arc, Mutex};
+
+  use crate::event::Event;
+  use crate::sys::windows::iocp::{CompletionPort, CompletionStatus};
+  use crate::sys::windows::Overlapped;
+  use crate::Token;
+  use windows_sys::Win32::System::IO::{OVERLAPPED, OVERLAPPED_ENTRY};
+
+  struct Inner {
+      connect: Overlapped,
+      read: Overlapped,
+      write: Overlapped,
+      event: Overlapped,
+      io: Mutex<Io>,
+  }
+
+  impl Inner {
+      unsafe fn ptr_from_event_overlapped(ptr: *mut OVERLAPPED) -> *const Inner {
+          (ptr as *mut Overlapped).wrapping_sub(3) as *const Inner
+      }
+  }
+
+  fn event_done(status: &OVERLAPPED_ENTRY, events: Option<&mut Vec<Event>>) {
+      let status = CompletionStatus::from_entry(status);
+      let me = unsafe { Arc::from_raw(Inner::ptr_from_event_overlapped(status.overlapped())) };
+
+      let io = me.io.lock().unwrap();
+
+      if io.token.is_some() {
+          if let Some(events) = events {
+              let mut ev = Event::from_completion_status(&status);
+              ev.data >>= 1;
+              events.push(ev);
+          }
+      }
+  }
+
+  impl Io {
+      fn notify_readable(&self, me: &Arc<Inner>, events: Option<&mut Vec<Event>>) {
+          if let Some(token) = self.token {
+              let mut ev = Event::new(token);
+              ev.set_readable();
+
+              if let Some(events) = events {
+                  events.push(ev);
+              } else {
+                  self.schedule_event(me, ev);
+              }
+          }
+      }
+
+      fn notify_writable(&self, me: &Arc<Inner>, events: Option<&mut Vec<Event>>) {
+          if let Some(token) = self.token {
+              let mut ev = Event::new(token);
+              ev.set_writable();
+
+              if let Some(events) = events {
+                  events.push(ev);
+              } else {
+                  self.schedule_event(me, ev);
+              }
+          }
+      }
+
+      fn schedule_event(&self, me: &Arc<Inner>, mut event: Event) {
+          event.data <<= 1;
+          event.data += 1;
+
+          let completion_status =
+              event.to_completion_status_with_overlapped(me.event.as_ptr() as *mut _);
+
+          match self.cp.as_ref().unwrap().post(completion_status) {
+              Ok(_) => {
+                  mem::forget(me.clone());
+              }
+              Err(_) => {}
+          }
+      }
+  }
+
+  impl Event {
+      pub(super) fn to_completion_status(&self) -> CompletionStatus {
+          CompletionStatus::new(self.flags, self.data as usize, std::ptr::null_mut())
+      }
+
+      pub(super) fn to_completion_status_with_overlapped(
+          &self,
+          overlapped: *mut Overlapped,
+      ) -> CompletionStatus {
+          CompletionStatus::new(self.flags, self.data as usize, overlapped)
+      }
+  }
+  ```
+
+test "rank1393: (c) the waker posts the same null-overlapped packet correctly, on a token that is never deregistered, and is unchanged by the fix"
+  lang rust
+  file src/sys/windows/waker.rs
+  reject VYQL-MEM-006
+  reject VYQL-MEM-007
+  reject VYQL-MEM-019
+  reject VYQL-RACE-003
+  code
+  ```
+  use crate::sys::windows::iocp::CompletionPort;
+  use crate::sys::windows::{Event, Selector};
+  use crate::Token;
+  use std::io;
+  use std::sync::Arc;
+
+  pub struct Waker {
+      token: Token,
+      port: Arc<CompletionPort>,
+  }
+
+  impl Waker {
+      pub fn new(selector: &Selector, token: Token) -> io::Result<Waker> {
+          Ok(Waker {
+              token,
+              port: selector.clone_port(),
+          })
+      }
+
+      pub fn wake(&self) -> io::Result<()> {
+          let mut ev = Event::new(self.token);
+          ev.set_readable();
+
+          self.port.post(ev.to_completion_status())
+      }
+  }
+  ```
