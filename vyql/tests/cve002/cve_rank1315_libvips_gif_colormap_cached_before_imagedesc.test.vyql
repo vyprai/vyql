@@ -1,0 +1,239 @@
+# Rank 1315 / CVE-2019-17534 (OSS-Fuzz 16796): libvips'
+# vips_foreign_load_gif_scan_image (libvips/foreign/gifload.c) caches the
+# frame's colour map into a local at the top of the function --
+# `ColorMapObject *map = file->Image.ColorMap ? file->Image.ColorMap :
+# file->SColorMap;` -- and only then calls DGifGetImageDesc( gif->file ).
+# DGifGetImageDesc is precisely the giflib entry point that parses a frame's
+# image descriptor, and reading the frame's local colour table is part of that
+# job: it releases whatever local map the previous frame left in
+# file->Image.ColorMap (GifFreeMapObject) and installs a freshly allocated one
+# for this frame. So the pre-call read captures the *previous* frame's map,
+# DGifGetImageDesc frees it, and the non-greyscale test further down the same
+# function then walks map->Colors[0 .. map->ColorCount) through that dangling
+# pointer -- a use-after-free on every multi-frame GIF whose earlier frame
+# carried a local colour table (CWE-416).
+#
+# Corpus correction. The pool row's commit 6ea76f9632edd93a716533acb78e7f6bd7089fe4
+# is not this CVE's fix: `git show` on it is "improve data_length handling in
+# jpg load", touching only ChangeLog and libvips/foreign/jpeg2vips.c to widen
+# attach_blob/attach_xmp_blob's `data_length` parameter from int to size_t --
+# a different file, a different subsystem, and no colour map anywhere. NVD's
+# own reference for CVE-2019-17534 names ce684dd008532ea0bf9d4a1d89bacb35f4a83f4d,
+# "fetch map after DGifGetImageDesc()" ("Earlier refactoring broke GIF map
+# fetch"), whose entire diff is gifload.c moving the `map = ...` fetch from
+# above the DGifGetImageDesc call down to just before the greyscale test that
+# consumes it. That matches the advisory text verbatim -- "tries to access a
+# color map before a DGifGetImageDesc call, leading to a use-after-free" --
+# so the specs below are written against ce684dd0 and its parent.
+#
+# ATTENTION, engine gap. The vulnerable and patched revisions differ only in
+# *where* one field read sits relative to one call; every token in the
+# function is otherwise identical, so no binding, however written, can tell
+# them apart -- a binding names an API and emits a label, it cannot express
+# "this read happens before that call". A full scan of libvips/foreign at
+# both revisions confirms it directly: 215 findings each, byte-identical
+# finding sets, seven of them in gifload.c (VYQL-MEM-016 at 743/747/975/1265,
+# VYQL-MEM-018 at 1045, VYQL-MEM-006 at 383/398) and none within
+# vips_foreign_load_gif_scan_image's own body at either revision. `vyql match`
+# on a repro of the function labels no source at all; the only labels are
+# code.IndexAccess/code.IndexAccessSink on map->Colors[i] and
+# code.IntegerSizeArithmetic on the frame-bounds addition. `vyql resolve`
+# terminates taint at every call; DGifGetImageDesc is not a recognized
+# source, sink or control. `vyql explain` reports no findings.
+#
+# The isolating pair is the last two tests below, and it has nothing to do
+# with GIF. `int *p = malloc(4); free(p); int x = *p;` reports VYQL-MEM-007
+# (PotentialUseAfterFree, CWE_416) through code.PointerFree -> code.PointerUse:
+# pointerFree136 keys on a call named `free` and pointerUse134 on a `__deref`
+# node, and the rule's `reaches` relates them. Both halves of that pipeline
+# fail on this rank's shape, and each failure is a separate missing fact:
+#
+#   1. The release is not in this function. Nothing named `free` appears
+#      anywhere in vips_foreign_load_gif_scan_image -- GifFreeMapObject runs
+#      inside giflib's DGifGetImageDesc, a library the scan never sees. There
+#      is no code.PointerFree to start the path from, and inventing one would
+#      mean the engine knowing that a given callee releases state reachable
+#      from its argument.
+#   2. The stale pointer is field-derived, not the freed pointer. `map` is a
+#      copy of `file->Image.ColorMap`, and the argument handed to the
+#      invalidating call is `gif->file`. Relating the two needs an alias
+#      relation from a struct field to the object that owns it, ordered
+#      against the call -- which is also the only thing that separates
+#      vulnerable from patched here.
+#
+# A confirming detail from the same pair: `struct s *p = malloc(...); free(p);
+# int x = p->a;` reports nothing either, because arrow field access is not
+# lowered through `__deref`, so pointerUse134 never sees it. That one is
+# narrow, but it is not this rank's blocker (there is still no free here) and
+# it is not safe to "fix" in isolation: emitting `__deref` for every `->`
+# would put code.PointerUse and code.NullableDeref (VYQL-MEM-006, low, fires
+# on every dereference) on essentially every field access in every C and C++
+# file, which is a precision change across two frontends, not a confined one.
+#
+# Not mechanical. Closing this rank needs a new fact the engine does not
+# have: an ordered invalidation relation -- "a local caching a field reached
+# through an object is stale once the object is passed to a call that
+# repopulates it" -- plus vocabulary to carry it and a rule to judge it. That
+# is a new classification and a new dataflow relation, not a missing switch
+# case. The narrowing signal for a future sweep is already visible in the real
+# function and needs no API name to state: the pre-call read and the post-call
+# reads share a struct prefix (`file->Image.ColorMap` cached before the call,
+# `file->Image.Left`/`Width`/`Top`/`Height` read after it), so the code itself
+# evidences that `file->Image` is only valid once the call has run. Without
+# that prefix-agreement requirement the shape -- cache a field, call a method
+# on the owner, use the cache -- is ordinary C and would flag everywhere. No
+# definition change attempted.
+#
+# verify_current_expected: attention-engine-gap, isolating pair below.
+
+test "rank1315: GIF frame scan caches the colour map before DGifGetImageDesc reloads it"
+  lang c
+  file gifload.c
+  reject VYQL-MEM-007
+  code
+  ```
+  static int
+  vips_foreign_load_gif_scan_image( VipsForeignLoadGif *gif )
+  {
+  	VipsObjectClass *class = VIPS_OBJECT_GET_CLASS( gif );
+  	GifFileType *file = gif->file;
+  	ColorMapObject *map = file->Image.ColorMap ?
+  		file->Image.ColorMap : file->SColorMap;
+
+  	GifByteType *extension;
+
+  	if( DGifGetImageDesc( gif->file ) == GIF_ERROR ) {
+  		vips_foreign_load_gif_error( gif );
+  		return( -1 );
+  	}
+
+  	if( file->Image.Left < 0 ||
+  		file->Image.Width < 1 ||
+  		file->Image.Width > 10000 ||
+  		file->Image.Left + file->Image.Width > file->SWidth ||
+  		file->Image.Top < 0 ||
+  		file->Image.Height < 1 ||
+  		file->Image.Height > 10000 ||
+  		file->Image.Top + file->Image.Height > file->SHeight ) {
+  		vips_error( class->nickname, "%s", _( "bad frame size" ) );
+  		return( -1 );
+  	}
+
+  	if( !gif->has_colour &&
+  		map ) {
+  		int i;
+
+  		for( i = 0; i < map->ColorCount; i++ )
+  			if( map->Colors[i].Red != map->Colors[i].Green ||
+  				map->Colors[i].Green != map->Colors[i].Blue ) {
+  				gif->has_colour = TRUE;
+  				break;
+  			}
+  	}
+
+  	do {
+  		if( vips_foreign_load_gif_code_next( gif, &extension ) )
+  			return( -1 );
+  	} while( extension != NULL );
+
+  	return( 0 );
+  }
+  ```
+
+test "rank1315: GIF frame scan fetches the colour map after DGifGetImageDesc has reloaded it"
+  lang c
+  file gifload.c
+  reject VYQL-MEM-007
+  code
+  ```
+  static int
+  vips_foreign_load_gif_scan_image( VipsForeignLoadGif *gif )
+  {
+  	VipsObjectClass *class = VIPS_OBJECT_GET_CLASS( gif );
+  	GifFileType *file = gif->file;
+
+  	ColorMapObject *map;
+  	GifByteType *extension;
+
+  	if( DGifGetImageDesc( gif->file ) == GIF_ERROR ) {
+  		vips_foreign_load_gif_error( gif );
+  		return( -1 );
+  	}
+
+  	if( file->Image.Left < 0 ||
+  		file->Image.Width < 1 ||
+  		file->Image.Width > 10000 ||
+  		file->Image.Left + file->Image.Width > file->SWidth ||
+  		file->Image.Top < 0 ||
+  		file->Image.Height < 1 ||
+  		file->Image.Height > 10000 ||
+  		file->Image.Top + file->Image.Height > file->SHeight ) {
+  		vips_error( class->nickname, "%s", _( "bad frame size" ) );
+  		return( -1 );
+  	}
+
+  	map = file->Image.ColorMap ? file->Image.ColorMap : file->SColorMap;
+  	if( !gif->has_colour &&
+  		map ) {
+  		int i;
+
+  		for( i = 0; i < map->ColorCount; i++ )
+  			if( map->Colors[i].Red != map->Colors[i].Green ||
+  				map->Colors[i].Green != map->Colors[i].Blue ) {
+  				gif->has_colour = TRUE;
+  				break;
+  			}
+  	}
+
+  	do {
+  		if( vips_foreign_load_gif_code_next( gif, &extension ) )
+  			return( -1 );
+  	} while( extension != NULL );
+
+  	return( 0 );
+  }
+  ```
+
+test "rank1315 pair: an in-function release followed by a direct dereference is reported"
+  lang c
+  file pair_direct.c
+  expect VYQL-MEM-007
+  code
+  ```
+  #include <stdlib.h>
+
+  int scan_direct( void )
+  {
+  	int *p = malloc( 4 );
+
+  	free( p );
+
+  	return *p;
+  }
+  ```
+
+test "rank1315 pair: a field-derived alias invalidated inside the callee is not reported"
+  lang c
+  file pair_field_alias.c
+  reject VYQL-MEM-007
+  code
+  ```
+  struct frame { int *colours; int count; int width; };
+  struct reader { struct frame image; int screen_width; };
+
+  extern int read_frame_desc( struct reader *r );
+
+  int scan_field_alias( struct reader *r )
+  {
+  	int *cached = r->image.colours;
+
+  	if( read_frame_desc( r ) )
+  		return( -1 );
+
+  	if( r->image.width < 1 ||
+  		r->image.width > r->screen_width )
+  		return( -1 );
+
+  	return cached[0];
+  }
+  ```
