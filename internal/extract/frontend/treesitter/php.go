@@ -1228,6 +1228,9 @@ func (c *phConv) phpReviewTokens(n *tree_sitter.Node) []string {
 		!strings.Contains(compact, "strip_tags($_GET") {
 		add("unescaped_request_global_template_var")
 	}
+	if c.phpClientTemplateInterpolatesRequestInput(n, compact, calls) {
+		add("client_template_interpolates_request_input")
+	}
 	if strings.Contains(compact, "$_POST['systemRootPath']") && strings.Contains(compact, "videos/configuration.php") &&
 		strings.Contains(compact, "fopen") && !strings.Contains(compact, "../videos/configuration.php") {
 		add("privileged_entry_point_review")
@@ -1455,6 +1458,88 @@ func phpBpDocsSaveMissingAccessPolicy(compact string) bool {
 		}
 	}
 	return true
+}
+
+// phpClientTemplateDirectives are the attribute names AngularJS and Vue put in
+// the markup they compile. Both are documented as compiling the DOM they are
+// bootstrapped on, and a directive attribute is the marker that says this
+// markup is that DOM rather than plain HTML; a `{{ ... }}` on its own can be
+// any other brace syntax, so the two are required together.
+var phpClientTemplateDirectives = []string{
+	"ng-app=", "ng-controller=", "ng-model=", "ng-init=", "ng-repeat=",
+	"ng-bind=", "ng-bind-html=", "ng-click=", "ng-show=", "ng-hide=",
+	"ng-if=", "ng-class=", "ng-options=", "ng-include=",
+	"data-ng-app=", "data-ng-controller=", "data-ng-model=", "data-ng-init=",
+	"v-model=", "v-bind:", "v-for=", "v-if=", "v-html=", "v-text=",
+}
+
+// phpClientTemplateInterpolatesRequestInput reports a PHP template that a
+// client-side template engine compiles in the browser and that echoes a request
+// superglobal into that markup with the interpolation delimiters intact.
+//
+// HTML escaping is not the control for this context. htmlspecialchars,
+// htmlentities, strip_tags and json_encode all pass `{` and `}` through
+// unchanged, and AngularJS and Vue evaluate `{{ ... }}` in text nodes and in
+// attribute values alike, so an echoed `{{ ... }}` is still compiled as an
+// expression. Both frameworks document the remedy as keeping request data out of
+// the markup the engine compiles, which server-side means removing the
+// delimiters themselves.
+func (c *phConv) phpClientTemplateInterpolatesRequestInput(n *tree_sitter.Node, compact string, calls map[string]bool) bool {
+	if !strings.Contains(compact, "{{") || !strings.Contains(compact, "}}") {
+		return false
+	}
+	directive := false
+	for _, attr := range phpClientTemplateDirectives {
+		if strings.Contains(compact, attr) {
+			directive = true
+			break
+		}
+	}
+	if !directive || phpClientTemplateDelimitersRewritten(compact, calls) {
+		return false
+	}
+	return c.phpEchoesRequestGlobal(n)
+}
+
+// phpClientTemplateDelimitersRewritten is satisfied when the template rewrites
+// the interpolation delimiters through one of PHP's replace functions, which is
+// what makes an echoed value inert in markup a client-side engine compiles. The
+// quoted forms only occur as PHP string literals, so raw `{{` in the surrounding
+// markup does not satisfy this.
+func phpClientTemplateDelimitersRewritten(compact string, calls map[string]bool) bool {
+	if !phpHasAnyCall(calls, "str_replace", "str_ireplace", "strtr", "preg_replace", "preg_replace_callback") {
+		return false
+	}
+	opening := strings.Contains(compact, `'{{'`) || strings.Contains(compact, `"{{"`)
+	closing := strings.Contains(compact, `'}}'`) || strings.Contains(compact, `"}}"`)
+	return opening && closing
+}
+
+// phpEchoesRequestGlobal reports an echo or print whose own expression reads one
+// of PHP's request superglobals, as opposed to a superglobal that only appears
+// in a surrounding isset() guard.
+func (c *phConv) phpEchoesRequestGlobal(n *tree_sitter.Node) bool {
+	found := false
+	var walk func(cur *tree_sitter.Node)
+	walk = func(cur *tree_sitter.Node) {
+		if cur == nil || found {
+			return
+		}
+		if cur.Kind() == "echo_statement" || cur.Kind() == "print_intrinsic" {
+			text := phpCompactText(c.text(cur))
+			for _, global := range []string{"$_GET[", "$_POST[", "$_REQUEST[", "$_COOKIE["} {
+				if strings.Contains(text, global) {
+					found = true
+					return
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(cur) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return found
 }
 
 func phpHasReviewToken(tokens []string, want string) bool {
