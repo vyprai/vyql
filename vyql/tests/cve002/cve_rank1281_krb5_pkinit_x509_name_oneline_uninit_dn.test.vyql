@@ -1,0 +1,193 @@
+# Rank 1281 / CVE-2017-15088: krb5's PKINIT preauth built a certificate's
+# subject/issuer DN into a fixed-size stack buffer, buf[DN_BUF_LEN], via
+# X509_NAME_oneline_ex(cert_name, buf, &bufsize, flag). That helper only
+# populates buf when the rendered name's length is strictly smaller than
+# bufsize; when a certificate's DN is longer than DN_BUF_LEN (attacker
+# controlled, since this runs during KDC/client PKINIT cert-matching before
+# authentication completes), the populate branch is skipped, buf is left
+# holding whatever was already on the stack, and the caller passes it
+# straight to strdup(buf) with no check on X509_NAME_oneline_ex's own return
+# value or on whether *size changed. strdup then reads uninitialized stack
+# memory as a NUL-terminated string (CWE-908, a stack information exposure --
+# and, since strdup keeps reading until it happens across a NUL byte
+# in adjacent stack memory, potentially an over-read past the frame).
+#
+# Fix commit fbb687db1088ddd894d975996e5f6a4252b9a2b4 replaces the whole
+# fixed-buffer helper with rfc2253_name(), which renders into a BIO and then
+# calloc()s a buffer sized exactly to BIO_number_written() plus a NUL, so
+# there is no capacity ceiling to overrun and no path that leaves the output
+# unpopulated: every call site now checks rfc2253_name()'s returned error
+# code before touching the string it produced.
+#
+# ATTENTION, vocabulary and engine gap. `vyql match` labels nothing at either
+# revision: X509_NAME_oneline_ex, BIO_new, BIO_read, BIO_number_written and
+# X509_NAME_print_ex are all unresolved, unbound calls (the C binding pack
+# has no OpenSSL BIO/X509_NAME vocabulary at all), so no rule has anything to
+# judge and `vyql resolve`/`vyql explain` report empty proof trees on both
+# the vulnerable and patched form. The nearest existing concept by mechanism
+# is code.UninitializedBufferExposure (CWE_908, VYQL-MEM-015, "a buffer with
+# reserved capacity is exposed as initialized mutable storage") -- exactly
+# this shape, a stack buffer conditionally populated and then used
+# regardless -- but it carries no C binding at all (only Rust and
+# JavaScript, matched on a single literal analysis tag apiece, not a
+# structural pattern), the identical gap already recorded for rank 1155
+# (ENGINE-GAPS.md) against h2o's `h2o_url_init`/`target_buf`. That case
+# established the missing fact directly: whether a call's out-parameter was
+# actually written on this path is a dataflow relation the engine has no
+# notion of, not a pattern over one call site -- a plain `emit issue ... at
+# call` on X509_NAME_oneline_ex would fire identically whether or not the
+# DN fits the buffer, since the call site's text is unchanged by the fix
+# (the fix replaces the helper and every call site, not one call's
+# argument). Scanning both revisions of src/plugins/preauth/pkinit confirms
+# this directly: byte-identical finding counts at parent and fix commit,
+# nothing at either revision's buf/X509_NAME_oneline_ex or
+# rfc2253_name/md->subject_dn lines. No definition change attempted.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1281: X509_NAME_oneline_ex leaves buf untouched when the DN overflows it"
+  lang c
+  file plugins/preauth/pkinit/pkinit_crypto_openssl.c
+  reject VYQL-MEM-015
+  code
+  ```
+  #include <stddef.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  #define DN_BUF_LEN 300
+  #define ENOMEM 12
+
+  typedef struct X509_NAME X509_NAME;
+  typedef struct X509 X509;
+  typedef struct BIO BIO;
+  typedef int krb5_error_code;
+
+  typedef struct pkinit_cert_matching_data {
+      char *subject_dn;
+      char *issuer_dn;
+  } pkinit_cert_matching_data;
+
+  X509_NAME *X509_get_subject_name(X509 *a);
+
+  /*
+   * Return a string format of an X509_NAME in buf where size is an in/out
+   * parameter. On input it is the size of the buffer; on output, the actual
+   * length of the name. If the rendered name does not fit in *size bytes,
+   * buf is left untouched and only *size is updated.
+   */
+  static char *
+  X509_NAME_oneline_ex(X509_NAME *a, char *buf, unsigned int *size,
+                        unsigned long flag);
+
+  static krb5_error_code
+  get_matching_data(X509 *cert, pkinit_cert_matching_data **md_out)
+  {
+      krb5_error_code ret = ENOMEM;
+      pkinit_cert_matching_data *md = NULL;
+      char buf[DN_BUF_LEN];
+      unsigned int bufsize = sizeof(buf);
+
+      *md_out = NULL;
+
+      md = calloc(1, sizeof(*md));
+      if (md == NULL)
+          goto cleanup;
+
+      /* Get the subject name (in rfc2253 format). */
+      X509_NAME_oneline_ex(X509_get_subject_name(cert), buf, &bufsize, 0);
+      md->subject_dn = strdup(buf);
+      if (md->subject_dn == NULL) {
+          ret = ENOMEM;
+          goto cleanup;
+      }
+
+      *md_out = md;
+      md = NULL;
+      ret = 0;
+
+  cleanup:
+      free(md);
+      return ret;
+  }
+  ```
+
+test "rank1281: rfc2253_name allocates exactly what it renders and every caller checks it"
+  lang c
+  file plugins/preauth/pkinit/pkinit_crypto_openssl.c
+  reject VYQL-MEM-015
+  code
+  ```
+  #include <stddef.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  #define ENOMEM 12
+
+  typedef struct X509_NAME X509_NAME;
+  typedef struct X509 X509;
+  typedef struct BIO BIO;
+  typedef int krb5_error_code;
+
+  typedef struct pkinit_cert_matching_data {
+      char *subject_dn;
+      char *issuer_dn;
+  } pkinit_cert_matching_data;
+
+  X509_NAME *X509_get_subject_name(X509 *a);
+  BIO *BIO_new_mem(void);
+  int X509_NAME_print_ex(BIO *b, X509_NAME *name, int indent, unsigned long flag);
+  size_t BIO_number_written(BIO *b);
+  int BIO_read(BIO *b, void *data, int len);
+  void BIO_free(BIO *b);
+
+  static krb5_error_code
+  rfc2253_name(X509_NAME *name, char **str_out)
+  {
+      BIO *b = NULL;
+      char *str;
+
+      *str_out = NULL;
+      b = BIO_new_mem();
+      if (b == NULL)
+          return ENOMEM;
+      if (X509_NAME_print_ex(b, name, 0, 0) < 0)
+          goto error;
+      str = calloc(BIO_number_written(b) + 1, 1);
+      if (str == NULL)
+          goto error;
+      BIO_read(b, str, (int)BIO_number_written(b));
+      BIO_free(b);
+      *str_out = str;
+      return 0;
+
+  error:
+      BIO_free(b);
+      return ENOMEM;
+  }
+
+  static krb5_error_code
+  get_matching_data(X509 *cert, pkinit_cert_matching_data **md_out)
+  {
+      krb5_error_code ret = ENOMEM;
+      pkinit_cert_matching_data *md = NULL;
+
+      *md_out = NULL;
+
+      md = calloc(1, sizeof(*md));
+      if (md == NULL)
+          goto cleanup;
+
+      ret = rfc2253_name(X509_get_subject_name(cert), &md->subject_dn);
+      if (ret)
+          goto cleanup;
+
+      *md_out = md;
+      md = NULL;
+      ret = 0;
+
+  cleanup:
+      free(md);
+      return ret;
+  }
+  ```
