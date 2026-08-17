@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule AuthEndpointRawRequestUriExemption {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_187, CWE_863]
+    id: "VYQL-AUTH-120"
+    severity: high
+  }
+  issue code.AuthEndpointRawRequestUriExemption as decision
+}
