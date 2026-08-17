@@ -1,0 +1,369 @@
+# `snprintf` returns the length the formatted output *would* have needed, not the
+# number of bytes it actually wrote. When the format expands past the destination
+# buffer the call truncates safely but reports the larger figure, so any caller
+# that reuses the return value as a byte count or a buffer offset without first
+# comparing it against the destination's size steps outside the buffer.
+#
+# miniupnpc did that at four call sites, each with a fixed-size stack destination
+# and a format whose arguments come from the device's own description URL,
+# service and action strings:
+#
+#   miniupnpc/miniwget.c   miniwget3():          len = snprintf(buf, sizeof(buf), ...)
+#                                                while(sent < len) send(s, buf+sent, len-sent, 0)
+#   miniupnpc/minisoap.c   soapPostSubmit():     headerssize = snprintf(headerbuf, sizeof(headerbuf), ...)
+#                                                httpWrite(fd, body, bodysize, headerbuf, headerssize)
+#   miniupnpc/minissdpc.c  ssdpDiscoverDevices():n = snprintf(bufr, sizeof(bufr), MSearchMsgFmt, ...)
+#                                                sendto(sudp, bufr, n, 0, ...)
+#   miniupnpc/miniupnpc.c  simpleUPnPcommand2(): soapbodylen = snprintf(soapbody, sizeof(soapbody), ...)
+#                                                p = soapbody + soapbodylen; *(p++) = ...
+#
+# The first three read past the end of the stack buffer and put whatever follows
+# it on the wire; the fourth is worse, because the write pointer starts outside
+# the buffer and the loop's own margin test (`soapbody + sizeof(soapbody) <= p +
+# 100`) compares an already out-of-range pointer, so the element writes that
+# follow are out-of-bounds writes.
+#
+# Fix commit 4c90b87ce3d2517097880279e8c3daa7731100e6 ("Check snprintf result")
+# adds the same comparison after each of the four calls -- `if ((unsigned int)ret
+# >= sizeof(dest)) <bail>` -- and captures the return value in the one place that
+# had commented it out (`/*soapbodylen = */snprintf(...)`). The axis is the
+# unchecked return value, not a string function without a bound: every one of
+# these calls is already a bounded `snprintf`. The corpus records CWE-120; the
+# behaviour is CWE-252 leading to CWE-125 on three sites and CWE-787 on the
+# fourth.
+#
+# ATTENTION, engine gap. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`
+# over the whole repository reports 1371 findings and 435 at or above high at the
+# vulnerable revision and 1371 and 435 at the fixed one, stable across three runs
+# and two runs respectively, and not
+# one of them lands on any of the four sites: the finding lines in those files are
+# 376 and 454 either side of miniwget.c:408, 50 and 51 either side of
+# minisoap.c:96, and 109 and 146 either side of miniupnpc.c:112-137, all
+# `code.NullableDeref`. minissdpc.c does report at :687 and :694 -- inside the
+# vulnerable `snprintf` call -- but for `deviceTypes[deviceIndex]` as an
+# `code.IndexAccessSink`, which is the format argument and not the defect. The
+# vulnerable and patched revisions of miniwget3 scan identically, one finding and
+# four flags each, the same `code.NullableDeref`, `code.PointerUse` and two
+# `code.IntegerSizeArithmetic` rows, shifted by the inserted lines.
+#
+# On the fourth site the scanner reports the opposite of the defect. The
+# `simpleUPnPcommand2` body below produces a medium/high `VYQL-MEM-016`
+# (`code.RawMemoryCopySize`) on the *correctly* bounded `strncpy(p, "...",
+# soapbody + sizeof(soapbody) - p)` and nothing on `p = soapbody + soapbodylen`
+# or on the `*(p++)` writes that run past the end, which carry only low-confidence
+# `code.NullableDeref` rows.
+#
+# The gap is a missing fact, not a missing binding. Detecting this needs three
+# things correlated on one variable inside one function: that it holds a
+# formatted-output call's return value, that it is later used as a length
+# argument or added to the destination pointer, and that no comparison against
+# the destination's size stands between the two. The C frontend's function
+# context tokens carry each half separately and name-preserving --
+# `assign:len=snprintf`, `call_arg_at:sendto:2:n`, `assign:p=soapbody+soapbodylen`
+# -- but binding predicates over them are contains tests with no way to require
+# that two tokens name the same variable. The only name-preserving token for the
+# comparison is `binary:`, which routes through the file-wide AST path with a
+# case-sensitive substring fallback, and the alternative -- matching
+# `>=sizeof(` in the function's raw body text -- is both the fixing commit's own
+# spelling (`>= (int)sizeof(`, `>= BUFSZ` and `< 0 || >=` are all equally
+# correct) and silenceable by a comment, since the C context's body token is the
+# source with whitespace stripped and comments intact.
+#
+# Measured, so a sweep need not re-derive it: the correlated form is worth having.
+# A three-part heuristic over source text -- a captured `v?snprintf` return, later
+# used as a call length argument or a destination-pointer offset, with no
+# comparison of that variable against `sizeof` or the size argument -- selects 5
+# functions in `miniupnpc/`, 4 of them these sites and the fifth the same shape in
+# `minihttptestserver.c`, and 0 functions across libexpat, libmspack, libpng and
+# libredwg. Dropping the "used as a length or offset" half is what makes it
+# unshippable: bare "captures the return value with no size comparison" selects
+# roughly 70 of the 86 capture sites in this repository.
+#
+# The pair at the end isolates the construct. The `send(s, buf + sent, len -
+# sent, 0)` line is byte-identical in both cases and the only difference is where
+# `len` came from: from `recv` it is a labelled source and the size arithmetic
+# reports `VYQL-NUM-003`; from `snprintf` it reports nothing, because a formatted
+# output call's return value is not a hazardous-length source of any kind. That is
+# the whole gap -- the engine's only route to this line is attacker taint, and the
+# hazard here is an API contract about a return value that no fact expresses.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1392: the HTTP request length reported by snprintf is sent from a fixed buffer without a truncation check"
+  lang c
+  file miniupnpc/miniwget.c
+  reject VYQL-NUM-003
+  reject VYQL-MEM-010
+  reject VYQL-MEM-016
+  reject_review code.OffsetLengthBoundsOverflow
+  reject_review code.UncheckedEncodedLengthArithmetic
+  reject_review code.MissingPostCopyBoundsCheck
+  reject_review code.PointerOffsetBoundsCheck
+  code
+  ```
+  #include <stdio.h>
+  #include <string.h>
+
+  void * miniwget3(const char * host, unsigned short port, const char * path,
+                   int * size, const char * httpversion)
+  {
+  	char buf[2048];
+  	int s;
+  	int n;
+  	int len;
+  	int sent;
+  	void * content;
+
+  	*size = 0;
+  	s = connecthostport(host, port, 0);
+  	if(s < 0)
+  		return NULL;
+
+  	len = snprintf(buf, sizeof(buf),
+  	               "GET %s HTTP/%s\r\n"
+  	               "Host: %s:%d\r\n"
+  	               "Connection: Close\r\n"
+  	               "\r\n",
+  	               path, httpversion, host, port);
+  	sent = 0;
+  	while(sent < len)
+  	{
+  		n = send(s, buf + sent, len - sent, 0);
+  		if(n < 0)
+  		{
+  			closesocket(s);
+  			return NULL;
+  		}
+  		else
+  		{
+  			sent += n;
+  		}
+  	}
+  	content = getHTTPResponse(s, size);
+  	closesocket(s);
+  	return content;
+  }
+  ```
+
+test "rank1392: the same request abandons the send once snprintf reports the buffer was too small"
+  lang c
+  file miniupnpc/miniwget.c
+  reject VYQL-NUM-003
+  reject VYQL-MEM-010
+  reject VYQL-MEM-016
+  reject_review code.OffsetLengthBoundsOverflow
+  reject_review code.UncheckedEncodedLengthArithmetic
+  reject_review code.MissingPostCopyBoundsCheck
+  reject_review code.PointerOffsetBoundsCheck
+  code
+  ```
+  #include <stdio.h>
+  #include <string.h>
+
+  void * miniwget3(const char * host, unsigned short port, const char * path,
+                   int * size, const char * httpversion)
+  {
+  	char buf[2048];
+  	int s;
+  	int n;
+  	int len;
+  	int sent;
+  	void * content;
+
+  	*size = 0;
+  	s = connecthostport(host, port, 0);
+  	if(s < 0)
+  		return NULL;
+
+  	len = snprintf(buf, sizeof(buf),
+  	               "GET %s HTTP/%s\r\n"
+  	               "Host: %s:%d\r\n"
+  	               "Connection: Close\r\n"
+  	               "\r\n",
+  	               path, httpversion, host, port);
+  	if ((unsigned int)len >= sizeof(buf))
+  	{
+  		closesocket(s);
+  		return NULL;
+  	}
+  	sent = 0;
+  	while(sent < len)
+  	{
+  		n = send(s, buf + sent, len - sent, 0);
+  		if(n < 0)
+  		{
+  			closesocket(s);
+  			return NULL;
+  		}
+  		else
+  		{
+  			sent += n;
+  		}
+  	}
+  	content = getHTTPResponse(s, size);
+  	closesocket(s);
+  	return content;
+  }
+  ```
+
+test "rank1392: the SOAP body write pointer starts at the length snprintf reported, so the loop's own margin test compares an out-of-range pointer"
+  lang c
+  file miniupnpc/miniupnpc.c
+  reject VYQL-NUM-003
+  reject VYQL-MEM-010
+  reject_review code.OffsetLengthBoundsOverflow
+  reject_review code.UncheckedEncodedLengthArithmetic
+  reject_review code.MissingPostCopyBoundsCheck
+  reject_review code.PointerOffsetBoundsCheck
+  code
+  ```
+  #include <stdio.h>
+  #include <string.h>
+
+  char * simpleUPnPcommand2(int s, const char * url, const char * service,
+                            const char * action, struct UPNParg * args,
+                            int * bufsize, const char * httpversion)
+  {
+  	char soapact[128];
+  	char soapbody[2048];
+  	char * p;
+  	const char * pe, * pv;
+  	int soapbodylen;
+
+  	*bufsize = 0;
+  	snprintf(soapact, sizeof(soapact), "%s#%s", service, action);
+  	soapbodylen = snprintf(soapbody, sizeof(soapbody),
+  	                       "<?xml version=\"1.0\"?>\r\n"
+  	                       "<s:Envelope><s:Body><u:%s xmlns:u=\"%s\">",
+  	                       action, service);
+  	p = soapbody + soapbodylen;
+  	while(args->elt)
+  	{
+  		if(soapbody + sizeof(soapbody) <= p + 100)
+  			return NULL;
+  		*(p++) = '<';
+  		pe = args->elt;
+  		while(*pe)
+  			*(p++) = *(pe++);
+  		*(p++) = '>';
+  		if((pv = args->val))
+  		{
+  			while(*pv)
+  				*(p++) = *(pv++);
+  		}
+  		args++;
+  	}
+  	strncpy(p, "></s:Body></s:Envelope>\r\n", soapbody + sizeof(soapbody) - p);
+  	return soapbody;
+  }
+  ```
+
+test "rank1392: the same SOAP body abandons the request when the envelope prologue did not fit"
+  lang c
+  file miniupnpc/miniupnpc.c
+  reject VYQL-NUM-003
+  reject VYQL-MEM-010
+  reject_review code.OffsetLengthBoundsOverflow
+  reject_review code.UncheckedEncodedLengthArithmetic
+  reject_review code.MissingPostCopyBoundsCheck
+  reject_review code.PointerOffsetBoundsCheck
+  code
+  ```
+  #include <stdio.h>
+  #include <string.h>
+
+  char * simpleUPnPcommand2(int s, const char * url, const char * service,
+                            const char * action, struct UPNParg * args,
+                            int * bufsize, const char * httpversion)
+  {
+  	char soapact[128];
+  	char soapbody[2048];
+  	char * p;
+  	const char * pe, * pv;
+  	int soapbodylen;
+
+  	*bufsize = 0;
+  	snprintf(soapact, sizeof(soapact), "%s#%s", service, action);
+  	soapbodylen = snprintf(soapbody, sizeof(soapbody),
+  	                       "<?xml version=\"1.0\"?>\r\n"
+  	                       "<s:Envelope><s:Body><u:%s xmlns:u=\"%s\">",
+  	                       action, service);
+  	if ((unsigned int)soapbodylen >= sizeof(soapbody))
+  		return NULL;
+  	p = soapbody + soapbodylen;
+  	while(args->elt)
+  	{
+  		if(soapbody + sizeof(soapbody) <= p + 100)
+  			return NULL;
+  		*(p++) = '<';
+  		pe = args->elt;
+  		while(*pe)
+  			*(p++) = *(pe++);
+  		*(p++) = '>';
+  		if((pv = args->val))
+  		{
+  			while(*pv)
+  				*(p++) = *(pv++);
+  		}
+  		args++;
+  	}
+  	strncpy(p, "></s:Body></s:Envelope>\r\n", soapbody + sizeof(soapbody) - p);
+  	return soapbody;
+  }
+  ```
+
+test "rank1392: minimal pair -- a send length read from the socket is reported as size arithmetic"
+  lang c
+  file miniupnpc/miniwget.c
+  expect VYQL-NUM-003
+  code
+  ```
+  #include <stdio.h>
+
+  int send_request(int s, const char * path, const char * host)
+  {
+  	char buf[2048];
+  	int len;
+  	int sent;
+  	int n;
+
+  	len = recv(s, buf, sizeof(buf), 0);
+  	sent = 0;
+  	while(sent < len)
+  	{
+  		n = send(s, buf + sent, len - sent, 0);
+  		if(n < 0)
+  			return -1;
+  		sent += n;
+  	}
+  	return 0;
+  }
+  ```
+
+test "rank1392: minimal pair -- the same send length reported by snprintf is not"
+  lang c
+  file miniupnpc/miniwget.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stdio.h>
+
+  int send_request(int s, const char * path, const char * host)
+  {
+  	char buf[2048];
+  	int len;
+  	int sent;
+  	int n;
+
+  	len = snprintf(buf, sizeof(buf), "GET %s HTTP/1.1\r\nHost: %s\r\n\r\n", path, host);
+  	sent = 0;
+  	while(sent < len)
+  	{
+  		n = send(s, buf + sent, len - sent, 0);
+  		if(n < 0)
+  			return -1;
+  		sent += n;
+  	}
+  	return 0;
+  }
+  ```
