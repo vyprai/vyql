@@ -1,0 +1,124 @@
+# CVE-2026-22039: Kyverno's APICall context entry (pkg/engine/apicall/apiCall.go)
+# lets a namespaced Policy fetch or mutate any URLPath through Kyverno's own
+# service-account client, including paths naming a different namespace or a
+# cluster-scoped resource. Fetch() substitutes variables into the configured
+# APICall (URLPath, method, body) and executes it without ever comparing the
+# resolved path's namespace segment against the Policy's own namespace, so an
+# authenticated user who can create a namespaced Policy or ClusterPolicy-scoped
+# object in their own namespace can reach secrets or resources anywhere in the
+# cluster through the admission controller's elevated privileges.
+#
+# Fixed by e0ba4de4f1e0ca325066d5095db51aec45b1407b, which threads a
+# `policyNamespace` string from the policy through to apiCall.Fetch and adds a
+# namespace-path regex check right before Execute: for a namespaced policy the
+# resolved URLPath must contain a `/namespaces/<ns>/` segment matching
+# policyNamespace, or the call is rejected outright.
+#
+# CAUGHT at the concept layer: code.RequestScopePolicyReview already exists
+# (minted for rank91's Kubernetes CRD dispatch, same shape -- request/resource
+# scope used without a consistency check before the privileged operation
+# runs) and needed no change. New binding requestScopePolicyReviewApiCallFetch
+# in vyql/bindings/go/m48a985c1.vyql, written from Kyverno's own APICall
+# executor: a function that substitutes variables into an APICall entry
+# (variables.SubstituteAllInType) and then executes it (a call path containing
+# "Execute") without any policyNamespace identifier appearing anywhere in the
+# same function body. The reject case adds the namespace comparison inline in
+# Fetch, matching the real fix's shape (policyNamespace used before Execute).
+
+test "rank1288: apiCall.Fetch executes a substituted URLPath with no namespace scope check"
+  lang go
+  file pkg/engine/apicall/apiCall.go
+  expect_review code.RequestScopePolicyReview
+  code
+  ```
+  package apicall
+
+  import (
+  	"context"
+  	"fmt"
+
+  	kyvernov1 "github.com/kyverno/kyverno/api/kyverno/v1"
+  	enginecontext "github.com/kyverno/kyverno/pkg/engine/context"
+  	"github.com/kyverno/kyverno/pkg/engine/variables"
+  )
+
+  type apiCall struct {
+  	entry    kyvernov1.ContextEntry
+  	jsonCtx  enginecontext.Interface
+  	executor Executor
+  }
+
+  func (a *apiCall) Fetch(ctx context.Context) ([]byte, error) {
+  	call, err := variables.SubstituteAllInType(a.logger, a.jsonCtx, a.entry.APICall)
+  	if err != nil {
+  		return nil, fmt.Errorf("failed to substitute variables in context entry %s %s: %v", a.entry.Name, a.entry.APICall.URLPath, err)
+  	}
+  	data, err := a.Execute(ctx, &call.APICall)
+  	if err != nil {
+  		if data == nil && a.entry.APICall.Default != nil {
+  			data = a.entry.APICall.Default.Raw
+  			return data, nil
+  		}
+  		return nil, err
+  	}
+  	return data, nil
+  }
+  ```
+
+test "rank1288: apiCall.Fetch rejects a resolved URLPath outside the policy's own namespace"
+  lang go
+  file pkg/engine/apicall/apiCall.go
+  reject_review code.RequestScopePolicyReview
+  code
+  ```
+  package apicall
+
+  import (
+  	"context"
+  	"fmt"
+  	"path"
+  	"regexp"
+
+  	kyvernov1 "github.com/kyverno/kyverno/api/kyverno/v1"
+  	enginecontext "github.com/kyverno/kyverno/pkg/engine/context"
+  	"github.com/kyverno/kyverno/pkg/engine/variables"
+  )
+
+  var namespacePathRegex = regexp.MustCompile(`^/api(s)?/.*?/namespaces/([^/]+)/?.*$`)
+
+  type apiCall struct {
+  	entry           kyvernov1.ContextEntry
+  	jsonCtx         enginecontext.Interface
+  	executor        Executor
+  	policyNamespace string
+  }
+
+  func (a *apiCall) Fetch(ctx context.Context) ([]byte, error) {
+  	call, err := variables.SubstituteAllInType(a.logger, a.jsonCtx, a.entry.APICall)
+  	if err != nil {
+  		return nil, fmt.Errorf("failed to substitute variables in context entry %s %s: %v", a.entry.Name, a.entry.APICall.URLPath, err)
+  	}
+
+  	if a.policyNamespace != "" {
+  		cleanPath := path.Clean(call.APICall.URLPath)
+  		if matches := namespacePathRegex.FindStringSubmatch(cleanPath); len(matches) > 2 {
+  			ns := matches[2]
+  			if ns != a.policyNamespace {
+  				return nil, fmt.Errorf("path %s refers to namespace %s, which is different from the policy namespace %s", cleanPath, ns, a.policyNamespace)
+  			}
+  		} else {
+  			return nil, fmt.Errorf("path %s does not contain a namespace segment, which is required for namespaced policies", cleanPath)
+  		}
+  	}
+
+  	data, err := a.Execute(ctx, &call.APICall)
+  	if err != nil {
+  		if data == nil && a.entry.APICall.Default != nil {
+  			data = a.entry.APICall.Default.Raw
+  			return data, nil
+  		}
+  		return nil, err
+  	}
+  	return data, nil
+  }
+  ```
