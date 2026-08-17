@@ -1,0 +1,183 @@
+# Rank 1327 / CVE-2024-32982 litestar-org/litestar (starlite 1.x):
+# StaticFiles.get_fs_info joins the request path under each configured static
+# directory and then confines the result with
+#
+#   joined_path = join(directory, file_path)
+#   if file_info and commonpath([str(directory), file_info["name"], joined_path]) == str(directory):
+#
+# os.path.commonpath is component-wise but purely lexical: it drops "" and "."
+# segments and keeps "..", so commonpath(["assets", "assets/../index.html"]) is
+# "assets" and the guard accepts a path that resolves outside the directory. A
+# request for "/static/../index.html" is served from the parent of the static
+# root (CWE-22, CWE-184).
+#
+# Pool commit a07b79b84d8717bec5ac4d4674c1e4920ba9c813 carries no flag. It is
+# titled "Merge pull request from GHSA-83pv-qr33-2vcf" but is a squash merge
+# with a single parent, and it carries the fix itself: starlite/static_files/
+# base.py normalizes the joined path (os.path.normpath) before commonpath and
+# normalizes the configured directories in __init__, plus a regression test
+# asserting get_fs_info([assets], "../index.html") returns (None, None). Not a
+# release bump; no pool correction needed.
+#
+# FIXED. Diagnosis: `vyql match` on the vulnerable get_fs_info labels nothing,
+# and a bounded scan of starlite/static_files/ at either revision reports
+# nothing -- os.path.commonpath had no vocabulary at all. VYQL-PATH-001 does
+# fire twice inside static_files/base.py when the whole checkout is scanned
+# (the FileResponse calls at base.py:94 and :109), but identically at both
+# revisions, so it does not discriminate this fix: the flow it reports carries
+# joined_path, which the patch still leaves unnormalized, and the guard the
+# patch actually repairs is not part of that flow.
+#
+# The existing code.CanonicalPathStringPrefixContainment / VYQL-PATH-040 is the
+# opposite mistake -- component-wise containment replaced by string-prefix
+# containment -- and its Python binding keys on `.startswith`, so it cannot
+# express this one, where the containment operator is already correct and the
+# operands are what was never canonicalized. Added concept
+# code.UncanonicalizedPathContainmentCheck (a containment check whose operands
+# were never canonicalized, so dot segments in the candidate defeat it), rule
+# VYQL-PATH-062, and Python binding uncanonicalizedPathContainmentCheck in
+# vyql/bindings/python/uncanonicalized_path_containment_check.vyql.
+#
+# The binding is a function-scope presence predicate, which is what the Python
+# frontend can express: internal/extract/frontend/treesitter/python.go emits
+# call_path:, expr: (comparison and boolean operators, compacted) and
+# assign: tokens per function scope, but no call-argument shape tokens, so
+# there is no way to ask at the call site whether commonpath's argument was
+# normalized. Those context call paths are the syntactic dotted text rather
+# than the import-resolved path the USG carries -- `from os.path import
+# commonpath` yields call_path:commonpath, not call_path:os.path.commonpath --
+# so the binding matches on the bare function names, which covers both
+# spellings. Three conditions carry the precision:
+#
+#   * commonpath/commonprefix appears inside a comparison or boolean operator
+#     (`expr:`), which is the containment-guard use. Computing a shared root for
+#     display or for a relative path -- commonpath's ordinary, non-security use
+#     -- does not put the call in a comparison and is not covered.
+#   * a join appears in the same function, so the function is composing a
+#     path under a base rather than comparing two paths it was handed.
+#   * no canonicalizer (normpath, realpath, abspath, resolve, relative_to)
+#     appears anywhere in the same function scope.
+#
+# Function scope, not module scope, is deliberate: the module-scope form would
+# repeat the failure recorded at rank 1250, where "a canonicalizer in scope"
+# meant the whole module and an unrelated os.path.abspath elsewhere in the file
+# decided the verdict. Here the scope is the function that performs the join
+# and the guard, which is also exactly the region the fix changes -- the
+# patched get_fs_info calls os.path.normpath itself, and the separate
+# os.path.normpath in the patched __init__ is in a different scope and does not
+# mask it.
+#
+# Measured (timeout 180, --max-ram 6GB, --cache off): the vulnerable
+# starlite/static_files/base.py reports VYQL-PATH-062 at the get_fs_info guard;
+# the fix commit's copy of the same file reports nothing. The whole vulnerable
+# checkout (636 python files) goes from 237 to 238 findings -- VYQL-PATH-062
+# exactly once, at the guard -- and the whole patched checkout stays at 237,
+# every other count unchanged.
+#
+# False positives: sweeping 11 unrelated real packages already installed in
+# this environment (boto3, botocore, jinja2, requests, urllib3, yaml, apt,
+# dbus, distro, apport, setuptools, plus pip's _internal, pyproject_hooks and
+# pygments trees -- around 1400 python files) reports VYQL-PATH-062 zero times,
+# and so do the 12 individual stdlib and packaging files that do call
+# os.path.commonpath or os.path.commonprefix (tarfile, posixpath, ntpath,
+# genericpath, unittest.util, pygments.regexopt, setuptools'
+# editable_wheel, pip's unpacking/auth/pyproject_hooks, two sos plugin
+# modules) -- those compute a shared root rather than guard a join, so the
+# comparison condition declines them. The one hit outside litestar is
+# sos/archive.py:141 in the sos package (483 python files, one finding):
+# `os.path.commonprefix([self._name, tmpdir]) == tmpdir` deciding how to build
+# os.path.join(tmpdir, name), which is the same structural mistake on a
+# non-security path rather than a false shape.
+#
+# Neither OWASP corpus can move: no source file in either BenchmarkJava or
+# BenchmarkPython calls commonpath or commonprefix at all, and the concept and
+# rule are new, so nothing already scored changes. OWASP Java +1.00 and Python
+# +0.90.
+
+test "rank1327: commonpath over an unnormalized joined path accepts a dot-segment escape"
+  lang python
+  file base.py
+  expect VYQL-PATH-062
+  expect_review code.UncanonicalizedPathContainmentCheck
+  code
+  ```
+  from os.path import commonpath, join
+
+
+  class StaticFiles:
+      def __init__(self, directories, adapter):
+          self.directories = directories
+          self.adapter = adapter
+
+      async def get_fs_info(self, directories, file_path):
+          for directory in directories:
+              try:
+                  joined_path = join(directory, file_path)
+                  file_info = await self.adapter.info(joined_path)
+                  if file_info and commonpath([str(directory), file_info["name"], joined_path]) == str(directory):
+                      return joined_path, file_info
+              except FileNotFoundError:
+                  continue
+          return None, None
+  ```
+
+test "rank1327: normalizing the joined path before commonpath closes the escape"
+  lang python
+  file base.py
+  reject VYQL-PATH-062
+  reject_review code.UncanonicalizedPathContainmentCheck
+  code
+  ```
+  import os.path
+
+
+  class StaticFiles:
+      def __init__(self, directories, adapter):
+          self.directories = [os.path.normpath(d) for d in directories]
+          self.adapter = adapter
+
+      async def get_fs_info(self, directories, file_path):
+          for directory in directories:
+              try:
+                  joined_path = os.path.join(directory, file_path)
+                  normalized_file_path = os.path.normpath(joined_path)
+                  if os.path.commonpath([directory, normalized_file_path]) == str(directory) and (
+                      file_info := await self.adapter.info(joined_path)
+                  ):
+                      return joined_path, file_info
+              except FileNotFoundError:
+                  continue
+          return None, None
+  ```
+
+test "rank1327: commonpath computing a shared root is not a containment guard"
+  lang python
+  file report.py
+  reject VYQL-PATH-062
+  reject_review code.UncanonicalizedPathContainmentCheck
+  code
+  ```
+  import os.path
+
+
+  def shared_root(paths):
+      root = os.path.commonpath(paths)
+      return [os.path.join(root, os.path.relpath(p, root)) for p in paths]
+  ```
+
+test "rank1327: a realpath-resolved candidate is a real containment check"
+  lang python
+  file serve.py
+  reject VYQL-PATH-062
+  reject_review code.UncanonicalizedPathContainmentCheck
+  code
+  ```
+  import os.path
+
+
+  def open_asset(root, name):
+      candidate = os.path.realpath(os.path.join(root, name))
+      if os.path.commonpath([root, candidate]) != root:
+          raise ValueError("outside asset root")
+      return open(candidate, "rb")
+  ```
