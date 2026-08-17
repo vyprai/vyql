@@ -2744,3 +2744,19 @@ binding redirectUriWildcardSchemeBypass468 {
   query pattern presenceNode where node.scope == "class" and node.context.className contains "edirect" and node.context.call contains "endsWith" and node.context.call contains "startsWith" and node.context.literal contains "*" and not (node.context.call contains "getScheme")
   emit issue code.RedirectUriWildcardSchemeBypass at node
 }
+
+// hudson.scm.SCM#checkout is the API contract for materialising a job's
+// configured repository location into a workspace, and its parameter list --
+// Run, Launcher, FilePath workspace, TaskListener, File, SCMRevisionState --
+// identifies the override uniquely. Jenkins SCM URLs accept every scheme the
+// underlying tool accepts, including file:// and bare local directories, and
+// job configuration is a weaker permission than administering the controller.
+// FilePath.isRemote() is the documented way to tell a controller-side
+// workspace from an agent one, so a checkout override that never consults it
+// cannot be branching on where the repository location is allowed to point;
+// once the method reads it, the operator has somewhere to reject local
+// sources and the finding stops.
+binding jenkinsScmCheckoutAllowsLocalSource469 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "checkout" and node.context.paramType contains "SCMRevisionState" and node.context.paramType contains "FilePath" and node.context.paramType contains "Launcher" and not (node.context.scopeCall contains "isRemote")
+  emit issue code.JenkinsScmCheckoutAllowsLocalSource at node
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept JenkinsScmCheckoutAllowsLocalSource : issue {
+  cwe: [CWE_22, CWE_73]
+  reviewAssumption: "a caller who can configure a job supplies the repository location, and the checkout can run in a controller-side workspace"
+  reviewCategory: path
+  reviewCondition: "a Jenkins SCM checkout materialises a job-configured repository location without restricting it to remote sources when the workspace is on the controller"
+  reviewConfidence: medium
+  reviewEvidence: "SCM checkout context {pattern} takes the workspace FilePath and SCMRevisionState baseline of hudson.scm.SCM#checkout without an observed FilePath.isRemote() controller/agent branch"
+  vulnerableTo: [path.PathTraversal]
+}
