@@ -1,0 +1,102 @@
+# Rank 1545 / CVE-2021-42235: osTicket's password-reset flow passed
+# the raw reset-form username straight into its ORM lookup arrays,
+# so a crafted username injected SQL through the query the ORM
+# assembles for joined navigation keys (SQL injection, CWE-89;
+# reported by Bittylicious). The lookup branches in
+# include/class.validator.php did `if (strpos($username, '@') !==
+# false) $user = static::lookup(array('user__emails__address' =>
+# $username)); else $user = static::lookup(array('username' =>
+# $username));` -- and Staff::lookup's variants forwarded `$var`
+# uncast -- with the ORM (VerySimpleModel::lookup) building WHERE
+# clauses from the array it receives. Pool commit e28291022e is the
+# real fix (COMMIT_OK -- "security: SQL Injection"): every lookup is
+# guarded by Validator predicates first (is_email, is_userid,
+# is_username with the unicode allowlist regex), staff_id is cast
+# (int), username cast (string), and pwreset.php rejects numeric
+# usernames outright. No pool correction.
+#
+# ATTENTION, ORM lookup injection. The taint crosses into
+# osTicket's own VerySimpleModel::lookup, whose array argument
+# becomes a WHERE clause inside the ORM -- the same project-ORM
+# boundary as ranks 1568 (phpipam's fetch_object) and 1526
+# (openrefine's config getters): no binding labels an application
+# ORM's lookup as a SqlExecution, so the taint from the form stops at
+# the call (scanning class.validator.php and pwreset.php reports
+# zero findings at both revisions). The fix's controls are the
+# general allowlist-guard shapes (Validator predicates, integer
+# casts), but Validator is osTicket's own class. No ENGINE-GAPS.md
+# entry beyond what the ORM-boundary family already records. No
+# definition change shipped. Spec cve_rank1545 records the raw
+# username reaching the lookup and the validator-gated form, both
+# asserting reject VYQL-INJ-001: when ORM-boundary vocabulary lands,
+# the raw form must flip to expect.
+
+test "rank1545: the reset username reaches the lookup raw"
+  lang php
+  file include/class.validator.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class Validator {
+      static function lookup($criteria) {
+          return VerySimpleModel::lookup($criteria);
+      }
+  }
+
+  class PasswordReset {
+      static function getUserByUsername($username) {
+          if (strpos($username, '@') !== false)
+              $user = Validator::lookup(array('user__emails__address' => $username));
+          else
+              $user = Validator::lookup(array('username' => $username));
+          return $user;
+      }
+  }
+  ```
+
+test "rank1545: the fix validates the username first"
+  lang php
+  file include/class.validator.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class Validator {
+      static function lookup($criteria) {
+          return VerySimpleModel::lookup($criteria);
+      }
+
+      static function is_email($email, &$error='') {
+          return filter_var($email, FILTER_VALIDATE_EMAIL);
+      }
+
+      static function is_userid($userid, &$error='') {
+          if (!self::is_username($userid))
+              return false;
+          return is_numeric($userid) ? false : true;
+      }
+
+      static function is_username($username, &$error='') {
+          if (strlen($username) < 4 || strlen($username) > 64)
+              return false;
+          elseif (is_numeric($username) || !preg_match('/^[\p{L}\d._-]+$/u', $username))
+              return false;
+          return true;
+      }
+  }
+
+  class PasswordReset {
+      static function getUserByUsername($username) {
+          if (Validator::is_email($username))
+              $user = Validator::lookup(array('user__emails__address' => $username));
+          elseif (Validator::is_userid($username))
+              $user = Validator::lookup(array('username' => $username));
+          else
+              $user = null;
+          return $user;
+      }
+  }
+  ```
