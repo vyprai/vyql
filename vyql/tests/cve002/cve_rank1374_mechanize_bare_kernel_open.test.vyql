@@ -1,0 +1,130 @@
+# Rank 1374 / CVE-2021-21289: mechanize wrote every downloaded body, cookie
+# jar and local file through Ruby's bare `open`. `Kernel#open` is a private
+# instance method mixed into Object, so a receiverless `open path, mode` is
+# `Kernel.open path, mode`, and Ruby documents that method as running the path
+# as a subprocess command line when its first character is `|`. The paths
+# mechanize passed are not the caller's own constants: `Mechanize::Download`
+# and `Mechanize::File` derive @filename from the response's
+# Content-Disposition header in extract_filename, and CookieJar#save/#load
+# take a path straight from the calling application. A server answering with
+# `Content-Disposition: attachment; filename="|id"` therefore ran a command on
+# the client when the download was saved (CWE-78).
+#
+# Pool commit 66a6a1bfa6 is the PR merge; its combined diff is empty, so the
+# patch is unreadable from the row. The five fixes sit inside it (aae0b13,
+# 2ac906b, f43a395, b48b12f, 63f8779) and each replaces the bare call with
+# `::File.open`, the spelling that has no pipe behaviour. f43a395,
+# "fix(security): prevent command injection in Download#save!", is the readable
+# single-commit stand-in for the row.
+#
+# The weakness class was already vocabulary: code.RubyPipeOpenCommandExecution,
+# its review twin and VYQL-INJ-042 all exist, and rank 224 covered the explicit
+# `Kernel.open` spelling. Only the receiverless spelling — the common one, and
+# the one mechanize used everywhere — had no binding, so the call was labelled
+# code.UrlFetch alone and no pipe-open flag was raised. The new Ruby binding
+# matches callee.path exactly, because `~=` is segment-aware in both directions
+# and would otherwise pull in `File.open`, `zip.open` and any other
+# receiver-qualified `.open` — including the patched form itself.
+
+test "rank1374: a downloaded body saved through bare open can run a piped path"
+  lang ruby
+  profile library
+  expect_review code.RubyPipeOpenCommandExecution
+  file lib/mechanize/download.rb
+  code
+  ```
+  class Mechanize::Download
+    attr_accessor :filename
+
+    def initialize uri = nil, response = nil, body_io = nil, code = nil
+      @uri     = uri
+      @body_io = body_io
+      fill_header response
+      extract_filename
+    end
+
+    def save! filename = nil
+      filename ||= @filename
+      dirname = File.dirname filename
+      FileUtils.mkdir_p dirname
+
+      open filename, 'wb' do |io|
+        until @body_io.eof? do
+          io.write @body_io.read 16384
+        end
+      end
+
+      filename
+    end
+  end
+  ```
+
+test "rank1374: a cookie jar path opened through bare open can run a piped path"
+  lang ruby
+  profile library
+  expect_review code.RubyPipeOpenCommandExecution
+  file lib/mechanize/cookie_jar.rb
+  code
+  ```
+  class Mechanize::CookieJar < ::HTTP::CookieJar
+    def load(input, *options)
+      input.respond_to?(:write) or
+        return open(input, 'r') { |io| load(io, *options) }
+
+      opthash = {
+        :format => :yaml,
+        :session => false,
+      }
+      opthash.update(options.first) if options.first
+      opthash
+    end
+  end
+  ```
+
+test "rank1374: ::File.open has no pipe behaviour and is not process execution"
+  lang ruby
+  profile library
+  reject_review code.RubyPipeOpenCommandExecution
+  file lib/mechanize/download.rb
+  code
+  ```
+  class Mechanize::Download
+    attr_accessor :filename
+
+    def initialize uri = nil, response = nil, body_io = nil, code = nil
+      @uri     = uri
+      @body_io = body_io
+      fill_header response
+      extract_filename
+    end
+
+    def save! filename = nil
+      filename ||= @filename
+      dirname = File.dirname filename
+      FileUtils.mkdir_p dirname
+
+      ::File.open(filename, 'wb') do |io|
+        until @body_io.eof? do
+          io.write @body_io.read 16384
+        end
+      end
+
+      filename
+    end
+  end
+  ```
+
+test "rank1374: an open method reached through a receiver is not Kernel#open"
+  lang ruby
+  profile library
+  reject_review code.RubyPipeOpenCommandExecution
+  file lib/mechanize/http/agent.rb
+  code
+  ```
+  class Mechanize::HTTP::Agent
+    def resolve_parameters uri, filename
+      File.open(filename, 'rb') { |io| io.read }
+      @connection_cache.open(uri.host)
+    end
+  end
+  ```

@@ -1,0 +1,13 @@
+module bindings.ruby.generated.mkernelopenpath;
+
+// `Kernel#open` is a private instance method mixed into Object, so the bare
+// receiverless `open path, mode` is the same method as `Kernel.open path, mode`
+// and carries the same documented behaviour: a path whose first character is
+// `|` is treated as a command line to run in a subprocess instead of a file to
+// open. Ruby's own documentation for Kernel#open states this, and `File.open`
+// is the spelling that does not have it, which is why the receiverless form
+// needs the pipe-open sink of its own.
+binding rubyPipeOpenCommandExecutionReceiverless {
+  query pattern callExpr where callee.path == "open"
+  emit sink code.RubyPipeOpenCommandExecution at args[0]
+}
