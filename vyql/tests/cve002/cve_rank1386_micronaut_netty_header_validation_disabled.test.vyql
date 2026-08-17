@@ -1,0 +1,243 @@
+# Rank 1386 / CVE-2020-7611 (GHSA-694p-xrhg-x3wm): Micronaut's own Netty header
+# type, io.micronaut.http.netty.NettyHttpHeaders, built its backing store with
+# Netty's header validation switched off:
+#
+#   public NettyHttpHeaders() {
+#       this.nettyHeaders = new DefaultHttpHeaders(false);
+#       this.conversionService = ConversionService.SHARED;
+#   }
+#
+# DefaultHttpHeaders(boolean validate) is documented as "validate -- validate
+# header names and values", and that validator is what rejects CR, LF and NUL in
+# a header value and separators in a header name. With it off, any string an
+# application hands to MutableHttpHeaders.add/set -- a forwarded cookie, a
+# tenant id, a query parameter copied onto an outbound request -- is written to
+# the wire verbatim, so a value carrying "\r\n" terminates the header block
+# early and injects a second message. Fix 9d1eff5c8d is one line, dropping the
+# argument so the no-arg constructor's default validation applies.
+#
+# The attacker is not a Micronaut committer and not the author of any particular
+# application: it is whoever controls a string that an application built on
+# Micronaut puts into a header, and the framework is what decides whether that
+# string is validated. Micronaut's HTTP client and its mutable server responses
+# both route through this one type, so a single constructor argument removed the
+# guarantee for every application on the framework at once -- request smuggling
+# against the upstream the client talks to (CWE-444), response splitting toward
+# the browser (CWE-113). That is what makes the fact worth detecting where it
+# is: the same call in one application would compromise only that application,
+# but the detectable fact is identical in both, which is why the binding names
+# the Netty constructor and not anything about Micronaut.
+#
+# FIXED. Nothing is tainted here and there is no path to trace -- the weakness
+# is a control switched off at construction, exactly the shape
+# code.CertValidationDisabled already occupies for TLS -- so a taint rule can
+# never reach it. code.HttpHeaderValidationDisabled and rule VYQL-INJ-247
+# (CWE-113, CWE-444) judge it, and the Java binding keys on the documented
+# constructor argument: the classes it names are those whose only boolean
+# parameter is the validation flag in every overload, so a false literal in the
+# argument list cannot be anything else. HttpClientCodec and
+# DefaultFullHttpResponse are deliberately excluded because each takes a second,
+# unrelated boolean (failOnMissingResponse, singleFieldHeaders) that a
+# positional guess would misread. The builder spelling
+# (Http2FrameCodecBuilder.validateHeaders(false),
+# HttpDecoderConfig.setValidateHeaders(false)) is covered by name rather than by
+# position.
+#
+# The predicate is callee.method, not callee.path, and that is load-bearing. A
+# Java call node's path carries its whole receiver chain, so
+# `new DefaultHttpHeaders().setBoolean(name, false)` resolves to
+# DefaultHttpHeaders.setBoolean and `builder.validateHeaders(true)
+# .autoAckSettingsFrame(false)` to ...validateHeaders.autoAckSettingsFrame.
+# Because a path match is segment-aware anywhere in the path, not only at its
+# end, `callee.path ~= "DefaultHttpHeaders"` accepted both of those and read the
+# following call's arguments -- two findings on two safe lines, measured. Both
+# shapes are pinned as reject cases below.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off), every count the
+# same across three runs. micronaut-core http-netty + http-server-netty +
+# http-client at 9d1eff5c8d^: 25 findings without the binding, 26 with it, the
+# extra one VYQL-INJ-247 at
+# http-netty/src/main/java/io/micronaut/http/netty/NettyHttpHeaders.java:56; at
+# 9d1eff5c8d, 25 and no VYQL-INJ-247. Whole micronaut-core (2670 java, 1188
+# groovy, 286 kotlin): 237 findings at 9d1eff5c8d^ with exactly one
+# VYQL-INJ-247, the CVE line, and 236 with none at 9d1eff5c8d. The four other
+# DefaultHttpHeaders constructions in the tree (HttpResponseEncoder,
+# NettyServerWebSocketUpgradeHandler, EmptyHttpRequest, EmptyHttpResponse) pass
+# no argument and none is reported.
+#
+# netty itself, codec-http + codec-http2, reports 35 VYQL-INJ-247 and every one
+# is under src/test: DefaultHttpHeadersTest, ReadOnlyHttpHeadersTest,
+# DefaultHttp2HeadersDecoderTest and the rest exercise the non-validating path
+# deliberately, and each reported line is a literal validate=false construction
+# rather than a misread. Nothing under src/main is reported. Three unrelated
+# Java trees totalling 2582 files -- logging-log4j2, the Jenkins git and
+# mercurial plugins -- report zero. No identifier this binding names appears
+# anywhere in the OWASP Java Benchmark corpus, and the full spec suite passes at
+# 4868 specs.
+
+test "rank1386: a framework header type whose backing Netty header store is constructed with validation disabled"
+  lang java
+  file http-netty/src/main/java/io/micronaut/http/netty/NettyHttpHeaders.java
+  expect VYQL-INJ-247
+  code
+  ```
+  package io.micronaut.http.netty;
+
+  import io.micronaut.core.convert.ConversionService;
+  import io.micronaut.http.MutableHttpHeaders;
+  import io.netty.handler.codec.http.DefaultHttpHeaders;
+
+  public class NettyHttpHeaders implements MutableHttpHeaders {
+
+      io.netty.handler.codec.http.HttpHeaders nettyHeaders;
+      final ConversionService<?> conversionService;
+
+      public NettyHttpHeaders(io.netty.handler.codec.http.HttpHeaders nettyHeaders, ConversionService conversionService) {
+          this.nettyHeaders = nettyHeaders;
+          this.conversionService = conversionService;
+      }
+
+      public NettyHttpHeaders() {
+          this.nettyHeaders = new DefaultHttpHeaders(false);
+          this.conversionService = ConversionService.SHARED;
+      }
+
+      @Override
+      public MutableHttpHeaders add(CharSequence header, CharSequence value) {
+          nettyHeaders.add(header, value);
+          return this;
+      }
+  }
+  ```
+
+test "rank1386: the fix leaves the no-argument constructor, so Netty's default header validation applies"
+  lang java
+  file http-netty/src/main/java/io/micronaut/http/netty/NettyHttpHeaders.java
+  reject VYQL-INJ-247
+  code
+  ```
+  package io.micronaut.http.netty;
+
+  import io.micronaut.core.convert.ConversionService;
+  import io.micronaut.http.MutableHttpHeaders;
+  import io.netty.handler.codec.http.DefaultHttpHeaders;
+
+  public class NettyHttpHeaders implements MutableHttpHeaders {
+
+      io.netty.handler.codec.http.HttpHeaders nettyHeaders;
+      final ConversionService<?> conversionService;
+
+      public NettyHttpHeaders() {
+          this.nettyHeaders = new DefaultHttpHeaders();
+          this.conversionService = ConversionService.SHARED;
+      }
+
+      @Override
+      public MutableHttpHeaders add(CharSequence header, CharSequence value) {
+          nettyHeaders.add(header, value);
+          return this;
+      }
+  }
+  ```
+
+test "rank1386: an encoder that builds a Netty header store and copies values into it without touching the validation flag is not reported"
+  lang java
+  file http-server-netty/src/main/java/io/micronaut/http/server/netty/encoders/HttpResponseEncoder.java
+  reject VYQL-INJ-247
+  code
+  ```
+  package io.micronaut.http.server.netty.encoders;
+
+  import io.netty.handler.codec.http.DefaultHttpHeaders;
+  import io.netty.handler.codec.http.HttpHeaders;
+
+  public class HttpResponseEncoder {
+
+      protected void encode(MutableHttpResponse<?> response) {
+          io.netty.handler.codec.http.HttpHeaders nettyHeaders = new DefaultHttpHeaders();
+          for (Map.Entry<String, List<String>> entry : response.getHeaders()) {
+              nettyHeaders.set(entry.getKey(), entry.getValue());
+          }
+      }
+  }
+  ```
+
+test "rank1386: a header store constructed with validation explicitly enabled is not reported"
+  lang java
+  file http-netty/src/main/java/io/micronaut/http/netty/NettyHttpParameters.java
+  reject VYQL-INJ-247
+  code
+  ```
+  package io.micronaut.http.netty;
+
+  import io.netty.handler.codec.http.DefaultHttpHeaders;
+
+  public class NettyHttpParameters {
+
+      public io.netty.handler.codec.http.HttpHeaders validatingHeaders() {
+          return new DefaultHttpHeaders(true);
+      }
+  }
+  ```
+
+test "rank1386: a boolean header written through a validating store is not read as the validation flag"
+  lang java
+  file http-netty/src/main/java/io/micronaut/http/netty/NettyHttpResponseFactory.java
+  reject VYQL-INJ-247
+  code
+  ```
+  package io.micronaut.http.netty;
+
+  import io.netty.handler.codec.http.DefaultHttpHeaders;
+  import io.netty.handler.codec.http.HttpHeaders;
+
+  public class NettyHttpResponseFactory {
+
+      HttpHeaders headers() {
+          return new DefaultHttpHeaders().setBoolean("x-cache-hit", false);
+      }
+  }
+  ```
+
+test "rank1386: an HTTP/2 codec builder that turns the documented header-validation flag off"
+  lang java
+  file http-server-netty/src/main/java/io/micronaut/http/server/netty/http2/Http2ServerHandler.java
+  expect VYQL-INJ-247
+  code
+  ```
+  package io.micronaut.http.server.netty.http2;
+
+  import io.netty.handler.codec.http2.Http2FrameCodec;
+  import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
+
+  public class Http2ServerHandler {
+
+      Http2FrameCodec codec() {
+          return Http2FrameCodecBuilder.forServer()
+                  .validateHeaders(false)
+                  .build();
+      }
+  }
+  ```
+
+test "rank1386: the same builder left at its validating default is not reported"
+  lang java
+  file http-server-netty/src/main/java/io/micronaut/http/server/netty/http2/Http2ServerHandler.java
+  reject VYQL-INJ-247
+  code
+  ```
+  package io.micronaut.http.server.netty.http2;
+
+  import io.netty.handler.codec.http2.Http2FrameCodec;
+  import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
+
+  public class Http2ServerHandler {
+
+      Http2FrameCodec codec() {
+          return Http2FrameCodecBuilder.forServer()
+                  .validateHeaders(true)
+                  .autoAckSettingsFrame(false)
+                  .build();
+      }
+  }
+  ```
