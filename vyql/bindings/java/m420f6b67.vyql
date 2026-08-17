@@ -2712,3 +2712,19 @@ binding jwtSignatureCheckDroppedByDelegateSelection467 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "configure" and node.context.call contains "ClientJwtValidator" and not (node.context.call contains "containsKey") and not (node.context.call contains "contains")
   emit issue code.UnverifiedJwt at node
 }
+
+// hudson.remoting.Callable is Jenkins' raw controller/agent RPC interface: its
+// checkRoles(RoleChecker) is the caller's only hook to restrict which channel
+// role may run call(), and the documented correct body invokes
+// roleChecker.check(this, ...) against an expected Role (Roles.SLAVE for a
+// controller-to-agent callable, MasterToSlaveCallable's own base class does
+// this already). A checkRoles method present in the class but never calling
+// .check anywhere in the class body leaves every role able to enter call(),
+// regardless of what call() itself does -- the same gap the JVM's own
+// MasterToSlaveCallable closes by fixing the expected role for its callers.
+// General to any call() body, unlike jenkinsRemotingCallableSystemPropertiesLeak240's
+// System.getProperties()-specific case above.
+binding jenkinsRemotingCallableMissingRoleCheck468 {
+  query pattern presenceNode where node.scope == "class" and node.context.classBase contains "Callable" and node.context.functionName contains "call" and node.context.functionName contains "checkRoles" and not (node.context.classBase contains "MasterToSlaveCallable") and not (node.context.scopeCall contains ".check")
+  emit issue code.JenkinsRemotingCallableMissingRoleCheck at node
+}
