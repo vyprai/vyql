@@ -1,0 +1,77 @@
+# Rank 1551 / CVE-2024-27298: Parse Server's Postgres adapter
+# escaped quotation marks inside user-supplied $regex query values
+# one at a time, so a regex carrying a second quote closed the string
+# literal early and injected SQL into the Postgres query (SQL
+# injection through an incomplete escape, CWE-89; GHSA-6927-3vr9-
+# xf2, fixed in 6.5.3/7.0.0-alpha.20; the pool row's nocommit flag
+# was advisory-side absence). literalizeRegexPart in
+# src/Adapters/Storage/Postgres/PostgresStorageAdapter.js chained
+# `.replace(/([^'])'/, "$1''")` -- no global flag -- so only the
+# first quote in the value was doubled; the spec added with the fix
+# shows the payload `A'B';SELECT PG_SLEEP(3);--` sailing through the
+# escape. Pool commit cbefe770a7 is the real fix (COMMIT_OK by diff
+# -- "fix: Improve PostgreSQL injection detection"): the replace
+# gains the global flag `(/([^'])'/g, "$1''")` so every quote in the
+# value is escaped. No pool correction.
+#
+# ATTENTION, escape-completeness inside a sanitizer. The escaping
+# helper exists and runs -- its defect is that a non-global replace
+# handles only the first match, the same present-but-incomplete
+# family as ranks 1564 (pgjdbc's unquoted bind types) and 1522
+# (bracket-blind hosts): nothing can ask "does this string-replace
+# sanitize every occurrence in the value" -- regex-flag semantics on
+# a project-local helper are not observed by any rule. A binding on
+# Parse Server's own literalizeRegexPart would detect this
+# application rather than the weakness. Measured on the real code:
+# scanning PostgresStorageAdapter.js reports zero findings at both
+# revisions (the injection crosses through the adapter's own query
+# assembly, a project-API boundary). No ENGINE-GAPS.md entry: the
+# piece is replace-completeness vocabulary, not a localised
+# construct. No definition change shipped. Spec cve_rank1551
+# records the single-shot escape and the global-flag form, both
+# asserting reject VYQL-INJ-001: when replace-completeness
+# vocabulary lands, the single-shot form must flip to expect.
+
+test "rank1551: the regex quote escape stops at the first match"
+  lang javascript
+  file src/Adapters/Storage/Postgres/PostgresStorageAdapter.js
+  reject VYQL-INJ-001
+  code
+  ```
+  function literalizeRegexPart(s) {
+    return s
+      .replace(/([\f\n\r\t\v])/g, `\\${'$1'}`)
+      .replace(/([^\\])(\\Q)/, '$1')
+      .replace(/^\\E/, '')
+      .replace(/^\\Q/, '')
+      .replace(/([^'])'/, `$1''`)
+      .replace(/^'([^'])/, `''$1`);
+  }
+
+  function buildRegexClause(column, regexValue) {
+    const literal = literalizeRegexPart(regexValue);
+    return `WHERE ${column} ~ '${literal}'`;
+  }
+  ```
+
+test "rank1551: the fix escapes every quote in the value"
+  lang javascript
+  file src/Adapters/Storage/Postgres/PostgresStorageAdapter.js
+  reject VYQL-INJ-001
+  code
+  ```
+  function literalizeRegexPart(s) {
+    return s
+      .replace(/([\f\n\r\t\v])/g, `\\${'$1'}`)
+      .replace(/([^\\])(\\Q)/, '$1')
+      .replace(/^\\E/, '')
+      .replace(/^\\Q/, '')
+      .replace(/([^'])'/g, `$1''`)
+      .replace(/^'([^'])/, `''$1`);
+  }
+
+  function buildRegexClause(column, regexValue) {
+    const literal = literalizeRegexPart(regexValue);
+    return `WHERE ${column} ~ '${literal}'`;
+  }
+  ```
