@@ -1,0 +1,202 @@
+# Rank 1287 / CVE-2026-32763: kysely's DefaultQueryCompiler built the MySQL
+# JSON path literal for `eb.ref(col, '->$').key(key)` by coercing the leg's
+# value straight into the SQL text (CWE-89).
+# src/query-compiler/default-query-compiler.ts's visitJSONPathLeg had
+#
+#   this.append(isArrayLocation ? '[' : '.')
+#   this.append(String(node.value))
+#
+# inside a fragment that opens with `this.append("'$")` and closes with
+# `this.append("'")` -- a raw string coercion of `.key()`'s argument, spliced
+# between two single quotes with no escaping. A key containing `'` closes the
+# literal early. Fix 0a602bff2f: route the string case through the
+# compiler's own `sanitizeStringLiteral` (doubles embedded `'`), leaving the
+# non-string (array index) branch as `String(node.value)` since numbers and
+# `'last'`/`'#-N'` never carry a quote.
+#
+# ATTENTION, engine gap. `append` mutates the private field `#sql`; that
+# field is set in `append`, called from `visitJSONPathLeg`, and read back out
+# inside `compileQuery` (the real code adds one more hop, a `getSql()`
+# getter, between the two) -- three (real code: four) methods on the same
+# receiver, joined only by `this`, no argument or return value carrying the
+# leg's value across the last hop. `vyql trace -from code.HttpInput -to
+# code.SqlExecution` on the repro below dead-ends identically for both the
+# vulnerable and the fixed form:
+#
+#   ⊣ code.Call  compiler.ts:5  call=this.#sql  no outgoing flow (callee not
+#     traced -- external or cross-package)
+#
+# at the `this.#sql += str` statement inside `append`. This is the same
+# construct ENGINE-GAPS.md already records for rank 1198 (instantCMS,
+# `cmsModel::select()` writing `$this->select[]`, read by a sibling method
+# two calls later): a field written on `this` inside one method is not
+# visible when the same field is read on the same receiver inside a
+# different method. That entry names `aliasReceiverSelf`
+# (internal/extract/lowering/lowering.go:2787) as the mechanism that exists
+# for exactly this shape but does not connect the write to the read. This
+# rank confirms the gap is not PHP-specific: TypeScript's private class
+# fields (`#sql`) hit the identical dead-end, with the identical trace
+# wording, for a receiver mutated through a plain method call rather than a
+# fluent/chained one.
+#
+# A trap while isolating this: `internal/extract/lowering/lowering.go:190`'s
+# `mutatorMethods` treats a fixed vocabulary of method names (`append`,
+# `write`, `add`, `push`, `set`, ...) as taint-transferring builder mutators
+# by name alone, at the call site, regardless of what the method actually
+# does. Naming the intermediate method `write` (a name on that list) instead
+# of `addPart` makes a structurally identical repro report VYQL-INJ-001 --
+# not because field-crossing works, but because `compile()`'s own call
+# `this.write(v)` is itself recognised as a mutator call and marks `this`
+# tainted right there, with no interprocedural hop at all. The isolating
+# pair below avoids every name on that list on the write side (`addPart`,
+# `build`) so it measures the real gap rather than this shortcut; `append`
+# stays in the primary repro because that is kysely's actual method name,
+# and it is the innermost hop either way, one level short of where the trace
+# actually dead-ends.
+#
+# The isolating pair holds no CVE-specific API: the same source, the same
+# `db.query(sql)` sink (already bound, unconditionally), and the same
+# concatenated fragment; only whether the fragment crosses a private field
+# between two methods on one instance differs. The inline control reports
+# VYQL-INJ-001; the field-crossing form does not.
+#
+# Scanning the real checkout (bounded, 926 findings total, mostly unrelated
+# review-tier noise from the library's own public-API entry points) reports
+# nothing at default-query-compiler.ts's visitJSONPathLeg or json-path-builder.ts's
+# key()/at() in either revision -- `vyql match` on the isolated repro labels the
+# source but no sink at the field write.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1287: the JSON path leg value is coerced straight into the SQL literal"
+  lang javascript
+  file src/query-compiler/default-query-compiler.ts
+  reject VYQL-INJ-001
+  code
+  ```
+  class DefaultQueryCompiler {
+    #sql = ''
+
+    protected append(str: string): void {
+      this.#sql += str
+    }
+
+    protected visitJSONPathLeg(node: { type: string; value: string | number }): void {
+      const isArrayLocation = node.type === 'ArrayLocation'
+      this.append(isArrayLocation ? '[' : '.')
+      this.append(String(node.value))
+      if (isArrayLocation) {
+        this.append(']')
+      }
+    }
+
+    compileQuery(pathLegs: { type: string; value: string | number }[]): string {
+      this.append("'$")
+      for (const leg of pathLegs) {
+        this.visitJSONPathLeg(leg)
+      }
+      this.append("'")
+      return this.#sql
+    }
+  }
+
+  async function handler(db, req) {
+    const key = req.query.key
+    const sql = new DefaultQueryCompiler().compileQuery([{ type: 'Member', value: key }])
+    await db.query(sql)
+  }
+  ```
+
+test "rank1287: the fix routes the string leg through sanitizeStringLiteral"
+  lang javascript
+  file src/query-compiler/default-query-compiler.ts
+  reject VYQL-INJ-001
+  code
+  ```
+  const LIT_WRAP_REGEX = /'/g
+
+  class DefaultQueryCompiler {
+    #sql = ''
+
+    protected append(str: string): void {
+      this.#sql += str
+    }
+
+    protected sanitizeStringLiteral(value: string): string {
+      return value.replace(LIT_WRAP_REGEX, "''")
+    }
+
+    protected visitJSONPathLeg(node: { type: string; value: string | number }): void {
+      const isArrayLocation = node.type === 'ArrayLocation'
+      this.append(isArrayLocation ? '[' : '.')
+      this.append(
+        typeof node.value === 'string'
+          ? this.sanitizeStringLiteral(node.value)
+          : String(node.value),
+      )
+      if (isArrayLocation) {
+        this.append(']')
+      }
+    }
+
+    compileQuery(pathLegs: { type: string; value: string | number }[]): string {
+      this.append("'$")
+      for (const leg of pathLegs) {
+        this.visitJSONPathLeg(leg)
+      }
+      this.append("'")
+      return this.#sql
+    }
+  }
+
+  async function handler(db, req) {
+    const key = req.query.key
+    const sql = new DefaultQueryCompiler().compileQuery([{ type: 'Member', value: key }])
+    await db.query(sql)
+  }
+  ```
+
+# The isolating pair. Same source, same db.query() sink, same concatenated
+# fragment; only whether it crosses a private field between two methods on
+# one receiver differs.
+
+test "rank1287: the fragment reaches db.query() inline, in one function"
+  lang javascript
+  file inline.ts
+  expect VYQL-INJ-001
+  code
+  ```
+  async function handler(db, req) {
+    const key = req.query.key
+    let sql = "'$"
+    sql += String(key)
+    sql += "'"
+    await db.query(sql)
+  }
+  ```
+
+test "rank1287: the same fragment, written to a private field in one method and read in another"
+  lang javascript
+  file field_crossing.ts
+  reject VYQL-INJ-001
+  code
+  ```
+  class Frag {
+    #sql = ''
+
+    addPart(value: string | number): void {
+      this.#sql += String(value)
+    }
+
+    build(value: string | number): string {
+      this.addPart(value)
+      return this.#sql
+    }
+  }
+
+  async function handler(db, req) {
+    const key = req.query.key
+    const frag = new Frag()
+    await db.query(frag.build(key))
+  }
+  ```
