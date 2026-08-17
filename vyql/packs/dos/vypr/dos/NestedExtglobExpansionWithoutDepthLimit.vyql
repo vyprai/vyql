@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule NestedExtglobExpansionWithoutDepthLimit {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_1333, CWE_400]
+    id: "VYQL-DOS-047"
+    severity: high
+  }
+  issue code.NestedExtglobExpansionWithoutDepthLimit as sink
+}
