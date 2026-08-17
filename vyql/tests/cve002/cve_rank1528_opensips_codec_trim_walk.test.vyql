@@ -1,0 +1,78 @@
+# Rank 1528 / CVE-2023-27596: OpenSIPS' codec-stripping functions
+# trimmed trailing spaces by walking a pointer backwards with no
+# lower bound, so a crafted codec parameter walked off the start of
+# the parsed value and read whatever preceded it (out-of-bounds read,
+# CWE-125; GHSA-3ghx-j39m-cw4f, found in the 2021/2022 security
+# audit by Enable Security). The loops in modules/sipmsgops/codecs.c
+# did `while (*(--tmp) == ' ') { ... }` -- tmp starts somewhere
+# inside lmp->u.value and the pre-decrement runs unchecked even when
+# the whole value is spaces or empty, stepping before the buffer and
+# dereferencing. Pool commit dd051f8ed5 is the real fix (COMMIT_OK --
+# "[sipmsgops] fix codec_delete_XX() parsing", one line): the walk is
+# bounded with `while (tmp > lmp->u.value && *(--tmp) == ' ')`. No
+# pool correction.
+#
+# ATTENTION, reverse-walk bounds. The defect is a pointer loop whose
+# only exit is the pointed-to byte -- no relation between the cursor
+# and the buffer it started from -- the same parser-walk family as
+# ranks 1527 (cursor-role separation) and 1559 (wire budget): the
+# corpus's memory rules label derefs and frees, not walk-bound
+# discipline, and asking "does every backwards step stay above the
+# buffer start" is loop-carried bound vocabulary. A binding on
+# OpenSIPS' own codecs.c would detect this module rather than the
+# weakness. Measured on the real code: scanning codecs.c reports the
+# same 20 findings at both revisions (1 at high; none change with the
+# bound). No ENGINE-GAPS.md entry. No definition change shipped.
+# Spec cve_rank1528 records the unbounded backward trim and the
+# bounded form -- the two snippets differ only in the tmp >
+# lmp->u.value guard -- both asserting reject VYQL-MEM-006: when
+# walk-bound vocabulary lands, the unbounded form must flip to
+# expect.
+
+test "rank1528: the space trim walks back without a floor"
+  lang c
+  file modules/sipmsgops/codecs.c
+  reject VYQL-MEM-006
+  code
+  ```
+  struct lump {
+      union {
+          char value[64];
+      } u;
+  };
+
+  int trim_codec(struct lump *lmp, int codec_len)
+  {
+      char *tmp = lmp->u.value + codec_len;
+
+      while (*(--tmp) == ' ') {
+          codec_len--;
+      }
+
+      return codec_len;
+  }
+  ```
+
+test "rank1528: the fix bounds the walk to the value start"
+  lang c
+  file modules/sipmsgops/codecs.c
+  reject VYQL-MEM-006
+  code
+  ```
+  struct lump {
+      union {
+          char value[64];
+      } u;
+  };
+
+  int trim_codec(struct lump *lmp, int codec_len)
+  {
+      char *tmp = lmp->u.value + codec_len;
+
+      while (tmp > lmp->u.value && *(--tmp) == ' ') {
+          codec_len--;
+      }
+
+      return codec_len;
+  }
+  ```
