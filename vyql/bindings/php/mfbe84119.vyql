@@ -2794,3 +2794,19 @@ binding pathAccessCheck478 {
     }
   }
 }
+
+// A preg_match() pattern that carries both a "^" and a "$" is PCRE's own
+// documented idiom for a full-string allowlist match rather than a
+// substring search: the PHP manual's own filename-validation examples
+// anchor the pattern this way precisely so preg_match cannot be satisfied
+// by a match anywhere inside the subject. It is the allowlist counterpart
+// of the "../" denylist checks above, gated the same way -- an endpoint
+// guard, not a value transform.
+binding pathAccessCheck479 {
+  query pattern callExpr where callee.path ~= "preg_match" and args.any.literal contains "^" and args.any.literal contains "$"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

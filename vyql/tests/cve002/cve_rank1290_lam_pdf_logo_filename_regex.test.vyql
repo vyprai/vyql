@@ -1,0 +1,79 @@
+# LDAP Account Manager's PDF-logo upload (lam/lib/pdfstruct.inc,
+# PdfStructurePersistenceManager::isValidLogoFileName / savePdfLogo) validated
+# the uploaded logo file name with:
+#   preg_match('/[a-zA-Z0-9_-]+\.(png)|(jpg)/i', $name)
+# `|` binds looser than concatenation, so this pattern is actually
+# `([a-zA-Z0-9_-]+\.(png))|(jpg)`, and with no leading "^" or trailing "$"
+# preg_match only needs a match anywhere in the string. A file name
+# containing the bare substring "jpg" anywhere -- including one carrying
+# "../" traversal segments and a different real extension -- satisfies the
+# check. The validated name is then concatenated straight into a storage
+# path (getPdfLogoFileName: __DIR__ . '/../config/pdf/' . $confName .
+# '/logos/' . $name) and opened for write with fopen()/fputs(). The fix
+# anchors the pattern and groups the extensions properly:
+#   preg_match('/^[a-z0-9_-]+\.(png|jpg)$/im', $fileName) === 1
+#
+# code.HttpInput -> code.FilePathAccess (fopen) already reports the
+# vulnerable shape through the existing VYQL-PATH-001 rule with no new
+# vocabulary. What was missing is the other half: nothing recognized the
+# *fixed* preg_match call as a path-access guard at all, so the same rule
+# still reported the patched form as a finding -- a precision gap, not a
+# recall one. New PHP binding pathAccessCheck479 teaches the engine that a
+# preg_match() pattern containing both "^" and "$" is PCRE's own documented
+# idiom for a full-string allowlist match (the same textbook shape as the
+# "../" denylist checks pathAccessCheck475-478 already cover), so it
+# suppresses VYQL-PATH-001 the same way in_array/isBelow endpoint checks do.
+
+test "rank1290: an unanchored preg_match alternation lets a traversal-bearing logo name reach the file write"
+  lang php
+  file lib/pdfstruct.inc
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+  class PdfStructurePersistenceManager {
+
+      public function savePdfLogo(string $confName, string $name, string $data): void {
+          if (!preg_match('/[a-zA-Z0-9_-]+\.(png)|(jpg)/i', $name)) {
+              throw new LAMException('Unable to upload logo file.');
+          }
+          $fileName = __DIR__ . '/../config/pdf/' . $confName . '/logos/' . $name;
+          $file = fopen($fileName, "w");
+          fputs($file, $data);
+          fclose($file);
+      }
+  }
+
+  $name = $_POST['name'];
+  $data = $_POST['data'];
+  $confName = $_POST['confName'];
+  $mgr = new PdfStructurePersistenceManager();
+  $mgr->savePdfLogo($confName, $name, $data);
+  ```
+
+test "rank1290: the shipped fix anchors the pattern and groups the extensions, and is recognized as the path guard"
+  lang php
+  file lib/pdfstruct.inc
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+  class PdfStructurePersistenceManager {
+
+      public function savePdfLogo(string $confName, string $name, string $data): void {
+          if (!preg_match('/^[a-z0-9_-]+\.(png|jpg)$/im', $name)) {
+              throw new LAMException('Unable to upload logo file.');
+          }
+          $fileName = __DIR__ . '/../config/pdf/' . $confName . '/logos/' . $name;
+          $file = fopen($fileName, "w");
+          fputs($file, $data);
+          fclose($file);
+      }
+  }
+
+  $name = $_POST['name'];
+  $data = $_POST['data'];
+  $confName = $_POST['confName'];
+  $mgr = new PdfStructurePersistenceManager();
+  $mgr->savePdfLogo($confName, $name, $data);
+  ```
