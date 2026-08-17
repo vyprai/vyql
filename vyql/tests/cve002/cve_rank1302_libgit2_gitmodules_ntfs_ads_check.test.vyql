@@ -1,0 +1,137 @@
+# Rank 1302 / CVE-2020-12278: libgit2's checkout-time guard against a
+# ".gitmodules" symlink escaping the working tree relies on
+# `git_path_is_gitfile` -> `verify_dotgit_ntfs_generic` -> `only_spaces_and_dots`
+# to recognize every NTFS-equivalent spelling of ".gitmodules" and reject it.
+# `only_spaces_and_dots` scans past the ".gitmodules" prefix and returns true
+# (meaning "this is still effectively .gitmodules, reject it") only when every
+# remaining byte is a space or a dot up to the terminating '\0'. NTFS Alternate
+# Data Stream syntax opens a colon after the base filename
+# (".gitmodules::$DATA" names the same file as ".gitmodules" to the NTFS
+# driver), and a colon is neither a space, a dot, nor '\0', so the scan falls
+# through to `return false` at the first non-space/non-dot byte and the
+# caller treats the symlink as an ordinary, unrelated filename — the ADS
+# spelling walks straight past the guard that ".gitmodules" itself,
+# ".gitmodules ", and ".gitmodules." are all correctly rejected by
+# (CWE-20, CWE-706). Fix e1832eb20a adds `|| *c == ':'` to the loop's
+# terminating condition, so the scan stops and reports "still .gitmodules"
+# the moment it reaches the ADS separator, exactly as it already does at '\0'.
+#
+# ATTENTION, vocabulary gap. `only_spaces_and_dots` has no source and no sink
+# in the taint sense: it is a same-function, no-I/O character scan over an
+# already-in-hand buffer, so there is nothing for a source/sink rule to
+# connect regardless of language. `vyql match`/`vyql explain` on a repro
+# faithful to the real call chain (`git_path_is_gitfile` ->
+# `verify_dotgit_ntfs_generic` -> `only_spaces_and_dots`) report the same two
+# unrelated low-confidence code.NullableDeref rows on both the vulnerable and
+# patched forms — nothing labels the scan itself, and nothing distinguishes
+# the two revisions. A bounded real-repository scan (timeout 180, --max-ram
+# 6GB, --cache off) of the vulnerable checkout confirms it: libgit2 as a
+# whole reports only unrelated low-confidence VYQL-NUM-003 rows in test/example
+# code, nothing at src/path.c or naming gitmodules/NTFS/ADS.
+#
+# The nearest existing concepts by shape are code.WindowsReservedDeviceNameBypass
+# (VYQL-PATH-010, "reserved device-name filtering omits alternate spellings" —
+# same "hand-rolled character-class check misses one variant" pattern) and
+# code.SpecialFileAccessReview (CWE_706 is one of its two, and "security-
+# sensitive virtual filesystem path ... without an observed secure filesystem
+# boundary" is a fair one-level-up description of a special-file guard that a
+# filesystem-specific aliasing trick walks past). Neither is bound to C:
+# WindowsReservedDeviceNameBypass's one binding is Rust-only and names digit
+# superscript variants specifically, not NTFS ADS colons; SpecialFileAccessReview's
+# one binding is Go-only and judges an open call, not a name-comparison helper.
+# Writing a C binding that fires specifically on `only_spaces_and_dots`'s
+# missing `:` case would describe this one function's internals, not
+# something answerable from NTFS/libgit2 documentation alone — the genericity
+# test in AGENTS.md fails it, so no binding is minted.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1302: only_spaces_and_dots stops at the NTFS ADS separator's absence, missing the colon"
+  lang c
+  file path.c
+  reject VYQL-PATH-010
+  reject_review code.WindowsReservedDeviceNameBypass
+  reject_review code.SpecialFileAccessReview
+  code
+  ```
+  #include <string.h>
+  #include <stdbool.h>
+
+  typedef struct { size_t size; const char *ptr; } git_buf;
+
+  static bool only_spaces_and_dots(const char *path)
+  {
+      const char *c = path;
+
+      for (;; c++) {
+          if (*c == '\0')
+              return true;
+          if (*c != ' ' && *c != '.')
+              return false;
+      }
+
+      return true;
+  }
+
+  static bool verify_dotgit_ntfs_generic(const char *name, size_t len, const char *dotgit_name, size_t dotgit_len, const char *shortname_pfix)
+  {
+      if (name[0] == '.' && len >= dotgit_len &&
+          !strncasecmp(name + 1, dotgit_name, dotgit_len)) {
+          return !only_spaces_and_dots(name + dotgit_len + 1);
+      }
+      return true;
+  }
+
+  int git_path_is_gitfile(const char *path, size_t pathlen)
+  {
+      /* checkout calls this to reject a symlink whose name is an
+       * NTFS-equivalent spelling of ".gitmodules" before writing it */
+      return !verify_dotgit_ntfs_generic(path, pathlen, "gitmodules", 10, "gi7eba");
+  }
+  ```
+
+test "rank1302: only_spaces_and_dots also stops at the ADS separator, matching the '\\0' case"
+  lang c
+  file path.c
+  reject VYQL-PATH-010
+  reject_review code.WindowsReservedDeviceNameBypass
+  reject_review code.SpecialFileAccessReview
+  code
+  ```
+  #include <string.h>
+  #include <stdbool.h>
+
+  typedef struct { size_t size; const char *ptr; } git_buf;
+
+  static bool only_spaces_and_dots(const char *path)
+  {
+      const char *c = path;
+
+      for (;; c++) {
+          if (*c == '\0' || *c == ':')
+              return true;
+          if (*c != ' ' && *c != '.')
+              return false;
+      }
+
+      return true;
+  }
+
+  static bool verify_dotgit_ntfs_generic(const char *name, size_t len, const char *dotgit_name, size_t dotgit_len, const char *shortname_pfix)
+  {
+      if (name[0] == '.' && len >= dotgit_len &&
+          !strncasecmp(name + 1, dotgit_name, dotgit_len)) {
+          return !only_spaces_and_dots(name + dotgit_len + 1);
+      }
+      return true;
+  }
+
+  int git_path_is_gitfile(const char *path, size_t pathlen)
+  {
+      /* checkout calls this to reject a symlink whose name is an
+       * NTFS-equivalent spelling of ".gitmodules" before writing it */
+      return !verify_dotgit_ntfs_generic(path, pathlen, "gitmodules", 10, "gi7eba");
+  }
+  ```
