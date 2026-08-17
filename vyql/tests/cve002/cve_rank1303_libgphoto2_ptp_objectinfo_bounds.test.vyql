@@ -1,0 +1,147 @@
+# Rank 1303 / CVE-2026-40340: libgphoto2's PTP ObjectInfo unpacker,
+# ptp_unpack_OI() in camlibs/ptp2/ptp-pack.c, validates the device-supplied
+# response buffer's length against the wrong offset. The vulnerable check is
+#
+#   if (!data || len < PTP_oi_SequenceNumber)   // PTP_oi_SequenceNumber == 48
+#     return;
+#
+# which only guarantees 48 bytes are present, but the function goes on to
+# read dtoh32a(data + PTP_oi_SequenceNumber) (bytes 48-51, needs len >= 52)
+# and then data[PTP_oi_filenamelen] / data[PTP_oi_filenamelen+4] (offsets 52
+# and 56, needs len >= 57) as part of the "Stupid Samsung Galaxy" 64-bit
+# object-size heuristic. A GetObjectInfo response between 48 and 56 bytes
+# passes the guard and the parser reads up to 9 bytes past the end of the
+# heap buffer libusb filled for the transaction -- CWE-125. The fix
+# (7c7f515bc88c3d0c4098ac965d313518e0ccbe33) tightens the same guard to
+# `len < PTP_oi_filenamelen + 5` (57), which covers every offset the
+# function actually touches.
+#
+# ATTENTION, engine gap already on record at rank 1206
+# (cve_rank1206_imageworsener_le_shift_representability), restated at rank
+# 1299 for the same reason: the C `fread` binding (vyql/bindings/c/
+# mce54b166.vyql, binding httpInput4) is `emit source code.HttpInput at
+# call.result` -- fread's *return value* (the byte count) is tainted, never
+# the buffer its first argument fills. A repro faithful to ptp_unpack_OI's
+# real entrypoint (ptp_getobjectinfo, which loads a USB response into a
+# byte buffer -- modeled here with fread into a local buffer for a
+# self-contained repro, the same substitution rank 1299 uses) shows `vyql
+# match` finds no source for the buffer at all when called directly
+# (parameters only, no fread), and `vyql trace -from code.HttpInput -to
+# code.IndexAccessSink` on the fread-fronted version shows the single
+# HttpInput source dead-ending at ptp_unpack_string (never reaching the
+# data[PTP_oi_filenamelen] subscript at all), identically on the vulnerable
+# and the patched form. `vyql match` confirms the subscript is labelled
+# code.IndexAccessSink on both revisions -- VYQL-MEM-005
+# (vypr.memory.TaintedIndexAccess) is the rule that should fire, and would,
+# if the buffer content carried taint -- so only the missing
+# source-through-buffer hop separates vulnerable from patched.
+#
+# A bounded real-repository scan (timeout 180, --max-ram 6GB, --cache off)
+# of camlibs/ptp2/ptp-pack.c confirms the same for libgphoto2 itself: the
+# finding sets at the parent of the fix commit and at the fix commit are
+# byte-for-byte identical (both report only a PointerFree/VYQL-MEM-008
+# double-free pair unrelated to ptp_unpack_OI's length check); nothing
+# fires at ptp_unpack_OI's guard or its subscript on either revision.
+#
+# No definition change attempted; this is the 1206 gap recurring, not a new
+# one.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1303: ptp_unpack_OI's length guard covers PTP_oi_SequenceNumber but not the filenamelen heuristic reads past it"
+  lang c
+  file ptp-pack.c
+  reject VYQL-MEM-005
+  code
+  ```
+  #include <stdint.h>
+  #include <stdlib.h>
+
+  typedef struct {
+    uint32_t StorageID, ObjectSize, ParentObject, AssociationDesc, SequenceNumber;
+    uint16_t ObjectFormat, ProtectionStatus, ThumbFormat, AssociationType;
+    uint32_t ThumbSize, ThumbPixWidth, ThumbPixHeight, ImagePixWidth, ImagePixHeight, ImageBitDepth;
+    char *Filename, *Keywords;
+  } PTPObjectInfo;
+
+  typedef struct { int ocs64; } PTPParams;
+
+  #define PTP_oi_SequenceNumber 48
+  #define PTP_oi_filenamelen    52
+
+  extern uint32_t dtoh32a(const unsigned char *p);
+  extern void ptp_unpack_string(PTPParams *params, const unsigned char *data, uint32_t *offset, unsigned int len, char **out);
+  extern void ptp_debug(PTPParams *params, const char *fmt, ...);
+
+  static inline void
+  ptp_unpack_OI (PTPParams *params, const unsigned char *data, PTPObjectInfo *oi, unsigned int len)
+  {
+    char *capture_date;
+
+    if (!data || len < PTP_oi_SequenceNumber)
+      return;
+
+    oi->SequenceNumber = dtoh32a(data + PTP_oi_SequenceNumber);
+
+    if ((data[PTP_oi_filenamelen] == 0) && (data[PTP_oi_filenamelen + 4] != 0)) {
+      ptp_debug(params, "objectsize 64bit detected!");
+      params->ocs64 = 1;
+      data += 4;
+      len -= 4;
+    }
+
+    uint32_t offset = PTP_oi_filenamelen;
+    ptp_unpack_string(params, data, &offset, len, &oi->Filename);
+    ptp_unpack_string(params, data, &offset, len, &capture_date);
+    free(capture_date);
+  }
+  ```
+
+test "rank1303: the fix widens the guard to cover the filenamelen heuristic's offsets"
+  lang c
+  file ptp-pack.c
+  reject VYQL-MEM-005
+  code
+  ```
+  #include <stdint.h>
+  #include <stdlib.h>
+
+  typedef struct {
+    uint32_t StorageID, ObjectSize, ParentObject, AssociationDesc, SequenceNumber;
+    uint16_t ObjectFormat, ProtectionStatus, ThumbFormat, AssociationType;
+    uint32_t ThumbSize, ThumbPixWidth, ThumbPixHeight, ImagePixWidth, ImagePixHeight, ImageBitDepth;
+    char *Filename, *Keywords;
+  } PTPObjectInfo;
+
+  typedef struct { int ocs64; } PTPParams;
+
+  #define PTP_oi_SequenceNumber 48
+  #define PTP_oi_filenamelen    52
+
+  extern uint32_t dtoh32a(const unsigned char *p);
+  extern void ptp_unpack_string(PTPParams *params, const unsigned char *data, uint32_t *offset, unsigned int len, char **out);
+  extern void ptp_debug(PTPParams *params, const char *fmt, ...);
+
+  static inline void
+  ptp_unpack_OI (PTPParams *params, const unsigned char *data, PTPObjectInfo *oi, unsigned int len)
+  {
+    char *capture_date;
+
+    if (!data || len < PTP_oi_filenamelen + 5)
+      return;
+
+    oi->SequenceNumber = dtoh32a(data + PTP_oi_SequenceNumber);
+
+    if ((data[PTP_oi_filenamelen] == 0) && (data[PTP_oi_filenamelen + 4] != 0)) {
+      ptp_debug(params, "objectsize 64bit detected!");
+      params->ocs64 = 1;
+      data += 4;
+      len -= 4;
+    }
+
+    uint32_t offset = PTP_oi_filenamelen;
+    ptp_unpack_string(params, data, &offset, len, &oi->Filename);
+    ptp_unpack_string(params, data, &offset, len, &capture_date);
+    free(capture_date);
+  }
+  ```
