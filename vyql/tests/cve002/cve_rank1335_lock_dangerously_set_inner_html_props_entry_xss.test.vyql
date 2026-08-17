@@ -1,0 +1,174 @@
+# A login widget renders host-supplied strings as raw markup through React's
+# `dangerouslySetInnerHTML`, spelled as an entry in a createElement props object
+# rather than as a JSX attribute. `Chrome.render()` wraps a global error or
+# success message:
+#
+#   function wrapGlobalMessage(message) {
+#     return typeof message === 'string'
+#       ? React.createElement('span', { dangerouslySetInnerHTML: { __html: message } })
+#       : message;
+#   }
+#
+# and `i18n.html()` does the same for a formatted dictionary string:
+#
+#   export function html(m, keyPath, ...args) {
+#     const html = str(m, keyPath, ...args);
+#     return html ? React.createElement('span', { dangerouslySetInnerHTML: { __html: html } }) : null;
+#   }
+#
+# Both strings come from the widget's `flashMessage.text` and
+# `languageDictionary` options, and embedding pages populate them from URL query
+# parameters, so `?flashMessage=<img src=x onerror=...>` executes in the login
+# page's origin (CWE-79). The fix imports dompurify and wraps each of these
+# renders in `sanitize(...)`, converts the widget's inline SVG strings to JSX
+# elements so they need no raw-HTML prop at all, and turns on `react/no-danger`
+# to keep new ones out.
+#
+# React documents `createElement(type, props, ...children)` and requires the
+# raw-HTML prop's value to be an object of the form `{__html: ...}` — it throws
+# on anything else — so the props argument of a `createElement` call naming both
+# keys is a code.HtmlRender sink over its collection, the way the JSX-attribute
+# spelling of the same prop already is. Both keys are required together: the
+# raw-HTML key alone appears in ordinary records and test fixtures that never
+# reach a renderer, and a props entry whose value is not `{__html: ...}` is a
+# shape React refuses to render.
+#
+# The props-entry spelling is matched on the pair keys `collectValTokens` emits
+# so that a structured-field sink is reachable when the field's value is not a
+# literal. Key-token matching carries no name resolution, so this spelling
+# reports at `syntactic` fidelity and medium confidence, where the
+# JSX-attribute spelling — lowered to a call the extractor names — reports at
+# `resolved` fidelity and high confidence.
+#
+# `dompurify`'s named `sanitize` export is a core.HtmlEscape control alongside
+# the `DOMPurify.sanitize` member form, gated on the import so a bare
+# `sanitize()` in a project that does not pull in dompurify is not mistaken for
+# HTML escaping.
+
+test "rank1335: a URL-derived widget message reaches createElement's raw-HTML props entry"
+  lang javascript
+  file chrome.jsx
+  expect VYQL-INJ-004
+  code
+  ```
+  import React from 'react';
+
+  export default function GlobalMessage() {
+    const flashMessage = new URLSearchParams(window.location.search).get('flashMessage');
+
+    function wrapGlobalMessage(message) {
+      return typeof message === 'string'
+        ? React.createElement('span', { dangerouslySetInnerHTML: { __html: message } })
+        : message;
+    }
+
+    return <div className="auth0-global-message">{wrapGlobalMessage(flashMessage)}</div>;
+  }
+  ```
+
+test "rank1335: the same render sanitized with dompurify is clean"
+  lang javascript
+  file chrome.jsx
+  reject VYQL-INJ-004
+  code
+  ```
+  import React from 'react';
+  import { sanitize } from 'dompurify';
+
+  export default function GlobalMessage() {
+    const flashMessage = new URLSearchParams(window.location.search).get('flashMessage');
+
+    function wrapGlobalMessage(message) {
+      return typeof message === 'string'
+        ? // dangerouslySetInnerHTML input is sanitized using dompurify
+          React.createElement('span', { dangerouslySetInnerHTML: { __html: sanitize(message) } })
+        : message;
+    }
+
+    return <div className="auth0-global-message">{wrapGlobalMessage(flashMessage)}</div>;
+  }
+  ```
+
+# The isolating pair. Same source, same nested `__html` key, same rendered
+# element; only how the component spells the prop differs. The third test holds
+# the control on the spelling that already reported, so the dompurify import is
+# pinned independently of the spelling that carries it.
+
+test "rank1335: React's raw-HTML prop written as a JSX attribute reports"
+  lang javascript
+  file banner.jsx
+  expect VYQL-INJ-004
+  code
+  ```
+  import React from 'react';
+
+  export default function Banner() {
+    const message = new URLSearchParams(window.location.search).get('message');
+    return <span dangerouslySetInnerHTML={{ __html: message }} />;
+  }
+  ```
+
+test "rank1335: the identical prop written as a createElement props entry reports the same way"
+  lang javascript
+  file banner.jsx
+  expect VYQL-INJ-004
+  code
+  ```
+  import React from 'react';
+
+  export default function Banner() {
+    const message = new URLSearchParams(window.location.search).get('message');
+    return React.createElement('span', { dangerouslySetInnerHTML: { __html: message } });
+  }
+  ```
+
+test "rank1335: dompurify's named sanitize export clears the JSX-attribute spelling"
+  lang javascript
+  file banner.jsx
+  reject VYQL-INJ-004
+  code
+  ```
+  import React from 'react';
+  import { sanitize } from 'dompurify';
+
+  export default function Banner() {
+    const message = new URLSearchParams(window.location.search).get('message');
+    return <span dangerouslySetInnerHTML={{ __html: sanitize(message) }} />;
+  }
+  ```
+
+# The key on its own does not make a render. An object literal is a value, not a
+# call to a renderer, and a props entry whose value is not `{__html: ...}` is a
+# shape React throws on rather than one it renders.
+
+test "rank1335: a plain record carrying the raw-HTML key but never rendered is clean"
+  lang javascript
+  file widget.ts
+  reject VYQL-INJ-004
+  code
+  ```
+  const raw = new URLSearchParams(window.location.search).get('body');
+
+  export const widget = {
+    kind: 'legacy-widget',
+    dangerouslySetInnerHTML: raw
+  };
+
+  export function serialize() {
+    return JSON.stringify(widget);
+  }
+  ```
+
+test "rank1335: a createElement props entry whose value is a bare string is clean"
+  lang javascript
+  file bare.jsx
+  reject VYQL-INJ-004
+  code
+  ```
+  import React from 'react';
+
+  export default function Bare() {
+    const q = new URLSearchParams(window.location.search).get('q');
+    return React.createElement('span', { dangerouslySetInnerHTML: q });
+  }
+  ```
