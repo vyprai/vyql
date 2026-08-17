@@ -1,0 +1,99 @@
+# Rank 1526 / CVE-2023-41887: OpenRefine's database extension
+# assembled its JDBC URLs by concatenation, so connection settings
+# carrying URL metacharacters injected structure and connector
+# parameters into the connection string (improper neutralization of
+# special elements in a URL, CWE-74/CWE-150 family; fixed in 3.7.4).
+# The connection managers (extensions/database/src/com/google/
+# refine/extension/database/{mysql,mariadb,pgsql}/*ConnectionManager.
+# java) built `return "jdbc:" + dbConfig.getDatabaseType().
+# toLowerCase() + "://" + dbConfig.getDatabaseHost() + ((port == 0) ?
+# "" : (":" + port)) + "/" + dbConfig.getDatabaseName();` -- host,
+# port and database name arrive from the database-connection form,
+# and a name like "db?allowLoadLocalInfile=true" changes what the
+# connector connects to. Pool commit 693fde606d is the real fix
+# (COMMIT_OK -- "Properly escape JDBC URL components in database
+# extension"): DatabaseConfiguration gains toURI(), which builds the
+# URL through java.net.URI's five-argument constructor -- each
+# component in its syntactic slot, percent-encoded by URI -- and
+# every manager calls databaseConfiguration.toURI().toString()
+# instead of concatenating. No pool correction.
+#
+# ATTENTION, object-field provenance at the URL boundary. The
+# components arrive through dbConfig getters -- object-field reads no
+# binding labels as input (the boundary ranks 1518, 1521 and 1545
+# also recorded) -- so no taint reaches any sink; the connection
+# managers are DriverManager.getConnection callers, which the corpus
+# does not treat as URL-injection sinks either. Measured on the real
+# code: scanning MySQLConnectionManager.java reports zero findings
+# at both revisions. The fix's control -- URI-component construction
+# -- is the general shape (encoding at component boundaries); the
+# missing corpus pieces are config-object provenance and a
+# connection-string sink concept. No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1526 records the
+# concatenating URL builder and the URI-built form, both asserting
+# reject VYQL-RF-001: when config-object vocabulary lands, the
+# concatenating form must flip to expect.
+
+test "rank1526: the connection url is built by concatenation"
+  lang java
+  file extensions/database/src/com/google/refine/extension/database/mysql/MySQLConnectionManager.java
+  reject VYQL-RF-001
+  code
+  ```
+  package com.google.refine.extension.database.mysql;
+
+  import java.sql.Connection;
+  import java.sql.DriverManager;
+
+  public class MySQLConnectionManager {
+
+      public Connection getConnection(DatabaseConfiguration dbConfig) throws Exception {
+          String dbURL = getDatabaseUrl(dbConfig);
+          return DriverManager.getConnection(dbURL, dbConfig.getDatabaseUser(), dbConfig.getDatabasePassword());
+      }
+
+      private static String getDatabaseUrl(DatabaseConfiguration dbConfig) {
+          int port = dbConfig.getDatabasePort();
+          return "jdbc:" + dbConfig.getDatabaseType().toLowerCase() + "://" + dbConfig.getDatabaseHost()
+                  + ((port == 0) ? "" : (":" + port)) + "/" + dbConfig.getDatabaseName();
+      }
+  }
+  ```
+
+test "rank1526: the fix builds the url through uri components"
+  lang java
+  file extensions/database/src/com/google/refine/extension/database/mysql/MySQLConnectionManager.java
+  reject VYQL-RF-001
+  code
+  ```
+  package com.google.refine.extension.database.mysql;
+
+  import java.net.URI;
+  import java.net.URISyntaxException;
+  import java.sql.Connection;
+  import java.sql.DriverManager;
+
+  public class MySQLConnectionManager {
+
+      public Connection getConnection(DatabaseConfiguration dbConfig) throws Exception {
+          String dbURL = dbConfig.toURI().toString();
+          return DriverManager.getConnection(dbURL, dbConfig.getDatabaseUser(), dbConfig.getDatabasePassword());
+      }
+  }
+
+  class DatabaseConfiguration {
+      public URI toURI() {
+          try {
+              return new URI(
+                      "jdbc:" + databaseType.toLowerCase(),
+                      databaseHost + ((databasePort == 0) ? "" : (":" + databasePort)),
+                      "/" + databaseName,
+                      useSSL ? "useSSL=true" : null,
+                      null
+              );
+          } catch (URISyntaxException e) {
+              throw new IllegalArgumentException(e);
+          }
+      }
+  }
+  ```
