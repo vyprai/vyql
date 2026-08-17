@@ -1,0 +1,114 @@
+# Rank 1292 / CVE-2026-7524: BaseFileComponent._unpack_bundle._safe_extract_tar
+# iterated tar.getmembers(), checked only that output_dir / member.name stayed
+# inside output_dir, and extracted every member regardless of type. A symlink
+# member's *target* is never validated by that check, so a link pointing at an
+# absolute host path (or a "../" escape) lands on disk untouched; the caller
+# then iterates the extracted directory and reads through the link, leaking
+# arbitrary host files such as ~/.langflow/secret_key (CWE-22/CWE-59). Fix
+# cb06a666d0f00a86d40599a91713fc615d7ea313 rejects symlink, hardlink, FIFO and
+# device-node members before extracting and only allows regular files and
+# directories.
+#
+# code.ArchiveSymlinkFilterBypass / VYQL-PATH-007 already exists for exactly
+# this weakness, but the one Python detector for it
+# (internal/extract/frontend/treesitter/python.go) required the enclosing
+# function to be named literally "safe_extract", to call os.path.join and
+# is_within_directory, and to extract via .extractall(. langflow's helper is
+# named _safe_extract_tar, joins the member path with the / operator, checks
+# containment with Path.resolve().is_relative_to(, and extracts one member at
+# a time via bundle.extract(member, ...) -- a different call shape recognising
+# the same weakness, which the literal name/API match missed entirely (`vyql
+# match` labelled nothing for it). The detector now matches on the shape that
+# makes the weakness a weakness -- a function whose name signals extraction,
+# iterating tar members and extracting them without ever checking issym()/
+# islnk()/linkname or opting into tarfile's own filter= argument -- rather
+# than one CVE's exact spelling of it.
+#
+# Isolating pair below, naming no langflow-specific API: an extraction
+# function with a name unrelated to any repro, using bundle.extract(member
+# instead of .extractall(, still reports when it never checks the member
+# type, and stops reporting the moment it does.
+
+test "rank1292: langflow tar bundle extraction follows symlink members onto host paths"
+  lang python
+  expect VYQL-PATH-007
+  expect_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  def _safe_extract_tar(bundle, output_dir):
+      for member in bundle.getmembers():
+          if Path(member.name).name.startswith("._"):
+              continue
+          member_path = output_dir / member.name
+          if not member_path.resolve().is_relative_to(output_dir.resolve()):
+              msg = f"Attempted Path Traversal in TAR File: {member.name}"
+              raise ValueError(msg)
+          bundle.extract(member, path=output_dir)
+  ```
+
+test "rank1292: langflow tar bundle extraction rejects link members before extracting"
+  lang python
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  def _safe_extract_tar(bundle, output_dir):
+      for member in bundle.getmembers():
+          if Path(member.name).name.startswith("._"):
+              continue
+          if member.issym() or member.islnk():
+              msg = f"Refusing to extract link member from TAR File: {member.name!r} -> {member.linkname!r}"
+              raise ValueError(msg)
+          if not (member.isfile() or member.isdir()):
+              msg = f"Refusing to extract non-regular TAR member: {member.name!r}"
+              raise ValueError(msg)
+          member_path = output_dir / member.name
+          if not member_path.resolve().is_relative_to(output_dir.resolve()):
+              msg = f"Attempted Path Traversal in TAR File: {member.name}"
+              raise ValueError(msg)
+          bundle.extract(member, path=output_dir)
+  ```
+
+test "rank1292: an extractor named unlike any repro, extracting one member at a time, still misses the link check"
+  lang python
+  expect VYQL-PATH-007
+  expect_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  def extract_archive_members(handle, dest):
+      for entry in handle.getmembers():
+          target = dest / entry.name
+          if not target.resolve().is_relative_to(dest.resolve()):
+              raise ValueError("escapes destination")
+          handle.extract(entry, path=dest)
+  ```
+
+test "rank1292: the same one-member-at-a-time extractor checking the link type clears it"
+  lang python
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  def extract_archive_members(handle, dest):
+      for entry in handle.getmembers():
+          if entry.issym() or entry.islnk():
+              raise ValueError("link members are not allowed")
+          target = dest / entry.name
+          if not target.resolve().is_relative_to(dest.resolve()):
+              raise ValueError("escapes destination")
+          handle.extract(entry, path=dest)
+  ```
+
+test "rank1292: opting into tarfile's own data filter clears it without a manual link check"
+  lang python
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  def extract_archive_members(handle, dest):
+      for entry in handle.getmembers():
+          target = dest / entry.name
+          if not target.resolve().is_relative_to(dest.resolve()):
+              raise ValueError("escapes destination")
+      handle.extractall(dest, filter="data")
+  ```
