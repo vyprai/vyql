@@ -1,0 +1,215 @@
+# Rank 1360 / CVE-2017-1001003 (GHSA-pv8x-p9hq-j328): mathjs's expression
+# compiler lowers each parsed node to JavaScript source text and hands the
+# assembled text to `new Function('defs', factoryCode)` in
+# lib/expression/node/Node.js:73. compileObjectNode validated every object-literal
+# key against isSafeProperty -- whose denylist is `prop in Object.prototype`, so
+# it does reject `constructor` -- and then emitted `stringify(key)` into that
+# source. The two do not see the same name: the guard reads the key as the parser
+# produced it, while `stringify` re-quotes it and the JavaScript engine decodes
+# the escapes when the generated source is compiled, so `a = {"constructor":
+# 2}` passes a denylist that names `constructor` and creates `constructor`
+# anyway. Fix a60f3c8d9d round-trips the key first --
+# `JSON.parse(stringify(key))` -- and checks the decoded spelling, emitting the
+# already-stringified form. The advisory's own reference list names this commit,
+# so the pool row is correct; the recorded CWE-88 is not -- the weakness is a
+# name guard applied to the pre-decode spelling of a value that reaches generated
+# code (CWE-176 into CWE-94/CWE-1321), with no argument delimiter anywhere in it.
+#
+# Detection state: the flaw is not reported, and no candidate discriminates the
+# fix. The whole tree scans to 311 findings at a60f3c8d9d^ and 311 at
+# a60f3c8d9d with identical fingerprint sets, none of them in ObjectNode.js or
+# utils/customs.js. `vyql match` on the three files that carry the weakness
+# labels no source at all and labels the code-generation step as
+# code.CodeEval at Node.js:73; `vyql explain` reports nothing, so no `unless`
+# suppressed anything -- nothing was ever a candidate. mathjs's shipped bundles
+# cannot contribute either: `dist` is in skipDirs
+# (internal/extract/frontend/treesitter/treesitter.go:13), so a directory scan
+# never reads dist/math.js, and only lib/ source is analysed.
+#
+# The three neighbouring rules are all inapplicable rather than merely quiet.
+# VYQL-INJ-167 describes a name-keyed lookup with no prototype-name guard, and
+# mathjs has one; VYQL-INJ-244 requires the guard's denylist to name `__proto__`
+# and nothing else, and mathjs's names none of them literally; VYQL-INJ-134
+# requires a nested-path write. Recording this as any of them would need the
+# concept's evidence text to misdescribe the code.
+#
+# Why nothing shipped, measured. The one fact that separates the vulnerable
+# function from the fixed one -- which expression the guard receives -- is not
+# extractable: internal/extract/frontend/treesitter/javascript.go emits
+# call_path:/call:/selector:/index_key: for every call but no call_arg: token at
+# all, where php.go, c.go, scala.go, csharp.go and rust.go each do, so
+# `isSafeProperty(node.properties, key)` and
+# `isSafeProperty(node.properties, JSON.parse(stringify(key)))` are the same
+# token set. What is left is whole-function text. Over 38293 JavaScript and
+# TypeScript function and module contexts in eight trees (mathjs lib, vite,
+# nest, liquidjs, eleventy, locutus, and the OWASP JavaScript and TypeScript
+# ports), a for-in loop concatenating a `stringify(` result matches 13, of which
+# 1 is the vulnerability: 8 in vite are all JSON.stringify (the substring match
+# `stringify(` cannot tell them apart), and 4 more are in ObjectNode.js itself.
+# Adding the object-literal punctuation literals narrows it to 0 outside mathjs
+# and 3 inside, but the third is ObjectNode.js's own `_toString`, which is
+# token-for-token the same loop -- same for-in, same `stringify(key) + ': '`,
+# same `'{' + entries.join(', ') + '}'` -- and is harmless because its result is
+# display text rather than source handed to Function. That string's destination
+# is in another file, which a function-scoped presence binding cannot see, and
+# there is no taint path to connect them: mathjs is a library, so nothing labels
+# the expression text a source. The only predicate that did separate them keyed
+# on the name `isSafeProperty`, which is mathjs-internal and inverted besides --
+# it fires because the function defends itself and stays silent on the sibling
+# that does not defend itself at all.
+#
+# The last two tests isolate a separate, general gap found while diagnosing
+# this: codeEval259 in vyql/bindings/javascript/mfb63017a.vyql emits
+# code.CodeEval at args[0] for `Function`, but the constructor's documented
+# signature is `new Function(arg1, ..., argN, functionBody)` -- the body is the
+# LAST argument. A tainted body reported as VYQL-INJ-003 critical in the
+# one-argument form is invisible the moment the generated function declares a
+# parameter, which is the form mathjs uses. Switching that binding to args.any
+# was measured and not kept: across ten JavaScript/TypeScript trees it adds
+# exactly one finding and no true positive. That one row is mathjs's own
+# Node.js:73, a correct sink reached from a pre-existing spurious
+# code.DomInput on DenseMatrix.js:269, and it appears at both revisions, so it
+# neither catches this weakness nor discriminates the fix. The pair below pins
+# where the boundary sits today; the second test is expected to gain a finding
+# when that binding is corrected alongside the source that makes it cost
+# something.
+
+test "rank1360: object-literal compiler guards the raw key and emits its re-quoted spelling into generated source"
+  lang javascript
+  file lib/expression/node/ObjectNode.js
+  reject VYQL-INJ-167
+  reject VYQL-INJ-244
+  reject VYQL-INJ-134
+  reject VYQL-INJ-003
+  reject_review code.ExpressionEvaluatorPrototypeNameAccess
+  reject_review code.IncompleteKeyDenylistGuardedReadPrototypePollution
+  code
+  ```
+  'use strict';
+
+  var stringify = require('../../utils/string').stringify;
+  var isSafeProperty = require('../../utils/customs').isSafeProperty;
+  var hasOwnProperty = require('../../utils/object').hasOwnProperty;
+
+  function compileObjectNode (node, defs, args) {
+    var entries = [];
+    for (var key in node.properties) {
+      if (hasOwnProperty(node.properties, key)) {
+        if (!isSafeProperty(node.properties, key)) {
+          throw new Error('No access to property "' + key + '"');
+        }
+
+        entries.push(stringify(key) + ': ' + compile(node.properties[key], defs, args));
+      }
+    }
+    return '{' + entries.join(', ') + '}';
+  }
+
+  function compileNode (node, defs) {
+    var code = compileObjectNode(node, defs, {});
+    var factoryCode =
+        'return {' +
+        '  "eval": function (scope) {' +
+        '    scope = scope || {};' +
+        '    return ' + code + ';' +
+        '  }' +
+        '};';
+
+    var factory = new Function('defs', factoryCode);
+    return factory(defs);
+  }
+  ```
+
+test "rank1360: object-literal compiler guards the escape-decoded key"
+  lang javascript
+  file lib/expression/node/ObjectNode.js
+  reject VYQL-INJ-167
+  reject VYQL-INJ-244
+  reject VYQL-INJ-134
+  reject VYQL-INJ-003
+  reject_review code.ExpressionEvaluatorPrototypeNameAccess
+  reject_review code.IncompleteKeyDenylistGuardedReadPrototypePollution
+  code
+  ```
+  'use strict';
+
+  var stringify = require('../../utils/string').stringify;
+  var isSafeProperty = require('../../utils/customs').isSafeProperty;
+  var hasOwnProperty = require('../../utils/object').hasOwnProperty;
+
+  function compileObjectNode (node, defs, args) {
+    var entries = [];
+    for (var key in node.properties) {
+      if (hasOwnProperty(node.properties, key)) {
+        // we stringify/parse the key here to resolve unicode characters,
+        // so you cannot create a key like {"co\\u006Estructor": null}
+        var stringifiedKey = stringify(key)
+        var parsedKey = JSON.parse(stringifiedKey)
+        if (!isSafeProperty(node.properties, parsedKey)) {
+          throw new Error('No access to property "' + parsedKey + '"');
+        }
+
+        entries.push(stringifiedKey + ': ' + compile(node.properties[key], defs, args));
+      }
+    }
+    return '{' + entries.join(', ') + '}';
+  }
+
+  function compileNode (node, defs) {
+    var code = compileObjectNode(node, defs, {});
+    var factoryCode =
+        'return {' +
+        '  "eval": function (scope) {' +
+        '    scope = scope || {};' +
+        '    return ' + code + ';' +
+        '  }' +
+        '};';
+
+    var factory = new Function('defs', factoryCode);
+    return factory(defs);
+  }
+  ```
+
+test "rank1360: generated factory body is the Function constructor's only argument"
+  lang javascript
+  file server.js
+  expect VYQL-INJ-003
+  code
+  ```
+  var express = require('express');
+  var app = express();
+
+  app.post('/compile', function (req, res) {
+    var factoryCode =
+        'return {' +
+        '  "eval": function (scope) {' +
+        '    return ' + req.body.expr + ';' +
+        '  }' +
+        '};';
+
+    var factory = new Function(factoryCode);
+    res.json(factory().eval({}));
+  });
+  ```
+
+test "rank1360: generated factory body follows a declared parameter name"
+  lang javascript
+  file server.js
+  reject VYQL-INJ-003
+  code
+  ```
+  var express = require('express');
+  var app = express();
+
+  app.post('/compile', function (req, res) {
+    var factoryCode =
+        'return {' +
+        '  "eval": function (scope) {' +
+        '    return ' + req.body.expr + ';' +
+        '  }' +
+        '};';
+
+    var factory = new Function('defs', factoryCode);
+    res.json(factory({}).eval({}));
+  });
+  ```
