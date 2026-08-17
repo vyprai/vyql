@@ -1,0 +1,101 @@
+# Rank 1262 / CVE-2024-28244: KaTeX's Parser bounds macro expansion by
+# counting `MacroExpander.expansionCount` against `settings.maxExpand` on
+# `this.gullet`, but the Unicode sub/superscript branch of
+# parseSupSub -- src/Parser.js -- built the accumulated Unicode run into a
+# plain string and handed it to a brand-new `new Parser(str, this.settings)`.
+# That constructor creates its own MacroExpander, so the fresh instance's
+# expansionCount starts at zero: nesting user-controlled macros inside a
+# Unicode sub/superscript run resets the counter on every level, letting the
+# expansion blow up exponentially past whatever maxExpand was configured to
+# stop.
+#
+# The fix (085e21b5da05414efefa932570e7201a7c70e5b2) does not touch the
+# limit itself. It changes which instance keeps counting: the run is tokenized
+# and handed to `this.subparse(subsupTokens)`, which pushes the tokens onto
+# the current job's own `this.gullet` instead of spinning up a second one, so
+# the existing expansionCount keeps accruing across the sub/superscript.
+#
+# No taint path connects a source to a sink here -- both the vulnerable and
+# patched forms parse the same untrusted TeX string, and the control that
+# changed is which object instance owns a resource counter, not a check on
+# tainted data. That is the same shape already logged ATTENTION for rank 1101
+# (Faraday's unbounded nested-params recursion) and rank 1255 (kaml's
+# anchor/alias billion-laughs): a bounded, counted operation is bypassed by
+# recursing through a freshly constructed instance of the same class instead
+# of continuing on the one whose counter is being enforced. The nearest
+# concept is code.UnboundedResourceOperation, populated today only by
+# bespoke per-language "Review" AST classifiers (Rust/Python/PHP/Ruby) plus a
+# handful of narrow presence-node bindings (e.g. the axios
+# maxContentLength/Buffer.concat binding in
+# vyql/bindings/javascript/mfb63017a.vyql); none of them generalizes to "a
+# class re-instantiates itself inside its own recursive-descent method,
+# discarding the counter the outer instance was enforcing." Writing a binding
+# on `new Parser(...)` inside Parser's own method would only ever match this
+# file: Parser/MacroExpander are KaTeX-internal types with no public
+# documentation surface, so nobody unfamiliar with this CVE would derive that
+# binding from a library doc, which fails the genericity test in AGENTS.md.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1262: the Unicode sub/superscript run parses through a fresh Parser instance, resetting expansionCount"
+  lang javascript
+  file src/Parser.js
+  reject_review code.UnboundedResourceOperation
+  code
+  ```
+  export default class Parser {
+      constructor(input, settings) {
+          this.gullet = new MacroExpander(input, settings, this.mode);
+          this.settings = settings;
+      }
+
+      parseSupSub(lex) {
+          let str = uSubsAndSups[lex.text];
+          const isSub = unicodeSubRegEx.test(lex.text);
+          this.consume();
+          while (true) {
+              const token = this.fetch().text;
+              if (!(uSubsAndSups[token])) { break; }
+              if (unicodeSubRegEx.test(token) !== isSub) { break; }
+              this.consume();
+              str += uSubsAndSups[token];
+          }
+          // Now create a (sub|super)script.
+          const body = (new Parser(str, this.settings)).parse();
+          return body;
+      }
+  }
+  ```
+
+test "rank1262: the Unicode sub/superscript run is subparsed on the current job's gullet, keeping expansionCount shared"
+  lang javascript
+  file src/Parser.js
+  reject_review code.UnboundedResourceOperation
+  code
+  ```
+  export default class Parser {
+      constructor(input, settings) {
+          this.gullet = new MacroExpander(input, settings, this.mode);
+          this.settings = settings;
+      }
+
+      parseSupSub(lex) {
+          const isSub = unicodeSubRegEx.test(lex.text);
+          const subsupTokens = [];
+          subsupTokens.push(new Token(uSubsAndSups[lex.text]));
+          this.consume();
+          while (true) {
+              const token = this.fetch().text;
+              if (!(uSubsAndSups[token])) { break; }
+              if (unicodeSubRegEx.test(token) !== isSub) { break; }
+              subsupTokens.unshift(new Token(uSubsAndSups[token]));
+              this.consume();
+          }
+          // Now create a (sub|super)script.
+          const body = this.subparse(subsupTokens);
+          return body;
+      }
+  }
+  ```
