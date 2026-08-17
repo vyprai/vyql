@@ -19,6 +19,7 @@ type phConv struct {
 	root       string
 	file       string
 	funcName   string
+	className  string
 	childCache map[uintptr][]*tree_sitter.Node
 }
 
@@ -204,8 +205,11 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}}
 	case "class_declaration", "interface_declaration", "trait_declaration", "enum_declaration":
 		name := c.text(field(n, "name"))
+		prevClass := c.className
+		c.className = name
 		body := c.block(field(n, "body"))
 		body = append(body, c.phpClassContext(n, name)...)
+		c.className = prevClass
 		return []nir.Stmt{nir.ClassDef{Name: name, Body: body, Loc: L}}
 	case "expression_statement":
 		kids := c.namedChildren(n)
@@ -1967,6 +1971,17 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		// `fn ($x) => expr` — single-expression closure; model the body as a return.
 		return nir.Lambda{Params: c.params(field(n, "parameters")), ParamTypes: c.paramTypes(field(n, "parameters")),
 			Body: []nir.Stmt{nir.Return{Value: c.expr(field(n, "body"))}}, Loc: L}
+	case "include_expression", "include_once_expression", "require_expression", "require_once_expression":
+		// include/require used as an expression (`return include $f;`, `$x = include $f;`) —
+		// same file-inclusion sink call as the statement form in exprStmt. Without this case the
+		// generic Seq fallback below dropped the Call entirely and kept only its argument, so the
+		// sink label vanished whenever the include's result was consumed instead of discarded.
+		kids := c.namedChildren(n)
+		var args []nir.Expr
+		if len(kids) > 0 {
+			args = append(args, c.expr(kids[0]))
+		}
+		return nir.Call{Callee: nir.Name{ID: "include", Loc: L}, Args: args, Path: "include", Method: "include", Loc: L}
 	}
 	var parts []nir.Expr
 	for _, ch := range c.namedChildren(n) {
@@ -2025,7 +2040,15 @@ func (c *phConv) dotted(n *tree_sitter.Node) string {
 	case "member_call_expression":
 		return c.dotted(field(n, "object")) + "." + c.text(field(n, "name"))
 	case "scoped_call_expression":
-		return c.text(field(n, "scope")) + "." + c.text(field(n, "name"))
+		// `self::`/`static::` name the enclosing class, same as `$this` already does for
+		// instance calls — substitute it so `self::foo()` resolves to `<Class>.foo` instead of
+		// the unresolvable literal path "self.foo". `parent::` is left as-is: the superclass is
+		// a genuinely different, unresolved target, not a wrong extraction of this one.
+		scope := c.text(field(n, "scope"))
+		if (scope == "self" || scope == "static") && c.className != "" {
+			scope = c.className
+		}
+		return scope + "." + c.text(field(n, "name"))
 	case "function_call_expression":
 		return c.dotted(field(n, "function"))
 	case "subscript_expression":
