@@ -1,0 +1,221 @@
+# Rank 1344 / CVE-2026-35169 (GHSA advisory, fix 8978dd60cf): LORIS took the
+# address of its own site from the browser. modules/publication/ajax/FileUpload.php
+# passed $_POST['baseURL'] straight from the upload and editProject actions into
+# notify(), which built the emailed link out of it:
+#
+#   notify($pubID, 'submission', $_POST['baseURL']);
+#   ...
+#   $emailData['URL'] = $baseURL . '/publication/view_project/?id='.$pubID;
+#   $Notifier->notify(['URL' => $emailData['URL'], ...]);
+#   Email::send($sendTo, "notifier_publication_$type.tpl", $emailData);
+#
+# The notification goes to the lead investigator and the collaborators named on
+# the proposal, not to the submitter, so a submitter who posts
+# baseURL=https://evil.example sends those recipients a mail from the real
+# instance whose "view the project proposal" link points at a host of their
+# choosing -- credential phishing with the project's own branding, and the
+# untrusted URL is interpolated into the mail body unescaped (CWE-79, CWE-552).
+# The fix drops the parameter: notify() takes no $baseURL, $emailData['URL'] is
+# gone, and the three notifier_publication_*.tpl templates say "in the loris
+# website" instead of printing {$URL}.
+#
+# New PHP binding requestSuppliedSiteUrlNotification emits the shipped
+# code.UntrustedSupportUrlNotification concept (VYQL-VAL-018, CWE-20) for a PHP
+# file that reads the application's own base or site URL out of a request
+# superglobal and then dispatches a mail or notification, with no server-side
+# base-URL derivation anywhere in the file. An application's own address is
+# server configuration; a request parameter named baseURL/base_url/site_url is
+# the client telling the server where the server lives, and the recipients of
+# whatever is sent next are the ones who pay for believing it. The file is the
+# unit because the superglobal read sits in the routed action and the mail send
+# sits in the helper it calls, which is how this file and PHP ajax handlers
+# generally are written. On the publication module it labels this file and no
+# other.
+#
+# Known limit: only superglobal reads are covered. A framework accessor spelling
+# ($request->input('base_url'), $request->getParsedBody()['baseURL']) carries the
+# key as a call argument rather than a subscript and is not matched here.
+
+test "rank1344: the emailed project link is built from a baseURL posted with the upload"
+  lang php
+  file modules/publication/ajax/FileUpload.php
+  expect VYQL-VAL-018
+  expect_review code.UntrustedSupportUrlNotification
+  code
+  ```
+  <?php declare(strict_types=1);
+
+  if (isset($_REQUEST['action'])) {
+      $action = $_REQUEST['action'];
+      if ($action === 'upload') {
+          uploadPublication();
+      } elseif ($action === 'editProject') {
+          editProject();
+      } else {
+          http_response_code(400);
+          exit(0);
+      }
+  }
+
+  function uploadPublication() : void
+  {
+      $factory = \NDB_Factory::singleton();
+      $db      = $factory->database();
+      $pubID   = insertPublication($db);
+
+      notify($pubID, 'submission', $_POST['baseURL']);
+  }
+
+  function notify($pubID, $type, $baseURL) : void
+  {
+      $factory   = \NDB_Factory::singleton();
+      $db        = $factory->database();
+      $config    = \NDB_Config::singleton();
+      $user      = $factory->user();
+      $emailData = [];
+
+      $data = $db->pselectRow(
+          "SELECT Title, DateProposed, pc.Email as LeadInvestigatorEmail " .
+          "FROM publication p " .
+          "LEFT JOIN publication_collaborator pc " .
+          "ON p.LeadInvestigatorID=pc.PublicationCollaboratorID " .
+          "WHERE PublicationID=:pubID",
+          ['pubID' => $pubID]
+      );
+
+      $emailData['Title']       = $data['Title'];
+      $emailData['Date']        = $data['DateProposed'];
+      $emailData['User']        = $user->getFullname();
+      $emailData['URL']         = $baseURL . '/publication/view_project/?id='.$pubID;
+      $emailData['ProjectName'] = $config->getSetting('prefix');
+
+      $Notifier = new \NDB_Notifier("publication", $type);
+      $Notifier->notify(
+          [
+              'URL'         => $emailData['URL'],
+              'Title'       => $emailData['Title'],
+              'User'        => $emailData['User'],
+              'ProjectName' => $emailData['ProjectName'],
+              'Date'        => $emailData['Date']
+          ]
+      );
+
+      $sendTo = isset($_POST['notifyLead']) && $_POST['notifyLead'] === 'true'
+          ? [$data['LeadInvestigatorEmail']] : [];
+      if (!empty($sendTo)) {
+          Email::send(
+              implode(', ', $sendTo),
+              "notifier_publication_$type.tpl",
+              $emailData
+          );
+      }
+  }
+  ```
+
+test "rank1344: the fix stops emailing a link at all and notify() takes no base URL"
+  lang php
+  file modules/publication/ajax/FileUpload.php
+  reject VYQL-VAL-018
+  reject_review code.UntrustedSupportUrlNotification
+  code
+  ```
+  <?php declare(strict_types=1);
+
+  if (isset($_REQUEST['action'])) {
+      $action = $_REQUEST['action'];
+      if ($action === 'upload') {
+          uploadPublication();
+      } elseif ($action === 'editProject') {
+          editProject();
+      } else {
+          http_response_code(400);
+          exit(0);
+      }
+  }
+
+  function uploadPublication() : void
+  {
+      $factory = \NDB_Factory::singleton();
+      $db      = $factory->database();
+      $pubID   = insertPublication($db);
+
+      notify($pubID, 'submission');
+  }
+
+  function notify($pubID, $type) : void
+  {
+      $factory   = \NDB_Factory::singleton();
+      $db        = $factory->database();
+      $config    = \NDB_Config::singleton();
+      $user      = $factory->user();
+      $emailData = [];
+
+      $data = $db->pselectRow(
+          "SELECT Title, DateProposed, pc.Email as LeadInvestigatorEmail " .
+          "FROM publication p " .
+          "LEFT JOIN publication_collaborator pc " .
+          "ON p.LeadInvestigatorID=pc.PublicationCollaboratorID " .
+          "WHERE PublicationID=:pubID",
+          ['pubID' => $pubID]
+      );
+
+      $emailData['Title']       = $data['Title'];
+      $emailData['Date']        = $data['DateProposed'];
+      $emailData['User']        = $user->getFullname();
+      $emailData['ProjectName'] = $config->getSetting('prefix');
+
+      $Notifier = new \NDB_Notifier("publication", $type);
+      $Notifier->notify(
+          [
+              'Title'       => $emailData['Title'],
+              'User'        => $emailData['User'],
+              'ProjectName' => $emailData['ProjectName'],
+              'Date'        => $emailData['Date']
+          ]
+      );
+
+      $sendTo = isset($_POST['notifyLead']) && $_POST['notifyLead'] === 'true'
+          ? [$data['LeadInvestigatorEmail']] : [];
+      if (!empty($sendTo)) {
+          Email::send(
+              implode(', ', $sendTo),
+              "notifier_publication_$type.tpl",
+              $emailData
+          );
+      }
+  }
+  ```
+
+test "rank1344: deriving the site address from server settings instead is not reported"
+  lang php
+  file tools/media_upload_digest.php
+  reject VYQL-VAL-018
+  reject_review code.UntrustedSupportUrlNotification
+  code
+  ```
+  <?php declare(strict_types=1);
+
+  if (isset($_REQUEST['action'])) {
+      digest($_POST['baseURL']);
+  }
+
+  function digest($ignored) : void
+  {
+      $factory = \NDB_Factory::singleton();
+      $db      = $factory->database();
+      $baseURL = $factory->settings()->getBaseURL();
+
+      $pending = $db->pselect(
+          "SELECT Filename, UploadedBy FROM media WHERE Pending=1",
+          []
+      );
+
+      foreach ($pending as $row) {
+          $emailData = [
+              'Filename' => $row['Filename'],
+              'URL'      => $baseURL . '/media/?pending=1',
+          ];
+          Email::send($row['UploadedBy'], 'media_pending_digest.tpl', $emailData);
+      }
+  }
+  ```
