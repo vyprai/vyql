@@ -1,0 +1,98 @@
+# Rank 1538 / CVE-2025-11436: OpnForm's login throttling keyed on the
+# client-supplied IP, so rotating the X-Forwarded-For header defeated
+# the brute-force limiter entirely (improper rate limiting,
+# CWE-307/CWE-348; PR #900 "Security patches"; the task list's
+# commit? flag resolves COMMIT_OK -- the commit is the patch). The
+# login path in api/app/Http/Controllers/Auth/LoginController.php
+# used Laravel's default throttleKey -- sha1 of the email joined with
+# the request IP -- and the IP comes from headers the client controls
+# whenever the app is not behind a correctly-configured trusted
+# proxy, so each guess arrives under a fresh key and no lockout ever
+# accumulates. Pool commit 36dad12ac1 is the real fix (part of the
+# same security patch: per-credential throttling, forced-download
+# file responses with nosniff against stored-XSS through uploaded
+# content types, and rich-text component sanitisation). The fix
+# overrides throttleKey to `sha1(strtolower($request->input('email'))
+# ?: 'unknown')` -- the credential, not the network vantage. No pool
+# correction.
+#
+# ATTENTION, throttle-key provenance. The defect is a rate-limit
+# identity built from a spoofable header -- client-controlled
+# provenance inside a control that must bind to something the client
+# cannot rotate: nothing in the corpus can ask "is the throttle key
+# derived from client-supplied request data", the same
+# decision-vocabulary family as ranks 1519 and 1535 (the authz gates)
+# with a taint twist no rule observes. Measured on the real code:
+# scanning LoginController.php reports zero findings at the parent
+# and one at the fix (a heuristic row on the newly added code --
+# fix-direction noise, the vulnerability itself never visible). No
+# ENGINE-GAPS.md entry. No definition change shipped. Spec
+# cve_rank1538 records the default IP-keyed throttling and the
+# per-credential form, both asserting reject VYQL-AUTH-079: when
+# throttle-provenance vocabulary lands, the IP-keyed form must flip
+# to expect.
+
+test "rank1538: the limiter keys on the client's address"
+  lang php
+  file api/app/Http/Controllers/Auth/LoginController.php
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  namespace App\Http\Controllers\Auth;
+
+  use Illuminate\Http\Request;
+  use Illuminate\Foundation\Auth\AuthenticatesUsers;
+
+  class LoginController extends Controller
+  {
+      use AuthenticatesUsers;
+
+      protected function credentials(Request $request)
+      {
+          return $request->only($this->username(), 'password');
+      }
+
+      protected function sendLoginResponse(Request $request)
+      {
+          $this->clearLoginAttempts($request);
+
+          return response()->json(['user' => $request->user()]);
+      }
+  }
+  ```
+
+test "rank1538: the fix keys the limiter on the credential"
+  lang php
+  file api/app/Http/Controllers/Auth/LoginController.php
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  namespace App\Http\Controllers\Auth;
+
+  use Illuminate\Http\Request;
+  use Illuminate\Foundation\Auth\AuthenticatesUsers;
+
+  class LoginController extends Controller
+  {
+      use AuthenticatesUsers;
+
+      /**
+       * Customize throttling to be per-credential (email) instead of IP-based,
+       * to avoid X-Forwarded-For spoofing bypasses.
+       */
+      protected function throttleKey(Request $request)
+      {
+          $email = strtolower((string) $request->input($this->username()));
+          return 'login:' . sha1($email !== '' ? $email : 'unknown');
+      }
+
+      protected function credentials(Request $request)
+      {
+          return $request->only($this->username(), 'password');
+      }
+  }
+  ```
