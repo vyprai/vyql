@@ -1,0 +1,238 @@
+# Rank 1317 / CVE-2018-15857: libxkbcommon's XKB keymap parser frees a stack
+# address. `ExprAppendMultiKeysymList` (src/xkbcomp/ast-build.c) takes the
+# statement it has just absorbed and releases it with
+#
+#   FreeStmt((ParseCommon *) &append);
+#
+# where `append` is the function's own `ExprDef *` parameter. `&append` is the
+# address of that stack slot, not the heap block it points at, and the
+# explicit `(ParseCommon *)` cast is what keeps the compiler quiet about the
+# `ExprDef **` it really is. `FreeStmt` then reinterprets the stack slot as a
+# `ParseCommon`, reads `stmt->next` and `stmt->type` out of adjacent stack
+# memory, and calls `free()` on the stack address -- an invalid free plus a
+# type-confused stack read (CWE-590 -> CWE-843), reachable from any keymap
+# whose symbol list uses the multi-keysym syntax that drives this production.
+# The heap `ExprDef` is simultaneously leaked, since nothing ever frees it.
+# Fix c1e5ac16e77a21f87bdf3bc4dea61b037a17dddb drops the `&`, making the call
+# `FreeStmt((ParseCommon *) append)`.
+#
+# ATTENTION, engine gap: the C frontend erases the address-of operator, so
+# the two revisions are not distinguishable at all. `ccConv.expr` in
+# internal/extract/frontend/treesitter/c.go handles `pointer_expression` by
+# branching on the unary operator: `*x` becomes a synthetic
+# `__deref` call (which bindings pointerUse134 / nullableDeref135 in
+# vyql/bindings/c/mce54b166.vyql do consume), but every other operator --
+# `&x` included -- falls through to `return nir.Thru{Inner: c.expr(arg)}`,
+# a pure pass-through that leaves no trace of the operator in the graph.
+# `vyql graph` over the minimal pair below is byte-identical for
+# `free(&p)` and `free(p)`, and identical for the two revisions of
+# `ExprAppendMultiKeysymList` reproduced in the two tests here: same nodes,
+# same edges, same single `code.PointerFree` label on the inner `free`
+# (`vyql match` confirms one label at the `free` inside `FreeStmt` and
+# nothing at the call site on either revision). No binding, concept or rule
+# can judge a shape the IR does not represent.
+#
+# Two further things would have to hold even after the operator survived:
+#
+#   * `vyql resolve` reports `FreeStmt  ast-build.c:69` UNRESOLVED on both
+#     revisions -- C call sites do not link to a callee body in the same
+#     translation unit (a two-line `helper(q)` / `void helper(char *p)` file
+#     resolves 2 of 6 sites and lists `helper` among the unresolved), so a
+#     taint route from a stack-address value into the wrapper's inner
+#     `free(stmt)` dead-ends at the wrapper call regardless.
+#   * distinguishing this from the correct pointer-to-pointer release idiom
+#     needs the callee's declared parameter type. `av_freep(&ptr)`,
+#     `g_clear_pointer(&ptr, free)` and the many project-local
+#     `thing_free(&thing)` wrappers that take `T **` are ordinary, correct C;
+#     only `FreeStmt`'s `ParseCommon *stmt` -- one level of indirection, not
+#     two -- makes `&append` wrong here. A label keyed on "a free-named
+#     callee receives the address of a local" carries no way to tell the two
+#     apart and would fire across most C codebases, so it is not shippable.
+#
+# Not mechanical: preserving `&` means a new IR node for an operator present
+# in essentially every C translation unit, and `nir.Thru` there is load-bearing
+# -- it is what carries taint through every out-parameter (`fread(buf, 1, n,
+# fp)`'s siblings, `sscanf(s, "%d", &n)`, and the three `darray_append_uint(&
+# expr->keysym_list...)` calls in this very function). Changing it alters
+# propagation for C, C++ and Objective-C at once, and pairing it with callee
+# parameter-type arity is a new dataflow relation, not a switch case. No
+# definition change attempted.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1317: multi-keysym list append frees the address of its own pointer parameter"
+  lang c
+  file ast-build.c
+  reject VYQL-MEM-008
+  code
+  ```
+  #include <stdlib.h>
+  #include <string.h>
+
+  enum stmt_type {
+      STMT_UNKNOWN = 0,
+      STMT_EXPR,
+      STMT_VAR,
+  };
+
+  typedef struct _ParseCommon {
+      enum stmt_type type;
+      struct _ParseCommon *next;
+  } ParseCommon;
+
+  typedef unsigned int xkb_keysym_t;
+
+  typedef struct {
+      xkb_keysym_t *item;
+      unsigned size;
+      unsigned alloc;
+  } darray_keysym;
+
+  typedef struct {
+      unsigned *item;
+      unsigned size;
+      unsigned alloc;
+  } darray_uint;
+
+  typedef struct _ExprDef {
+      ParseCommon common;
+      struct {
+          darray_uint symsMapIndex;
+          darray_uint symsNumEntries;
+          darray_keysym syms;
+      } keysym_list;
+  } ExprDef;
+
+  extern void darray_append_uint(darray_uint *d, unsigned v);
+  extern void darray_concat_keysym(darray_keysym *dst, darray_keysym src);
+
+  void
+  FreeStmt(ParseCommon *stmt)
+  {
+      ParseCommon *next;
+
+      while (stmt) {
+          next = stmt->next;
+          switch (stmt->type) {
+          case STMT_EXPR:
+              break;
+          default:
+              break;
+          }
+          free(stmt);
+          stmt = next;
+      }
+  }
+
+  ExprDef *
+  ExprAppendMultiKeysymList(ExprDef *expr, ExprDef *append)
+  {
+      unsigned nSyms = expr->keysym_list.syms.size;
+      unsigned numEntries = append->keysym_list.syms.size;
+
+      darray_append_uint(&expr->keysym_list.symsMapIndex, nSyms);
+      darray_append_uint(&expr->keysym_list.symsNumEntries, numEntries);
+      darray_concat_keysym(&expr->keysym_list.syms, append->keysym_list.syms);
+
+      FreeStmt((ParseCommon *) &append);
+
+      return expr;
+  }
+  ```
+
+test "rank1317: multi-keysym list append releases the pointer it was handed"
+  lang c
+  file ast-build.c
+  reject VYQL-MEM-008
+  code
+  ```
+  #include <stdlib.h>
+  #include <string.h>
+
+  enum stmt_type {
+      STMT_UNKNOWN = 0,
+      STMT_EXPR,
+      STMT_VAR,
+  };
+
+  typedef struct _ParseCommon {
+      enum stmt_type type;
+      struct _ParseCommon *next;
+  } ParseCommon;
+
+  typedef unsigned int xkb_keysym_t;
+
+  typedef struct {
+      xkb_keysym_t *item;
+      unsigned size;
+      unsigned alloc;
+  } darray_keysym;
+
+  typedef struct {
+      unsigned *item;
+      unsigned size;
+      unsigned alloc;
+  } darray_uint;
+
+  typedef struct _ExprDef {
+      ParseCommon common;
+      struct {
+          darray_uint symsMapIndex;
+          darray_uint symsNumEntries;
+          darray_keysym syms;
+      } keysym_list;
+  } ExprDef;
+
+  extern void darray_append_uint(darray_uint *d, unsigned v);
+  extern void darray_concat_keysym(darray_keysym *dst, darray_keysym src);
+
+  void
+  FreeStmt(ParseCommon *stmt)
+  {
+      ParseCommon *next;
+
+      while (stmt) {
+          next = stmt->next;
+          switch (stmt->type) {
+          case STMT_EXPR:
+              break;
+          default:
+              break;
+          }
+          free(stmt);
+          stmt = next;
+      }
+  }
+
+  ExprDef *
+  ExprAppendMultiKeysymList(ExprDef *expr, ExprDef *append)
+  {
+      unsigned nSyms = expr->keysym_list.syms.size;
+      unsigned numEntries = append->keysym_list.syms.size;
+
+      darray_append_uint(&expr->keysym_list.symsMapIndex, nSyms);
+      darray_append_uint(&expr->keysym_list.symsNumEntries, numEntries);
+      darray_concat_keysym(&expr->keysym_list.syms, append->keysym_list.syms);
+
+      FreeStmt((ParseCommon *) append);
+
+      return expr;
+  }
+  ```
+
+# The minimal pair isolating the erased operator: nothing but `&` differs, and
+# `vyql graph` output for the two is byte-identical.
+test "rank1317: releasing the address of a pointer local is the same graph as releasing the pointer"
+  lang c
+  file pair.c
+  reject VYQL-MEM-008
+  code
+  ```
+  #include <stdlib.h>
+
+  struct S { int t; struct S *next; };
+
+  void release_stack_slot(struct S *p) { free(&p); }
+
+  void release_pointer(struct S *p) { free(p); }
+  ```
