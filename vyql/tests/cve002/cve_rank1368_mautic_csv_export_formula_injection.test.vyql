@@ -1,0 +1,123 @@
+# CVE-2018-8092: Mautic's generic export helper streamed contact, form-result
+# and report rows straight into a CSV writer. Every cell came from data a
+# visitor can set (contact fields, form submissions), and a cell beginning
+# with `=`, `+`, `-` or `@` is a live formula when the operator opens the
+# download in a spreadsheet, so the export executed attacker-authored
+# formulas on the operator's machine (CWE-1236).
+#
+# CommonController::exportResultsAs built
+# `new CsvWriter('php://output')` and handed the row iterator to
+# `Handler::create($sourceIterator, $writer)`. sonata-project/exporter's
+# CsvWriter writes each cell verbatim -- the library has no formula-escaping
+# option at all -- so nothing between the row data and the file neutralised a
+# leading formula character.
+#
+# The fix walks the rows before handing them to the writer and prefixes a
+# space to any cell whose first character is one of `+ - = @`, which makes a
+# spreadsheet treat the value as text.
+#
+# Pool row cbc49f0ac4cc7e3a is the release merge of the security branch, so
+# `git show` on it prints an empty combined diff; the single commit it merges,
+# 60ca6b52932c885cab1e4dfff04351a8ea05837c "CSV injection fix", is the patch.
+# The merge's first parent is still the vulnerable state, so the row scans
+# correctly as-is.
+#
+# code.CsvFormulaProneExportRow (VYQL-INJ-121) is already the vocabulary for
+# this weakness. PHP only reached it through a marker keyed on one plugin's
+# `getForCsvExport`/`self::COLUMNS` shape, and nothing described the
+# sonata-project/exporter export the library's own README documents:
+# `new CsvWriter(...)` plus `Handler::create($source, $writer)`. The binding
+# below names that documented pair and stands down when the function carries a
+# formula-trigger-character guard.
+#
+# verify_current_expected: current-behavior
+
+test "rank1368: a sonata-exporter CSV export streams rows with no formula guard"
+  lang php
+  file CommonController.php
+  expect VYQL-INJ-121
+  code
+  ```
+  <?php
+  namespace Mautic\CoreBundle\Controller;
+
+  use Exporter\Handler;
+  use Exporter\Source\ArraySourceIterator;
+  use Exporter\Source\IteratorSourceIterator;
+  use Exporter\Writer\CsvWriter;
+  use Exporter\Writer\XlsWriter;
+  use Symfony\Component\HttpFoundation\StreamedResponse;
+
+  class CommonController
+  {
+      public function exportResultsAs($toExport, $type, $filename)
+      {
+          if ($toExport instanceof \Iterator) {
+              $sourceIterator = new IteratorSourceIterator($toExport);
+          } else {
+              $sourceIterator = new ArraySourceIterator($toExport);
+          }
+
+          $writer      = $type === 'xlsx' ? new XlsWriter('php://output') : new CsvWriter('php://output');
+          $contentType = $type === 'xlsx' ? 'application/vnd.ms-excel' : 'text/csv';
+          $handler     = Handler::create($sourceIterator, $writer);
+
+          return new StreamedResponse(function () use ($handler) {
+              $handler->export();
+          }, 200, ['Content-Type' => $contentType]);
+      }
+  }
+  ```
+
+test "rank1368: the export neutralises cells that begin with a formula character"
+  lang php
+  file CommonController.php
+  reject VYQL-INJ-121
+  code
+  ```
+  <?php
+  namespace Mautic\CoreBundle\Controller;
+
+  use Exporter\Handler;
+  use Exporter\Source\ArraySourceIterator;
+  use Exporter\Source\IteratorSourceIterator;
+  use Exporter\Writer\CsvWriter;
+  use Exporter\Writer\XlsWriter;
+  use Symfony\Component\HttpFoundation\StreamedResponse;
+
+  class CommonController
+  {
+      public function exportResultsAs($toExport, $type, $filename)
+      {
+          if ($toExport instanceof \Iterator) {
+              $sourceIterator = new IteratorSourceIterator($toExport);
+          } else {
+              $sourceIterator = new ArraySourceIterator($toExport);
+          }
+
+          $writer      = $type === 'xlsx' ? new XlsWriter('php://output') : new CsvWriter('php://output');
+          $contentType = $type === 'xlsx' ? 'application/vnd.ms-excel' : 'text/csv';
+          if ($writer instanceof CsvWriter) {
+              $securedData = [];
+              foreach ($sourceIterator as $row) {
+                  $securedRow = [];
+                  foreach ($row as $cell) {
+                      if (in_array($cell[0], ['+', '-', '=', '@'])) {
+                          $securedCell = ' '.$cell;
+                      } else {
+                          $securedCell = $cell;
+                      }
+                      $securedRow[] = $securedCell;
+                  }
+                  $securedData[] = $securedRow;
+              }
+              $sourceIterator = new ArraySourceIterator($securedData);
+          }
+          $handler     = Handler::create($sourceIterator, $writer);
+
+          return new StreamedResponse(function () use ($handler) {
+              $handler->export();
+          }, 200, ['Content-Type' => $contentType]);
+      }
+  }
+  ```
