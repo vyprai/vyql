@@ -1,0 +1,300 @@
+# Rank 1311 / CVE-2024-41703: LibreChat's message persistence layer keyed
+# every write on the caller-supplied messageId alone, so an authenticated
+# user who learned another user's conversationId/messageId (both disclosed
+# by the shared-chat API) could overwrite that user's messages -- and, by
+# posting to /api/ask/<model> with the victim's conversationId, graft the
+# victim's conversation into their own history and keep editing it through
+# the normal UI (CWE-284/CWE-639). In api/models/Message.js the three
+# mutating helpers were
+#
+#   Message.findOneAndUpdate({ messageId }, update, { upsert: true })  # saveMessage
+#   Message.updateOne({ messageId }, { text })                         # updateMessageText
+#   Message.findOneAndUpdate({ messageId }, update, { new: true })     # updateMessage
+#
+# with messageId arriving from req.params via api/server/routes/messages.js
+# and from the request body via AskController/BaseClient. Fix commit
+# d5d188eebf7826c6d36dbeab46e468e8fc42b953 (PR #3363, the reference NVD
+# labels "Patch") threads the Express request through each helper and adds
+# `user: req.user.id` to every filter, plus a `this.user !== user` guard in
+# BaseClient.saveMessageToDatabase. The pool row's nocommit flag is a false
+# alarm: the commit exists, is not a release bump, and its diff is the
+# advisory's fix. No pool correction.
+#
+# ATTENTION, precision cost. Nothing is labelled at the write: `vyql match`
+# on a repro of updateMessage plus its PUT route reports only the three
+# req.params/req.body reads as code.HttpInput and the require() calls as
+# code.DynamicCodeLoad -- Message.findOneAndUpdate carries no sink, check or
+# issue label, so neither VYQL-AUTH-002 (taint core.UserControlledData ->
+# code.ObjectLookupByUserInput) nor VYQL-AUTH-081 (issue
+# code.IdorPolicyReview) can see the function. The existing JavaScript
+# bindings for both concepts are per-name (User.findById, Account.findById,
+# findUserById; a presence match naming one project's prisma.accounts.update
+# and currentUserId), and the general shape is "a Mongoose write whose filter
+# object omits an ownership key".
+#
+# Two forms of that binding were written and measured against the real
+# checkout, and both were rejected on precision:
+#
+#   * Mongoose write primitives (findOneAndUpdate/updateOne/updateMany/
+#     findOneAndDelete/deleteOne/deleteMany) with no `req.user` anywhere in
+#     the enclosing function -> 51 VYQL-AUTH-081 rows at HIGH on the
+#     vulnerable revision, 1 of them this CVE. LibreChat's model layer never
+#     receives the request by design, so Session.js's refresh-token store,
+#     Config.js, Role.js, Transaction.js, the mongoMeili search plugin and an
+#     e2e cleanup script all match identically.
+#   * The same, additionally requiring that no conventional ownership key
+#     (user/userId/owner/ownerId) appears in the function -> 25 rows, 3 of
+#     them this CVE (Message.js:127/162/196), and 26 rows on the *patched*
+#     revision. The count moves the wrong way because the surviving row is
+#     deleteMessages(filter), a pass-through helper the fix leaves alone: the
+#     shape does not distinguish fixed from vulnerable on the code it was
+#     derived from.
+#
+# The negation is unsound in principle as well as in measurement, and
+# Message.js shows why in one file: recordMessage already filters on
+# `{ user, messageId }` while updateMessage filters on `{ messageId }`, and
+# nothing in either call says which collections are owner-partitioned. That
+# is the same flat-bag negation over object-literal keys declined at ranks
+# 1074, 1081 and 1150 for the same reason. No definition change attempted.
+#
+# verify_current_expected: attention-precision-cost, both revisions reject
+# VYQL-AUTH-081 and code.IdorPolicyReview.
+
+test "rank1311: message update route passes the requested messageId with no owner constraint"
+  lang javascript
+  file messages.js
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  const express = require('express');
+  const router = express.Router();
+  const {
+    getMessages,
+    updateMessage,
+    saveConvo,
+    saveMessage,
+    deleteMessages,
+  } = require('../../models');
+  const { countTokens } = require('../utils');
+  const { requireJwtAuth, validateMessageReq } = require('../middleware/');
+
+  router.use(requireJwtAuth);
+
+  router.put('/:conversationId/:messageId', validateMessageReq, async (req, res) => {
+    const { messageId, model } = req.params;
+    const { text } = req.body;
+    const tokenCount = await countTokens(text, model);
+    res.status(201).json(await updateMessage({ messageId, text, tokenCount }));
+  });
+
+  module.exports = router;
+  ```
+
+test "rank1311: message update route hands the request to the model layer"
+  lang javascript
+  file messages.js
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  const express = require('express');
+  const router = express.Router();
+  const { saveConvo, saveMessage, getMessages, updateMessage, deleteMessages } = require('~/models');
+  const { requireJwtAuth, validateMessageReq } = require('~/server/middleware');
+  const { countTokens } = require('~/server/utils');
+
+  router.use(requireJwtAuth);
+  router.use(validateMessageReq);
+
+  router.put('/:conversationId/:messageId', async (req, res) => {
+    const { messageId, model } = req.params;
+    const { text } = req.body;
+    const tokenCount = await countTokens(text, model);
+    const result = await updateMessage(req, { messageId, text, tokenCount });
+    res.status(201).json(result);
+  });
+
+  module.exports = router;
+  ```
+
+test "rank1311: mongoose write filtered on messageId alone"
+  lang javascript
+  file Message.js
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  const { Message } = require('./schema/messageSchema');
+  const logger = require('~/config/winston');
+
+  module.exports = {
+    async updateMessageText({ messageId, text }) {
+      try {
+        await Message.updateOne({ messageId }, { text });
+      } catch (err) {
+        logger.error('Error updating message text:', err);
+        throw new Error('Failed to update message text.');
+      }
+    },
+    async updateMessage(message) {
+      try {
+        const { messageId, ...update } = message;
+        update.isEdited = true;
+        const updatedMessage = await Message.findOneAndUpdate({ messageId }, update, {
+          new: true,
+        });
+
+        if (!updatedMessage) {
+          throw new Error('Message not found.');
+        }
+
+        return {
+          messageId: updatedMessage.messageId,
+          conversationId: updatedMessage.conversationId,
+          text: updatedMessage.text,
+          isEdited: true,
+        };
+      } catch (err) {
+        logger.error('Error updating message:', err);
+        throw new Error('Failed to update message.');
+      }
+    },
+  };
+  ```
+
+test "rank1311: mongoose write filter carries the request principal"
+  lang javascript
+  file Message.js
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  const { Message } = require('./schema/messageSchema');
+  const logger = require('~/config/winston');
+
+  async function updateMessageText(req, { messageId, text }) {
+    try {
+      await Message.updateOne({ messageId, user: req.user.id }, { text });
+    } catch (err) {
+      logger.error('Error updating message text:', err);
+      throw err;
+    }
+  }
+
+  async function updateMessage(req, message) {
+    try {
+      const { messageId, ...update } = message;
+      update.isEdited = true;
+      const updatedMessage = await Message.findOneAndUpdate(
+        { messageId, user: req.user.id },
+        update,
+        {
+          new: true,
+        },
+      );
+
+      if (!updatedMessage) {
+        throw new Error('Message not found or user not authorized.');
+      }
+
+      return {
+        messageId: updatedMessage.messageId,
+        conversationId: updatedMessage.conversationId,
+        text: updatedMessage.text,
+        isEdited: true,
+      };
+    } catch (err) {
+      logger.error('Error updating message:', err);
+      throw err;
+    }
+  }
+
+  module.exports = { updateMessageText, updateMessage };
+  ```
+
+test "rank1311: upsert whose owner field is set in the update document but not the filter"
+  lang javascript
+  file Message.js
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  const { Message } = require('./schema/messageSchema');
+  const logger = require('~/config/winston');
+  const idSchema = z.string().uuid();
+
+  module.exports = {
+    async saveMessage({ user, messageId, newMessageId, conversationId, sender, text }) {
+      try {
+        const validConvoId = idSchema.safeParse(conversationId);
+        if (!validConvoId.success) {
+          return;
+        }
+
+        const update = {
+          user,
+          messageId: newMessageId || messageId,
+          conversationId,
+          sender,
+          text,
+        };
+
+        const message = await Message.findOneAndUpdate({ messageId }, update, {
+          upsert: true,
+          new: true,
+        });
+
+        return message.toObject();
+      } catch (err) {
+        logger.error('Error saving message:', err);
+        throw new Error('Failed to save message.');
+      }
+    },
+  };
+  ```
+
+test "rank1311: upsert filter pinned to the authenticated principal"
+  lang javascript
+  file Message.js
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  const { Message } = require('./schema/messageSchema');
+  const logger = require('~/config/winston');
+  const idSchema = z.string().uuid();
+
+  async function saveMessage(req, { messageId, newMessageId, conversationId, sender, text }) {
+    try {
+      if (!req || !req.user || !req.user.id) {
+        throw new Error('User not authenticated');
+      }
+
+      const validConvoId = idSchema.safeParse(conversationId);
+      if (!validConvoId.success) {
+        throw new Error('Invalid conversation ID');
+      }
+
+      const update = {
+        user: req.user.id,
+        messageId: newMessageId || messageId,
+        conversationId,
+        sender,
+        text,
+      };
+
+      const message = await Message.findOneAndUpdate({ messageId, user: req.user.id }, update, {
+        upsert: true,
+        new: true,
+      });
+
+      return message.toObject();
+    } catch (err) {
+      logger.error('Error saving message:', err);
+      throw err;
+    }
+  }
+
+  module.exports = { saveMessage };
+  ```
