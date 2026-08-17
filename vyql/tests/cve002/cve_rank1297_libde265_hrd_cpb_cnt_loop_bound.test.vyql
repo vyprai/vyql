@@ -1,0 +1,209 @@
+# Rank 1297 / CVE-2022-1253: libde265's HEVC VUI parser reads
+# cpb_cnt_minus1[i] straight off the bitstream with READ_VLC_OFFSET (a uvlc
+# value has no inherent upper bound) and, without ever checking it against
+# anything, uses it as an inclusive loop bound:
+#
+#   READ_VLC_OFFSET(cpb_cnt_minus1[i], uvlc, 0);
+#   ...
+#   for (j = 0; j <= cpb_cnt_minus1[i]; j++) {
+#     READ_VLC_OFFSET(bit_rate_value_minus1[i][j][nalOrVcl], uvlc, 0);
+#     READ_VLC_OFFSET(cpb_size_value_minus1[i][j][nalOrVcl], uvlc, 0);
+#     cbr_flag[i][j][nalOrVcl] = get_bits(br, 1);
+#   }
+#
+# bit_rate_value_minus1/cpb_size_value_minus1/cbr_flag are all fixed
+# [7][32][2] arrays (libde265/vui.h). A crafted SPS with cpb_cnt_minus1
+# larger than 31 drives j past the array's 32-element second dimension,
+# writing attacker-influenced VLC values out of bounds (oss-fuzz 27590,
+# CWE-787/CWE-1284). The fix, 8e89fe0e175d2870c39486fdd09250b230ec10b8, adds
+# `if (cpb_cnt_minus1[i] > 31) return DE265_ERROR_CODED_PARAMETER_OUT_OF_RANGE;`
+# right after the read, and separately propagates hrd_parameters' and vui.read's
+# error returns instead of discarding them (sps.cc, vui.cc) so the caller
+# actually stops on this and other VUI parse errors.
+#
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 5GB` against the real
+# checkout at the fix's parent commit reports nothing at vui.cc's
+# hrd_parameters: no VYQL-MEM-010 (FieldDerivedIndexAccess), no VYQL-MEM-017
+# (CountDerivedElementAccess), no VYQL-MEM-047-style review flag, nothing
+# beyond the generic code.IndexAccess presence label every subscript gets.
+# `vyql explain` on the isolated function confirms: no source is labelled
+# (get_uvlc/get_bits are not recognised as untrusted input by any C/C++
+# binding) and no issue concept is emitted for the loop at all.
+#
+# ATTENTION, engine gap. `ccIndexAccessObservations`
+# (internal/extract/frontend/treesitter/c.go:1595) only asks the upper-bound
+# question about an index expression that is *itself* field-derived --
+# `ccStructuredIndex(idxText)` requires the subscript's own index text to
+# contain "->" or ".". Here the vulnerable index is the bare loop variable
+# `j`; the unchecked field (`cpb_cnt_minus1[i]`) appears only in the loop's
+# condition, never inside a subscript, so the analysis never looks at it.
+# This is a different gap from the already-logged C++
+# `subscript_argument_list` defect (ENGINE-GAPS.md, blocking rank 1213 and
+# the C++ side of 1026/1032): fixing that only restores index text for a
+# direct field-derived subscript like `s->rate[s->cpb_cnt]`, and would not
+# help here even if it were fixed, because `j` alone never carries `->`/`.`
+# regardless of language. The minimal pair below isolates exactly this,
+# entirely in C to keep the two known gaps from being conflated: a
+# struct-field count used directly as a subscript is reported
+# (code.FieldDerivedIndexAccess / VYQL-MEM-010), the identical unchecked
+# count used as an inclusive loop bound that then indexes the same array is
+# not.
+#
+# Not mechanical: recognising "a field-derived count bounds a loop whose
+# body indexes a fixed-size array by the loop variable" is a new
+# classification, not a correction to how `ccIndexAccessObservations`
+# already extracts an index's own text -- it would need to correlate a
+# separate loop-condition expression with a same-array subscript inside the
+# loop body, which is a new dataflow relation, not a bounded fix to one
+# extraction path. It also is not simply "any unguarded loop against a
+# field": most such loops bound a linear scan and never touch a fixed-size
+# array at all, so a rule broad enough to catch this shape without that
+# correlation would flag the ordinary counted-loop idiom everywhere.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1297: HRD cpb_cnt_minus1 is read unchecked and used as an inclusive loop bound over fixed HRD arrays"
+  lang cpp
+  file vui.cc
+  reject VYQL-MEM-010
+  reject VYQL-MEM-017
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  struct video_usability_information {
+    unsigned nal_hrd_parameters_present_flag;
+    unsigned vcl_hrd_parameters_present_flag;
+    unsigned low_delay_hrd_flag[7];
+    unsigned cpb_cnt_minus1[7];
+    unsigned elemental_duration_in_tc_minus1[7];
+    unsigned fixed_pic_rate_within_cvs_flag[7];
+    unsigned bit_rate_value_minus1[7][32][2];
+    unsigned cpb_size_value_minus1[7][32][2];
+    bool     cbr_flag[7][32][2];
+
+    int hrd_parameters(void* br, int sps_max_sub_layers) {
+      int vlc;
+      int i, j, nalOrVcl;
+
+      for (i = 0; i < sps_max_sub_layers; i++) {
+        low_delay_hrd_flag[i] = 0;
+        cpb_cnt_minus1[i] = 0;
+
+        if (fixed_pic_rate_within_cvs_flag[i]) {
+          vlc = get_uvlc(br);
+          elemental_duration_in_tc_minus1[i] = vlc;
+        } else {
+          low_delay_hrd_flag[i] = get_bits(br, 1);
+        }
+        if (!low_delay_hrd_flag[i]) {
+          vlc = get_uvlc(br);
+          cpb_cnt_minus1[i] = vlc;
+        }
+
+        for (nalOrVcl = 0; nalOrVcl < 2; nalOrVcl++) {
+          if (((nalOrVcl == 0) && nal_hrd_parameters_present_flag) ||
+              ((nalOrVcl == 1) && vcl_hrd_parameters_present_flag)) {
+            for (j = 0; j <= cpb_cnt_minus1[i]; j++) {
+              vlc = get_uvlc(br);
+              bit_rate_value_minus1[i][j][nalOrVcl] = vlc;
+              vlc = get_uvlc(br);
+              cpb_size_value_minus1[i][j][nalOrVcl] = vlc;
+              cbr_flag[i][j][nalOrVcl] = get_bits(br, 1);
+            }
+          }
+        }
+      }
+      return 0;
+    }
+  };
+  ```
+
+test "rank1297: fix caps cpb_cnt_minus1 before it bounds the loop"
+  lang cpp
+  file vui.cc
+  reject VYQL-MEM-010
+  reject VYQL-MEM-017
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  struct video_usability_information {
+    unsigned nal_hrd_parameters_present_flag;
+    unsigned vcl_hrd_parameters_present_flag;
+    unsigned low_delay_hrd_flag[7];
+    unsigned cpb_cnt_minus1[7];
+    unsigned elemental_duration_in_tc_minus1[7];
+    unsigned fixed_pic_rate_within_cvs_flag[7];
+    unsigned bit_rate_value_minus1[7][32][2];
+    unsigned cpb_size_value_minus1[7][32][2];
+    bool     cbr_flag[7][32][2];
+
+    int hrd_parameters(void* br, int sps_max_sub_layers) {
+      int vlc;
+      int i, j, nalOrVcl;
+
+      for (i = 0; i < sps_max_sub_layers; i++) {
+        low_delay_hrd_flag[i] = 0;
+        cpb_cnt_minus1[i] = 0;
+
+        if (fixed_pic_rate_within_cvs_flag[i]) {
+          vlc = get_uvlc(br);
+          elemental_duration_in_tc_minus1[i] = vlc;
+        } else {
+          low_delay_hrd_flag[i] = get_bits(br, 1);
+        }
+        if (!low_delay_hrd_flag[i]) {
+          vlc = get_uvlc(br);
+          cpb_cnt_minus1[i] = vlc;
+          if (cpb_cnt_minus1[i] > 31) {
+            return -1;
+          }
+        }
+
+        for (nalOrVcl = 0; nalOrVcl < 2; nalOrVcl++) {
+          if (((nalOrVcl == 0) && nal_hrd_parameters_present_flag) ||
+              ((nalOrVcl == 1) && vcl_hrd_parameters_present_flag)) {
+            for (j = 0; j <= cpb_cnt_minus1[i]; j++) {
+              vlc = get_uvlc(br);
+              bit_rate_value_minus1[i][j][nalOrVcl] = vlc;
+              vlc = get_uvlc(br);
+              cpb_size_value_minus1[i][j][nalOrVcl] = vlc;
+              cbr_flag[i][j][nalOrVcl] = get_bits(br, 1);
+            }
+          }
+        }
+      }
+      return 0;
+    }
+  };
+  ```
+
+test "rank1297: minimal pair -- a struct-field count used directly as an index is caught"
+  lang c
+  file vui.c
+  expect VYQL-MEM-010
+  expect_review code.FieldDerivedIndexAccess
+  code
+  ```
+  struct hrd_state { unsigned cpb_cnt; int rate[32]; };
+
+  void direct_index(struct hrd_state *s) {
+      s->rate[s->cpb_cnt] = 1;
+  }
+  ```
+
+test "rank1297: minimal pair -- the identical unchecked count used as an inclusive loop bound over the same array is not"
+  lang c
+  file vui.c
+  reject VYQL-MEM-010
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  struct hrd_state { unsigned cpb_cnt; int rate[32]; };
+
+  void loop_bound_index(struct hrd_state *s) {
+      int j;
+      for (j = 0; j <= s->cpb_cnt; j++) {
+          s->rate[j] = 1;
+      }
+  }
+  ```
