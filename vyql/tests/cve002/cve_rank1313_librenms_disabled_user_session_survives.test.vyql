@@ -1,0 +1,354 @@
+# Rank 1313 / CVE-2022-4070 (GHSA-x93j-3hh3-6x23, CWE-613, "Insufficient
+# Session Expiration"): disabling a LibreNMS account revoked nothing that was
+# already issued to it. Only the interactive credential path ever consulted
+# the `enabled` column -- `LibreNMS\Authentication\MysqlAuthorizer::authenticate()`
+# throws `AuthenticationException` when `$user_data->enabled` is false, and it
+# is reached only through `App\Providers\LegacyUserProvider::validateCredentials()`,
+# i.e. only when a password is actually being checked. Laravel's session guard
+# restores an already-authenticated user through `retrieveById()` (a bare
+# `User::find($identifier)`) and restores a "remember me" cookie holder through
+# `retrieveByToken()`, which returns the user once the token compares equal and
+# the username still exists in the auth backend:
+#
+#   public function retrieveByToken($identifier, $token)
+#   {
+#       $user = new User();
+#       $user = $user->where($user->getAuthIdentifierName(), $identifier)->first();
+#       if (! $user) { return null; }
+#       $rememberToken = $user->getRememberToken();
+#       if ($rememberToken && hash_equals($rememberToken, $token)) {
+#           if (LegacyAuth::get()->userExists($user->username)) { return $user; }
+#       }
+#       return null;
+#   }
+#
+# Neither path looks at `enabled`, so a live session cookie and a remember-me
+# cookie both kept working indefinitely after an administrator disabled the
+# account. The disabling side does not clean up either: `UserController::update()`
+# explicitly revokes other sessions when the *password* changes
+# (`Auth::logoutOtherDevices($request->new_password)`) and then applies every
+# other validated field -- `enabled` among them, it is in `User::$fillable` and
+# `UpdateUserRequest` validates it as `nullable` -- through
+# `$user->fill($request->validated()); $user->save();` with no revocation at
+# all.
+#
+# Pool commit ce8e5f3d05 is the real fix (metadata COMMIT_OK) and it closes the
+# gap at neither of those places: it adds `App\Http\Middleware\VerifyUserEnabled`
+# and registers it in `App\Http\Kernel`'s global `web` middleware group, so
+# every web request re-checks `Auth::user()->enabled` after the session has been
+# started and logs the account out when it is false. The rest of the commit is
+# the user-facing half of the same change: the `enabled` control in
+# `resources/views/user/form.blade.php` stops being gated on
+# `auth_mechanism == 'mysql'` (so non-MySQL auth mechanisms can disable users at
+# all), its hidden-input fallback's missing `@else` is corrected, and the login
+# view learns to show the new `auth.disabled` message.
+#
+# ATTENTION, vocabulary gap. Scanning the vulnerable `app/` tree reports 179
+# findings and none of them are this: `vyql match` on `app/Http/Kernel.php`
+# labels nothing at all -- no source, no sink, no control -- and on
+# `UserController::update` labels only the generic `code.MassAssign` at
+# `$user->fill($request->validated())` and `code.StateChangingOp(Sink)` at
+# `$user->save()`, which is VYQL-RF-043 firing identically on every controller
+# write in the repository and on both revisions. The nearest shipped concept is
+# `code.SessionHashMissingAuthorizationState` (VYQL-AUTH-058, CWE-613/CWE-863,
+# "session validity hashes omit authorization state that can change while a
+# session remains active"), which is the right weakness class but the wrong
+# mechanism: it requires an authentication routine that stores a session
+# validity hash derived from the password, and LibreNMS has no such hash -- the
+# session is Laravel's own and the recaller is a remember-me token, so there is
+# nothing for a hash-shaped binding to observe.
+#
+# No binding was written, because every form expressible here is either
+# unsound or fires on the safe majority:
+#
+#   * The construct the fix actually changes is an *absence in a different
+#     file*. `app/Http/Kernel.php`'s `web` group is where the account-status
+#     gate is missing, but Kernel.php contains no evidence that this
+#     application has an account-status attribute at all -- that lives in
+#     `app/Models/User.php` (`$fillable` includes `enabled`),
+#     `app/Http/Requests/UpdateUserRequest.php` (`'enabled' => 'nullable'`) and
+#     `LibreNMS/Authentication/MysqlAuthorizer.php`. A binding is compiled
+#     against per-file presence contexts (`node.scope == "module"` /
+#     `"function"` / `"class"`), so "this app has a disable-user feature *and*
+#     no middleware re-checks it" cannot be stated. Without the first half, the
+#     binding reduces to "a Laravel web middleware group runs StartSession /
+#     AuthenticateSession and no account-status middleware", which is true of
+#     essentially every Laravel application, the overwhelming majority of which
+#     have no account-status flag to check.
+#
+#   * Anchoring on `retrieveByToken()` instead -- a custom
+#     `Illuminate\Contracts\Auth\UserProvider` whose remember-me lookup returns
+#     the user on token equality alone -- is expressible and would fire on the
+#     vulnerable file, but it does not discriminate the fix: upstream never
+#     changed `retrieveByToken()`, and today's `LegacyUserProvider` still
+#     performs exactly the same three checks. A rule that reports the fixed
+#     revision as loudly as the vulnerable one is a false positive by the
+#     project's own standard.
+#
+#   * Anchoring on the disabling side -- "a handler writes a user
+#     account-status attribute and persists it with no session or remember-token
+#     revocation" -- is the textbook CWE-613 statement and the shape ordinary
+#     admin user-management CRUD has everywhere; re-checking status per request,
+#     which is what LibreNMS chose, is a perfectly correct alternative to
+#     revoking on change, so the rule would flag the correct design as well as
+#     the broken one. It also cannot even see the account-status field here:
+#     `UserController::update` names no attribute, it mass-assigns
+#     `$request->validated()`.
+#
+# What would close this class is a concept for "a security-relevant account
+# state (disabled, locked, role downgrade) that an authentication path checks
+# only while verifying credentials, so already-issued sessions and persistent
+# login tokens outlive the change", plus the ability for a binding to require
+# evidence from more than one file of the same application -- the same
+# whole-application predicate rank 1077 needed for a different reason. Both are
+# design work rather than a bounded binding change, so nothing is shipped here.
+#
+# The four snippets below are the real code at both revisions. All four reject
+# VYQL-AUTH-058, the nearest rule in the weakness class, and they pin the
+# current behaviour so a future concept for this class has the pair waiting.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions reject
+# VYQL-AUTH-058, the nearest rule in this weakness class.
+
+test "rank1313: the web middleware group starts an authenticated session with no account-status re-check"
+  lang php
+  reject VYQL-AUTH-058
+  file app/Http/Kernel.php
+  ```
+  <?php
+
+  namespace App\Http;
+
+  use Illuminate\Foundation\Http\Kernel as HttpKernel;
+
+  class Kernel extends HttpKernel
+  {
+      protected $middlewareGroups = [
+          'web' => [
+              \App\Http\Middleware\CheckInstalled::class,
+              \App\Http\Middleware\EncryptCookies::class,
+              \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+              \Illuminate\Session\Middleware\StartSession::class,
+              \Illuminate\Session\Middleware\AuthenticateSession::class,
+              \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+              \App\Http\Middleware\VerifyCsrfToken::class,
+              \Illuminate\Routing\Middleware\SubstituteBindings::class,
+          ],
+
+          'auth' => [
+              \App\Http\Middleware\LegacyExternalAuth::class,
+              'authenticate',
+              \App\Http\Middleware\VerifyTwoFactor::class,
+              \App\Http\Middleware\LoadUserPreferences::class,
+          ],
+      ];
+  }
+  ```
+  file app/Providers/LegacyUserProvider.php
+  ```
+  <?php
+
+  namespace App\Providers;
+
+  use App\Models\User;
+  use Illuminate\Contracts\Auth\Authenticatable;
+  use Illuminate\Contracts\Auth\UserProvider;
+  use LibreNMS\Authentication\LegacyAuth;
+  use LibreNMS\Exceptions\AuthenticationException;
+
+  class LegacyUserProvider implements UserProvider
+  {
+      public function retrieveById($identifier)
+      {
+          return User::find($identifier);
+      }
+
+      public function retrieveByToken($identifier, $token)
+      {
+          $user = new User();
+          $user = $user->where($user->getAuthIdentifierName(), $identifier)->first();
+
+          if (! $user) {
+              return null;
+          }
+
+          $rememberToken = $user->getRememberToken();
+          if ($rememberToken && hash_equals($rememberToken, $token)) {
+              if (LegacyAuth::get()->userExists($user->username)) {
+                  return $user;
+              }
+          }
+
+          return null;
+      }
+
+      public function validateCredentials(Authenticatable $user, array $credentials)
+      {
+          $authorizer = LegacyAuth::get();
+
+          try {
+              if ($authorizer->authIsExternal()) {
+                  $credentials['username'] = $authorizer->getExternalUsername();
+              }
+
+              if (empty($credentials['username']) || ! $authorizer->authenticate($credentials)) {
+                  throw new AuthenticationException();
+              }
+
+              return true;
+          } catch (AuthenticationException $ae) {
+              return false;
+          }
+      }
+  }
+  ```
+
+test "rank1313: only the credential path consults the enabled column"
+  lang php
+  reject VYQL-AUTH-058
+  file LibreNMS/Authentication/MysqlAuthorizer.php
+  ```
+  <?php
+
+  namespace LibreNMS\Authentication;
+
+  use App\Models\User;
+  use Illuminate\Support\Facades\Hash;
+  use LibreNMS\Exceptions\AuthenticationException;
+
+  class MysqlAuthorizer extends AuthorizerBase
+  {
+      public function authenticate($credentials)
+      {
+          $username = $credentials['username'] ?? null;
+          $password = $credentials['password'] ?? null;
+
+          $user_data = User::whereNotNull('password')->firstWhere(['username' => $username]);
+          $hash = $user_data->password;
+          $enabled = $user_data->enabled;
+
+          if (! $enabled) {
+              throw new AuthenticationException();
+          }
+
+          if (Hash::check($password, $hash)) {
+              if (Hash::needsRehash($hash)) {
+                  $user_data->setPassword($password);
+                  $user_data->save();
+              }
+
+              return true;
+          }
+
+          throw new AuthenticationException();
+      }
+  }
+  ```
+
+test "rank1313: the update handler revokes sessions for a password change but not for the enabled flag"
+  lang php
+  reject VYQL-AUTH-058
+  file app/Http/Controllers/UserController.php
+  ```
+  <?php
+
+  namespace App\Http\Controllers;
+
+  use App\Http\Requests\UpdateUserRequest;
+  use App\Models\User;
+  use Auth;
+  use Flasher\Prime\FlasherInterface;
+
+  class UserController extends Controller
+  {
+      public function update(UpdateUserRequest $request, User $user, FlasherInterface $flasher)
+      {
+          if ($request->get('new_password') && $user->canSetPassword($request->user())) {
+              $user->setPassword($request->new_password);
+              /** @var User $current_user */
+              $current_user = Auth::user();
+              Auth::setUser($user); // make sure new password is loaded, can only logout other sessions for the active user
+              Auth::logoutOtherDevices($request->new_password);
+
+              // when setting the password on another account, restore back to the user's account.
+              if ($current_user->user_id !== $user->user_id) {
+                  Auth::setUser($current_user);
+              }
+          }
+
+          $user->fill($request->validated());
+
+          if ($user->save()) {
+              $flasher->addSuccess(__('User :username updated', ['username' => $user->username]));
+
+              return redirect(route('users.index'));
+          }
+
+          $flasher->addError(__('Failed to update user :username', ['username' => $user->username]));
+
+          return redirect()->back();
+      }
+  }
+  ```
+
+test "rank1313: the fix re-checks the enabled flag on every web request and logs the account out"
+  lang php
+  reject VYQL-AUTH-058
+  file app/Http/Kernel.php
+  ```
+  <?php
+
+  namespace App\Http;
+
+  use Illuminate\Foundation\Http\Kernel as HttpKernel;
+
+  class Kernel extends HttpKernel
+  {
+      protected $middlewareGroups = [
+          'web' => [
+              \App\Http\Middleware\CheckInstalled::class,
+              \App\Http\Middleware\EncryptCookies::class,
+              \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+              \Illuminate\Session\Middleware\StartSession::class,
+              \Illuminate\Session\Middleware\AuthenticateSession::class,
+              \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+              \App\Http\Middleware\VerifyUserEnabled::class,
+              \App\Http\Middleware\VerifyCsrfToken::class,
+              \Illuminate\Routing\Middleware\SubstituteBindings::class,
+          ],
+
+          'auth' => [
+              \App\Http\Middleware\LegacyExternalAuth::class,
+              'authenticate',
+              \App\Http\Middleware\VerifyTwoFactor::class,
+              \App\Http\Middleware\LoadUserPreferences::class,
+          ],
+      ];
+  }
+  ```
+  file app/Http/Middleware/VerifyUserEnabled.php
+  ```
+  <?php
+
+  namespace App\Http\Middleware;
+
+  use Closure;
+  use Illuminate\Http\Request;
+  use Illuminate\Support\Facades\Auth;
+
+  class VerifyUserEnabled
+  {
+      public function handle(Request $request, Closure $next)
+      {
+          if (Auth::check() && ! Auth::user()->enabled) {
+              Auth::logout();
+              $request->session()->invalidate();
+              $request->session()->regenerateToken();
+
+              return redirect()->route('login')->withErrors(['msg' => __('auth.disabled')]);
+          }
+
+          return $next($request);
+      }
+  }
+  ```
