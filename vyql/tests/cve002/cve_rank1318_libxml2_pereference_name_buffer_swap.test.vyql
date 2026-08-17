@@ -1,0 +1,370 @@
+# Rank 1318 / CVE-2017-16931: libxml2's xmlParseNameComplex (parser.c) hands a
+# backwards-computed pointer to xmlDictLookup without checking that the cursor
+# is still that far past the buffer base:
+#
+#   while (xmlIsNameChar(c)) {
+#       if (count++ > XML_PARSER_CHUNK_SIZE) { count = 0; GROW; }
+#       len += l;
+#       NEXTL(l);
+#       c = CUR_CHAR(l);
+#   }
+#   ...
+#   return(xmlDictLookup(ctxt->dict, ctxt->input->cur - len, len));
+#
+# `len` accumulates the width of every character consumed, so `cur - len` is
+# meant to point back at the start of the name. The NEXTL macro (parser.c
+# ~2121) ended with `if (*ctxt->input->cur == '%')
+# xmlParserHandlePEReference(ctxt);`, and a `%` inside a DTD name therefore
+# expanded a parameter entity in the middle of the scan. That pushes a new
+# input via xmlPushInput, so `ctxt->input` — and the buffer `cur` points into —
+# is replaced while `len` keeps counting from the old one. `cur - len` then
+# points before the new buffer's base and xmlDictLookup reads out of bounds
+# (CWE-125). The fix (e26630548e7d138d2c560844c43820b6767251e3, "Fix handling
+# of parameter-entity references") removes the xmlParserHandlePEReference call
+# from NEXTL, drops the GROW/xmlPopInput path in the XML_PARSE_OLD10 branch
+# (CVE-2017-9049, CVE-2017-9050), and adds the explicit guard
+# `if (ctxt->input->cur - ctxt->input->base < len) { xmlFatalErr(...); return
+# (NULL); }` immediately before the two xmlDictLookup returns.
+#
+# `vyql match` on the vulnerable function labels the pointer arithmetic
+# `code.IntegerSizeArithmeticSink` (parser.c, both xmlDictLookup returns) and
+# the `*ctxt->input->cur` read `code.NullableDeref`, but reports `== source ==
+# (none)`; `vyql trace -from core.UserControlledData -to
+# code.IntegerSizeArithmeticSink` reports "0 source(s): 0 reach a sink". A
+# bounded `./bin/vyql scan --cache off --max-ram 6GB` over the vulnerable
+# parser.c reports 276 findings, of which the only one on the vulnerable
+# statement is VYQL-MEM-006 (code.NullableDeref, low) for the `*cur` read —
+# and that same finding is reported verbatim on the patched form, so no rule
+# separates the two sides. (Scanning the whole libxml2 checkout aborts with
+# `vyql: runtime error: slice bounds out of range [:49980] with capacity
+# 49869`, unrelated to this rank; the per-file scan above is what the numbers
+# come from.)
+#
+# ATTENTION, engine gap. Two things are missing, and neither is a bounded
+# correction:
+#
+# 1. No relation for a pointer invalidated by a callee. What makes `cur - len`
+#    wrong is that a call inside the loop may replace the buffer the pointer
+#    was taken from, leaving a cursor/length pair that describe two different
+#    allocations. The engine has no notion of a callee invalidating a pointer
+#    its caller holds across the call, so nothing distinguishes this loop from
+#    any other tokenizer loop. Adding one is a new dataflow relation plus a
+#    new classification of which callees may reallocate, i.e. exactly the
+#    design work step 5 says not to launder as a one-line fix.
+# 2. The invalidating call is only visible inside a macro body. The
+#    `xmlParserHandlePEReference` call lives in NEXTL, and the C/C++ frontend
+#    never expands `#define` bodies at call sites (already recorded at rank
+#    1203, restated at 1307), so even with relation 1 the loop would look
+#    call-free at the NEXTL site.
+#
+# Detecting the shape alone — a cursor minus a locally accumulated length,
+# passed to a consumer, with no comparison against the buffer base — is not
+# worth its precision cost, and this codebase measures that directly:
+# `cur - <ident>` appears 32 times in parser.c, 30 of them ordinary
+# `cur - base` offset computations, and htmlParseNameComplex
+# (HTMLparser.c:2534) ends in the byte-identical
+# `xmlDictLookup(ctxt->dict, ctxt->input->cur - len, len)` while being safe,
+# because it snapshots `base` before the loop, re-checks `ctxt->input->base !=
+# base` after every NEXTL, and guards `if (ctxt->input->base > ctxt->input->cur
+# - len) return(NULL);`. A shape-only detector reports that function too. The
+# reject blocks below hold both neutralised forms — the XML parser's added
+# size check and the HTML parser's pre-existing base check — because the
+# discriminator is the base-versus-cursor comparison, not the subtraction.
+#
+# The minimal pair isolates the missing relation on an otherwise identical
+# call: when `len` is copied from a labelled source, `cur - len` is reported
+# (VYQL-NUM-003); when the same `cur - len` reaches the same consumer with
+# `len` accumulated by the scan loop, nothing is.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1318: xmlParseNameComplex subtracts an accumulated length from a cursor a loop callee can invalidate"
+  lang c
+  file parser.c
+  reject VYQL-NUM-003
+  reject VYQL-NUM-006
+  code
+  ```
+  #include <stdlib.h>
+
+  typedef unsigned char xmlChar;
+
+  typedef struct _xmlParserInput {
+      const xmlChar *base;
+      const xmlChar *cur;
+      const xmlChar *end;
+      int line;
+      int col;
+  } xmlParserInput, *xmlParserInputPtr;
+
+  typedef struct _xmlParserCtxt {
+      xmlParserInputPtr input;
+      void *dict;
+      int options;
+  } xmlParserCtxt, *xmlParserCtxtPtr;
+
+  #define XML_PARSER_CHUNK_SIZE 100
+  #define XML_MAX_NAME_LENGTH 50000
+  #define XML_PARSE_HUGE 524288
+
+  extern int xmlCurrentChar(xmlParserCtxtPtr ctxt, int *len);
+  extern void xmlParserHandlePEReference(xmlParserCtxtPtr ctxt);
+  extern void xmlGROW(xmlParserCtxtPtr ctxt);
+  extern const xmlChar *xmlDictLookup(void *dict, const xmlChar *name, int len);
+  extern void xmlFatalErr(xmlParserCtxtPtr ctxt, int error, const char *info);
+
+  #define CUR_CHAR(l) xmlCurrentChar(ctxt, &l)
+  #define GROW xmlGROW(ctxt)
+
+  #define NEXTL(l) do {							\
+      if (*(ctxt->input->cur) == '\n') {				\
+          ctxt->input->line++; ctxt->input->col = 1;			\
+      } else ctxt->input->col++;					\
+      ctxt->input->cur += l;						\
+      if (*ctxt->input->cur == '%') xmlParserHandlePEReference(ctxt);	\
+    } while (0)
+
+  static int xmlIsNameChar(int c) {
+      return ((c >= 'a') && (c <= 'z')) || ((c >= 'A') && (c <= 'Z')) ||
+             ((c >= '0') && (c <= '9')) || (c == '_') || (c == ':') ||
+             (c == '-') || (c == '.');
+  }
+
+  static const xmlChar *
+  xmlParseNameComplex(xmlParserCtxtPtr ctxt) {
+      int len = 0, l;
+      int c;
+      int count = 0;
+
+      c = CUR_CHAR(l);
+      while (xmlIsNameChar(c)) {
+          if (count++ > XML_PARSER_CHUNK_SIZE) {
+              count = 0;
+              GROW;
+          }
+          len += l;
+          NEXTL(l);
+          c = CUR_CHAR(l);
+      }
+      if ((len > XML_MAX_NAME_LENGTH) &&
+          ((ctxt->options & XML_PARSE_HUGE) == 0)) {
+          xmlFatalErr(ctxt, 110, "Name");
+          return(NULL);
+      }
+      if ((*ctxt->input->cur == '\n') && (ctxt->input->cur[-1] == '\r'))
+          return(xmlDictLookup(ctxt->dict, ctxt->input->cur - (len + 1), len));
+      return(xmlDictLookup(ctxt->dict, ctxt->input->cur - len, len));
+  }
+  ```
+
+test "rank1318: fix drops the PE reference from NEXTL and checks the cursor against the buffer base"
+  lang c
+  file parser.c
+  reject VYQL-NUM-003
+  reject VYQL-NUM-006
+  code
+  ```
+  #include <stdlib.h>
+
+  typedef unsigned char xmlChar;
+
+  typedef struct _xmlParserInput {
+      const xmlChar *base;
+      const xmlChar *cur;
+      const xmlChar *end;
+      int line;
+      int col;
+  } xmlParserInput, *xmlParserInputPtr;
+
+  typedef struct _xmlParserCtxt {
+      xmlParserInputPtr input;
+      void *dict;
+      int options;
+  } xmlParserCtxt, *xmlParserCtxtPtr;
+
+  #define XML_PARSER_CHUNK_SIZE 100
+  #define XML_MAX_NAME_LENGTH 50000
+  #define XML_PARSE_HUGE 524288
+  #define XML_ERR_INTERNAL_ERROR 1
+
+  extern int xmlCurrentChar(xmlParserCtxtPtr ctxt, int *len);
+  extern void xmlGROW(xmlParserCtxtPtr ctxt);
+  extern const xmlChar *xmlDictLookup(void *dict, const xmlChar *name, int len);
+  extern void xmlFatalErr(xmlParserCtxtPtr ctxt, int error, const char *info);
+
+  #define CUR_CHAR(l) xmlCurrentChar(ctxt, &l)
+  #define GROW xmlGROW(ctxt)
+
+  #define NEXTL(l) do {							\
+      if (*(ctxt->input->cur) == '\n') {				\
+          ctxt->input->line++; ctxt->input->col = 1;			\
+      } else ctxt->input->col++;					\
+      ctxt->input->cur += l;						\
+    } while (0)
+
+  static int xmlIsNameChar(int c) {
+      return ((c >= 'a') && (c <= 'z')) || ((c >= 'A') && (c <= 'Z')) ||
+             ((c >= '0') && (c <= '9')) || (c == '_') || (c == ':') ||
+             (c == '-') || (c == '.');
+  }
+
+  static const xmlChar *
+  xmlParseNameComplex(xmlParserCtxtPtr ctxt) {
+      int len = 0, l;
+      int c;
+      int count = 0;
+
+      c = CUR_CHAR(l);
+      while (xmlIsNameChar(c)) {
+          if (count++ > XML_PARSER_CHUNK_SIZE) {
+              count = 0;
+              GROW;
+          }
+          len += l;
+          NEXTL(l);
+          c = CUR_CHAR(l);
+      }
+      if ((len > XML_MAX_NAME_LENGTH) &&
+          ((ctxt->options & XML_PARSE_HUGE) == 0)) {
+          xmlFatalErr(ctxt, 110, "Name");
+          return(NULL);
+      }
+      if (ctxt->input->cur - ctxt->input->base < len) {
+          /*
+           * There were a couple of bugs where PERefs lead to to a change
+           * of the buffer. Check the buffer size to avoid passing an invalid
+           * pointer to xmlDictLookup.
+           */
+          xmlFatalErr(ctxt, XML_ERR_INTERNAL_ERROR,
+                      "unexpected change of input buffer");
+          return (NULL);
+      }
+      if ((*ctxt->input->cur == '\n') && (ctxt->input->cur[-1] == '\r'))
+          return(xmlDictLookup(ctxt->dict, ctxt->input->cur - (len + 1), len));
+      return(xmlDictLookup(ctxt->dict, ctxt->input->cur - len, len));
+  }
+  ```
+
+test "rank1318: the HTML parser's identical subtraction is safe because it re-checks the base pointer"
+  lang c
+  file HTMLparser.c
+  reject VYQL-NUM-003
+  reject VYQL-NUM-006
+  code
+  ```
+  #include <stdlib.h>
+
+  typedef unsigned char xmlChar;
+
+  typedef struct _xmlParserInput {
+      const xmlChar *base;
+      const xmlChar *cur;
+      const xmlChar *end;
+      int line;
+      int col;
+  } xmlParserInput, *xmlParserInputPtr;
+
+  typedef struct _xmlParserCtxt {
+      xmlParserInputPtr input;
+      void *dict;
+  } xmlParserCtxt, *xmlParserCtxtPtr;
+
+  extern int xmlCurrentChar(xmlParserCtxtPtr ctxt, int *len);
+  extern void xmlGROW(xmlParserCtxtPtr ctxt);
+  extern const xmlChar *xmlDictLookup(void *dict, const xmlChar *name, int len);
+
+  #define CUR_CHAR(l) xmlCurrentChar(ctxt, &l)
+  #define GROW xmlGROW(ctxt)
+
+  #define NEXTL(l) do {							\
+      if (*(ctxt->input->cur) == '\n') {				\
+          ctxt->input->line++; ctxt->input->col = 1;			\
+      } else ctxt->input->col++;					\
+      ctxt->input->cur += l;						\
+    } while (0)
+
+  static int htmlIsNameChar(int c) {
+      return ((c >= 'a') && (c <= 'z')) || ((c >= 'A') && (c <= 'Z')) ||
+             ((c >= '0') && (c <= '9')) || (c == '_') || (c == ':') ||
+             (c == '-') || (c == '.');
+  }
+
+  static const xmlChar *
+  htmlParseNameComplex(xmlParserCtxtPtr ctxt) {
+      int len = 0, l;
+      int c;
+      int count = 0;
+      const xmlChar *base = ctxt->input->base;
+
+      GROW;
+      c = CUR_CHAR(l);
+      while (htmlIsNameChar(c)) {
+          if (count++ > 100) {
+              count = 0;
+              GROW;
+          }
+          len += l;
+          NEXTL(l);
+          c = CUR_CHAR(l);
+          if (ctxt->input->base != base) {
+              /*
+               * We changed encoding from an unknown encoding
+               * Input buffer changed location, so we better start again
+               */
+              return(htmlParseNameComplex(ctxt));
+          }
+      }
+
+      if (ctxt->input->base > ctxt->input->cur - len)
+          return(NULL);
+
+      return(xmlDictLookup(ctxt->dict, ctxt->input->cur - len, len));
+  }
+  ```
+
+test "rank1318: minimal pair -- a length copied from a source into the same backwards pointer is caught"
+  lang c
+  file parser.c
+  expect VYQL-NUM-003
+  code
+  ```
+  #include <stdlib.h>
+
+  typedef unsigned char xmlChar;
+
+  extern const xmlChar *xmlDictLookup(void *dict, const xmlChar *name, int len);
+
+  const xmlChar *lookup_env_len(void *dict, const xmlChar *cur) {
+      int len = atoi(getenv("NAME_LEN"));
+      return xmlDictLookup(dict, cur - len, len);
+  }
+  ```
+
+test "rank1318: minimal pair -- the same pointer with the length accumulated by the scan loop is not"
+  lang c
+  file parser.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stdlib.h>
+
+  typedef unsigned char xmlChar;
+  typedef struct { const xmlChar *base; const xmlChar *cur; } xmlParserInput;
+  typedef struct { xmlParserInput *input; void *dict; } xmlParserCtxt;
+
+  extern const xmlChar *xmlDictLookup(void *dict, const xmlChar *name, int len);
+  extern int xmlCurrentChar(xmlParserCtxt *ctxt, int *len);
+  extern void xmlParserHandlePEReference(xmlParserCtxt *ctxt);
+
+  const xmlChar *lookup_scanned_len(xmlParserCtxt *ctxt) {
+      int len = 0, l;
+      int c = xmlCurrentChar(ctxt, &l);
+      while ((c >= 'a') && (c <= 'z')) {
+          len += l;
+          ctxt->input->cur += l;
+          if (*ctxt->input->cur == '%') xmlParserHandlePEReference(ctxt);
+          c = xmlCurrentChar(ctxt, &l);
+      }
+      return xmlDictLookup(ctxt->dict, ctxt->input->cur - len, len);
+  }
+  ```
