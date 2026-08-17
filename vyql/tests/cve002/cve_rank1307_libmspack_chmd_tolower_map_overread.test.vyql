@@ -1,0 +1,167 @@
+# Rank 1307 / CVE-2018-14682: libmspack's CHM index search compares an
+# attacker-controlled entry name against the target filename with
+# `compare()` (mspack/chmd.c), which decodes each side to a UTF-8 code
+# point via GET_UTF8_CHAR and folds case with the TOLOWER() macro before
+# comparing. Without towlower/tolower available, TOLOWER() falls back to a
+# hand-rolled table lookup:
+#
+#   #define TOLOWER(x) (((x)<0||(x)>256)?(x):mspack_tolower_map[(x)])
+#   static const unsigned char mspack_tolower_map[256] = { ... };
+#
+# `mspack_tolower_map` holds exactly 256 entries (valid indices 0-255), but
+# the guard rejects only `x > 256`, so `x == 256` -- a code point search_chunk
+# can produce while decoding a name pulled straight from a CHM chunk buffer
+# read off the archive -- passes the guard and indexes one byte past the
+# array, an out-of-bounds read (CWE-125). Fix 4fd9ccaa54e1aebde1e4b95fb01
+# tightens the comparison to `x > 255`, the correct exclusive upper bound
+# for a 256-entry table.
+#
+# ATTENTION, engine gap already on record at rank 1203
+# (see ENGINE-GAPS.md): the C/C++ frontend never expands a `#define`d
+# macro's body at its call site, so any construct that lives purely inside
+# a function-like macro -- here, the ternary and the array subscript inside
+# TOLOWER() -- is invisible to node emission and every rule downstream of
+# it, on both the vulnerable and the patched form alike, identically.
+#
+# Isolated with a minimal pair naming no libmspack API: an env-derived int
+# indexed straight into a fixed table, `tbl[x]` with `x` sourced from
+# `atoi(getenv(...))`, is labelled `mspack_tolower_map.__subscript
+# code.IndexAccessSink` by `vyql match` and reached by
+# `code.EnvVariable` on `vyql trace -from code.EnvVariable -to
+# code.IndexAccessSink`. The identical guard-then-index written as a
+# function-like macro, `#define TOLOWER(x) (((x)<0||(x)>256)?(x):tbl[(x)])`
+# used as `return TOLOWER(x);`, labels no sink at all -- `vyql match`
+# reports no sink, and `vyql resolve` never even lists `TOLOWER` as an
+# unresolved call site, because tree-sitter parses the macro invocation as
+# a call expression to an unknown external function named `TOLOWER`
+# (there is no preprocessor pass to substitute its body), so the subscript
+# and the ternary it lives inside never enter the AST the engine walks.
+# `vyql trace -from code.EnvVariable -to code.IndexAccessSink` dead-ends at
+# that call, tagged `⟂ no outgoing flow (callee not traced -- external or
+# cross-package)`, on the vulnerable (`>256`) and patched (`>255`) macro
+# alike, since the only thing that differs between them -- the comparison
+# literal -- sits inside the very macro body that never gets walked.
+#
+# Not mechanical, and not a new gap: this is the same limitation rank 1203
+# already names (the C/C++ frontend has no macro-expansion pass at all),
+# now surfacing through an array subscript instead of a free/use pair.
+# Fixing it needs a real preprocessing stage -- recognizing every
+# `#define`, substituting at each call site, handling macros that invoke
+# other macros, and keeping source-to-node line mapping sane once
+# substituted text no longer matches the file line-for-line -- not a
+# bounded, one-function change, and it is shared by every C, C++ and
+# Objective-C source the engine parses, not scoped to this one array. No
+# definition change attempted here; recording so 1203's "ranks it blocks"
+# list in ENGINE-GAPS.md includes 1307.
+#
+# A bounded real-repository scan (timeout 180, --cache off) over the
+# vulnerable parent commit confirms the same for libmspack/mspack/chmd.c
+# itself: no VYQL-MEM-005 finding at the TOLOWER() call sites in compare(),
+# and no finding of any kind naming mspack_tolower_map, on that revision or
+# the patched one.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1307: chmd TOLOWER() off-by-one lets a decoded name byte index one past mspack_tolower_map"
+  lang c
+  file chmd_compare.c
+  reject VYQL-MEM-005
+  reject_review code.IndexAccess
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  #define TOLOWER(x) (((x)<0||(x)>256)?(x):mspack_tolower_map[(x)])
+  static const unsigned char mspack_tolower_map[256] = {0};
+
+  #define GET_UTF8_CHAR(s, e, c) do {                                    \
+      unsigned char x = *s++;                                            \
+      if (x < 0x80) c = x;                                               \
+      else if (x >= 0xC2 && x < 0xE0 && s < e) {                         \
+          c = (x & 0x1F) << 6 | (*s++ & 0x3F);                           \
+      }                                                                  \
+      else c = 0xFFFD;                                                   \
+  } while (0)
+
+  static inline int compare(const char *s1, const char *s2, int l1, int l2) {
+      register const unsigned char *p1 = (const unsigned char *) s1;
+      register const unsigned char *p2 = (const unsigned char *) s2;
+      register const unsigned char *e1 = p1 + l1, *e2 = p2 + l2;
+      int c1, c2;
+
+      while (p1 < e1 && p2 < e2) {
+          GET_UTF8_CHAR(p1, e1, c1);
+          GET_UTF8_CHAR(p2, e2, c2);
+          if (c1 == c2) continue;
+          c1 = TOLOWER(c1);
+          c2 = TOLOWER(c2);
+          if (c1 != c2) return c1 - c2;
+      }
+      return l1 - l2;
+  }
+
+  static int search_chunk(const char *filename, FILE *fh) {
+      char chunk[4096];
+      size_t chunk_len = fread(chunk, 1, sizeof(chunk), fh);
+      if (!chunk_len) return -1;
+      return compare(filename, chunk, (int) strlen(filename), (int) chunk_len);
+  }
+
+  int chmd_fast_find(const char *filename, FILE *fh) {
+      return search_chunk(filename, fh);
+  }
+  ```
+
+test "rank1307: chmd TOLOWER() with the corrected exclusive upper bound of 255"
+  lang c
+  file chmd_compare_fixed.c
+  reject VYQL-MEM-005
+  reject_review code.IndexAccess
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  #define TOLOWER(x) (((x)<0||(x)>255)?(x):mspack_tolower_map[(x)])
+  static const unsigned char mspack_tolower_map[256] = {0};
+
+  #define GET_UTF8_CHAR(s, e, c) do {                                    \
+      unsigned char x = *s++;                                            \
+      if (x < 0x80) c = x;                                               \
+      else if (x >= 0xC2 && x < 0xE0 && s < e) {                         \
+          c = (x & 0x1F) << 6 | (*s++ & 0x3F);                           \
+      }                                                                  \
+      else c = 0xFFFD;                                                   \
+  } while (0)
+
+  static inline int compare(const char *s1, const char *s2, int l1, int l2) {
+      register const unsigned char *p1 = (const unsigned char *) s1;
+      register const unsigned char *p2 = (const unsigned char *) s2;
+      register const unsigned char *e1 = p1 + l1, *e2 = p2 + l2;
+      int c1, c2;
+
+      while (p1 < e1 && p2 < e2) {
+          GET_UTF8_CHAR(p1, e1, c1);
+          GET_UTF8_CHAR(p2, e2, c2);
+          if (c1 == c2) continue;
+          c1 = TOLOWER(c1);
+          c2 = TOLOWER(c2);
+          if (c1 != c2) return c1 - c2;
+      }
+      return l1 - l2;
+  }
+
+  static int search_chunk(const char *filename, FILE *fh) {
+      char chunk[4096];
+      size_t chunk_len = fread(chunk, 1, sizeof(chunk), fh);
+      if (!chunk_len) return -1;
+      return compare(filename, chunk, (int) strlen(filename), (int) chunk_len);
+  }
+
+  int chmd_fast_find(const char *filename, FILE *fh) {
+      return search_chunk(filename, fh);
+  }
+  ```
