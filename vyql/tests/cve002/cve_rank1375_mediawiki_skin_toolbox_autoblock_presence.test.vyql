@@ -1,0 +1,235 @@
+# CVE-2026-34092: MediaWiki's `Skin::buildNavUrls()` decides which block link
+# the sidebar toolbox carries for the page's relevant user. It asked the block
+# manager for a block on that target and treated *any* returned block object as
+# "already blocked", switching the toolbox from "Block this user" to "Change
+# block"/"Manage blocks" plus "Unblock".
+#
+# `BlockManager::getBlock()` also returns autoblocks -- the blocks MediaWiki
+# places automatically on an address a blocked account edited from. An
+# autoblock's target address is private by design: Special:AutoblockList shows
+# autoblocks by ID and never the address. Because the toolbox branched on a
+# bare truthiness test, opening a page whose relevant user is an IP (for
+# example Special:Contributions/127.0.0.1) rendered the change-block form of
+# the toolbox whenever an autoblock covered that address, so the rendered
+# sidebar told the viewer that a hidden autoblock on that IP exists (CWE-200).
+#
+# The fix keeps the lookup and narrows the branch: the target counts as
+# blocked only when `$userBlock->getType() !== Block::TYPE_AUTO`. The same
+# guard was already present in the sibling
+# `ContributionsSpecialPage::getUserLinks`, which builds the equivalent
+# Special:Block/Special:Unblock links, so excluding autoblocks -- not the
+# lookup -- is what makes this code correct.
+#
+# Pool row 1367e89489e17de24356ad6d3c473a649ee3a03b is "Prep 1.45.2", a
+# release commit touching only RELEASE-NOTES-1.45 and includes/Defines.php;
+# its release notes name this CVE alongside six others. The fix is
+# 39615d4f86c1cb32bd0192b41e6d56ea8695f497, "SECURITY: Ignore autoblocks when
+# setting Skin's toolbox links".
+#
+# code.HiddenBlockPresenceDisclosure (VYQL-SEC-047) is the vocabulary for
+# this: a block lookup whose result selects the block-management UI shown to a
+# viewer, with no exclusion of the block types whose target is deliberately
+# hidden. The PHP binding names the documented MediaWiki APIs -- the block
+# lookups (`getBlock`, `getIpRangeBlock`, `newFromTarget`) and the documented
+# ways to link a special page for a target (`makeSpecialUrlSubpage`,
+# `SpecialPage::getTitleFor`) -- and stands down as soon as the function
+# inspects the block's type for an autoblock.
+#
+# verify_current_expected: current-behavior
+
+test "rank1375: skin toolbox block links branch on a block lookup that still includes autoblocks"
+  lang php
+  file Skin.php
+  expect VYQL-SEC-047
+  code
+  ```
+  <?php
+
+  namespace MediaWiki\Skin;
+
+  use MediaWiki\Context\ContextSource;
+  use MediaWiki\MainConfigNames;
+  use MediaWiki\MediaWikiServices;
+
+  abstract class Skin extends ContextSource {
+
+  	protected function buildNavUrls() {
+  		$services = MediaWikiServices::getInstance();
+  		$nav_urls = [];
+
+  		$user = $this->getRelevantUser();
+  		$target = false;
+  		$targetIsIpRange = false;
+  		if ( $user ) {
+  			$target = $user->getName();
+  		}
+  		if ( !$target ) {
+  			return $nav_urls;
+  		}
+
+  		$nav_urls['contributions'] = [
+  			'href' => SkinComponentUtils::makeSpecialUrlSubpage( 'Contributions', $target ),
+  		];
+
+  		// Check if the user/ip/ip range is blocked
+  		if ( $this->getAuthority()->isAllowed( 'block' ) ) {
+  			$userBlock = null;
+  			if ( $targetIsIpRange ) {
+  				$userBlock = $services
+  					->getBlockManager()
+  					->getIpRangeBlock( $target );
+  			} elseif ( $user ) {
+  				$userBlock = $services
+  					->getBlockManager()
+  					->getBlock( $user, null );
+  			}
+
+  			if ( $userBlock ) {
+  				$useCodex = $this->getConfig()->get( MainConfigNames::UseCodexSpecialBlock );
+  				$nav_urls[ $useCodex ? 'block-manage-blocks' : 'changeblockip' ] = [
+  					'icon' => 'block',
+  					'href' => SkinComponentUtils::makeSpecialUrlSubpage( 'Block', $target )
+  				];
+  				if ( !$useCodex ) {
+  					$nav_urls['unblockip'] = [
+  						'icon' => 'unBlock',
+  						'href' => SkinComponentUtils::makeSpecialUrlSubpage( 'Unblock', $target ),
+  						'text' => $this->msg( 'unblockip' )->text(),
+  					];
+  				}
+  			} else {
+  				$nav_urls['blockip'] = [
+  					'icon' => 'block',
+  					'text' => $this->msg( 'blockip' )->text(),
+  					'href' => SkinComponentUtils::makeSpecialUrlSubpage( 'Block', $target ),
+  				];
+  			}
+  		}
+
+  		return $nav_urls;
+  	}
+  }
+  ```
+
+test "rank1375: the toolbox counts the target as blocked only for a non-autoblock"
+  lang php
+  file Skin.php
+  reject VYQL-SEC-047
+  code
+  ```
+  <?php
+
+  namespace MediaWiki\Skin;
+
+  use MediaWiki\Block\Block;
+  use MediaWiki\Context\ContextSource;
+  use MediaWiki\MainConfigNames;
+  use MediaWiki\MediaWikiServices;
+
+  abstract class Skin extends ContextSource {
+
+  	protected function buildNavUrls() {
+  		$services = MediaWikiServices::getInstance();
+  		$nav_urls = [];
+
+  		$user = $this->getRelevantUser();
+  		$target = false;
+  		$targetIsIpRange = false;
+  		if ( $user ) {
+  			$target = $user->getName();
+  		}
+  		if ( !$target ) {
+  			return $nav_urls;
+  		}
+
+  		$nav_urls['contributions'] = [
+  			'href' => SkinComponentUtils::makeSpecialUrlSubpage( 'Contributions', $target ),
+  		];
+
+  		// Check if the user/ip/ip range is blocked
+  		if ( $this->getAuthority()->isAllowed( 'block' ) ) {
+  			$userBlock = null;
+  			if ( $targetIsIpRange ) {
+  				$userBlock = $services
+  					->getBlockManager()
+  					->getIpRangeBlock( $target );
+  			} elseif ( $user ) {
+  				$userBlock = $services
+  					->getBlockManager()
+  					->getBlock( $user, null );
+  			}
+
+  			if (
+  				$userBlock &&
+  				$userBlock->getType() !== Block::TYPE_AUTO
+  			) {
+  				$useCodex = $this->getConfig()->get( MainConfigNames::UseCodexSpecialBlock );
+  				$nav_urls[ $useCodex ? 'block-manage-blocks' : 'changeblockip' ] = [
+  					'icon' => 'block',
+  					'href' => SkinComponentUtils::makeSpecialUrlSubpage( 'Block', $target )
+  				];
+  				if ( !$useCodex ) {
+  					$nav_urls['unblockip'] = [
+  						'icon' => 'unBlock',
+  						'href' => SkinComponentUtils::makeSpecialUrlSubpage( 'Unblock', $target ),
+  						'text' => $this->msg( 'unblockip' )->text(),
+  					];
+  				}
+  			} else {
+  				$nav_urls['blockip'] = [
+  					'icon' => 'block',
+  					'text' => $this->msg( 'blockip' )->text(),
+  					'href' => SkinComponentUtils::makeSpecialUrlSubpage( 'Block', $target ),
+  				];
+  			}
+  		}
+
+  		return $nav_urls;
+  	}
+  }
+  ```
+
+test "rank1375: the contributions page's equivalent block links already exclude autoblocks"
+  lang php
+  file ContributionsSpecialPage.php
+  reject VYQL-SEC-047
+  code
+  ```
+  <?php
+
+  namespace MediaWiki\SpecialPage;
+
+  use MediaWiki\Block\Block;
+  use MediaWiki\MainConfigNames;
+
+  class ContributionsSpecialPage extends IncludableSpecialPage {
+
+  	protected function getUserLinks( SpecialPage $sp, User $target ) {
+  		$username = $target->getName();
+  		$linkRenderer = $sp->getLinkRenderer();
+  		$tools = [];
+
+  		# Block links
+  		if ( $this->permissionManager->userHasRight( $sp->getUser(), 'block' ) ) {
+  			$userBlock = $target->getBlock();
+  			if ( $userBlock && $userBlock->getType() != Block::TYPE_AUTO ) {
+  				$tools['block'] = $linkRenderer->makeKnownLink(
+  					SpecialPage::getTitleFor( 'Block', $username ),
+  					$sp->msg( 'change-blocklink' )->text()
+  				);
+  				$tools['unblock'] = $linkRenderer->makeKnownLink(
+  					SpecialPage::getTitleFor( 'Unblock', $username ),
+  					$sp->msg( 'unblocklink' )->text()
+  				);
+  			} else {
+  				$tools['block'] = $linkRenderer->makeKnownLink(
+  					SpecialPage::getTitleFor( 'Block', $username ),
+  					$sp->msg( 'blocklink' )->text()
+  				);
+  			}
+  		}
+
+  		return $tools;
+  	}
+  }
+  ```
