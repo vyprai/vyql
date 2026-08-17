@@ -2749,3 +2749,48 @@ binding customTemplateRenderMissingSandbox474 {
   query pattern presenceNode where node.analysis == "function.context" and node.token contains "renderTwigTemplateWithLanguage" and node.token contains "$twig->render(" and not (node.token contains "SandboxExtension")
   emit issue code.IncompleteTemplateValidation at node
 }
+
+// A call that tests a string for the literal directory-traversal sequence
+// "../" (via strstr, strpos, stripos, or the PHP 8 str_contains) and rejects
+// the value when found is the textbook blacklist mitigation for path
+// traversal that the PHP manual's own traversal-prevention examples show:
+// check for the sequence, refuse the request if present, the same shape as
+// an allow-listed template name or an isBelow() containment check already
+// covers. It is a gate on the value, not a transform of it, so it is bound
+// the same way as the existing in_array/isBelow endpoint checks rather than
+// as a path rewrite.
+binding pathAccessCheck475 {
+  query pattern callExpr where callee.path ~= "strstr" and args.any.literal contains "../"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding pathAccessCheck476 {
+  query pattern callExpr where callee.path ~= "strpos" and args.any.literal contains "../"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding pathAccessCheck477 {
+  query pattern callExpr where callee.path ~= "stripos" and args.any.literal contains "../"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding pathAccessCheck478 {
+  query pattern callExpr where callee.path ~= "str_contains" and args.any.literal contains "../"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
