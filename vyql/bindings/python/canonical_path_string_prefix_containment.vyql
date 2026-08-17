@@ -1,0 +1,32 @@
+module bindings.python.canonical_path_string_prefix_containment;
+
+// os.path.abspath/realpath/normpath followed by .startswith(prefix) is the
+// Python idiom for confining a resolved path to a parent directory, but
+// string-prefix containment accepts any sibling whose name happens to share
+// the prefix ("/srv/notebooks-evil" starts with "/srv/notebooks"). The
+// documented fix appends a separator to the prefix argument itself -- os.sep,
+// os.path.sep, a literal slash or backslash, or os.path.join(prefix, "") --
+// so a startswith call whose argument carries none of those is the unguarded
+// form, regardless of which side of the comparison the separator was
+// mistakenly attached to instead.
+//
+// callee.path is what keeps this scoped to a path comparison rather than any
+// bare startswith: a call receiver resolves to its own dotted path (matching
+// the three canonicalizers directly), and a receiver the resolver cannot
+// reduce to a name at all -- the shape a separator-concatenation expression
+// like `abspath(x) + os.sep` takes -- resolves to "?". A plain identifier
+// receiver (`full.startswith(base)`) resolves to its own name instead and is
+// not covered, which is deliberate: nothing here can tell whether that
+// identifier was ever canonicalized, and the reachability-based check that
+// could (a canonicalizer "in scope") turned out to mean "anywhere in the
+// module" for a module-level statement, firing on unrelated checks like
+// `sys.platform.startswith("win")` merely for sharing a module with an
+// unrelated os.path.abspath call elsewhere.
+binding canonicalPathStringPrefixContainment {
+  query pattern callExpr where callee.path in ["?.startswith", "os.path.realpath.startswith", "os.path.abspath.startswith", "os.path.normpath.startswith"]
+    and not (args.any.literal contains "sep")
+    and not (args.any.literal contains "/")
+    and not (args.any.literal contains "\\")
+    and not (args.any.literal contains "join")
+  emit issue code.CanonicalPathStringPrefixContainment at call
+}
