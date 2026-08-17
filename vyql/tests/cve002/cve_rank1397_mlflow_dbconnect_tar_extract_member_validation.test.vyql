@@ -1,0 +1,257 @@
+# Rank 1397 / CVE-2025-15036 (GHSA-vhcx-3pq2-4fvc, advisory CWE-29; the class is
+# CWE-22 with CWE-59 for the symlink arm): mlflow/mlflow unpacks a "prebuilt
+# environment" tar archive into an NFS directory before running a pyfunc model in
+# a Spark UDF. mlflow/pyfunc/dbconnect_artifact_cache.py:140 is the whole of it:
+#
+#   def extract_archive_to_dir(archive_path, dest_dir):
+#       os.makedirs(dest_dir, exist_ok=True)
+#       with tarfile.open(archive_path, "r") as tar:
+#           tar.extractall(path=dest_dir)
+#       return dest_dir
+#
+# Nothing looks at the archive's members. mlflow/pyfunc/__init__.py:2422 calls it
+# with the caller's `prebuilt_env_uri` after downloading it, so the party who
+# supplies the environment archive -- not the party running the model -- decides
+# every member name in it. Before Python 3.14, tarfile's default extraction
+# writes an absolute member name to that absolute path, walks a member name's
+# `../` components out of `dest_dir`, and creates a symlink member pointing
+# anywhere at all, so any member of the archive lands at an arbitrary path with
+# the extracting process's privileges. The weakness is not which file is opened:
+# it is that an archive from a lower-trust producer is expanded with no
+# constraint on where its entries may land.
+#
+# 3bf6d81ac4d38654c8ff012dbd0c3e9f17e7e346 adds
+# mlflow/utils/file_utils.py:check_tarfile_security(archive_path) and calls it as
+# the first statement of extract_archive_to_dir. The helper opens the archive
+# itself, normpaths each member name, and raises MlflowException on an absolute
+# path, on a leading `..`, or on a path whose prefix is a symlink member. The
+# extraction below it is unchanged -- same tarfile.open, same
+# extractall(path=dest_dir), still no `filter=`.
+#
+# Pool row verified: repo, CVE and commit are exactly the advisory's own
+# reference, the diff is the fix plus its regression test and nothing else, and
+# the vulnerable function is present at the parent. No corpus correction. The
+# advisory's CWE-29 is a narrower spelling than the defect ('\..\filename'
+# specifically); CWE-22/CWE-59 is what the code shows.
+#
+# What fires today. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over
+# mlflow/pyfunc reports 47 findings and 24 flags, identical over three runs and
+# identical on the vulnerable and the fixed revision -- same rules, same sites,
+# the two dbconnect_artifact_cache.py lines merely shifted by the inserted call.
+# The whole mlflow/ package holds exactly three `extractall` call sites
+# (mlflow/pyfunc/dbconnect_artifact_cache.py:143, mlflow/utils/_spark_utils.py:173,
+# mlflow/projects/utils.py:180), none with a `filter=` argument and none walking
+# members first, so that grep is the shape's entire reachable set here; a
+# whole-tree scan does not finish inside the 180s bound, so the measurement is
+# the three package subtrees mlflow/pyfunc (47), mlflow/utils (193) and
+# mlflow/projects (28) plus that enumeration.
+#
+# One finding does land inside the vulnerable function -- VYQL-PATH-001, tainting
+# `archive_path` from _download_prebuilt_env_if_needed into the
+# `code.FilePathAccess` on tarfile.open -- and it is the other axis: it says the
+# archive's *path* is caller-chosen, which the fix does not change and which it
+# still reports afterwards. Findings in the function are not coverage of the
+# defect.
+#
+# Vocabulary was checked for reuse first, and the rule for this weakness already
+# exists twice over. VYQL-PATH-004 is `taint core.UserControlledData ->
+# code.ArchiveEntryWrite`, and code.ArchiveEntryWrite is bound for Python at
+# `callee.method == "extractall"`. VYQL-PATH-007 is `issue
+# code.ArchiveSymlinkFilterBypass as sink`, and Python reaches it through the
+# `archive_symlink_filter_bypass` fact in
+# internal/extract/frontend/treesitter/python.go:1015 -- an extraction-named
+# function that calls `.getmembers()` and then `.extract(`/`.extractall(` without
+# `.issym()`, `.islnk()`, `.linkname` or `filter=`. Neither reaches this code:
+#
+#  * PATH-004's sink is anchored at `args[0]`, and this call passes the
+#    destination by its documented keyword, `extractall(path=dest_dir)`. Cases
+#    (e) and (f) below are that pair on shipped vocabulary alone -- the
+#    positional spelling reports, the keyword spelling reports nothing -- so the
+#    label is absent before taint is even considered.
+#  * PATH-007's fact requires a `.getmembers()` walk as its evidence that the
+#    function is inspecting members at all. mlflow inspects nothing, which is
+#    strictly more dangerous than the partial-validation shape the fact was
+#    written for, and is therefore silent. Cases (c) and (d) show the same
+#    function reporting the moment a member walk is added and clearing again on
+#    `filter="data"`.
+#
+# Why no detector for the missing half ships here. Dropping the `.getmembers()`
+# requirement so that a bare `extractall` with no `filter=` and no member
+# inspection raises the flag does report the vulnerable revision -- and reports
+# the fixed revision identically, because the fix leaves not one of the four
+# negations in that function: no `filter=`, no member walk, no link test. Every
+# in-function difference between the two revisions is the single added call
+# `check_tarfile_security(archive_path)`, whose name is the fixing commit's own
+# helper -- the discriminator rank 1364's four-variant measurement and rank 1372
+# both had rejected, and which rank 1348 additionally showed is silenceable by a
+# comment when it is matched over context text. A rule keyed on nothing else
+# would flag mlflow's own patched code high, so it is held back, and case (b)
+# pins that non-discrimination as a reject.
+#
+# This is rank 1377's gap, one language over and with the sink on the review side
+# rather than the taint side, so it is restated rather than filed anew: a control
+# that lives wholly inside a resolved callee is not attributed to the caller's
+# sink (endpointGuarded, internal/engine/engine.go:1160, suppresses only when the
+# control is in the sink's own function). Two things make this instance narrower
+# than 1377's. The value that identifies the resource does cross the boundary --
+# `archive_path` is the argument to check_tarfile_security and then to
+# tarfile.open -- so 1377's stated precondition, that the tainted value flow
+# through the callee, already holds. And rank 1380's counterweight does not
+# apply: the fix left no API-documented call inside the guarded function to key
+# on, only the helper call itself. What is additional here is where the
+# neutraliser would have to live. An `issue` rule can carry coverage clauses --
+# internal/engine/match.go:64 runs endpointGuarded over the issue node itself --
+# but VYQL-PATH-007 declares none, and declaring one would not help: that is the
+# same function-confined endpointGuarded, so a control inside
+# check_tarfile_security is outside its reach, and no Python control concept
+# describes archive-member validation for such a clause to name. With no flow
+# there is no flowGuarded alternative either, which is why the shipped Python
+# detector carries its neutralisers as four text negations inside the frontend
+# fact, and why a guard one resolved call away can never clear it.
+#
+# Behaviour a shippable detector needs, in this order: (1) anchor Python's
+# code.ArchiveEntryWrite at the extraction call's `path` argument whether it is
+# positional or the documented keyword; (2) let an archive-extraction review
+# concept be neutralised by a control, so an `issue` rule can carry an `unless`
+# the way VYQL-PATH-004 does; (3) attribute a member-validation control found in
+# a resolved callee to the caller's extraction site when the archive's own
+# identifier is what was passed to it. Ranks blocked: this one, and any fix of
+# the same shape -- validate the archive in a helper, extract unchanged.
+#
+# verify_current_expected: attention-engine-gap. (c), (d) and (e) are correct
+# today; (a), (b) and (f) record the gap.
+
+test "rank1397: (a) an mlflow prebuilt-environment tar is expanded with no constraint on its member names"
+  lang python
+  file mlflow/pyfunc/dbconnect_artifact_cache.py
+  reject VYQL-PATH-004
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import os
+  import tarfile
+
+
+  def extract_archive_to_dir(archive_path, dest_dir):
+      os.makedirs(dest_dir, exist_ok=True)
+      with tarfile.open(archive_path, "r") as tar:
+          tar.extractall(path=dest_dir)
+      return dest_dir
+  ```
+
+test "rank1397: (b) the same extraction with member validation delegated to a helper that raises"
+  lang python
+  file mlflow/pyfunc/dbconnect_artifact_cache.py
+  reject VYQL-PATH-004
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import os
+  import posixpath
+  import tarfile
+
+  from mlflow.exceptions import MlflowException
+
+
+  def check_tarfile_security(archive_path):
+      with tarfile.open(archive_path, "r") as tar:
+          symlink_set = set()
+          for m in tar.getmembers():
+              path = posixpath.normpath(m.name)
+              if m.issym():
+                  symlink_set.add(path)
+              else:
+                  if path.startswith("/"):
+                      raise MlflowException("Absolute path destination is not allowed.")
+                  path_parts = path.split("/")
+                  if path_parts[0] == "..":
+                      raise MlflowException("Escaped path destination is not allowed.")
+          for m in tar.getmembers():
+              if not m.issym():
+                  for prefix_len in range(1, len(path_parts) + 1):
+                      prefix_path = "/".join(path_parts[:prefix_len])
+                      if prefix_path in symlink_set:
+                          raise MlflowException("Destination can not go through a symlink.")
+
+
+  def extract_archive_to_dir(archive_path, dest_dir):
+      check_tarfile_security(archive_path)
+      os.makedirs(dest_dir, exist_ok=True)
+      with tarfile.open(archive_path, "r") as tar:
+          tar.extractall(path=dest_dir)
+      return dest_dir
+  ```
+
+test "rank1397: (c) the same extractor walking its members without testing their type reports"
+  lang python
+  expect VYQL-PATH-007
+  expect_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import os
+  import tarfile
+
+
+  def extract_archive_to_dir(archive_path, dest_dir):
+      os.makedirs(dest_dir, exist_ok=True)
+      with tarfile.open(archive_path, "r") as tar:
+          for member in tar.getmembers():
+              if member.name.startswith("."):
+                  continue
+          tar.extractall(path=dest_dir)
+      return dest_dir
+  ```
+
+test "rank1397: (d) the member walk opting into tarfile's own data filter clears it"
+  lang python
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import os
+  import tarfile
+
+
+  def extract_archive_to_dir(archive_path, dest_dir):
+      os.makedirs(dest_dir, exist_ok=True)
+      with tarfile.open(archive_path, "r") as tar:
+          for member in tar.getmembers():
+              if member.name.startswith("."):
+                  continue
+          tar.extractall(path=dest_dir, filter="data")
+      return dest_dir
+  ```
+
+test "rank1397: (e) a caller-chosen extraction destination passed positionally reports"
+  lang python
+  expect VYQL-PATH-004
+  code
+  ```
+  import tarfile
+
+  from flask import request
+
+
+  def unpack(archive_path):
+      dest = request.args["dest"]
+      with tarfile.open(archive_path, "r") as tar:
+          tar.extractall(dest)
+  ```
+
+test "rank1397: (f) the same destination passed by tarfile's documented path keyword is not labelled"
+  lang python
+  reject VYQL-PATH-004
+  code
+  ```
+  import tarfile
+
+  from flask import request
+
+
+  def unpack(archive_path):
+      dest = request.args["dest"]
+      with tarfile.open(archive_path, "r") as tar:
+          tar.extractall(path=dest)
+  ```
