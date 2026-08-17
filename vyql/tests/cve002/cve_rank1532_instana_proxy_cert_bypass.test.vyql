@@ -1,0 +1,88 @@
+# Rank 1532 / CVE-2026-44213: OpenTelemetry .NET's Instana exporter
+# disabled TLS certificate validation wholesale whenever a proxy was
+# configured through INSTANA_ENDPOINT_PROXY, so a network attacker
+# who could man-in-the-middle the proxy connection received all
+# telemetry and the Instana API key (improper certificate validation,
+# CWE-295; GHSA-wfr5-454p-mjc2, fixed in 1.1.0; the task list's
+# nocommit flag was advisory-side absence -- the changelog's 1.1.0
+# entry names PR #4153, which IS pool commit 3b5b6e1405). Configure
+# in src/OpenTelemetry.Exporter.Instana/Implementation/Transport.cs
+# did `if (Uri.TryCreate(proxy, UriKind.Absolute, out var
+# proxyAddress)) { configuredHandler.Proxy = new WebProxy(
+# proxyAddress, true); configuredHandler.UseProxy = true;
+# configuredHandler.ServerCertificateCustomValidationCallback =
+# delegate { return true; }; }` -- an unconditional acceptance
+# callback attached to the proxy branch. The fix removes the bypass
+# from the production path (validation defaults stay on; the
+# HttpClientFactory option lets callers take responsibility
+# explicitly).
+#
+# FIXED, delegate-form binding shipped. The corpus already had two
+# CertValidationDisabled bindings (VYQL-CFG-004) -- one anchored on
+# DangerousAcceptAnyServerCertificateValidator, one on a
+# ServerCertificateCustomValidationCallback CALL carrying literal
+# true -- but the assignment form `... = delegate { return true; }`
+# matched neither. This adds certValidationDisabledDelegate to
+# vyql/bindings/csharp/m1caa8bf2.vyql: a presence rule on functions
+# whose callPath mentions ServerCertificateCustomValidationCallback
+# and whose literals contain true, excluding functions whose name
+# mentions Validate. Measured: the vulnerable Transport.cs at the
+# fix parent now reports VYQL-CFG-004 HIGH, the fix revision reports
+# zero, and two legitimate shapes stay silent -- a named validator
+# method assignment (h.ServerCertificateCustomValidationCallback =
+# ValidateCertificate, whose body's return true sits in a function
+# named Validate) and a conditional lambda ((msg, cert, chain,
+# errors) => errors == SslPolicyErrors.None). No
+# ServerCertificateCustomValidationCallback exists anywhere in the
+# benchmark corpora, and the full suite plus both benchmarks pass
+# below. Spec cve_rank1532 records the proxy-branch bypass expecting
+# VYQL-CFG-004 and the factory-configured form rejecting it.
+
+test "rank1532: the proxy branch accepts any certificate"
+  lang csharp
+  file src/OpenTelemetry.Exporter.Instana/Implementation/Transport.cs
+  expect VYQL-CFG-004
+  code
+  ```
+  using System;
+  using System.Net;
+
+  public class Transport
+  {
+      public static HttpClientHandler ConfigureHandler(HttpClientHandler configuredHandler)
+      {
+          var proxy = Environment.GetEnvironmentVariable("INSTANA_ENDPOINT_PROXY");
+          if (Uri.TryCreate(proxy, UriKind.Absolute, out var proxyAddress))
+          {
+              configuredHandler.Proxy = new WebProxy(proxyAddress, true);
+              configuredHandler.UseProxy = true;
+              configuredHandler.ServerCertificateCustomValidationCallback = delegate { return true; };
+          }
+          return configuredHandler;
+      }
+  }
+  ```
+
+test "rank1532: the fix leaves validation on by default"
+  lang csharp
+  file src/OpenTelemetry.Exporter.Instana/Implementation/Transport.cs
+  reject VYQL-CFG-004
+  code
+  ```
+  using System;
+  using System.Net;
+
+  public class Transport
+  {
+      public static HttpClientHandler ConfigureHandler(HttpClientHandler configuredHandler)
+      {
+          var proxy = Environment.GetEnvironmentVariable("INSTANA_ENDPOINT_PROXY");
+          if (Uri.TryCreate(proxy, UriKind.Absolute, out var proxyAddress))
+          {
+              configuredHandler.Proxy = new WebProxy(proxyAddress, true);
+              configuredHandler.UseProxy = true;
+          }
+          return configuredHandler;
+      }
+  }
+  ```

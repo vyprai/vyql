@@ -1153,3 +1153,8 @@ binding xmlSignatureDigestOnlyVerification205 {
   query pattern callExpr where callee.path ~= "SignedInfo.Verify"
   emit issue code.XmlSignatureDigestOnlyVerification at call
 }
+
+binding certValidationDisabledDelegate {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.callPath contains "ServerCertificateCustomValidationCallback" and node.context.literal contains "true" and not (node.context.functionName contains "Validate")
+  emit issue code.CertValidationDisabled at node
+}
