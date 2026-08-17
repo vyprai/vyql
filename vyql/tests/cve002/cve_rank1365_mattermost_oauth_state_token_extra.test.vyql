@@ -1,0 +1,206 @@
+# Rank 1365 / CVE-2025-12419: Mattermost's OAuth/OpenID callback bound the
+# authorization state to the browser by storing "email:action:cookie" in the state
+# token's Extra column (generateOAuthStateTokenExtra) and, on the callback,
+# rebuilding that string from the callback's own state props plus the request
+# cookie and comparing the whole composite with one `!=`. Joining fields with a
+# separator is not injective when a field may contain the separator, so a state
+# whose email carries an extra ":" shifts the field boundaries and still produces
+# an equal string: the callback accepts a state/cookie pair it never actually
+# matched, and the SSO login completes as another account. Fix
+# c3f4818afe46a7084740e809708ae22641c76d8d adds parseOAuthStateTokenExtra, which
+# splits the stored Extra on ":", refuses anything that is not exactly three
+# parts, and compares email, action and cookie field by field.
+#
+# There is no taint path to judge here -- both sides of the comparison are server
+# state by the time it runs -- so this is an authentication-logic weakness:
+# code.DelimiterJoinedCredentialComparison / VYQL-AUTH-116 names the shape of the
+# check rather than Mattermost's schema. The binding is about the construct the
+# Go standard library documents: `(*http.Request).Cookie` returns a value the
+# client controls, so an equality check in a function that reads one is an
+# authentication decision, and it reports when one side of that check is a string
+# concatenation interleaving constant separators with variable fields instead of
+# the fields themselves. Its neutraliser is the documented way to take a delimited
+# composite apart again -- strings.Split, strings.SplitN or strings.Cut on the
+# stored value in the same scope.
+#
+# The last two cases carry the genericity: the concatenation reports when it is
+# written inline at the comparison, not only when a helper returns it, and a
+# callback that splits the stored composite and compares the parts stops
+# reporting -- both spellings differ from the fix's.
+
+test "rank1365: an OAuth callback compares a rejoined email:action:cookie composite"
+  lang go
+  file server/channels/app/oauth.go
+  expect VYQL-AUTH-116
+  expect_review code.DelimiterJoinedCredentialComparison
+  code
+  ```
+  package app
+
+  import (
+  	"errors"
+  	"net/http"
+  )
+
+  func generateOAuthStateTokenExtra(email, action, cookie string) string {
+  	return email + ":" + action + ":" + cookie
+  }
+
+  func (a *App) AuthorizeOAuthUser(w http.ResponseWriter, r *http.Request, state string) error {
+  	stateProps := decodeState(state)
+
+  	expectedToken, appErr := a.GetOAuthStateToken(stateProps["token"])
+  	if appErr != nil {
+  		return appErr
+  	}
+
+  	stateEmail := stateProps["email"]
+  	stateAction := stateProps["action"]
+
+  	cookie, cookieErr := r.Cookie(CookieOAuth)
+  	if cookieErr != nil {
+  		return cookieErr
+  	}
+
+  	expectedTokenExtra := generateOAuthStateTokenExtra(stateEmail, stateAction, cookie.Value)
+  	if expectedTokenExtra != expectedToken.Extra {
+  		return errors.New("Extra token value does not match token generated from state")
+  	}
+
+  	return a.DeleteToken(expectedToken)
+  }
+  ```
+
+test "rank1365: the callback parses the stored composite and compares its fields"
+  lang go
+  file server/channels/app/oauth.go
+  reject VYQL-AUTH-116
+  reject_review code.DelimiterJoinedCredentialComparison
+  code
+  ```
+  package app
+
+  import (
+  	"errors"
+  	"fmt"
+  	"net/http"
+  	"strings"
+  )
+
+  func generateOAuthStateTokenExtra(email, action, cookie string) string {
+  	return email + ":" + action + ":" + cookie
+  }
+
+  func parseOAuthStateTokenExtra(tokenExtra string) (email, action, cookie string, err error) {
+  	parts := strings.Split(tokenExtra, ":")
+  	if len(parts) != 3 {
+  		return "", "", "", fmt.Errorf("invalid token format: expected exactly 3 parts separated by ':', got %d", len(parts))
+  	}
+
+  	return parts[0], parts[1], parts[2], nil
+  }
+
+  func (a *App) AuthorizeOAuthUser(w http.ResponseWriter, r *http.Request, state string) error {
+  	stateProps := decodeState(state)
+
+  	expectedToken, appErr := a.GetOAuthStateToken(stateProps["token"])
+  	if appErr != nil {
+  		return appErr
+  	}
+
+  	stateEmail := stateProps["email"]
+  	stateAction := stateProps["action"]
+
+  	cookie, cookieErr := r.Cookie(CookieOAuth)
+  	if cookieErr != nil {
+  		return cookieErr
+  	}
+
+  	tokenEmail, tokenAction, tokenCookie, parseErr := parseOAuthStateTokenExtra(expectedToken.Extra)
+  	if parseErr != nil {
+  		return parseErr
+  	}
+
+  	if tokenEmail != stateEmail || tokenAction != stateAction || tokenCookie != cookie.Value {
+  		return errors.New("invalid state token")
+  	}
+
+  	return a.DeleteToken(expectedToken)
+  }
+  ```
+
+test "rank1365: a callback joins the fields inline at the comparison"
+  lang go
+  file internal/sso/callback.go
+  expect VYQL-AUTH-116
+  expect_review code.DelimiterJoinedCredentialComparison
+  code
+  ```
+  package sso
+
+  import (
+  	"errors"
+  	"net/http"
+  )
+
+  func (s *Server) Complete(w http.ResponseWriter, r *http.Request, state string) error {
+  	claims := s.decodeState(state)
+
+  	pending, err := s.store.PendingLogin(claims["nonce"])
+  	if err != nil {
+  		return err
+  	}
+
+  	nonceCookie, cookieErr := r.Cookie("sso_nonce")
+  	if cookieErr != nil {
+  		return cookieErr
+  	}
+
+  	if claims["subject"]+"|"+claims["intent"]+"|"+nonceCookie.Value != pending.Binding {
+  		return errors.New("state does not match the pending login")
+  	}
+
+  	return s.store.Consume(pending)
+  }
+  ```
+
+test "rank1365: the callback splits the stored binding before comparing"
+  lang go
+  file internal/sso/callback.go
+  reject VYQL-AUTH-116
+  reject_review code.DelimiterJoinedCredentialComparison
+  code
+  ```
+  package sso
+
+  import (
+  	"errors"
+  	"net/http"
+  	"strings"
+  )
+
+  func (s *Server) Complete(w http.ResponseWriter, r *http.Request, state string) error {
+  	claims := s.decodeState(state)
+
+  	pending, err := s.store.PendingLogin(claims["nonce"])
+  	if err != nil {
+  		return err
+  	}
+
+  	nonceCookie, cookieErr := r.Cookie("sso_nonce")
+  	if cookieErr != nil {
+  		return cookieErr
+  	}
+
+  	parts := strings.Split(pending.Binding, "|")
+  	if len(parts) != 3 {
+  		return errors.New("stored binding is malformed")
+  	}
+
+  	if parts[0] != claims["subject"] || parts[1] != claims["intent"] || parts[2] != nonceCookie.Value {
+  		return errors.New("state does not match the pending login")
+  	}
+
+  	return s.store.Consume(pending)
+  }
+  ```
