@@ -1,0 +1,76 @@
+# A mobile-app analyser parses the AndroidManifest.xml out of the package it was
+# handed and concatenates the DOM attribute values it reads into the HTML bodies
+# of its own report rows. The package is attacker-supplied by design, so an
+# activity whose `android:name` carries markup lands verbatim in the analyst's
+# report page. The fix escapes each manifest attribute value with Django's
+# `escape()` before it reaches a markup-bearing string.
+
+test "rank1398: manifest DOM attribute values concatenated into report markup"
+  lang python
+  file manifest_analysis.py
+  expect VYQL-INJ-180
+  expect_review code.UnescapedLocalFileContentHtmlRender
+  code
+  ```
+  from xml.dom import minidom
+
+
+  def manifest_analysis(app_dic, man_data_dic):
+      """Analyse the manifest of the submitted package."""
+      ns = 'android'
+      ret_list = []
+      manifest = minidom.parseString(app_dic['manifest_xml'])
+      for node in manifest.getElementsByTagName('activity'):
+          item = node.getAttribute(f'{ns}:name')
+          if node.getAttribute(f'{ns}:exported') == 'true':
+              perm = ''
+              if node.getAttribute(f'{ns}:permission'):
+                  perm = ('<strong>Permission: </strong>'
+                          + node.getAttribute(f'{ns}:permission'))
+              ret_list.append(('exported_intent_filter_exists',
+                               (item, perm), ()))
+          task_affinity = node.getAttribute(f'{ns}:taskAffinity')
+          if task_affinity:
+              ret_list.append(('task_affinity_set', (item,), ()))
+      return ret_list
+  ```
+
+test "rank1398: manifest DOM attribute values escaped before reaching markup"
+  lang python
+  file manifest_analysis.py
+  reject VYQL-INJ-180
+  reject_review code.UnescapedLocalFileContentHtmlRender
+  code
+  ```
+  from xml.dom import minidom
+
+  from django.utils.html import escape
+
+
+  def escape_manifest_attribute(value):
+      """Escape manifest attributes."""
+      if not value:
+          return value
+      return escape(value)
+
+
+  def manifest_analysis(app_dic, man_data_dic):
+      """Analyse the manifest of the submitted package."""
+      ns = 'android'
+      ret_list = []
+      manifest = minidom.parseString(app_dic['manifest_xml'])
+      for node in manifest.getElementsByTagName('activity'):
+          item = node.getAttribute(f'{ns}:name')
+          item = escape_manifest_attribute(item)
+          if node.getAttribute(f'{ns}:exported') == 'true':
+              perm = ''
+              if node.getAttribute(f'{ns}:permission'):
+                  perm = ('<strong>Permission: </strong>'
+                          + node.getAttribute(f'{ns}:permission'))
+              ret_list.append(('exported_intent_filter_exists',
+                               (item, perm), ()))
+          task_affinity = node.getAttribute(f'{ns}:taskAffinity')
+          if task_affinity:
+              ret_list.append(('task_affinity_set', (item,), ()))
+      return ret_list
+  ```
