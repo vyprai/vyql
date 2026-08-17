@@ -4319,3 +4319,22 @@ binding incompleteTemplateValidationEnvFilterRawGetattr907 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.decoratorMethod == "pass_environment" and node.context.callPath == "getattr" and not (node.context.callPath contains ".getattr")
   emit issue code.IncompleteTemplateValidation at node
 }
+
+// A literal-prefix `.startswith()` guard dominating a dynamic module loader
+// (importlib.import_module, __import__, ...) is the same unsound-by-string
+// shape already advisory-flagged for FilePathAccess (bindings 556-558):
+// it confines the loaded name to a fixed namespace, but any module the
+// attacker can otherwise reach that happens to share the prefix still
+// passes, so this is never a sound sanitizer -- always an advisory note
+// for review, never a suppression.
+binding inputValidationPyStartswithGuardsDynamicCodeLoad908 {
+  query pattern callExpr where callee.method == "startswith"
+  emit check core.InputValidation at call {
+    advisory: true
+    about: code.DynamicCodeLoad
+    covers dominates {
+      from: call
+      to: call
+    }
+  }
+}
