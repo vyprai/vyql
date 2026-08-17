@@ -1,0 +1,87 @@
+# Rank 1518 / CVE-2023-45282: Open MCT's import-from-JSON action
+# parsed an uploaded file with a bare JSON.parse and instantiated the
+# resulting tree, so a crafted export file with __proto__ keys
+# polluted Object.prototype across the application (prototype
+# pollution, CWE-1321). onSave in src/plugins/importFromJSONAction/
+# ImportFromJSONAction.js did `const objectTree = selectFile.body;
+# this._importObjectTree(object, JSON.parse(objectTree))` -- the file
+# body arrives from the import dialog's file picker -- and the
+# validation twin at :284 parsed the same body bare. Pool commit
+# 2243381d52 is the real fix (COMMIT_OK -- "Protect against prototype
+# pollution in import action (#7094)"): a new src/utils/sanitization.js
+# exports filter__proto__, a JSON.parse reviver returning undefined
+# for __proto__ keys, and both parses now run `JSON.parse(objectTree,
+# filter__proto__)`; the localStorage provider's parses pass the same
+# reviver, and specs assert polluted imports are dropped. No pool
+# correction.
+#
+# ATTENTION, upload-field provenance. The corpus's ProtoPollute sink
+# (VYQL-INJ-013) fires on member-assignment shapes (it reported
+# path-to-regexp's options parameter at rank 1554), but nothing here
+# feeds it: the body arrives as selectFile.body -- a plugin dialog's
+# file-picker field, an object property no binding labels as input --
+# and the pollution itself happens inside openmct's own instantiate
+# merge, a project API boundary (the same shape ranks 1526 and 1545
+# recorded). Measured on the real code: scanning
+# ImportFromJSONAction.js reports zero findings at both revisions.
+# The fix's control -- a JSON.parse reviver dropping __proto__ -- is
+# the general guard shape; openmct's filter__proto__ helper is
+# project-local, but binding the reviver position of JSON.parse as a
+# neutralizer (like the existing safe-deser rules for JSON.parse in
+# other languages) is the corpus-level piece. No ENGINE-GAPS.md
+# entry. No definition change shipped. Spec cve_rank1518 records the
+# bare file-body parse and the reviver-guarded form, both asserting
+# reject VYQL-INJ-013: when upload-field provenance lands, the bare
+# form must flip to expect.
+
+test "rank1518: the import action parses the uploaded body bare"
+  lang javascript
+  file src/plugins/importFromJSONAction/ImportFromJSONAction.js
+  reject VYQL-INJ-013
+  code
+  ```
+  class ImportFromJSONAction {
+    onSave(object, changes) {
+      const selectFile = changes.selectFile;
+      const objectTree = selectFile.body;
+      this._importObjectTree(object, JSON.parse(objectTree));
+    }
+
+    _importObjectTree(parent, tree) {
+      for (const key in tree) {
+        const child = tree[key];
+        this.openmct.objects.save(child);
+        this._importObjectTree(child, childComposition);
+      }
+    }
+  }
+  ```
+
+test "rank1518: the fix drops proto keys through a reviver"
+  lang javascript
+  file src/plugins/importFromJSONAction/ImportFromJSONAction.js
+  reject VYQL-INJ-013
+  code
+  ```
+  function filter__proto__(key, value) {
+    if (key !== '__proto__') {
+      return value;
+    }
+  }
+
+  class ImportFromJSONAction {
+    onSave(object, changes) {
+      const selectFile = changes.selectFile;
+      const objectTree = selectFile.body;
+      this._importObjectTree(object, JSON.parse(objectTree, filter__proto__));
+    }
+
+    _importObjectTree(parent, tree) {
+      for (const key in tree) {
+        const child = tree[key];
+        this.openmct.objects.save(child);
+        this._importObjectTree(child, childComposition);
+      }
+    }
+  }
+  ```
