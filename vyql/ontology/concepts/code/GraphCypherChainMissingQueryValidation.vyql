@@ -1,0 +1,11 @@
+module code;
+
+concept GraphCypherChainMissingQueryValidation : issue {
+  cwe: [CWE_89, CWE_943]
+  reviewAssumption: "the graph database credentials the chain holds are not scoped to read-only access and the natural-language question reaching the chain can come from a caller the operator does not fully trust"
+  reviewCategory: sql
+  reviewCondition: "a Cypher QA chain extracts the Cypher statement its LLM generation sub-chain produced from a natural-language question and executes it directly against the graph database, with no validation, allow-list, or read-only restriction on the generated statement before it runs"
+  reviewConfidence: high
+  reviewEvidence: "chain context {pattern} extracts the LLM-generated Cypher from the generation chain's output and passes it straight to the graph query executor with no check on the statement before execution"
+  vulnerableTo: [injection.SqlInjection, access_control.IncorrectAuthorization]
+}

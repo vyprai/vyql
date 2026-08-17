@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule GraphCypherChainMissingQueryValidation {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_89, CWE_943]
+    id: "VYQL-INJ-242"
+    severity: critical
+  }
+  issue code.GraphCypherChainMissingQueryValidation as sink
+}
