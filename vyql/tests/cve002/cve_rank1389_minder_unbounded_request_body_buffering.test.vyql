@@ -1,0 +1,333 @@
+# Rank 1389 / CVE-2024-34084: stacklok/minder's control-plane HTTP server reads
+# every incoming request body fully into memory with no upper bound on its
+# length. The GitHub webhook path is the reachable case the advisory describes:
+# HandleGitHubWebHook validates the delivery signature through
+# validatePayloadSignature, which starts by calling readerFromRequest
+# (internal/controlplane/handlers_githubwebhooks.go:367):
+#
+#   func readerFromRequest(r *http.Request) (*bytes.Reader, error) {
+#       b, err := io.ReadAll(r.Body)
+#       if err != nil {
+#           return nil, err
+#       }
+#       err = r.Body.Close()
+#       if err != nil {
+#           return nil, err
+#       }
+#       return bytes.NewReader(b), nil
+#   }
+#
+# The whole body is buffered so the signature check can be replayed against
+# each previously configured webhook secret (validatePreviousSecrets seeks the
+# bytes.Reader back to zero per secret), and because a HMAC over the body is
+# what authenticates the request, the buffering necessarily happens *before*
+# the caller is authenticated at all. The endpoint listens without credentials,
+# so one unauthenticated POST with a multi-gigabyte body forces an allocation
+# proportional to that body and takes the process to an OOM kill. The regression
+# test the fix ships makes the shape explicit: a 4 GB strings.Repeat body handed
+# to io.MultiReader five times, against a bare webhook handler. That is
+# uncontrolled resource consumption / allocation without limits, CWE-400 and
+# CWE-770, matching the advisory's own record.
+#
+# The fix (3e5a527d2f1b535159206161d1d519602c75bd0d, "Merge pull request from
+# GHSA-9c5w-9q3f-3hv7" -- a squash with a single parent, so its diff reads
+# normally) adds no check to any reading function. It installs one middleware in
+# internal/controlplane/server.go and wraps every mux registration in it:
+#
+#   var RequestBodyMaxBytes int64 = 2 << 20
+#
+#   func withMaxSizeMiddleware(h http.Handler) http.Handler {
+#       return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+#           r.Body = http.MaxBytesReader(w, r.Body, RequestBodyMaxBytes)
+#           h.ServeHTTP(w, r)
+#       })
+#   }
+#
+#   mux.Handle("/", withMaxSizeMiddleware(s.handlerWithHTTPMiddleware(gwmux)))
+#   mux.Handle("/api/v1/webhook/", mw(withMaxSizeMiddleware(s.HandleGitHubWebHook())))
+#   mux.Handle("/api/v1/ghapp/", mw(withMaxSizeMiddleware(s.HandleGitHubAppWebhook())))
+#   mux.Handle("/api/v1/gh-marketplace/", mw(withMaxSizeMiddleware(s.NoopWebhookHandler())))
+#
+# handlers_githubwebhooks.go is byte-identical either side of the fix.
+#
+# Pool row confirmed on every field: repo, language, CVE identifier and the
+# CWE-400 the corpus records. ee05c7a658e2d81d2d223d2362b7d4f8ed92ab51 is the
+# vulnerable parent and carries both halves of the construct quoted above.
+#
+# Measured at both revisions, `./bin/vyql scan --cache off --max-ram 6GB` over
+# internal/controlplane (34 Go files):
+#
+#   * vulnerable parent: 8 findings, 18 flags. Patched revision: 10 findings,
+#     19 flags. Every one of the differences belongs to the regression test the
+#     fix adds -- one VYQL-CFG-006 and one VYQL-CFG-014 in
+#     handlers_githubwebhooks_test.go, plus a sixth evt.Close release flag --
+#     and the rest of the two sets differ only in line numbers shifted by the
+#     four added lines. The patched revision scores *higher* than the vulnerable
+#     one, and no row on either side concerns a request body.
+#   * The buffering site is labelled, but for the other axis: code.ResourceReview
+#     at handlers_githubwebhooks.go:368 (call=io.ReadAll), whose review text asks
+#     that the resource be "bounded, timed out, and released" and whose expected
+#     control is core.ResourceRelease -- satisfied by r.Body.Close() four lines
+#     down, so no finding is emitted. It is present identically at both
+#     revisions. Nothing in the vocabulary distinguishes released from bounded.
+#   * The whole tree at the vulnerable parent (470 Go files, 6 JavaScript, 84
+#     config) reports 348 findings and not one VYQL-DOS-041. Its single DOS row
+#     is a VYQL-DOS-001 regex-compile path from a generated Keycloak client into
+#     internal/engine/ingester/artifact/tag_match.go:41, unrelated to request
+#     bodies.
+#   * `./bin/vyql match` over the patched internal/controlplane/server.go
+#     produces no label of any kind for http.MaxBytesReader: one code.HttpInput,
+#     four code.LogOutput sinks and a code.ResourceReview on net.Listen, the
+#     same set as the vulnerable file. The stdlib call the fix is built on
+#     carries no concept.
+#
+# ATTENTION. Two independent blockers, both measured, and both already settled
+# by earlier ranks rather than new.
+#
+# 1. Precision. The only signal available inside a reading function is the shape
+#    rank 1355 already measured and declined: a request body handed to
+#    io.ReadAll or json.NewDecoder with no http.MaxBytesReader or io.LimitReader
+#    in the same function. It took canonical/lxd from 1 VYQL-DOS-041 finding to
+#    124, because that is the ordinary form of nearly every Go handler. lxd is
+#    re-counted here and the number is structural, not incidental: 123 non-test
+#    (r|req|request).Body reads into io.ReadAll or json.NewDecoder and zero
+#    http.MaxBytesReader anywhere in the tree. Rank 1135 recorded the same shape
+#    ATTENTION as a vocabulary gap; the vocabulary exists now, and the precision
+#    cost is the standing reason.
+#
+# 2. On this codebase that shape does not even discriminate. minder carries 29
+#    non-test request-body reads, and 29 remain after the fix -- 28 of them in
+#    the generated grpc-gateway file pkg/api/protobuf/go/minder/v1/minder.pb.gw.go
+#    and one in handlers_githubwebhooks.go. The fix caps all 29 without touching
+#    any of them, because the cap is installed once, in a sibling function,
+#    and reaches each reader through net/http's handler chain: mux.Handle
+#    registers the wrapped http.Handler, and the wrapper mutates r.Body before
+#    calling h.ServeHTTP. A per-site binding would report 29 rows on the
+#    vulnerable tree, 28 of them in generated code, and the identical 29 on the
+#    patched tree.
+#
+# The attribution half of this is rank 1377's gap, restated rather than filed
+# anew: a neutralising control that lives outside the function holding the sink
+# is invisible to that function's context facts. Cases 3 and 4 below isolate it
+# as a minimal pair against a shipped binding rather than a hypothetical one,
+# using unboundedDecompressionReadAll348 (vyql/bindings/go/m48a985c1.vyql:1921),
+# whose negation `not (node.context.callPath contains "io.LimitReader")` is the
+# exact idiom a request-body cap would need:
+#
+#   * cap in a sibling function of the same file: VYQL-DOS-041 still fires.
+#   * cap in the same function: VYQL-DOS-041 correctly clears.
+#
+# So Go's callPath negation is genuinely function-confined -- the good property
+# rank 1379 measured for literals holds here too -- and that is precisely why
+# minder's fix cannot register. minder's case is a step beyond rank 1377's: the
+# control is not merely in a sibling function, it reaches the sink through an
+# http.Handler interface dispatch installed at a mux registration, so even
+# cross-function control attribution would have to model the middleware chain.
+#
+# Rank 1380's counterweight was tested and does not apply. The test for writing
+# off a delegated-check fix is whether the fix left any API-documented call
+# inside the method it guards; here it left none. readerFromRequest,
+# validatePayloadSignature and HandleGitHubWebHook are unchanged by the fix, and
+# the whole guard -- the new variable, the new middleware and its
+# http.MaxBytesReader call -- lives outside all three.
+#
+# verify_current_expected: attention-precision-and-attribution. Cases 1 and 2
+# record that the two revisions are indistinguishable, and cases 3 and 4 isolate
+# the construct that makes them so.
+
+test "rank1389: the webhook path buffers the whole request body before its signature is checked"
+  lang go
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  package controlplane
+
+  import (
+  	"bytes"
+  	"io"
+  	"mime"
+  	"net/http"
+
+  	"github.com/google/go-github/v61/github"
+  )
+
+  func (s *Server) StartHTTPServer() error {
+  	mux := http.NewServeMux()
+  	mux.Handle("/api/v1/webhook/", s.HandleGitHubWebHook())
+  	return http.ListenAndServe(":8080", mux)
+  }
+
+  func (s *Server) HandleGitHubWebHook() http.HandlerFunc {
+  	return func(w http.ResponseWriter, r *http.Request) {
+  		payload, err := validatePayloadSignature(r, s.cfg.WebhookConfig)
+  		if err != nil {
+  			w.WriteHeader(http.StatusInternalServerError)
+  			return
+  		}
+  		s.handlePayload(r.Context(), github.WebHookType(r), payload)
+  		w.WriteHeader(http.StatusOK)
+  	}
+  }
+
+  func validatePayloadSignature(r *http.Request, wc *WebhookConfig) (payload []byte, err error) {
+  	var br *bytes.Reader
+  	br, err = readerFromRequest(r)
+  	if err != nil {
+  		return
+  	}
+
+  	signature := r.Header.Get(github.SHA256SignatureHeader)
+  	contentType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+  	if err != nil {
+  		return
+  	}
+
+  	whSecret, err := wc.GetWebhookSecret()
+  	if err != nil {
+  		return
+  	}
+
+  	payload, err = github.ValidatePayloadFromBody(contentType, br, signature, []byte(whSecret))
+  	return
+  }
+
+  func readerFromRequest(r *http.Request) (*bytes.Reader, error) {
+  	b, err := io.ReadAll(r.Body)
+  	if err != nil {
+  		return nil, err
+  	}
+  	err = r.Body.Close()
+  	if err != nil {
+  		return nil, err
+  	}
+  	return bytes.NewReader(b), nil
+  }
+  ```
+
+test "rank1389: the fix caps the body in a middleware installed at the mux registration"
+  lang go
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  package controlplane
+
+  import (
+  	"bytes"
+  	"io"
+  	"mime"
+  	"net/http"
+
+  	"github.com/google/go-github/v61/github"
+  )
+
+  var RequestBodyMaxBytes int64 = 2 << 20
+
+  func (s *Server) StartHTTPServer() error {
+  	mux := http.NewServeMux()
+  	mux.Handle("/api/v1/webhook/", withMaxSizeMiddleware(s.HandleGitHubWebHook()))
+  	return http.ListenAndServe(":8080", mux)
+  }
+
+  func withMaxSizeMiddleware(h http.Handler) http.Handler {
+  	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+  		r.Body = http.MaxBytesReader(w, r.Body, RequestBodyMaxBytes)
+  		h.ServeHTTP(w, r)
+  	})
+  }
+
+  func (s *Server) HandleGitHubWebHook() http.HandlerFunc {
+  	return func(w http.ResponseWriter, r *http.Request) {
+  		payload, err := validatePayloadSignature(r, s.cfg.WebhookConfig)
+  		if err != nil {
+  			w.WriteHeader(http.StatusInternalServerError)
+  			return
+  		}
+  		s.handlePayload(r.Context(), github.WebHookType(r), payload)
+  		w.WriteHeader(http.StatusOK)
+  	}
+  }
+
+  func validatePayloadSignature(r *http.Request, wc *WebhookConfig) (payload []byte, err error) {
+  	var br *bytes.Reader
+  	br, err = readerFromRequest(r)
+  	if err != nil {
+  		return
+  	}
+
+  	signature := r.Header.Get(github.SHA256SignatureHeader)
+  	contentType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+  	if err != nil {
+  		return
+  	}
+
+  	whSecret, err := wc.GetWebhookSecret()
+  	if err != nil {
+  		return
+  	}
+
+  	payload, err = github.ValidatePayloadFromBody(contentType, br, signature, []byte(whSecret))
+  	return
+  }
+
+  func readerFromRequest(r *http.Request) (*bytes.Reader, error) {
+  	b, err := io.ReadAll(r.Body)
+  	if err != nil {
+  		return nil, err
+  	}
+  	err = r.Body.Close()
+  	if err != nil {
+  		return nil, err
+  	}
+  	return bytes.NewReader(b), nil
+  }
+  ```
+
+test "rank1389: a read cap in a sibling function does not reach the draining function"
+  lang go
+  expect VYQL-DOS-041
+  expect_review code.UnboundedAllocationReview
+  code
+  ```
+  package main
+
+  import (
+  	"compress/gzip"
+  	"io"
+  )
+
+  func decompress(r io.Reader) ([]byte, error) {
+  	zr, err := gzip.NewReader(r)
+  	if err != nil {
+  		return nil, err
+  	}
+  	return io.ReadAll(zr)
+  }
+
+  func capped(r io.Reader) io.Reader {
+  	return io.LimitReader(r, 1<<20)
+  }
+  ```
+
+test "rank1389: the same cap inside the draining function clears the flag"
+  lang go
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  package main
+
+  import (
+  	"compress/gzip"
+  	"io"
+  )
+
+  func decompress(r io.Reader) ([]byte, error) {
+  	zr, err := gzip.NewReader(r)
+  	if err != nil {
+  		return nil, err
+  	}
+  	return io.ReadAll(io.LimitReader(zr, 1<<20))
+  }
+  ```
