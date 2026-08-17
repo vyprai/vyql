@@ -1,0 +1,94 @@
+# Rank 1524 / CVE-2019-9153: OpenPGP.js verified signatures without
+# checking that the signature's public-key algorithm matches the
+# verifying key's, so a signature crafted under one algorithm could
+# verify against a key of another (improper signature verification,
+# CWE-347; PR #816 "Security fixes"; the task list's commit? flag
+# resolves COMMIT_OK -- the merge carries the fix and the
+# preferred_algo_mismatch test). Signature.prototype.verify in
+# src/packet/signature.js wrote `const publicKeyAlgorithm =
+# enums.write(enums.publicKey, this.publicKeyAlgorithm); const
+# hashAlgorithm = ...` and went straight to hashing and the crypto
+# verify call -- nothing ties the signature's algorithm to
+# key.algorithm. Pool commit b1b19946d8 adds the gate: `if
+# (publicKeyAlgorithm !== enums.write(enums.publicKey, key.algorithm))
+# { throw new Error('Public key algorithm used to sign signature does
+# not match issuer key algorithm.'); }` before any hashing; the CFB
+# decrypt path was reworked beside it (constant-time check octets).
+# No pool correction.
+#
+# ATTENTION, verification-hygiene vocabulary. The corpus's crypto
+# signature rules are shape-specific (VYQL-CRY-016 ECDSA scalar
+# bounds, VYQL-CRY-024 PKCS#1 digest suffix) -- none can ask "does
+# the verifier bind the signature's algorithm to the key's", which is
+# protocol-level pairing vocabulary, not a localised construct.
+# Measured on the real code: scanning signature.js reports ZERO
+# findings at the parent and FOUR at the fix -- all VYQL-CRY-006
+# SecretComparisonReview advisories firing on the newly added
+# equality comparisons at :696-:698 (the CFB check-octet compares
+# and the algorithm mismatch test, read as secret-material
+# comparisons): the fix adds heuristic noise, and the vulnerability
+# itself was never visible. No ENGINE-GAPS.md entry. No definition
+# change shipped. Spec cve_rank1524 records the ungated verify and
+# the mismatch-gated form, both asserting reject VYQL-CRY-016: when
+# algorithm-pairing vocabulary lands, the ungated form must flip to
+# expect.
+
+test "rank1524: the verify path never compares the algorithms"
+  lang javascript
+  file src/packet/signature.js
+  reject VYQL-CRY-016
+  code
+  ```
+  import enums from '../enums.js';
+  import crypto from '../crypto';
+  import util from '../util.js';
+
+  Signature.prototype.verify = async function(key, signatureType, data) {
+    const publicKeyAlgorithm = enums.write(enums.publicKey, this.publicKeyAlgorithm);
+    const hashAlgorithm = enums.write(enums.hash, this.hashAlgorithm);
+
+    let hash;
+    if (signatureType === enums.signature.text) {
+      hash = await crypto.hash.digest(hashAlgorithm, data);
+    } else {
+      hash = await crypto.hash.digest(hashAlgorithm, util.concatUint8Array(data));
+    }
+
+    return crypto.signature.verify(
+      publicKeyAlgorithm, hashAlgorithm, hash, key.params,
+      this.signature
+    );
+  };
+  ```
+
+test "rank1524: the fix refuses algorithm mismatches"
+  lang javascript
+  file src/packet/signature.js
+  reject VYQL-CRY-016
+  code
+  ```
+  import enums from '../enums.js';
+  import crypto from '../crypto';
+  import util from '../util.js';
+
+  Signature.prototype.verify = async function(key, signatureType, data) {
+    const publicKeyAlgorithm = enums.write(enums.publicKey, this.publicKeyAlgorithm);
+    const hashAlgorithm = enums.write(enums.hash, this.hashAlgorithm);
+
+    if (publicKeyAlgorithm !== enums.write(enums.publicKey, key.algorithm)) {
+      throw new Error('Public key algorithm used to sign signature does not match issuer key algorithm.');
+    }
+
+    let hash;
+    if (signatureType === enums.signature.text) {
+      hash = await crypto.hash.digest(hashAlgorithm, data);
+    } else {
+      hash = await crypto.hash.digest(hashAlgorithm, util.concatUint8Array(data));
+    }
+
+    return crypto.signature.verify(
+      publicKeyAlgorithm, hashAlgorithm, hash, key.params,
+      this.signature
+    );
+  };
+  ```
