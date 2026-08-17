@@ -1,0 +1,127 @@
+# Rank 1259 / CVE-2026-24834: Kata Containers picked virtio-pmem as the VM
+# rootfs driver for Cloud Hypervisor guests unless confidential-guest mode
+# was on (CWE-281, CWE-732). The Linux virtio-pmem probe path always
+# registers the region as a generic pagemap that supports asynchronous
+# flushes but never marks it read-only, and Cloud Hypervisor's own
+# discard_writes uses a MAP_PRIVATE mapping that does not stop the guest
+# kernel from writing into that page-cache-backed region either -- only from
+# persisting the write back to the host file. So a container process with
+# nothing more than CAP_MKNOD could overwrite binaries on the guest's root
+# filesystem and run as root inside the microVM. The fix 6a672503973b drops
+# pmem/NVDIMM entirely for Cloud Hypervisor: rootfs always resolves to
+# VM_ROOTFS_DRIVER_BLK (virtio-blk-pci with a real readonly flag), DAX is
+# disabled, and setConfig/set_hypervisor_config force the driver to BLK even
+# if the shared HypervisorConfig still names pmem.
+#
+# ATTENTION, vocabulary gap in the same family as ranks 1030 and 1047: the
+# concept that names this weakness exists but does not reach this code, and
+# the only discriminator the code offers names a device model rather than
+# the weakness.
+#
+# code.InsecurePermission (VYQL-CFG-008, CWE-732) is the CWE the advisory
+# itself cites, but every Rust binding for it keys on a POSIX mode literal
+# passed to `.mode(...)` or `Permissions::from_mode(...)` -- 0o777, 0o666,
+# S_IRWXO. Nothing here sets a permission bit; the read/write behaviour is a
+# property of which virtio device backend the guest kernel driver attaches,
+# something the code never states as a mode value at all.
+#
+# The literal discriminator present in the code -- VM_ROOTFS_DRIVER_PMEM vs
+# VM_ROOTFS_DRIVER_BLK, or PmemConfig vs DiskConfig in the Cloud Hypervisor
+# client -- detects the device model rather than the weakness, exactly as
+# RequestType::Out and POOL_OP_ did at 1047 and 1039. Worse, that
+# discriminator survives the fix: VM_ROOTFS_DRIVER_PMEM is still legitimate
+# and still used for QEMU and Dragonball in this same tree, whose pmem
+# backends behave differently. A binding that fires on the constant name
+# alone would flag every hypervisor backend that chooses pmem, most of
+# which are not vulnerable, which is the precision failure this loop's
+# guidance on broad labels warns about. Telling the two apart needs
+# knowledge that Cloud Hypervisor's virtio-pmem specifically fails to
+# enforce read-only for a rootfs image, which is a fact about one
+# hypervisor's device model, not a pattern any binding can express from the
+# API surface alone.
+#
+# Both revisions of inner_hypervisor.rs report zero findings on this
+# function; the surrounding file's other findings are unrelated low-
+# confidence noise.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1259: Cloud Hypervisor defaults to the pmem rootfs driver"
+  lang rust
+  file src/runtime-rs/crates/hypervisor/src/ch/inner_hypervisor.rs
+  reject VYQL-CFG-008
+  code
+  ```
+  impl CloudHypervisorInner {
+      async fn boot_vm(&mut self, cfg: HypervisorConfig, enable_debug: bool) -> Result<()> {
+          let confidential_guest = cfg.security_info.confidential_guest;
+
+          // Note that the configuration option hypervisor.block_device_driver is not used.
+          let rootfs_driver = if confidential_guest {
+              // PMEM is not available with TDX.
+              VM_ROOTFS_DRIVER_BLK
+          } else {
+              VM_ROOTFS_DRIVER_PMEM
+          };
+
+          let rootfs_type = match cfg.boot_info.rootfs_type.is_empty() {
+              true => DEFAULT_CH_ROOTFS_TYPE,
+              false => cfg.boot_info.rootfs_type.as_str(),
+          };
+
+          let kernel_params = KernelParams::new_rootfs_kernel_params(
+              &cfg.boot_info.kernel_verity_params,
+              rootfs_driver,
+              rootfs_type,
+          )?;
+
+          Ok(())
+      }
+  }
+  ```
+
+test "rank1259: fix always resolves the rootfs driver to virtio-blk"
+  lang rust
+  file src/runtime-rs/crates/hypervisor/src/ch/inner_hypervisor.rs
+  reject VYQL-CFG-008
+  code
+  ```
+  impl CloudHypervisorInner {
+      async fn boot_vm(&mut self, cfg: HypervisorConfig, enable_debug: bool) -> Result<()> {
+          // NVDIMM is not supported for Cloud Hypervisor.
+          let rootfs_driver = VM_ROOTFS_DRIVER_BLK;
+
+          let rootfs_type = match cfg.boot_info.rootfs_type.is_empty() {
+              true => DEFAULT_CH_ROOTFS_TYPE,
+              false => cfg.boot_info.rootfs_type.as_str(),
+          };
+
+          let kernel_params = KernelParams::new_rootfs_kernel_params(
+              &cfg.boot_info.kernel_verity_params,
+              rootfs_driver,
+              rootfs_type,
+              true,
+          )?;
+
+          Ok(())
+      }
+  }
+  ```
+
+test "rank1259: set_hypervisor_config now forces pmem down to virtio-blk"
+  lang rust
+  file src/runtime-rs/crates/hypervisor/src/ch/inner.rs
+  reject VYQL-CFG-008
+  code
+  ```
+  impl CloudHypervisorInner {
+      pub fn set_hypervisor_config(&mut self, mut config: HypervisorConfig) {
+          // virtio-pmem is not supported for Cloud Hypervisor.
+          if config.boot_info.vm_rootfs_driver == crate::VM_ROOTFS_DRIVER_PMEM {
+              config.boot_info.vm_rootfs_driver = crate::VM_ROOTFS_DRIVER_BLK.to_string();
+          }
+
+          self.config = config;
+      }
+  }
+  ```
