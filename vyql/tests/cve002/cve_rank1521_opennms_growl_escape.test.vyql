@@ -1,0 +1,83 @@
+# Rank 1521 / CVE-2021-25931: OpenNMS' requisition UI concatenated
+# $scope values into growl notification messages, which the growl
+# directive renders as HTML, so a requisition name or node label
+# carrying markup executed in the operator's browser (cross-site
+# scripting, CWE-79; NMS-13231 backport). The controllers in
+# core/web-assets/src/main/assets/js/apps/onms-requisitions/lib/
+# scripts/controllers did `growl.success('The definition for the
+# requisition ' + $scope.foreignSource + ' has been saved.')` and a
+# dozen siblings -- every $scope-derived field flows raw into the
+# notification -- while one path wrapped the message in $sanitize
+# (HTML sanitising, wrong for a text context). Pool commit eb08b5ed4c
+# is the real fix (COMMIT_OK -- "NMS-13231: Backport Security Issues
+# from Last Month"): every interpolation is wrapped in lodash's
+# _.escape($scope...) and the $sanitize calls are removed (escaping,
+# not sanitising, is the control a text notification needs). No pool
+# correction.
+#
+# ATTENTION, member-field provenance and an unbound notification
+# sink. Both halves exist in the corpus: _.escape is a bound
+# core.HtmlEscape control (mfb63017a.vyql:2843, callee.path ~=
+# "_.escape") and string concatenation into a rendered message is
+# HtmlRender in spirit -- but the source never labels ($scope.foreignSource
+# is a framework-object member read, the same boundary ranks 1518
+# and 1545 recorded) and the sink never fires (growl.success is a
+# project directive call, not markup), so no taint path forms.
+# Measured on the real code: scanning ForeignSource.js (the
+# controllers directory file) reports zero findings at both
+# revisions. When framework-object provenance lands, the raw concat
+# reports and the _.escape form suppresses -- the control binding
+# already exists. No ENGINE-GAPS.md entry. No definition change
+# shipped. Spec cve_rank1521 records the raw growl concat and the
+# _.escape-wrapped form, both asserting reject VYQL-INJ-004: when
+# member-field vocabulary lands, the raw form must flip to expect.
+
+test "rank1521: requisition names flow raw into notifications"
+  lang javascript
+  file core/web-assets/src/main/assets/js/apps/onms-requisitions/lib/scripts/controllers/ForeignSource.js
+  reject VYQL-INJ-004
+  code
+  ```
+  angular.module('onms-requisitions').controller('ForeignSourceController', function($scope, growl) {
+      $scope.save = function() {
+          RequisitionsService.saveForeignSource($scope.foreignSourceDef).then(
+              function() {
+                  growl.success('The definition for the requisition ' + $scope.foreignSource + ' has been saved.');
+              }
+          );
+      };
+
+      $scope.reset = function() {
+          RequisitionsService.resetForeignSource($scope.foreignSource).then(
+              function() {
+                  growl.success('The foreign source definition for ' + $scope.foreignSource + 'has been reseted.');
+              }
+          );
+      };
+  });
+  ```
+
+test "rank1521: the fix escapes every interpolation"
+  lang javascript
+  file core/web-assets/src/main/assets/js/apps/onms-requisitions/lib/scripts/controllers/ForeignSource.js
+  reject VYQL-INJ-004
+  code
+  ```
+  angular.module('onms-requisitions').controller('ForeignSourceController', function($scope, growl) {
+      $scope.save = function() {
+          RequisitionsService.saveForeignSource($scope.foreignSourceDef).then(
+              function() {
+                  growl.success('The definition for the requisition ' + _.escape($scope.foreignSource) + ' has been saved.');
+              }
+          );
+      };
+
+      $scope.reset = function() {
+          RequisitionsService.resetForeignSource($scope.foreignSource).then(
+              function() {
+                  growl.success('The foreign source definition for ' + _.escape($scope.foreignSource) + 'has been reseted.');
+              }
+          );
+      };
+  });
+  ```
