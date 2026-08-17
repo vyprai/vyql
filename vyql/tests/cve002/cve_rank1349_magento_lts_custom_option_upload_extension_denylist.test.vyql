@@ -1,0 +1,220 @@
+# Rank 1349 / CVE-2026-40488: OpenMage LTS lets a product carry a "file" custom
+# option, and Mage_Catalog_Model_Product_Option_Type_File::_validateUploadedFile()
+# is what screens the storefront upload for it. It drives a raw
+# Zend_File_Transfer_Adapter_Http and registers the extension check in an
+# either/or:
+#
+#   $_allowed = $this->_parseExtensionsString($option->getFileExtension());
+#   if ($_allowed !== null) {
+#       $upload->addValidator('Extension', false, $_allowed);
+#   } else {
+#       $_forbidden = $this->_parseExtensionsString($this->getConfigData('forbidden_extensions'));
+#       if ($_forbidden !== null) {
+#           $upload->addValidator('ExcludeExtension', false, $_forbidden);
+#       }
+#   }
+#
+# When the option names no allowed extensions the only screen left is the
+# denylist, and the config key it reads holds `php,exe`
+# (Catalog/etc/config.xml). The platform's own protected list --
+# Mage_Core_Helper_Data::getProtectedFileExtensions(), which every other
+# uploader reaches through Mage_Core_Model_File_Validator_NotProtectedExtension
+# -- carries php3/php4/php5/php7/pht/phtml/shtml/jsp/pl/py/asp/sh/cgi/htaccess,
+# and none of it is consulted here. So `shell.phtml` passes, and the file lands
+# under media/custom_options/quote/ at a path the uploader derives entirely from
+# attacker-known values (getDispretionPath takes the first two filename
+# characters, the basename is md5 of the bytes the attacker wrote), which is
+# CWE-434 with a pre-computable URL on any deployment that maps .phtml to PHP.
+#
+# Step 0, `nocommit` flag: the pool row's commit f4dd542b87 is
+# "tools: use `easy-coding-standard` for code-style checks (#5489)" -- a CS
+# tooling change touching .php-cs-fixer.dist.php, composer.lock and the docs,
+# nothing in Mage_Catalog. The real fix is 80513ba79e1ae6e8c6e0d1ee7fd8b4d7845c34e1,
+# "*improved extension checks (#5460)", released in 20.17.0, which touches the
+# advisory's two files: it hoists the denylist out of the else branch so it
+# always applies, and builds it from the platform list merged with the legacy
+# key.
+#
+# FIXED. Nothing was labelled before: `vyql match` over the vulnerable method
+# reported no source, no sink and no control, and a scan of
+# app/code/core/Mage/Catalog/ reported only VYQL-CRY-001 (the md5 path hash)
+# and VYQL-RF-043 on this file, neither of which says anything about the screen
+# being incomplete. code.IncompleteDangerousUploadExtensionBlocklist /
+# VYQL-INJ-070 is already the concept for this weakness -- its review condition
+# is "dangerous upload extension blocklist omits an executable extension handled
+# by common PHP deployments" -- so this adds the PHP binding for the Zend
+# transfer spelling of it rather than a second concept, and generalises the
+# concept's assumption and evidence lines, which described only the PHAR-regex
+# form the first binding found.
+#
+# The binding names the ZF1 API, not this repository: a function that registers
+# the `ExcludeExtension` validator on a file transfer -- the documented way to
+# spell an upload extension denylist, as against `Extension`, the allowlist --
+# and whose blocklist visibly reaches no further than bare `php`. Both
+# documented ways of reaching further neutralise it: consulting the platform's
+# protected-extension list, or naming the alternative PHP extensions
+# (phar/phtml/php3/php4/php5/php7) in the denylist itself.
+#
+# Measured on the real checkout, bounded (timeout 180, --max-ram 6GB,
+# --cache off): app/ as a whole does not finish inside the bound, so the scan is
+# scoped to app/code/core/Mage/Catalog/, which holds the changed file -- 321 PHP
+# files, 245 findings, and VYQL-INJ-070 appears exactly once, at
+# Model/Product/Option/Type/File.php:164, the declaration line of
+# _validateUploadedFile. The same scan of the patched revision reports it zero
+# times, and app/code/core/Mage/Adminhtml/Model/ (158 files, 66 findings), which
+# holds the backend's own upload handlers, reports it zero times too.
+# `ExcludeExtension` occurs in one file in the whole repository, so there is no
+# second candidate the binding could have misfired on.
+
+test "rank1349: the custom-option upload denylist reaches no further than the module's forbidden_extensions"
+  lang php
+  file app/code/core/Mage/Catalog/Model/Product/Option/Type/File.php
+  expect VYQL-INJ-070
+  expect_review code.IncompleteDangerousUploadExtensionBlocklist
+  code
+  ```
+  <?php
+  class Mage_Catalog_Model_Product_Option_Type_File extends Mage_Catalog_Model_Product_Option_Type_Default
+  {
+      protected function _validateUploadedFile()
+      {
+          $option = $this->getOption();
+          $upload = new Zend_File_Transfer_Adapter_Http();
+          $file = $this->_getProcessingParams()->getFilesPrefix() . 'options_' . $option->getId() . '_file';
+          $upload->setDestination($this->getQuoteTargetDir());
+
+          $fileInfo = $upload->getFileInfo($file);
+          $fileInfo = $fileInfo[$file];
+
+          $_allowed = $this->_parseExtensionsString($option->getFileExtension());
+          if ($_allowed !== null) {
+              $upload->addValidator('Extension', false, $_allowed);
+          } else {
+              $_forbidden = $this->_parseExtensionsString($this->getConfigData('forbidden_extensions'));
+              if ($_forbidden !== null) {
+                  $upload->addValidator('ExcludeExtension', false, $_forbidden);
+              }
+          }
+
+          $upload->addValidator('FilesSize', false, ['max' => $this->_getUploadMaxFilesize()]);
+
+          $this->_initFilesystem();
+
+          if ($upload->isUploaded($file) && $upload->isValid($file)) {
+              $extension = pathinfo(strtolower($fileInfo['name']), PATHINFO_EXTENSION);
+              $fileName = Mage_Core_Model_File_Uploader::getCorrectFileName($fileInfo['name']);
+              $dispersion = Mage_Core_Model_File_Uploader::getDispretionPath($fileName);
+              $filePath = $dispersion . DS . sha1_file($fileInfo['tmp_name']) . '.' . $extension;
+              $fileFullPath = $this->getQuoteTargetDir() . $filePath;
+              $upload->addFilter('Rename', ['target' => $fileFullPath, 'overwrite' => true]);
+          }
+
+          return $this;
+      }
+  }
+  ```
+
+test "rank1349: the same upload denylist merged with the platform protected-extension list is silent"
+  lang php
+  file app/code/core/Mage/Catalog/Model/Product/Option/Type/File.php
+  reject VYQL-INJ-070
+  reject_review code.IncompleteDangerousUploadExtensionBlocklist
+  code
+  ```
+  <?php
+  class Mage_Catalog_Model_Product_Option_Type_File extends Mage_Catalog_Model_Product_Option_Type_Default
+  {
+      protected function _validateUploadedFile()
+      {
+          $option = $this->getOption();
+          $upload = new Zend_File_Transfer_Adapter_Http();
+          $file = $this->_getProcessingParams()->getFilesPrefix() . 'options_' . $option->getId() . '_file';
+          $upload->setDestination($this->getQuoteTargetDir());
+
+          $fileInfo = $upload->getFileInfo($file);
+          $fileInfo = $fileInfo[$file];
+
+          $_allowed = $this->_parseExtensionsString($option->getFileExtension());
+          if ($_allowed !== null) {
+              $upload->addValidator('Extension', false, $_allowed);
+          }
+
+          $_forbidden = array_unique(array_merge(
+              $this->_getProtectedFileExtensions(),
+              $this->_getForbiddenExtensions(),
+          ));
+          if ($_forbidden !== []) {
+              $upload->addValidator('ExcludeExtension', false, $_forbidden);
+          }
+
+          $upload->addValidator('FilesSize', false, ['max' => $this->_getUploadMaxFilesize()]);
+
+          $this->_initFilesystem();
+
+          if ($upload->isUploaded($file) && $upload->isValid($file)) {
+              $extension = pathinfo(strtolower($fileInfo['name']), PATHINFO_EXTENSION);
+              $fileName = Mage_Core_Model_File_Uploader::getCorrectFileName($fileInfo['name']);
+              $dispersion = Mage_Core_Model_File_Uploader::getDispretionPath($fileName);
+              $filePath = $dispersion . DS . sha1_file($fileInfo['tmp_name']) . '.' . $extension;
+              $fileFullPath = $this->getQuoteTargetDir() . $filePath;
+              $upload->addFilter('Rename', ['target' => $fileFullPath, 'overwrite' => true]);
+          }
+
+          return $this;
+      }
+  }
+  ```
+
+test "rank1349: a transfer denylist spelling out the alternative PHP extensions is silent"
+  lang php
+  file app/code/community/Acme/Attach/Model/Uploader.php
+  reject VYQL-INJ-070
+  reject_review code.IncompleteDangerousUploadExtensionBlocklist
+  code
+  ```
+  <?php
+  class Acme_Attach_Model_Uploader
+  {
+      public function receive($field, $target)
+      {
+          $transfer = new Zend_File_Transfer_Adapter_Http();
+          $transfer->setDestination($target);
+          $transfer->addValidator('ExcludeExtension', false, [
+              'php', 'php3', 'php4', 'php5', 'php7', 'pht', 'phtml', 'phar', 'shtml', 'cgi', 'htaccess',
+          ]);
+          $transfer->addValidator('FilesSize', false, ['max' => '2MB']);
+
+          if ($transfer->isUploaded($field) && $transfer->isValid($field)) {
+              $transfer->receive($field);
+          }
+
+          return $transfer->getFileName($field);
+      }
+  }
+  ```
+
+test "rank1349: a transfer screened by an allowlist alone is silent"
+  lang php
+  file app/code/community/Acme/Attach/Model/Image.php
+  reject VYQL-INJ-070
+  reject_review code.IncompleteDangerousUploadExtensionBlocklist
+  code
+  ```
+  <?php
+  class Acme_Attach_Model_Image
+  {
+      public function receive($field, $target)
+      {
+          $transfer = new Zend_File_Transfer_Adapter_Http();
+          $transfer->setDestination($target);
+          $transfer->addValidator('Extension', false, ['jpg', 'jpeg', 'png', 'gif']);
+          $transfer->addValidator('ImageSize', false, ['maxwidth' => 4096, 'maxheight' => 4096]);
+
+          if ($transfer->isUploaded($field) && $transfer->isValid($field)) {
+              $transfer->receive($field);
+          }
+
+          return $transfer->getFileName($field);
+      }
+  }
+  ```
