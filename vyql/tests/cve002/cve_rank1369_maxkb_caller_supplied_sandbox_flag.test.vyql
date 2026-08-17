@@ -1,0 +1,234 @@
+# Rank 1369 / CVE-2025-66419 (GHSA-f9qm-2pxq-fx6c): MaxKB runs user-authored
+# tool code -- Python a workspace user types into the tool editor and a workflow
+# or chat step then calls -- in a child interpreter, and confines it two ways:
+# the generated file starts with an `os.setgid(...)/os.setuid(...)` prologue that
+# drops to the unprivileged `sandbox` account, and `subprocess.run` is given a
+# `preexec_fn` that caps address space and CPU affinity. Both are conditional,
+# and before fix f8ada9a110 the condition was `self.sandbox` -- per-instance
+# state assigned from `ToolExecutor.__init__(self, sandbox=False)`, whose default
+# is "no sandbox". Every executor in the application is a module-level singleton
+# (`function_executor = ToolExecutor(CONFIG.get('SANDBOX'))` in the tool node,
+# the tool-lib node, the knowledge-workflow serializer and the tool serializer),
+# so the flag that decides whether untrusted code drops privileges was a
+# constructor argument on a shared object, duplicating a policy the same class
+# already derived from configuration as the class attribute `enable_sandbox`.
+# The two copies gate different halves of the confinement: `enable_sandbox`
+# gates directory hardening and the sandbox path, `self.sandbox` gates the
+# setuid prologue and the resource limits. The fix deletes the parameter and
+# makes both a single module constant read once from CONFIG, so no caller and no
+# concurrent path can present the executor with a weaker value than the
+# configured one.
+#
+# The same commit also moves the one-shot `init_sandbox_dir()` call from a
+# trailing module statement into the class body, so directory hardening now
+# completes before `ToolExecutor` is bound in the module namespace rather than
+# after. That is the only part of the diff a concurrency reading rests on, and
+# it is an ordering change, not a synchronisation one: the construct that
+# actually races is unchanged on both sides -- `init_sandbox_dir` claims an
+# O_EXCL lock file at the *start* of initialisation, so every concurrent caller
+# that finds the file returns as though initialisation had finished while
+# `.sandbox.conf` is still deleted and `chmod -R 550` has not run yet, and the
+# `except Exception` wrapped around the whole thing logs the failure and lets
+# execution proceed unconfined either way. The recorded CWE-362 is therefore a
+# hint the diff does not confirm; what the diff removes is a caller-supplied,
+# insecure-by-default sandbox toggle (CWE-1188 / CWE-269 reaching CWE-94), and
+# that is the shape the pair below is written against.
+#
+# Detection state: nothing reports it, and no candidate discriminates the fix.
+# apps/ scans to 267 findings at f8ada9a110^ and 267 at f8ada9a110, over the
+# same 910 Python files. Scanning each of the seven files
+# the fix touches on both revisions gives the same rows on both sides: the six
+# call-site files -- tools/serializers/tool.py,
+# knowledge/serializers/knowledge_workflow.py and the four flow/chat step nodes,
+# each of which is exactly where `ToolExecutor(CONFIG.get('SANDBOX'))` becomes
+# `ToolExecutor()` -- report nothing at all on either revision, and
+# common/utils/tool_code.py reports the same two rows on both: VYQL-INJ-202 on
+# the `os.system(f"chmod -R 550 {ToolExecutor.sandbox_path}")` in the directory
+# initialiser and VYQL-CRY-003 on the `random.sample` picking CPU cores. Neither
+# describes the sandbox bypass. `vyql match`
+# over the file labels no source at all: the tool code arrives from the Tool
+# model rather than from a request, so `exec_code`'s `code_str` is never
+# tainted, and the labels that do land are the file/command sinks of the
+# initialiser plus a `code.SecretValue` on a CONFIG read. `vyql explain` on the
+# file alone prints those same two findings and no negation evidence, so no
+# `unless` clause suppressed a candidate -- nothing was ever one. `-flags only`
+# adds five core.ResourceRelease/code.ResourceReview flags on the initialiser's
+# `os.close` and `socket` calls and nothing on the executor.
+#
+# Why nothing shipped, measured. The one fact that carries the weakness is that
+# the removed constructor parameter defaulted to the insecure value, and it is
+# not extractable: internal/extract/frontend/treesitter/python.go's `params`
+# (line 1903) recognises `default_parameter`, `typed_parameter` and
+# `typed_default_parameter` only to recover the parameter's *name*, discards the
+# default expression, and no frontend in the tree emits a parameter-default token
+# of any kind -- `internal/bindings/compile_presence.go` maps no such context
+# field. `def __init__(self, sandbox=False)`, `def __init__(self,
+# sandbox=True)` and `def __init__(self, sandbox)` therefore produce the same
+# context token set -- `param_name:self`, `param_name:sandbox` -- so "a security
+# control that is opt-in through a parameter defaulting to the unsafe value" has
+# no expression in binding data.
+#
+# What is left separates the revisions only by where the flag is stored. The
+# `exec_code` context of the vulnerable form carries
+# `assign:set_run_user=f'os.setgid({pwd.getpwnam(self.user).pw_gid});...'
+# ifself.sandboxelse''` with `selector:self.sandbox` and `selector:self.user`;
+# the patched form carries the same assignment with `identifier:_enable_sandbox`
+# and `identifier:_run_user` and no `self.` operand. Keying on that reports any
+# executor that keeps its configured flag on the instance -- the ordinary Python
+# idiom of reading config in `__init__` -- and clears any executor that keeps it
+# in a module constant, including one whose constant is wrong. It is the fix's
+# own layout, not the property that made the code exploitable. Correlating the
+# constructor's default with the method that consumes it is a second obstacle
+# even with the token: they are different function contexts, and the only thing
+# spanning them is the class context's raw body text.
+#
+# Both tests below reject the same rules on the vulnerable and the patched form,
+# which is what pins the miss: the pair is not a near miss that a threshold
+# would resolve, it is two revisions the definitions cannot tell apart.
+
+test "rank1369: tool executor drops privileges only when a per-instance flag set from a defaulted constructor argument is truthy"
+  lang python
+  file apps/common/utils/tool_code.py
+  reject VYQL-INJ-003
+  reject VYQL-INJ-202
+  reject VYQL-AUTH-112
+  code
+  ```
+  import getpass
+  import os
+  import pwd
+  import resource
+  import subprocess
+  import sys
+  import tempfile
+
+  from maxkb.const import BASE_DIR, CONFIG, PROJECT_DIR
+
+
+  class ToolExecutor:
+
+      enable_sandbox = bool(CONFIG.get('SANDBOX', 0))
+      sandbox_path = CONFIG.get("SANDBOX_HOME", '/opt/maxkb-app/sandbox') if enable_sandbox else os.path.join(PROJECT_DIR, 'data', 'sandbox')
+      process_timeout_seconds = int(CONFIG.get("SANDBOX_PYTHON_PROCESS_TIMEOUT_SECONDS", '3600'))
+      process_limit_mem_mb = int(CONFIG.get("SANDBOX_PYTHON_PROCESS_LIMIT_MEM_MB", '256'))
+
+      def __init__(self, sandbox=False):
+          self.sandbox = sandbox
+          if sandbox:
+              self.user = 'sandbox'
+          else:
+              self.user = getpass.getuser()
+
+      def exec_code(self, code_str, keywords):
+          python_paths = CONFIG.get_sandbox_python_package_paths().split(',')
+          set_run_user = f'os.setgid({pwd.getpwnam(self.user).pw_gid});os.setuid({pwd.getpwnam(self.user).pw_uid});' if self.sandbox else ''
+          _exec_code = f"""
+  try:
+      import os, sys, json, base64, builtins
+      sys.path += {python_paths}
+      keywords={keywords}
+      {set_run_user}
+      os.environ.clear()
+      exec({code_str!a}, globals(), locals())
+  except Exception as e:
+      builtins.print(str(e), flush=True)
+  """
+          with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=True) as f:
+              f.write(_exec_code)
+              f.flush()
+              return self._exec(f.name)
+
+      def _exec(self, execute_file):
+          kwargs = {'cwd': BASE_DIR, 'env': {
+              'LD_PRELOAD': f'{ToolExecutor.sandbox_path}/lib/sandbox.so',
+          }}
+          return subprocess.run(
+              [sys.executable, execute_file],
+              timeout=ToolExecutor.process_timeout_seconds,
+              text=True,
+              capture_output=True,
+              **kwargs,
+              preexec_fn=(lambda: None if (not self.sandbox or not sys.platform.startswith("linux")) else (
+                  resource.setrlimit(resource.RLIMIT_AS, (ToolExecutor.process_limit_mem_mb * 1024 * 1024,) * 2),
+              ))
+          )
+
+
+  function_executor = ToolExecutor(CONFIG.get('SANDBOX'))
+
+
+  def run_tool_node(tool, params):
+      return function_executor.exec_code(tool.code, params)
+  ```
+
+test "rank1369: tool executor drops privileges on a module constant read once from configuration"
+  lang python
+  file apps/common/utils/tool_code.py
+  reject VYQL-INJ-003
+  reject VYQL-INJ-202
+  reject VYQL-AUTH-112
+  code
+  ```
+  import getpass
+  import os
+  import pwd
+  import resource
+  import subprocess
+  import sys
+  import tempfile
+
+  from maxkb.const import BASE_DIR, CONFIG, PROJECT_DIR
+
+  _enable_sandbox = bool(CONFIG.get('SANDBOX', 0))
+  _run_user = 'sandbox' if _enable_sandbox else getpass.getuser()
+  _sandbox_path = CONFIG.get("SANDBOX_HOME", '/opt/maxkb-app/sandbox') if _enable_sandbox else os.path.join(PROJECT_DIR, 'data', 'sandbox')
+  _process_limit_timeout_seconds = int(CONFIG.get("SANDBOX_PYTHON_PROCESS_LIMIT_TIMEOUT_SECONDS", '3600'))
+  _process_limit_mem_mb = int(CONFIG.get("SANDBOX_PYTHON_PROCESS_LIMIT_MEM_MB", '256'))
+
+
+  class ToolExecutor:
+
+      def __init__(self):
+          pass
+
+      def exec_code(self, code_str, keywords):
+          python_paths = CONFIG.get_sandbox_python_package_paths().split(',')
+          set_run_user = f'os.setgid({pwd.getpwnam(_run_user).pw_gid});os.setuid({pwd.getpwnam(_run_user).pw_uid});' if _enable_sandbox else ''
+          _exec_code = f"""
+  try:
+      import os, sys, json, base64, builtins
+      sys.path += {python_paths}
+      keywords={keywords}
+      {set_run_user}
+      os.environ.clear()
+      exec({code_str!a}, globals(), locals())
+  except Exception as e:
+      builtins.print(str(e), flush=True)
+  """
+          with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=True) as f:
+              f.write(_exec_code)
+              f.flush()
+              return self._exec(f.name)
+
+      def _exec(self, execute_file):
+          kwargs = {'cwd': BASE_DIR, 'env': {
+              'LD_PRELOAD': f'{_sandbox_path}/lib/sandbox.so',
+          }}
+          return subprocess.run(
+              [sys.executable, execute_file],
+              timeout=_process_limit_timeout_seconds,
+              text=True,
+              capture_output=True,
+              **kwargs,
+              preexec_fn=(lambda: None if (not _enable_sandbox or not sys.platform.startswith("linux")) else (
+                  resource.setrlimit(resource.RLIMIT_AS, (_process_limit_mem_mb * 1024 * 1024,) * 2),
+              ))
+          )
+
+
+  function_executor = ToolExecutor()
+
+
+  def run_tool_node(tool, params):
+      return function_executor.exec_code(tool.code, params)
+  ```
