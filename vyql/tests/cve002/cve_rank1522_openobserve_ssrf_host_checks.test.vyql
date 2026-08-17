@@ -1,0 +1,112 @@
+# Rank 1522 / CVE-2026-39361: OpenObserve's enrichment-table URL
+# fetch guarded against private addresses with a host check that
+# could not see bracketed or mapped hosts, so a crafted URL reached
+# loopback and private services (server-side request forgery,
+# CWE-918; PR #11162). validate_url in src/handler/http/request/
+# enrichment_table/mod.rs parsed the URL's host into IpAddr and
+# checked octets -- but a bracketed IPv6 literal like [::1] or
+# [::ffff:127.0.0.1] does not parse as an IpAddr with brackets, so
+# the ip branch never ran for exactly the hosts the guard exists for,
+# and native-v6 handling checked only loopback and fc00::/7 (missing
+# fe80::/10 link-local and ipv4-mapped private ranges). Pool commit
+# d1a5d8f65b is the real fix (COMMIT_OK -- "fix: enhance URL
+# validation to block private and loopback IP addresses"): the host
+# is first `trim_start_matches('[').trim_end_matches(']')`-stripped,
+# IPv6 addresses map through to_ipv4_mapped() so ::ffff:10.0.0.1
+# takes the v4 path, native v6 blocks ULA, link-local and loopback,
+# and the v4 path uses is_loopback()/is_private()/is_link_local()/
+# is_unspecified() instead of hand-listed octets. No pool
+# correction.
+#
+# ATTENTION, guard-normalization strength. The check exists and
+# runs -- its defect is that the host spelling it examines is not
+# the host spelling the fetcher connects to, the same
+# present-but-incomplete family as ranks 1551 (first-quote-only
+# escaping), 1565 (three-character scheme strip) and 1564 (unquoted
+# bind types): nothing can ask "does this host validation normalise
+# every form the URL parser accepts" (brackets, mapped v6, decimal
+# octets, short forms) -- parser-equivalence vocabulary. A binding
+# on OpenObserve's own validate_url would detect this application
+# rather than the weakness. Measured on the real code: scanning
+# enrichment_table/mod.rs reports zero findings at both revisions.
+# No ENGINE-GAPS.md entry: the piece is normalization-strength
+# vocabulary, not a localised construct. No definition change
+# shipped. Spec cve_rank1522 records the bracket-blind octet check
+# and the stripped-and-mapped form, both asserting reject
+# VYQL-RF-001: when host-normalization vocabulary lands, the
+# bracket-blind form must flip to expect.
+
+test "rank1522: the host check cannot see bracketed literals"
+  lang rust
+  file src/handler/http/request/enrichment_table/mod.rs
+  reject VYQL-RF-001
+  code
+  ```
+  use std::net::IpAddr;
+
+  pub fn validate_url(url: &str) -> Result<(), String> {
+      let parsed = url::Url::parse(url).map_err(|e| e.to_string())?;
+      let host = parsed.host_str().ok_or("missing host")?;
+
+      if let Ok(ip) = host.parse::<IpAddr>() {
+          match ip {
+              IpAddr::V4(v4) => {
+                  let octets = v4.octets();
+                  if octets[0] == 10
+                      || (octets[0] == 172 && (16..=31).contains(&octets[1]))
+                      || (octets[0] == 192 && octets[1] == 168)
+                      || (octets[0] == 169 && octets[1] == 254)
+                  {
+                      return Err("Cannot access private IP addresses".to_string());
+                  }
+              }
+              IpAddr::V6(v6) => {
+                  if v6.is_loopback() || v6.segments()[0] & 0xfe00 == 0xfc00 {
+                      return Err("Cannot access private IP addresses".to_string());
+                  }
+              }
+          }
+      }
+
+      Ok(())
+  }
+  ```
+
+test "rank1522: the fix strips brackets and maps v6 before checking"
+  lang rust
+  file src/handler/http/request/enrichment_table/mod.rs
+  reject VYQL-RF-001
+  code
+  ```
+  use std::net::{IpAddr, Ipv4Addr};
+
+  pub fn validate_url(url: &str) -> Result<(), String> {
+      let parsed = url::Url::parse(url).map_err(|e| e.to_string())?;
+      let host = parsed.host_str().ok_or("missing host")?;
+      let host = host.trim_start_matches('[').trim_end_matches(']');
+
+      if let Ok(ip) = host.parse::<IpAddr>() {
+          let v4 = match ip {
+              IpAddr::V4(v4) => Some(v4),
+              IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+                  Some(v4) => Some(v4),
+                  None => {
+                      let seg0 = v6.segments()[0];
+                      if v6.is_loopback() || (seg0 & 0xfe00 == 0xfc00) || (seg0 & 0xffc0 == 0xfe80) {
+                          return Err("Cannot access private IP addresses".to_string());
+                      }
+                      None
+                  }
+              },
+          };
+          if let Some(ip) = v4
+              && (ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified())
+          {
+              return Err("Cannot access private IP addresses".to_string());
+          }
+      }
+
+      let _ = std::marker::PhantomData::<Ipv4Addr>;
+      Ok(())
+  }
+  ```
