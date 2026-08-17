@@ -1,0 +1,153 @@
+# Rank 1308 / CVE-2017-12652: libpng's chunk reader trusted the 4-byte length
+# field straight off the wire. png_read_chunk_header (pngrutil.c) reads the
+# chunk header into a local buffer, decodes the length with
+# png_get_uint_31(png_ptr, buf), and returns it with no upper bound at all;
+# every handler that receives that length (e.g. png_handle_eXIf) then passes
+# it straight to png_malloc_warn() as an allocation size. A crafted PNG with
+# an oversized ancillary-chunk length drives an arbitrarily large allocation
+# before a single byte of the chunk's actual payload has been validated
+# (CWE-400/CWE-789). The equivalent push-reader path, png_push_read_chunk in
+# pngpread.c, has the identical shape against png_ptr->push_length.
+#
+# Pool commit 347538efbd carries no flag; its diff is exactly this fix and
+# nothing else -- pngrutil.c's png_read_chunk_header and pngpread.c's
+# png_push_read_chunk both gain the same guard right before returning/using
+# the chunk length: compare it against png_ptr->user_chunk_malloc_max (or the
+# PNG_USER_CHUNK_MALLOC_MAX build default) and png_chunk_error() out if it is
+# larger, for every chunk type except IDAT (which already has its own
+# incremental-read cap).
+#
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` against the real
+# checkout at the fix's parent commit (2b37d46) reports nothing on
+# pngrutil.c's png_read_chunk_header or the eXIf/iCCP handlers that consume
+# its return value -- the one VYQL-NUM-001 (TaintedSizeComputation) hit in
+# the whole tree is an unrelated CliArgument-to-malloc path in
+# contrib/examples/iccfrompng.c. `vyql match` on a minimal pair isolating
+# png_read_chunk_header + png_handle_eXIf verbatim labels no source at all
+# (png_read_data's buffer write is bound only as a code.Deserialization sink,
+# never as a taint source, and nothing decodes buf[] back into a labelled
+# value) and no sink for png_malloc_warn (only the generic C bindings know
+# malloc/calloc/realloc/reallocarray/operator new, and "malloc" does not
+# match the "png_malloc_warn" segment under the engine's dotted-segment path
+# matching). `vyql resolve` shows png_malloc_warn is not a known
+# source/sink/control. `vyql explain` returns no findings on either the
+# vulnerable or the patched form.
+#
+# Checked for reuse first: code.UnboundedAllocationReview (VYQL-DOS-041,
+# CWE_400/770) is the right concept by CWE and by its own review text --
+# "the value is not range-checked before memory use" describes exactly this
+# gap -- but the only C binding that ever emits it
+# (unboundedAllocationReview64 in vyql/bindings/cpp/m4e783366.vyql) is driven
+# by ccUnboundedAccumulatedAllocationObservations
+# (internal/extract/frontend/treesitter/c.go:2592), which requires an
+# accumulation idiom matched by ccAccumulatedAllocationRe (`total+=*elem`)
+# feeding a `new T[total]` -- a running sum across a loop, not a single
+# length value read once and passed straight to an allocator. Neither form
+# here has that shape. code.ComputedSizeValue/code.SizeComputation
+# (VYQL-NUM-001, taint core.UserControlledData -> code.SizeComputation) is
+# also the right shape in principle, but nothing labels png_read_data's
+# output buffer or png_get_uint_31's decode as a taint source, and
+# png_malloc_warn is not bound as code.SizeComputation, so the taint chain
+# has neither an endpoint to start from nor one to land on.
+#
+# ATTENTION, engine gap. The nearest existing analysis,
+# ccLengthDerivedAllocationObservations
+# (internal/extract/frontend/treesitter/c.go:3263 --
+# analysis.allocation.length_derived_before_file_bound), already recognizes
+# "a header-decoded length flows into an allocator with no bound check
+# before it," but its regex is pinned to one other codebase's exact call
+# shape: it only fires on a literal `malloc_from_callbacks(<size>` call site
+# and only excuses a guard that mentions `hasKnownFileSize` or
+# `fileSize-runningFilePos`. libpng's allocator is `png_malloc_warn`, and its
+# guard compares against a struct field (`png_ptr->user_chunk_malloc_max`) --
+# neither the call name nor the guard's shape matches. Widening that
+# function's fixed literals to also recognize png_malloc_warn (and the
+# struct-field-limit guard shape generally, since that is the common
+# libpng/libtiff/libjpeg idiom) is a new classification of what "the
+# allocator call" and "the guard" can look like, not a bounded correction to
+# one extraction path already in place. A minimal pair pins this precisely:
+# the same length-decode-then-allocate function is undetected whether or not
+# the guard is present, so the gap is a missing recognition of the
+# construct, not a broken judgment about a construct already recognized.
+#
+# Not mechanical: generalizing an allocator-name/guard-shape recognizer to a
+# second codebase, and then to the general "struct-field-limit guard" idiom
+# so it transfers to the next codebase after libpng, is a design decision
+# about how wide that recognition should be -- too narrow (function name
+# only) reproduces this same gap for the next parser, too wide (any
+# allocator call preceded anywhere by any comparison) risks flagging the vast
+# majority of length-prefixed C parsers that already guard correctly. That
+# tradeoff needs measurement against real C codebases, which this loop does
+# not do inside a single rank.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1308: chunk length is decoded with no upper bound and used directly as a malloc size"
+  lang c
+  file pngrutil.c
+  reject VYQL-DOS-041
+  reject VYQL-NUM-001
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  png_uint_32 png_read_chunk_header(png_structrp png_ptr) {
+     png_byte buf[8];
+     png_uint_32 length;
+
+     png_read_data(png_ptr, buf, 8);
+     length = png_get_uint_31(png_ptr, buf);
+
+     png_ptr->chunk_name = PNG_CHUNK_FROM_STRING(buf + 4);
+
+     png_reset_crc(png_ptr);
+     png_calculate_crc(png_ptr, buf + 4, 4);
+
+     png_check_chunk_name(png_ptr, png_ptr->chunk_name);
+
+     return length;
+  }
+
+  void png_handle_eXIf(png_structrp png_ptr, png_inforp info_ptr, png_uint_32 length) {
+     info_ptr->eXIf_buf = png_malloc_warn(png_ptr, length);
+     png_crc_read(png_ptr, info_ptr->eXIf_buf, length);
+  }
+  ```
+
+test "rank1308: fix compares the decoded length against the user chunk-malloc limit before it is ever used"
+  lang c
+  file pngrutil.c
+  reject VYQL-DOS-041
+  reject VYQL-NUM-001
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  png_uint_32 png_read_chunk_header(png_structrp png_ptr) {
+     png_byte buf[8];
+     png_uint_32 length;
+
+     png_read_data(png_ptr, buf, 8);
+     length = png_get_uint_31(png_ptr, buf);
+
+     png_ptr->chunk_name = PNG_CHUNK_FROM_STRING(buf + 4);
+
+     png_reset_crc(png_ptr);
+     png_calculate_crc(png_ptr, buf + 4, 4);
+
+     png_check_chunk_name(png_ptr, png_ptr->chunk_name);
+
+     if (png_ptr->chunk_name != png_IDAT) {
+        png_alloc_size_t limit = PNG_SIZE_MAX;
+        if (png_ptr->user_chunk_malloc_max > 0 && png_ptr->user_chunk_malloc_max < limit)
+           limit = png_ptr->user_chunk_malloc_max;
+        if (length > limit)
+           png_chunk_error(png_ptr, "chunk data is too large");
+     }
+
+     return length;
+  }
+
+  void png_handle_eXIf(png_structrp png_ptr, png_inforp info_ptr, png_uint_32 length) {
+     info_ptr->eXIf_buf = png_malloc_warn(png_ptr, length);
+     png_crc_read(png_ptr, info_ptr->eXIf_buf, length);
+  }
+  ```
