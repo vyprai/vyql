@@ -1,0 +1,94 @@
+# Rank 1561 / CVE-2026-8376: Perl's regex compiler sized its
+# repeat-quantifier expansion with an unchecked multiply, so a crafted
+# pattern overflowed the size computation and corrupted memory
+# (integer overflow leading to buffer overflow, CWE-190/CWE-787;
+# perl-security#147). Perl_study_chunk in regcomp_study.c computed the
+# added-string size for a quantified node as `l = ... - old; l -=
+# old;` then used mincount * l downstream (`newSVpvn_utf8(s + old, l,
+# UTF)` feeding an expansion sized by the repeat count) with no
+# overflow check anywhere -- a large mincount times a long literal
+# wraps the SSize_t arithmetic. Pool commit 5e7f119eb2 is the real
+# fix (COMMIT_OK -- the message cites perl-security#147, "test
+# against the actual character lengths"): the multiply is guarded --
+# `if (l > 0 && (mincount >= SSize_t_MAX / (SSize_t)l || old >
+# SSize_t_MAX - mincount * (SSize_t)l)) FAIL("Regexp out of space");`
+# -- before the string is built. No pool correction.
+#
+# ATTENTION, unchecked length multiply in C. The defect is the same
+# shape rank 1530 recorded for OpenSSL's buf2hex sizing: an allocation
+# or expansion sized by a multiply of attacker-influenced factors with
+# no overflow guard, invisible because the C frontend emits no
+# cast/checked-shape observations (the C# twin fires twelve rows on
+# OpenMcdf). This rank joins that ENGINE-GAPS.md Medium row's Blocks
+# (cast/checked-shape observations, C#-only). A binding on Perl's own
+# study_chunk would detect this application rather than the weakness.
+# Measured on the real code: scanning regcomp_study.c reports the same
+# 42 findings at both revisions (memory-family heuristics over the
+# 3000-line file; none change with the guard). No definition change
+# shipped. Spec cve_rank1561 records the unguarded repeat sizing and
+# the overflow-checked form, both asserting reject VYQL-NUM-005: when
+# cast/checked-shape observations reach C, the unguarded multiply
+# must flip to expect.
+
+test "rank1561: the repeat expansion is sized by an unchecked multiply"
+  lang c
+  file regcomp_study.c
+  reject VYQL-NUM-005
+  code
+  ```
+  #include <stddef.h>
+
+  typedef long SSize_t;
+
+  char *study_repeat(const char *s, size_t old, SSize_t mincount, size_t end) {
+      size_t l = end - (size_t)s - old;
+      l -= old;
+
+      /* Get the added string: */
+      char *last_str = malloc(mincount * l + 1);
+      if (last_str == NULL) {
+          return NULL;
+      }
+
+      for (SSize_t i = 0; i < mincount; i++) {
+          memcpy(last_str + i * l, s + old, l);
+      }
+      last_str[mincount * l] = '\0';
+      return last_str;
+  }
+  ```
+
+test "rank1561: the fix refuses overflowable repeat sizing"
+  lang c
+  file regcomp_study.c
+  reject VYQL-NUM-005
+  code
+  ```
+  #include <stddef.h>
+  #include <stdint.h>
+
+  typedef long SSize_t;
+
+  char *study_repeat(const char *s, size_t old, SSize_t mincount, size_t end) {
+      size_t l = end - (size_t)s - old;
+      l -= old;
+
+      if (l > 0 &&
+          (mincount >= SSize_t_MAX / (SSize_t)l
+           || old > SSize_t_MAX - mincount * (SSize_t)l)) {
+          return NULL; /* FAIL("Regexp out of space") */
+      }
+
+      /* Get the added string: */
+      char *last_str = malloc(mincount * l + 1);
+      if (last_str == NULL) {
+          return NULL;
+      }
+
+      for (SSize_t i = 0; i < mincount; i++) {
+          memcpy(last_str + i * l, s + old, l);
+      }
+      last_str[mincount * l] = '\0';
+      return last_str;
+  }
+  ```
