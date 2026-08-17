@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule OptionalTokenClaimValidation {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_287, CWE_290]
+    id: "VYQL-AUTH-118"
+    severity: high
+  }
+  issue code.OptionalTokenClaimValidation as validator
+}

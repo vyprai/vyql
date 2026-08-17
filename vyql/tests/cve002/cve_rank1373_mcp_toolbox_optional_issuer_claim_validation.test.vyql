@@ -1,0 +1,409 @@
+# Rank 1373 / CVE-2026-11718 (GHSA-wcpr-6g7x-p44r, CWE-287): MCP Toolbox fronts
+# database access for an LLM and authenticates every MCP request itself. For an
+# opaque bearer token, internal/auth/generic/generic.go calls the authorization
+# server's RFC 7662 introspection endpoint, unmarshals `active`, `scope`, `aud`,
+# `exp` and `iss` out of the response, and hands the issuer and audience to
+# AuthService.validateClaims.
+#
+# validateClaims only compared issuers when both sides happened to be non-empty:
+#
+#	if a.issuer != "" && iss != "" {
+#		if iss != a.issuer { return &MCPAuthError{Code: 401, ...} }
+#	}
+#
+# so a token whose introspection response carries no `iss` claim skipped issuer
+# validation entirely and was accepted on its audience and scopes alone. That is
+# the weakness: the claim that decides *who vouched for this token* is validated
+# only when the token chooses to carry it, and an introspection response is
+# whatever the configured authorization server returns -- so a token minted by a
+# different issuer, or an introspection endpoint that simply omits `iss`,
+# authenticates against the toolbox and reaches every database tool it exposes.
+# The same commit closes the other half by refusing an OIDC discovery document
+# with no `issuer` field, which is what let `a.issuer` be empty in the first
+# place.
+#
+# The fix inverts the guard into a fail-closed rejection and then compares
+# unconditionally:
+#
+#	if iss == "" { return &MCPAuthError{Code: 401, Message: "missing issuer in token validation", ...} }
+#	if iss != a.issuer { return &MCPAuthError{Code: 401, ...} }
+#
+# Nothing labelled any of this: `vyql match` over the vulnerable file reported no
+# source, sink or control at all, and the package scan's only flags in
+# internal/auth/generic were core.ResourceRelease on resp.Body.Close and
+# code.ResourceReview on io.ReadAll. The ontology had no issuer vocabulary of any
+# kind, and code.OptionalClientSignatureVerification -- the one concept for the
+# same class, a check performed only when the value it checks is present -- is
+# written for a client signature and a certificate identity, so reusing it would
+# report the wrong thing.
+#
+# Detection is code.OptionalTokenClaimValidation (VYQL-AUTH-118, CWE-287/CWE-290),
+# emitted by the goOptionalTokenClaimValidation binding on a Go function that gates
+# on the token's issuer claim being non-empty, compares two issuer-named operands
+# with `!=` in the same body, and never establishes that the claim is empty. The
+# claim names are RFC 7519's and RFC 7662's, not this repository's: `iss`,
+# `claims.Issuer`, `token.Issuer`, `tokenIssuer`. The neutraliser is the documented
+# fail-closed form -- any comparison establishing the claim is empty -- however it
+# is spelled.
+#
+# Measured: 1 flag on the vulnerable revision (internal/auth/generic/generic.go:467,
+# 43 findings at or above high against 42 on the untouched tree), 0 on the patched
+# revision, and 0 on eleven other Go trees -- coreos/go-oidc, golang-jwt/jwt,
+# zitadel/oidc, lxd, LocalAI, mailpit and five Mattermost plugins. The first four
+# are the ones that exercise the neighbourhood: three token libraries whose whole
+# job is claim validation, and lxd's six OIDC functions with two
+# `oidcIssuer != ""` configuration guards.
+#
+# Two nearby shapes are declined, and the second is why the binding requires the
+# mismatch comparison rather than the presence guard alone. Reading a configured
+# issuer and acting on it only when it is set is ordinary OIDC provider setup (the
+# fourth case). golang-jwt's Validator.Validate is the same guard on the
+# expectation rather than the claim -- `if v.expectedIss != ""` delegating to a
+# verifyIssuer that does refuse an empty `iss` -- and an earlier revision of this
+# binding, keyed on the presence guard and an issuer-named identifier, flagged it:
+# 1 flag on golang-jwt/jwt and 4 on lxd's client/lxd_oidc.go, now 0 on both. The
+# fourth and sixth cases pin those two shapes; the fifth pins the `len(iss) == 0`
+# spelling of the fail-closed check.
+#
+# Pool row: the row is flagged nocommit because the advisory names no commit, but
+# 1d8df0df590383ba56091b6e4d7c37ab7d7d9749 ("fix(auth/generic): enforce issuer
+# presence in opaque token validation") is the real fix for exactly this CWE-287
+# weakness and its parent carries the conditional guard, so the row stands.
+
+test "rank1373: an opaque token's issuer claim is compared only when the claim is present"
+  lang go
+  file internal/auth/generic/generic.go
+  expect VYQL-AUTH-118
+  expect_review code.OptionalTokenClaimValidation
+  code
+  ```
+  package generic
+
+  import (
+  	"context"
+  	"fmt"
+  	"net/http"
+  	"strings"
+  )
+
+  type MCPAuthError struct {
+  	Code           int
+  	Message        string
+  	ScopesRequired []string
+  }
+
+  func (e *MCPAuthError) Error() string { return e.Message }
+
+  type AuthService struct {
+  	issuer         string
+  	Audience       string
+  	ScopesRequired []string
+  }
+
+  func (a AuthService) validateClaims(ctx context.Context, iss string, aud []string, scopeStr string) error {
+  	// Validate issuer
+  	if a.issuer != "" && iss != "" {
+  		if iss != a.issuer {
+  			return &MCPAuthError{Code: http.StatusUnauthorized, Message: "issuer validation failed", ScopesRequired: a.ScopesRequired}
+  		}
+  	}
+
+  	// Validate audience
+  	if a.Audience != "" {
+  		isAudValid := false
+  		for _, audItem := range aud {
+  			if audItem == a.Audience {
+  				isAudValid = true
+  				break
+  			}
+  		}
+
+  		if !isAudValid {
+  			return &MCPAuthError{Code: http.StatusUnauthorized, Message: "audience validation failed", ScopesRequired: a.ScopesRequired}
+  		}
+  	}
+
+  	// Check scopes
+  	if len(a.ScopesRequired) > 0 {
+  		tokenScopes := strings.Fields(scopeStr)
+  		scopeMap := make(map[string]bool)
+  		for _, s := range tokenScopes {
+  			scopeMap[s] = true
+  		}
+
+  		for _, requiredScope := range a.ScopesRequired {
+  			if !scopeMap[requiredScope] {
+  				return &MCPAuthError{Code: http.StatusForbidden, Message: fmt.Sprintf("insufficient scopes: %s", requiredScope), ScopesRequired: a.ScopesRequired}
+  			}
+  		}
+  	}
+
+  	return nil
+  }
+  ```
+
+test "rank1373: an absent issuer claim is rejected before the issuer is compared"
+  lang go
+  file internal/auth/generic/generic.go
+  reject VYQL-AUTH-118
+  reject_review code.OptionalTokenClaimValidation
+  code
+  ```
+  package generic
+
+  import (
+  	"context"
+  	"fmt"
+  	"net/http"
+  	"strings"
+  )
+
+  type MCPAuthError struct {
+  	Code           int
+  	Message        string
+  	ScopesRequired []string
+  }
+
+  func (e *MCPAuthError) Error() string { return e.Message }
+
+  type AuthService struct {
+  	issuer         string
+  	Audience       string
+  	ScopesRequired []string
+  }
+
+  func (a AuthService) validateClaims(ctx context.Context, iss string, aud []string, scopeStr string) error {
+  	// Validate issuer
+  	if iss == "" {
+  		return &MCPAuthError{Code: http.StatusUnauthorized, Message: "missing issuer in token validation", ScopesRequired: a.ScopesRequired}
+  	}
+  	if iss != a.issuer {
+  		return &MCPAuthError{Code: http.StatusUnauthorized, Message: "issuer validation failed", ScopesRequired: a.ScopesRequired}
+  	}
+
+  	// Validate audience
+  	if a.Audience != "" {
+  		isAudValid := false
+  		for _, audItem := range aud {
+  			if audItem == a.Audience {
+  				isAudValid = true
+  				break
+  			}
+  		}
+
+  		if !isAudValid {
+  			return &MCPAuthError{Code: http.StatusUnauthorized, Message: "audience validation failed", ScopesRequired: a.ScopesRequired}
+  		}
+  	}
+
+  	// Check scopes
+  	if len(a.ScopesRequired) > 0 {
+  		tokenScopes := strings.Fields(scopeStr)
+  		scopeMap := make(map[string]bool)
+  		for _, s := range tokenScopes {
+  			scopeMap[s] = true
+  		}
+
+  		for _, requiredScope := range a.ScopesRequired {
+  			if !scopeMap[requiredScope] {
+  				return &MCPAuthError{Code: http.StatusForbidden, Message: fmt.Sprintf("insufficient scopes: %s", requiredScope), ScopesRequired: a.ScopesRequired}
+  			}
+  		}
+  	}
+
+  	return nil
+  }
+  ```
+
+test "rank1373: an id-token verifier spelled nothing like the toolbox skips its issuer check for a claimless token"
+  lang go
+  file auth/idtoken.go
+  expect VYQL-AUTH-118
+  expect_review code.OptionalTokenClaimValidation
+  code
+  ```
+  package auth
+
+  import (
+  	"errors"
+  )
+
+  type Claims struct {
+  	Issuer   string
+  	Subject  string
+  	Audience string
+  }
+
+  type Verifier struct {
+  	expectedIssuer   string
+  	expectedAudience string
+  }
+
+  func (v *Verifier) Check(claims Claims) error {
+  	if claims.Issuer != "" {
+  		if claims.Issuer != v.expectedIssuer {
+  			return errors.New("issuer mismatch")
+  		}
+  	}
+
+  	if claims.Audience != v.expectedAudience {
+  		return errors.New("audience mismatch")
+  	}
+
+  	if claims.Subject == "" {
+  		return errors.New("missing subject")
+  	}
+
+  	return nil
+  }
+  ```
+
+test "rank1373: an OIDC provider that only acts on a configured issuer when one is set is not a claim check"
+  lang go
+  file auth/provider.go
+  reject VYQL-AUTH-118
+  reject_review code.OptionalTokenClaimValidation
+  code
+  ```
+  package auth
+
+  import (
+  	"context"
+  	"fmt"
+  )
+
+  type Config struct {
+  	Issuer   string
+  	ClientID string
+  	JwksURI  string
+  }
+
+  type Provider struct {
+  	issuer  string
+  	jwksURI string
+  }
+
+  func NewProvider(ctx context.Context, cfg Config) (*Provider, error) {
+  	p := &Provider{}
+
+  	if cfg.Issuer != "" {
+  		p.issuer = cfg.Issuer
+  	}
+
+  	if cfg.JwksURI != "" {
+  		p.jwksURI = cfg.JwksURI
+  	}
+
+  	if p.issuer == "" {
+  		return nil, fmt.Errorf("issuer not found in config")
+  	}
+
+  	return p, nil
+  }
+  ```
+
+test "rank1373: a claimless token rejected by a helper the same body calls is not a skipped check"
+  lang go
+  file auth/introspect.go
+  reject VYQL-AUTH-118
+  reject_review code.OptionalTokenClaimValidation
+  code
+  ```
+  package auth
+
+  import (
+  	"errors"
+  )
+
+  type Introspection struct {
+  	Active bool
+  	Iss    string
+  	Aud    string
+  }
+
+  type Validator struct {
+  	trustedIssuer string
+  	audience      string
+  }
+
+  func (v *Validator) Validate(resp Introspection) error {
+  	iss := resp.Iss
+  	if len(iss) == 0 {
+  		return errors.New("missing issuer in token")
+  	}
+
+  	if iss != "" && iss != v.trustedIssuer {
+  		return errors.New("issuer validation failed")
+  	}
+
+  	if resp.Aud != v.audience {
+  		return errors.New("audience validation failed")
+  	}
+
+  	return nil
+  }
+  ```
+
+test "rank1373: a validator that requires the claim once an expectation is configured is not an optional check"
+  lang go
+  file jwt/validator.go
+  reject VYQL-AUTH-118
+  reject_review code.OptionalTokenClaimValidation
+  code
+  ```
+  package jwt
+
+  import (
+  	"errors"
+  	"time"
+  )
+
+  type Validator struct {
+  	expectedIss string
+  	expectedSub string
+  	requireExp  bool
+  }
+
+  func (v *Validator) Validate(claims Claims) error {
+  	var errs []error
+
+  	now := time.Now()
+
+  	if err := v.verifyExpiresAt(claims, now, v.requireExp); err != nil {
+  		errs = append(errs, err)
+  	}
+
+  	// If we have an expected issuer, we also require the issuer claim
+  	if v.expectedIss != "" {
+  		if err := v.verifyIssuer(claims, v.expectedIss, true); err != nil {
+  			errs = append(errs, err)
+  		}
+  	}
+
+  	// If we have an expected subject, we also require the subject claim
+  	if v.expectedSub != "" {
+  		if err := v.verifySubject(claims, v.expectedSub, true); err != nil {
+  			errs = append(errs, err)
+  		}
+  	}
+
+  	if len(errs) == 0 {
+  		return nil
+  	}
+
+  	return errors.Join(errs...)
+  }
+
+  func (v *Validator) verifyIssuer(claims Claims, cmp string, required bool) error {
+  	iss, err := claims.GetIssuer()
+  	if err != nil {
+  		return err
+  	}
+
+  	if iss == "" {
+  		return errorIfRequired(required, "iss")
+  	}
+
+  	return errorIfFalse(iss == cmp, ErrTokenInvalidIssuer)
+  }
+  ```
