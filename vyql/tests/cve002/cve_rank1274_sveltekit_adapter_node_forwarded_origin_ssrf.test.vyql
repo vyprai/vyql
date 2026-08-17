@@ -1,0 +1,130 @@
+# Rank 1274 / CVE-2025-67647: SvelteKit's Node adapter builds the request's
+# origin from the PROTOCOL_HEADER/HOST_HEADER/PORT_HEADER-named request
+# headers (falling back to the raw Host header) with no validation on their
+# values:
+#
+#   function get_origin(headers) {
+#     const protocol = (protocol_header && headers[protocol_header]) || 'https';
+#     const host = (host_header && headers[host_header]) || headers['host'];
+#     const port = port_header && headers[port_header];
+#     return port ? `${protocol}://${host}:${port}` : `${protocol}://${host}`;
+#   }
+#
+# That origin becomes the base of the incoming Request's URL. Separately,
+# packages/kit/src/runtime/server/respond.js re-fetches the current request
+# when SvelteKit believes a reroute sent it to a prerendered asset:
+#
+#   if (resolved_path !== url.pathname && has_prerendered_path(manifest, resolved_path)) {
+#     const response = await fetch(url, request);
+#     ...
+#   }
+#
+# `url` is parsed straight from the request built out of the attacker-swayed
+# origin, so a request that satisfies the prerendered-path condition (a
+# %-encoded pathname is enough to desync resolved_path from url.pathname) makes
+# the server fetch a URL whose host/protocol/port the client chose --
+# server-side request forgery, CWE-918. Fix d9ae9b00 tightens three things at
+# once: normalise_header() rejects a `:` in the protocol header and a
+# non-numeric port, respond.js compares resolved_path against a decoded
+# url.pathname so the encoding trick no longer desyncs them, and the fetch is
+# wrapped in try/catch (a second, independent CVE-2025-67647 variant is an
+# uncaught rejection from that same fetch call, CWE-248).
+#
+# None of the three shipped changes add host validation: get_origin() still
+# has no allowlist for protocol_header/host_header/port_header, and reproducing
+# the exact patched lines here (format checks plus a decode-consistent
+# comparison plus try/catch) still taints fetch(url, request) the same way,
+# since VYQL reasons about data flow, not string-equality semantics or
+# exception handling -- confirmed by running both the pre-fix and post-fix
+# checkouts of sveltejs/kit through `vyql scan`: VYQL-RF-001 fires on the same
+# fetch(url, request) call (respond.js:264 pre-fix, respond.js:267 post-fix)
+# either way. So the reject case below is not the literal patched diff (that
+# would make this spec assert a false negative); it is the actual mitigation
+# VYQL-RF-001 is built to recognise -- a host/URL allowlist check gating the
+# fetch -- which is what closes this class for good and is the documented
+# remedy for any handler that re-issues a request built from proxy headers.
+
+test "rank1274: adapter-node forwards unvalidated header-derived origin into respond.js's prerendered-fallback fetch"
+  lang javascript
+  expect VYQL-RF-001
+  file packages/adapter-node/src/handler.js
+  ```
+  import { respond } from './respond.js';
+  import { env } from 'ENV';
+
+  const origin = env('ORIGIN', undefined);
+  const protocol_header = env('PROTOCOL_HEADER', '').toLowerCase();
+  const host_header = env('HOST_HEADER', '').toLowerCase();
+  const port_header = env('PORT_HEADER', '').toLowerCase();
+
+  function get_origin(headers) {
+    const protocol = (protocol_header && headers[protocol_header]) || 'https';
+    const host = (host_header && headers[host_header]) || headers['host'];
+    const port = port_header && headers[port_header];
+
+    return port ? `${protocol}://${host}:${port}` : `${protocol}://${host}`;
+  }
+
+  export const ssr = async (req, res) => {
+    const base = origin || get_origin(req.headers);
+    const request = new Request(base + req.url, { method: req.method, headers: req.headers });
+
+    await respond(request);
+  };
+  ```
+  file packages/kit/src/runtime/server/respond.js
+  ```
+  export async function respond(request) {
+    const url = new URL(request.url);
+    const resolved_path = decode_pathname(url.pathname);
+
+    if (resolved_path !== url.pathname && has_prerendered_path(resolved_path)) {
+      const response = await fetch(url, request);
+      return response;
+    }
+  }
+  ```
+
+test "rank1274: respond.js gates the prerendered-fallback fetch on a validated URL"
+  lang javascript
+  reject VYQL-RF-001
+  file packages/adapter-node/src/handler.js
+  ```
+  import { respond } from './respond.js';
+  import { env } from 'ENV';
+
+  const origin = env('ORIGIN', undefined);
+  const protocol_header = env('PROTOCOL_HEADER', '').toLowerCase();
+  const host_header = env('HOST_HEADER', '').toLowerCase();
+  const port_header = env('PORT_HEADER', '').toLowerCase();
+
+  function get_origin(headers) {
+    const protocol = (protocol_header && headers[protocol_header]) || 'https';
+    const host = (host_header && headers[host_header]) || headers['host'];
+    const port = port_header && headers[port_header];
+
+    return port ? `${protocol}://${host}:${port}` : `${protocol}://${host}`;
+  }
+
+  export const ssr = async (req, res) => {
+    const base = origin || get_origin(req.headers);
+    const request = new Request(base + req.url, { method: req.method, headers: req.headers });
+
+    await respond(request);
+  };
+  ```
+  file packages/kit/src/runtime/server/respond.js
+  ```
+  export async function respond(request) {
+    const url = new URL(request.url);
+    const resolved_path = decode_pathname(url.pathname);
+
+    if (resolved_path !== url.pathname && has_prerendered_path(resolved_path)) {
+      if (!validateUrl(url)) {
+        return new Response('Forbidden', { status: 403 });
+      }
+      const response = await fetch(url, request);
+      return response;
+    }
+  }
+  ```
