@@ -2810,19 +2810,3 @@ binding pathAccessCheck479 {
     }
   }
 }
-
-// A PHP template whose markup a client-side template engine compiles -- an
-// AngularJS or Vue directive attribute beside a `{{ ... }}` interpolation --
-// and that echoes a request superglobal into that markup is the same
-// structural gap already caught for Jinja2 and Twig
-// (code.IncompleteTemplateValidation / VYQL-INJ-024): a template engine is
-// handed caller-supplied template syntax with nothing making it inert. HTML
-// escaping does not qualify here, because htmlspecialchars, strip_tags and
-// json_encode all leave `{` and `}` alone while both engines evaluate
-// `{{ ... }}` in text nodes and in attribute values; the documented remedy is
-// to keep request data out of the compiled markup, so the token clears once the
-// delimiters themselves are rewritten.
-binding incompleteTemplateValidation480 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "client_template_interpolates_request_input"
-  emit issue code.IncompleteTemplateValidation at node
-}
