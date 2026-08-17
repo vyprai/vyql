@@ -1,0 +1,323 @@
+# Rank 1345 / CVE-2020-15889: Lua 5.4.0's generational collector keeps every
+# non-finalizable object on one intrusive singly-linked list, `g->allgc`,
+# partitioned by age with three cursor fields pointing *into* it --
+# head(`allgc`) .. `survival` .. `old` .. `reallyold` -- so a segment is a
+# half-open walk between two of those cursors:
+#
+#   for (p = from; p != to; p = p->next) { if (getage(p) == G_OLD1) ... }
+#
+# A minor (young) collection must mark every G_OLD1 object so the objects it
+# references survive the sweep. `youngcollection` (lgc.c) did that by walking
+# only `g->survival` .. `g->reallyold`, on the commented assumption that the
+# nursery segment before `survival` can hold nothing older than G_OLD0.
+# Finalization breaks the assumption: `udata2finalize` takes the object off
+# `g->tobefnz` and re-links it at the *head* of `allgc` (`o->next = g->allgc;
+# g->allgc = o;`), keeping whatever age it already had. An object that reached
+# G_OLD1 before its `__gc` ran therefore lands in front of `g->survival`, where
+# `markold` never reaches it -- so its referents are never marked, `sweepgen`
+# frees them while still reachable, and the collector goes on reading through
+# the dangling pointers. The reported crash is a heap over-read in
+# `getobjname` walking a freed `Proto` (NVD files it CWE-125; the mechanism is
+# CWE-416), reachable from ordinary Lua source that defines a `__gc`
+# metamethod, hence CVSS 9.8.
+#
+# Fix commit 127e7a6c8942b362aa3c6627f44d660a4fb75312 is genuine: a single
+# non-merge commit by Lua's maintainer, "Fixed bug of old finalized objects in
+# the GC", whose whole diff is lgc.c changing one argument --
+# `markold(g, g->survival, g->reallyold)` becomes
+# `markold(g, g->allgc, g->reallyold)` -- plus the stale comment that asserted
+# the broken invariant. Widening the start cursor to the list head is safe
+# because `markold` already tests `getage(p) == G_OLD1` per element and skips
+# everything else; the nursery segment simply costs one extra pass. The
+# `finobj` walk on the next line needed no change, because `g->finobj` already
+# *is* its list's head.
+#
+# ATTENTION, engine gap. Scanning the whole repository at both revisions with
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` reports 593 findings
+# each, and the finding sets are identical: the only four fingerprints that
+# differ are two VYQL-MEM-006 (low NullableDeref) flags on the two
+# `*psurvival` reads, which move from lgc.c:1152/1160 to lgc.c:1150/1158
+# because the patched comment is two lines shorter. Nothing is reported inside
+# `youngcollection` or `markold` at either revision. `vyql match` on the
+# functions below labels no source and no sink at all -- the only concepts
+# emitted anywhere in them are code.NullableDeref and code.PointerUse on those
+# same two `*psurvival` dereferences. `vyql explain` reports exactly those two
+# low findings and nothing else.
+#
+# No binding can reach this, and the reason is not a missing API name: the
+# vulnerable and patched call sites are the same callee, the same arity, the
+# same argument position, and the same kind of expression -- a pointer field
+# read off the same struct. `g->survival` versus `g->allgc` is the entire
+# difference, and choosing between them requires knowing which field is the
+# list's head. That is a whole-program shape fact about `global_State`,
+# recoverable only from other functions (`luaC_checkfinalizer` walks
+# `for (p = &g->allgc; *p != o; p = &(*p)->next)`, and `youngcollection` itself
+# ends with `g->survival = g->allgc`), never from the call site.
+#
+# Not mechanical, and the narrowing signal that does exist is a new relation,
+# not a missing extraction. The honest in-function signal is a range
+# asymmetry: the sweep half of `youngcollection` covers `&g->allgc` ..
+# `g->survival` and then `g->survival` .. `g->reallyold`, i.e. the whole list,
+# while the mark half covers only the second of those two spans. Stating that
+# needs a structural observation the C frontend does not have -- a
+# list-segment walk and the pair of cursor fields bounding it -- plus a new
+# containment relation between two such spans over the same list, plus a
+# concept and a rule. `internal/extract/frontend/treesitter/c.go` carries 69
+# `analysis.*` observations and the three nearest
+# (`analysis.lifetime.release_then_return`,
+# `analysis.lifetime.realloc_failure_input_free`,
+# `analysis.list.conditional_fallback_double_free`) are all single-statement
+# release patterns; none models a list, a cursor, or a traversal span. This is
+# the same missing ordered-invalidation machinery recorded at rank 1315, one
+# step harder: there the stale alias and the invalidating call were at least
+# both present in one function.
+#
+# The weaker forms are measurably unshippable, and Lua's own source is the
+# measurement. Labelling "a call taking two pointer fields of the same struct
+# as traversal bounds" fires twice in lua/*.c and both hits are in this one
+# function -- `markold(g, g->survival, g->reallyold)` and
+# `markold(g, g->finobj, g->finobjrold)` -- of which the second is correct, so
+# the label is 50% wrong inside the function that contains the CVE. Labelling
+# the walk itself, `for (o = X; o != Y; o = o->next)` with a non-null start
+# cursor, fires six times in lua/*.c: once on `markold` and four times on
+# `checklist` in ltests.c, which walks all four age segments deliberately and
+# whose third loop tests `G_OLD1` exactly as `markold` does. Five false
+# positives to one true positive, in 30k lines, before the shape ever meets a
+# codebase with a real intrusive-list library in it. No definition change
+# attempted.
+#
+# The pair below isolates the construct with the GC vocabulary removed: two
+# functions identical except for which cursor field bounds the walk, with the
+# head-relinking function beside them either way. Scanned on their own, each
+# half reports `No findings.` -- the scanner cannot tell them apart, which is
+# the gap.
+#
+# verify_current_expected: attention-engine-gap, isolating pair below.
+
+test "rank1345: young collection marks OLD1 objects from the survival cursor, skipping finalized objects relinked at the list head"
+  lang c
+  file lgc.c
+  reject VYQL-MEM-007
+  code
+  ```
+  /* a finalized object is returned to 'allgc' at its *head*, keeping its age */
+  static GCObject *udata2finalize (global_State *g) {
+    GCObject *o = g->tobefnz;  /* get first element */
+    lua_assert(tofinalize(o));
+    g->tobefnz = o->next;  /* remove it from 'tobefnz' list */
+    o->next = g->allgc;  /* return it to 'allgc' list */
+    g->allgc = o;
+    resetbit(o->marked, FINALIZEDBIT);  /* object is "normal" again */
+    if (issweepphase(g))
+      makewhite(g, o);  /* "sweep" object */
+    return o;
+  }
+
+
+  /*
+  ** Mark 'OLD1' objects when starting a new young collection.
+  */
+  static void markold (global_State *g, GCObject *from, GCObject *to) {
+    GCObject *p;
+    for (p = from; p != to; p = p->next) {
+      if (getage(p) == G_OLD1) {
+        lua_assert(!iswhite(p));
+        if (isblack(p)) {
+          black2gray(p);  /* should be '2white', but gray works too */
+          reallymarkobject(g, p);
+        }
+      }
+    }
+  }
+
+
+  /*
+  ** Does a young collection. First, mark 'OLD1' objects.  (Only survival
+  ** and "recent old" lists can contain 'OLD1' objects. New lists cannot
+  ** contain 'OLD1' objects, at most 'OLD0' objects that were already
+  ** visited when marked old.) Then does the atomic step. Then,
+  ** sweep all lists and advance pointers. Finally, finish the collection.
+  */
+  static void youngcollection (lua_State *L, global_State *g) {
+    GCObject **psurvival;  /* to point to first non-dead survival object */
+    lua_assert(g->gcstate == GCSpropagate);
+    markold(g, g->survival, g->reallyold);
+    markold(g, g->finobj, g->finobjrold);
+    atomic(L);
+
+    /* sweep nursery and get a pointer to its last live element */
+    psurvival = sweepgen(L, g, &g->allgc, g->survival);
+    /* sweep 'survival' and 'old' */
+    sweepgen(L, g, psurvival, g->reallyold);
+    g->reallyold = g->old;
+    g->old = *psurvival;  /* 'survival' survivals are old now */
+    g->survival = g->allgc;  /* all news are survivals */
+
+    /* repeat for 'finobj' lists */
+    psurvival = sweepgen(L, g, &g->finobj, g->finobjsur);
+    /* sweep 'survival' and 'old' */
+    sweepgen(L, g, psurvival, g->finobjrold);
+    g->finobjrold = g->finobjold;
+    g->finobjold = *psurvival;  /* 'survival' survivals are old now */
+    g->finobjsur = g->finobj;  /* all news are survivals */
+
+    sweepgen(L, g, &g->tobefnz, NULL);
+
+    finishgencycle(L, g);
+  }
+  ```
+
+test "rank1345: young collection marks OLD1 objects from the head of allgc, covering the whole list"
+  lang c
+  file lgc.c
+  reject VYQL-MEM-007
+  code
+  ```
+  /* a finalized object is returned to 'allgc' at its *head*, keeping its age */
+  static GCObject *udata2finalize (global_State *g) {
+    GCObject *o = g->tobefnz;  /* get first element */
+    lua_assert(tofinalize(o));
+    g->tobefnz = o->next;  /* remove it from 'tobefnz' list */
+    o->next = g->allgc;  /* return it to 'allgc' list */
+    g->allgc = o;
+    resetbit(o->marked, FINALIZEDBIT);  /* object is "normal" again */
+    if (issweepphase(g))
+      makewhite(g, o);  /* "sweep" object */
+    return o;
+  }
+
+
+  /*
+  ** Mark 'OLD1' objects when starting a new young collection.
+  */
+  static void markold (global_State *g, GCObject *from, GCObject *to) {
+    GCObject *p;
+    for (p = from; p != to; p = p->next) {
+      if (getage(p) == G_OLD1) {
+        lua_assert(!iswhite(p));
+        if (isblack(p)) {
+          black2gray(p);  /* should be '2white', but gray works too */
+          reallymarkobject(g, p);
+        }
+      }
+    }
+  }
+
+
+  /*
+  ** Does a young collection. First, mark 'OLD1' objects. Then does the
+  ** atomic step. Then, sweep all lists and advance pointers. Finally,
+  ** finish the collection.
+  */
+  static void youngcollection (lua_State *L, global_State *g) {
+    GCObject **psurvival;  /* to point to first non-dead survival object */
+    lua_assert(g->gcstate == GCSpropagate);
+    markold(g, g->allgc, g->reallyold);
+    markold(g, g->finobj, g->finobjrold);
+    atomic(L);
+
+    /* sweep nursery and get a pointer to its last live element */
+    psurvival = sweepgen(L, g, &g->allgc, g->survival);
+    /* sweep 'survival' and 'old' */
+    sweepgen(L, g, psurvival, g->reallyold);
+    g->reallyold = g->old;
+    g->old = *psurvival;  /* 'survival' survivals are old now */
+    g->survival = g->allgc;  /* all news are survivals */
+
+    /* repeat for 'finobj' lists */
+    psurvival = sweepgen(L, g, &g->finobj, g->finobjsur);
+    /* sweep 'survival' and 'old' */
+    sweepgen(L, g, psurvival, g->finobjrold);
+    g->finobjrold = g->finobjold;
+    g->finobjold = *psurvival;  /* 'survival' survivals are old now */
+    g->finobjsur = g->finobj;  /* all news are survivals */
+
+    sweepgen(L, g, &g->tobefnz, NULL);
+
+    finishgencycle(L, g);
+  }
+  ```
+
+test "rank1345: minimal pair -- an intrusive-list segment walk bounded from a mid-list cursor, while another function relinks at the head"
+  lang c
+  file segment_walk.c
+  reject VYQL-MEM-007
+  code
+  ```
+  struct obj { int age; struct obj *next; };
+
+  struct pool {
+    struct obj *head;      /* the list */
+    struct obj *survival;  /* cursor into it */
+    struct obj *oldest;    /* cursor into it */
+    struct obj *pending;
+  };
+
+  extern void keep (struct pool *p, struct obj *o);
+  extern void collect (struct pool *p, struct obj **from, struct obj *to);
+
+  /* an object leaves 'pending' and is relinked at the head of the list */
+  static struct obj *revive (struct pool *p) {
+    struct obj *o = p->pending;
+    p->pending = o->next;
+    o->next = p->head;
+    p->head = o;
+    return o;
+  }
+
+  static void mark_aged (struct pool *p, struct obj *from, struct obj *to) {
+    struct obj *o;
+    for (o = from; o != to; o = o->next) {
+      if (o->age == 1)
+        keep(p, o);
+    }
+  }
+
+  void minor_collect (struct pool *p) {
+    mark_aged(p, p->survival, p->oldest);
+    collect(p, &p->head, p->survival);
+    collect(p, &p->survival, p->oldest);
+  }
+  ```
+
+test "rank1345: minimal pair -- the identical walk bounded from the list head"
+  lang c
+  file segment_walk.c
+  reject VYQL-MEM-007
+  code
+  ```
+  struct obj { int age; struct obj *next; };
+
+  struct pool {
+    struct obj *head;      /* the list */
+    struct obj *survival;  /* cursor into it */
+    struct obj *oldest;    /* cursor into it */
+    struct obj *pending;
+  };
+
+  extern void keep (struct pool *p, struct obj *o);
+  extern void collect (struct pool *p, struct obj **from, struct obj *to);
+
+  /* an object leaves 'pending' and is relinked at the head of the list */
+  static struct obj *revive (struct pool *p) {
+    struct obj *o = p->pending;
+    p->pending = o->next;
+    o->next = p->head;
+    p->head = o;
+    return o;
+  }
+
+  static void mark_aged (struct pool *p, struct obj *from, struct obj *to) {
+    struct obj *o;
+    for (o = from; o != to; o = o->next) {
+      if (o->age == 1)
+        keep(p, o);
+    }
+  }
+
+  void minor_collect (struct pool *p) {
+    mark_aged(p, p->head, p->oldest);
+    collect(p, &p->head, p->survival);
+    collect(p, &p->survival, p->oldest);
+  }
+  ```
