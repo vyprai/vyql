@@ -1,0 +1,307 @@
+# Rank 1329 / CVE-2026-34159: llama.cpp's RPC server
+# (ggml/src/ggml-rpc/ggml-rpc.cpp) turns a wire `rpc_tensor` into a real
+# `ggml_tensor` in `rpc_server::deserialize_tensor`, which resolves the
+# peer-supplied buffer handle against the server's registry and, when the
+# handle is not one it issued, drops the field instead of failing:
+#
+#   result->buffer = reinterpret_cast<ggml_backend_buffer_t>(tensor->buffer);
+#   if (result->buffer && buffers.find(result->buffer) == buffers.end()) {
+#       result->buffer = nullptr;                 // handle not ours
+#   }
+#   if (result->buffer) {                         // bounds check, buffer only
+#       GGML_ASSERT(tensor->data >= buffer_start && ...);
+#   }
+#   result->data = reinterpret_cast<void *>(tensor->data);   // raw wire value
+#   return result;                                // non-null, buffer null
+#
+# So a returned tensor carries two states, and only the `buffer != nullptr`
+# one has had its `data` pointer bounds-checked. `set_tensor`, `get_tensor`,
+# `set_tensor_hash` and `copy_tensor` all reject the second state explicitly
+# (`if (tensor == nullptr || tensor->buffer == nullptr)`); `create_node`, the
+# path `graph_compute` uses to rebuild a peer-described graph, checked only the
+# pointer:
+#
+#   struct ggml_tensor * result = deserialize_tensor(ctx, tensor);
+#   if (result == nullptr) {
+#       return nullptr;
+#   }
+#   tensor_map[id] = result;                      // reaches graph->nodes[i]
+#
+# A peer therefore sends a graph whose node names an unregistered buffer handle
+# and any 64-bit `data` value, and `ggml_backend_graph_compute` operates on a
+# tensor whose data pointer it chose: arbitrary read and write in the RPC
+# server process, remote and unauthenticated (CWE-476 missing null check on the
+# field, exploited as CWE-787 out-of-bounds write; the fix is titled
+# "rpc : RCE patch").
+#
+# Fix 39bf0d3c6a95803e0f41aaba069ffbee26721042 (PR #20908) extends the one
+# guard to the field the other four call sites already check:
+#
+#   if (result == nullptr || result->buffer == nullptr) {
+#       GGML_LOG_ERROR("[%s] invalid tensor: null %s (id=%" PRIu64 ")\n", ...);
+#       return nullptr;
+#   }
+#
+# ATTENTION, engine gap. llama.cpp does not finish inside the scan budget, so
+# the measurement is of the affected directory: `timeout 180 ./bin/vyql scan
+# --cache off --max-ram 6GB .../ggml/src/ggml-rpc` reports 22 findings at the
+# fix's parent -- 15x VYQL-MEM-016, 4x VYQL-MEM-006, 2x VYQL-MEM-008 and
+# 1x VYQL-LIFE-001 -- none of them at `create_node` (1443-1448) or anywhere in
+# `deserialize_tensor`'s guard, and the patched tree reports the same 22. There
+# is no discrimination in either direction. Isolated, both halves of the pair
+# below scan to zero findings.
+#
+# `vyql match` on the isolated functions labels the callee's own field drop and
+# nothing else: `analysis.field.clear_null` fires on `result->buffer = nullptr`
+# and binds to `code.OwnerFieldClear` (a lifecycle-ownership concept), while
+# the caller's `if (result == nullptr)` carries no label of any kind, and the
+# reconstructed graph reaching `ggml_backend_graph_compute` carries none
+# either. The two CWE-476 rules cannot reach it: VYQL-MEM-006
+# (`code.NullableDeref`) flags a dereference with no null exclusion, and here
+# an exclusion *is* present -- just for the pointer, not the field --
+# while VYQL-MEM-018's C/C++ observation
+# (`ccUncheckedNullableResultDerefObservations`, emitting
+# `analysis.nullable_result.unchecked_deref`) requires the call result to be
+# stored *into a field* (`x->y = f(...)`) and then dereferenced with no null
+# check at all, so a plain local that is null-checked is doubly outside it.
+#
+# Taint cannot substitute for the missing judgement here either, and for a
+# reason already on record: the RPC payload never becomes tainted at all,
+# because `recv_data` is `recv(sockfd, (char *)data + bytes_recv, ...)` and a
+# read-style source taints only the return value, not the buffer it fills --
+# the rank 1206 gap (sibling case at rank 1304). `code.HttpInput` is labelled
+# at ggml-rpc.cpp:402 and stops there.
+#
+# The missing fact is interprocedural and about a post-condition, not a data
+# path: "a function conditionally assigns null to a field of the object it
+# returns and returns it anyway, and a caller validates the returned pointer
+# without validating that field." Nothing in
+# `internal/extract/frontend/treesitter/c.go` relates a callee's body to a
+# caller's guard -- all ~90 `analysis.*` observations there are single-function
+# text matches -- and binding queries compare a field to a literal, so the
+# relation cannot come from data either. New classification and a new relation
+# between two functions: not mechanical.
+#
+# Worth the sweep, because the narrow form measures well rather than badly.
+# Over all of llama.cpp the naive shape a rule could key on today -- a call
+# result assigned to a pointer local and null-checked before use -- occurs at
+# 149 sites in 65 files, one of which is this CVE, so that granularity is
+# unshippable. Adding the callee half collapses it: functions that
+# conditionally null a field of the object they return number 8 in the whole
+# tree, vendored miniaudio included. One of those 8 is
+# `apir_deserialize_tensor` in ggml/src/ggml-virtgpu/backend, whose
+# `apir_create_node` has the identical `if (result == nullptr)` guard and is
+# untouched by the fix -- so the fact would have paid for itself twice in this
+# repository alone.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1329: rpc graph node accepts a deserialized tensor whose buffer handle was rejected"
+  lang cpp
+  file ggml-rpc.cpp
+  reject VYQL-MEM-006
+  reject VYQL-MEM-018
+  reject_review code.NullableDeref
+  reject_review code.UncheckedNullableResultDeref
+  code
+  ```
+  ggml_tensor * rpc_server::deserialize_tensor(struct ggml_context * ctx, const rpc_tensor * tensor) {
+      if (tensor->type >= GGML_TYPE_COUNT) {
+          return nullptr;
+      }
+      ggml_tensor * result = ggml_new_tensor_4d(ctx, (ggml_type) tensor->type,
+          tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);
+      if (result == nullptr) {
+          return nullptr;
+      }
+      result->buffer = reinterpret_cast<ggml_backend_buffer_t>(tensor->buffer);
+      if (result->buffer && buffers.find(result->buffer) == buffers.end()) {
+          result->buffer = nullptr;
+      }
+      if (result->buffer) {
+          uint64_t tensor_size = (uint64_t) ggml_nbytes(result);
+          uint64_t buffer_start = (uint64_t) ggml_backend_buffer_get_base(result->buffer);
+          uint64_t buffer_size = (uint64_t) ggml_backend_buffer_get_size(result->buffer);
+          GGML_ASSERT(tensor->data >= buffer_start && tensor->data + tensor_size <= buffer_start + buffer_size);
+      }
+      result->data = reinterpret_cast<void *>(tensor->data);
+      return result;
+  }
+
+  ggml_tensor * rpc_server::create_node(uint64_t id,
+                                        struct ggml_context * ctx,
+                                        const std::unordered_map<uint64_t, const rpc_tensor*> & tensor_ptrs,
+                                        std::unordered_map<uint64_t, struct ggml_tensor*> & tensor_map) {
+      if (tensor_map.find(id) != tensor_map.end()) {
+          return tensor_map[id];
+      }
+      auto it_ptr = tensor_ptrs.find(id);
+      if (it_ptr == tensor_ptrs.end()) {
+          return nullptr;
+      }
+      const rpc_tensor * tensor = it_ptr->second;
+
+      struct ggml_tensor * result = deserialize_tensor(ctx, tensor);
+      if (result == nullptr) {
+          return nullptr;
+      }
+      tensor_map[id] = result;
+      result->view_offs = tensor->view_offs;
+      return result;
+  }
+
+  bool rpc_server::graph_compute(const std::vector<uint8_t> & input) {
+      const uint8_t * src = input.data();
+      const rpc_tensor * tensors = (const rpc_tensor *)src;
+      std::unordered_map<uint64_t, const rpc_tensor*> tensor_ptrs;
+      for (uint32_t i = 0; i < n_tensors; i++) {
+          tensor_ptrs.emplace(tensors[i].id, &tensors[i]);
+      }
+      std::unordered_map<uint64_t, ggml_tensor*> tensor_map;
+      for (uint32_t i = 0; i < n_nodes; i++) {
+          graph->nodes[i] = create_node(nodes[i], ctx, tensor_ptrs, tensor_map);
+      }
+      ggml_status status = ggml_backend_graph_compute(backends[device], graph);
+      return true;
+  }
+  ```
+
+test "rank1329: fix rejects the node when the deserialized tensor carries no buffer"
+  lang cpp
+  file ggml-rpc.cpp
+  reject VYQL-MEM-006
+  reject VYQL-MEM-018
+  reject_review code.NullableDeref
+  reject_review code.UncheckedNullableResultDeref
+  code
+  ```
+  ggml_tensor * rpc_server::deserialize_tensor(struct ggml_context * ctx, const rpc_tensor * tensor) {
+      if (tensor->type >= GGML_TYPE_COUNT) {
+          return nullptr;
+      }
+      ggml_tensor * result = ggml_new_tensor_4d(ctx, (ggml_type) tensor->type,
+          tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);
+      if (result == nullptr) {
+          return nullptr;
+      }
+      result->buffer = reinterpret_cast<ggml_backend_buffer_t>(tensor->buffer);
+      if (result->buffer && buffers.find(result->buffer) == buffers.end()) {
+          result->buffer = nullptr;
+      }
+      if (result->buffer) {
+          uint64_t tensor_size = (uint64_t) ggml_nbytes(result);
+          uint64_t buffer_start = (uint64_t) ggml_backend_buffer_get_base(result->buffer);
+          uint64_t buffer_size = (uint64_t) ggml_backend_buffer_get_size(result->buffer);
+          GGML_ASSERT(tensor->data >= buffer_start && tensor->data + tensor_size <= buffer_start + buffer_size);
+      }
+      result->data = reinterpret_cast<void *>(tensor->data);
+      return result;
+  }
+
+  ggml_tensor * rpc_server::create_node(uint64_t id,
+                                        struct ggml_context * ctx,
+                                        const std::unordered_map<uint64_t, const rpc_tensor*> & tensor_ptrs,
+                                        std::unordered_map<uint64_t, struct ggml_tensor*> & tensor_map) {
+      if (tensor_map.find(id) != tensor_map.end()) {
+          return tensor_map[id];
+      }
+      auto it_ptr = tensor_ptrs.find(id);
+      if (it_ptr == tensor_ptrs.end()) {
+          return nullptr;
+      }
+      const rpc_tensor * tensor = it_ptr->second;
+
+      struct ggml_tensor * result = deserialize_tensor(ctx, tensor);
+      if (result == nullptr || result->buffer == nullptr) {
+          GGML_LOG_ERROR("[%s] invalid tensor: null %s (id=%" PRIu64 ")\n",
+                         __func__, result == nullptr ? "tensor" : "buffer", id);
+          return nullptr;
+      }
+      tensor_map[id] = result;
+      result->view_offs = tensor->view_offs;
+      return result;
+  }
+
+  bool rpc_server::graph_compute(const std::vector<uint8_t> & input) {
+      const uint8_t * src = input.data();
+      const rpc_tensor * tensors = (const rpc_tensor *)src;
+      std::unordered_map<uint64_t, const rpc_tensor*> tensor_ptrs;
+      for (uint32_t i = 0; i < n_tensors; i++) {
+          tensor_ptrs.emplace(tensors[i].id, &tensors[i]);
+      }
+      std::unordered_map<uint64_t, ggml_tensor*> tensor_map;
+      for (uint32_t i = 0; i < n_nodes; i++) {
+          graph->nodes[i] = create_node(nodes[i], ctx, tensor_ptrs, tensor_map);
+      }
+      ggml_status status = ggml_backend_graph_compute(backends[device], graph);
+      return true;
+  }
+  ```
+
+test "rank1329: minimal pair -- caller null-checks the factory result but not the field the factory drops"
+  lang cpp
+  file lookup.cpp
+  reject VYQL-MEM-006
+  reject VYQL-MEM-018
+  reject_review code.NullableDeref
+  reject_review code.UncheckedNullableResultDeref
+  code
+  ```
+  struct wire_t { unsigned long handle; unsigned long data; };
+  struct obj_t { void * buf; void * data; };
+
+  static obj_t * lookup(const wire_t * w) {
+      obj_t * o = alloc_obj();
+      if (o == nullptr) {
+          return nullptr;
+      }
+      o->buf = reinterpret_cast<void *>(w->handle);
+      if (o->buf && !registered(o->buf)) {
+          o->buf = nullptr;
+      }
+      o->data = reinterpret_cast<void *>(w->data);
+      return o;
+  }
+
+  void run(const wire_t * w) {
+      obj_t * o = lookup(w);
+      if (o == nullptr) {
+          return;
+      }
+      execute(o);
+  }
+  ```
+
+test "rank1329: minimal pair -- the identical caller extending its guard to the dropped field"
+  lang cpp
+  file lookup.cpp
+  reject VYQL-MEM-006
+  reject VYQL-MEM-018
+  reject_review code.NullableDeref
+  reject_review code.UncheckedNullableResultDeref
+  code
+  ```
+  struct wire_t { unsigned long handle; unsigned long data; };
+  struct obj_t { void * buf; void * data; };
+
+  static obj_t * lookup(const wire_t * w) {
+      obj_t * o = alloc_obj();
+      if (o == nullptr) {
+          return nullptr;
+      }
+      o->buf = reinterpret_cast<void *>(w->handle);
+      if (o->buf && !registered(o->buf)) {
+          o->buf = nullptr;
+      }
+      o->data = reinterpret_cast<void *>(w->data);
+      return o;
+  }
+
+  void run(const wire_t * w) {
+      obj_t * o = lookup(w);
+      if (o == nullptr || o->buf == nullptr) {
+          return;
+      }
+      execute(o);
+  }
+  ```
