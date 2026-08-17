@@ -1,0 +1,463 @@
+# marked's block and inline lexers consume their source buffer branch by branch:
+# a tokenizer that matches returns a token, the loop cuts `token.raw.length`
+# characters off the front of `src`, and `continue` restarts it. Each loop states
+# the invariant that termination rests on in code -- its last statement is
+# `if (src) { const errMsg = 'Infinite loop on byte: ' + src.charCodeAt(0); ... }`
+# -- and states it in the one position that cannot enforce it: the bailout is
+# reached only once every tokenizer has declined, so a tokenizer that matches
+# while returning a zero-length `raw` restarts the loop on a buffer it never
+# changed, forever. `Tokenizer.code` did exactly that. It set
+# `raw = trimTrailingBlankLines(cap[0])`, and that helper tested each line with
+# `String.trim()`, which counts a vertical tab as blank, while the rest of the
+# parser tests blankness with `other.blankLine` (`/^[ \t]*$/`), which does not.
+# The three bytes `\t\v\n` therefore matched the indented-code rule and trimmed
+# back to the empty string: `src.substring(0)` is `src`, the token is truthy, and
+# `continue` jumps over the bailout. Each iteration allocates another token and
+# concatenates another string, so 18.0.0 and 18.0.1 exhaust a Node heap on a
+# three-byte document.
+#
+# Fix commit 58a52e8a49c60b375b5aab8f82a339f589e79a36 is genuine: a single
+# non-merge commit whose parent is the 18.0.1 release commit, released as 18.0.2.
+# It carries `srcLength` progress checks at the head of both loops -- `if
+# (src.length < srcLength) { srcLength = src.length } else { bail; break }` --
+# switches `trimTrailingBlankLines` to `other.blankLine`, factors the two copies
+# of the bailout into `infiniteLoopError`, and adds
+# `test/specs/redos/code_blank_line.cjs` holding `markdown: '\t\v\n'`, the
+# reported input verbatim.
+#
+# ATTENTION, engine gap. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`
+# over the repository reports 139 findings at the vulnerable revision and 139 at
+# the fixed one. Four rows touch `src/Lexer.ts` at the vulnerable revision and
+# none of them is about termination: VYQL-INJ-134 on `blockTokens`'s nested-path
+# writes, VYQL-INJ-004 at :192, and VYQL-INJ-009 with VYQL-SEC-001 at :280 --
+# which is the `console.error(errMsg)` inside the bailout itself, read as a log
+# sink. `vyql match` over the loop alone reports no source at all, and the only
+# labels anywhere in it are that same `console.error` as code.LogOutput,
+# code.LogWriteSink and code.LogWrite. `vyql explain` reports `No findings.`
+# There is no taint path to find and no API to bind: both revisions call the same
+# `String.prototype.substring` with the same argument expression, and what
+# separates them is where a length comparison sits relative to the branches that
+# restart the loop.
+#
+# The nearest existing vocabulary is two rules for this same weakness, each built
+# for one shape: code.BufReadDiscardLoopWithoutEofGuard (VYQL-DOS-028, fed by a
+# Rust frontend observation) and code.NumericParserMissingProgressCheck
+# (VYQL-DOS-029, fed by a C one), both carrying `[CWE_400, CWE_835]`, each with
+# its own concept, review twin and rule. Neither reaches JavaScript, and a third
+# per-shape sibling is the wrong answer -- generalising one of these two, so the
+# concept describes any scanning loop that can fail to advance and the frontends
+# feed it, is what keeps one weakness class in one place.
+#
+# A JavaScript fact for this shape was built and measured, and it fails twice.
+#
+# Confinement. The fact was a boolean token added for a `while_statement` in the
+# JavaScript structured-context walk, consumed by a function-scoped binding.
+# `jsFunctionContext` walks a function's entire body subtree with no function-like
+# cutoff, so every enclosing function expression, arrow and declaration in the
+# chain receives any token a nested loop produces. One loop inside an arrow that
+# returns it reports twice, once at the arrow and once at the loop's own function.
+# limesurvey's vendored `assets/packages/ckeditor/plugins/markdown/js/marked.js`
+# reports three times for two loops: :149 and :560 are the real lexers and :7 is
+# the file's `;(function() {` wrapper, which contains no loop at all. The clean
+# one-row-per-loop result on marked's own source is a property of its layout --
+# both loops are class methods, whose bodies no outer function-like node
+# encloses -- not of the fact.
+#
+# Discriminator. Crediting a progress check only when a textual `buf.length`
+# comparison sits in a statement strictly before the first restarting branch
+# encodes where marked wrote its fix, not what enforcement is. Four loops that do
+# enforce progress are reported: one comparing `src.length` against a length read
+# inside the restarting branch, on every restarting path; one carrying
+# `if (src === previous) { throw } previous = src;` at the head; one carrying
+# `if (++guard > 100000) { throw }`; and one whose every branch is an anchored
+# regex that cannot match fewer than one character. The same reading misses the
+# rest of the weakness class: a `for (;;)` scanner over an index cursor, the shape
+# other markdown lexers use, and `do`/`while` are not read at all. It fails upward
+# and sideways at once, and because the enforcement test lives in Go rather than
+# in the rule's `unless`, correcting either direction costs another engine change.
+#
+# What a fact that ships needs, then: attribution to the innermost enclosing
+# function rather than every enclosing function-like node; a progress check
+# credited anywhere on the restarting path rather than only ahead of the first
+# restarting branch; the neutralising controls -- an identity comparison carried
+# across iterations, a bounded iteration counter, branches anchored so every match
+# consumes -- expressed as rule-level `unless` clauses over emitted controls
+# rather than as exclusions in Go; and either `for (;;)`, `do`/`while` and
+# index-cursor scanning covered too, or a concept that says in its own text that
+# it reads `while` loops over a string buffer and nothing else.
+#
+# The cases below are the real vulnerable and fixed loops, the enforcing forms
+# that any fact has to stay quiet on, and the cursor form it has to reach. Every
+# one of them reports nothing today, which is the gap.
+#
+# verify_current_expected: attention-engine-gap, cases below record the current miss.
+
+test "rank1358: block lexer loop restarts on a token length with the progress bailout after every continue"
+  lang javascript
+  file src/Lexer.ts
+  reject VYQL-DOS-029
+  reject_review code.NumericParserMissingProgressCheck
+  code
+  ```
+  export class _Lexer {
+    blockTokens(src: string, tokens: Token[] = []) {
+      this.tokenizer.lexer = this;
+
+      while (src) {
+        let token: Tokens.Generic | undefined;
+
+        // newline
+        if (token = this.tokenizer.space(src)) {
+          src = src.substring(token.raw.length);
+          tokens.push(token);
+          continue;
+        }
+
+        // code
+        if (token = this.tokenizer.code(src)) {
+          src = src.substring(token.raw.length);
+          tokens.push(token);
+          continue;
+        }
+
+        // fences
+        if (token = this.tokenizer.fences(src)) {
+          src = src.substring(token.raw.length);
+          tokens.push(token);
+          continue;
+        }
+
+        // text
+        if (token = this.tokenizer.text(src)) {
+          src = src.substring(token.raw.length);
+          tokens.push(token);
+          continue;
+        }
+
+        if (src) {
+          const errMsg = 'Infinite loop on byte: ' + src.charCodeAt(0);
+          if (this.options.silent) {
+            console.error(errMsg);
+            break;
+          } else {
+            throw new Error(errMsg);
+          }
+        }
+      }
+
+      return tokens;
+    }
+
+    code(src: string): Tokens.Code | undefined {
+      const cap = this.rules.block.code.exec(src);
+      if (cap) {
+        const raw = trimTrailingBlankLines(cap[0]);
+        return { type: 'code', raw, codeBlockStyle: 'indented', text: raw };
+      }
+    }
+  }
+
+  export function trimTrailingBlankLines(str: string) {
+    const lines = str.split('\n');
+    let end = lines.length - 1;
+    while (end >= 0 && !lines[end].trim()) {
+      end--;
+    }
+    if (lines.length - end <= 2) {
+      return str;
+    }
+    return lines.slice(0, end + 1).join('\n');
+  }
+  ```
+
+test "rank1358: inline lexer loop restarts on a token length with the same bailout placement"
+  lang javascript
+  file src/Lexer.ts
+  reject VYQL-DOS-029
+  reject_review code.NumericParserMissingProgressCheck
+  code
+  ```
+  export class _Lexer {
+    inlineTokens(src: string, tokens: Token[] = []): Token[] {
+      let keepPrevChar = false;
+      let prevChar = '';
+
+      while (src) {
+        if (!keepPrevChar) {
+          prevChar = '';
+        }
+        keepPrevChar = false;
+
+        let token: Tokens.Generic | undefined;
+
+        // escape
+        if (token = this.tokenizer.escape(src)) {
+          src = src.substring(token.raw.length);
+          tokens.push(token);
+          continue;
+        }
+
+        // tag
+        if (token = this.tokenizer.tag(src)) {
+          src = src.substring(token.raw.length);
+          tokens.push(token);
+          continue;
+        }
+
+        // em & strong
+        if (token = this.tokenizer.emStrong(src, src, prevChar)) {
+          src = src.substring(token.raw.length);
+          tokens.push(token);
+          continue;
+        }
+
+        // codespan
+        if (token = this.tokenizer.codespan(src)) {
+          src = src.substring(token.raw.length);
+          tokens.push(token);
+          continue;
+        }
+
+        if (src) {
+          const errMsg = 'Infinite loop on byte: ' + src.charCodeAt(0);
+          if (this.options.silent) {
+            console.error(errMsg);
+            break;
+          } else {
+            throw new Error(errMsg);
+          }
+        }
+      }
+
+      return tokens;
+    }
+  }
+  ```
+
+test "rank1358: block lexer loop compares the buffer length at the head of the loop"
+  lang javascript
+  file src/Lexer.ts
+  reject VYQL-DOS-029
+  reject_review code.NumericParserMissingProgressCheck
+  code
+  ```
+  export class _Lexer {
+    blockTokens(src: string, tokens: Token[] = []) {
+      this.tokenizer.lexer = this;
+
+      let srcLength = Infinity;
+      while (src) {
+        if (src.length < srcLength) {
+          srcLength = src.length;
+        } else {
+          this.infiniteLoopError(src.charCodeAt(0));
+          break;
+        }
+
+        let token: Tokens.Generic | undefined;
+
+        // newline
+        if (token = this.tokenizer.space(src)) {
+          src = src.substring(token.raw.length);
+          tokens.push(token);
+          continue;
+        }
+
+        // code
+        if (token = this.tokenizer.code(src)) {
+          src = src.substring(token.raw.length);
+          tokens.push(token);
+          continue;
+        }
+
+        // text
+        if (token = this.tokenizer.text(src)) {
+          src = src.substring(token.raw.length);
+          tokens.push(token);
+          continue;
+        }
+
+        if (src) {
+          this.infiniteLoopError(src.charCodeAt(0));
+          break;
+        }
+      }
+
+      return tokens;
+    }
+
+    private infiniteLoopError(byte: number) {
+      const errMsg = 'Infinite loop on byte: ' + byte;
+      if (this.options.silent) {
+        console.error(errMsg);
+      } else {
+        throw new Error(errMsg);
+      }
+    }
+  }
+  ```
+
+test "rank1358: scanning loop that consumes its buffer without stating a progress invariant"
+  lang javascript
+  file src/scanner.ts
+  reject VYQL-DOS-029
+  reject_review code.NumericParserMissingProgressCheck
+  code
+  ```
+  export function scan(src: string) {
+    const tokens: string[] = [];
+
+    while (src) {
+      const space = /^[ \t]+/.exec(src);
+      if (space) {
+        src = src.substring(space[0].length);
+        continue;
+      }
+
+      const word = /^[A-Za-z]+/.exec(src);
+      if (word) {
+        src = src.substring(word[0].length);
+        tokens.push(word[0]);
+        continue;
+      }
+
+      tokens.push(src.charAt(0));
+      src = src.substring(1);
+    }
+
+    return tokens;
+  }
+  ```
+
+test "rank1358: scanning loop that compares the buffer length inside the restarting branch"
+  lang javascript
+  file src/scanner.ts
+  reject VYQL-DOS-029
+  reject_review code.NumericParserMissingProgressCheck
+  code
+  ```
+  export function scan(src: string, tokens: Token[] = []) {
+    while (src) {
+      let token: Token | undefined;
+
+      if (token = space(src)) {
+        const before = src.length;
+        src = src.substring(token.raw.length);
+        if (src.length === before) {
+          throw new Error('tokenizer consumed nothing');
+        }
+        tokens.push(token);
+        continue;
+      }
+
+      if (src) {
+        throw new Error('Infinite loop on byte: ' + src.charCodeAt(0));
+      }
+    }
+
+    return tokens;
+  }
+  ```
+
+test "rank1358: scanning loop guarded by an identity comparison carried across iterations"
+  lang javascript
+  file src/scanner.ts
+  reject VYQL-DOS-029
+  reject_review code.NumericParserMissingProgressCheck
+  code
+  ```
+  export function scan(src: string, tokens: Token[] = []) {
+    let previous = '';
+
+    while (src) {
+      if (src === previous) {
+        throw new Error('tokenizer consumed nothing');
+      }
+      previous = src;
+
+      let token: Token | undefined;
+
+      if (token = space(src)) {
+        src = src.substring(token.raw.length);
+        tokens.push(token);
+        continue;
+      }
+
+      if (src) {
+        throw new Error('Infinite loop on byte: ' + src.charCodeAt(0));
+      }
+    }
+
+    return tokens;
+  }
+  ```
+
+test "rank1358: scanning loop guarded by a bounded iteration counter"
+  lang javascript
+  file src/scanner.ts
+  reject VYQL-DOS-029
+  reject_review code.NumericParserMissingProgressCheck
+  code
+  ```
+  export function scan(src: string, tokens: Token[] = []) {
+    let guard = 0;
+
+    while (src) {
+      if (++guard > 100000) {
+        throw new Error('too many iterations');
+      }
+
+      let token: Token | undefined;
+
+      if (token = space(src)) {
+        src = src.substring(token.raw.length);
+        tokens.push(token);
+        continue;
+      }
+
+      if (src) {
+        throw new Error('Infinite loop on byte: ' + src.charCodeAt(0));
+      }
+    }
+
+    return tokens;
+  }
+  ```
+
+test "rank1358: cursor scanner whose bailout follows every restart over an index rather than a buffer"
+  lang javascript
+  file src/scanner.ts
+  reject VYQL-DOS-029
+  reject_review code.NumericParserMissingProgressCheck
+  code
+  ```
+  export function scan(src: string, tokens: Token[] = []) {
+    let pos = 0;
+
+    for (;;) {
+      if (pos >= src.length) {
+        break;
+      }
+
+      let token: Token | undefined;
+
+      if (token = space(src, pos)) {
+        pos += token.raw.length;
+        tokens.push(token);
+        continue;
+      }
+
+      if (token = text(src, pos)) {
+        pos += token.raw.length;
+        tokens.push(token);
+        continue;
+      }
+
+      if (pos < src.length) {
+        throw new Error('Infinite loop on byte: ' + src.charCodeAt(pos));
+      }
+    }
+
+    return tokens;
+  }
+  ```
