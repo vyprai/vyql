@@ -1,0 +1,95 @@
+# Rank 1576 / CVE-2022-30595: Pillow's TGA RLE decoder kept two
+# byte counters but only decremented one of them in the raw-packet
+# path, so the outer loop's bound went stale and decoding continued
+# past the buffer end (out-of-bounds read, CWE-125/CWE-835). The
+# copy loop in src/libImaging/TgaRleDecode.c did `memcpy(state->
+# buffer + state->x, ptr, n); ptr += n; extra_bytes -= n;` -- the
+# bytes counter that bounds the whole decode call never shrank by n,
+# so a truncated scan line (the added cross_scan_line_truncated.tga
+# fixture) left the decoder believing data remained. Pool commit
+# c846cc881e is the real fix (COMMIT_OK -- "When reading past the
+# end of a scan line, reduce bytes left"): the single line `bytes
+# -= n;` joins the other two decrements. No pool correction.
+#
+# ATTENTION, counter-set synchronization. The defect is one loop
+# maintaining several length counters whose updates diverge on one
+# path -- the missing-progress family VYQL-DOS-029 names for parsers
+# (rank 1560's continue skipped its increment; here a branch omits
+# its decrement), with the OOB read as the consequence: no
+# observation asks "does every consumed chunk decrement every bound
+# it belongs to" -- multi-counter coherence is loop-carried
+# vocabulary. A binding on Pillow's own decoder would detect this
+# library rather than the weakness. Measured on the real code:
+# scanning TgaRleDecode.c reports 5 findings at both revisions
+# (memory heuristics; none change with the fix). No ENGINE-GAPS.md
+# entry. No definition change shipped. Spec cve_rank1576 records the
+# raw-packet copy without the outer decrement and the synchronized
+# form, both asserting reject VYQL-DOS-029: when counter-coherence
+# vocabulary lands, the missing-decrement form must flip to expect.
+
+test "rank1576: the raw packet leaves the outer bound stale"
+  lang c
+  file src/libImaging/TgaRleDecode.c
+  reject VYQL-DOS-029
+  code
+  ```
+  #include <string.h>
+  #include <stdint.h>
+
+  int decode_scan_line(uint8_t *buffer, int *x, const uint8_t *ptr,
+                       int bytes, int extra_bytes)
+  {
+      while (bytes > 0 && extra_bytes > 0) {
+          uint8_t b = *ptr++;
+
+          if (b & 0x80) {
+              int n = (b & 0x7f) + 1;
+              memset(buffer + *x, *ptr++, n);
+              *x += n;
+              bytes -= n;
+              extra_bytes -= n;
+          } else {
+              int n = (b & 0x7f) + 1;
+              memcpy(buffer + *x, ptr, n);
+              ptr += n;
+              extra_bytes -= n;
+              *x += n;
+          }
+      }
+      return *x;
+  }
+  ```
+
+test "rank1576: the fix decrements every counter it consumes"
+  lang c
+  file src/libImaging/TgaRleDecode.c
+  reject VYQL-DOS-029
+  code
+  ```
+  #include <string.h>
+  #include <stdint.h>
+
+  int decode_scan_line(uint8_t *buffer, int *x, const uint8_t *ptr,
+                       int bytes, int extra_bytes)
+  {
+      while (bytes > 0 && extra_bytes > 0) {
+          uint8_t b = *ptr++;
+
+          if (b & 0x80) {
+              int n = (b & 0x7f) + 1;
+              memset(buffer + *x, *ptr++, n);
+              *x += n;
+              bytes -= n;
+              extra_bytes -= n;
+          } else {
+              int n = (b & 0x7f) + 1;
+              memcpy(buffer + *x, ptr, n);
+              ptr += n;
+              bytes -= n;
+              extra_bytes -= n;
+              *x += n;
+          }
+      }
+      return *x;
+  }
+  ```
