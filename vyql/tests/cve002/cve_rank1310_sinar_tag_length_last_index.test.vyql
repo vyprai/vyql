@@ -1,0 +1,204 @@
+# Rank 1310 / CVE-2017-6886 (Secunia SA75000): LibRaw's TIFF IFD parser reads
+# the Sinar tag's (50454/50455) length straight off the file and sizes a heap
+# buffer with it:
+#
+#   case 50454: /* Sinar tag */
+#   case 50455:
+#     if (len > 2560000 || !(cbuf = (char *)malloc(len)))
+#       break;
+#     if (fread(cbuf, 1, len, ifp) != len)
+#       throw LIBRAW_EXCEPTION_IO_CORRUPT;
+#     cbuf[len - 1] = 0;
+#
+# (internal/dcraw_common.cpp:11852 and dcraw/dcraw.c:13180, parse_tiff_ifd;
+# `len` comes from tiff_get(), i.e. get4() on the IFD entry). Only an upper
+# bound is checked, so a crafted raw file declaring length 0 reaches
+# malloc(0) -- which legitimately returns a non-NULL minimal allocation -- and
+# `cbuf[len - 1]` then writes a NUL one byte *before* the allocation
+# (CWE-787/CWE-119). Fix d7c3d2cb46 adds the missing lower bound,
+# `if (len < 1 || len > 2560000 || ...)`, leaving everything after it
+# unchanged. The same commit closes two more overruns in the same parser: an
+# unbounded `ifd++` in the DSLR-A100 SubIFD branch (guarded afterwards with
+# `ifd >= sizeof tiff_ifd / sizeof tiff_ifd[0]`), and parse_jpeg's
+# `parse_ciff(save + hlen, len - hlen, 0)` on an unvalidated file-derived
+# `hlen` (guarded afterwards with `(save+hlen) <= ifp->size()`).
+#
+# ATTENTION, engine gap, the same one already on record at rank 1295: the
+# last-element analysis (ccLastElementCountExpr in
+# internal/extract/frontend/treesitter/c.go, feeding
+# ccIndexAccessObservations -> code.ZeroCountLastElementAccess /
+# VYQL-MEM-041) recognizes a `count - 1` subscript only when the count
+# expression itself is struct/field-derived, because ccLastElementCountExpr
+# gates on ccStructuredIndex(count), which requires "->" or "." in the count
+# text. LibRaw's count is `len`, a plain `int` local filled from get4(), so
+# the subscript is never examined at all.
+#
+# What makes this rank worth pinning beside 1295 is that the *guard* half of
+# the analysis already handles LibRaw's exact fix idiom: ccHasNonZeroGuard
+# matches `<1` on the count, so `if (len < 1) ...` before the subscript is
+# recognized as the neutralising control. The three-way pair below measures
+# it: a struct-field count with no lower bound fires VYQL-MEM-041; the same
+# field count behind `if (s->len < 1) return;` -- textually the fix -- is
+# silent; the identical shape with a plain local count is silent whether
+# guarded or not. Closing the bare-identifier gate would therefore give exact
+# discrimination on both revisions of this parser, with no change to the
+# guard analysis.
+#
+# Real-repository scan at the vulnerable parent (bounded, --cache off,
+# --max-ram 6GB): 3259 findings, exactly one VYQL-MEM-041 in the whole
+# checkout, at dcraw/dcraw.c:19207 (`th->tag[th->ntag - 1]` in the TIFF
+# *writer*, unrelated and safe). The vulnerable line is reported only by
+# VYQL-MEM-005 (dcraw/dcraw.c:13188, source the fread on 13183) and
+# low-confidence VYQL-NUM-003; neither rule carries a range-check `unless`,
+# so both fire identically on the patched revision -- coincidental true
+# positives, no discrimination. The parse_jpeg site behaves the same way:
+# VYQL-NUM-003 reports `parse_ciff(save + hlen, ...)` before and after the
+# fix. The `ifd++` site is invisible for a related but separately logged
+# reason -- `tiff_ifd[ifd]`'s index is also a plain local, the
+# missing-upper-bound half of the same ccStructuredIndex gate already
+# recorded for ranks 1026/1032/1038.
+#
+# Not mechanical, for the reason recorded at 1295: ccStructuredIndex is
+# shared with the FieldDerivedIndexAccess upper-bound analysis, and
+# `buf[len - 1]` on a plain local is a very common and usually-safe C idiom
+# (trailing-separator strip, last-byte read after a length check made
+# earlier). Deciding how much of that idiom to report is a precision
+# judgment, not a bounded correction, so no definition change is attempted
+# here.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1310: Sinar tag sizes a heap buffer from a file-derived length checked only for an upper bound"
+  lang c
+  file dcraw_common.c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  static FILE *ifp;
+  static int order;
+  static float cam_mul[4];
+
+  static unsigned sget4(unsigned char *s)
+  {
+    if (order == 0x4949)
+      return s[0] | s[1] << 8 | s[2] << 16 | s[3] << 24;
+    else
+      return s[0] << 24 | s[1] << 16 | s[2] << 8 | s[3];
+  }
+
+  static unsigned get4(void)
+  {
+    unsigned char str[4] = {0xff, 0xff, 0xff, 0xff};
+    fread(str, 1, 4, ifp);
+    return sget4(str);
+  }
+
+  void parse_sinar_tag(void)
+  {
+    int len;
+    char *cbuf, *cp;
+
+    len = get4();
+    if (len > 2560000 || !(cbuf = (char *)malloc(len)))
+      return;
+    if (fread(cbuf, 1, len, ifp) != (size_t)len)
+      return;
+    cbuf[len - 1] = 0;
+    for (cp = cbuf - 1; cp && cp < cbuf + len; cp = strchr(cp, '\n'))
+      if (!strncmp(++cp, "Neutral ", 8))
+        sscanf(cp + 8, "%f %f %f", cam_mul, cam_mul + 1, cam_mul + 2);
+    free(cbuf);
+  }
+  ```
+
+test "rank1310: fix adds the missing lower bound on the Sinar tag length"
+  lang c
+  file dcraw_common.c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  static FILE *ifp;
+  static int order;
+  static float cam_mul[4];
+
+  static unsigned sget4(unsigned char *s)
+  {
+    if (order == 0x4949)
+      return s[0] | s[1] << 8 | s[2] << 16 | s[3] << 24;
+    else
+      return s[0] << 24 | s[1] << 16 | s[2] << 8 | s[3];
+  }
+
+  static unsigned get4(void)
+  {
+    unsigned char str[4] = {0xff, 0xff, 0xff, 0xff};
+    fread(str, 1, 4, ifp);
+    return sget4(str);
+  }
+
+  void parse_sinar_tag(void)
+  {
+    int len;
+    char *cbuf, *cp;
+
+    len = get4();
+    if (len < 1 || len > 2560000 || !(cbuf = (char *)malloc(len)))
+      return;
+    if (fread(cbuf, 1, len, ifp) != (size_t)len)
+      return;
+    cbuf[len - 1] = 0;
+    for (cp = cbuf - 1; cp && cp < cbuf + len; cp = strchr(cp, '\n'))
+      if (!strncmp(++cp, "Neutral ", 8))
+        sscanf(cp + 8, "%f %f %f", cam_mul, cam_mul + 1, cam_mul + 2);
+    free(cbuf);
+  }
+  ```
+
+test "rank1310: minimal pair — a struct-field count with no lower bound is caught"
+  lang c
+  expect VYQL-MEM-041
+  expect_review code.ZeroCountLastElementAccess
+  code
+  ```
+  struct sinar { unsigned len; char *cbuf; };
+
+  void field_derived(struct sinar *s) {
+      s->cbuf[s->len - 1] = 0;
+  }
+  ```
+
+test "rank1310: minimal pair — the fix's `< 1` lower bound already neutralises the field-derived form"
+  lang c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  struct sinar { unsigned len; char *cbuf; };
+
+  void field_derived_guarded(struct sinar *s) {
+      if (s->len < 1)
+          return;
+      s->cbuf[s->len - 1] = 0;
+  }
+  ```
+
+test "rank1310: minimal pair — the same count-1 write through a plain local count is invisible"
+  lang c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  void local_count(char *cbuf, unsigned len) {
+      cbuf[len - 1] = 0;
+  }
+  ```
