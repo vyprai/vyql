@@ -24,18 +24,20 @@
 # The vocabulary for this is complete: `window.location.href` is
 # `code.DomInput`, `import(...)` is `code.DynamicCodeLoad`, taint survives the
 # `parseURL`/`parseQuery` hops, and `VYQL-INJ-023` pairs them. What stopped it
-# being reported is the frontend, in two places, and the tests below pin both.
+# being reported was the frontend, in two places; the first is closed here and
+# the tests below pin both.
 #
 # 1. tree-sitter makes a comment a named child of an argument list, and the JS
-#    frontend builds a call's arguments from every named child, so
-#    `import(/* @vite-ignore */ query.path)` puts the comment in args[0] and the
+#    frontend built a call's arguments from every named child, so
+#    `import(/* @vite-ignore */ query.path)` put the comment in args[0] and the
 #    specifier in args[1] -- every binding emitting at a fixed argument index
-#    labels the comment instead of the value, and the sink is absent. The same
-#    shift deletes `code.CommandExecution` from `exec(/* nosemgrep */ cmd)`.
+#    labelled the comment instead of the value, and the sink vanished. The same
+#    shift deleted `code.CommandExecution` from `exec(/* nosemgrep */ cmd)`.
 #    Inline argument annotations are ordinary in bundler and linter directives
-#    (`@vite-ignore`, `webpackChunkName`, `#__PURE__`), so this is silent. The
-#    first and last tests pin it as a miss; the second differs from the first
-#    only in the specifier being a constant and is correctly quiet.
+#    (`@vite-ignore`, `webpackChunkName`, `#__PURE__`), so it was silent. A
+#    comment is no longer an argument: the first and last tests are the
+#    positive half, and the second differs from the first only in the specifier
+#    being a constant.
 #
 # 2. The wrapper is a component factory -- `export default (url) =>
 #    defineComponent({ async setup () { … } })` -- and `c.expr`'s `object` case
@@ -63,7 +65,7 @@
 test "rank1476: a request query parameter names the module a dynamic import loads, through an inline bundler annotation"
   lang javascript
   file src/app/components/test-component-wrapper.ts
-  reject VYQL-INJ-023
+  expect VYQL-INJ-023
   code
   ```
   import { parseURL } from 'ufo'
@@ -124,7 +126,7 @@ test "rank1476: the wrapper as written, a component factory whose setup method i
 test "rank1476: a command string reaching a child process behind an inline linter annotation"
   lang javascript
   file src/core/build.ts
-  reject VYQL-INJ-002
+  expect VYQL-INJ-002
   code
   ```
   import { exec } from 'child_process'
