@@ -1,0 +1,154 @@
+# Rank 1079 / CVE-2025-50334: Technitium DNS Server's query-rate limiter counted
+# clients in fixed-size blocks and applied one flat limit to every block, so the
+# limit did not hold against a client spread across a larger address range
+# (CWE-770). IsQpmLimitCrossed reduced the peer to a subnet with
+#
+#   remoteSubnet = remoteIP.GetNetworkAddress(_qpmLimitIPv4PrefixLength);   // 24
+#   remoteSubnet = remoteIP.GetNetworkAddress(_qpmLimitIPv6PrefixLength);   // 56
+#
+# and compared its minute counts against the single pair _qpmLimitRequests and
+# _qpmLimitErrors, 6000 and 600. An IPv6 client with more than a /56, which is
+# an ordinary residential allocation, simply used another block per bucket, and
+# a UDP flood that crossed the limit was dropped rather than truncated, so the
+# limiter itself became a way to silence a resolver. Pool commit 7229b21723 is
+# the fix (COMMIT_OK); it replaces the flat pair with per-prefix-length limit
+# tables for v4 and v6, rewrites the counters to key on a NetworkAddress, splits
+# the check by transport in HasQpmLimitExceeded, and answers a chosen percentage
+# of over-limit UDP queries with a truncation response instead of nothing.
+# No pool correction.
+#
+# ATTENTION, vocabulary gap, and it is the second rank in this block to land on
+# it. The vocabulary for rate limiting exists and is binary: code.RateLimitRequiredOp
+# with the review condition "an authentication-sensitive endpoint accepts
+# attempts without a throttle", code.RateLimitCheck as the control that clears
+# it, and rule VYQL-AUTH-105 asking one question -- is there a throttle on this
+# endpoint. Here there is. Both revisions call the limiter on every transport
+# before doing any work, so a rule that asks whether a limit exists answers yes
+# on the vulnerable code and yes on the fix, and nothing in the ontology can ask
+# the question that separates them: whether the key the limit counts on, and the
+# ceiling it compares against, are chosen so the limit cannot be stepped around.
+#
+# Rank 1042 recorded the same shape from the other side, a rack-attack throttle
+# keyed on exact request-path equality that a format suffix walked past. Two
+# ranks, two languages, one missing distinction -- present versus effective --
+# and the concept that would carry it does not exist in any form today. The
+# control bindings are Python-only besides, keyed on the method names ratelimit,
+# throttle and limiter, so a C# limiter is not even the binary answer.
+#
+# Measured: 31 findings on DnsServer.cs at the vulnerable revision, four at or
+# above high, none of them on the limiter; VYQL-AUTH-105 does not fire, because
+# nothing labels this as an endpoint needing one.
+#
+# The two snippets differ only in what the limit is keyed on and compared to.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1079: one flat limit over a fixed-size client block"
+  lang csharp
+  file DnsServerCore/Dns/DnsServer.cs
+  reject VYQL-AUTH-105
+  code
+  ```
+  using System.Net;
+  using System.Net.Sockets;
+
+  namespace DnsServerCore.Dns
+  {
+      public class DnsServer
+      {
+          int _qpmLimitRequests = 6000;
+          int _qpmLimitErrors = 600;
+          int _qpmLimitIPv4PrefixLength = 24;
+          int _qpmLimitIPv6PrefixLength = 56;
+
+          internal bool IsQpmLimitCrossed(IPAddress remoteIP)
+          {
+              if ((_qpmLimitRequests < 1) && (_qpmLimitErrors < 1))
+                  return false;
+
+              if (IsQpmLimitBypassed(remoteIP))
+                  return false;
+
+              IPAddress remoteSubnet;
+
+              switch (remoteIP.AddressFamily)
+              {
+                  case AddressFamily.InterNetwork:
+                      remoteSubnet = remoteIP.GetNetworkAddress(_qpmLimitIPv4PrefixLength);
+                      break;
+
+                  case AddressFamily.InterNetworkV6:
+                      remoteSubnet = remoteIP.GetNetworkAddress(_qpmLimitIPv6PrefixLength);
+                      break;
+
+                  default:
+                      throw new NotSupportedException("AddressFamily not supported.");
+              }
+
+              if (_qpmLimitClientSubnetStats.TryGetValue(remoteSubnet, out long count))
+                  return count >= _qpmLimitRequests;
+
+              return false;
+          }
+      }
+  }
+  ```
+
+test "rank1079: a limit per prefix length, split by transport"
+  lang csharp
+  file DnsServerCore/Dns/DnsServer.cs
+  reject VYQL-AUTH-105
+  code
+  ```
+  using System.Collections.Generic;
+  using System.Net;
+  using System.Net.Sockets;
+
+  namespace DnsServerCore.Dns
+  {
+      public class DnsServer
+      {
+          IReadOnlyDictionary<int, (int, int)> _qpmPrefixLimitsIPv4 = new Dictionary<int, (int, int)>() { { 24, (6000, 600) }, { 32, (600, 60) } };
+          IReadOnlyDictionary<int, (int, int)> _qpmPrefixLimitsIPv6 = new Dictionary<int, (int, int)>() { { 48, (6000, 600) }, { 64, (600, 60) } };
+          int _qpmLimitUdpTruncationPercentage = 50;
+
+          internal bool HasQpmLimitExceeded(IPAddress remoteIP, DnsTransportProtocol protocol)
+          {
+              if (IsQpmLimitBypassed(remoteIP))
+                  return false;
+
+              IReadOnlyDictionary<int, (int, int)> prefixLimits;
+
+              switch (remoteIP.AddressFamily)
+              {
+                  case AddressFamily.InterNetwork:
+                      prefixLimits = _qpmPrefixLimitsIPv4;
+                      break;
+
+                  case AddressFamily.InterNetworkV6:
+                      prefixLimits = _qpmPrefixLimitsIPv6;
+                      break;
+
+                  default:
+                      throw new NotSupportedException("AddressFamily not supported.");
+              }
+
+              foreach (KeyValuePair<int, (int, int)> prefixLimit in prefixLimits)
+              {
+                  NetworkAddress subnet = new NetworkAddress(remoteIP.GetNetworkAddress(prefixLimit.Key), prefixLimit.Key);
+
+                  if (_qpmLimitClientSubnetStats.TryGetValue(subnet, out ValueTuple<long, long> counts))
+                  {
+                      if (counts.Item1 >= prefixLimit.Value.Item1)
+                          return true;
+
+                      if (counts.Item2 >= prefixLimit.Value.Item2)
+                          return true;
+                  }
+              }
+
+              return false;
+          }
+      }
+  }
+  ```
