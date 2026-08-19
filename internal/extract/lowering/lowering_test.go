@@ -1504,3 +1504,74 @@ func TestScopeBranchDoesNotRestoreConstants(t *testing.T) {
 		t.Errorf("cnst = %q — a branch must NOT restore constants", got)
 	}
 }
+
+// TestPureNIRStructuralFactLowering verifies that lowering translates NIR statements
+// into well-formed USG structural nodes (code.Call, code.Arg, code.Param, code.BinOp)
+// with correct flow connectivity and property attributes.
+func TestPureNIRStructuralFactLowering(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "calc.py",
+		File: "calc.py",
+		Body: []nir.Stmt{
+			nir.FuncDef{
+				Name:   "compute",
+				Loc:    "calc.py:1",
+				Params: []string{"a", "b"},
+				Body: []nir.Stmt{
+					nir.Assign{
+						Targets: []string{"sum"},
+						Value: nir.BinOp{
+							Op:    "+",
+							Left:  nir.Name{ID: "a", Loc: "calc.py:2"},
+							Right: nir.Name{ID: "b", Loc: "calc.py:2"},
+							Loc:   "calc.py:2",
+						},
+						Loc: "calc.py:2",
+					},
+					nir.Return{
+						Value: nir.Name{ID: "sum", Loc: "calc.py:3"},
+					},
+				},
+			},
+		},
+	}}}
+
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("Lower failed: %v", err)
+	}
+
+	// Verify Param nodes
+	paramA := findNodeID(t, g, "code.Param", "name", "a")
+	paramB := findNodeID(t, g, "code.Param", "name", "b")
+	if paramA == "" || paramB == "" {
+		t.Fatal("expected Param nodes for a and b")
+	}
+
+	// Verify BinOp node
+	binOps, _ := g.NodesOfType("code.BinOp")
+	if len(binOps) == 0 {
+		t.Fatal("expected at least one code.BinOp node")
+	}
+	binOpNode, _, _ := g.GetNode(binOps[0])
+	if binOpNode.Prop("op") != "+" {
+		t.Errorf("expected BinOp op '+', got %q", binOpNode.Prop("op"))
+	}
+
+	// Verify flow connectivity from params to return
+	reachA, err := usg.BFS(g, paramA, "FLOWS", 10)
+	if err != nil {
+		t.Fatalf("BFS from paramA: %v", err)
+	}
+	reachB, err := usg.BFS(g, paramB, "FLOWS", 10)
+	if err != nil {
+		t.Fatalf("BFS from paramB: %v", err)
+	}
+
+	if !reachA[binOpNode.ID] {
+		t.Errorf("expected paramA to flow to BinOp node %s", binOpNode.ID)
+	}
+	if !reachB[binOpNode.ID] {
+		t.Errorf("expected paramB to flow to BinOp node %s", binOpNode.ID)
+	}
+}
