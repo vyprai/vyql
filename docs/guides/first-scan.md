@@ -2,11 +2,23 @@
 
 ## Install
 
-VyQL needs Go 1.26+ and a C toolchain — the parsers are C, and without cgo the
-build constraints exclude them silently rather than failing.
+The convenience path installs the engine and the free definitions together:
+
+```sh
+curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh
+```
+
+`go install` is the engine only (Go 1.26+ and a C toolchain; the parsers are C,
+and without cgo the build constraints exclude them silently rather than failing):
 
 ```sh
 go install github.com/vyprai/vyql/cmd/vyql@latest
+curl -fsSLO https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz
+curl -fsSLO https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz.sha256
+shasum -a 256 -c latest.tar.gz.sha256
+mkdir -p "$HOME/.local/share/vyql"
+tar -xzf latest.tar.gz -C "$HOME/.local/share/vyql"
+export VYQL_HOME="$HOME/.local/share/vyql/vyql"
 ```
 
 From source:
@@ -22,22 +34,22 @@ make build      # -> bin/vyql
 The binary carries no security knowledge. It loads all of it at startup from a
 directory containing `ontology/`, `packs/`, `bindings/` and `taxonomy/`.
 
-It finds that directory in one of two ways:
+It finds that directory in this order:
 
-1. `$VYQL_HOME`, if set
-2. otherwise, a `vyql/` directory in the working directory or any ancestor
+1. `-data` or `$VYQL_HOME`, if set
+2. a `vyql/` directory in the working directory or any ancestor
+3. a `vyql/` directory next to the executable (and through a symlink, as Homebrew does)
 
-A `go install`ed binary run from an unrelated directory has neither, and says so:
+A `go install`ed binary run from an unrelated directory has none of those, and
+exits 1:
 
 ```
-could not locate the data directory; set $VYQL_HOME to the path of your `vyql/` dir
+vyql: could not locate the data directory; go install installs the engine only
 ```
 
-Point it at the `vyql/` from a clone:
-
-```sh
-export VYQL_HOME=/path/to/vyql/vyql
-```
+Install with `install.sh`, Homebrew, Docker, or a release archive; or unpack the
+free bundle from `https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz` and
+set `$VYQL_HOME` to that `vyql/` directory.
 
 Check what loaded:
 

@@ -10,6 +10,17 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
+### Changed
+
+- **`go install` is the engine only.** The binary does not look up definitions
+  in the module cache. A command that needs the knowledge base and cannot find
+  a `vyql/` directory prints an error on stderr and exits 1. Install with
+  `curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh`, or download the free
+  bundle from `https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz` and set
+  `$VYQL_HOME`. Homebrew, Docker, and GitHub release archives include the free
+  definitions; those archives pack the bundle pinned in
+  `packaging/definitions-free.url`.
+
 ## [0.3.1] - 2026-08-13
 
 ### Fixed

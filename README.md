@@ -66,13 +66,32 @@ cd vyql_${V}_${P}
 
 ### go install
 
-Requires Go 1.26+ and a C toolchain (the parsers are C).
+Requires Go 1.26+ and a C toolchain (the parsers are C). This installs the
+**engine only**. The knowledge base is not in the module; a scan without it
+exits 1.
+
+Use the install script instead if you want both halves in one step:
+
+```sh
+curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh
+```
+
+Or, after `go install`, download the free definitions and point the engine at them:
 
 ```sh
 go install github.com/vyprai/vyql/cmd/vyql@latest
+
+curl -fsSLO https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz
+curl -fsSLO https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz.sha256
+shasum -a 256 -c latest.tar.gz.sha256
+mkdir -p "$HOME/.local/share/vyql"
+tar -xzf latest.tar.gz -C "$HOME/.local/share/vyql"
+# unpack so this path contains ontology/concepts, packs and taxonomy:
+export VYQL_HOME="$HOME/.local/share/vyql/vyql"
 ```
 
-The binary finds its data in the module cache, so no further setup is needed.
+Homebrew, Docker, and the GitHub release archive already include the free
+definitions.
 
 ### Container
 

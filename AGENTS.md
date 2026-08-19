@@ -177,6 +177,8 @@ What actually drifts, in order of how often it has:
 2. **Install instructions**, which exist in four places: this README, the
    action's, the tap's, and the skill's `references/install.md`. The install URL,
    the container image name and the `go install` path appear in all of them.
+   `go install` is the engine only. The satellites that describe it must also
+   name `install.sh` or the free bundle on `dl.vyprsec.ai`.
 3. **Flags and severity vocabulary.** `-fail-on` takes
    `none info low medium high critical`; the action's input description repeats
    that list, and a change here does not update it there. The same goes for the
