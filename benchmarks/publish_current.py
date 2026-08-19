@@ -50,7 +50,7 @@ def parse_realvuln(text: str) -> dict[str, list[int]]:
         if not m:
             continue
         repo = m.group(1)
-        if not repo.startswith("realvuln-"):
+        if repo.startswith("POOLED"):
             continue
         out[repo] = [int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5))]
     return out

@@ -98,6 +98,14 @@ class ParseTests(unittest.TestCase):
         got = pc.parse_realvuln(REALVULN)
         self.assertEqual(got, {"realvuln-djangoat": [21, 70, 31, 6]})
 
+    def test_parse_realvuln_reads_seeded_vc_repos(self):
+        text = (
+            "vc-claude-code-seeded-v2-crm-saas-django "
+            "TP=  1 FP=  2 FN=  3 TN=  4 prec=0.333 rec=0.250 J=-0.500\n"
+        )
+        got = pc.parse_realvuln(text)
+        self.assertEqual(got, {"vc-claude-code-seeded-v2-crm-saas-django": [1, 2, 3, 4]})
+
     def test_parse_xbow_reads_vyql_row(self):
         got = pc.parse_xbow(XBOW)
         self.assertEqual(
