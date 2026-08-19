@@ -1,0 +1,193 @@
+# Nightly scores for the staging /benchmarks page.
+#
+# Hosted ubuntu-latest. Workload Identity Federation impersonates
+# vypr-ci-benchmarks, which can read and overwrite objects under
+# gs://vypr-web-uploads/benchmarks/. The page is force-dynamic; overwriting
+# latest.json is the publish. No image, no Nomad deploy.
+#
+# Federation is issued for refs/heads/main or a tag, not a topic branch.
+# Scorer stdout is files on the runner; this log does not print counts.
+
+name: benchmarks-publish
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+  push:
+    tags: ['bench-publish-*']
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: benchmarks-publish
+  cancel-in-progress: false
+
+env:
+  CGO_ENABLED: "1"
+  CORPORA: /home/runner/benchmark-corpora
+  XBOW: /home/runner/validation-benchmarks
+  LINKS: /tmp/bench
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Unit tests for the publisher
+        run: python3 -m unittest discover -s benchmarks -p 'test_*.py'
+
+      - uses: actions/cache/restore@v4
+        id: owasp
+        with:
+          path: |
+            ${{ env.CORPORA }}/BenchmarkJava
+            ${{ env.CORPORA }}/BenchmarkPython
+          key: owasp-corpora-v1
+
+      - uses: actions/cache/restore@v4
+        id: realvuln
+        with:
+          path: ${{ env.CORPORA }}/Real-Vuln-Benchmark
+          key: realvuln-corpora-v1
+
+      - uses: actions/cache/restore@v4
+        id: xbow
+        with:
+          path: ${{ env.XBOW }}
+          key: xbow-corpora-v1
+
+      - name: Fetch missing corpora
+        env:
+          VYQL_BENCH_CORPORA: ${{ env.CORPORA }}
+          VYQL_BENCH_LINKS: ${{ env.LINKS }}
+        run: |
+          set -euo pipefail
+          ./benchmarks/fetch-corpora.sh
+          mkdir -p "$CORPORA" "$LINKS"
+          if [ ! -d "$CORPORA/Real-Vuln-Benchmark/.git" ]; then
+            git clone --depth 1 --quiet \
+              https://github.com/kolega-ai/Real-Vuln-Benchmark.git \
+              "$CORPORA/Real-Vuln-Benchmark"
+          fi
+          ln -sfn "$CORPORA/Real-Vuln-Benchmark" "$LINKS/Real-Vuln-Benchmark"
+          # Four upstream repos are 404; clone_repos exits non-zero on those.
+          # Existing clones are skipped. publish_current.py is the shape check.
+          (cd "$CORPORA/Real-Vuln-Benchmark" && python3 clone_repos.py) || true
+          if [ ! -d "$XBOW/.git" ]; then
+            git clone --depth 1 --filter=blob:none --sparse --quiet \
+              https://github.com/vyprai/validation-benchmarks.git "$XBOW"
+            git -C "$XBOW" sparse-checkout set benchmarks rules
+          fi
+
+      - uses: actions/cache/save@v4
+        if: steps.owasp.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ${{ env.CORPORA }}/BenchmarkJava
+            ${{ env.CORPORA }}/BenchmarkPython
+          key: owasp-corpora-v1
+
+      - uses: actions/cache/save@v4
+        if: steps.realvuln.outputs.cache-hit != 'true'
+        with:
+          path: ${{ env.CORPORA }}/Real-Vuln-Benchmark
+          key: realvuln-corpora-v1
+
+      - uses: actions/cache/save@v4
+        if: steps.xbow.outputs.cache-hit != 'true'
+        with:
+          path: ${{ env.XBOW }}
+          key: xbow-corpora-v1
+
+      - name: Build vyql
+        run: go build -o "$RUNNER_TEMP/vyql" ./cmd/vyql
+
+      - name: Score OWASP Java
+        env:
+          VYQL_BENCH: "1"
+          BENCH_DIR: ${{ env.LINKS }}/BenchmarkJava
+        run: |
+          set +e
+          go test -count=1 -timeout 60m ./cmd/vyql/ -run TestOWASPBenchmark \
+            > "$RUNNER_TEMP/owasp-java.txt" 2>&1
+          set -e
+          if ! grep -q Youden "$RUNNER_TEMP/owasp-java.txt"; then
+            echo "OWASP Java produced no table" >&2
+            exit 1
+          fi
+
+      - name: Score OWASP Python
+        env:
+          VYQL_BENCH: "1"
+          BENCH_DIR: ${{ env.LINKS }}/BenchmarkPython
+        run: |
+          set +e
+          go test -count=1 -timeout 60m ./cmd/vyql/ -run TestOWASPBenchmark \
+            > "$RUNNER_TEMP/owasp-python.txt" 2>&1
+          set -e
+          if ! grep -q Youden "$RUNNER_TEMP/owasp-python.txt"; then
+            echo "OWASP Python produced no table" >&2
+            exit 1
+          fi
+
+      - name: Score RealVuln
+        run: |
+          set +e
+          python3 benchmarks/score_realvuln.py \
+            "$LINKS/Real-Vuln-Benchmark" "$RUNNER_TEMP/vyql" "$GITHUB_WORKSPACE/vyql" \
+            > "$RUNNER_TEMP/realvuln.txt" 2>"$RUNNER_TEMP/realvuln.err"
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ] || ! grep -q '^realvuln-' "$RUNNER_TEMP/realvuln.txt"; then
+            echo "RealVuln scoring failed" >&2
+            exit 1
+          fi
+
+      - name: Score XBOW
+        run: |
+          set +e
+          python3 benchmarks/score_xbow.py \
+            "$XBOW" "$RUNNER_TEMP/vyql" "$GITHUB_WORKSPACE/vyql" \
+            > "$RUNNER_TEMP/xbow.txt" 2>"$RUNNER_TEMP/xbow.err"
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ] || ! grep -q '^technical' "$RUNNER_TEMP/xbow.txt"; then
+            echo "XBOW scoring failed" >&2
+            exit 1
+          fi
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/722086909849/locations/global/workloadIdentityPools/github/providers/github-actions
+          service_account: vypr-ci-benchmarks@valid-perigee-471809-r0.iam.gserviceaccount.com
+          project_id: valid-perigee-471809-r0
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Patch and upload latest.json
+        run: |
+          set -euo pipefail
+          gcloud storage cp gs://vypr-web-uploads/benchmarks/latest.json \
+            "$RUNNER_TEMP/latest.json"
+          python3 benchmarks/publish_current.py \
+            --report "$RUNNER_TEMP/latest.json" \
+            --owasp "BenchmarkJava=$RUNNER_TEMP/owasp-java.txt" \
+            --owasp "BenchmarkPython=$RUNNER_TEMP/owasp-python.txt" \
+            --realvuln "$RUNNER_TEMP/realvuln.txt" \
+            --xbow "$RUNNER_TEMP/xbow.txt" \
+            --ref "${GITHUB_SHA:0:9}" \
+            --date "$(date -u +%F)" \
+            --out "$RUNNER_TEMP/latest.patched.json"
+          gcloud storage cp "$RUNNER_TEMP/latest.patched.json" \
+            gs://vypr-web-uploads/benchmarks/latest.json
