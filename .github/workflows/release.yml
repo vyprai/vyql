@@ -141,7 +141,8 @@ jobs:
 
       # The data directory ships with the binary. VyQL loads all of its security
       # knowledge from it at startup, so a release archive without it produces a
-      # binary that starts and then cannot do anything.
+      # binary that starts and then cannot scan. Definitions come from the
+      # pinned free bundle on dl.vyprsec.ai.
       - name: Assemble the archive
         run: |
           NAME="vyql_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
@@ -152,7 +153,8 @@ jobs:
           # found by searching the working directory and its ancestors.
           mkdir -p "stage/${NAME}/bin"
           cp dist/vyql "stage/${NAME}/bin/vyql"
-          cp -R vyql "stage/${NAME}/vyql"
+          chmod +x scripts/fetch-free-definitions.sh
+          ./scripts/fetch-free-definitions.sh "stage/${NAME}/vyql"
           cp LICENSE NOTICE THIRD_PARTY_NOTICES.md README.md "stage/${NAME}/"
           tar -czf "${NAME}.tar.gz" -C stage "${NAME}"
           shasum -a 256 "${NAME}.tar.gz" > "${NAME}.tar.gz.sha256"
