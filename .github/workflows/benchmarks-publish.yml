@@ -119,7 +119,7 @@ jobs:
           BENCH_DIR: ${{ env.LINKS }}/BenchmarkJava
         run: |
           set +e
-          go test -count=1 -timeout 60m ./cmd/vyql/ -run TestOWASPBenchmark \
+          go test -count=1 -timeout 60m -v ./cmd/vyql/ -run TestOWASPBenchmark \
             > "$RUNNER_TEMP/owasp-java.txt" 2>&1
           set -e
           if ! grep -q Youden "$RUNNER_TEMP/owasp-java.txt"; then
@@ -133,7 +133,7 @@ jobs:
           BENCH_DIR: ${{ env.LINKS }}/BenchmarkPython
         run: |
           set +e
-          go test -count=1 -timeout 60m ./cmd/vyql/ -run TestOWASPBenchmark \
+          go test -count=1 -timeout 60m -v ./cmd/vyql/ -run TestOWASPBenchmark \
             > "$RUNNER_TEMP/owasp-python.txt" 2>&1
           set -e
           if ! grep -q Youden "$RUNNER_TEMP/owasp-python.txt"; then
