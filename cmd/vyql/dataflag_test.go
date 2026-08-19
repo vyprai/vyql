@@ -169,6 +169,54 @@ func TestKnownFlagCategoryIsAccepted(t *testing.T) {
 	}
 }
 
+// go install puts the engine in GOBIN with no vyql/ beside it. A data root
+// under GOMODCACHE is not used, so scan exits 1.
+func TestScanWithoutDataDirectoryExitsOne(t *testing.T) {
+	modcache := t.TempDir()
+	stale := filepath.Join(modcache, "github.com", "vyprai", "vyql@v0.3.1", "vyql")
+	for _, d := range []string{"taxonomy", "packs", filepath.Join("ontology", "concepts")} {
+		if err := os.MkdirAll(filepath.Join(stale, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	src := writeGoSource(t)
+	cmd := exec.Command(vyqlBinary(t), "scan", "-fail-on", "none", src)
+	cmd.Env = append(os.Environ(), "VYQL_HOME=", "GOMODCACHE="+modcache)
+	cmd.Dir = t.TempDir()
+	out, err := cmd.CombinedOutput()
+	code := 0
+	if err != nil {
+		var exit *exec.ExitError
+		if !asExitError(err, &exit) {
+			t.Fatalf("run scan: %v\n%s", err, out)
+		}
+		code = exit.ExitCode()
+	}
+	if code != 1 {
+		t.Fatalf("scan with no data directory exited %d, want 1:\n%s", code, out)
+	}
+	if !strings.Contains(string(out), "go install installs the engine only") {
+		t.Fatalf("missing data must say go install is the engine only:\n%s", out)
+	}
+	if !strings.Contains(string(out), "dl.vyprsec.ai") {
+		t.Fatalf("missing data must name dl.vyprsec.ai:\n%s", out)
+	}
+}
+
+func TestVersionWithoutDataDirectoryExitsZero(t *testing.T) {
+	code, out := runVyql(t, "version")
+	if code != 0 {
+		t.Fatalf("version with no data directory exited %d:\n%s", code, out)
+	}
+}
+
+func TestCachePathWithoutDataDirectoryExitsZero(t *testing.T) {
+	code, out := runVyql(t, "cache", "path")
+	if code != 0 {
+		t.Fatalf("cache path with no data directory exited %d:\n%s", code, out)
+	}
+}
+
 // A directory that yields no concepts, rules, bindings or reviews is not a
 // knowledge base. Reporting zero of each and exiting 0 reads as "loaded, and there
 // is nothing in it" — which is the same shape as a clean scan, from a tool whose

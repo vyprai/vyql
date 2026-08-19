@@ -141,6 +141,14 @@ func vyqlMain() (code int) {
 	if err := applyDataFlagEarly(args); err != nil {
 		return exitCodeFor(err)
 	}
+	// go install ships the engine only. Commands that load packs or the ontology
+	// require a data directory, except help (which must answer without it) and
+	// cache (which does not load it).
+	if commandNeedsData(cmd) && !wantsHelp(args) {
+		if _, ok := datadir.Lookup(); !ok {
+			return exitCodeFor(errNoDataDirectory)
+		}
+	}
 	// Installed for the commands that do work, not for help or version.
 	watchForInterrupt()
 	err := run(args)

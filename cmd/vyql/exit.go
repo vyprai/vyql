@@ -25,6 +25,32 @@ const (
 	exitCheckFail = 3
 )
 
+// errNoDataDirectory is a go install (or any other binary) that has nowhere to
+// load packs and ontology from. Exit 1: the tool could not complete, distinct
+// from a scan that ran and found nothing.
+var errNoDataDirectory = errors.New(`could not locate the data directory; go install installs the engine only
+  install the engine and the free definitions together:
+    curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh
+  or download https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz, unpack it,
+  and set $VYQL_HOME or -data to the vyql/ directory
+  Homebrew, Docker, and the GitHub release archive already include the free definitions`)
+
+func commandNeedsData(cmd string) bool {
+	return cmd != "cache"
+}
+
+func wantsHelp(args []string) bool {
+	for _, arg := range args {
+		if arg == "--" {
+			return false
+		}
+		if arg == "-h" || arg == "--help" {
+			return true
+		}
+	}
+	return false
+}
+
 // usageError is an invocation that cannot mean anything: an unknown command, a
 // missing path, a flag value outside its set. It is detected before any work
 // starts, so a mistake costs nothing.
