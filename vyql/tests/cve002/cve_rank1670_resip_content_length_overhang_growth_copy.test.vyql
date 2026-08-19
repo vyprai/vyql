@@ -33,24 +33,34 @@
 # min-with-contentLength allocation are present) and at the fixed revision (the >= guard,
 # the overhang copy and the assert are present).
 #
-# Two blockers, both measured.
+# Two findings, both measured.
 #
-# 1. A `name:` label hides the whole framing loop. The C/C++ statement walker
-# has no case for `labeled_statement`, so the labelled statement and everything
-# under it is dropped from the graph. preparseNewBytes is
-# `start: switch (mConnState) { ... }`, so its entire body — three states, every
-# copy, every length derivation — produces no nodes at all: `vyql match` over
-# the real file reports nothing between :135 and :590 while the memcpys at :908
-# and :1042 outside the label are labelled normally, and `vyql graph` confirms
-# the only node the function contributes in that range is its own return. The
-# last two snippets are the minimal pair: identical switch, identical copy,
-# differing only in whether the switch carries a label — the labelled one
-# reports nothing, the unlabelled one reports VYQL-MEM-016. This is an
-# extraction defect, not a vocabulary one.
+# 1. FIXED (extraction) — a `name:` label hides the whole framing loop.
+# The C/C++ statement walker had no case for `labeled_statement`, so the
+# labelled statement and everything under it drops from the graph.
+# preparseNewBytes is `start: switch (mConnState) { ... }`, so its entire body
+# — three states, every copy, every length derivation — produced no nodes at
+# all: `vyql match` over the real file reported nothing between :135 and :590
+# while the memcpys at :908 and :1042 outside the label are labelled normally,
+# and `vyql graph` confirmed the only node the function contributed in that
+# range is its own return. Lowering the statement a label marks
+# (internal/extract/frontend/treesitter/c.go, ccConv.stmt) restores the whole
+# region. Measured with `timeout 180 ... --max-ram 6GB`, fingerprint sets
+# deterministic over two runs each way:
+#   resip/stack (435 C/C++ files)  1483 -> 1495  (+12, -0; the five memcpys
+#     and six dereferences inside the labelled switch, plus
+#     MsgHeaderScanner.cxx:1061 inside scanChunk's own `endOfFunction:` label)
+#   neomutt (whole tree)           7300 -> 7340  (+40, -0)
+#   libgit2/src                    2343 -> 2366  (+24, -1; the -1 is a
+#     VYQL-LIFE-001 that claimed git_libgit2_shutdown never releases
+#     _init_mutex — the pthread_mutex_unlock it wanted sits under the
+#     function's `out:` label, so the dropped label is manufacturing a false
+#     positive)
+# The last two snippets are the minimal pair: identical switch, identical copy,
+# differing only in the label.
 #
 # 2. ATTENTION — with the function visible, the capacity-correlation gap
-# remains, in its third form. Rewriting the snippet without the label (the
-# growth branch alone) makes VYQL-MEM-016 fire on the growth-branch memcpy at
+# remains, in its third form. VYQL-MEM-016 fires on the growth-branch memcpy at
 # the parent (:534) and at the fixed revision (:564, byte-for-byte the same code) — the
 # patch ADDS a finding at :493, the safe overhang copy it introduces, rather
 # than removing one. No rule correlates the allocation size with the copy
@@ -69,14 +79,15 @@
 # framing code uses correctly.
 #
 # The first two snippets hold the real PartialBody shape at both revisions with
-# the label and the switch kept; they report nothing, which is the miss pinned.
+# the label and the switch kept; they assert the same rule at both, which pins
+# the inverted discrimination.
 #
 # verify_current_expected: attention-engine-gap
 
 test "rank1670: the body-complete guard is an exact equality, so an over-long read falls into the growth branch sized from the declared Content-Length"
   lang cpp
   file ConnectionBase.cxx
-  reject VYQL-MEM-016
+  expect VYQL-MEM-016
   code
   ```
   #include <stddef.h>
@@ -146,7 +157,7 @@ test "rank1670: the body-complete guard is an exact equality, so an over-long re
 test "rank1670: the fixed revision accepts an over-long read, carries the tail into a fresh buffer, and asserts the growth branch's precondition"
   lang cpp
   file ConnectionBase.cxx
-  reject VYQL-MEM-016
+  expect VYQL-MEM-016
   code
   ```
   #include <stddef.h>
@@ -238,7 +249,7 @@ test "rank1670: the fixed revision accepts an over-long read, carries the tail i
 test "rank1670: minimal pair — a copy inside a labelled switch"
   lang cpp
   file labelled_switch.cxx
-  reject VYQL-MEM-016
+  expect VYQL-MEM-016
   code
   ```
   #include <stddef.h>
