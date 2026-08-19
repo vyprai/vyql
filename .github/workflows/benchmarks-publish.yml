@@ -27,8 +27,6 @@ concurrency:
 
 env:
   CGO_ENABLED: "1"
-  CORPORA: /home/runner/benchmark-corpora
-  XBOW: /home/runner/validation-benchmarks
   LINKS: /tmp/bench
 
 jobs:
@@ -51,28 +49,29 @@ jobs:
         id: owasp
         with:
           path: |
-            ${{ env.CORPORA }}/BenchmarkJava
-            ${{ env.CORPORA }}/BenchmarkPython
+            ~/benchmark-corpora/BenchmarkJava
+            ~/benchmark-corpora/BenchmarkPython
           key: owasp-corpora-v1
 
       - uses: actions/cache/restore@v4
         id: realvuln
         with:
-          path: ${{ env.CORPORA }}/Real-Vuln-Benchmark
+          path: ~/benchmark-corpora/Real-Vuln-Benchmark
           key: realvuln-corpora-v1
 
       - uses: actions/cache/restore@v4
         id: xbow
         with:
-          path: ${{ env.XBOW }}
+          path: ~/validation-benchmarks
           key: xbow-corpora-v1
 
       - name: Fetch missing corpora
-        env:
-          VYQL_BENCH_CORPORA: ${{ env.CORPORA }}
-          VYQL_BENCH_LINKS: ${{ env.LINKS }}
         run: |
           set -euo pipefail
+          CORPORA="$HOME/benchmark-corpora"
+          XBOW="$HOME/validation-benchmarks"
+          export VYQL_BENCH_CORPORA="$CORPORA"
+          export VYQL_BENCH_LINKS="$LINKS"
           ./benchmarks/fetch-corpora.sh
           mkdir -p "$CORPORA" "$LINKS"
           if [ ! -d "$CORPORA/Real-Vuln-Benchmark/.git" ]; then
@@ -94,20 +93,20 @@ jobs:
         if: steps.owasp.outputs.cache-hit != 'true'
         with:
           path: |
-            ${{ env.CORPORA }}/BenchmarkJava
-            ${{ env.CORPORA }}/BenchmarkPython
+            ~/benchmark-corpora/BenchmarkJava
+            ~/benchmark-corpora/BenchmarkPython
           key: owasp-corpora-v1
 
       - uses: actions/cache/save@v4
         if: steps.realvuln.outputs.cache-hit != 'true'
         with:
-          path: ${{ env.CORPORA }}/Real-Vuln-Benchmark
+          path: ~/benchmark-corpora/Real-Vuln-Benchmark
           key: realvuln-corpora-v1
 
       - uses: actions/cache/save@v4
         if: steps.xbow.outputs.cache-hit != 'true'
         with:
-          path: ${{ env.XBOW }}
+          path: ~/validation-benchmarks
           key: xbow-corpora-v1
 
       - name: Build vyql
@@ -158,7 +157,7 @@ jobs:
         run: |
           set +e
           python3 benchmarks/score_xbow.py \
-            "$XBOW" "$RUNNER_TEMP/vyql" "$GITHUB_WORKSPACE/vyql" \
+            "$HOME/validation-benchmarks" "$RUNNER_TEMP/vyql" "$GITHUB_WORKSPACE/vyql" \
             > "$RUNNER_TEMP/xbow.txt" 2>"$RUNNER_TEMP/xbow.err"
           status=$?
           set -e
