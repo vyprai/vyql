@@ -46,18 +46,15 @@
 # through the NIR), so that form stays with the reviewer; NuGetGallery's
 # PackageListTests holds exactly that shape and keeps its medium finding.
 #
-# verify_current_expected: attention-engine-gap, both revisions rejected. The
-# C# leg of the shared regex classification does not exist yet: the ambiguity
-# classifier is wired for Python `re.` calls and Ruby/JavaScript regex literals,
-# and nothing recognises a .NET construction that passes the pattern as a string
-# argument, so every direction below is a reject and the miss is pinned. The
-# engine change that lands on top flips the reported directions to expect.
+# verify_current_expected: fixed by the C# leg of the shared regex
+# classification; the vulnerable direction is committed as a pinned reject in
+# the first commit and flipped to expect alongside the engine change.
 
 test "rank1672: the newDate regex splits digit runs across a repeated group"
   lang csharp
   file RestSharp/Extensions/StringExtensions.cs
   profile library
-  reject VYQL-DOS-003
+  expect VYQL-DOS-003
   reject VYQL-DOS-001
   reject VYQL-DOS-002
   code
@@ -146,10 +143,10 @@ test "rank1672: the fixed newDate regex repeats once and is clean"
 # input instead of into the constructor, so both .NET spellings are held by the
 # pair.
 
-test "rank1672 pair: a repeat inside a repeated group is not reported"
+test "rank1672 pair: a repeat inside a repeated group is reported"
   lang csharp
   profile library
-  reject VYQL-DOS-003
+  expect VYQL-DOS-003
   code
   ```
   using System;
@@ -197,10 +194,10 @@ test "rank1672 pair: the same outer repeat over a group with no inner repeat is 
   }
   ```
 
-test "rank1672 pair: a nested-quantifier pattern passed to the static helper is not reported"
+test "rank1672 pair: a nested-quantifier pattern passed to the static helper is reported"
   lang csharp
   profile library
-  reject VYQL-DOS-003
+  expect VYQL-DOS-003
   code
   ```
   using System;
@@ -254,10 +251,10 @@ test "rank1672 mitigation: the two-argument timeout overload is not reported"
   }
   ```
 
-test "rank1672 mitigation: InfiniteTimeSpan lifts the limit and is not reported"
+test "rank1672 mitigation: InfiniteTimeSpan lifts the limit and is reported"
   lang csharp
   profile library
-  reject VYQL-DOS-003
+  expect VYQL-DOS-003
   code
   ```
   using System;

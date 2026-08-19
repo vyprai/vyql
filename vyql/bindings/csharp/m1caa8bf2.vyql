@@ -1227,3 +1227,7 @@ binding passwordVerificationRateLimitRequired301 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and containsAny(node.context.selector, ["PasswordHash", "HashedPassword", "passwordHash"]) and containsAny(node.context.call, ["IsMatch", "Verify", "VerifyHashedPassword", "CheckPassword", "Compare", "Equals"]) and not (containsAny(node.token, ["Lockout", "LockedOut", "lockoutOnFailure:true", "RateLimit", "rateLimit", "RateLimiter", "Throttle", "throttle", "TooManyRequests", "AccessFailed", "FailedAccess", "FailedAttempt", "failedAttempt", "LoginAttempt", "loginAttempt", "AttemptCount", "attemptCount"]))
   emit issue code.RateLimitRequiredOp at node
 }
+binding catastrophicRegex300 {
+  query pattern callExpr where callee.analysis ~= "dos.catastrophic_regex"
+  emit issue code.CatastrophicRegex at call
+}

@@ -2199,7 +2199,10 @@ func csRegexPassesMatchTimeout(args []nir.Expr, patIdx int) bool {
 // unquoting: `@"…"` (and the interpolated `$@"…"`), where `""` escapes a quote. A pattern that
 // reached here already unquoted, or never carried the wrapper, is returned unchanged.
 func csUnquoteVerbatim(s string) string {
-	body := strings.TrimPrefix(s, "$@")
+	body := s
+	if strings.HasPrefix(body, "$@") {
+		body = body[2:]
+	}
 	if strings.HasPrefix(body, "@\"") && strings.HasSuffix(body, "\"") && len(body) >= 3 {
 		return strings.ReplaceAll(body[2:len(body)-1], "\"\"", "\"")
 	}
