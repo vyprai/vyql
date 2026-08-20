@@ -75,11 +75,18 @@ func asExitError(err error, target **exec.ExitError) bool {
 	return ok
 }
 
-// repoDataDir is the data directory that ships in this repository. Tests that need
-// the real knowledge base pass it explicitly, because runVyql clears $VYQL_HOME and
-// runs from a temporary directory, so nothing else would find it.
+// repoDataDir is the data directory tests use for the real knowledge base.
+// Prefer $VYQL_HOME when set (CI fetches into that path). Otherwise walk from
+// this package up to a sibling `vyql/` tree. runVyql clears $VYQL_HOME and runs
+// from a temporary directory, so callers that need the corpus pass this path
+// with -data.
 func repoDataDir(t *testing.T) string {
 	t.Helper()
+	if d := strings.TrimSpace(os.Getenv("VYQL_HOME")); d != "" {
+		if _, err := os.Stat(filepath.Join(d, "ontology")); err == nil {
+			return d
+		}
+	}
 	wd, err := os.Getwd() // cmd/vyql
 	if err != nil {
 		t.Fatal(err)
@@ -128,7 +135,7 @@ func TestEveryCommandOfferingDataHonoursIt(t *testing.T) {
 // Asking for help is not an error. A command that exits non-zero on -h reads as a
 // broken tool to a CI wrapper that checks the status.
 func TestEveryCommandExitsZeroOnHelp(t *testing.T) {
-	for _, name := range []string{"scan", "trace", "explain", "match", "resolve", "query", "graph", "definitions", "diff", "cache"} {
+	for _, name := range []string{"scan", "trace", "explain", "match", "resolve", "query", "graph", "definitions", "diff", "cache", "update"} {
 		t.Run(name, func(t *testing.T) {
 			code, out := runVyql(t, name, "-h")
 
@@ -166,6 +173,55 @@ func TestKnownFlagCategoryIsAccepted(t *testing.T) {
 
 	if code != 0 {
 		t.Fatalf("scan -flag-category auth exited %d, but auth is a category the shipped reviews declare:\n%s", code, out)
+	}
+}
+
+// go install puts the engine in GOBIN with no vyql/ beside it. A data root
+// under GOMODCACHE is not used. Without a terminal, scan exits 1 and names the
+// free definitions on dl.vyprsec.ai.
+func TestScanWithoutDataDirectoryExitsOne(t *testing.T) {
+	modcache := t.TempDir()
+	stale := filepath.Join(modcache, "github.com", "vyprai", "vyql@v0.3.1", "vyql")
+	for _, d := range []string{"taxonomy", "packs", filepath.Join("ontology", "concepts")} {
+		if err := os.MkdirAll(filepath.Join(stale, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	src := writeGoSource(t)
+	cmd := exec.Command(vyqlBinary(t), "scan", "-fail-on", "none", src)
+	cmd.Env = append(os.Environ(), "VYQL_HOME=", "GOMODCACHE="+modcache)
+	cmd.Dir = t.TempDir()
+	out, err := cmd.CombinedOutput()
+	code := 0
+	if err != nil {
+		var exit *exec.ExitError
+		if !asExitError(err, &exit) {
+			t.Fatalf("run scan: %v\n%s", err, out)
+		}
+		code = exit.ExitCode()
+	}
+	if code != 1 {
+		t.Fatalf("scan with no data directory exited %d, want 1:\n%s", code, out)
+	}
+	if !strings.Contains(string(out), "go install installs the engine only") {
+		t.Fatalf("missing data must say go install is the engine only:\n%s", out)
+	}
+	if !strings.Contains(string(out), "dl.vyprsec.ai") {
+		t.Fatalf("missing data must name dl.vyprsec.ai:\n%s", out)
+	}
+}
+
+func TestVersionWithoutDataDirectoryExitsZero(t *testing.T) {
+	code, out := runVyql(t, "version")
+	if code != 0 {
+		t.Fatalf("version with no data directory exited %d:\n%s", code, out)
+	}
+}
+
+func TestCachePathWithoutDataDirectoryExitsZero(t *testing.T) {
+	code, out := runVyql(t, "cache", "path")
+	if code != 0 {
+		t.Fatalf("cache path with no data directory exited %d:\n%s", code, out)
 	}
 }
 

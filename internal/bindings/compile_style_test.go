@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -12,34 +11,21 @@ import (
 	"github.com/vyprai/vyql/internal/datadir"
 )
 
-// bindingStyleRepoRoot walks up from this file until it finds the directory holding the
-// runtime data tree. Counting "../.." instead would pin the depth of this package
-// below the repository root, which differs between this repository (parser/ sits
-// under go/) and the published one (parser/ sits at the root).
-func bindingStyleRepoRoot(t *testing.T) string {
+// bindingStyleDataRoot is the resolved definitions tree (VYQL_HOME / -data /
+// search). Style gates read authored bindings from there, not from an in-repo
+// vyql/ path that CI may have moved aside.
+func bindingStyleDataRoot(t *testing.T) string {
 	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
+	root, ok := datadir.Lookup()
 	if !ok {
-		t.Fatal("runtime.Caller failed")
+		t.Fatal("data directory not found; set VYQL_HOME or pass -data")
 	}
-	dir := filepath.Dir(file)
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "vyql", "bindings")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Fatalf("locate repo root from %s: no ancestor contains vyql/bindings", file)
-		}
-		dir = parent
-	}
+	return root
 }
 
 func TestAdaptersAvoidLegacyStructuredTokenHasSyntax(t *testing.T) {
-	root := bindingStyleRepoRoot(t)
-	bindingRoot := filepath.Join(root, "vyql", "bindings")
+	bindingRoot := filepath.Join(bindingStyleDataRoot(t), "bindings")
 	legacy := regexp.MustCompile(`\b(?:has|lacks)\s+"(?:call_path|literal|selector|identifier|function_name|class_name|class_base|class_bases|attr_path|decorator_path|decorator_method|param_name|param_type|param_index|var_name|return):`)
-
 	var hits []string
 	err := filepath.WalkDir(bindingRoot, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -52,7 +38,7 @@ func TestAdaptersAvoidLegacyStructuredTokenHasSyntax(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		rel, _ := filepath.Rel(root, path)
+		rel, _ := filepath.Rel(bindingRoot, path)
 		for i, line := range strings.Split(string(data), "\n") {
 			if legacy.MatchString(line) {
 				hits = append(hits, rel+":"+strconv.Itoa(i+1)+": "+strings.TrimSpace(line))
@@ -69,8 +55,7 @@ func TestAdaptersAvoidLegacyStructuredTokenHasSyntax(t *testing.T) {
 }
 
 func TestSecretComparisonReviewUsesStructuredFlagPredicates(t *testing.T) {
-	root := bindingStyleRepoRoot(t)
-	bindingRoot := filepath.Join(root, "vyql", "bindings")
+	bindingRoot := filepath.Join(bindingStyleDataRoot(t), "bindings")
 
 	var hits []string
 	err := filepath.WalkDir(bindingRoot, func(path string, d os.DirEntry, err error) error {
@@ -88,7 +73,7 @@ func TestSecretComparisonReviewUsesStructuredFlagPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		rel, _ := filepath.Rel(root, path)
+		rel, _ := filepath.Rel(bindingRoot, path)
 		for _, ad := range decls {
 			for _, mapping := range ad.Mappings {
 				if mapping.Concept != "code.SecretComparisonReview" || mapping.Flag == nil {
@@ -118,8 +103,7 @@ func TestSecretComparisonReviewUsesStructuredFlagPredicates(t *testing.T) {
 }
 
 func TestMultipleDropdownScalarFallbackUsesAstPredicates(t *testing.T) {
-	root := bindingStyleRepoRoot(t)
-	bindingRoot := filepath.Join(root, "vyql", "bindings")
+	bindingRoot := filepath.Join(bindingStyleDataRoot(t), "bindings")
 
 	var hits []string
 	err := filepath.WalkDir(bindingRoot, func(path string, d os.DirEntry, err error) error {
@@ -137,7 +121,7 @@ func TestMultipleDropdownScalarFallbackUsesAstPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		rel, _ := filepath.Rel(root, path)
+		rel, _ := filepath.Rel(bindingRoot, path)
 		for _, ad := range decls {
 			for _, mapping := range ad.Mappings {
 				if mapping.Concept != "code.MultipleDropdownScalarFallbackMissing" || mapping.Flag == nil {
@@ -227,8 +211,7 @@ func TestJavaScriptContextFlowFlagsUseAstPredicates(t *testing.T) {
 }
 
 func TestFlowAwareFlagsUseAstPredicates(t *testing.T) {
-	root := bindingStyleRepoRoot(t)
-	bindingRoot := filepath.Join(root, "vyql", "bindings")
+	bindingRoot := filepath.Join(bindingStyleDataRoot(t), "bindings")
 
 	var hits []string
 	err := filepath.WalkDir(bindingRoot, func(path string, d os.DirEntry, err error) error {
@@ -246,7 +229,7 @@ func TestFlowAwareFlagsUseAstPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		rel, _ := filepath.Rel(root, path)
+		rel, _ := filepath.Rel(bindingRoot, path)
 		for _, ad := range decls {
 			for _, mapping := range ad.Mappings {
 				if mapping.Flag == nil || !flagHasFlowPredicate(mapping.Flag) {
@@ -287,8 +270,7 @@ func TestFlowAwareFlagsUseAstPredicates(t *testing.T) {
 }
 
 func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
-	root := bindingStyleRepoRoot(t)
-	bindingRoot := filepath.Join(root, "vyql", "bindings")
+	bindingRoot := filepath.Join(bindingStyleDataRoot(t), "bindings")
 	structuralConcepts := map[string]bool{
 		"code.EnvFileVariableInjection":                       true,
 		"code.ForOwnRecursiveDefaultsPrototypePollution":      true,
@@ -321,7 +303,7 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		rel, _ := filepath.Rel(root, path)
+		rel, _ := filepath.Rel(bindingRoot, path)
 		for _, ad := range decls {
 			for _, mapping := range ad.Mappings {
 				if !structuralConcepts[mapping.Concept] || mapping.Flag == nil {

@@ -86,6 +86,12 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Fetch definitions
+        if: needs.changes.outputs.code == 'true'
+        run: |
+          chmod +x scripts/ci-setup-definitions.sh
+          eval "$(./scripts/ci-setup-definitions.sh)"
+
       - name: Build the scanner
         if: needs.changes.outputs.code == 'true'
         run: go build -o bin/vyql ./cmd/vyql
@@ -94,7 +100,7 @@ jobs:
       # packs, reviews. A file that does not parse fails the command.
       - name: The full definition set loads
         if: needs.changes.outputs.code == 'true'
-        run: VYQL_HOME=./vyql ./bin/vyql definitions -kind all > /tmp/defs.txt
+        run: ./bin/vyql definitions -data "$VYQL_DEFINITIONS" -kind all > /tmp/defs.txt
 
       # Loading zero of something is the failure that looks like success: a glob
       # that stops matching reports a clean run over nothing at all. Assert
@@ -135,7 +141,7 @@ jobs:
           # -fail-on none: the sample is deliberately vulnerable and the check
           # below requires at least one finding. The gate would fail the step on
           # exactly the outcome this asserts.
-          VYQL_HOME=./vyql ./bin/vyql scan -fail-on none --format json /tmp/sample > /tmp/findings.json
+          ./bin/vyql scan -data "$VYQL_DEFINITIONS" -fail-on none --format json /tmp/sample > /tmp/findings.json
           n="$(python3 -c "import json;d=json.load(open('/tmp/findings.json'));print(len(d if isinstance(d,list) else d.get('findings',[])))")"
           echo "findings: $n"
           # An engine that loads its data but detects nothing passes every check

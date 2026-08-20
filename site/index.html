@@ -307,14 +307,16 @@ header.site .inner {
       <tbody>
         <tr><td>Homebrew</td><td><code data-copy>brew install vyprai/tap/vyql</code></td></tr>
         <tr><td>Container</td><td><code data-copy>docker run --rm -v "$PWD:/work" ghcr.io/vyprai/vyql scan .</code></td></tr>
-        <tr><td>Go</td><td><code data-copy>go install github.com/vyprai/vyql/cmd/vyql@latest</code></td></tr>
+        <tr><td>Go</td><td><code data-copy>go install github.com/vyprai/vyql/cmd/vyql@latest &amp;&amp; vyql update -yes</code></td></tr>
         <tr><td>GitHub Actions</td><td><a href="https://github.com/marketplace/actions/vyql-security-scan">vyql-security-scan</a></td></tr>
         <tr><td>Claude Code</td><td><code data-copy>/plugin marketplace add vyprai/claude-plugins</code></td></tr>
       </tbody>
     </table>
     <p>
-      Each of them carries the security knowledge inside. There is no second
-      setup step, and there is no server to configure.
+      Homebrew, Docker, release archives, and the install script ship the free
+      definitions with the engine. <code>go install</code> is the engine only;
+      follow it with <code>vyql update -yes</code>, or run an interactive scan
+      and accept the download prompt.
     </p>
   </section>
 

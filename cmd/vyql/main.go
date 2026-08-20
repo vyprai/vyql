@@ -141,6 +141,16 @@ func vyqlMain() (code int) {
 	if err := applyDataFlagEarly(args); err != nil {
 		return exitCodeFor(err)
 	}
+	// go install ships the engine only. Commands that load packs or the ontology
+	// require a data directory, except help (which must answer without it),
+	// cache, and update (which install or inspect the bundle themselves). On a
+	// terminal, ensureDataDirectory offers to download the free channel before
+	// failing.
+	if commandNeedsData(cmd) && !wantsHelp(args) {
+		if err := ensureDataDirectory(); err != nil {
+			return exitCodeFor(err)
+		}
+	}
 	// Installed for the commands that do work, not for help or version.
 	watchForInterrupt()
 	err := run(args)
@@ -164,6 +174,7 @@ var commands = map[string]func([]string) error{
 	"definitions": cmdDefinitions,
 	"diff":        cmdDiff,
 	"cache":       cmdCache,
+	"update":      cmdUpdate,
 }
 
 // movedCommands names where a retired command's job is done now. Each was retired
@@ -1126,6 +1137,7 @@ var commandHelp = []struct{ name, summary string }{
 	{"definitions", "inspect, search and validate the loaded VyQL definitions"},
 	{"diff", "diff two `scan -format json` outputs by fingerprint"},
 	{"cache", "inspect or clear the persistent scan cache"},
+	{"update", "download or refresh the free definitions bundle from dl.vyprsec.ai"},
 	{"version", "print the version, revision and build information"},
 	{"help", "print this list, or `help <command>` for one command's flags"},
 }

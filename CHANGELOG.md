@@ -10,6 +10,31 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
+### Added
+
+- **`vyql update`.** Checks the free definitions channel on `dl.vyprsec.ai`,
+  reports with `-check`, and installs with confirmation or `-yes` into the
+  current data directory or `~/.local/share/vyql/vyql`.
+- **Interactive install when the data directory is missing.** On a terminal, a
+  command that needs packs asks before downloading the free bundle. Without a
+  terminal it exits 1 and names `vyql update -yes`.
+
+### Changed
+
+- **`go install` is the engine only.** Install with `install.sh`, run
+  `vyql update -yes` after `go install`, or use Homebrew / Docker / a release
+  archive.
+- **`-data` pins the data directory via `datadir.Set`.** The flag no longer sets
+  `$VYQL_HOME`. `$VYQL_HOME` remains for tools that cannot pass `-data` (notably
+  `go test`).
+- **CI fetches definitions into `$RUNNER_TEMP`**, moves any checked-in `vyql/`
+  aside, runs CLI commands with `-data`, and points `go test` at the same tree
+  through `$VYQL_HOME`.
+- **`vyql update` compares semver** (`NeedsUpdate`) rather than string equality,
+  so `1.0.0` vs `1.0.1` is detected.
+- **Definition downloads use `dl.vyprsec.ai` only**, with retries and
+  `Cache-Control: no-cache` when the CDN has not yet served a new object.
+
 ## [0.3.1] - 2026-08-13
 
 ### Fixed

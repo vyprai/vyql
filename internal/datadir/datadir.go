@@ -2,26 +2,29 @@
 // (rule packs + ontology + taxonomy) that lives OUTSIDE the Go source tree and is
 // loaded from disk at runtime (no go:embed). Resolution order:
 //
-//  1. $VYQL_HOME, if set.
-//  2. the nearest ancestor of the current working directory that contains a
+//  1. Set (the `-data` flag), if the process called it.
+//  2. $VYQL_HOME, if set (same override for tools that cannot pass `-data`, such as
+//     `go test`).
+//  3. the nearest ancestor of the current working directory that contains a
 //     valid `vyql/` data directory (covers `go test ./...` from any package and
 //     running the binary from within the repo).
-//  3. the nearest such ancestor of the executable's directory, following the
+//  4. the nearest such ancestor of the executable's directory, following the
 //     symlink if there is one (covers an installed binary shipped alongside its
 //     `vyql/` data dir, and one linked onto PATH from a package prefix).
-//  4. the module cache entry this binary was built from (covers `go install`,
-//     where the binary lands in GOBIN with nothing beside it -- but the module,
-//     data included, is already on disk).
 //
-// If none is found, Root panics with a message telling the user to set
-// $VYQL_HOME — the data is required, never silently empty.
+// The module cache is not consulted. `go install` places only the engine in
+// GOBIN; the definitions arrive via `vyql update`, the install script, a release
+// archive, Homebrew, Docker, or `-data` / $VYQL_HOME pointing at a downloaded
+// bundle. An interactive CLI that needs data and finds none offers to download
+// the free channel from dl.vyprsec.ai.
+//
+// If none is found, Root panics. The CLI turns that into an error and exit 1.
 package datadir
 
 import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime/debug"
 	"sort"
 	"strings"
 	"sync"
@@ -31,6 +34,7 @@ var (
 	mu              sync.Mutex
 	resolved        bool
 	cached          string
+	explicit        string   // from Set / -data; wins over env and search
 	vyqlSourceCache sync.Map // map[root+kind+rel][]Source
 )
 
@@ -38,7 +42,7 @@ var (
 func Root() string {
 	root, ok := Lookup()
 	if !ok {
-		panic("could not locate the data directory; set $VYQL_HOME to the path of your `vyql/` dir " +
+		panic("could not locate the data directory; pass -data or set $VYQL_HOME to the path of your `vyql/` dir " +
 			"(containing ontology/concepts/, plus taxonomy/ and packs/)")
 	}
 	return root
@@ -61,15 +65,26 @@ func Lookup() (string, bool) {
 	return root, root != ""
 }
 
+// Set pins the data directory for this process. The CLI `-data` flag calls it.
+// An empty path clears the pin so the next Lookup walks the search path again.
+func Set(root string) {
+	mu.Lock()
+	explicit = strings.TrimSpace(root)
+	cached, resolved = "", false
+	mu.Unlock()
+	vyqlSourceCache.Range(func(key, _ any) bool {
+		vyqlSourceCache.Delete(key)
+		return true
+	})
+}
+
 // Reset drops the resolved root and everything read from it, so the next Root
-// resolves again.
+// resolves again. It keeps a Set pin: clearing the pin is Set("").
 //
-// A command applies -data by setting $VYQL_HOME, which only has an effect while
-// the root is still unresolved. Building a flag's help text can read the data
-// directory — naming the available profiles requires loading them — and that
-// happens while the flags are being registered, before any of them are parsed. So
-// by the time -data is read, the root is already fixed. Resetting after the change
-// is what makes the flag take effect.
+// Building a flag's help text can read the data directory — naming the available
+// profiles requires loading them — and that happens while the flags are being
+// registered, before any of them are parsed. Resetting after `-data` is applied
+// is what makes the flag take effect if something already looked up the root.
 func Reset() {
 	mu.Lock()
 	cached, resolved = "", false
@@ -210,6 +225,9 @@ func cloneSourceHeaders(sources []Source) []Source {
 }
 
 func resolve() string {
+	if explicit != "" {
+		return explicit
+	}
 	if env := os.Getenv("VYQL_HOME"); env != "" {
 		return env
 	}
@@ -223,68 +241,7 @@ func resolve() string {
 			return d
 		}
 	}
-	if d := moduleCacheRoot(); d != "" {
-		return d
-	}
 	return ""
-}
-
-// moduleCacheRoot finds the data directory inside the module cache entry this
-// binary was built from. `go install example.com/x/cmd/y@v1` leaves the binary in
-// GOBIN with no data beside it, and the working directory is wherever the user
-// happens to be -- so the first three rules all miss, even though the module was
-// just downloaded and the data is sitting in the cache.
-//
-// Returns "" for a locally built binary, whose version reads "(devel)" and which
-// has no cache entry to find.
-func moduleCacheRoot() string {
-	info, ok := debug.ReadBuildInfo()
-	if !ok || info.Main.Path == "" {
-		return ""
-	}
-	version := info.Main.Version
-	if version == "" || version == "(devel)" {
-		return ""
-	}
-	base := os.Getenv("GOMODCACHE")
-	if base == "" {
-		if gopath := os.Getenv("GOPATH"); gopath != "" {
-			base = filepath.Join(gopath, "pkg", "mod")
-		} else if home, err := os.UserHomeDir(); err == nil {
-			base = filepath.Join(home, "go", "pkg", "mod")
-		}
-	}
-	if base == "" {
-		return ""
-	}
-	cand := moduleCachePath(base, info.Main.Path, version)
-	if isDataRoot(cand) {
-		return cand
-	}
-	return ""
-}
-
-// moduleCachePath builds the data directory's path inside the module cache. Split
-// out from the lookup so it can be tested without a binary that was actually go
-// install-ed, which is the only way ReadBuildInfo reports a real version.
-func moduleCachePath(base, modulePath, version string) string {
-	return filepath.Join(base, escapeModulePath(modulePath)+"@"+version, "vyql")
-}
-
-// escapeModulePath applies the module cache's case encoding: an upper-case letter
-// becomes "!" followed by its lower-case form, so that paths differing only in
-// case cannot collide on a case-insensitive filesystem.
-func escapeModulePath(p string) string {
-	var b strings.Builder
-	for _, r := range p {
-		if r >= 'A' && r <= 'Z' {
-			b.WriteByte('!')
-			b.WriteRune(r - 'A' + 'a')
-			continue
-		}
-		b.WriteRune(r)
-	}
-	return b.String()
 }
 
 // searchUp walks from start toward the filesystem root, returning the first

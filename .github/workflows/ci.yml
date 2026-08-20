@@ -74,6 +74,12 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Fetch definitions
+        if: needs.changes.outputs.code == 'true'
+        run: |
+          chmod +x scripts/ci-setup-definitions.sh
+          eval "$(./scripts/ci-setup-definitions.sh)"
+
       - name: Build
         if: needs.changes.outputs.code == 'true'
         run: |
@@ -86,7 +92,8 @@ jobs:
 
       # -count=1 is mandatory: the test cache keys on source and does not track
       # the .vyql data files, so a cached pass can hide a change to the security
-      # knowledge base entirely.
+      # knowledge base entirely. VYQL_HOME comes from ci-setup-definitions.sh
+      # because go test has no -data flag.
       - name: Test
         if: needs.changes.outputs.code == 'true'
         run: go test -count=1 ./...
@@ -102,6 +109,12 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Fetch definitions
+        if: needs.changes.outputs.code == 'true'
+        run: |
+          chmod +x scripts/ci-setup-definitions.sh
+          eval "$(./scripts/ci-setup-definitions.sh)"
 
       - name: gofmt
         if: needs.changes.outputs.code == 'true'
@@ -170,6 +183,11 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Fetch definitions
+        run: |
+          chmod +x scripts/ci-setup-definitions.sh
+          eval "$(./scripts/ci-setup-definitions.sh)"
+
       - name: Build
           # darwin/amd64 is cross-built on an arm64 runner rather than taken from
           # a macos-13 Intel runner: that image is being retired, and a job
@@ -221,7 +239,7 @@ jobs:
             exit 0
           fi
           ./dist/vyql version
-          n="$(VYQL_HOME=./vyql ./dist/vyql scan -fail-on none --format json /tmp/sample \
+          n="$(./dist/vyql scan -data "$VYQL_DEFINITIONS" -fail-on none --format json /tmp/sample \
                 | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d if isinstance(d,list) else d.get("findings",[])))')"
           echo "findings: $n"
           [ "$n" -ge 1 ] || { echo "built, ran, detected nothing"; exit 1; }

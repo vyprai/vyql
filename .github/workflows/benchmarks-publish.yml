@@ -42,6 +42,11 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Fetch definitions
+        run: |
+          chmod +x scripts/ci-setup-definitions.sh
+          eval "$(./scripts/ci-setup-definitions.sh)"
+
       - name: Unit tests for the publisher
         run: python3 -m unittest discover -s benchmarks -p 'test_*.py'
 
@@ -144,7 +149,7 @@ jobs:
         run: |
           set +e
           python3 benchmarks/score_realvuln.py \
-            "$LINKS/Real-Vuln-Benchmark" "$RUNNER_TEMP/vyql" "$GITHUB_WORKSPACE/vyql" \
+            "$LINKS/Real-Vuln-Benchmark" "$RUNNER_TEMP/vyql" "$VYQL_DEFINITIONS" \
             > "$RUNNER_TEMP/realvuln.txt" 2>"$RUNNER_TEMP/realvuln.err"
           status=$?
           set -e
@@ -157,7 +162,7 @@ jobs:
         run: |
           set +e
           python3 benchmarks/score_xbow.py \
-            "$HOME/validation-benchmarks" "$RUNNER_TEMP/vyql" "$GITHUB_WORKSPACE/vyql" \
+            "$HOME/validation-benchmarks" "$RUNNER_TEMP/vyql" "$VYQL_DEFINITIONS" \
             > "$RUNNER_TEMP/xbow.txt" 2>"$RUNNER_TEMP/xbow.err"
           status=$?
           set -e

@@ -932,7 +932,7 @@ func checkCatalogLoaded(cat definitions.Catalog) error {
 	// a data directory that cannot be found at all.
 	return fmt.Errorf("no definitions found under %s\n"+
 		"  the data directory holds no concepts, rules, bindings or reviews\n"+
-		"  point -data or $VYQL_HOME at the vyql/ directory that ships with the scanner", cat.Root)
+		"  point -data at a vyql/ directory, or run `vyql update -yes`", cat.Root)
 }
 
 func printDefinitions(cat definitions.Catalog) {

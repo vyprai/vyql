@@ -162,10 +162,7 @@ func applyDataFlagEarly(args []string) error {
 		return usageWith("-data needs a directory",
 			"usage: -data <path to the vyql/ data directory>")
 	}
-	if err := os.Setenv("VYQL_HOME", strings.TrimSpace(dir)); err != nil {
-		return fmt.Errorf("-data: %w", err)
-	}
-	datadir.Reset()
+	datadir.Set(strings.TrimSpace(dir))
 	return nil
 }
 
@@ -217,7 +214,7 @@ func addRunFlags(fs *flag.FlagSet) runFlags {
 // data directory first. Declaring it here is what makes the flag parse rather than
 // be rejected, and what puts it in the command's help.
 func addDataFlag(fs *flag.FlagSet) {
-	fs.String("data", "", "the vyql/ data directory (default: $VYQL_HOME, then the search path)")
+	fs.String("data", "", "the vyql/ data directory (default: search path; $VYQL_HOME for tools without this flag)")
 }
 
 // statsValue is `-stats`, which reports what the run did: graph counts, taint-hub

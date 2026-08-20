@@ -5,9 +5,10 @@ such as `module`, `concept`, `threat`, `pattern`, `binding`, `rule`, and
 `policy`) and loaded from disk at runtime — no `go:embed`. Built-in language
 mechanics such as rule verbs, coverage modes, and assume traversal are
 implemented in Go; shipped VyQL content must not author them. The engine resolves
-this directory via `$VYQL_HOME`, or by walking up from the working directory /
-the executable to find a `vyql/` containing `ontology/concepts.vyql` (see
-`go/datadir`).
+this directory via `$VYQL_HOME` / `-data`, by walking up from the working
+directory or the executable to find a `vyql/` data root, or after
+`vyql update` installs the free channel under `~/.local/share/vyql/vyql`
+(see `internal/datadir`).
 
 ```
 vyql/

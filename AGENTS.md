@@ -12,7 +12,11 @@ A Go engine plus a large body of security knowledge stored as data.
   purpose: the CLI is the supported interface, so the Go packages stay free to
   change.
 - `vyql/` — the knowledge: `ontology/` (concepts), `bindings/` (what each
-  language means), `packs/` (rules), `tests/` (specs), `taxonomy/` (CWE/CAPEC)
+  language means), `packs/` (rules), `tests/` (specs), `taxonomy/` (CWE/CAPEC).
+  CI fetches a with-tests bundle into `$RUNNER_TEMP` and passes `-data` (CLI) or
+  `$VYQL_HOME` (`go test`). Locally, when `./vyql` is absent, run
+  `./scripts/fetch-free-definitions.sh --with-tests ./vyql` or
+  `make fetch-definitions`.
 - `docs/` — the design series; `docs/README.md` indexes it
 - `benchmarks/` — the measured record
 
@@ -177,6 +181,8 @@ What actually drifts, in order of how often it has:
 2. **Install instructions**, which exist in four places: this README, the
    action's, the tap's, and the skill's `references/install.md`. The install URL,
    the container image name and the `go install` path appear in all of them.
+   `go install` is the engine only. The satellites that describe it must also
+   name `vyql update -yes`, `install.sh`, or the free bundle on `dl.vyprsec.ai`.
 3. **Flags and severity vocabulary.** `-fail-on` takes
    `none info low medium high critical`; the action's input description repeats
    that list, and a change here does not update it there. The same goes for the

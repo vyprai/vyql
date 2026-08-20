@@ -11,9 +11,11 @@ on:
     # workflow edits cannot.
     paths:
       - "**/*.go"
-      - "vyql/**"
       - "go.mod"
       - "go.sum"
+      - "scripts/fetch-free-definitions.sh"
+      - "scripts/ci-setup-definitions.sh"
+      - "packaging/**"
   push:
     branches: [main]
   workflow_dispatch:
@@ -36,6 +38,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Fetch definitions
+        run: |
+          chmod +x scripts/ci-setup-definitions.sh
+          eval "$(./scripts/ci-setup-definitions.sh)"
 
       # The corpora are GPL and are never vendored here. They are also stable --
       # pinned upstream repositories that change rarely -- so a cache hit is the
