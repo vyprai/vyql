@@ -48,8 +48,37 @@ jobs:
           # Asked of the API rather than computed from a checkout: the working
           # tree is 34,000 files and this job exists to save time, not spend it
           # cloning three times over. --paginate covers pull requests with more
-          # than one page of files.
-          changed="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --jq '.[].filename')"
+          # than one page of files. Self-hosted runners do not ship gh; use the
+          # REST API directly.
+          changed="$(python3 <<'PY'
+          import json, os, urllib.request
+          repo = os.environ["GITHUB_REPOSITORY"]
+          pr = os.environ["PR"]
+          token = os.environ["GH_TOKEN"]
+          headers = {
+              "Authorization": f"Bearer {token}",
+              "Accept": "application/vnd.github+json",
+              "User-Agent": "vyql-private-ci",
+          }
+          filenames = []
+          page = 1
+          while True:
+              url = (
+                  f"https://api.github.com/repos/{repo}/pulls/{pr}/files"
+                  f"?per_page=100&page={page}"
+              )
+              req = urllib.request.Request(url, headers=headers)
+              with urllib.request.urlopen(req) as resp:
+                  batch = json.load(resp)
+              if not batch:
+                  break
+              filenames.extend(item["filename"] for item in batch)
+              if len(batch) < 100:
+                  break
+              page += 1
+          print("\n".join(filenames))
+          PY
+          )"
           echo "changed files:"; echo "$changed" | sed 's/^/  /'
           # Inverted on purpose: anything that is not recognisably documentation
           # counts as code, so a new kind of file runs the full suite. Being
