@@ -238,8 +238,16 @@ func untarGz(path, dest string) error {
 		if err != nil {
 			return err
 		}
-		target := filepath.Join(dest, hdr.Name)
-		if !strings.HasPrefix(filepath.Clean(target), filepath.Clean(dest)+string(os.PathSeparator)) && filepath.Clean(target) != filepath.Clean(dest) {
+		name := filepath.Clean(hdr.Name)
+		if name == "." || name == "" {
+			continue
+		}
+		if filepath.IsAbs(name) || name == ".." || strings.HasPrefix(name, ".."+string(os.PathSeparator)) {
+			return fmt.Errorf("tar entry escapes destination: %s", hdr.Name)
+		}
+		target := filepath.Join(dest, name)
+		rel, err := filepath.Rel(dest, target)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
 			return fmt.Errorf("tar entry escapes destination: %s", hdr.Name)
 		}
 		switch hdr.Typeflag {
