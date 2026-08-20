@@ -2,6 +2,7 @@ name: ci
 
 on:
   pull_request:
+    branches: [main]
   push:
     branches: [main]
 
@@ -16,7 +17,7 @@ jobs:
   #
   # A job skipped by a conditional does report, as success.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vyql-private]
     # Granted here rather than at the workflow level: only this job reads the
     # pull request's file list, and nothing else needs the scope.
     permissions:
@@ -43,8 +44,37 @@ jobs:
           # Asked of the API rather than computed from a checkout: the working
           # tree is 34,000 files and this job exists to save time, not spend it
           # cloning three times over. --paginate covers pull requests with more
-          # than one page of files.
-          changed="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --jq '.[].filename')"
+          # than one page of files. Self-hosted runners do not ship gh; use the
+          # REST API directly.
+          changed="$(python3 <<'PY'
+          import json, os, urllib.request
+          repo = os.environ["GITHUB_REPOSITORY"]
+          pr = os.environ["PR"]
+          token = os.environ["GH_TOKEN"]
+          headers = {
+              "Authorization": f"Bearer {token}",
+              "Accept": "application/vnd.github+json",
+              "User-Agent": "vyql-private-ci",
+          }
+          filenames = []
+          page = 1
+          while True:
+              url = (
+                  f"https://api.github.com/repos/{repo}/pulls/{pr}/files"
+                  f"?per_page=100&page={page}"
+              )
+              req = urllib.request.Request(url, headers=headers)
+              with urllib.request.urlopen(req) as resp:
+                  batch = json.load(resp)
+              if not batch:
+                  break
+              filenames.extend(item["filename"] for item in batch)
+              if len(batch) < 100:
+                  break
+              page += 1
+          print("\n".join(filenames))
+          PY
+          )"
           echo "changed files:"; echo "$changed" | sed 's/^/  /'
           # Inverted on purpose: anything that is not recognisably documentation
           # counts as code, so a new kind of file runs the full suite. Being
@@ -58,11 +88,10 @@ jobs:
           fi
   build-test:
     needs: changes
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    # macOS hosted runners are unavailable on a private repository without
+    # billing. darwin portability is covered by matrix-build on push and by
+    # release.yml when a tag is cut.
+    runs-on: [self-hosted, linux, x64, vyql-private]
     env:
       # The tree-sitter grammars are C. Without cgo the build constraints exclude
       # them silently rather than failing, so this is not a default worth trusting.
@@ -93,7 +122,7 @@ jobs:
 
   lint:
     needs: changes
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vyql-private]
     env:
       CGO_ENABLED: "1"
     steps:
@@ -147,20 +176,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - runner: [self-hosted, linux, x64, vyql-private]
             goos: linux
             goarch: amd64
-          - os: ubuntu-24.04-arm
+          - runner: [self-hosted, linux, arm64, vyql-private]
             goos: linux
             goarch: arm64
-          - os: macos-latest
+          - runner: macos-latest
             goos: darwin
             goarch: arm64
-          - os: macos-latest
+          - runner: macos-latest
             goos: darwin
             goarch: amd64
             cc: clang -arch x86_64
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     env:
       CGO_ENABLED: "1"
     steps:

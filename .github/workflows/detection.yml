@@ -7,6 +7,9 @@ name: detection
 
 on:
   pull_request:
+    # Stacked pull requests target each other, and their content is proven
+    # by the main-targeting pull request at the top of the stack.
+    branches: [main]
     # Only when something that can move a score changes. Documentation and
     # workflow edits cannot.
     paths:
@@ -27,7 +30,7 @@ jobs:
       fail-fast: false
       matrix:
         suite: [BenchmarkJava, BenchmarkPython]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vyql-private]
     env:
       CGO_ENABLED: "1"
     steps:
