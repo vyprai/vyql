@@ -21,7 +21,7 @@ jobs:
   #
   # A job skipped by a conditional does report, as success.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vyql-private]
     # Granted here rather than at the workflow level: only this job reads the
     # pull request's file list, and nothing else needs the scope.
     permissions:
@@ -63,7 +63,7 @@ jobs:
           fi
   govulncheck:
     needs: changes
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vyql-private]
     env:
       CGO_ENABLED: "1"
     steps:
@@ -81,7 +81,7 @@ jobs:
 
   codeql:
     needs: changes
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vyql-private]
     permissions:
       contents: read
       security-events: write
@@ -111,7 +111,7 @@ jobs:
     needs: changes
     # VyQL scans its own source. A security scanner that cannot be run against
     # itself is making a claim it will not test.
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vyql-private]
     env:
       CGO_ENABLED: "1"
     steps:

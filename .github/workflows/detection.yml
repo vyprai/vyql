@@ -30,7 +30,7 @@ jobs:
       fail-fast: false
       matrix:
         suite: [BenchmarkJava, BenchmarkPython]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vyql-private]
     env:
       CGO_ENABLED: "1"
     steps:

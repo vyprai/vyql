@@ -21,7 +21,7 @@ jobs:
   #
   # A job skipped by a conditional does report, as success.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vyql-private]
     # Granted here rather than at the workflow level: only this job reads the
     # pull request's file list, and nothing else needs the scope.
     permissions:
@@ -63,7 +63,7 @@ jobs:
           fi
   hygiene:
     needs: changes
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vyql-private]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -77,7 +77,7 @@ jobs:
 
   data-integrity:
     needs: changes
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vyql-private]
     env:
       CGO_ENABLED: "1"
     steps:

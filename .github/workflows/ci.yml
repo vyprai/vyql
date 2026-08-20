@@ -17,7 +17,7 @@ jobs:
   #
   # A job skipped by a conditional does report, as success.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vyql-private]
     # Granted here rather than at the workflow level: only this job reads the
     # pull request's file list, and nothing else needs the scope.
     permissions:
@@ -59,11 +59,10 @@ jobs:
           fi
   build-test:
     needs: changes
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    # macOS hosted runners are unavailable on a private repository without
+    # billing. darwin portability is covered by matrix-build on push and by
+    # release.yml when a tag is cut.
+    runs-on: [self-hosted, linux, x64, vyql-private]
     env:
       # The tree-sitter grammars are C. Without cgo the build constraints exclude
       # them silently rather than failing, so this is not a default worth trusting.
@@ -94,7 +93,7 @@ jobs:
 
   lint:
     needs: changes
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vyql-private]
     env:
       CGO_ENABLED: "1"
     steps:
@@ -148,20 +147,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - runner: [self-hosted, linux, x64, vyql-private]
             goos: linux
             goarch: amd64
-          - os: ubuntu-24.04-arm
+          - runner: [self-hosted, linux, arm64, vyql-private]
             goos: linux
             goarch: arm64
-          - os: macos-latest
+          - runner: macos-latest
             goos: darwin
             goarch: arm64
-          - os: macos-latest
+          - runner: macos-latest
             goos: darwin
             goarch: amd64
             cc: clang -arch x86_64
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     env:
       CGO_ENABLED: "1"
     steps:
