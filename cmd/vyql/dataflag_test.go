@@ -75,9 +75,11 @@ func asExitError(err error, target **exec.ExitError) bool {
 	return ok
 }
 
-// repoDataDir is the data directory that ships in this repository. Tests that need
-// the real knowledge base pass it explicitly, because runVyql clears $VYQL_HOME and
-// runs from a temporary directory, so nothing else would find it.
+// repoDataDir is the data directory tests use for the real knowledge base.
+// Prefer $VYQL_HOME when set (CI fetches into that path). Otherwise walk from
+// this package up to a sibling `vyql/` tree. runVyql clears $VYQL_HOME and runs
+// from a temporary directory, so callers that need the corpus pass this path
+// with -data.
 func repoDataDir(t *testing.T) string {
 	t.Helper()
 	if d := strings.TrimSpace(os.Getenv("VYQL_HOME")); d != "" {
@@ -175,7 +177,8 @@ func TestKnownFlagCategoryIsAccepted(t *testing.T) {
 }
 
 // go install puts the engine in GOBIN with no vyql/ beside it. A data root
-// under GOMODCACHE is not used, so scan exits 1.
+// under GOMODCACHE is not used. Without a terminal, scan exits 1 and names the
+// free definitions on dl.vyprsec.ai.
 func TestScanWithoutDataDirectoryExitsOne(t *testing.T) {
 	modcache := t.TempDir()
 	stale := filepath.Join(modcache, "github.com", "vyprai", "vyql@v0.3.1", "vyql")

@@ -47,7 +47,8 @@ crit=$(vyql scan --format json . | jq '[.[] | select(.severity=="critical")] | l
 ```
 
 A non-zero exit means the scan itself failed — unreadable path, bad rule file,
-missing data directory.
+missing data directory (and no interactive download). Install definitions with
+`vyql update -yes` when the engine alone is present.
 
 ## Only new findings
 

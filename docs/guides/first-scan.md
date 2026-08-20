@@ -9,23 +9,23 @@ curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh
 ```
 
 `go install` is the engine only (Go 1.26+ and a C toolchain; the parsers are C,
-and without cgo the build constraints exclude them silently rather than failing):
+and without cgo the build constraints exclude them silently rather than failing).
+After install, fetch the free definitions:
 
 ```sh
 go install github.com/vyprai/vyql/cmd/vyql@latest
-curl -fsSLO https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz
-curl -fsSLO https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz.sha256
-shasum -a 256 -c latest.tar.gz.sha256
-mkdir -p "$HOME/.local/share/vyql"
-tar -xzf latest.tar.gz -C "$HOME/.local/share/vyql"
-export VYQL_HOME="$HOME/.local/share/vyql/vyql"
+vyql update -yes
 ```
+
+That unpacks into `~/.local/share/vyql/vyql`. An interactive `vyql scan` from a
+directory with no data nearby asks before downloading the same bundle.
 
 From source:
 
 ```sh
 git clone https://github.com/vyprai/vyql
 cd vyql
+./scripts/fetch-free-definitions.sh --with-tests ./vyql   # if ./vyql is absent
 make build      # -> bin/vyql
 ```
 
@@ -40,16 +40,20 @@ It finds that directory in this order:
 2. a `vyql/` directory in the working directory or any ancestor
 3. a `vyql/` directory next to the executable (and through a symlink, as Homebrew does)
 
-A `go install`ed binary run from an unrelated directory has none of those, and
-exits 1:
+A `go install`ed binary run from an unrelated directory has none of those. On a
+terminal it offers to download the free bundle from `dl.vyprsec.ai`. Without a
+terminal (CI, a pipe) it exits 1 and names the install options, including
+`vyql update -yes`.
 
 ```
 vyql: could not locate the data directory; go install installs the engine only
+  run interactively to download the free bundle, or:
+    vyql update -yes
 ```
 
-Install with `install.sh`, Homebrew, Docker, or a release archive; or unpack the
-free bundle from `https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz` and
-set `$VYQL_HOME` to that `vyql/` directory.
+`vyql update` refreshes an installed copy; `vyql update -check` reports whether
+the CDN has a newer free version. Homebrew, Docker, and the GitHub release
+archive already ship the free definitions beside the binary.
 
 Check what loaded:
 

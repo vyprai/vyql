@@ -11,8 +11,10 @@
 //     `vyql/` data dir, and one linked onto PATH from a package prefix).
 //
 // The module cache is not consulted. `go install` places only the engine in
-// GOBIN; the definitions arrive via the install script, a release archive,
-// Homebrew, Docker, or $VYQL_HOME / -data pointing at a downloaded bundle.
+// GOBIN; the definitions arrive via `vyql update`, the install script, a release
+// archive, Homebrew, Docker, or $VYQL_HOME / -data pointing at a downloaded
+// bundle. An interactive CLI that needs data and finds none offers to download
+// the free channel from dl.vyprsec.ai.
 //
 // If none is found, Root panics. The CLI turns that into an error and exit 1.
 package datadir

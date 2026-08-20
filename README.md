@@ -12,8 +12,9 @@ code, and for every finding it explains why it thinks the finding is real.
 
 There are two parts. A small Go engine builds one graph of your program and
 answers questions about it. Everything the engine knows about frameworks, sinks,
-sanitizers and vulnerability classes lives in `vyql/` as plain text you can read
-and edit.
+sanitizers and vulnerability classes lives in a `vyql/` data directory as plain
+text you can read and edit — shipped with release installs, or fetched with
+`vyql update` after `go install`.
 
 ```
 pattern  →  concept  →  binding  →  rule
@@ -67,27 +68,22 @@ cd vyql_${V}_${P}
 ### go install
 
 Requires Go 1.26+ and a C toolchain (the parsers are C). This installs the
-**engine only**. The knowledge base is not in the module; a scan without it
-exits 1.
+**engine only**. The knowledge base is not in the module.
+
+```sh
+go install github.com/vyprai/vyql/cmd/vyql@latest
+vyql update -yes
+```
+
+`vyql update` downloads the free definitions from `dl.vyprsec.ai` into
+`~/.local/share/vyql/vyql`. An interactive scan with no data directory nearby
+asks before doing the same download. Without a terminal, a missing data
+directory exits 1 and names `vyql update -yes`.
 
 Use the install script instead if you want both halves in one step:
 
 ```sh
 curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh
-```
-
-Or, after `go install`, download the free definitions and point the engine at them:
-
-```sh
-go install github.com/vyprai/vyql/cmd/vyql@latest
-
-curl -fsSLO https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz
-curl -fsSLO https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz.sha256
-shasum -a 256 -c latest.tar.gz.sha256
-mkdir -p "$HOME/.local/share/vyql"
-tar -xzf latest.tar.gz -C "$HOME/.local/share/vyql"
-# unpack so this path contains ontology/concepts, packs and taxonomy:
-export VYQL_HOME="$HOME/.local/share/vyql/vyql"
 ```
 
 Homebrew, Docker, and the GitHub release archive already include the free
@@ -109,8 +105,12 @@ glibc.
 ```sh
 git clone https://github.com/vyprai/vyql
 cd vyql
+./scripts/fetch-free-definitions.sh --with-tests ./vyql   # if ./vyql is absent
 make build          # -> bin/vyql
 ```
+
+CI uses the same fetch (with tests) before `go test`. The runtime free bundle
+without tests is what release archives and `vyql update` install.
 
 ### As an agent skill
 
@@ -771,20 +771,26 @@ vyql definitions refs -in vyql/ontology/concepts core.SqlParameterization
 vyql definitions explain -in vyql/bindings/python code.SqlExecution
 ```
 
-### `diff`, `cache`, `version`, `help`
+### `diff`, `cache`, `update`, `version`, `help`
 
 ```sh
 vyql diff before.json after.json     # two `scan -format json` outputs
 vyql cache path                      # the directory this build would use
 vyql cache clear                     # remove it, reporting the space freed
 vyql cache clear -cache /tmp/mine    # a cache somewhere else
+vyql update -check                   # compare local VERSION to dl.vyprsec.ai
+vyql update -yes                     # download the free definitions bundle
 vyql version
 vyql help
 vyql help scan
 ```
 
-`diff` exits `3` when the finding set changed, so a pipeline can gate on "this
-branch changed the findings" without parsing the output.
+`diff` exits `3` when the finding set changed, so a pipeline can gate on "there
+are new findings" without parsing the output.
+
+`update -check` exits `3` when the CDN has a newer free bundle, or when none is
+installed yet. `update -yes` installs without prompting into the current data
+directory when one is found, otherwise into `~/.local/share/vyql/vyql`.
 
 `cache clear` removes the directory instead of emptying it, and reports how much
 space it freed. The next scan creates it again.
@@ -818,9 +824,10 @@ vyql/
 ```
 
 None of this is compiled into the binary. It is loaded at startup from the
-directory that `VYQL_HOME` names, or from a `vyql/` directory found above the
-working directory. Point `VYQL_HOME` at your own copy, and your edits apply on
-the next run.
+directory that `$VYQL_HOME` or `-data` names, from a `vyql/` directory found
+above the working directory, or beside the executable. `vyql update` installs
+the free bundle under `~/.local/share/vyql/vyql`. Point `$VYQL_HOME` at your own
+copy, and your edits apply on the next run.
 
 ## Adding coverage
 

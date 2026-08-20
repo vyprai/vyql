@@ -142,8 +142,10 @@ func vyqlMain() (code int) {
 		return exitCodeFor(err)
 	}
 	// go install ships the engine only. Commands that load packs or the ontology
-	// require a data directory, except help (which must answer without it) and
-	// cache (which does not load it).
+	// require a data directory, except help (which must answer without it),
+	// cache, and update (which install or inspect the bundle themselves). On a
+	// terminal, ensureDataDirectory offers to download the free channel before
+	// failing.
 	if commandNeedsData(cmd) && !wantsHelp(args) {
 		if err := ensureDataDirectory(); err != nil {
 			return exitCodeFor(err)

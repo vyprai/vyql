@@ -18,12 +18,16 @@ anything.
 
 ```sh
 make build     # -> bin/
+# if ./vyql is absent:
+./scripts/fetch-free-definitions.sh --with-tests ./vyql
 make test      # full suite, never cached
 make lint      # gofmt, go vet, golangci-lint
 make ci        # exactly what the pipeline runs
 ```
 
-If `make ci` passes locally, CI should agree.
+If `make ci` passes locally, CI should agree. CI itself downloads the free
+definitions **with tests** from `dl.vyprsec.ai` before `go test`; it does not
+rely on an in-tree `vyql/` checkout.
 
 ## Reporting a missed or wrong finding
 

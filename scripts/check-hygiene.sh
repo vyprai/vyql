@@ -40,8 +40,8 @@ hits="$(grep -rIn 'github.com/vypr/vyql' . --exclude-dir=.git --exclude-dir=bin 
 
 echo "== the data directory is not ignored =="
 # A gitignore pattern without a trailing slash matches directories too, so a
-# root-level `vyql` entry would silently drop the entire knowledge base: the
-# repository would still build, and the scanner would panic at runtime.
+# root-level `vyql` entry would silently drop a checked-in knowledge tree when
+# one is present. CI fetches definitions into ./vyql when the tree is absent.
 for p in vyql/README.md vyql/ontology/concepts vyql/bindings; do
   if git check-ignore -q --no-index "$p" 2>/dev/null; then
     report "gitignore excludes the runtime data directory ($p)" "$(git check-ignore -v --no-index "$p")"

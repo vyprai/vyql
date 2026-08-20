@@ -59,6 +59,7 @@ jobs:
           # The install command is the page's only call to action. A page that
           # loses it still looks fine and converts nobody.
           grep -q "dl.vyprsec.ai/vyql/install.sh" site/index.html
+          grep -q "vyql update -yes" site/index.html
           # Copy buttons are attached to these markers at runtime. Losing the
           # attribute removes every button and leaves a page that still looks
           # entirely correct.

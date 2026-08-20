@@ -1,14 +1,16 @@
 # VyQL dev Makefile. The scanner is `vyql`; the security knowledge it evaluates
-# — ontology, bindings, rule packs, taxonomy — is data under vyql/, loaded at
-# runtime rather than compiled in.
+# — ontology, bindings, rule packs, taxonomy — is data under $VYQL_HOME or
+# ./vyql, loaded at runtime rather than compiled in. When ./vyql is absent,
+# fetch it with `make fetch-definitions` (same script CI uses).
 #
-#   make build    # build the binaries into bin/
-#   make test     # full suite (never cached — see below)
-#   make lint     # gofmt check, go vet, golangci-lint
-#   make ci       # everything the PR pipeline runs
+#   make build                 # build the binaries into bin/
+#   make fetch-definitions     # free with-tests bundle into ./vyql
+#   make test                  # full suite (never cached — see below)
+#   make lint                  # gofmt check, go vet, golangci-lint
+#   make ci                    # everything the PR pipeline runs
 #
-# Binaries go to bin/ and never to the repository root: vyql/ already occupies
-# that name, and a root-level binary would collide with the data directory.
+# Binaries go to bin/ and never to the repository root: a root-level `vyql`
+# binary would collide with the data directory name.
 
 HOME_DIR := ./vyql
 GO       := go
@@ -44,6 +46,10 @@ lint: ## gofmt check, go vet and golangci-lint
 # -count=1 is mandatory, not a preference: the Go test cache keys on source and
 # does not track the .vyql data files, so a cached pass can hide a change to the
 # security knowledge base entirely. A bare `go test` in this repo is a bug.
+.PHONY: fetch-definitions
+fetch-definitions: ## Download free definitions with tests into ./vyql
+	./scripts/fetch-free-definitions.sh --with-tests ./vyql
+
 .PHONY: test
 test: ## Run the full Go test suite (never cached)
 	$(GO) test -count=1 ./...

@@ -10,16 +10,26 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
+### Added
+
+- **`vyql update`.** Checks the free definitions channel on `dl.vyprsec.ai`,
+  reports with `-check`, and installs with confirmation or `-yes` into the
+  current data directory or `~/.local/share/vyql/vyql`.
+- **Interactive install when the data directory is missing.** On a terminal, a
+  command that needs packs asks before downloading the free bundle. Without a
+  terminal it exits 1 and names `vyql update -yes`.
+
 ### Changed
 
 - **`go install` is the engine only.** The binary does not look up definitions
-  in the module cache. A command that needs the knowledge base and cannot find
-  a `vyql/` directory prints an error on stderr and exits 1. Install with
-  `curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh`, or download the free
-  bundle from `https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz` and set
-  `$VYQL_HOME`. Homebrew, Docker, and GitHub release archives include the free
-  definitions; those archives pack the bundle pinned in
-  `packaging/definitions-free.url`.
+  in the module cache. Install with `curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh`,
+  run `vyql update -yes` after `go install`, or use Homebrew, Docker, or a
+  GitHub release archive (those pack the free bundle pinned in
+  `packaging/definitions-free.url`).
+- **CI fetches free definitions with tests** via
+  `scripts/fetch-free-definitions.sh --with-tests` and sets `VYQL_HOME` before
+  build and test jobs. The engine repository does not need an in-tree `vyql/`
+  for those jobs.
 
 ## [0.3.1] - 2026-08-13
 

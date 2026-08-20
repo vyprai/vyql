@@ -26,7 +26,8 @@ const (
 )
 
 // errNoDataDirectory is a go install (or any other binary) that has nowhere to
-// load packs and ontology from. Exit 1: the tool could not complete, distinct
+// load packs and ontology from, and that is not on an interactive terminal where
+// the CLI can offer a download. Exit 1: the tool could not complete, distinct
 // from a scan that ran and found nothing.
 var errNoDataDirectory = errors.New(`could not locate the data directory; go install installs the engine only
   run interactively to download the free bundle, or:
