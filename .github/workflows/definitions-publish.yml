@@ -4,6 +4,17 @@
 #   definitions/vX.Y.Z-free  → public  gs://dl.vyprsec.ai/vyql/definitions/free/
 #   definitions/vX.Y.Z       → private gs://vypr-vyql-definitions-commercial/
 #
+# Each tag publishes two packs of the same tree:
+#   runtime     — no vyql/tests/ (customer installs, vyql update)
+#   with-tests  — includes vyql/tests/ (public CI / benchmarks for free;
+#                 private commercial CI for commercial)
+#
+# Paths:
+#   free runtime:      …/free/latest.tar.gz
+#   free with-tests:   …/free/with-tests/latest.tar.gz  (public; IAM under free/)
+#   commercial runtime:     gs://vypr-vyql-definitions-commercial/latest.tar.gz
+#   commercial with-tests:  gs://vypr-vyql-definitions-commercial/with-tests/…
+#
 # User-facing version is bare semver in latest.json and in-tree VERSION.
 # Free tags belong on the definitions/free branch; commercial tags on main.
 #
@@ -82,17 +93,28 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x scripts/pack-definitions.sh
-          url=""
           case "$CHANNEL" in
-            free) url="https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz" ;;
-            commercial) url="gs://vypr-vyql-definitions-commercial/latest.tar.gz" ;;
+            free)
+              runtime_url="https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz"
+              tests_url="https://dl.vyprsec.ai/vyql/definitions/free/with-tests/latest.tar.gz"
+              ;;
+            commercial)
+              runtime_url="gs://vypr-vyql-definitions-commercial/latest.tar.gz"
+              tests_url="gs://vypr-vyql-definitions-commercial/with-tests/latest.tar.gz"
+              ;;
           esac
           ./scripts/pack-definitions.sh \
             --version "$VERSION" \
             --channel "$CHANNEL" \
             --out "${RUNNER_TEMP}/definitions-out" \
-            --url "$url"
-          ls -la "${RUNNER_TEMP}/definitions-out"
+            --url "$runtime_url"
+          ./scripts/pack-definitions.sh \
+            --version "$VERSION" \
+            --channel "$CHANNEL" \
+            --include-tests \
+            --out "${RUNNER_TEMP}/definitions-out-with-tests" \
+            --url "$tests_url"
+          ls -la "${RUNNER_TEMP}/definitions-out" "${RUNNER_TEMP}/definitions-out-with-tests"
 
       - uses: google-github-actions/auth@v2
         with:
@@ -106,20 +128,32 @@ jobs:
         env:
           VERSION: ${{ steps.meta.outputs.version }}
           OUT: ${{ runner.temp }}/definitions-out
+          OUT_TESTS: ${{ runner.temp }}/definitions-out-with-tests
         run: |
           set -euo pipefail
           prefix="gs://dl.vyprsec.ai/vyql/definitions/free"
+          # Runtime pack (no tests).
           gcloud storage cp "$OUT/definitions.tar.gz" "$prefix/v${VERSION}.tar.gz"
           gcloud storage cp "$OUT/definitions.tar.gz.sha256" "$prefix/v${VERSION}.tar.gz.sha256"
           gcloud storage cp "$OUT/definitions.tar.gz" "$prefix/latest.tar.gz"
           gcloud storage cp "$OUT/definitions.tar.gz.sha256" "$prefix/latest.tar.gz.sha256"
           gcloud storage cp "$OUT/latest.json" "$prefix/latest.json"
+          # With-tests pack for public CI and benchmarks (same free/ IAM prefix).
+          gcloud storage cp "$OUT_TESTS/definitions.tar.gz" "$prefix/with-tests/v${VERSION}.tar.gz"
+          gcloud storage cp "$OUT_TESTS/definitions.tar.gz.sha256" "$prefix/with-tests/v${VERSION}.tar.gz.sha256"
+          gcloud storage cp "$OUT_TESTS/definitions.tar.gz" "$prefix/with-tests/latest.tar.gz"
+          gcloud storage cp "$OUT_TESTS/definitions.tar.gz.sha256" "$prefix/with-tests/latest.tar.gz.sha256"
+          gcloud storage cp "$OUT_TESTS/latest.json" "$prefix/with-tests/latest.json"
           {
             echo "### Free definitions v${VERSION}"
             echo ""
+            echo "Runtime (no tests):"
             echo "- https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz"
             echo "- https://dl.vyprsec.ai/vyql/definitions/free/latest.json"
-            echo "- https://dl.vyprsec.ai/vyql/definitions/free/v${VERSION}.tar.gz"
+            echo ""
+            echo "With tests (public CI / benchmarks):"
+            echo "- https://dl.vyprsec.ai/vyql/definitions/free/with-tests/latest.tar.gz"
+            echo "- https://dl.vyprsec.ai/vyql/definitions/free/with-tests/latest.json"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload commercial
@@ -127,6 +161,7 @@ jobs:
         env:
           VERSION: ${{ steps.meta.outputs.version }}
           OUT: ${{ runner.temp }}/definitions-out
+          OUT_TESTS: ${{ runner.temp }}/definitions-out-with-tests
         run: |
           set -euo pipefail
           prefix="gs://vypr-vyql-definitions-commercial"
@@ -135,10 +170,16 @@ jobs:
           gcloud storage cp "$OUT/definitions.tar.gz" "$prefix/latest.tar.gz"
           gcloud storage cp "$OUT/definitions.tar.gz.sha256" "$prefix/latest.tar.gz.sha256"
           gcloud storage cp "$OUT/latest.json" "$prefix/latest.json"
+          gcloud storage cp "$OUT_TESTS/definitions.tar.gz" "$prefix/with-tests/v${VERSION}.tar.gz"
+          gcloud storage cp "$OUT_TESTS/definitions.tar.gz.sha256" "$prefix/with-tests/v${VERSION}.tar.gz.sha256"
+          gcloud storage cp "$OUT_TESTS/definitions.tar.gz" "$prefix/with-tests/latest.tar.gz"
+          gcloud storage cp "$OUT_TESTS/definitions.tar.gz.sha256" "$prefix/with-tests/latest.tar.gz.sha256"
+          gcloud storage cp "$OUT_TESTS/latest.json" "$prefix/with-tests/latest.json"
           {
             echo "### Commercial definitions v${VERSION}"
             echo ""
-            echo "- Object: \`${prefix}/v${VERSION}.tar.gz\` (private)"
+            echo "- Runtime: \`${prefix}/v${VERSION}.tar.gz\` (private)"
+            echo "- With tests: \`${prefix}/with-tests/v${VERSION}.tar.gz\` (private)"
             echo "- Smoke signed URL (operator):"
-            echo "  \`gcloud storage sign-url ${prefix}/v${VERSION}.tar.gz --duration=15m\`"
+            echo "  \`gcloud storage sign-url ${prefix}/with-tests/v${VERSION}.tar.gz --duration=15m\`"
           } >> "$GITHUB_STEP_SUMMARY"
