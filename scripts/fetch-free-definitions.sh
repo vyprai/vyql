@@ -48,14 +48,22 @@ url=""
 want=""
 
 if [ "$with_tests" = true ]; then
-	manifest="https://dl.vyprsec.ai/vyql/definitions/free/with-tests/latest.json"
-	json="$(curl -fsSL "$manifest")" || die "fetch $manifest"
+	# Prefer the GCS origin for CI. The CDN front (dl.vyprsec.ai) can keep a
+	# cached 404 for an hour after a new with-tests object is published.
+	manifest_cdn="https://dl.vyprsec.ai/vyql/definitions/free/with-tests/latest.json"
+	manifest_gcs="https://storage.googleapis.com/dl.vyprsec.ai/vyql/definitions/free/with-tests/latest.json"
+	json=""
+	if ! json="$(curl -fsSL "$manifest_cdn")"; then
+		json="$(curl -fsSL "$manifest_gcs")" || die "fetch $manifest_cdn (and GCS fallback $manifest_gcs)"
+	fi
 	url="$(printf '%s' "$json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["url"])')"
 	want="$(printf '%s' "$json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["sha256"])')"
 	case "$url" in
 		https://dl.vyprsec.ai/*) ;;
 		*) die "manifest url must be https://dl.vyprsec.ai/...; got $url" ;;
 	esac
+	# Download the archive from GCS when the CDN path fails (same object).
+	url_gcs="https://storage.googleapis.com/dl.vyprsec.ai/${url#https://dl.vyprsec.ai/}"
 else
 	pin="$root/packaging/definitions-free.url"
 	[ -f "$pin" ] || die "missing $pin"
@@ -85,7 +93,13 @@ cd "$tmp"
 
 archive="${url##*/}"
 [ -n "$archive" ] || archive="definitions.tar.gz"
-curl -fsSL -o "$archive" "$url" || die "download failed: $url"
+if ! curl -fsSL -o "$archive" "$url"; then
+	if [ "$with_tests" = true ] && [ -n "${url_gcs:-}" ]; then
+		curl -fsSL -o "$archive" "$url_gcs" || die "download failed: $url and $url_gcs"
+	else
+		die "download failed: $url"
+	fi
+fi
 
 got=""
 if command -v sha256sum >/dev/null 2>&1; then

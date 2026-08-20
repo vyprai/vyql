@@ -56,8 +56,8 @@ func ManifestURL(withTests bool) string {
 
 // FetchManifest reads latest.json from dl.vyprsec.ai.
 func FetchManifest(withTests bool) (*Manifest, error) {
-	url := ManifestURL(withTests)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	manifestURL := ManifestURL(withTests)
+	req, err := http.NewRequest(http.MethodGet, manifestURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -65,9 +65,9 @@ func FetchManifest(withTests bool) (*Manifest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fetch manifest: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetch manifest: HTTP %d from %s", resp.StatusCode, url)
+		return nil, fmt.Errorf("fetch manifest: HTTP %d from %s", resp.StatusCode, manifestURL)
 	}
 	var m Manifest
 	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
@@ -132,7 +132,7 @@ func InstallManifest(m *Manifest, dest string) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(tmp)
+	defer func() { _ = os.RemoveAll(tmp) }()
 
 	archive := filepath.Join(tmp, "definitions.tar.gz")
 	if err := downloadFile(m.URL, archive); err != nil {
@@ -178,26 +178,29 @@ func InstallFree(dest string) error {
 	return InstallManifest(m, dest)
 }
 
-func downloadFile(url, dest string) error {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+func downloadFile(fileURL, dest string) error {
+	req, err := http.NewRequest(http.MethodGet, fileURL, nil)
 	if err != nil {
 		return err
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("download %s: %w", url, err)
+		return fmt.Errorf("download %s: %w", fileURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download %s: HTTP %d", url, resp.StatusCode)
+		return fmt.Errorf("download %s: HTTP %d", fileURL, resp.StatusCode)
 	}
 	f, err := os.Create(dest)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	if _, err := io.Copy(f, resp.Body); err != nil {
-		return fmt.Errorf("download %s: %w", url, err)
+		_ = f.Close()
+		return fmt.Errorf("download %s: %w", fileURL, err)
+	}
+	if err := f.Close(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -207,7 +210,7 @@ func fileSHA256(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err
@@ -220,12 +223,12 @@ func untarGz(path, dest string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	gz, err := gzip.NewReader(f)
 	if err != nil {
 		return err
 	}
-	defer gz.Close()
+	defer func() { _ = gz.Close() }()
 	tr := tar.NewReader(gz)
 	for {
 		hdr, err := tr.Next()
@@ -244,7 +247,7 @@ func untarGz(path, dest string) error {
 			if err := os.MkdirAll(target, 0o755); err != nil {
 				return err
 			}
-		case tar.TypeReg, tar.TypeRegA:
+		case tar.TypeReg:
 			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 				return err
 			}
@@ -253,10 +256,12 @@ func untarGz(path, dest string) error {
 				return err
 			}
 			if _, err := io.Copy(out, tr); err != nil {
-				out.Close()
+				_ = out.Close()
 				return err
 			}
-			out.Close()
+			if err := out.Close(); err != nil {
+				return err
+			}
 		}
 	}
 }
