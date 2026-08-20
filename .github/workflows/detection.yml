@@ -7,8 +7,9 @@ name: detection
 
 on:
   pull_request:
-    # Stacked pull requests target each other, and their content is proven
-    # by the main-targeting pull request at the top of the stack.
+    # branches: [main] matches the stack trunk, not the PR's direct base, so
+    # mid-stack PRs still trigger. The job if: below keeps the suite on the
+    # bottom of the stack only.
     branches: [main]
     # Only when something that can move a score changes. Documentation and
     # workflow edits cannot.
@@ -26,6 +27,12 @@ permissions:
 
 jobs:
   owasp:
+    # Bottom of the stack: direct base equals stack.base. Standalone PRs have
+    # no stack object, so coalesce falls back to main.
+    # https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/optimizing-ci-for-stacked-pull-requests
+    if: |
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.base.ref == coalesce(github.event.pull_request.stack.base.ref, 'main')
     strategy:
       fail-fast: false
       matrix:
