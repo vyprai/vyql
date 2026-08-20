@@ -8,6 +8,7 @@ go 1.26.6
 // reason to anyone who pinned it.
 // `go install` produces a binary that cannot locate its data directory: it
 // lands in GOBIN alone, and that version does not look in the module cache.
+// Follow with `vyql update -yes`, or use install.sh / a release archive.
 retract v0.1.0
 
 require (
