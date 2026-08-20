@@ -32,10 +32,7 @@ func ensureDataDirectory() error {
 	if err := datadir.InstallFree(dest); err != nil {
 		return fmt.Errorf("download definitions: %w", err)
 	}
-	if err := os.Setenv("VYQL_HOME", dest); err != nil {
-		return err
-	}
-	datadir.Reset()
+	datadir.Set(dest)
 	fmt.Fprintf(os.Stderr, "vyql: installed definitions %s\n", dest)
 	return nil
 }

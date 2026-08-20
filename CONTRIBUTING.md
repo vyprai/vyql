@@ -18,16 +18,19 @@ anything.
 
 ```sh
 make build     # -> bin/
-# if ./vyql is absent:
-./scripts/fetch-free-definitions.sh --with-tests ./vyql
+# if ./vyql is absent (or CI has moved it aside):
+./scripts/fetch-free-definitions.sh --with-tests "$RUNNER_TEMP/vyql-definitions"
+# or locally:
+make fetch-definitions
 make test      # full suite, never cached
 make lint      # gofmt, go vet, golangci-lint
 make ci        # exactly what the pipeline runs
 ```
 
-If `make ci` passes locally, CI should agree. CI itself downloads the free
-definitions **with tests** from `dl.vyprsec.ai` before `go test`; it does not
-rely on an in-tree `vyql/` checkout.
+If `make ci` passes locally, CI should agree. CI fetches definitions into
+`$RUNNER_TEMP/vyql-definitions`, moves any checked-in `vyql/` aside, and runs
+CLI commands with `-data`. `go test` uses `$VYQL_HOME` because it has no `-data`
+flag.
 
 ## Reporting a missed or wrong finding
 

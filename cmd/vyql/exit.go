@@ -34,7 +34,7 @@ var errNoDataDirectory = errors.New(`could not locate the data directory; go ins
     vyql update -yes
     curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh
   or download https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz, unpack it,
-  and set $VYQL_HOME or -data to the vyql/ directory
+  and pass -data (or set $VYQL_HOME for tools that cannot) to the vyql/ directory
   Homebrew, Docker, and the GitHub release archive already include the free definitions`)
 
 func commandNeedsData(cmd string) bool {

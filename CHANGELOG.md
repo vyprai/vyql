@@ -21,15 +21,19 @@ behaviour change, even if no code moved.
 
 ### Changed
 
-- **`go install` is the engine only.** The binary does not look up definitions
-  in the module cache. Install with `curl -fsSL https://dl.vyprsec.ai/vyql/install.sh | sh`,
-  run `vyql update -yes` after `go install`, or use Homebrew, Docker, or a
-  GitHub release archive (those pack the free bundle pinned in
-  `packaging/definitions-free.url`).
-- **CI fetches free definitions with tests** via
-  `scripts/fetch-free-definitions.sh --with-tests` and sets `VYQL_HOME` before
-  build and test jobs. The engine repository does not need an in-tree `vyql/`
-  for those jobs.
+- **`go install` is the engine only.** Install with `install.sh`, run
+  `vyql update -yes` after `go install`, or use Homebrew / Docker / a release
+  archive.
+- **`-data` pins the data directory via `datadir.Set`.** The flag no longer sets
+  `$VYQL_HOME`. `$VYQL_HOME` remains for tools that cannot pass `-data` (notably
+  `go test`).
+- **CI fetches definitions into `$RUNNER_TEMP`**, moves any checked-in `vyql/`
+  aside, runs CLI commands with `-data`, and points `go test` at the same tree
+  through `$VYQL_HOME`.
+- **`vyql update` compares semver** (`NeedsUpdate`) rather than string equality,
+  so `1.0.0` vs `1.0.1` is detected.
+- **Definition downloads use `dl.vyprsec.ai` only**, with retries and
+  `Cache-Control: no-cache` when the CDN has not yet served a new object.
 
 ## [0.3.1] - 2026-08-13
 

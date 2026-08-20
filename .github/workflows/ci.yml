@@ -67,7 +67,6 @@ jobs:
       # The tree-sitter grammars are C. Without cgo the build constraints exclude
       # them silently rather than failing, so this is not a default worth trusting.
       CGO_ENABLED: "1"
-      VYQL_HOME: ${{ github.workspace }}/vyql
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -77,7 +76,9 @@ jobs:
 
       - name: Fetch definitions
         if: needs.changes.outputs.code == 'true'
-        run: ./scripts/fetch-free-definitions.sh --with-tests ./vyql
+        run: |
+          chmod +x scripts/ci-setup-definitions.sh
+          eval "$(./scripts/ci-setup-definitions.sh)"
 
       - name: Build
         if: needs.changes.outputs.code == 'true'
@@ -91,7 +92,8 @@ jobs:
 
       # -count=1 is mandatory: the test cache keys on source and does not track
       # the .vyql data files, so a cached pass can hide a change to the security
-      # knowledge base entirely.
+      # knowledge base entirely. VYQL_HOME comes from ci-setup-definitions.sh
+      # because go test has no -data flag.
       - name: Test
         if: needs.changes.outputs.code == 'true'
         run: go test -count=1 ./...
@@ -101,7 +103,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: "1"
-      VYQL_HOME: ${{ github.workspace }}/vyql
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -111,7 +112,9 @@ jobs:
 
       - name: Fetch definitions
         if: needs.changes.outputs.code == 'true'
-        run: ./scripts/fetch-free-definitions.sh --with-tests ./vyql
+        run: |
+          chmod +x scripts/ci-setup-definitions.sh
+          eval "$(./scripts/ci-setup-definitions.sh)"
 
       - name: gofmt
         if: needs.changes.outputs.code == 'true'
@@ -173,7 +176,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       CGO_ENABLED: "1"
-      VYQL_HOME: ${{ github.workspace }}/vyql
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -182,7 +184,9 @@ jobs:
           cache: true
 
       - name: Fetch definitions
-        run: ./scripts/fetch-free-definitions.sh --with-tests ./vyql
+        run: |
+          chmod +x scripts/ci-setup-definitions.sh
+          eval "$(./scripts/ci-setup-definitions.sh)"
 
       - name: Build
           # darwin/amd64 is cross-built on an arm64 runner rather than taken from
@@ -235,7 +239,7 @@ jobs:
             exit 0
           fi
           ./dist/vyql version
-          n="$(./dist/vyql scan -fail-on none --format json /tmp/sample \
+          n="$(./dist/vyql scan -data "$VYQL_DEFINITIONS" -fail-on none --format json /tmp/sample \
                 | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d if isinstance(d,list) else d.get("findings",[])))')"
           echo "findings: $n"
           [ "$n" -ge 1 ] || { echo "built, ran, detected nothing"; exit 1; }

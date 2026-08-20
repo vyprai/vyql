@@ -113,7 +113,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: "1"
-      VYQL_HOME: ${{ github.workspace }}/vyql
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -122,11 +121,13 @@ jobs:
           cache: true
       - name: Fetch definitions
         if: needs.changes.outputs.code == 'true'
-        run: ./scripts/fetch-free-definitions.sh --with-tests ./vyql
+        run: |
+          chmod +x scripts/ci-setup-definitions.sh
+          eval "$(./scripts/ci-setup-definitions.sh)"
       - run: go build -o bin/vyql ./cmd/vyql
         if: needs.changes.outputs.code == 'true'
       # Two directories are excluded, and both are cost rather than coverage:
-      # vyql/ is the data corpus, and internal/extract/frontend/treesitter/grammars is
+      # a checked-in vyql/ tree (when present) and internal/extract/frontend/treesitter/grammars is
       # 121 MB of generated C from upstream tree-sitter. Scanning the root
       # without these took over twenty minutes; with them excluded it takes ten
       # seconds and covers the code we actually write.
@@ -138,7 +139,7 @@ jobs:
           # finding instead of reporting it, and the report is the point.
           # One -exclude per pattern: a comma would be ambiguous with a valid
           # glob pattern, so a comma-separated value is rejected.
-          ./bin/vyql scan -fail-on none -format sarif \
+          ./bin/vyql scan -data "$VYQL_DEFINITIONS" -fail-on none -format sarif \
             -exclude grammars -exclude vyql -exclude bin \
             -exclude docs -exclude benchmarks . > vyql-self.sarif
           # A scan that produces no SARIF, or SARIF with no runs, has not

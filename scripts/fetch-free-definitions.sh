@@ -10,6 +10,8 @@
 #
 # With --with-tests, reads vyql/definitions/free/with-tests/latest.json and
 # unpacks the bundle that includes vyql/tests/ for CI.
+#
+# All downloads use https://dl.vyprsec.ai only.
 set -eu
 
 die() { printf 'fetch-free-definitions: %s\n' "$*" >&2; exit 1; }
@@ -47,23 +49,32 @@ root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 url=""
 want=""
 
+# curl_cdn retries when the CDN still serves a stale miss after a publish.
+curl_cdn() {
+	# usage: curl_cdn -o FILE URL   or   curl_cdn URL  (stdout)
+	_attempt=1
+	_max=6
+	while :; do
+		if curl -fsSL -H 'Cache-Control: no-cache' "$@"; then
+			return 0
+		fi
+		if [ "$_attempt" -ge "$_max" ]; then
+			return 1
+		fi
+		sleep $((_attempt * 2))
+		_attempt=$((_attempt + 1))
+	done
+}
+
 if [ "$with_tests" = true ]; then
-	# Prefer the GCS origin for CI. The CDN front (dl.vyprsec.ai) can keep a
-	# cached 404 for an hour after a new with-tests object is published.
-	manifest_cdn="https://dl.vyprsec.ai/vyql/definitions/free/with-tests/latest.json"
-	manifest_gcs="https://storage.googleapis.com/dl.vyprsec.ai/vyql/definitions/free/with-tests/latest.json"
-	json=""
-	if ! json="$(curl -fsSL "$manifest_cdn")"; then
-		json="$(curl -fsSL "$manifest_gcs")" || die "fetch $manifest_cdn (and GCS fallback $manifest_gcs)"
-	fi
+	manifest="https://dl.vyprsec.ai/vyql/definitions/free/with-tests/latest.json"
+	json="$(curl_cdn "$manifest")" || die "fetch $manifest"
 	url="$(printf '%s' "$json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["url"])')"
 	want="$(printf '%s' "$json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["sha256"])')"
 	case "$url" in
 		https://dl.vyprsec.ai/*) ;;
 		*) die "manifest url must be https://dl.vyprsec.ai/...; got $url" ;;
 	esac
-	# Download the archive from GCS when the CDN path fails (same object).
-	url_gcs="https://storage.googleapis.com/dl.vyprsec.ai/${url#https://dl.vyprsec.ai/}"
 else
 	pin="$root/packaging/definitions-free.url"
 	[ -f "$pin" ] || die "missing $pin"
@@ -93,13 +104,7 @@ cd "$tmp"
 
 archive="${url##*/}"
 [ -n "$archive" ] || archive="definitions.tar.gz"
-if ! curl -fsSL -o "$archive" "$url"; then
-	if [ "$with_tests" = true ] && [ -n "${url_gcs:-}" ]; then
-		curl -fsSL -o "$archive" "$url_gcs" || die "download failed: $url and $url_gcs"
-	else
-		die "download failed: $url"
-	fi
-fi
+curl_cdn -o "$archive" "$url" || die "download failed: $url"
 
 got=""
 if command -v sha256sum >/dev/null 2>&1; then
@@ -112,7 +117,7 @@ fi
 
 case "$want" in
 	pending)
-		curl -fsSL -o "$archive.sha256" "${url}.sha256" \
+		curl_cdn -o "$archive.sha256" "${url}.sha256" \
 			|| die "no ${url}.sha256 (set a sha256 pin in packaging/definitions-free.url)"
 		if command -v sha256sum >/dev/null 2>&1; then
 			sha256sum -c "$archive.sha256"
@@ -139,12 +144,12 @@ find_root() {
 }
 
 data=""
-if find_root "$tmp/extracted"; then
-	data="$tmp/extracted"
+if data_cand="$(find_root "$tmp/extracted")"; then
+	data="$data_cand"
 else
 	set -- "$tmp/extracted"/*
-	if [ "$#" -eq 1 ] && [ -d "$1" ] && find_root "$1"; then
-		data="$1"
+	if [ "$#" -eq 1 ] && [ -d "$1" ] && data_cand="$(find_root "$1")"; then
+		data="$data_cand"
 	fi
 fi
 [ -n "$data" ] || die "archive did not contain ontology/concepts, packs and taxonomy"

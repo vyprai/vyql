@@ -14,6 +14,7 @@ func cmdUpdate(args []string) error {
 	fs := newFlagSet("update")
 	yes := fs.Bool("yes", false, "download without asking")
 	checkOnly := fs.Bool("check", false, "report whether an update is available and exit")
+	addDataFlag(fs)
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
@@ -32,8 +33,10 @@ func cmdUpdate(args []string) error {
 		}
 	}
 
+	newer := datadir.NeedsUpdate(localVer, remote.Version)
+
 	if *checkOnly {
-		if hasLocal && localVer == remote.Version {
+		if !newer {
 			fmt.Printf("definitions are up to date (%s)\n", localVer)
 			return nil
 		}
@@ -45,7 +48,7 @@ func cmdUpdate(args []string) error {
 		return checkFailedf("update available")
 	}
 
-	if hasLocal && localVer == remote.Version {
+	if !newer {
 		fmt.Printf("definitions are up to date (%s)\n", localVer)
 		return nil
 	}
@@ -74,10 +77,7 @@ func cmdUpdate(args []string) error {
 	if err := datadir.InstallManifest(remote, dest); err != nil {
 		return fmt.Errorf("download definitions: %w", err)
 	}
-	if err := os.Setenv("VYQL_HOME", dest); err != nil {
-		return err
-	}
-	datadir.Reset()
+	datadir.Set(dest)
 	fmt.Printf("installed definitions %s\n", remote.Version)
 	return nil
 }

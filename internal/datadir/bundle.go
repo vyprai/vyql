@@ -238,10 +238,15 @@ func untarGz(path, dest string) error {
 		if err != nil {
 			return err
 		}
-		if !filepath.IsLocal(hdr.Name) {
+		if strings.Contains(hdr.Name, "..") || !filepath.IsLocal(hdr.Name) {
 			return fmt.Errorf("tar entry escapes destination: %s", hdr.Name)
 		}
 		target := filepath.Join(dest, hdr.Name)
+		// Refuse to leave dest even if Join cleaned oddly on a given platform.
+		rel, err := filepath.Rel(dest, target)
+		if err != nil || !filepath.IsLocal(rel) {
+			return fmt.Errorf("tar entry escapes destination: %s", hdr.Name)
+		}
 		switch hdr.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(target, 0o755); err != nil {
@@ -262,6 +267,10 @@ func untarGz(path, dest string) error {
 			if err := out.Close(); err != nil {
 				return err
 			}
+		default:
+			// Skip links and special entries so an archive cannot plant a
+			// symlink that later entries write through.
+			continue
 		}
 	}
 }

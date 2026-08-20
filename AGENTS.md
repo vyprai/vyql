@@ -13,9 +13,10 @@ A Go engine plus a large body of security knowledge stored as data.
   change.
 - `vyql/` — the knowledge: `ontology/` (concepts), `bindings/` (what each
   language means), `packs/` (rules), `tests/` (specs), `taxonomy/` (CWE/CAPEC).
-  CI and `make` assume this tree under `$VYQL_HOME` or `./vyql`. When it is
-  absent locally, fetch with
-  `./scripts/fetch-free-definitions.sh --with-tests ./vyql`.
+  CI fetches a with-tests bundle into `$RUNNER_TEMP` and passes `-data` (CLI) or
+  `$VYQL_HOME` (`go test`). Locally, when `./vyql` is absent, run
+  `./scripts/fetch-free-definitions.sh --with-tests ./vyql` or
+  `make fetch-definitions`.
 - `docs/` — the design series; `docs/README.md` indexes it
 - `benchmarks/` — the measured record
 

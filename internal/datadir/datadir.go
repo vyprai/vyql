@@ -2,17 +2,19 @@
 // (rule packs + ontology + taxonomy) that lives OUTSIDE the Go source tree and is
 // loaded from disk at runtime (no go:embed). Resolution order:
 //
-//  1. $VYQL_HOME, if set.
-//  2. the nearest ancestor of the current working directory that contains a
+//  1. Set (the `-data` flag), if the process called it.
+//  2. $VYQL_HOME, if set (same override for tools that cannot pass `-data`, such as
+//     `go test`).
+//  3. the nearest ancestor of the current working directory that contains a
 //     valid `vyql/` data directory (covers `go test ./...` from any package and
 //     running the binary from within the repo).
-//  3. the nearest such ancestor of the executable's directory, following the
+//  4. the nearest such ancestor of the executable's directory, following the
 //     symlink if there is one (covers an installed binary shipped alongside its
 //     `vyql/` data dir, and one linked onto PATH from a package prefix).
 //
 // The module cache is not consulted. `go install` places only the engine in
 // GOBIN; the definitions arrive via `vyql update`, the install script, a release
-// archive, Homebrew, Docker, or $VYQL_HOME / -data pointing at a downloaded
+// archive, Homebrew, Docker, or `-data` / $VYQL_HOME pointing at a downloaded
 // bundle. An interactive CLI that needs data and finds none offers to download
 // the free channel from dl.vyprsec.ai.
 //
@@ -32,6 +34,7 @@ var (
 	mu              sync.Mutex
 	resolved        bool
 	cached          string
+	explicit        string   // from Set / -data; wins over env and search
 	vyqlSourceCache sync.Map // map[root+kind+rel][]Source
 )
 
@@ -39,7 +42,7 @@ var (
 func Root() string {
 	root, ok := Lookup()
 	if !ok {
-		panic("could not locate the data directory; set $VYQL_HOME to the path of your `vyql/` dir " +
+		panic("could not locate the data directory; pass -data or set $VYQL_HOME to the path of your `vyql/` dir " +
 			"(containing ontology/concepts/, plus taxonomy/ and packs/)")
 	}
 	return root
@@ -62,15 +65,26 @@ func Lookup() (string, bool) {
 	return root, root != ""
 }
 
+// Set pins the data directory for this process. The CLI `-data` flag calls it.
+// An empty path clears the pin so the next Lookup walks the search path again.
+func Set(root string) {
+	mu.Lock()
+	explicit = strings.TrimSpace(root)
+	cached, resolved = "", false
+	mu.Unlock()
+	vyqlSourceCache.Range(func(key, _ any) bool {
+		vyqlSourceCache.Delete(key)
+		return true
+	})
+}
+
 // Reset drops the resolved root and everything read from it, so the next Root
-// resolves again.
+// resolves again. It keeps a Set pin: clearing the pin is Set("").
 //
-// A command applies -data by setting $VYQL_HOME, which only has an effect while
-// the root is still unresolved. Building a flag's help text can read the data
-// directory — naming the available profiles requires loading them — and that
-// happens while the flags are being registered, before any of them are parsed. So
-// by the time -data is read, the root is already fixed. Resetting after the change
-// is what makes the flag take effect.
+// Building a flag's help text can read the data directory — naming the available
+// profiles requires loading them — and that happens while the flags are being
+// registered, before any of them are parsed. Resetting after `-data` is applied
+// is what makes the flag take effect if something already looked up the root.
 func Reset() {
 	mu.Lock()
 	cached, resolved = "", false
@@ -211,6 +225,9 @@ func cloneSourceHeaders(sources []Source) []Source {
 }
 
 func resolve() string {
+	if explicit != "" {
+		return explicit
+	}
 	if env := os.Getenv("VYQL_HOME"); env != "" {
 		return env
 	}
