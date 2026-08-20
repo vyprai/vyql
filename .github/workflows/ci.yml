@@ -18,13 +18,13 @@ jobs:
   # A job skipped by a conditional does report, as success.
   #
   # Native stacked PRs treat branches: [main] as the stack trunk, so every
-  # layer would still run. Restrict pull_request jobs to the bottom of the
-  # stack (direct base equals stack.base) or a standalone PR targeting main.
+  # layer would still run. Restrict pull_request jobs to PRs whose direct
+  # base is main (bottom of the stack, or a standalone PR). Equivalent to
+  # base.ref == stack.base.ref when the stack trunk is main; do not read
+  # stack.* here — referencing it makes GitHub reject the workflow file.
   # https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/optimizing-ci-for-stacked-pull-requests
   changes:
-    if: |
-      github.event_name != 'pull_request' ||
-      github.event.pull_request.base.ref == coalesce(github.event.pull_request.stack.base.ref, 'main')
+    if: github.event_name != 'pull_request' || github.event.pull_request.base.ref == 'main'
     runs-on: [self-hosted, linux, x64, vyql-private]
     # Granted here rather than at the workflow level: only this job reads the
     # pull request's file list, and nothing else needs the scope.
