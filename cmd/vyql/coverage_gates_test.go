@@ -1306,11 +1306,10 @@ func TestSinkOperationsExportResolves(t *testing.T) {
 }
 
 func TestMigrationLedgerDoesNotCarryStaleV1BridgeSuggestions(t *testing.T) {
-	root := testRepoRoot(t)
 	// The ledger records that the v1-to-v2 migration finished and the bridge was
 	// not reintroduced. Only a tree that had a v1 can regress that, so the
 	// published tree does not carry the file.
-	data, err := os.ReadFile(filepath.Join(root, "vyql", "migration-ledger.json"))
+	data, err := os.ReadFile(filepath.Join(datadir.Root(), "migration-ledger.json"))
 	if os.IsNotExist(err) {
 		t.Skip("migration ledger is not part of this tree")
 	}
