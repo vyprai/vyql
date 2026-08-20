@@ -105,7 +105,8 @@ jobs:
         if: steps.meta.outputs.channel == 'free'
         env:
           VERSION: ${{ steps.meta.outputs.version }}
-          OUT: ${{ runner.temp }}/definitions-out        run: |
+          OUT: ${{ runner.temp }}/definitions-out
+        run: |
           set -euo pipefail
           prefix="gs://dl.vyprsec.ai/vyql/definitions/free"
           gcloud storage cp "$OUT/definitions.tar.gz" "$prefix/v${VERSION}.tar.gz"
@@ -125,7 +126,8 @@ jobs:
         if: steps.meta.outputs.channel == 'commercial'
         env:
           VERSION: ${{ steps.meta.outputs.version }}
-          OUT: ${{ runner.temp }}/definitions-out        run: |
+          OUT: ${{ runner.temp }}/definitions-out
+        run: |
           set -euo pipefail
           prefix="gs://vypr-vyql-definitions-commercial"
           gcloud storage cp "$OUT/definitions.tar.gz" "$prefix/v${VERSION}.tar.gz"
