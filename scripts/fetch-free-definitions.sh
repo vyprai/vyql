@@ -1,48 +1,83 @@
 #!/bin/sh
-# Fetch the pinned free definitions tarball from dl.vyprsec.ai and unpack it
+# Fetch the free definitions tarball from dl.vyprsec.ai and unpack it
 # so DEST is a vyql/ data root (ontology/concepts, packs, taxonomy).
 #
-#   scripts/fetch-free-definitions.sh DEST
+#   scripts/fetch-free-definitions.sh [--with-tests] DEST
 #
-# Reads packaging/definitions-free.url: URL, then sha256 or "pending".
-# "pending" verifies against the CDN sibling .sha256. A 64-hex pin must match
-# the archive, so a tagged engine keeps the definitions it was built with.
+# Without --with-tests, reads packaging/definitions-free.url: URL, then sha256
+# or "pending". "pending" verifies against the CDN sibling .sha256. A 64-hex pin
+# must match the archive, so a tagged engine keeps the definitions it was built with.
+#
+# With --with-tests, reads vyql/definitions/free/with-tests/latest.json and
+# unpacks the bundle that includes vyql/tests/ for CI.
 set -eu
 
 die() { printf 'fetch-free-definitions: %s\n' "$*" >&2; exit 1; }
 
-dest="${1:-}"
-[ -n "$dest" ] || die "usage: $0 DEST"
-
-root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
-pin="$root/packaging/definitions-free.url"
-[ -f "$pin" ] || die "missing $pin"
-
-url=""
-want=""
-while IFS= read -r line || [ -n "$line" ]; do
-	case "$line" in
-		\#*|"") continue ;;
+with_tests=false
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--with-tests)
+			with_tests=true
+			shift
+			;;
+		--)
+			shift
+			break
+			;;
+		-*)
+			die "unknown option $1"
+			;;
+		*)
+			break
+			;;
 	esac
-	if [ -z "$url" ]; then
-		url="$line"
-		continue
-	fi
-	if [ -z "$want" ]; then
-		want="$line"
-		continue
-	fi
-done < "$pin"
+done
 
-[ -n "$url" ] || die "$pin has no URL"
-case "$url" in
-	https://dl.vyprsec.ai/*) ;;
-	*) die "pin URL must be https://dl.vyprsec.ai/...; got $url" ;;
-esac
+dest="${1:-}"
+[ -n "$dest" ] || die "usage: $0 [--with-tests] DEST"
 
 need() { command -v "$1" >/dev/null 2>&1 || die "$1 is required"; }
 need curl
 need tar
+need python3
+
+root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
+
+url=""
+want=""
+
+if [ "$with_tests" = true ]; then
+	manifest="https://dl.vyprsec.ai/vyql/definitions/free/with-tests/latest.json"
+	json="$(curl -fsSL "$manifest")" || die "fetch $manifest"
+	url="$(printf '%s' "$json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["url"])')"
+	want="$(printf '%s' "$json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["sha256"])')"
+	case "$url" in
+		https://dl.vyprsec.ai/*) ;;
+		*) die "manifest url must be https://dl.vyprsec.ai/...; got $url" ;;
+	esac
+else
+	pin="$root/packaging/definitions-free.url"
+	[ -f "$pin" ] || die "missing $pin"
+	while IFS= read -r line || [ -n "$line" ]; do
+		case "$line" in
+			\#*|"") continue ;;
+		esac
+		if [ -z "$url" ]; then
+			url="$line"
+			continue
+		fi
+		if [ -z "$want" ]; then
+			want="$line"
+			continue
+		fi
+	done < "$pin"
+	[ -n "$url" ] || die "$pin has no URL"
+	case "$url" in
+		https://dl.vyprsec.ai/*) ;;
+		*) die "pin URL must be https://dl.vyprsec.ai/...; got $url" ;;
+	esac
+fi
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT INT TERM
@@ -72,17 +107,15 @@ case "$want" in
 		fi >/dev/null || die "checksum mismatch against ${url}.sha256"
 		;;
 	[a-fA-F0-9]*)
-		[ "${#want}" -eq 64 ] || die "pin sha256 must be 64 hex digits or 'pending'"
-		[ "$got" = "$want" ] || die "checksum mismatch: got $got want $want (bump packaging/definitions-free.url)"
+		[ "${#want}" -eq 64 ] || die "sha256 must be 64 hex digits or 'pending'"
+		[ "$got" = "$want" ] || die "checksum mismatch: got $got want $want"
 		;;
-	*) die "pin sha256 must be 64 hex digits or 'pending'; got $want" ;;
+	*) die "sha256 must be 64 hex digits or 'pending'; got $want" ;;
 esac
 
 mkdir -p extracted
 tar -xzf "$archive" -C extracted
 
-# The archive may be the data root itself, or a single top-level directory
-# (often named vyql) that is the data root.
 find_root() {
 	if [ -d "$1/ontology/concepts" ] && [ -d "$1/packs" ] && [ -d "$1/taxonomy" ]; then
 		printf '%s' "$1"
@@ -105,6 +138,9 @@ fi
 mkdir -p "$dest"
 rm -rf "$dest"
 mkdir -p "$dest"
-# Copy contents into dest so dest IS the data root, matching stage/.../vyql.
 tar -C "$data" -cf - . | tar -C "$dest" -xf -
 [ -d "$dest/ontology/concepts" ] || die "unpack did not produce $dest/ontology/concepts"
+
+if [ "$with_tests" = true ]; then
+	[ -d "$dest/tests" ] || die "with-tests bundle did not contain tests/"
+fi

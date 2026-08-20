@@ -145,8 +145,8 @@ func vyqlMain() (code int) {
 	// require a data directory, except help (which must answer without it) and
 	// cache (which does not load it).
 	if commandNeedsData(cmd) && !wantsHelp(args) {
-		if _, ok := datadir.Lookup(); !ok {
-			return exitCodeFor(errNoDataDirectory)
+		if err := ensureDataDirectory(); err != nil {
+			return exitCodeFor(err)
 		}
 	}
 	// Installed for the commands that do work, not for help or version.
@@ -172,6 +172,7 @@ var commands = map[string]func([]string) error{
 	"definitions": cmdDefinitions,
 	"diff":        cmdDiff,
 	"cache":       cmdCache,
+	"update":      cmdUpdate,
 }
 
 // movedCommands names where a retired command's job is done now. Each was retired
@@ -1134,6 +1135,7 @@ var commandHelp = []struct{ name, summary string }{
 	{"definitions", "inspect, search and validate the loaded VyQL definitions"},
 	{"diff", "diff two `scan -format json` outputs by fingerprint"},
 	{"cache", "inspect or clear the persistent scan cache"},
+	{"update", "download or refresh the free definitions bundle from dl.vyprsec.ai"},
 	{"version", "print the version, revision and build information"},
 	{"help", "print this list, or `help <command>` for one command's flags"},
 }

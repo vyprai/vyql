@@ -11,9 +11,10 @@ on:
     # workflow edits cannot.
     paths:
       - "**/*.go"
-      - "vyql/**"
       - "go.mod"
       - "go.sum"
+      - "scripts/fetch-free-definitions.sh"
+      - "packaging/**"
   push:
     branches: [main]
   workflow_dispatch:
@@ -30,12 +31,16 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: "1"
+      VYQL_HOME: ${{ github.workspace }}/vyql
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Fetch definitions
+        run: ./scripts/fetch-free-definitions.sh --with-tests ./vyql
 
       # The corpora are GPL and are never vendored here. They are also stable --
       # pinned upstream repositories that change rarely -- so a cache hit is the

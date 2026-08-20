@@ -67,12 +67,17 @@ jobs:
       # The tree-sitter grammars are C. Without cgo the build constraints exclude
       # them silently rather than failing, so this is not a default worth trusting.
       CGO_ENABLED: "1"
+      VYQL_HOME: ${{ github.workspace }}/vyql
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Fetch definitions
+        if: needs.changes.outputs.code == 'true'
+        run: ./scripts/fetch-free-definitions.sh --with-tests ./vyql
 
       - name: Build
         if: needs.changes.outputs.code == 'true'
@@ -96,12 +101,17 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: "1"
+      VYQL_HOME: ${{ github.workspace }}/vyql
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Fetch definitions
+        if: needs.changes.outputs.code == 'true'
+        run: ./scripts/fetch-free-definitions.sh --with-tests ./vyql
 
       - name: gofmt
         if: needs.changes.outputs.code == 'true'
@@ -163,12 +173,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       CGO_ENABLED: "1"
+      VYQL_HOME: ${{ github.workspace }}/vyql
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Fetch definitions
+        run: ./scripts/fetch-free-definitions.sh --with-tests ./vyql
 
       - name: Build
           # darwin/amd64 is cross-built on an arm64 runner rather than taken from
@@ -221,7 +235,7 @@ jobs:
             exit 0
           fi
           ./dist/vyql version
-          n="$(VYQL_HOME=./vyql ./dist/vyql scan -fail-on none --format json /tmp/sample \
+          n="$(./dist/vyql scan -fail-on none --format json /tmp/sample \
                 | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d if isinstance(d,list) else d.get("findings",[])))')"
           echo "findings: $n"
           [ "$n" -ge 1 ] || { echo "built, ran, detected nothing"; exit 1; }

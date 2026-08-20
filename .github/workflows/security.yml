@@ -113,12 +113,16 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: "1"
+      VYQL_HOME: ${{ github.workspace }}/vyql
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
+      - name: Fetch definitions
+        if: needs.changes.outputs.code == 'true'
+        run: ./scripts/fetch-free-definitions.sh --with-tests ./vyql
       - run: go build -o bin/vyql ./cmd/vyql
         if: needs.changes.outputs.code == 'true'
       # Two directories are excluded, and both are cost rather than coverage:
@@ -134,7 +138,7 @@ jobs:
           # finding instead of reporting it, and the report is the point.
           # One -exclude per pattern: a comma would be ambiguous with a valid
           # glob pattern, so a comma-separated value is rejected.
-          VYQL_HOME=./vyql ./bin/vyql scan -fail-on none -format sarif \
+          ./bin/vyql scan -fail-on none -format sarif \
             -exclude grammars -exclude vyql -exclude bin \
             -exclude docs -exclude benchmarks . > vyql-self.sarif
           # A scan that produces no SARIF, or SARIF with no runs, has not

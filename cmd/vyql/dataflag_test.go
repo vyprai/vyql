@@ -80,6 +80,11 @@ func asExitError(err error, target **exec.ExitError) bool {
 // runs from a temporary directory, so nothing else would find it.
 func repoDataDir(t *testing.T) string {
 	t.Helper()
+	if d := strings.TrimSpace(os.Getenv("VYQL_HOME")); d != "" {
+		if _, err := os.Stat(filepath.Join(d, "ontology")); err == nil {
+			return d
+		}
+	}
 	wd, err := os.Getwd() // cmd/vyql
 	if err != nil {
 		t.Fatal(err)
@@ -128,7 +133,7 @@ func TestEveryCommandOfferingDataHonoursIt(t *testing.T) {
 // Asking for help is not an error. A command that exits non-zero on -h reads as a
 // broken tool to a CI wrapper that checks the status.
 func TestEveryCommandExitsZeroOnHelp(t *testing.T) {
-	for _, name := range []string{"scan", "trace", "explain", "match", "resolve", "query", "graph", "definitions", "diff", "cache"} {
+	for _, name := range []string{"scan", "trace", "explain", "match", "resolve", "query", "graph", "definitions", "diff", "cache", "update"} {
 		t.Run(name, func(t *testing.T) {
 			code, out := runVyql(t, name, "-h")
 
