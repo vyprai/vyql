@@ -1,8 +1,7 @@
 # Free definitions packed into engine release archives.
 #
 # Line 1: HTTPS URL on dl.vyprsec.ai (never storage.googleapis.com).
-# Line 2: sha256 of that tarball, or "pending" to verify against the sibling
-# .sha256 published next to the object. A 64-hex pin keeps a tagged engine on
-# one content hash.
+# Line 2: sha256 of that tarball. A 64-hex pin keeps a tagged engine on one
+# content hash; "pending" would verify against the sibling .sha256 instead.
 https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz
-pending
+0856d96713ef19855e233764bb546a0e2fece3a2956d2a969f8f461e650e3aa2
