@@ -59,9 +59,6 @@ jobs:
           fi
   build-test:
     needs: changes
-    # macOS hosted runners are unavailable on a private repository without
-    # billing. darwin portability is covered by matrix-build on push and by
-    # release.yml when a tag is cut.
     runs-on: [self-hosted, linux, x64, vyql-private]
     env:
       # The tree-sitter grammars are C. Without cgo the build constraints exclude
@@ -123,16 +120,15 @@ jobs:
         with:
           version: v2.12.1
 
-  # Every target we publish must build and RUN. A tag is a bad place to discover
-  # that one of four platforms has been broken for weeks, so this runs on every
+  # Every Linux target we publish must build and RUN. A tag is a bad place to
+  # discover that one of them has been broken for weeks, so this runs on every
   # push to main rather than waiting for a release -- breakage surfaces within
   # one merge.
   #
-  # Not on pull requests: these four legs are portability checks, and a change
-  # that breaks a platform is nearly always one that breaks it on main too. The
-  # pull request keeps `build-test` and `lint`, which is where a logic error
-  # shows up. `release.yml` rebuilds all four natively before publishing, so a
-  # tag is covered independently of this.
+  # Not on pull requests: these legs are portability checks, and a change that
+  # breaks a platform is nearly always one that breaks it on main too. The pull
+  # request keeps `build-test` and `lint`, which is where a logic error shows
+  # up.
   #
   # Required status checks must not include these: a pull request never runs
   # them, and a required check that never runs blocks the pull request forever.
@@ -153,13 +149,6 @@ jobs:
           - runner: [self-hosted, linux, arm64, vyql-private]
             goos: linux
             goarch: arm64
-          - runner: macos-latest
-            goos: darwin
-            goarch: arm64
-          - runner: macos-latest
-            goos: darwin
-            goarch: amd64
-            cc: clang -arch x86_64
     runs-on: ${{ matrix.runner }}
     env:
       CGO_ENABLED: "1"
@@ -171,11 +160,6 @@ jobs:
           cache: true
 
       - name: Build
-          # darwin/amd64 is cross-built on an arm64 runner rather than taken from
-          # a macos-13 Intel runner: that image is being retired, and a job
-          # requesting it sits unassigned indefinitely rather than failing. clang
-          # targets x86_64 natively, so this is a supported cgo cross-build, not
-          # a workaround.
         env:
           # Set explicitly rather than left to the host. A cross-build with only
           # CC set leaves Go targeting the runner's architecture while clang is
