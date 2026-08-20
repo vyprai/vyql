@@ -7,6 +7,9 @@ name: detection
 
 on:
   pull_request:
+    # Stacked pull requests target each other, and their content is proven
+    # by the main-targeting pull request at the top of the stack.
+    branches: [main]
     # Only when something that can move a score changes. Documentation and
     # workflow edits cannot.
     paths:
