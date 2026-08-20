@@ -112,6 +112,7 @@ jobs:
     needs: changes
     runs-on: [self-hosted, linux, x64, vyql-private]
     permissions:
+      actions: read
       contents: read
       security-events: write
     steps:
