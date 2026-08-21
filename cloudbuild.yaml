@@ -75,10 +75,9 @@ steps:
       - |
         set -euo pipefail
         apt-get update -qq
-        apt-get install -y -qq build-essential git curl ca-certificates
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh \
-          | sh -s -- -b /usr/local/bin v2.12.1
-        golangci-lint run
+        apt-get install -y -qq build-essential git
+        go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.1
+        "$$(go env GOPATH)/bin/golangci-lint" run
 
   - id: matrix-amd64
     name: golang:1.26
