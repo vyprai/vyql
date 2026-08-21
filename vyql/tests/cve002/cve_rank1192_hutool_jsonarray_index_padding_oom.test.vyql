@@ -1,0 +1,122 @@
+# Rank 1192 / CVE-2023-42276: hutool's JSONArray.add(int, Object) pads the
+# backing list up to a caller-supplied index before placing the element
+# (CWE-400, GHSA-rxgf-r843-g53h, issue#3286@Github). When index is at or past
+# the current size, the vulnerable form loops `while (index != this.size())
+# this.add(JSONNull.NULL);`, appending one JSONNull per step with no upper
+# bound on index -- a single call with a large index (Integer.MAX_VALUE, or
+# any value far past the array's real size) drives the loop until the JVM
+# runs out of heap. ListUtil.setOrPadding in hutool-core has the identical
+# shape (a for-loop from size to index calling list.add(paddingElement)) and
+# the same fix, but only JSONArray is modelled here since the two are the
+# same weakness once.
+#
+# The fixed revision touches exactly
+# hutool-json/src/main/java/cn/hutool/json/JSONArray.java and
+# hutool-core/src/main/java/cn/hutool/core/collection/ListUtil.java, both
+# adding the identical two-line guard, with a CHANGELOG entry naming
+# issue#3286 by number and title ("fixed JSONArray's add() method throwing
+# OutOfMemory").
+#
+# ATTENTION, engine gap. vyql match on a minimal pair reproducing add()
+# verbatim from both revisions labels nothing at all -- no source, sink, or
+# issue on either one -- and vyql resolve shows every call inside the method,
+# including the recursive `this.add`/`this.set`, terminating as unresolved
+# rather than hinting at a missing fact. vyql scan --cache off --max-ram 4GB
+# over the real hutool checkout (1996 java files) reports zero VYQL-DOS-041
+# findings anywhere.
+#
+# Checked for reuse first: code.UnboundedAllocationReview (VYQL-DOS-041,
+# CWE_400/770) is the right concept by CWE and by its own review text --
+# "review allocation sizes derived from parsed counts for per-item limits,
+# aggregate consistency checks, and overflow" describes exactly this loop --
+# but every language that binds it does so from a dedicated per-language
+# analysis fact (C's allocation.unbounded_accumulated_count at
+# c.go:2611, Rust's rustReview == "unbounded_next_await", PHP's
+# phpReview == "unbounded_report_period", and so on), never from
+# presenceNode's flat context bag alone; Java has no such fact and none of
+# the shipped ones are close enough to reuse. Confirmed why the bag alone
+# cannot express this safely rather than assuming it: the only literal names
+# available in the vulnerable method are "index", "add" and "size" --
+# functionally, JDK convention for List.add(int index, E element) and
+# Collection.size() -- and requiring their co-occurrence
+# (context.identifier contains "index", context.call contains "add",
+# context.callPath contains ".size") also matches an ordinary,
+# entirely-safe copy loop with the same three words:
+#   for (int index = 0; index < src.size(); index++) { dest.add(src.get(index)); }
+# vyql match against that copy loop (not committed, checked by hand) would
+# report the same three tokens present on both the padding method and this
+# unrelated one, because presenceNode context has no notion of loop
+# structure and no identity between the collection whose size is compared
+# and the collection being grown -- the same two facts C's dedicated
+# analysis correlates for the allocation case. Widening further to catch it
+# would flag any bounded iterate-and-copy loop everywhere, the precision
+# trap AGENTS.md warns against; narrowing to the literal expression text
+# (`index!=this.size()`) answers to this file's variable names, not to
+# List's documented contract, and would not generalise past hutool.
+#
+# What is missing is a Java analogue of ccUnboundedAccumulatedAllocationObservations
+# (c.go:2589): a fact that a loop grows a collection by repeated append calls,
+# terminating only when the collection's own live size reaches a parameter,
+# with no prior comparison of that parameter against a bound. That is a new
+# dataflow relation (same collection identity between the size check and the
+# append target, plus absence-of-guard), not a one-line frontend change.
+# Entered in ENGINE-GAPS.md under "Not mechanical, do not sweep these" with
+# this rank's minimal pair as the regression test. No definition change
+# shipped.
+#
+# verify_current_expected: attention-engine-gap, both revisions reject VYQL-DOS-041.
+
+test "rank1192: JSONArray.add pads to a caller-supplied index with no upper bound"
+  lang java
+  file JSONArray.java
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  public class JSONArray implements JSON, JSONGetter<Integer>, List<Object>, RandomAccess {
+  	@Override
+  	public void add(int index, Object element) {
+  		if (index < 0) {
+  			throw new JSONException("JSONArray[{}] not found.", index);
+  		}
+  		if (index < this.size()) {
+  			InternalJSONUtil.testValidity(element);
+  			this.rawList.add(index, JSONUtil.wrap(element, this.config));
+  		} else {
+  			while (index != this.size()) {
+  				this.add(JSONNull.NULL);
+  			}
+  			this.set(element);
+  		}
+  	}
+  }
+  ```
+
+test "rank1192: JSONArray.add caps padding growth before looping"
+  lang java
+  file JSONArray.java
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  public class JSONArray implements JSON, JSONGetter<Integer>, List<Object>, RandomAccess {
+  	@Override
+  	public void add(int index, Object element) {
+  		if (index < 0) {
+  			throw new JSONException("JSONArray[{}] not found.", index);
+  		}
+  		if (index < this.size()) {
+  			InternalJSONUtil.testValidity(element);
+  			this.rawList.add(index, JSONUtil.wrap(element, this.config));
+  		} else {
+  			if(index > (this.size() + 1) * 2) {
+  				throw new JSONException("Index is too large:", index);
+  			}
+  			while (index != this.size()) {
+  				this.add(JSONNull.NULL);
+  			}
+  			this.set(element);
+  		}
+  	}
+  }
+  ```

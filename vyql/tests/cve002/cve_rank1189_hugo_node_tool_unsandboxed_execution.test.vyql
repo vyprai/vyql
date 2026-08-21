@@ -1,0 +1,160 @@
+# Rank 1189 / CVE-2026-44301: Hugo builds a site's Node-based asset pipeline
+# (PostCSS, Babel, TailwindCSS) by resolving the tool binary from
+# WORKINGDIR/node_modules/.bin or PATH and executing it directly with no
+# restriction on what it can touch. A site author can ship a postcss.config.js
+# or babel.config.js that reads or writes anywhere on the build host, because
+# the tool runs with the same file system access as the Hugo process itself
+# (CWE-22, impact of CWE-250). The fixed revision changes what gets
+# executed: instead of running the tool binary, common/hexec/exec.go
+# resolves its underlying Node.js script and runs "node --permission
+# --allow-fs-read=<dir> --allow-fs-write=<dir> <script>", so file access is
+# confined to the configured paths (the working directory by default)
+# under Node's own permission model.
+#
+# ATTENTION, vocabulary gap. No taint path separates the two revisions, and no
+# concept in the ontology names the weakness.
+#  - vyql match on both the vulnerable and fixed shape of Npx()/new() labels
+#    the same code.CommandExecution sink at the same exec.Command call and no
+#    source anywhere in the function: nodeBinFilename/bin/scriptPath are
+#    locally resolved values, not request- or caller-controlled data, so this
+#    was never a case of untrusted input reaching a command sink. The
+#    difference is a capability grant on an already-intended, already-trusted
+#    execution, which taint dataflow does not model.
+#  - The closest concept, code.TemplateInstallScriptHostExecution
+#    (VYQL-INJ-054, CWE-78/CWE-269), is for install scripts a template author
+#    defines being forwarded to the host shell instead of an isolated
+#    runtime -- a container swap. This CVE keeps the same host process and
+#    instead narrows what one already-existing process may touch through an
+#    interpreter's own permission flags; forcing that concept over this shape
+#    would answer to this CVE's flag name rather than to a documented API, the
+#    same trap the genericity test in AGENTS.md exists to catch.
+#  - The general shape worth naming -- a subprocess resolved from a project's
+#    own dependency directory and executed without restricting its file
+#    system access -- would also need a provenance fact no local code shape
+#    encodes: whether the site being built is trusted or not. The same
+#    exec.Command(toolBinaryPath, args...) shape appears constantly in
+#    ordinary Go tooling (any wrapper around a locally installed CLI) and is
+#    not a vulnerability there, so a binding broad enough to flag this rank
+#    would flag routine build tooling everywhere it runs, the precision-cost
+#    trap in the same section.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1189: Npx resolves the tool binary from node_modules/.bin or PATH and execs it directly"
+  lang go
+  file common/hexec/exec.go
+  reject VYQL-INJ-002
+  code
+  ```
+  package hexec
+
+  import (
+      "os/exec"
+      "path/filepath"
+  )
+
+  const nodeModulesBinPath = "node_modules/.bin"
+
+  func (e *Exec) Npx(name string, arg ...any) (Runner, error) {
+      if err := e.sc.CheckAllowedExec(name); err != nil {
+          return nil, err
+      }
+
+      nodeBinFilename := filepath.Join(e.workingDir, nodeModulesBinPath, name)
+      if _, err := exec.LookPath(nodeBinFilename); err == nil {
+          return e.new(name, nodeBinFilename, arg...)
+      }
+
+      bin, err := exec.LookPath(name)
+      if err != nil {
+          return nil, &NotFoundError{name: name, method: "in PATH"}
+      }
+      return e.new(name, bin, arg...)
+  }
+
+  func (e *Exec) new(name, fullyQualifiedName string, arg ...any) (Runner, error) {
+      var args []string
+      for _, a := range arg {
+          if s, ok := a.(string); ok {
+              args = append(args, s)
+          }
+      }
+      cmd := exec.Command(fullyQualifiedName, args...)
+      return &cmdWrapper{c: cmd}, nil
+  }
+  ```
+
+test "rank1189: fix always runs the tool's Node.js script through node with --permission flags"
+  lang go
+  file common/hexec/exec.go
+  reject VYQL-INJ-002
+  code
+  ```
+  package hexec
+
+  import (
+      "os/exec"
+      "path/filepath"
+  )
+
+  const nodeModulesBinPath = "node_modules/.bin"
+
+  func (e *Exec) Npx(name string, arg ...any) (Runner, error) {
+      if err := e.sc.CheckAllowedExec(name); err != nil {
+          return nil, err
+      }
+
+      nodeBinFilename := filepath.Join(e.workingDir, nodeModulesBinPath, name)
+      resolvedBin, err := exec.LookPath(nodeBinFilename)
+      if err != nil {
+          resolvedBin, err = exec.LookPath(name)
+          if err != nil {
+              return nil, &NotFoundError{name: name, method: "in PATH"}
+          }
+      }
+
+      scriptPath := resolveNodeBin(resolvedBin)
+      if scriptPath == "" {
+          return nil, &NotFoundError{name: name, method: "as a Node.js script"}
+      }
+
+      return e.newNode(name, scriptPath, arg...)
+  }
+
+  func (e *Exec) newNode(name, scriptPath string, arg ...any) (Runner, error) {
+      var allArgs []any
+      for _, pa := range e.nodePermissionArgs(name, scriptPath) {
+          allArgs = append(allArgs, pa)
+      }
+      allArgs = append(allArgs, scriptPath)
+      allArgs = append(allArgs, arg...)
+      return e.New("node", allArgs...)
+  }
+
+  func (e *Exec) nodePermissionArgs(name, scriptPath string) []string {
+      perms := e.sc.Node.Permissions
+      if !perms.IsEnabled() {
+          return nil
+      }
+
+      args := []string{"--permission"}
+      for _, p := range e.resolveNodePermPaths(perms.AllowRead) {
+          args = append(args, "--allow-fs-read="+p)
+      }
+      for _, p := range e.resolveNodePermPaths(perms.AllowWrite) {
+          args = append(args, "--allow-fs-write="+p)
+      }
+      return args
+  }
+
+  func (e *Exec) New(name string, arg ...any) (Runner, error) {
+      var args []string
+      for _, a := range arg {
+          if s, ok := a.(string); ok {
+              args = append(args, s)
+          }
+      }
+      cmd := exec.Command(name, args...)
+      return &cmdWrapper{c: cmd}, nil
+  }
+  ```
