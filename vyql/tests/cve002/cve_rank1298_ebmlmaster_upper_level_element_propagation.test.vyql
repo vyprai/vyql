@@ -1,0 +1,159 @@
+# Rank 1298 / CVE-2015-8789 (Cisco TALOS-CAN-0037): libebml's
+# EbmlMaster::Read() (src/EbmlMaster.cpp) reads a run of sibling child
+# elements in a loop. FindNextElement/the recursive ElementLevelA->Read()
+# call communicate "the element I actually found belongs to an ancestor
+# level, N levels up" back to the caller through two out-parameters,
+# UpperEltFound (a countdown) and FoundElt (the element itself); the normal
+# path (after the finite/infinite-size handling) decrements UpperEltFound
+# and, once it reaches exactly this level (0), does `ElementLevelA =
+# FoundElt; continue;` so the loop absorbs it as this level's own element.
+#
+# The infinite-size branch skipped all of that: `if (DeleteElement) delete
+# ElementLevelA; break;` returns straight out of the loop (and the function)
+# without ever inspecting UpperEltFound or handing FoundElt back up. If the
+# nested ElementLevelA->Read() call that just ran found such an ancestor
+# element while ElementLevelA itself has infinite size, the signal -- and
+# FoundElt -- is silently dropped at this level. The caller one recursion
+# level up still receives the stale, undecremented UpperEltFound and later
+# rediscovers/re-inserts the very same FoundElt a second time, so it ends up
+# a member of two different EbmlMaster instances' ElementList at once --
+# freed once when each owner's element tree is torn down (double free), and
+# used after the first free in between (CWE-415/CWE-416).
+#
+# Fix 88409e2a94dd3b40ff81d08bf6d92f486d036b24 makes the infinite-size branch
+# check UpperEltFound before breaking, exactly mirroring the finite-size
+# path: decrement it, goto processCrc if it still belongs further up, else
+# take over FoundElt as ElementLevelA so the enclosing loop absorbs it here
+# instead of leaking the signal to the caller.
+#
+# ATTENTION, engine gap. `vyql match` on a repro built from the real
+# function body labels nothing at all on either revision (no source, no
+# sink, no control) -- EbmlStream::FindNextElement and EbmlElement::Read are
+# both unresolved, and neither revision's text differs anywhere but the
+# absorb-into-FoundElt lines. code.PointerFree/code.PointerUse (VYQL-MEM-008
+# PotentialDoubleFree, VYQL-MEM-007 PotentialUseAfterFree, CWE_415/416) are
+# the nearest concepts by mechanism, but their C/C++ bindings key only on a
+# literal `free`-named call and never fire here (confirmed: 0 VYQL-MEM-007/
+# VYQL-MEM-008 findings anywhere in a full scan of the real libebml
+# checkout, byte-identical at both revisions). Even a binding
+# recognizing C++'s `delete` as a release site would not close this gap by
+# itself: no two `delete`/push_back calls on the same variable appear inside
+# one function body here. The double ownership is established across two
+# different EbmlMaster *instances* -- this level's ElementList and an
+# ancestor level's ElementList, joined only by an element handed through the
+# UpperEltFound/FoundElt out-parameter pair across a recursive call chain
+# and re-entered into the loop via `ElementLevelA = FoundElt`. Discriminating
+# the vulnerable and patched forms needs a dataflow relation the engine does
+# not have: whether a value received through an out-parameter is re-added to
+# a container the current function owns, versus dropped and later
+# re-discovered by a caller -- the same category of out-parameter/ownership
+# gap recorded unmechanical at ranks 1155, 1157, 1281, 1283 and 1285
+# (return/out-parameter checkedness and ownership-transfer are not
+# expressible facts today). Scanning the real checkout confirms it directly:
+# the pre-fix and post-fix trees produce identical finding sets, with
+# nothing at either revision's EbmlMaster.cpp Read() lines. No definition
+# change attempted.
+
+test "rank1298: infinite-size child drops a pending upper-level element instead of absorbing it"
+  lang cpp
+  file EbmlMaster.cpp
+  reject VYQL-MEM-008
+  code
+  ```
+  void EbmlMaster::Read(EbmlStream & inDataStream, const EbmlSemanticContext & sContext, int & UpperEltFound, EbmlElement * & FoundElt, bool AllowDummyElt, ScopeMode ReadFully)
+  {
+    EbmlElement * ElementLevelA;
+    ElementList.clear();
+    uint64 MaxSizeToRead = IsFiniteSize() ? GetSize() : 0x7FFFFFFF;
+
+    ElementLevelA = inDataStream.FindNextElement(sContext, UpperEltFound, MaxSizeToRead, AllowDummyElt);
+    while (ElementLevelA != NULL && UpperEltFound <= 0 && MaxSizeToRead > 0) {
+      ElementLevelA->Read(inDataStream, EBML_CONTEXT(ElementLevelA), UpperEltFound, FoundElt, AllowDummyElt, ReadFully);
+
+      bool DeleteElement = true;
+      if (ElementLevelA->ValueIsSet() || (ReadFully != SCOPE_ALL_DATA)) {
+        ElementList.push_back(ElementLevelA);
+        DeleteElement = false;
+      }
+
+      if (ElementLevelA->IsFiniteSize()) {
+        ElementLevelA->SkipData(inDataStream, EBML_CONTEXT(ElementLevelA));
+        if (DeleteElement)
+          delete ElementLevelA;
+      } else {
+        if (DeleteElement)
+          delete ElementLevelA;
+        break;
+      }
+
+      if (UpperEltFound > 0) {
+        UpperEltFound--;
+        if (UpperEltFound > 0 || MaxSizeToRead <= 0)
+          goto processCrc;
+        ElementLevelA = FoundElt;
+        continue;
+      }
+
+      ElementLevelA = inDataStream.FindNextElement(sContext, UpperEltFound, MaxSizeToRead, AllowDummyElt);
+    }
+
+  processCrc:
+    return;
+  }
+  ```
+
+test "rank1298: infinite-size child hands a pending upper-level element back before breaking"
+  lang cpp
+  file EbmlMaster.cpp
+  reject VYQL-MEM-008
+  code
+  ```
+  void EbmlMaster::Read(EbmlStream & inDataStream, const EbmlSemanticContext & sContext, int & UpperEltFound, EbmlElement * & FoundElt, bool AllowDummyElt, ScopeMode ReadFully)
+  {
+    EbmlElement * ElementLevelA;
+    ElementList.clear();
+    uint64 MaxSizeToRead = IsFiniteSize() ? GetSize() : 0x7FFFFFFF;
+
+    ElementLevelA = inDataStream.FindNextElement(sContext, UpperEltFound, MaxSizeToRead, AllowDummyElt);
+    while (ElementLevelA != NULL && UpperEltFound <= 0 && MaxSizeToRead > 0) {
+      ElementLevelA->Read(inDataStream, EBML_CONTEXT(ElementLevelA), UpperEltFound, FoundElt, AllowDummyElt, ReadFully);
+
+      bool DeleteElement = true;
+      if (ElementLevelA->ValueIsSet() || (ReadFully != SCOPE_ALL_DATA)) {
+        ElementList.push_back(ElementLevelA);
+        DeleteElement = false;
+      }
+
+      if (ElementLevelA->IsFiniteSize()) {
+        ElementLevelA->SkipData(inDataStream, EBML_CONTEXT(ElementLevelA));
+        if (DeleteElement)
+          delete ElementLevelA;
+      } else {
+        if (DeleteElement)
+          delete ElementLevelA;
+
+        if (UpperEltFound) {
+          --UpperEltFound;
+          if (UpperEltFound > 0 || MaxSizeToRead <= 0)
+            goto processCrc;
+          ElementLevelA = FoundElt;
+        }
+
+        break;
+      }
+
+      if (UpperEltFound > 0) {
+        UpperEltFound--;
+        if (UpperEltFound > 0 || MaxSizeToRead <= 0)
+          goto processCrc;
+        ElementLevelA = FoundElt;
+        continue;
+      }
+
+      ElementLevelA = inDataStream.FindNextElement(sContext, UpperEltFound, MaxSizeToRead, AllowDummyElt);
+    }
+
+  processCrc:
+    return;
+  }
+  ```
