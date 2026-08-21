@@ -1,0 +1,101 @@
+test "rank1264: config-driven module import resolves any importable module before class lookup"
+  lang python
+  file serialization_lib.py
+  expect VYQL-INJ-023
+  code
+  ```
+  import importlib
+  import sys
+
+
+  def _retrieve_class_or_fn(name, module, full_config):
+      if module:
+          mod = importlib.import_module(module)
+          obj = vars(mod).get(name, None)
+          if obj is not None:
+              return obj
+      raise TypeError(f"Could not locate '{name}'. Full object config: {full_config}")
+
+
+  def deserialize_keras_object(config, custom_objects=None):
+      class_name = config["class_name"]
+      module = config.get("module", None)
+      cls = _retrieve_class_or_fn(class_name, module, config)
+      inner_config = config["config"] or {}
+      return cls(**inner_config)
+
+
+  def main():
+      module_name = sys.argv[1]
+      class_name = sys.argv[2]
+      config = {"class_name": class_name, "module": module_name, "config": {}}
+      return deserialize_keras_object(config)
+  ```
+
+test "rank1264: startswith namespace guard is an unsound string check, not a suppression"
+  lang python
+  file serialization_lib.py
+  expect VYQL-INJ-023
+  expect_evidence VYQL-INJ-023 advisory
+  code
+  ```
+  import importlib
+  import sys
+
+
+  def _retrieve_class_or_fn(name, module, full_config):
+      if module == "keras.src" or module.startswith("keras.src."):
+          mod = importlib.import_module(module)
+          obj = vars(mod).get(name, None)
+          if obj is not None:
+              return obj
+      raise TypeError(f"Could not locate '{name}'. Full object config: {full_config}")
+
+
+  def deserialize_keras_object(config, custom_objects=None):
+      class_name = config["class_name"]
+      module = config.get("module", None)
+      cls = _retrieve_class_or_fn(class_name, module, config)
+      inner_config = config["config"] or {}
+      return cls(**inner_config)
+
+
+  def main():
+      module_name = sys.argv[1]
+      class_name = sys.argv[2]
+      config = {"class_name": class_name, "module": module_name, "config": {}}
+      return deserialize_keras_object(config)
+  ```
+
+test "rank1264: registered custom object short-circuits before any dynamic import"
+  lang python
+  file serialization_lib.py
+  reject VYQL-INJ-023
+  code
+  ```
+  import sys
+
+  _REGISTERED_OBJECTS = {}
+
+
+  def get_registered_object(name, custom_objects=None):
+      if custom_objects and name in custom_objects:
+          return custom_objects[name]
+      if name in _REGISTERED_OBJECTS:
+          return _REGISTERED_OBJECTS[name]
+      return None
+
+
+  def deserialize_keras_object(config, custom_objects=None):
+      class_name = config["class_name"]
+      custom_obj = get_registered_object(class_name, custom_objects=custom_objects)
+      if custom_obj is not None:
+          return custom_obj
+      raise TypeError(f"Could not locate '{class_name}'.")
+
+
+  def main():
+      class_name = sys.argv[1]
+      config = {"class_name": class_name, "config": {}}
+      return deserialize_keras_object(config)
+  ```

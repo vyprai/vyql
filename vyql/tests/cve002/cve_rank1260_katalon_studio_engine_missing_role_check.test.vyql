@@ -1,0 +1,180 @@
+# Rank 1260 / CVE-2022-43416 (SECURITY-2844): the Katalon Studio Engine
+# Plugin's ExecuteKatalonStudioHelper sent an anonymous hudson.remoting.Callable
+# across the Jenkins channel to run Katalon Studio, with a checkRoles override
+# left empty -- nothing ever calls RoleChecker.check, so the callable does not
+# restrict which channel role may enter call(). The fixed revision drops the
+# raw Callable/RoleChecker pair and extends
+# jenkins.security.MasterToSlaveCallable, whose own checkRoles enforces the
+# expected role.
+#
+# ATTENTION, engine gap. internal/extract/frontend/treesitter/java.go's expr()
+# handling of "object_creation_expression" (java.go:1234-1244) converts `new T(args)
+# { ... }` to a bare nir.Call{Callee: Name{ID: typ}, Path: typ, Method: typ} and never
+# reads the node's "body" field, so a Java anonymous class body -- the class_body
+# holding the overridden call()/checkRoles() methods here -- is dropped entirely
+# during parsing. No ClassDef, no FuncDef, no class-context event exists for it: the
+# checkRoles/call methods, and the fact this anonymous class implements Callable, are
+# invisible to every binding. Confirmed with a minimal pair: the same checkRoles/call
+# shape written as a *named* top-level class (`public class X implements Callable`)
+# is caught by the new JenkinsRemotingCallableMissingRoleCheck binding below (verified
+# directly with `vyql explain` against a standalone repro); the identical shape as an
+# anonymous inner class -- which is what the real vulnerable and patched code both use
+# -- produces no findings either way, vulnerable or patched, because the class_body is
+# never parsed to begin with. `vyql resolve` on the real code shows only
+# analysis.class.context for the *enclosing* named class
+# (ExecuteKatalonStudioHelper) at line 13; no analysis.class.context or
+# analysis.function.context event exists anywhere for the anonymous Callable's own
+# body (the object_creation_expression spanning the launcher.getChannel().call(...)
+# argument).
+#
+# Not mechanical: anonymous class bodies are common far beyond Jenkins Callables
+# (Runnable, Comparator, ActionListener, TimerTask, anonymous interface
+# implementations generally), and giving them nir representation needs a new
+# statement/expression shape -- object_creation_expression appears as a nested
+# expression (here, an argument to .call()), not a standalone statement, so there is
+# no existing statement slot to hang a ClassDef off of; a fix has to decide how an
+# expression-position construct emits an additional top-level nir node and how that
+# node's methods get scoped, resolved, and connected into the call graph
+# (`launcher.getChannel().call(anonymousCallable)` needs to resolve into the
+# anonymous class's call() body for taint to reach KatalonUtils.executeKatalon at
+# all). That is new classification and a new call-resolution relation, not a missing
+# switch case, and it would touch every language frontend and binding that scopes on
+# "class" or "function", so it stays out of this loop. Blocks any Java CVE whose
+# vulnerable or patched shape lives inside an anonymous class body -- this rank, and
+# any future rank shaped the same way.
+#
+# The JenkinsRemotingCallableMissingRoleCheck binding added alongside this spec is
+# independently useful: it generalizes the shipped
+# JenkinsRemotingCallableSystemPropertiesLeak binding (VYQL-SEC-013, scoped to
+# callables that leak System.getProperties) to the class of Jenkins remoting
+# Callables whose checkRoles never calls RoleChecker.check, regardless of what
+# call() does -- the same fix (extend MasterToSlaveCallable) resolves both, and
+# Jenkins' own remoting documentation describes checkRoles this way independent of
+# any one CVE. It fires on this rank's exact vulnerability when written as the more
+# common named-class shape (verified directly, not through this spec, since the
+# spec's job is to model the real code); it cannot fire on the anonymous-class shape
+# the real fix commit actually uses, for the reason above.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1260: raw Callable with an empty checkRoles runs Katalon on any role"
+  lang java
+  file src/main/java/com/katalon/jenkins/plugin/helper/ExecuteKatalonStudioHelper.java
+  reject VYQL-AUTH-113
+  reject_review code.JenkinsRemotingCallableMissingRoleCheck
+  code
+  ```
+  package com.katalon.jenkins.plugin.helper;
+
+  import hudson.EnvVars;
+  import hudson.FilePath;
+  import hudson.Launcher;
+  import hudson.model.TaskListener;
+  import hudson.remoting.Callable;
+  import org.jenkinsci.remoting.RoleChecker;
+
+  import java.util.HashMap;
+  import java.util.Map;
+
+  public class ExecuteKatalonStudioHelper {
+
+      public static boolean executeKatalon(
+              FilePath workspace,
+              EnvVars buildEnvironment,
+              Launcher launcher,
+              TaskListener taskListener,
+              String version,
+              String location,
+              String executeArgs,
+              String x11Display,
+              String xvfbConfiguration) {
+          try {
+              return launcher.getChannel().call(new Callable<Boolean, Exception>() {
+                  @Override
+                  public Boolean call() throws Exception {
+                      if (workspace != null) {
+                          String workspaceLocation = workspace.getRemote();
+                          if (workspaceLocation != null) {
+                              Map<String, String> environmentVariables = new HashMap<>();
+                              environmentVariables.putAll(System.getenv());
+                              return KatalonUtils.executeKatalon(
+                                  version,
+                                  location,
+                                  workspaceLocation,
+                                  executeArgs,
+                                  x11Display,
+                                  xvfbConfiguration,
+                                  environmentVariables);
+                          }
+                      }
+                      return true;
+                  }
+                  @Override
+                  public void checkRoles(RoleChecker roleChecker) throws SecurityException {
+                  }
+              });
+          } catch (Exception e) {
+              return false;
+          }
+      }
+  }
+  ```
+
+test "rank1260: MasterToSlaveCallable enforces the expected role for the same run"
+  lang java
+  file src/main/java/com/katalon/jenkins/plugin/helper/ExecuteKatalonStudioHelper.java
+  reject VYQL-AUTH-113
+  reject_review code.JenkinsRemotingCallableMissingRoleCheck
+  code
+  ```
+  package com.katalon.jenkins.plugin.helper;
+
+  import hudson.EnvVars;
+  import hudson.FilePath;
+  import hudson.Launcher;
+  import hudson.model.TaskListener;
+  import jenkins.security.MasterToSlaveCallable;
+
+  import java.util.HashMap;
+  import java.util.Map;
+
+  public class ExecuteKatalonStudioHelper {
+
+      public static boolean executeKatalon(
+              FilePath workspace,
+              EnvVars buildEnvironment,
+              Launcher launcher,
+              TaskListener taskListener,
+              String version,
+              String location,
+              String executeArgs,
+              String x11Display,
+              String xvfbConfiguration) {
+          try {
+              return launcher.getChannel().call(new MasterToSlaveCallable<Boolean, Exception>() {
+                  @Override
+                  public Boolean call() throws Exception {
+                      if (workspace != null) {
+                          String workspaceLocation = workspace.getRemote();
+                          if (workspaceLocation != null) {
+                              Map<String, String> environmentVariables = new HashMap<>();
+                              environmentVariables.putAll(System.getenv());
+                              return KatalonUtils.executeKatalon(
+                                  version,
+                                  location,
+                                  workspaceLocation,
+                                  executeArgs,
+                                  x11Display,
+                                  xvfbConfiguration,
+                                  environmentVariables);
+                          }
+                      }
+                      return true;
+                  }
+              });
+          } catch (Exception e) {
+              return false;
+          }
+      }
+  }
+  ```

@@ -1,0 +1,22 @@
+module bindings.go.elevatedClientGrantIgnoresCreateError;
+
+// A resource-creation loop that remembers which Projects it created earlier in
+// the same call, and switches later resources in that Project's namespace onto
+// an internally-elevated client (InternalClient) on the reasoning that
+// "creating the Project proves the caller owns it" -- but records that grant
+// from a type/kind match on the created resource alone, without checking
+// whether the creation call that just ran actually returned an error. A
+// manifest naming a Project that fails to create (already exists, owned by
+// someone else) still seeds the grant, so every later resource in that
+// namespace is created with the server's own permissions instead of the
+// caller's: an authorization decision made without checking the result of the
+// operation it is supposedly derived from (CWE-252/CWE-285/CWE-863).
+//
+// The `err != nil` conjunct requires this function to be already checking that
+// error somewhere (the early-return guard on a single-resource request), so
+// this only fires where the grant genuinely skips a check the function
+// otherwise performs -- not on code with no error to check in the first place.
+binding elevatedClientGrantIgnoresCreateError293 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.callPath contains "InternalClient" and node.context.callPath contains "GroupVersionKind" and node.context.index contains "createdProjects" and node.context.binary contains "err!=nil" and not (node.context.binary contains "err==nil")
+  emit issue code.IgnoredAuthorizationResult at node
+}

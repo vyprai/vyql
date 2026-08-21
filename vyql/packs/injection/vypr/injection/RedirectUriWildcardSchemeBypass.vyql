@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule RedirectUriWildcardSchemeBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79, CWE_20]
+    id: "VYQL-INJ-241"
+    severity: high
+  }
+  issue code.RedirectUriWildcardSchemeBypass as sink
+}

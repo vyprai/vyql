@@ -1,0 +1,125 @@
+# akuity/kargo: CreateResource, CreateOrUpdateResource, createResources and
+# updateResources loop over the resources parsed from a manifest, and for each
+# one belonging to a Project the loop creates earlier in the same
+# call, they switch to s.client.InternalClient() -- the API server's own
+# elevated permissions -- to create the resource, reasoning that "the user had
+# sufficient permissions" to create the owning Project and is therefore its
+# owner and an admin. The bug: createdProjects[resource.GetName()] is recorded
+# from resource.GroupVersionKind() == projectGVK alone, never checking the err
+# that s.createResource/s.updateResource just returned. A manifest naming a
+# Project that fails to create (e.g. one that exists and the caller
+# does not own) still marks that Project as "created" for the rest of the
+# call, so every later resource in that namespace is created with the
+# server's own elevated client rather than the caller's -- an authorization
+# bypass into a Project the caller is never granted.
+#
+# The fixed revision adds `err == nil &&` to each of the four gates, so a
+# failed create can never seed createdProjects.
+
+test "rank1258: a Project GVK match alone marks a namespace as caller-owned, even when the create call errored"
+  lang go
+  expect_review code.IgnoredAuthorizationResult
+  code
+  ```
+  package server
+
+  import (
+  	"context"
+
+  	"connectrpc.com/connect"
+  	"sigs.k8s.io/controller-runtime/pkg/client"
+
+  	svcv1alpha1 "github.com/akuity/kargo/api/service/v1alpha1"
+  )
+
+  func (s *server) CreateResource(
+  	ctx context.Context,
+  	req *connect.Request[svcv1alpha1.CreateResourceRequest],
+  ) (*connect.Response[svcv1alpha1.CreateResourceResponse], error) {
+  	projects, otherResources, err := splitYAML(req.Msg.GetManifest())
+  	if err != nil {
+  		return nil, err
+  	}
+  	resources := append(projects, otherResources...)
+  	createdProjects := map[string]struct{}{}
+  	results := make([]*svcv1alpha1.CreateResourceResult, 0, len(resources))
+  	for _, r := range resources {
+  		resource := r
+  		var cl client.Client = s.client
+  		if _, ok := createdProjects[resource.GetNamespace()]; ok {
+  			// This resource belongs to a Project we created previously in this API
+  			// call. The user had sufficient permissions to accomplish that and having
+  			// done so makes them automatically the "owner" of the Project and an
+  			// admin, so use the API server's own elevated permissions here.
+  			cl = s.client.InternalClient()
+  		}
+  		result, err := s.createResource(ctx, cl, &resource)
+  		if err != nil && len(resources) == 1 {
+  			return nil, err
+  		}
+  		// If we just created a Project successfully, keep track of this Project
+  		// being one that was created in the course of this API call.
+  		if resource.GroupVersionKind() == projectGVK {
+  			createdProjects[resource.GetName()] = struct{}{}
+  		}
+  		results = append(results, toProtoCreateResult(result))
+  	}
+  	return &connect.Response[svcv1alpha1.CreateResourceResponse]{
+  		Msg: &svcv1alpha1.CreateResourceResponse{Results: results},
+  	}, nil
+  }
+  ```
+
+test "rank1258: the same gate additionally requires the create call to have actually succeeded"
+  lang go
+  reject_review code.IgnoredAuthorizationResult
+  code
+  ```
+  package server
+
+  import (
+  	"context"
+
+  	"connectrpc.com/connect"
+  	"sigs.k8s.io/controller-runtime/pkg/client"
+
+  	svcv1alpha1 "github.com/akuity/kargo/api/service/v1alpha1"
+  )
+
+  func (s *server) CreateResource(
+  	ctx context.Context,
+  	req *connect.Request[svcv1alpha1.CreateResourceRequest],
+  ) (*connect.Response[svcv1alpha1.CreateResourceResponse], error) {
+  	projects, otherResources, err := splitYAML(req.Msg.GetManifest())
+  	if err != nil {
+  		return nil, err
+  	}
+  	resources := append(projects, otherResources...)
+  	createdProjects := map[string]struct{}{}
+  	results := make([]*svcv1alpha1.CreateResourceResult, 0, len(resources))
+  	for _, r := range resources {
+  		resource := r
+  		var cl client.Client = s.client
+  		if _, ok := createdProjects[resource.GetNamespace()]; ok {
+  			// This resource belongs to a Project we created previously in this API
+  			// call. The user had sufficient permissions to accomplish that and having
+  			// done so makes them automatically the "owner" of the Project and an
+  			// admin, so use the API server's own elevated permissions here.
+  			cl = s.client.InternalClient()
+  		}
+  		result, err := s.createResource(ctx, cl, &resource)
+  		if err != nil && len(resources) == 1 {
+  			return nil, err
+  		}
+  		// If we just created a Project successfully, keep track of this Project
+  		// being one that was created in the course of this API call.
+  		if err == nil && resource.GroupVersionKind() == projectGVK {
+  			createdProjects[resource.GetName()] = struct{}{}
+  		}
+  		results = append(results, toProtoCreateResult(result))
+  	}
+  	return &connect.Response[svcv1alpha1.CreateResourceResponse]{
+  		Msg: &svcv1alpha1.CreateResourceResponse{Results: results},
+  	}, nil
+  }
+  ```

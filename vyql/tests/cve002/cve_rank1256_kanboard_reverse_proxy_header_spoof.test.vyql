@@ -1,0 +1,153 @@
+# Rank 1256 / CVE-2026-21881: Kanboard's reverse-proxy authentication provider
+# trusted the REVERSE_PROXY_USER_HEADER (and email/fullname) server variables
+# unconditionally, so any deployment with REVERSE_PROXY_AUTH enabled could be
+# impersonated by any client able to reach the app directly and set the
+# configured header itself, bypassing the reverse proxy entirely (CWE-290,
+# CWE-807 -- authentication bypass by spoofing a header the app assumes only
+# a trusted proxy can set).
+#
+# app/Core/Http/Request.php had
+#
+#   public function getRemoteUser()
+#   {
+#       return $this->getServerVariable(REVERSE_PROXY_USER_HEADER);
+#   }
+#
+# and app/Auth/ReverseProxyAuth.php's authenticate() used it directly:
+#
+#   public function authenticate()
+#   {
+#       $username = $this->request->getRemoteUser();
+#       ...
+#       if (! empty($username)) {
+#           $userProfile = $this->userCacheDecorator->getByUsername($username);
+#           $this->userInfo = new ReverseProxyUserProvider($username, $email, $fullname, $userProfile ?: array());
+#           return true;
+#       }
+#   }
+#
+# Nothing in that path checks whether the request's peer address is actually
+# the configured reverse proxy -- the header name is merely read out of
+# $_SERVER, which PHP populates from client-sent headers just as readily as
+# from ones a real proxy sets. The fixed revision adds a new
+# TRUSTED_PROXY_NETWORKS allow-list, a Request::isTrustedProxy() CIDR check
+# (IPv4 and IPv6), and gates getRemoteUser()/getRemoteEmail()/getRemoteName()
+# on it, returning '' when the direct peer is not inside a configured trusted
+# network. It also adds OptionalAuthenticationProviderInterface so
+# ReverseProxyAuth::isEnabled() (true only once a REMOTE_USER-shaped header
+# has actually arrived from a trusted peer) can be checked before
+# AuthenticationManager consults the provider at all, and check_setup.php now
+# refuses to boot with REVERSE_PROXY_AUTH on and no TRUSTED_PROXY_NETWORKS
+# configured.
+#
+# ATTENTION, vocabulary gap. Scanning ReverseProxyAuth.php and Request.php at
+# either revision reports 0 findings; vyql match labels no source or sink
+# around getServerVariable(REVERSE_PROXY_USER_HEADER). code.ProxyClientIpSpoofingBypass
+# (VYQL-AUTH-012) is the closest shipped concept but its reviewCondition is
+# specifically an unnormalized client-IP header trusted for an access-control
+# decision (CWE-348); here the spoofed header carries a *username*, not an IP,
+# and the sink is an authentication decision (CWE-290), not IP-based access
+# control -- reusing it would misdescribe the CWE and the mechanism. This is
+# the same class rank 1092 (erxes) flags with no concept available:
+# a self-asserted identity header accepted as pre-verified without a check
+# that the request actually came through the component trusted to set it.
+# Minting a new concept here is not attempted: the pattern -- an app reading a
+# configurable header name and trusting it as an authenticated username -- is
+# the same shape used correctly by every REMOTE_USER/SSO-proxy integration
+# (Apache, nginx auth_request, oauth2-proxy, Shibboleth, Django's
+# RemoteUserMiddleware) where safety is enforced by network topology (the app
+# is unreachable except through the proxy), not by any check visible in the
+# application's source. A binding that flags "reads a proxy-identity header
+# without an in-code trusted-network check" would fire on the safe majority of
+# these deployments as often as the vulnerable ones, since the mitigating
+# control usually lives in infrastructure config the scanner cannot see.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1256: reverse-proxy auth trusts the configured identity header unconditionally"
+  lang php
+  file app/Auth/ReverseProxyAuth.php
+  reject VYQL-AUTH-012
+  code
+  ```
+  <?php
+
+  namespace Kanboard\Auth;
+
+  use Kanboard\Core\Base;
+  use Kanboard\Core\Security\PreAuthenticationProviderInterface;
+  use Kanboard\Core\Security\SessionCheckProviderInterface;
+  use Kanboard\User\ReverseProxyUserProvider;
+
+  class ReverseProxyAuth extends Base implements PreAuthenticationProviderInterface, SessionCheckProviderInterface
+  {
+      protected $userInfo = null;
+
+      public function authenticate()
+      {
+          $username = $this->request->getRemoteUser();
+          $email = $this->request->getRemoteEmail();
+          $fullname = $this->request->getRemoteName();
+
+          if (! empty($username)) {
+              $userProfile = $this->userCacheDecorator->getByUsername($username);
+              $this->userInfo = new ReverseProxyUserProvider($username, $email, $fullname, $userProfile ?: array());
+              return true;
+          }
+
+          return false;
+      }
+
+      public function isValidSession()
+      {
+          return $this->request->getRemoteUser() === $this->userSession->getUsername();
+      }
+  }
+  ```
+
+test "rank1256: the fixed revision checks the direct peer against a trusted-proxy allow list first"
+  lang php
+  file app/Auth/ReverseProxyAuth.php
+  reject VYQL-AUTH-012
+  code
+  ```
+  <?php
+
+  namespace Kanboard\Auth;
+
+  use Kanboard\Core\Base;
+  use Kanboard\Core\Security\OptionalAuthenticationProviderInterface;
+  use Kanboard\Core\Security\PreAuthenticationProviderInterface;
+  use Kanboard\Core\Security\SessionCheckProviderInterface;
+  use Kanboard\User\ReverseProxyUserProvider;
+
+  class ReverseProxyAuth extends Base implements PreAuthenticationProviderInterface, SessionCheckProviderInterface, OptionalAuthenticationProviderInterface
+  {
+      protected $userInfo = null;
+
+      public function isEnabled()
+      {
+          return ! empty($this->request->getRemoteUser());
+      }
+
+      public function authenticate()
+      {
+          $username = $this->request->getRemoteUser();
+          $email = $this->request->getRemoteEmail();
+          $fullname = $this->request->getRemoteName();
+
+          if (! empty($username)) {
+              $userProfile = $this->userCacheDecorator->getByUsername($username);
+              $this->userInfo = new ReverseProxyUserProvider($username, $email, $fullname, $userProfile ?: array());
+              return true;
+          }
+
+          return false;
+      }
+
+      public function isValidSession()
+      {
+          return $this->request->getRemoteUser() === $this->userSession->getUsername();
+      }
+  }
+  ```

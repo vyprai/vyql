@@ -1,0 +1,11 @@
+module code;
+
+concept RedirectUriWildcardSchemeBypass : issue {
+  cwe: [CWE_79, CWE_20]
+  reviewAssumption: "a client can register a wildcard redirect/callback URL pattern and an attacker can supply the redirect_uri or AssertionConsumerServiceURL value"
+  reviewCategory: xss
+  reviewCondition: "a wildcard-suffix redirect URI matcher accepts any URI scheme, so a non-http(s) scheme such as javascript: can satisfy a registered '*' pattern and be reflected back by the caller"
+  reviewConfidence: high
+  reviewEvidence: "redirect URI validation context {pattern} strips a trailing wildcard and matches candidates by prefix without ever checking the candidate URI's scheme"
+  vulnerableTo: [injection.Xss, validation.ImproperInputValidation]
+}
