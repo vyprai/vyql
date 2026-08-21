@@ -1,0 +1,123 @@
+# Rank 1211 / CVE-2019-10158: Infinispan's Spring Session integration
+# implemented session fixation protection incompletely. Spring Session's
+# MapSession.changeSessionId() gives a session a new getId() while
+# getOriginalId() keeps returning the id it had before rotation (the id an
+# attacker could have fixed before login). AbstractInfinispanSessionRepository
+# .save(MapSession) is the point every Spring Session filter calls to persist
+# that change, and the vulnerable version wrote the cache entry under the new
+# id without ever removing the entry still sitting under the original id, so
+# the pre-rotation session identifier stayed valid and pointed at the same
+# (now authenticated) session data (CWE-384).
+#
+# The CVE-2019-10158 deletion logic itself predates the fixing commit's
+# parent: it contains
+# `if (!session.getId().equals(session.getOriginalId())) { deleteById(...); }`
+# in save(). The commit that introduces the
+# getId()/getOriginalId() comparison and the deleteById(originalId) call is
+# debdf5447da3626d2f970050ca79cdf98bf87661 ("ISPN-10224 Fix session fixation
+# protection", PR #6960), reachable from origin/main and confirmed by diffing
+# its parent against itself: the parent's save() is exactly
+# `cache.put(session.getId(), session, ...)` with no id comparison at all, and
+# deleteById() unconditionally calls `cache.get(sessionId).get()` (a decision
+# checked at rank review time, not carried over from the metadata flag, since
+# this row carried no commit? flag). Correcting pool.tsv rank 1211 from
+# 4b381c5910265972ccaabefbdbd16a2b929f6b72 to
+# debdf5447da3626d2f970050ca79cdf98bf87661.
+#
+# ATTENTION, vocabulary gap. code.MissingSessionRotationAfterAuthentication
+# (CWE_384, vulnerableTo session.SessionFixation) is the closest existing
+# concept, already used at ranks 1110 and 1115 for the same CWE under a
+# different code shape. Its two Java bindings (missingSessionRotationAfter
+# Authentication69/70 in vyql/bindings/java/m420f6b67.vyql) both require a
+# `setAuthentication` call in the matched function, on the theory that the
+# vulnerable shape is a login/security-context filter that reuses the
+# pre-login HttpSession. Infinispan's save() is a Spring Session
+# SessionRepository persistence-layer method: it never calls setAuthentication
+# or touches a SecurityContext, it is called on every session write, and its
+# only signal that the id changed is the getId()/getOriginalId() comparison
+# that Spring Session's own MapSession exposes for exactly this purpose.
+# Reusing the concept with a new binding keyed on that comparison was
+# considered and rejected: Spring Session's own javadoc for
+# MapSession.getOriginalId() ("Get the original session id") and
+# SessionRepository.save() (persists the session; says nothing about deleting
+# a stale id) never states that a stale entry must be removed — that
+# requirement is only visible by reading Spring Session's own built-in
+# repository implementations (Redis, JDBC, Hazelcast, MongoDB) as worked
+# examples, not from anything the interface's contract documents. A binding
+# built from a worked example rather than a documented contract is closer to
+# a repro-shaped patch than a binding, so no definition change is attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1211: save() writes the new id without deleting the entry under the original id"
+  lang java
+  file AbstractInfinispanSessionRepository.java
+  reject_review code.MissingSessionRotationAfterAuthentication
+  code
+  ```
+  package org.infinispan.spring.common.session;
+
+  import java.util.concurrent.TimeUnit;
+  import org.infinispan.spring.common.provider.SpringCache;
+  import org.springframework.session.MapSession;
+
+  public abstract class AbstractInfinispanSessionRepository {
+
+     protected final SpringCache cache;
+
+     protected AbstractInfinispanSessionRepository(SpringCache cache) {
+        this.cache = cache;
+     }
+
+     public void save(MapSession session) {
+        cache.put(session.getId(), session, session.getMaxInactiveInterval().getSeconds(), TimeUnit.SECONDS);
+     }
+
+     public void deleteById(String sessionId) {
+        MapSession mapSession = (MapSession) cache.get(sessionId).get();
+        if (mapSession != null) {
+           cache.evict(sessionId);
+        }
+     }
+  }
+  ```
+
+test "rank1211: save() deletes the entry under the original id before writing the new one"
+  lang java
+  file AbstractInfinispanSessionRepository.java
+  reject_review code.MissingSessionRotationAfterAuthentication
+  code
+  ```
+  package org.infinispan.spring.common.session;
+
+  import java.util.concurrent.TimeUnit;
+  import org.infinispan.spring.common.provider.SpringCache;
+  import org.springframework.session.MapSession;
+
+  public abstract class AbstractInfinispanSessionRepository {
+
+     protected final SpringCache cache;
+
+     protected AbstractInfinispanSessionRepository(SpringCache cache) {
+        this.cache = cache;
+     }
+
+     public void save(MapSession session) {
+        if (!session.getId().equals(session.getOriginalId())) {
+           deleteById(session.getOriginalId());
+        }
+        cache.put(session.getId(), session, session.getMaxInactiveInterval().getSeconds(), TimeUnit.SECONDS);
+     }
+
+     public void deleteById(String sessionId) {
+        Object valueWrapper = cache.get(sessionId);
+        if (valueWrapper == null) {
+           return;
+        }
+        MapSession mapSession = (MapSession) valueWrapper;
+        if (mapSession != null) {
+           cache.evict(sessionId);
+        }
+     }
+  }
+  ```

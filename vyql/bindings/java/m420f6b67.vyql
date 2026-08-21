@@ -2653,3 +2653,35 @@ binding jenkinsHtmlPublisherLegacyWrapperXss459 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "publishReports" and node.context.literal contains "links-data-holder'" and node.context.callPath contains "job.getName"
   emit issue code.JenkinsHtmlPublisherLegacyWrapperXss at node
 }
+
+// A secret-named field or local (secret/signing_key/jwt/hmac/api_key/private_key/
+// cipher_key/encryption_key/session_key/access_token/auth_token/refresh_token,
+// per secretNamedTarget in internal/extract/lowering/lowering.go) assigned a
+// non-trivial string literal directly, outside test/seed sources. The lowering
+// pass already emits this analysis call for every language sharing nir.Assign;
+// python and javascript already bind it, java had no binding consuming it at
+// all. Scoped to the "secret="-tagged evidence (secretNamedTarget) rather than
+// also the "credential_const="-tagged one (credentialConstName, the PASSWORD/
+// USERNAME family): Java schemas commonly declare a SCREAMING_CASE constant
+// like PASSWORD naming a property/column *key*, not holding a credential
+// value, and that shape fired on this project's own real code
+// (HugeUser.java's `PASSWORD = "~user_password"`) the first time this
+// evidence family was tried here.
+binding hardcodedSecretLiteral460 {
+  query pattern callExpr where callee.analysis ~= "secret.hardcoded" and args.any.literal contains "secret="
+  emit issue code.HardcodedSecretLiteral at call
+}
+
+// filterSensitive strips each denylisted JDBC parameter (autoDeserialize,
+// allowLoadLocalInfile, allowUrlInLocalInfile, ...) from the URL by iterating the
+// denylist once and calling a string-replace per key. A denylisted key nested
+// inside another occurrence of itself survives: removing the inner match leaves
+// the two flanking fragments adjacent, which reconstructs the same key=value pair
+// the single pass already walked past. The fix (containSensitiveKey, re-invoked in
+// a loop until the URL no longer contains any denylisted key) re-scans after every
+// strip instead of scanning once, so its presence in the function's scope is what
+// distinguishes the patched form.
+binding jdbcSensitiveParamSinglePassFilterBypass461 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "filterSensitive" and node.context.callPath contains "StringUtils.replaceIgnoreCase" and node.context.callPath contains ".keySet" and not (node.context.scopeCall contains "containSensitiveKey")
+  emit issue code.JdbcSensitiveParamSinglePassFilterBypass at node
+}

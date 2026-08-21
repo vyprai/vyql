@@ -1,0 +1,186 @@
+# Rank 1215 / CVE-2022-2111 (GHSA-fr2w-mp56-g4xp): InvenTree lets an
+# authenticated user attach an arbitrary file to a part/build/order/stock
+# record with no restriction on its type. The bootstrap-table formatter for
+# every attachment column (InvenTree/templates/js/translated/attachment.js's
+# loadAttachmentTable, InvenTree/templates/js/translated/stock.js's
+# loadStockTestResultsTable) turned that file's URL into a plain anchor via
+# InvenTree/templates/js/translated/tables.js's renderLink(text, url,
+# options): `return '<a href="' + url + '">' + text + '</a>';`. A same-origin
+# `<a href>` with no `download` attribute lets the browser navigate to and
+# render the response inline, so an attachment saved as an .html file with
+# embedded <script> ran with the application's own origin the moment another
+# user clicked its link (CWE-434).
+#
+# The fixed revision (in inventree/inventree) never restricts the
+# uploadable extension; it makes renderLink take a `download: true` option
+# that appends a `download='<filename>'` attribute, and switches both
+# attachment-link call sites to pass it, so the browser always saves the file
+# instead of opening it in the current tab. No Python file changed for this
+# specific advisory (the same squash commit's admin.py/version.py changes are
+# for two other bundled GHSAs, CSV formula injection and bootstrap-table HTML
+# escaping); the entire fix for CVE-2022-2111 itself is these two JavaScript
+# files.
+#
+# repo! resolved: GHSA-fr2w-mp56-g4xp's own "For more information" section
+# links http://github.com/inventree/inventree, and the fixing commit
+# 26bf51c20a1c9b3130ac5dd2e17649bece5ff84f exists in inventree/inventree
+# (`gh api /repos/inventree/inventree/commits/26bf51c...` resolves; the same
+# SHA against inventree/inventree-python 404s). OSV's affected-package entry
+# lists PyPI `inventree`, which is the pip name inventree-python's own
+# setup.py publishes under — a coincidental name collision between the
+# server's PyPI-irrelevant CVE metadata and the client library's package
+# name, not a second repository carrying the same fix. inventree-python is a
+# thin REST client (session/part/stock wrapper classes over `requests`); it
+# has no bootstrap-table rendering, no renderLink, and no attachment-link
+# templates for this vulnerability to live in. pool.tsv rank 1215 is
+# unchanged.
+#
+# ATTENTION, vocabulary gap. `vyql match` on both revisions of a repro
+# faithful to tables.js's renderLink and attachment.js's loadAttachmentTable
+# labels nothing at all (no source, sink, or control), and a bounded scan of
+# the real checkout's InvenTree/templates/js/translated/ directory (timeout
+# 180, --max-ram 4GB, --cache off; javascript:21 textpattern:21, 247 findings)
+# reports zero findings at attachment.js or tables.js — VYQL-INJ-004
+# (code.DomInput -> code.HtmlRender) fires nearby, on modals.js, part.js,
+# notification.js and order.js, so the general DOM-XSS rule is reachable in
+# this exact file set, but never on renderLink's own two call sites, because
+# `value`/`row.attachment` there is data read back from an inventreeGet() API
+# response rather than a bound code.DomInput source, and `renderLink`'s
+# `<a href>` build is not a recognized code.HtmlRender-relevant string shape
+# either. No existing concept models this weakness's actual mechanism: every
+# CWE-434 concept in this ontology (code.FileUpload, code.UnsafeUpload,
+# code.IncompleteFileExtensionValidation and its per-CMS variants) judges
+# whether an uploaded file's *extension* is restricted before it is saved to
+# disk, which is not what InvenTree's own fix does — it accepts any
+# extension and instead forces the browser to download rather than render
+# the file. That is a client-side HTML-attribute question (does this anchor
+# to a same-origin, arbitrarily-typed resource carry `download`), not a
+# server-side upload-validation one, and no concept in either family
+# addresses it. A new concept was not minted: `renderLink` is an
+# application-private helper with no public documentation to write a binding
+# from — the genericity test in AGENTS.md ("would someone who has never seen
+# this CVE write the same binding from the library's documentation alone?")
+# fails outright, since there is no library here, only InvenTree's own JS.
+# The generalizable version of the rule — "an anchor to a same-origin,
+# type-unrestricted user-uploaded file must carry `download` or the response
+# must set Content-Disposition: attachment" — would need a new taint source
+# for "URL naming an uploaded file" that has no natural home in the current
+# ontology and no way to discriminate from any other same-origin link without
+# risking false positives on ordinary internal navigation, so it is design
+# work, not a bounded binding or rule change, and was not attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions reject
+# VYQL-INJ-004, the nearest rule reachable in this exact file set.
+
+test "rank1215: renderLink builds a plain <a href> with no download attribute, so an HTML attachment renders inline"
+  lang javascript
+  reject VYQL-INJ-004
+  file tables.js
+  ```
+  function renderLink(text, url, options={}) {
+      if (url === null || url === undefined || url === '') {
+          return text;
+      }
+
+      var max_length = options.max_length || -1;
+
+      if ((max_length > 0) && (text.length > max_length)) {
+          var slice_length = (max_length - 3) / 2;
+          var text_start = text.slice(0, slice_length);
+          var text_end = text.slice(-slice_length);
+          text = `${text_start}...${text_end}`;
+      }
+
+      return '<a href="' + url + '">' + text + '</a>';
+  }
+  ```
+  file attachment.js
+  ```
+  function loadAttachmentTable(url, options) {
+
+      options.table.inventreeTable({
+          url: url,
+          columns: [
+              {
+                  field: 'attachment',
+                  title: 'File',
+                  formatter: function(value, row) {
+                      if (value) {
+                          var split = value.split('/');
+                          var filename = split[split.length - 1];
+                          var icon = attachmentIcon(filename);
+                          var html = `<span class='fas ${icon}'></span> ${filename}`;
+
+                          return renderLink(html, value);
+                      } else if (row.link) {
+                          var html = `<span class='fas fa-link'></span> ${row.link}`;
+                          return renderLink(html, row.link);
+                      } else {
+                          return '-';
+                      }
+                  }
+              }
+          ]
+      });
+  }
+  ```
+
+test "rank1215: renderLink({download: true}) forces the browser to save the attachment instead of rendering it"
+  lang javascript
+  reject VYQL-INJ-004
+  file tables.js
+  ```
+  function renderLink(text, url, options={}) {
+      if (url === null || url === undefined || url === '') {
+          return text;
+      }
+
+      var max_length = options.max_length || -1;
+
+      var extra = '';
+
+      if (options.download) {
+          var fn = url.split('/').at(-1);
+          extra += ` download='${fn}'`;
+      }
+
+      if ((max_length > 0) && (text.length > max_length)) {
+          var slice_length = (max_length - 3) / 2;
+          var text_start = text.slice(0, slice_length);
+          var text_end = text.slice(-slice_length);
+          text = `${text_start}...${text_end}`;
+      }
+
+      return `<a href='${url}'${extra}>${text}</a>`;
+  }
+  ```
+  file attachment.js
+  ```
+  function loadAttachmentTable(url, options) {
+
+      options.table.inventreeTable({
+          url: url,
+          columns: [
+              {
+                  field: 'attachment',
+                  title: 'File',
+                  formatter: function(value, row) {
+                      if (value) {
+                          var split = value.split('/');
+                          var filename = split[split.length - 1];
+                          var icon = attachmentIcon(filename);
+                          var html = `<span class='fas ${icon}'></span> ${filename}`;
+
+                          return renderLink(html, value, {download: true});
+                      } else if (row.link) {
+                          var html = `<span class='fas fa-link'></span> ${row.link}`;
+                          return renderLink(html, row.link);
+                      } else {
+                          return '-';
+                      }
+                  }
+              }
+          ]
+      });
+  }
+  ```
