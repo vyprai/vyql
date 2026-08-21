@@ -1,0 +1,13 @@
+module bindings.javascript.rsa_keygen_modulus_length;
+
+// A bignum RSA key generation loop: two probable primes, a modulus, then the
+// private exponent and the CRT parameters. The modulus of two primes whose bit
+// lengths sum to the requested size can be one bit shorter than requested, so
+// the loop has to compare the modulus bit length against the request and retry.
+// bitLength, testBit and setBit are the accessors a jsbn-style BigInteger
+// offers for that comparison; none of them present means the size is never
+// checked.
+binding rsaKeyGenerationModulusLengthUnchecked {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.call, ["isProbablePrime", "probablePrime"]) and node.context.call contains "modInverse" and node.context.call contains "multiply" and not (containsAny(node.context.call, ["bitLength", "bitCount", "setBit", "testBit", "byteLength"]))
+  emit issue code.RsaKeyGenerationModulusLengthUnchecked at node
+}

@@ -1,0 +1,87 @@
+# Rank 1245 / CVE-2020-14968: jsrsasign's RSAGenerate accepted the product of
+# two primes as the modulus without checking its bit length, so a caller asking
+# for a 1024-bit key could receive a 1023-bit one.
+
+test "rank1245: RSA key generation derives the private key without a modulus length check"
+  lang javascript
+  expect VYQL-CRY-040
+  expect_review code.RsaKeyGenerationModulusLengthUnchecked
+  code
+  ```
+  function RSAGenerate(B,E) {
+    var rng = new SecureRandom();
+    var qs = B>>1;
+    this.e = parseInt(E,16);
+    var ee = new BigInteger(E,16);
+    for(;;) {
+      for(;;) {
+        this.p = new BigInteger(B-qs,1,rng);
+        if(this.p.subtract(BigInteger.ONE).gcd(ee).compareTo(BigInteger.ONE) == 0 && this.p.isProbablePrime(10)) break;
+      }
+      for(;;) {
+        this.q = new BigInteger(qs,1,rng);
+        if(this.q.subtract(BigInteger.ONE).gcd(ee).compareTo(BigInteger.ONE) == 0 && this.q.isProbablePrime(10)) break;
+      }
+      if(this.p.compareTo(this.q) <= 0) {
+        var t = this.p;
+        this.p = this.q;
+        this.q = t;
+      }
+      var p1 = this.p.subtract(BigInteger.ONE);
+      var q1 = this.q.subtract(BigInteger.ONE);
+      var phi = p1.multiply(q1);
+      if(phi.gcd(ee).compareTo(BigInteger.ONE) == 0) {
+        this.n = this.p.multiply(this.q);
+        this.d = ee.modInverse(phi);
+        this.dmp1 = this.d.mod(p1);
+        this.dmq1 = this.d.mod(q1);
+        this.coeff = this.q.modInverse(this.p);
+        break;
+      }
+    }
+    this.isPrivate = true;
+  }
+  ```
+
+test "rank1245: a modulus bit length check against the requested size suppresses the finding"
+  lang javascript
+  reject VYQL-CRY-040
+  reject_review code.RsaKeyGenerationModulusLengthUnchecked
+  code
+  ```
+  function RSAGenerate(B,E) {
+    var rng = new SecureRandom();
+    var qs = B>>1;
+    this.e = parseInt(E,16);
+    var ee = new BigInteger(E,16);
+    for(;;) {
+      for(;;) {
+        this.p = new BigInteger(B-qs,1,rng);
+        if(this.p.subtract(BigInteger.ONE).gcd(ee).compareTo(BigInteger.ONE) == 0 && this.p.isProbablePrime(10)) break;
+      }
+      for(;;) {
+        this.q = new BigInteger(qs,1,rng);
+        if(this.q.subtract(BigInteger.ONE).gcd(ee).compareTo(BigInteger.ONE) == 0 && this.q.isProbablePrime(10)) break;
+      }
+      if(this.p.compareTo(this.q) <= 0) {
+        var t = this.p;
+        this.p = this.q;
+        this.q = t;
+      }
+      var p1 = this.p.subtract(BigInteger.ONE);
+      var q1 = this.q.subtract(BigInteger.ONE);
+      var phi = p1.multiply(q1);
+      if(phi.gcd(ee).compareTo(BigInteger.ONE) == 0) {
+        this.n = this.p.multiply(this.q);
+        if (this.n.bitLength() == B) {
+          this.d = ee.modInverse(phi);
+          this.dmp1 = this.d.mod(p1);
+          this.dmq1 = this.d.mod(q1);
+          this.coeff = this.q.modInverse(this.p);
+          break;
+        }
+      }
+    }
+    this.isPrivate = true;
+  }
+  ```

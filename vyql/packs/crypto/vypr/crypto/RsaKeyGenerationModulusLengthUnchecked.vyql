@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule RsaKeyGenerationModulusLengthUnchecked {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_326, CWE_1240]
+    id: "VYQL-CRY-040"
+    severity: medium
+  }
+  issue code.RsaKeyGenerationModulusLengthUnchecked as keygen
+}
