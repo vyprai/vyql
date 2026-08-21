@@ -1,0 +1,71 @@
+# Rank 1096 / CVE-2023-44398: exiv2's Brotli decompression loop can clamp
+# `uncompressedLen` below the accumulated `total_out`, so an unsigned
+# `available_out` subtraction wraps and the decoder writes past the buffer
+# (CWE-787).
+#
+# ATTENTION: not mechanical. The defect is a multi-iteration size invariant, not
+# a single index guard. Both snippets reject VYQL-MEM-002.
+#
+# verify_current_expected: attention-not-mechanical
+
+test "rank1096: the DoS cap clamps the target size before checking accumulated output"
+  lang cpp
+  file src/bmffimage.cpp
+  reject VYQL-MEM-002
+  code
+  ```
+  void BmffImage::brotliUncompress(const byte* compressedBuf, size_t compressedBufSize, DataBuf& arr) {
+    size_t uncompressedLen = compressedBufSize * 2;
+    int dos = 0;
+    size_t available_out;
+    byte* next_out;
+    size_t total_out = 0;
+
+    do {
+      arr.alloc(uncompressedLen);
+      available_out = uncompressedLen - total_out;
+      next_out = arr.data() + total_out;
+      BrotliDecoderResult result = BrotliDecoderDecompressStream(
+          decoder.get(), &available_in, &next_in, &available_out, &next_out, &total_out);
+      if (result == BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT) {
+        uncompressedLen *= 2;
+        if (uncompressedLen > 131072) {
+          if (++dos > 1)
+            break;
+          uncompressedLen = 131072;
+        }
+      }
+    } while (true);
+  }
+  ```
+
+test "rank1096: the fixed revision also breaks when accumulated output exceeds the cap"
+  lang cpp
+  file src/bmffimage.cpp
+  reject VYQL-MEM-002
+  code
+  ```
+  void BmffImage::brotliUncompress(const byte* compressedBuf, size_t compressedBufSize, DataBuf& arr) {
+    size_t uncompressedLen = compressedBufSize * 2;
+    int dos = 0;
+    size_t available_out;
+    byte* next_out;
+    size_t total_out = 0;
+
+    do {
+      arr.alloc(uncompressedLen);
+      available_out = uncompressedLen - total_out;
+      next_out = arr.data() + total_out;
+      BrotliDecoderResult result = BrotliDecoderDecompressStream(
+          decoder.get(), &available_in, &next_in, &available_out, &next_out, &total_out);
+      if (result == BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT) {
+        uncompressedLen *= 2;
+        if (uncompressedLen > 131072) {
+          if (++dos > 1 || total_out > 131072)
+            break;
+          uncompressedLen = 131072;
+        }
+      }
+    } while (true);
+  }
+  ```

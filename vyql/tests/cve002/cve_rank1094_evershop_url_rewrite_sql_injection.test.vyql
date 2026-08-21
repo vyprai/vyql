@@ -1,0 +1,85 @@
+# Rank 1094 / CVE-2026-25993: Evershop rebuilds url_rewrite rows by
+# interpolating the category path and URL key into a raw SQL string passed to
+# `@evershop/postgres-query-builder`'s `execute(connection, query)` (CWE-89).
+#
+# FIXED. A library-gated SqlExecution binding anchors the SQL string at args[1]
+# for that import. The vulnerable snippet expects VYQL-INJ-001; the
+# parameterized fix rejects it; both argument-order probes on execute expect
+# the finding.
+#
+# verify_current_expected: fixed
+
+test "rank1094: the url key is interpolated into a raw SQL update"
+  lang javascript
+  file packages/evershop/src/modules/catalog/subscribers/category_updated/builUrlRewrite.ts
+  expect VYQL-INJ-001
+  code
+  ```
+  import { execute, select } from '@evershop/postgres-query-builder';
+  import { pool } from '../../../../lib/postgres/connection.js';
+
+  async function buildUrlReWrite(data) {
+    const { uuid: categoryUUid, url_key: path } = data;
+    const request = await getIncomingRequest();
+    const currentPath = { request_path: request.query.old_path };
+    if (currentPath) {
+      await execute(
+        pool,
+        `UPDATE url_rewrite SET request_path = REPLACE(request_path, '${currentPath.request_path}', '${path}') WHERE entity_type IN ('category', 'product') AND entity_uuid != '${categoryUUid}'`
+      );
+    }
+  }
+  ```
+
+test "rank1094: the fixed revision parameterizes the same update"
+  lang javascript
+  file packages/evershop/src/modules/catalog/subscribers/category_updated/builUrlRewrite.ts
+  reject VYQL-INJ-001
+  code
+  ```
+  import { select } from '@evershop/postgres-query-builder';
+  import { pool } from '../../../../lib/postgres/connection.js';
+
+  async function buildUrlReWrite(data) {
+    const { uuid: categoryUUid, url_key: path } = data;
+    const request = await getIncomingRequest();
+    const currentPath = { request_path: request.query.old_path };
+    if (currentPath) {
+      await pool.query(
+        `UPDATE url_rewrite SET request_path = REPLACE(request_path, $1, $2) WHERE entity_type IN ('category', 'product') AND entity_uuid != $3`,
+        [currentPath.request_path, path, categoryUUid]
+      );
+    }
+  }
+  ```
+
+# The argument-position pair. Same execute() call from the same library;
+# only which position carries the tainted value differs.
+
+test "rank1094: a tainted SQL string in evershop's execute(connection, query) reports"
+  lang javascript
+  file args1.ts
+  expect VYQL-INJ-001
+  code
+  ```
+  import { execute } from '@evershop/postgres-query-builder';
+
+  async function handler(request) {
+    const path = request.body.url_key;
+    await execute(pool, `UPDATE url_rewrite SET request_path = '${path}' WHERE id = 1`);
+  }
+  ```
+
+test "rank1094: the same call with the connection argument tainted instead"
+  lang javascript
+  file args0.ts
+  expect VYQL-INJ-001
+  code
+  ```
+  import { execute } from '@evershop/postgres-query-builder';
+
+  async function handler(request) {
+    const poolLike = request.body.pool;
+    await execute(poolLike, "SELECT 1");
+  }
+  ```

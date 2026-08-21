@@ -1,0 +1,24 @@
+# Rank 1098 / CVE-2026-33979: express-xss-sanitizer treats an explicit empty
+# `allowedTags: []` or `allowedAttributes: {}` as unset and falls back to
+# sanitize-html's permissive defaults (CWE-79, CWE-183).
+#
+# CAUGHT by omission: `sanitize()` is not a known HtmlEscape control, so an
+# HTML-render sink downstream expects VYQL-INJ-004 on the empty-allowlist call.
+# The same unrecognized call would still report on the fixed library version.
+#
+# verify_current_expected: caught-by-omission
+
+test "rank1098: sanitize is called with an explicit empty allowlist"
+  lang javascript
+  file app.js
+  expect VYQL-INJ-004
+  code
+  ```
+  const { sanitize } = require('express-xss-sanitizer');
+
+  function handler(req, res) {
+    const bio = req.query.bio;
+    const clean = sanitize(bio, { allowedTags: [], allowedAttributes: {} });
+    res.send('<div>' + clean + '</div>');
+  }
+  ```

@@ -1,0 +1,88 @@
+# Rank 1091 / CVE-2022-29226: Envoy's OAuth2 filter treats the mere presence of
+# a client-supplied Authorization: Bearer header (or token= query param) as
+# proof of authentication, with no validation call (CWE-306).
+#
+# ATTENTION: vocabulary gap. This is a control-flow decision on credential
+# presence, not a taint-to-sink flow; existing JWT/token/hop-by-hop concepts do
+# not fit. Both snippets reject VYQL-AUTH-108.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1091: a bearer header alone finishes the auth flow"
+  lang cpp
+  file source/extensions/filters/http/oauth2/filter.cc
+  reject VYQL-AUTH-108
+  code
+  ```
+  #include <string>
+
+  namespace Envoy {
+  namespace Extensions {
+  namespace HttpFilters {
+  namespace Oauth2 {
+
+  std::string OAuth2Filter::extractAccessToken(const Http::RequestHeaderMap& headers) const {
+    const Http::HeaderEntry* authorization = headers.getInline(authorization_handle.handle());
+    if (authorization != nullptr) {
+      const auto value = StringUtil::trim(authorization->value().getStringView());
+      const auto& bearer_prefix = bearerPrefix();
+      if (absl::StartsWithIgnoreCase(value, bearer_prefix)) {
+        const size_t start = bearer_prefix.length();
+        return std::string(StringUtil::ltrim(value.substr(start)));
+      }
+    }
+    return EMPTY_STRING;
+  }
+
+  Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+    access_token_ = extractAccessToken(headers);
+    if (!access_token_.empty()) {
+      found_bearer_token_ = true;
+      finishFlow();
+      return Http::FilterHeadersStatus::Continue;
+    }
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  void OAuth2Filter::finishFlow() {
+    if (found_bearer_token_) {
+      config_->stats().oauth_success_.inc();
+      decoder_callbacks_->continueDecoding();
+      return;
+    }
+  }
+
+  }}}}
+  ```
+
+test "rank1091: the incoming header is stripped and the cookie flow is the only path"
+  lang cpp
+  file source/extensions/filters/http/oauth2/filter.cc
+  reject VYQL-AUTH-108
+  code
+  ```
+  #include <string>
+
+  namespace Envoy {
+  namespace Extensions {
+  namespace HttpFilters {
+  namespace Oauth2 {
+
+  Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+    headers.removeInline(authorization_handle.handle());
+
+    if (!isCallbackRequest(headers)) {
+      redirectToAuthServer(headers);
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  void OAuth2Filter::finishFlow() {
+    setBearerCookieOnResponse();
+    decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_LOGGED_IN);
+    config_->stats().oauth_success_.inc();
+  }
+
+  }}}}
+  ```
