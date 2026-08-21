@@ -1,0 +1,9 @@
+module bindings.python.cookie_auth_origin_check;
+
+binding cookieAuthHandlerMissingPrepareOriginCheck {
+  requires {
+    dependency("tornado")
+  }
+  query pattern presenceNode where node.scope == "module" and node.context.language == "python" and node.context.callPath contains "get_secure_cookie" and not (containsAny(node.context.callPath, ["urlparse", "check_xsrf_cookie"])) and not (containsAny(node.context.literal, ["xsrf_cookies"]))
+  emit issue code.CookieAuthHandlerMissingPrepareOriginCheck at node
+}

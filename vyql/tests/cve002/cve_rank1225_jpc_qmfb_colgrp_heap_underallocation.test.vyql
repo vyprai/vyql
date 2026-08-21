@@ -1,0 +1,126 @@
+# Rank 1225 / CVE-2016-8654 (GHSA-fvh8-26m7-hp86): JasPer's QMFB (quadrature
+# mirror filter bank) column-group split functions in
+# src/libjasper/jpc/jpc_qmfb.c use a fixed-size stack array,
+# `splitbuf[QMFB_SPLITBUFSIZE * JPC_QMFB_COLGRPSIZE]`, as the common-case
+# scratch buffer and fall back to a heap allocation only when `bufsize`
+# exceeds that stack capacity. The stack declaration correctly multiplies by
+# `JPC_QMFB_COLGRPSIZE` because every element the function writes is a whole
+# column group (`JPC_QMFB_COLGRPSIZE` samples), but the heap fallback in
+# `jpc_qmfb_split_colgrp` called `jas_alloc2(bufsize, sizeof(jpc_fix_t))` --
+# `bufsize` samples, not `bufsize` column groups -- so a crafted JPC codestream
+# with enough rows to force the heap path got a buffer `JPC_QMFB_COLGRPSIZE`
+# times too small while the write loop kept advancing by
+# `JPC_QMFB_COLGRPSIZE` samples per iteration, a heap buffer overflow
+# (CWE-119/CWE-787). `jpc_qmfb_split_colres` had the same
+# `jas_alloc2(bufsize, sizeof(jpc_fix_t))` call missing its `numcols`
+# multiplier. Fix 4a59cfaf9ab3d48fca4a15c0d2674bf7138e3d1a (verified: the
+# pool's jasper-software/jasper row carries the flag because the advisory
+# metadata lookup could not resolve the commit under that owner, but the
+# commit exists in the current jasper-software/jasper history unchanged and
+# its message, diff and regression PoC all match GHSA-fvh8-26m7-hp86 and
+# NVD's CVE-2016-8654 description verbatim) replaces both calls with
+# `jas_alloc3(bufsize, JPC_QMFB_COLGRPSIZE, sizeof(jpc_fix_t))` and
+# `jas_alloc3(bufsize, numcols, sizeof(jpc_fix_t))`, which multiply the extra
+# dimension into the allocation the way the stack array's declared size
+# already does; the `hstartcol` -> `hstartrow` rename in the same commit is
+# cosmetic.
+#
+# ATTENTION, engine gap. `vyql match` on a repro faithful to both revisions
+# of jpc_qmfb_split_colgrp labels nothing at all for the allocation call or
+# the stack array -- no source, sink, allocation-size, or buffer-size concept
+# fires on either revision, only an unrelated low-confidence VYQL-MEM-006
+# null-deref review that fires identically on both. A bounded scan of the
+# real checkout at the vulnerable commit (timeout 180, --max-ram 4GB,
+# --cache off; c:339) confirms the same: no finding anywhere in
+# src/libjasper/jpc/. The defect is a size mismatch between two independent
+# buffer declarations for the same logical buffer within one function -- the
+# stack array's declared size (`QMFB_SPLITBUFSIZE * JPC_QMFB_COLGRPSIZE`)
+# carries the correct multiplier and the heap allocation's size argument
+# (`bufsize`, alone) does not -- and judging that requires comparing two
+# size *expressions* symbolically, not labelling either call site in
+# isolation; no `unless` clause or missing binding closes that, because there
+# is no vocabulary yet for "this heap allocation's size expression omits a
+# multiplier present in the sibling stack declaration for the same buffer
+# variable." The two existing underallocation concepts closest by shape,
+# code.GzipDeflateFixedExpansionUnderallocation (VYQL-MEM stack) and
+# code.LengthMultiplierFormattedExpansionUnderallocation, both key off a
+# `node.analysis` tag that internal/extract/frontend/treesitter/c.go computes
+# as a hardcoded Go heuristic for their specific call shapes, not a binding
+# any documentation-only author could write -- confirming this class of bug
+# is handled at the engine layer in this codebase, not the binding layer, and
+# extending it needs a new Go-side heuristic (or a general size-expression
+# comparison relation) rather than a data workaround here. No binding,
+# concept, or rule change was attempted.
+
+test "rank1225: heap fallback buffer for split_colgrp omits the column-group multiplier"
+  lang c
+  reject VYQL-MEM-021
+  file jpc_qmfb.c
+  ```
+  void jpc_qmfb_split_colgrp(jpc_fix_t *a, int numrows, int stride,
+    int parity)
+  {
+  	int bufsize = JPC_CEILDIVPOW2(numrows, 1);
+  	jpc_fix_t splitbuf[QMFB_SPLITBUFSIZE * JPC_QMFB_COLGRPSIZE];
+  	jpc_fix_t *buf = splitbuf;
+  	jpc_fix_t *dstptr;
+  	int n;
+  	int i;
+
+  	if (bufsize > QMFB_SPLITBUFSIZE) {
+  		if (!(buf = jas_alloc2(bufsize, sizeof(jpc_fix_t)))) {
+  			abort();
+  		}
+  	}
+
+  	n = numrows;
+  	dstptr = buf;
+  	while (n-- > 0) {
+  		for (i = 0; i < JPC_QMFB_COLGRPSIZE; ++i) {
+  			*dstptr = a[i];
+  			++dstptr;
+  		}
+  	}
+
+  	if (buf != splitbuf) {
+  		jas_free(buf);
+  	}
+  }
+  ```
+
+test "rank1225: heap fallback buffer for split_colgrp carries the column-group multiplier"
+  lang c
+  reject VYQL-MEM-021
+  file jpc_qmfb.c
+  ```
+  void jpc_qmfb_split_colgrp(jpc_fix_t *a, int numrows, int stride,
+    int parity)
+  {
+  	int bufsize = JPC_CEILDIVPOW2(numrows, 1);
+  	jpc_fix_t splitbuf[QMFB_SPLITBUFSIZE * JPC_QMFB_COLGRPSIZE];
+  	jpc_fix_t *buf = splitbuf;
+  	jpc_fix_t *dstptr;
+  	int n;
+  	int i;
+
+  	if (bufsize > QMFB_SPLITBUFSIZE) {
+  		if (!(buf = jas_alloc3(bufsize, JPC_QMFB_COLGRPSIZE,
+  		  sizeof(jpc_fix_t)))) {
+  			abort();
+  		}
+  	}
+
+  	n = numrows;
+  	dstptr = buf;
+  	while (n-- > 0) {
+  		for (i = 0; i < JPC_QMFB_COLGRPSIZE; ++i) {
+  			*dstptr = a[i];
+  			++dstptr;
+  		}
+  	}
+
+  	if (buf != splitbuf) {
+  		jas_free(buf);
+  	}
+  }
+  ```

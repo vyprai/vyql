@@ -1,0 +1,11 @@
+module code;
+
+concept CookieAuthHandlerMissingPrepareOriginCheck : issue {
+  cwe: [CWE_352, CWE_346]
+  reviewAssumption: "the handler's secure-cookie session authorizes state-changing requests made from a browser, including cross-site ones that carry the ambient cookie"
+  reviewCategory: csrf
+  reviewCondition: "a Tornado request handler authenticates callers from a secure session cookie but defines no prepare() hook to validate the request Origin before dispatch"
+  reviewConfidence: high
+  reviewEvidence: "handler module context {pattern} authenticates via get_secure_cookie and defines no prepare method"
+  vulnerableTo: [request_forgery.Csrf, access_control.OriginValidationError]
+}

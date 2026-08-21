@@ -1,0 +1,258 @@
+# Rank 1223 / CVE-2018-14721: jackson-databind's BeanDeserializerFactory
+# (src/main/java/com/fasterxml/jackson/databind/deser/BeanDeserializerFactory.java)
+# keeps a hardcoded denylist of classes its own deserializer refuses to
+# instantiate through polymorphic/default typing, DEFAULT_NO_DESER_CLASS_NAMES,
+# checked by checkIllegalTypes via the instance field it seeds once,
+# _cfgIllegalClassNames (CWE-184: incomplete blacklist). Fix
+# 87d29af25e82a249ea15858e2d4ecbf64091db44 (`git show`, VERSION and
+# BeanDeserializerFactory.java only) adds four class names research had shown
+# reachable through polymorphic deserialization gadget chains --
+# org.slf4j.ext.EventData, flex.messaging.util.concurrent.
+# AsynchBeansWorkManagerExecutor, com.sun.deploy.security.ruleset.DRSHelper,
+# org.apache.axis2.jaxws.spi.handler.HandlerResolverImpl -- the last of which
+# triggers an outbound WSDL fetch on instantiation, which is what earns this
+# CVE its CWE-918 (SSRF) tag alongside the advisory's CWE-502 lineage. No
+# other file changes.
+#
+# No flag on the pool row. Verified the commit is the real, targeted fix per
+# Step 0's note that flags are not the only source of pool errors: the diff
+# is exactly a release-notes line plus four `s.add(...)` calls appended to
+# the same static initializer the CVE's advisory names, nothing else.
+#
+# ATTENTION, engine gap. `vyql match` on the real file (both the pre-fix and
+# post-fix revision) labels no source or sink anywhere near the denylist or
+# checkIllegalTypes; the only evidence at all is
+# `_cfgIllegalClassNames.contains -> vyql.internal.NeutralizerAssumption`, a
+# generic control marker that says "this call looks like a containment
+# check", not anything that judges whether the checked set is complete.
+#
+# The shape needed to catch this already exists and already ships: a
+# class-scope presence binding keying on the class name, an identifier a
+# method in that class references, and the literal set the class's own
+# denylist field holds -- exactly what code.H2oJdbcDisallowedParameterDenylistGap
+# / VYQL-INJ-205 (rank 1156, vyql/bindings/java/m420f6b67.vyql binding
+# h2oJdbcDisallowedParameterDenylistGap458) already does for H2O's
+# SQLManager. Building the identical binding for BeanDeserializerFactory,
+# class name "BeanDeserializerFactory", identifier "_cfgIllegalClassNames"
+# (the field checkIllegalTypes actually reads -- no method in this class
+# refers to DEFAULT_NO_DESER_CLASS_NAMES by its own name), and the same
+# missing-literal-set shape, fires correctly on a trimmed repro that mirrors
+# the real class's structure. It does not fire on the real file. Instrumenting
+# lowering.go's classContextAnalysisEvent directly and scanning the real,
+# unmodified BeanDeserializerFactory.java (898 lines) shows why:
+# memberTokens for this class hits exactly 512 entries -- the hardcoded cap
+# in classMemberContextTokens (internal/extract/lowering/lowering.go:1330,
+# `if len(tokens) > 512 { return tokens[:512] }`) and the same limit in
+# classContextAnalysisEvent's own `add` closure (lowering.go:1267,
+# `len(tokens) >= 512`) -- before the walk ever reaches checkIllegalTypes,
+# one of the last methods declared in this ~40-method class. The token
+# `identifier:_cfgIllegalClassNames` that the binding's condition needs is
+# never added to the set the query engine evaluates against, so no vocabulary
+# or binding, however precisely aimed, can see it. (No definition change
+# ships with this rank -- the binding above was built and tested to
+# characterize the gap, then reverted.)
+#
+# Isolated CVE-independently, using the already-shipped VYQL-INJ-205
+# pipeline and no jackson-databind vocabulary at all: H2O's own SQLManager,
+# padded with unrelated methods ahead of validateJdbcUrl (same
+# DEFAULT_JDBC_DISALLOWED_PARAMETERS field and check, untouched), stops
+# firing once enough padding methods precede it. 3 padding methods still
+# fires; 14 does not -- both below, as the test pair. This confirms the cap
+# is a general per-class token budget, not anything about jackson's own
+# class shape, this CVE's vocabulary, or a binding that does not yet exist.
+#
+# Scanning the real checkout (bounded, timeout 180, --max-ram 4GB, --cache
+# off) confirms the same absence at scale: both revisions report 46
+# findings (36 at or above high), an identical set of rule IDs on both, and
+# neither output names BeanDeserializerFactory.java anywhere.
+#
+# Raising or removing the 512-token cap is a small diff -- two constants,
+# one file -- but not a bounded, risk-free one: an unbounded (or much
+# larger) per-class token budget changes what every other class-scope
+# binding already shipped sees on every large real class in the corpus, not
+# just this one, and needs to be weighed against scan cost and precision
+# across the whole benchmark before it ships, not bumped in isolation inside
+# this rank's review. Recorded here rather than attempted.
+#
+# verify_current_expected: attention-engine-gap, isolating pair below.
+
+test "rank1223: H2O's SQLManager denylist check, with 3 unrelated methods ahead of it, is still caught"
+  lang java
+  file h2o-core/src/main/java/water/jdbc/SQLManager.java
+  expect VYQL-INJ-205
+  code
+  ```
+  package water.jdbc;
+
+  import java.util.List;
+  import java.util.stream.Collectors;
+  import java.util.stream.Stream;
+
+  public class SQLManager {
+
+    private static final List<String> DEFAULT_JDBC_DISALLOWED_PARAMETERS = Stream.of(
+            "autoDeserialize", "queryInterceptors", "allowLoadLocalInfile", "allowMultiQueries",
+            "allowLoadLocalInfileInPath", "allowUrlInLocalInfile", "allowPublicKeyRetrieval",
+            "init", "script", "shutdown"
+    ).map(String::toLowerCase).collect(Collectors.toList());
+
+    public void paddingMethod0(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 0 does some unrelated logging work here");
+        String local0 = argOne + argTwo + argThree;
+        if (local0.length() > 3) {
+            System.out.println("branch taken in padding method 0 for extra token volume");
+        }
+    }
+    public void paddingMethod1(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 1 does some unrelated logging work here");
+        String local1 = argOne + argTwo + argThree;
+        if (local1.length() > 3) {
+            System.out.println("branch taken in padding method 1 for extra token volume");
+        }
+    }
+    public void paddingMethod2(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 2 does some unrelated logging work here");
+        String local2 = argOne + argTwo + argThree;
+        if (local2.length() > 3) {
+            System.out.println("branch taken in padding method 2 for extra token volume");
+        }
+    }
+
+    public static void validateJdbcUrl(String jdbcUrl) {
+        for (String key : parseParameterNames(jdbcUrl)) {
+            if (DEFAULT_JDBC_DISALLOWED_PARAMETERS.contains(key.toLowerCase())) {
+                throw new IllegalArgumentException("Potentially dangerous JDBC parameter found: " + key);
+            }
+        }
+    }
+  }
+  ```
+
+test "rank1223: the identical denylist check, with 14 unrelated methods ahead of it, is invisible"
+  lang java
+  file h2o-core/src/main/java/water/jdbc/SQLManager.java
+  reject VYQL-INJ-205
+  code
+  ```
+  package water.jdbc;
+
+  import java.util.List;
+  import java.util.stream.Collectors;
+  import java.util.stream.Stream;
+
+  public class SQLManager {
+
+    private static final List<String> DEFAULT_JDBC_DISALLOWED_PARAMETERS = Stream.of(
+            "autoDeserialize", "queryInterceptors", "allowLoadLocalInfile", "allowMultiQueries",
+            "allowLoadLocalInfileInPath", "allowUrlInLocalInfile", "allowPublicKeyRetrieval",
+            "init", "script", "shutdown"
+    ).map(String::toLowerCase).collect(Collectors.toList());
+
+    public void paddingMethod0(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 0 does some unrelated logging work here");
+        String local0 = argOne + argTwo + argThree;
+        if (local0.length() > 3) {
+            System.out.println("branch taken in padding method 0 for extra token volume");
+        }
+    }
+    public void paddingMethod1(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 1 does some unrelated logging work here");
+        String local1 = argOne + argTwo + argThree;
+        if (local1.length() > 3) {
+            System.out.println("branch taken in padding method 1 for extra token volume");
+        }
+    }
+    public void paddingMethod2(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 2 does some unrelated logging work here");
+        String local2 = argOne + argTwo + argThree;
+        if (local2.length() > 3) {
+            System.out.println("branch taken in padding method 2 for extra token volume");
+        }
+    }
+    public void paddingMethod3(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 3 does some unrelated logging work here");
+        String local3 = argOne + argTwo + argThree;
+        if (local3.length() > 3) {
+            System.out.println("branch taken in padding method 3 for extra token volume");
+        }
+    }
+    public void paddingMethod4(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 4 does some unrelated logging work here");
+        String local4 = argOne + argTwo + argThree;
+        if (local4.length() > 3) {
+            System.out.println("branch taken in padding method 4 for extra token volume");
+        }
+    }
+    public void paddingMethod5(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 5 does some unrelated logging work here");
+        String local5 = argOne + argTwo + argThree;
+        if (local5.length() > 3) {
+            System.out.println("branch taken in padding method 5 for extra token volume");
+        }
+    }
+    public void paddingMethod6(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 6 does some unrelated logging work here");
+        String local6 = argOne + argTwo + argThree;
+        if (local6.length() > 3) {
+            System.out.println("branch taken in padding method 6 for extra token volume");
+        }
+    }
+    public void paddingMethod7(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 7 does some unrelated logging work here");
+        String local7 = argOne + argTwo + argThree;
+        if (local7.length() > 3) {
+            System.out.println("branch taken in padding method 7 for extra token volume");
+        }
+    }
+    public void paddingMethod8(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 8 does some unrelated logging work here");
+        String local8 = argOne + argTwo + argThree;
+        if (local8.length() > 3) {
+            System.out.println("branch taken in padding method 8 for extra token volume");
+        }
+    }
+    public void paddingMethod9(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 9 does some unrelated logging work here");
+        String local9 = argOne + argTwo + argThree;
+        if (local9.length() > 3) {
+            System.out.println("branch taken in padding method 9 for extra token volume");
+        }
+    }
+    public void paddingMethod10(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 10 does some unrelated logging work here");
+        String local10 = argOne + argTwo + argThree;
+        if (local10.length() > 3) {
+            System.out.println("branch taken in padding method 10 for extra token volume");
+        }
+    }
+    public void paddingMethod11(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 11 does some unrelated logging work here");
+        String local11 = argOne + argTwo + argThree;
+        if (local11.length() > 3) {
+            System.out.println("branch taken in padding method 11 for extra token volume");
+        }
+    }
+    public void paddingMethod12(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 12 does some unrelated logging work here");
+        String local12 = argOne + argTwo + argThree;
+        if (local12.length() > 3) {
+            System.out.println("branch taken in padding method 12 for extra token volume");
+        }
+    }
+    public void paddingMethod13(String argOne, String argTwo, String argThree) {
+        System.out.println("padding method number 13 does some unrelated logging work here");
+        String local13 = argOne + argTwo + argThree;
+        if (local13.length() > 3) {
+            System.out.println("branch taken in padding method 13 for extra token volume");
+        }
+    }
+
+    public static void validateJdbcUrl(String jdbcUrl) {
+        for (String key : parseParameterNames(jdbcUrl)) {
+            if (DEFAULT_JDBC_DISALLOWED_PARAMETERS.contains(key.toLowerCase())) {
+                throw new IllegalArgumentException("Potentially dangerous JDBC parameter found: " + key);
+            }
+        }
+    }
+  }
+  ```
