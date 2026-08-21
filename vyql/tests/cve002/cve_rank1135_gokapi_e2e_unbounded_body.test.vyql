@@ -1,0 +1,72 @@
+# Rank 1135 / CVE-2026-30955: Gokapi's E2E metadata-store API decodes the raw
+# HTTP request body as JSON with no size limit, so a large body can exhaust
+# server memory (CWE-400).
+#
+# ATTENTION: vocabulary gap. code.ConduitHyperUnboundedBodyToBytes matches the
+# shape but is scoped to one Rust framework; there is no generic concept for
+# decoding an HTTP body without a MaxBytesReader-equivalent cap. Both snippets
+# reject.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1135: the e2e metadata body is decoded with no size limit"
+  lang go
+  file routing.go
+  reject_review code.ConduitHyperUnboundedBodyToBytes
+  code
+  ```
+  package api
+
+  import (
+      "encoding/json"
+      "net/http"
+  )
+
+  type paramE2eStore struct{}
+
+  func (p *paramE2eStore) ProcessParameter(r *http.Request) error {
+      type expectedInput struct {
+          Content string `json:"content"`
+      }
+      var input expectedInput
+
+      err := json.NewDecoder(r.Body).Decode(&input)
+      if err != nil {
+          return err
+      }
+      return nil
+  }
+  ```
+
+test "rank1135: the body is wrapped in MaxBytesReader before decoding"
+  lang go
+  file routing.go
+  reject_review code.ConduitHyperUnboundedBodyToBytes
+  code
+  ```
+  package api
+
+  import (
+      "encoding/json"
+      "net/http"
+  )
+
+  type paramE2eStore struct{}
+
+  func (p *paramE2eStore) ProcessParameter(r *http.Request) error {
+      const maxBodySize = 5 * 1024 * 1024
+      bodyReader := http.MaxBytesReader(nil, r.Body, maxBodySize)
+      defer bodyReader.Close()
+
+      type expectedInput struct {
+          Content string `json:"content"`
+      }
+      var input expectedInput
+
+      err := json.NewDecoder(bodyReader).Decode(&input)
+      if err != nil {
+          return err
+      }
+      return nil
+  }
+  ```

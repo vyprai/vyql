@@ -3922,3 +3922,8 @@ binding htmlRenderHrefWrite {
   query pattern callExpr where callee.path ~= "href"
   emit sink code.HtmlRender at args[0]
 }
+
+binding csvFormulaProneExportRow900 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "Papa.unparse" and not (node.context.literal contains "escapeFormulae")
+  emit issue code.CsvFormulaProneExportRow at node
+}

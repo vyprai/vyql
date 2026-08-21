@@ -1,0 +1,56 @@
+# Rank 1136 / CVE-2020-24707: gophish's campaign-results CSV export writes
+# attacker-influenced fields through Papa.unparse with no formula-character
+# escaping, so values starting with `=`, `+`, `-`, or `@` become live
+# spreadsheet formulas (CWE-1236).
+#
+# VYQL-INJ-121 fires on Papa.unparse without an `escapeFormulae` option and
+# separates the revisions. Vulnerable snippet expects the finding; fixed
+# snippet rejects it.
+#
+# verify_current_expected: current-behavior
+
+test "rank1136: the CSV export uses PapaParse's default, unescaped config"
+  lang javascript
+  file campaign_results.js
+  expect VYQL-INJ-121
+  code
+  ```
+  function exportAsCSV(scope) {
+    var csvScope = scope.results.map(function (result) {
+      return {
+        "First Name": result.first_name,
+        "Last Name": result.last_name,
+        "Email": result.email,
+        "Status": result.status,
+      }
+    })
+    var csvString = Papa.unparse(csvScope, {})
+    var csvData = new Blob([csvString], {
+      type: 'text/csv;charset=utf-8;'
+    });
+  }
+  ```
+
+test "rank1136: the CSV export escapes formula-trigger characters"
+  lang javascript
+  file campaign_results.js
+  reject VYQL-INJ-121
+  code
+  ```
+  function exportAsCSV(scope) {
+    var csvScope = scope.results.map(function (result) {
+      return {
+        "First Name": result.first_name,
+        "Last Name": result.last_name,
+        "Email": result.email,
+        "Status": result.status,
+      }
+    })
+    var csvString = Papa.unparse(csvScope, {
+      'escapeFormulae': true
+    })
+    var csvData = new Blob([csvString], {
+      type: 'text/csv;charset=utf-8;'
+    });
+  }
+  ```

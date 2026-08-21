@@ -1,0 +1,73 @@
+# Rank 1134 / CVE-2024-56731: Gogs' web editor blocks `.git` in the request
+# path text but never checks whether the resolved filesystem entry is a
+# symlink, so a working-tree symlink into `.git` lets a low-privileged user
+# delete or overwrite repository metadata (CWE-552).
+#
+# ATTENTION: vocabulary gap. Nothing states that a filesystem-modifying
+# operation guarded only by request-path text must also reject a symlink at
+# the resolved entry; archive-symlink concepts cover a different call shape.
+# Both snippets reject VYQL-PATH-012.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1134: the delete path is checked as a string, never as a resolved filesystem entry"
+  lang go
+  file repo_editor.go
+  reject VYQL-PATH-012
+  code
+  ```
+  package database
+
+  import (
+      "fmt"
+      "os"
+      "path"
+  )
+
+  func (r *Repository) DeleteRepoFile(doer *User, opts DeleteRepoFileOptions) (err error) {
+      if isRepositoryGitPath(opts.TreePath) {
+          return fmt.Errorf("bad tree path %q", opts.TreePath)
+      }
+
+      localPath := r.LocalCopyPath()
+      if err = os.Remove(path.Join(localPath, opts.TreePath)); err != nil {
+          return fmt.Errorf("remove file %q: %v", opts.TreePath, err)
+      }
+      return nil
+  }
+  ```
+
+test "rank1134: the resolved filesystem entry is checked for a symlink before removal"
+  lang go
+  file repo_editor.go
+  reject VYQL-PATH-012
+  code
+  ```
+  package database
+
+  import (
+      "fmt"
+      "os"
+      "path"
+
+      "gogs.io/gogs/internal/osutil"
+  )
+
+  func (r *Repository) DeleteRepoFile(doer *User, opts DeleteRepoFileOptions) (err error) {
+      if isRepositoryGitPath(opts.TreePath) {
+          return fmt.Errorf("bad tree path %q", opts.TreePath)
+      }
+
+      localPath := r.LocalCopyPath()
+      filePath := path.Join(localPath, opts.TreePath)
+
+      if osutil.IsSymlink(filePath) {
+          return fmt.Errorf("cannot delete symbolic link: %s", opts.TreePath)
+      }
+
+      if err = os.Remove(filePath); err != nil {
+          return fmt.Errorf("remove file %q: %v", opts.TreePath, err)
+      }
+      return nil
+  }
+  ```

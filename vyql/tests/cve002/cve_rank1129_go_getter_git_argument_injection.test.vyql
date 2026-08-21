@@ -1,0 +1,55 @@
+# Rank 1129 / CVE-2024-3817: go-getter passes an attacker-controlled source URL
+# as a positional git argv entry with no `--` terminator, so a URL beginning
+# with a dash is read as a git option (CWE-88).
+#
+# ATTENTION: vocabulary gap. code.CommandLineAssemblyReview matches the CWE
+# and mechanism but is bound only in Python and C; Go has no binding for an
+# argv append without an argument terminator. Both snippets reject.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1129: the source URL is appended with nothing marking it positional"
+  lang go
+  file get_git.go
+  reject_review code.CommandLineAssemblyReview
+  code
+  ```
+  package getter
+
+  import (
+      "context"
+      "net/url"
+      "os/exec"
+  )
+
+  func (g *GitGetter) clone(ctx context.Context, dst, sshKeyFile string, u *url.URL) (*exec.Cmd, error) {
+      args := []string{"clone"}
+      args = append(args, u.String(), dst)
+
+      cmd := exec.CommandContext(ctx, "git", args...)
+      return cmd, nil
+  }
+  ```
+
+test "rank1129: an argument terminator marks the URL positional before it's used"
+  lang go
+  file get_git.go
+  reject_review code.CommandLineAssemblyReview
+  code
+  ```
+  package getter
+
+  import (
+      "context"
+      "net/url"
+      "os/exec"
+  )
+
+  func (g *GitGetter) clone(ctx context.Context, dst, sshKeyFile string, u *url.URL) (*exec.Cmd, error) {
+      args := []string{"clone"}
+      args = append(args, "--", u.String(), dst)
+
+      cmd := exec.CommandContext(ctx, "git", args...)
+      return cmd, nil
+  }
+  ```

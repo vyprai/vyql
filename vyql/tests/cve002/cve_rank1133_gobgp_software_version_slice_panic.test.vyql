@@ -1,0 +1,57 @@
+# Rank 1133 / CVE-2025-43971: gobgp's BGP OPEN SoftwareVersion parser accepts a
+# declared length of zero, so `data[1:0]` panics when the slice low bound
+# exceeds its high bound and crashes the speaker (CWE-193).
+#
+# ATTENTION: engine gap. Go has no slice-bound analysis; VYQL-MEM-002 states
+# an unbounded copy into a destination, the inverse of internally inconsistent
+# slice bounds. Both snippets reject VYQL-MEM-002.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1133: a declared length of zero produces an invalid slice expression"
+  lang go
+  file bgp.go
+  reject VYQL-MEM-002
+  code
+  ```
+  package bgp
+
+  func (c *CapSoftwareVersion) DecodeFromBytes(data []byte) error {
+      c.DefaultParameterCapability.DecodeFromBytes(data)
+      data = data[2:]
+      if len(data) < 2 {
+          return NewMessageError(BGP_ERROR_OPEN_MESSAGE_ERROR, BGP_ERROR_SUB_UNSUPPORTED_CAPABILITY, nil, "Not all CapabilitySoftwareVersion bytes allowed")
+      }
+      softwareVersionLen := uint8(data[0])
+      if len(data[1:]) < int(softwareVersionLen) || softwareVersionLen > 64 {
+          return NewMessageError(BGP_ERROR_OPEN_MESSAGE_ERROR, BGP_ERROR_SUB_UNSUPPORTED_CAPABILITY, nil, "invalid length of software version capablity")
+      }
+      c.SoftwareVersionLen = softwareVersionLen
+      c.SoftwareVersion = string(data[1:c.SoftwareVersionLen])
+      return nil
+  }
+  ```
+
+test "rank1133: a declared length of zero is rejected before the slice expression runs"
+  lang go
+  file bgp.go
+  reject VYQL-MEM-002
+  code
+  ```
+  package bgp
+
+  func (c *CapSoftwareVersion) DecodeFromBytes(data []byte) error {
+      c.DefaultParameterCapability.DecodeFromBytes(data)
+      data = data[2:]
+      if len(data) < 2 {
+          return NewMessageError(BGP_ERROR_OPEN_MESSAGE_ERROR, BGP_ERROR_SUB_UNSUPPORTED_CAPABILITY, nil, "Not all CapabilitySoftwareVersion bytes allowed")
+      }
+      softwareVersionLen := uint8(data[0])
+      if len(data[1:]) < int(softwareVersionLen) || softwareVersionLen > 64 || softwareVersionLen == 0 {
+          return NewMessageError(BGP_ERROR_OPEN_MESSAGE_ERROR, BGP_ERROR_SUB_UNSUPPORTED_CAPABILITY, nil, "invalid length of software version capablity")
+      }
+      c.SoftwareVersionLen = softwareVersionLen
+      c.SoftwareVersion = string(data[1:c.SoftwareVersionLen])
+      return nil
+  }
+  ```
