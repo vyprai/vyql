@@ -1,0 +1,74 @@
+# Rank 1074 / CVE-2021-39225: Nextcloud Deck lets any authenticated user read a
+# stack, and the cards on it, by asking for its id with no check that the caller
+# may see that board (CWE-639, CWE-862).
+#
+# ATTENTION: vocabulary gap. PermissionService::checkPermission is unbound as
+# core.AuthorizationCheck, and code.IdorPolicyReview (VYQL-AUTH-081) has only
+# project-keyed PHP presence bindings. Both snippets reject VYQL-AUTH-081.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1074: a stack is read by id with no permission check"
+  lang php
+  file lib/Service/StackService.php
+  reject VYQL-AUTH-081
+  code
+  ```
+  <?php
+
+  namespace OCA\Deck\Service;
+
+  use OCA\Deck\BadRequestException;
+
+  class StackService {
+      private $stackMapper;
+      private $cardMapper;
+      private $permissionService;
+
+      public function find($stackId) {
+          if (is_numeric($stackId) === false) {
+              throw new BadRequestException('stack id must be a number');
+          }
+
+          $stack = $this->stackMapper->find($stackId);
+          $cards = $this->cardMapper->findAll($stackId);
+          $stack->setCards($cards);
+
+          return $stack;
+      }
+  }
+  ```
+
+test "rank1074: the same read behind the permission check"
+  lang php
+  file lib/Service/StackService.php
+  reject VYQL-AUTH-081
+  code
+  ```
+  <?php
+
+  namespace OCA\Deck\Service;
+
+  use OCA\Deck\BadRequestException;
+  use OCA\Deck\Db\Acl;
+
+  class StackService {
+      private $stackMapper;
+      private $cardMapper;
+      private $permissionService;
+
+      public function find($stackId) {
+          if (is_numeric($stackId) === false) {
+              throw new BadRequestException('stack id must be a number');
+          }
+
+          $this->permissionService->checkPermission($this->stackMapper, $stackId, Acl::PERMISSION_READ);
+
+          $stack = $this->stackMapper->find($stackId);
+          $cards = $this->cardMapper->findAll($stackId);
+          $stack->setCards($cards);
+
+          return $stack;
+      }
+  }
+  ```

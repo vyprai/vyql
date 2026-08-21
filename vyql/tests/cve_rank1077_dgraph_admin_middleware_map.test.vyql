@@ -1,0 +1,74 @@
+# Rank 1077 / CVE-2026-34976: Dgraph's admin GraphQL endpoint runs one mutation
+# with no authorization middleware, because the operation is registered as a
+# resolver and left out of the middleware table (CWE-862).
+#
+# ATTENTION: analysis gap. Both maps are literals in one file; the property that
+# separates the revisions is set inclusion between them, which a call/presence
+# binding cannot compare. Both snippets reject VYQL-AUTH-081.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1077: a mutation is resolved with no middleware entry"
+  lang go
+  file graphql/admin/admin.go
+  reject VYQL-AUTH-081
+  code
+  ```
+  package admin
+
+  import "github.com/dgraph-io/dgraph/v25/graphql/resolve"
+
+  var (
+  	gogMutMWs = resolve.MutationMiddlewares{
+  		resolve.IpWhitelistingMW4Mutation,
+  		resolve.GuardianOfTheGalaxyAuthMW4Mutation,
+  		resolve.LoggingMWMutation,
+  	}
+
+  	adminMutationMWConfig = map[string]resolve.MutationMiddlewares{
+  		"backup":   gogMutMWs,
+  		"restore":  gogMutMWs,
+  		"shutdown": gogMutMWs,
+  	}
+
+  	adminMutationResolvers = map[string]resolve.MutationResolverFunc{
+  		"backup":        resolveBackup,
+  		"restore":       resolveRestore,
+  		"shutdown":      resolveShutdown,
+  		"restoreTenant": resolveTenantRestore,
+  	}
+  )
+  ```
+
+test "rank1077: the same tables with the entry present"
+  lang go
+  file graphql/admin/admin.go
+  reject VYQL-AUTH-081
+  code
+  ```
+  package admin
+
+  import "github.com/dgraph-io/dgraph/v25/graphql/resolve"
+
+  var (
+  	gogMutMWs = resolve.MutationMiddlewares{
+  		resolve.IpWhitelistingMW4Mutation,
+  		resolve.GuardianOfTheGalaxyAuthMW4Mutation,
+  		resolve.LoggingMWMutation,
+  	}
+
+  	adminMutationMWConfig = map[string]resolve.MutationMiddlewares{
+  		"backup":        gogMutMWs,
+  		"restore":       gogMutMWs,
+  		"shutdown":      gogMutMWs,
+  		"restoreTenant": gogMutMWs,
+  	}
+
+  	adminMutationResolvers = map[string]resolve.MutationResolverFunc{
+  		"backup":        resolveBackup,
+  		"restore":       resolveRestore,
+  		"shutdown":      resolveShutdown,
+  		"restoreTenant": resolveTenantRestore,
+  	}
+  )
+  ```

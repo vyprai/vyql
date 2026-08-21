@@ -1,0 +1,65 @@
+# Rank 1075 / CVE-2024-38427: DemoIccMAX's ProfileSequenceId tag parser returns
+# false from every path, so a well-formed tag is reported as a parse failure
+# (CWE-252).
+#
+# ATTENTION: precision cost. An always-false bool return is checkable, but it
+# fails closed; the dangerous mirror is a verifier stuck at true
+# (code.EmptyVerifierAcceptance / VYQL-AUTH-006). Both snippets reject that rule.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1075: the tag parser cannot report success"
+  lang cpp
+  file IccXML/IccLibXML/IccTagXml.cpp
+  reject VYQL-AUTH-006
+  code
+  ```
+  #include <string>
+
+  bool CIccTagXmlProfileSequenceId::ParseXml(xmlNode *pNode, std::string &parseStr)
+  {
+      if (!pNode)
+          return false;
+
+      for (pNode = icXmlFindNode(pNode->children, "ProfileIdDesc"); pNode;
+           pNode = icXmlFindNode(pNode->next, "ProfileIdDesc")) {
+          CIccProfileIdDesc entry;
+
+          const char *szDesc = icXmlAttrValue(pNode, "profileID");
+          if (szDesc && *szDesc)
+              entry.m_profileID = szDesc;
+
+          m_list->push_back(entry);
+      }
+
+      return false;
+  }
+  ```
+
+test "rank1075: the same parser returning success"
+  lang cpp
+  file IccXML/IccLibXML/IccTagXml.cpp
+  reject VYQL-AUTH-006
+  code
+  ```
+  #include <string>
+
+  bool CIccTagXmlProfileSequenceId::ParseXml(xmlNode *pNode, std::string &parseStr)
+  {
+      if (!pNode)
+          return false;
+
+      for (pNode = icXmlFindNode(pNode->children, "ProfileIdDesc"); pNode;
+           pNode = icXmlFindNode(pNode->next, "ProfileIdDesc")) {
+          CIccProfileIdDesc entry;
+
+          const char *szDesc = icXmlAttrValue(pNode, "profileID");
+          if (szDesc && *szDesc)
+              entry.m_profileID = szDesc;
+
+          m_list->push_back(entry);
+      }
+
+      return true;
+  }
+  ```
