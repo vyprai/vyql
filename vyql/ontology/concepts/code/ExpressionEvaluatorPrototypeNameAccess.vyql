@@ -2,10 +2,10 @@ module code;
 
 concept ExpressionEvaluatorPrototypeNameAccess : issue {
   cwe: [CWE_1321]
-  reviewAssumption: "a caller can evaluate attacker-controlled expressions containing variable or member names"
+  reviewAssumption: "a caller supplies the expression or template text that names what gets resolved"
   reviewCategory: prototype_pollution
-  reviewCondition: "expression evaluator resolves variable or member tokens against JavaScript objects without rejecting prototype-sensitive names"
+  reviewCondition: "an evaluator or name-keyed registry resolves externally supplied variable, member or entry names against JavaScript objects without rejecting prototype-sensitive names"
   reviewConfidence: high
-  reviewEvidence: "expression evaluator context {pattern} resolves item.value from expression tokens through values[item.value] and object[item.value] without filtering __proto__/constructor/prototype"
+  reviewEvidence: "name-keyed lookup context {pattern} resolves an externally supplied name against an object whose prototype chain stays reachable, with no own-property or prototype-name guard and no null-prototype storage"
   vulnerableTo: [injection.PrototypePollution]
 }

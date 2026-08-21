@@ -1,0 +1,106 @@
+# Rank 1325 / CVE-2026-45618: harttle/liquidjs stored its filter and tag
+# registries in plain object literals, so a bracket lookup on a
+# template-controlled name inherited Object.prototype members. `{{ x | valueOf }}`
+# resolved Object.prototype.valueOf, which the filter pipeline then invoked as a
+# handler with `this` bound to the filter implementation, leaking context,
+# liquid, token and through them the parser, loader and fs into the template.
+# The tag side is the same shape: `{% constructor %}` resolved
+# Object.prototype.constructor, so the "tag not found" assertion never fired.
+# Fix 457fae0736 stores both registries with Object.create(null), which makes
+# `assert(impl || !strictFilters)` and `assert(TagClass, ...)` do what they read
+# as doing: a lookup can only resolve an explicitly registered entry.
+#
+# Detection: the existing concept code.ExpressionEvaluatorPrototypeNameAccess
+# (VYQL-INJ-167, CWE-1321) describes a name-keyed lookup resolving an
+# externally supplied name against an object whose prototype chain stays
+# reachable, and it now covers a third binding: a module that registers handlers
+# by name into a plain-object field on `this` and carries neither
+# Object.create nor an own-property or prototype-name guard. Registering by name
+# and looking up by name is what every JavaScript template engine's own
+# documentation describes, so the shape is written from the API, not from this
+# advisory. The registry's storage is a module fact rather than a method fact --
+# a class field's initializer sits outside every method body -- so the binding
+# keys on the module scope.
+#
+# Measured over ten JavaScript/TypeScript repositories, roughly ten thousand
+# files: it reports src/liquid.ts here, nunjucks/src/environment.js (this.filters
+# = {} with getFilter's only check a falsy test, which `valueOf` passes), and two
+# name registries in eleventy (src/UserConfig.js, src/Engines/Nunjucks.js) where
+# the same inherited-name confusion costs a wrong duplicate-entry branch rather
+# than code execution. It reports nothing on the fixed revision above, nothing on
+# handlebars, eta, squirrelly, ejs or marked, and nothing on two large
+# general-purpose TypeScript codebases (vite 1697 files, nest 1832 files) or the
+# OWASP JavaScript and TypeScript ports (2747 and 2748 files).
+#
+# The known limit: handlebars declares registerHelper/registerPartial as
+# object-literal properties rather than class methods, so its registries fall
+# outside this binding. Widening to property keys would pull it in, and
+# handlebars resolves helper names through an allowlist in a different module,
+# which a module-scoped guard cannot see -- so the narrower form is the one that
+# ships.
+
+test "rank1325: template filter registry is a plain object indexed by a template-controlled name"
+  lang javascript
+  file src/liquid.ts
+  expect VYQL-INJ-167
+  expect_review code.ExpressionEvaluatorPrototypeNameAccess
+  code
+  ```
+  export class Liquid {
+    public readonly filters: Record<string, FilterImplOptions> = {}
+    public readonly tags: Record<string, TagClass> = {}
+
+    public registerFilter (name: string, filter: FilterImplOptions) {
+      this.filters[name] = filter
+    }
+
+    public registerTag (name: string, tag: TagClass) {
+      this.tags[name] = isFunction(tag) ? tag : createTagClass(tag)
+    }
+
+    public getFilter (name: string) {
+      const impl = this.filters[name]
+      assert(impl || !this.options.strictFilters, () => `undefined filter: ${name}`)
+      return impl
+    }
+
+    public parseToken (token: TopLevelToken, remainTokens: TopLevelToken[]) {
+      const TagClass = this.tags[token.name]
+      assert(TagClass, `tag "${token.name}" not found`)
+      return new TagClass(token, remainTokens, this, this.parser)
+    }
+  }
+  ```
+
+test "rank1325: template filter registry uses null-prototype storage"
+  lang javascript
+  file src/liquid.ts
+  reject VYQL-INJ-167
+  reject_review code.ExpressionEvaluatorPrototypeNameAccess
+  code
+  ```
+  export class Liquid {
+    public readonly filters: Record<string, FilterImplOptions> = Object.create(null)
+    public readonly tags: Record<string, TagClass> = Object.create(null)
+
+    public registerFilter (name: string, filter: FilterImplOptions) {
+      this.filters[name] = filter
+    }
+
+    public registerTag (name: string, tag: TagClass) {
+      this.tags[name] = isFunction(tag) ? tag : createTagClass(tag)
+    }
+
+    public getFilter (name: string) {
+      const impl = this.filters[name]
+      assert(impl || !this.options.strictFilters, () => `undefined filter: ${name}`)
+      return impl
+    }
+
+    public parseToken (token: TopLevelToken, remainTokens: TopLevelToken[]) {
+      const TagClass = this.tags[token.name]
+      assert(TagClass, `tag "${token.name}" not found`)
+      return new TagClass(token, remainTokens, this, this.parser)
+    }
+  }
+  ```
