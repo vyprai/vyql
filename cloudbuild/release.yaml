@@ -1,0 +1,151 @@
+# linux amd64 + arm64 (QEMU) release archives on tag v*, then GitHub release upload.
+timeout: 3600s
+options:
+  logging: CLOUD_LOGGING_ONLY
+  substitution_option: ALLOW_LOOSE
+  pool:
+    name: projects/valid-perigee-471809-r0/locations/europe-west3/workerPools/vypr-ci-amd64
+availableSecrets:
+  secretManager:
+    - versionName: projects/valid-perigee-471809-r0/secrets/vypr-cloudbuild-github-token/versions/latest
+      env: GH_TOKEN
+steps:
+  - id: reproducible-amd64
+    name: golang:1.26
+    entrypoint: bash
+    env:
+      - CGO_ENABLED=1
+      - GOTOOLCHAIN=auto
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        apt-get update -qq
+        apt-get install -y -qq build-essential git
+        VERSION="$${TAG_NAME:-$$COMMIT_SHA}"
+        if [ -n "$$(git status --porcelain)" ]; then
+          echo "checkout is dirty; vcs.modified would be stamped true"
+          git status --porcelain
+          exit 1
+        fi
+        FLAGS=(-trimpath -ldflags "-s -w -X main.version=$$VERSION")
+        go build "$${FLAGS[@]}" -o /tmp/build-a ./cmd/vyql
+        cp -R /workspace /tmp/elsewhere
+        cd /tmp/elsewhere
+        go build "$${FLAGS[@]}" -o /tmp/build-b ./cmd/vyql
+        a="$$(sha256sum /tmp/build-a | cut -d' ' -f1)"
+        b="$$(sha256sum /tmp/build-b | cut -d' ' -f1)"
+        echo "path A: $$a"
+        echo "path B: $$b"
+        [ "$$a" = "$$b" ] || { echo "build is not reproducible"; exit 1; }
+
+  - id: build-amd64
+    name: golang:1.26
+    entrypoint: bash
+    env:
+      - CGO_ENABLED=1
+      - GOTOOLCHAIN=auto
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        apt-get update -qq
+        apt-get install -y -qq build-essential git python3
+        VERSION="$${TAG_NAME:-dry-run}"
+        mkdir -p /workspace/artifacts
+        go build -trimpath -ldflags "-s -w -X main.version=$$VERSION" -o dist/vyql ./cmd/vyql
+        got="$$(./dist/vyql version | head -1)"
+        echo "$$got"
+        [ "$$got" = "vyql $$VERSION" ] || { echo "expected 'vyql $$VERSION'"; exit 1; }
+        NAME="vyql_$${VERSION}_linux_amd64"
+        mkdir -p "stage/$${NAME}/bin"
+        cp dist/vyql "stage/$${NAME}/bin/vyql"
+        cp -R vyql "stage/$${NAME}/vyql"
+        cp LICENSE NOTICE THIRD_PARTY_NOTICES.md README.md "stage/$${NAME}/"
+        tar -czf "/workspace/artifacts/$${NAME}.tar.gz" -C stage "$${NAME}"
+        sha256sum "/workspace/artifacts/$${NAME}.tar.gz" > "/workspace/artifacts/$${NAME}.tar.gz.sha256"
+        mkdir -p /tmp/smoke && tar -xzf "/workspace/artifacts/$${NAME}.tar.gz" -C /tmp/smoke
+        mkdir -p /tmp/sample
+        cat > /tmp/sample/app.py <<'PY'
+        import sqlite3
+        from flask import Flask, request
+        app = Flask(__name__)
+        @app.route("/u")
+        def u():
+            name = request.args.get("name")
+            conn = sqlite3.connect("app.db")
+            return conn.execute("SELECT * FROM users WHERE name = '" + name + "'").fetchall()
+        PY
+        cd /tmp/smoke/"$${NAME}"
+        env -u VYQL_HOME ./bin/vyql version
+        n="$$(env -u VYQL_HOME ./bin/vyql scan -fail-on none --format json /tmp/sample | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d if isinstance(d,list) else d.get("findings",[])))')"
+        echo "findings: $$n"
+        [ "$$n" -ge 1 ]
+
+  - id: binfmt
+    name: gcr.io/cloud-builders/docker
+    args: ['run', '--privileged', '--rm', 'tonistiigi/binfmt', '--install', 'arm64']
+
+  - id: build-arm64
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        VERSION="$${TAG_NAME:-dry-run}"
+        mkdir -p /workspace/artifacts
+        cat > /workspace/build-arm64-release.sh <<'SCRIPT'
+        set -euo pipefail
+        apt-get update -qq
+        apt-get install -y -qq build-essential git python3
+        VERSION="$1"
+        go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o dist/vyql ./cmd/vyql
+        got="$(./dist/vyql version | head -1)"
+        [ "$got" = "vyql $VERSION" ] || { echo "expected vyql $VERSION got $got"; exit 1; }
+        NAME="vyql_${VERSION}_linux_arm64"
+        mkdir -p "stage/${NAME}/bin"
+        cp dist/vyql "stage/${NAME}/bin/vyql"
+        cp -R vyql "stage/${NAME}/vyql"
+        cp LICENSE NOTICE THIRD_PARTY_NOTICES.md README.md "stage/${NAME}/"
+        tar -czf "artifacts/${NAME}.tar.gz" -C stage "${NAME}"
+        sha256sum "artifacts/${NAME}.tar.gz" > "artifacts/${NAME}.tar.gz.sha256"
+        SCRIPT
+        docker run --rm --platform linux/arm64 \
+          -v /workspace:/src -w /src \
+          -e CGO_ENABLED=1 -e GOTOOLCHAIN=auto \
+          golang:1.26 bash /src/build-arm64-release.sh "$$VERSION"
+
+  - id: publish-github
+    name: gcr.io/google.com/cloudsdktool/google-cloud-cli:slim
+    entrypoint: bash
+    secretEnv: ['GH_TOKEN']
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        if [ -z "$${TAG_NAME:-}" ]; then
+          echo "no TAG_NAME; skipping GitHub release publish"
+          ls -la /workspace/artifacts
+          exit 0
+        fi
+        apt-get update -qq
+        apt-get install -y -qq curl ca-certificates gnupg
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+          | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+        echo "deb [arch=$$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+          > /etc/apt/sources.list.d/github-cli.list
+        apt-get update -qq && apt-get install -y -qq gh
+        VER="$${TAG_NAME#v}"
+        awk -v tag="## [$$VER]" '
+          index($$0, tag) == 1 {found=1; next}
+          found && /^## \[/ {exit}
+          found {print}
+        ' CHANGELOG.md > /tmp/notes.md || true
+        echo "Full detail in [CHANGELOG.md](https://github.com/vyprai/vyql-private/blob/main/CHANGELOG.md)." >> /tmp/notes.md
+        ls -la /workspace/artifacts
+        gh release create "$$TAG_NAME" /workspace/artifacts/*.tar.gz /workspace/artifacts/*.tar.gz.sha256 \
+          --repo vyprai/vyql-private \
+          --notes-file /tmp/notes.md \
+          --generate-notes \
+          --verify-tag

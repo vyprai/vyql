@@ -1,0 +1,48 @@
+# linux/arm64 CGO build and smoke via QEMU on vypr-ci-amd64 (push to main).
+timeout: 2400s
+options:
+  logging: CLOUD_LOGGING_ONLY
+  pool:
+    name: projects/valid-perigee-471809-r0/locations/europe-west3/workerPools/vypr-ci-amd64
+steps:
+  - id: binfmt
+    name: gcr.io/cloud-builders/docker
+    args: ['run', '--privileged', '--rm', 'tonistiigi/binfmt', '--install', 'arm64']
+
+  - id: matrix-arm64
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        cat > /workspace/run-arm64.sh <<'SCRIPT'
+        set -euo pipefail
+        apt-get update -qq
+        apt-get install -y -qq build-essential git python3 file
+        go build -trimpath -ldflags "-s -w" -o dist/vyql ./cmd/vyql
+        file dist/vyql
+        go version -m dist/vyql | grep -q "GOOS=linux"
+        go version -m dist/vyql | grep -q "GOARCH=arm64"
+        uname -m | grep -q aarch64
+        mkdir -p /tmp/sample
+        cat > /tmp/sample/app.py <<'PY'
+        import sqlite3
+        from flask import Flask, request
+        app = Flask(__name__)
+        @app.route("/u")
+        def u():
+            name = request.args.get("name")
+            conn = sqlite3.connect("app.db")
+            return conn.execute("SELECT * FROM users WHERE name = '" + name + "'").fetchall()
+        PY
+        ./dist/vyql version
+        n="$(VYQL_HOME=./vyql ./dist/vyql scan -fail-on none --format json /tmp/sample \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d if isinstance(d,list) else d.get("findings",[])))')"
+        echo "findings: $n"
+        [ "$n" -ge 1 ] || { echo "built, ran, detected nothing"; exit 1; }
+        SCRIPT
+        docker run --rm --platform linux/arm64 \
+          -v /workspace:/src -w /src \
+          -e CGO_ENABLED=1 -e GOTOOLCHAIN=auto \
+          golang:1.26 bash /src/run-arm64.sh

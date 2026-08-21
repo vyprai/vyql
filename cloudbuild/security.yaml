@@ -1,0 +1,47 @@
+# Security checks on vypr-ci-amd64: govulncheck and self-scan.
+timeout: 1800s
+options:
+  logging: CLOUD_LOGGING_ONLY
+  pool:
+    name: projects/valid-perigee-471809-r0/locations/europe-west3/workerPools/vypr-ci-amd64
+steps:
+  - id: govulncheck
+    name: golang:1.26
+    entrypoint: bash
+    env:
+      - CGO_ENABLED=1
+      - GOTOOLCHAIN=auto
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        apt-get update -qq
+        apt-get install -y -qq build-essential git
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        "$$(go env GOPATH)/bin/govulncheck" ./...
+
+  - id: scan-self
+    name: golang:1.26
+    entrypoint: bash
+    env:
+      - CGO_ENABLED=1
+      - GOTOOLCHAIN=auto
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        apt-get update -qq
+        apt-get install -y -qq build-essential git python3
+        go build -o bin/vyql ./cmd/vyql
+        VYQL_HOME=./vyql ./bin/vyql scan -fail-on none -format sarif \
+          -exclude grammars -exclude vyql -exclude bin \
+          -exclude docs -exclude benchmarks . > vyql-self.sarif
+        python3 - <<'CHECK'
+        import json, sys
+        d = json.load(open("vyql-self.sarif"))
+        runs = d.get("runs", [])
+        if not runs:
+            print("no runs in the SARIF output"); sys.exit(1)
+        n = len(runs[0].get("results", []))
+        print(f"SARIF {d.get('version')}, {n} result(s)")
+        CHECK

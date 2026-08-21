@@ -1,11 +1,40 @@
-# amd64 go test + self-scan on vypr-ci-amd64. Does not publish images.
-# OWASP suites are cloudbuild/owasp.yaml (long, same pool).
+# Full amd64 CI on vypr-ci-amd64: build, vet, test, gofmt, lint, matrix-amd64, scan-self.
+# Sibling configs: cloudbuild/owasp.yaml, data.yaml, security.yaml, matrix-arm64.yaml.
 timeout: 1800s
 options:
   logging: CLOUD_LOGGING_ONLY
   pool:
     name: projects/valid-perigee-471809-r0/locations/europe-west3/workerPools/vypr-ci-amd64
 steps:
+  - id: build
+    name: golang:1.26
+    entrypoint: bash
+    env:
+      - CGO_ENABLED=1
+      - GOTOOLCHAIN=auto
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        apt-get update -qq
+        apt-get install -y -qq build-essential git
+        go build -o bin/vyql ./cmd/vyql
+        go build -o bin/gen-ontology-json ./cmd/gen-ontology-json
+
+  - id: vet
+    name: golang:1.26
+    entrypoint: bash
+    env:
+      - CGO_ENABLED=1
+      - GOTOOLCHAIN=auto
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        apt-get update -qq
+        apt-get install -y -qq build-essential git
+        go vet ./...
+
   - id: test
     name: golang:1.26
     entrypoint: bash
@@ -18,7 +47,73 @@ steps:
         set -euo pipefail
         apt-get update -qq
         apt-get install -y -qq build-essential git
+        # -count=1: test cache does not track .vyql data files.
         go test -count=1 ./...
+
+  - id: gofmt
+    name: golang:1.26
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        out="$(gofmt -l .)"
+        if [ -n "$$out" ]; then
+          echo "These files need gofmt:"
+          echo "$$out"
+          exit 1
+        fi
+
+  - id: lint
+    name: golang:1.26
+    entrypoint: bash
+    env:
+      - CGO_ENABLED=1
+      - GOTOOLCHAIN=auto
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        apt-get update -qq
+        apt-get install -y -qq build-essential git curl ca-certificates
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh \
+          | sh -s -- -b /usr/local/bin v2.12.1
+        golangci-lint run
+
+  - id: matrix-amd64
+    name: golang:1.26
+    entrypoint: bash
+    env:
+      - CGO_ENABLED=1
+      - GOTOOLCHAIN=auto
+      - GOOS=linux
+      - GOARCH=amd64
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        apt-get update -qq
+        apt-get install -y -qq build-essential git python3 file
+        go build -trimpath -ldflags "-s -w" -o dist/vyql ./cmd/vyql
+        file dist/vyql
+        go version -m dist/vyql | grep -q 'GOOS=linux'
+        go version -m dist/vyql | grep -q 'GOARCH=amd64'
+        mkdir -p /tmp/sample
+        cat > /tmp/sample/app.py <<'PY'
+        import sqlite3
+        from flask import Flask, request
+        app = Flask(__name__)
+        @app.route("/u")
+        def u():
+            name = request.args.get("name")
+            conn = sqlite3.connect("app.db")
+            return conn.execute("SELECT * FROM users WHERE name = '" + name + "'").fetchall()
+        PY
+        ./dist/vyql version
+        n="$$(VYQL_HOME=./vyql ./dist/vyql scan -fail-on none --format json /tmp/sample \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d if isinstance(d,list) else d.get("findings",[])))')"
+        echo "findings: $$n"
+        [ "$$n" -ge 1 ] || { echo "built, ran, detected nothing"; exit 1; }
 
   - id: scan-self
     name: golang:1.26
