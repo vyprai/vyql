@@ -1,0 +1,100 @@
+# Rank 1065 / CVE-2026-31232: CosyVoice loads model checkpoints with torch.load
+# and no weights_only, so a .pt file under a CLI-named directory unpickles into
+# arbitrary Python objects (CWE-502).
+#
+# VYQL-DESER-001 fires when a CLI-controlled path reaches torch.load without
+# weights_only=True, and clears when weights_only restricts the load to tensors.
+# Vulnerable and explicit-false snippets expect the finding; the restricted load
+# rejects it.
+#
+# verify_current_expected: skip-fresh-target
+
+test "rank1065: a checkpoint path from the command line is unpickled"
+  lang python
+  file cosyvoice/cli/model.py
+  profile cli
+  expect VYQL-DESER-001
+  code
+  ```
+  import argparse
+
+  import torch
+
+
+  class CosyVoiceModel:
+      def __init__(self, device):
+          self.device = device
+
+      def load(self, llm_model, flow_model, hift_model):
+          self.llm.load_state_dict(torch.load(llm_model, map_location=self.device), strict=True)
+          self.flow.load_state_dict(torch.load(flow_model, map_location=self.device), strict=True)
+          hift_state_dict = {k.replace('generator.', ''): v for k, v in torch.load(hift_model, map_location=self.device).items()}
+          self.hift.load_state_dict(hift_state_dict, strict=True)
+
+
+  def main():
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--model_dir', type=str, required=True)
+      args = parser.parse_args()
+      model = CosyVoiceModel('cpu')
+      model.load('{}/llm.pt'.format(args.model_dir), '{}/flow.pt'.format(args.model_dir), '{}/hift.pt'.format(args.model_dir))
+
+
+  main()
+  ```
+
+test "rank1065: the same load restricted to weights"
+  lang python
+  file cosyvoice/cli/model.py
+  profile cli
+  reject VYQL-DESER-001
+  code
+  ```
+  import argparse
+
+  import torch
+
+
+  class CosyVoiceModel:
+      def __init__(self, device):
+          self.device = device
+
+      def load(self, llm_model, flow_model, hift_model):
+          self.llm.load_state_dict(torch.load(llm_model, map_location=self.device, weights_only=True), strict=True)
+          self.flow.load_state_dict(torch.load(flow_model, map_location=self.device, weights_only=True), strict=True)
+          hift_state_dict = {k.replace('generator.', ''): v for k, v in torch.load(hift_model, map_location=self.device, weights_only=True).items()}
+          self.hift.load_state_dict(hift_state_dict, strict=True)
+
+
+  def main():
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--model_dir', type=str, required=True)
+      args = parser.parse_args()
+      model = CosyVoiceModel('cpu')
+      model.load('{}/llm.pt'.format(args.model_dir), '{}/flow.pt'.format(args.model_dir), '{}/hift.pt'.format(args.model_dir))
+
+
+  main()
+  ```
+
+test "rank1065: weights_only turned off explicitly"
+  lang python
+  file runtime/triton_trtllm/model_repo/cosyvoice2/1/model.py
+  profile cli
+  expect VYQL-DESER-001
+  code
+  ```
+  import argparse
+
+  import torch
+
+
+  def load_speaker_info(model_dir):
+      return torch.load('{}/spk2info.pt'.format(model_dir), map_location='cpu', weights_only=False)
+
+
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--model_dir', type=str, required=True)
+  args = parser.parse_args()
+  load_speaker_info(args.model_dir)
+  ```

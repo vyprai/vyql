@@ -1,0 +1,80 @@
+# Rank 1063 / CVE-2026-54782: CoreWCF verifies a SAML 1.1 assertion's signature
+# in two branches, and the non-X509 branch checks SignedInfo digests only — never
+# the SignatureValue against a key (CWE-347, CWE-290).
+#
+# VYQL-AUTH-109 (code.XmlSignatureDigestOnlyVerification) fires on the
+# digest-only branch and clears when that branch verifies the signature against
+# a bridged key. Vulnerable snippet expects the finding; fixed snippet rejects
+# it.
+
+test "rank1063: the non-X509 branch verifies SignedInfo instead of the signature"
+  lang csharp
+  file src/CoreWCF.Primitives/src/CoreWCF/IdentityModel/Tokens/SamlSerializer.cs
+  expect VYQL-AUTH-109
+  code
+  ```
+  using Microsoft.IdentityModel.Tokens;
+
+  namespace CoreWCF.IdentityModel.Tokens
+  {
+      public class SamlSerializer
+      {
+          public SamlSecurityToken ReadToken(SamlAssertion assertion, SecurityToken signingToken)
+          {
+              if (signingToken is X509SecurityToken x509signingToken)
+              {
+                  var cryptoProviderFactory = new Sha1CryptoProviderFactory();
+                  var imX509SecurityKey = new X509SecurityKey(x509signingToken.Certificate);
+                  imX509SecurityKey.CryptoProviderFactory = cryptoProviderFactory;
+                  assertion.Signature.Verify(imX509SecurityKey, cryptoProviderFactory);
+              }
+              else
+              {
+                  assertion.Signature.SignedInfo.Verify(CryptoProviderFactory.Default);
+              }
+
+              return new SamlSecurityToken(assertion);
+          }
+      }
+  }
+  ```
+
+test "rank1063: the same branch verifying the signature against a bridged key"
+  lang csharp
+  file src/CoreWCF.Primitives/src/CoreWCF/IdentityModel/Tokens/SamlSerializer.cs
+  reject VYQL-AUTH-109
+  code
+  ```
+  using Microsoft.IdentityModel.Tokens;
+
+  namespace CoreWCF.IdentityModel.Tokens
+  {
+      public class SamlSerializer
+      {
+          public SamlSecurityToken ReadToken(SamlAssertion assertion, SecurityToken signingToken, SecurityKey verificationKey)
+          {
+              if (signingToken is X509SecurityToken x509signingToken)
+              {
+                  var cryptoProviderFactory = new Sha1CryptoProviderFactory();
+                  var imX509SecurityKey = new X509SecurityKey(x509signingToken.Certificate);
+                  imX509SecurityKey.CryptoProviderFactory = cryptoProviderFactory;
+                  assertion.Signature.Verify(imX509SecurityKey, cryptoProviderFactory);
+              }
+              else
+              {
+                  SecurityKey msVerificationKey = TryCreateMicrosoftIdentityVerificationKey(verificationKey);
+                  if (msVerificationKey == null)
+                  {
+                      throw new SecurityTokenException("no bridgeable verification key");
+                  }
+
+                  var cryptoProviderFactory = new Sha1CryptoProviderFactory();
+                  msVerificationKey.CryptoProviderFactory = cryptoProviderFactory;
+                  assertion.Signature.Verify(msVerificationKey, cryptoProviderFactory);
+              }
+
+              return new SamlSecurityToken(assertion);
+          }
+      }
+  }
+  ```

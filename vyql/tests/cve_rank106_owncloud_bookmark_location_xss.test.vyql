@@ -1,5 +1,8 @@
-# Rank 106 / CVE-2012-5666: ownCloud Bookmarks inserted window.location into
-# generated bookmark HTML before escaping the current page URL.
+# Rank 106 / CVE-2012-5666: ownCloud Bookmarks inserts window.location into
+# generated bookmark HTML before escaping the current page URL (CWE-79).
+#
+# VYQL-INJ-004 fires when the location string reaches the bookmark HTML render.
+# The snippet expects the finding.
 
 test "rank106: location string reaches bookmark html rendering"
   expect VYQL-INJ-004
