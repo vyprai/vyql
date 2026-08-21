@@ -2713,3 +2713,24 @@ binding userControlledData464 {
   query pattern callExpr where callee.method == "getStringOrDefault" and callee.receiver.type == "UDFParameters"
   emit source core.UserControlledData at call.result
 }
+
+// args4j's CmdLineParser treats an argument of the form `@path` as a reference to a
+// file and replaces it with that file's lines before option parsing ("at-syntax").
+// The library turns this on by default, and ParserProperties.withAtSyntax(boolean) is
+// the documented switch, so a parser constructed without one reads whatever file an
+// argument names. Whether that is a problem depends on where the arguments come from,
+// which is the rule's call, not this label's.
+binding argumentFileExpansion465 {
+  query pattern callExpr where callee.method == "CmdLineParser"
+  emit issue code.ArgumentFileExpansion at call
+}
+
+// The documented way to choose the at-syntax mode instead of inheriting the default.
+binding argumentFileExpansionControl466 {
+  query pattern callExpr where callee.method == "withAtSyntax"
+  emit check core.ArgumentFileExpansionControl at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

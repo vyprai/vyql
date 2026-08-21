@@ -1,0 +1,8 @@
+module code;
+
+review code.LlmToolRegistrationMissingAuthorization {
+  category: access_control
+  expected: [core.AuthorizationCheck]
+  kind: target
+  text: "verify an LLM tool registry checks the caller's permission before registering tools that administer accounts, roles or permissions"
+}

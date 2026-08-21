@@ -3998,3 +3998,8 @@ binding segmentedKeyDenylistBypassPrototypePollution908 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "Object.keys" and node.context.callPath contains "indexOf" and node.context.callPath contains "saveMissing" and not (node.context.callPath contains "hasUnsafeKeySegment")
   emit issue code.SegmentedKeyDenylistBypassPrototypePollution at node
 }
+
+binding incompleteHtmlEntityEscape909 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.prop contains "decodeEntities=true" and node.context.prop contains "ontext=" and node.context.literal contains "script" and node.context.literal contains "iframe" and node.context.callPath contains ".join" and not (node.context.literal contains "&lt;") and not (node.context.callPath contains "escapeHtml") and not (node.context.callPath contains "htmlentities") and not (node.context.callPath contains "encode") and not (node.context.callPath contains "sanitizeHtml") and not (node.context.callPath contains "DOMPurify")
+  emit issue code.IncompleteHtmlEntityEscape at node
+}

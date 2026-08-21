@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UploadContentScanMissingPharStub {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_434]
+    id: "VYQL-INJ-209"
+    severity: high
+  }
+  issue code.UploadContentScanMissingPharStub as validator
+}
