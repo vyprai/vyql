@@ -1,0 +1,189 @@
+# Rank 1353 / CVE-2024-52508 (GHSA-vmhx-hwph-q6mc, fix a84c70e15d): Nextcloud
+# Mail's autoconfiguration walked one label too far up the domain hierarchy.
+# lib/Service/AutoConfig/IspDb.php::query() built its lookup URLs out of the
+# domain -- 'https://autoconfig.{DOMAIN}/mail/config-v1.1.xml?emailaddress={EMAIL}'
+# -- and when neither the address domain nor its MX target answered, it shortened
+# the MX target by its leftmost label and queried that too:
+#
+#   if ($tryMx && ($dns = dns_get_record($domain, DNS_MX))) {
+#       $domain = $dns[0]['target'];
+#       if (!($config = $this->query($domain, $email, false))) {
+#           [, $domain] = explode('.', $domain, 2);
+#           $config = $this->query($domain, $email, false);
+#       }
+#   }
+#
+# For an MX target of mx.example.tld that yields example.tld, but for a
+# two-label target it yields the public suffix itself, so the app fetches
+# https://autoconfig.tld/... and hands the user's email address -- and the
+# credentials a returned configuration then collects -- to whoever registered
+# autoconfig under that suffix. The fixed revision adds lib/Dns/Resolver.php with a
+# public-suffix-list test and gates the shortened lookup on it:
+# `if (!$this->dnsResolver->isSuffix($domain))`.
+#
+# New concept code.DomainWalkMissingPublicSuffixBoundary (VYQL-RF-046, CWE-200,
+# CWE-346) with PHP binding dnsLabelWalkMissingPublicSuffixCheck: a function that
+# resolves DNS records for a name, shortens that name by dropping its leftmost
+# label, and carries no public-suffix, registrable-domain or second-level-domain
+# test on the result. Walking up a domain until something answers is how mail
+# autoconfiguration, DMARC organizational-domain lookup and cookie-domain scoping
+# are all written, and the public suffix list is the documented boundary for each;
+# a walk with no such boundary reaches names nobody in the original domain owns.
+# The function is the unit: the resolution, the label drop and the boundary test
+# all sit in the one routine that decides how far up to go.
+#
+# Known limits: the binding wants both halves of the walk in one function, so an
+# implementation that resolves in one method and shortens in another is not
+# matched; and the boundary test is recognised by name (isSuffix, publicSuffix,
+# registrableDomain, secondLevelDomain and the like), so a check spelled through
+# an opaque helper reads as absent.
+
+test "rank1353: the autoconfig lookup shortens the MX target by one label and queries it"
+  lang php
+  file lib/Service/AutoConfig/IspDb.php
+  expect VYQL-RF-046
+  expect_review code.DomainWalkMissingPublicSuffixBoundary
+  code
+  ```
+  <?php declare(strict_types=1);
+
+  namespace OCA\Mail\Service\AutoConfig;
+
+  use Horde_Mail_Rfc822_Address;
+  use OCP\Http\Client\IClientService;
+  use function explode;
+  use function str_replace;
+
+  class IspDb {
+      private $client;
+
+      public function __construct(IClientService $clientService) {
+          $this->client = $clientService->newClient();
+      }
+
+      /** @returns string[] */
+      public function getUrls(): array {
+          return [
+              'https://autoconfig.{DOMAIN}/mail/config-v1.1.xml?emailaddress={EMAIL}',
+              'https://{DOMAIN}/.well-known/autoconfig/mail/config-v1.1.xml?emailaddress={EMAIL}',
+          ];
+      }
+
+      private function queryUrl(string $url, Horde_Mail_Rfc822_Address $email): ?Configuration {
+          $xml = $this->client->get($url, ['timeout' => 7])->getBody();
+          return Configuration::fromXml($xml, $email);
+      }
+
+      public function query(string $domain, Horde_Mail_Rfc822_Address $email, bool $tryMx = true): ?Configuration {
+          $config = null;
+          foreach ($this->getUrls() as $url) {
+              $url = str_replace(['{DOMAIN}', '{EMAIL}'], [$domain, $email->bare_address], $url);
+              $config = $this->queryUrl($url, $email);
+              if ($config !== null) {
+                  return $config;
+              }
+          }
+
+          if ($tryMx && ($dns = dns_get_record($domain, DNS_MX))) {
+              $domain = $dns[0]['target'];
+              if (!($config = $this->query($domain, $email, false))) {
+                  [, $domain] = explode('.', $domain, 2);
+                  $config = $this->query($domain, $email, false);
+              }
+          }
+          return $config;
+      }
+  }
+  ```
+
+test "rank1353: the fixed revision only queries the shortened domain when it is not a public suffix"
+  lang php
+  file lib/Service/AutoConfig/IspDb.php
+  reject VYQL-RF-046
+  reject_review code.DomainWalkMissingPublicSuffixBoundary
+  code
+  ```
+  <?php declare(strict_types=1);
+
+  namespace OCA\Mail\Service\AutoConfig;
+
+  use Horde_Mail_Rfc822_Address;
+  use OCA\Mail\Dns\Resolver;
+  use OCP\Http\Client\IClientService;
+  use function explode;
+  use function str_replace;
+
+  class IspDb {
+      private $client;
+      private Resolver $dnsResolver;
+
+      public function __construct(IClientService $clientService, Resolver $dnsResolver) {
+          $this->client = $clientService->newClient();
+          $this->dnsResolver = $dnsResolver;
+      }
+
+      /** @returns string[] */
+      public function getUrls(): array {
+          return [
+              'https://autoconfig.{DOMAIN}/mail/config-v1.1.xml?emailaddress={EMAIL}',
+              'https://{DOMAIN}/.well-known/autoconfig/mail/config-v1.1.xml?emailaddress={EMAIL}',
+          ];
+      }
+
+      private function queryUrl(string $url, Horde_Mail_Rfc822_Address $email): ?Configuration {
+          $xml = $this->client->get($url, ['timeout' => 7])->getBody();
+          return Configuration::fromXml($xml, $email);
+      }
+
+      public function query(string $domain, Horde_Mail_Rfc822_Address $email, bool $tryMx = true): ?Configuration {
+          $config = null;
+          foreach ($this->getUrls() as $url) {
+              $url = str_replace(['{DOMAIN}', '{EMAIL}'], [$domain, $email->bare_address], $url);
+              $config = $this->queryUrl($url, $email);
+              if ($config !== null) {
+                  return $config;
+              }
+          }
+
+          if ($tryMx && ($dns = $this->dnsResolver->resolve($domain, DNS_MX))) {
+              $domain = $dns[0]['target'];
+              if (!($config = $this->query($domain, $email, false))) {
+                  [, $domain] = explode('.', $domain, 2);
+                  // Only try second-level domains and deeper
+                  if (!$this->dnsResolver->isSuffix($domain)) {
+                      $config = $this->query($domain, $email, false);
+                  }
+              }
+          }
+          return $config;
+      }
+  }
+  ```
+
+test "rank1353: resolving a domain without climbing the label hierarchy is not reported"
+  lang php
+  file includes/dns_lookup.php
+  reject VYQL-RF-046
+  reject_review code.DomainWalkMissingPublicSuffixBoundary
+  code
+  ```
+  <?php declare(strict_types=1);
+
+  function isDomainResolves($domain)
+  {
+      if (gethostbyname($domain) != $domain) {
+          return true;
+      }
+
+      $records = dns_get_record($domain, DNS_MX);
+
+      return ! empty($records);
+  }
+
+  function hostLabels($hostname)
+  {
+      [$label, $rest] = explode('.', $hostname, 2);
+
+      return [$label, $rest];
+  }
+  ```

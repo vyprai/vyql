@@ -1,0 +1,145 @@
+# Rank 1354 / CVE-2025-53909: mailcow's dovecot quota- and quarantine-notifier
+# scripts read the notification body template out of Redis (`QW_HTML`,
+# `Q_HTML` -- written by the admin UI) and compiled it with `jinja2.Template`,
+# the plain non-sandboxed environment. Jinja2's default environment gives a
+# template author attribute access on every object it is handed, which is the
+# documented route from `{{ ... }}` markup to arbitrary Python inside the
+# dovecot container -- so anyone able to set the stored template escalated to
+# code execution (CWE-1336, SSTI).
+#
+# Fix commit 8c5f6c032 replaces `Template(r.get('QW_HTML'))` with
+# `SandboxedEnvironment().from_string(...)` in both scripts and wraps the
+# render in a `SecurityError`/`TemplateError` handler. The template source,
+# the render call and its keyword arguments are otherwise unchanged: the only
+# difference is which environment compiles the stored string.
+#
+# This is an ordinary source-to-sink shape once the stored read is named:
+# `code.StoredDataRead` on a Redis client's read methods reaches the
+# `code.TemplateRender` sink bound for `jinja2.Template`, which
+# VYQL-INJ-008 judges. The Redis reads are recognised by receiver type, so
+# only a `.get()` on a value assigned from a `redis` client constructor is a
+# stored-data source -- a bare `.get` (a dict, a mapping wrapper, a settings
+# object) is not, which is what the third case pins.
+#
+# The fourth case is the shape both real scripts actually use, and it is where
+# the receiver type is lost: the client is built inside a `while True: try:
+# ... else: break` connect-retry loop, so every later `r.get(...)` names a
+# merge of the loop's definitions as its receiver rather than the constructor
+# call, and lowering's receiver typing reads a constructor path off the node
+# the call site names. A merge carries no path, so the read is not a
+# stored-data source and the finding is lost -- pinned here against the
+# otherwise identical straight-line first case.
+
+test "rank1354: Redis-stored notification template compiled with a plain jinja2.Template"
+  lang python
+  file quota_notify.py
+  expect VYQL-INJ-008
+  code
+  ```
+  import os
+  import sys
+  import jinja2
+  from jinja2 import Template
+  import redis
+
+  percent = int(sys.argv[1])
+  username = str(sys.argv[2])
+
+  r = redis.StrictRedis(host='redis', decode_responses=True, port=6379, db=0)
+
+  if r.get('QW_HTML'):
+    try:
+      template = Template(r.get('QW_HTML'))
+    except:
+      print("Error: Cannot parse quota template, falling back to default template.")
+      with open('/templates/quota.tpl') as file_:
+        template = Template(file_.read())
+  else:
+    with open('/templates/quota.tpl') as file_:
+      template = Template(file_.read())
+
+  html = template.render(username=username, percent=percent)
+  ```
+
+test "rank1354: Redis-stored notification template compiled by a Jinja2 sandbox"
+  lang python
+  file quota_notify.py
+  reject VYQL-INJ-008
+  code
+  ```
+  import os
+  import sys
+  import jinja2
+  from jinja2.sandbox import SandboxedEnvironment
+  import redis
+
+  percent = int(sys.argv[1])
+  username = str(sys.argv[2])
+
+  r = redis.StrictRedis(host='redis', decode_responses=True, port=6379, db=0)
+
+  if r.get('QW_HTML'):
+    try:
+      env = SandboxedEnvironment()
+      template = env.from_string(r.get('QW_HTML'))
+    except Exception:
+      print("Error: Cannot parse quota template, falling back to default template.")
+      with open('/templates/quota.tpl') as file_:
+        env = SandboxedEnvironment()
+        template = env.from_string(file_.read())
+  else:
+    with open('/templates/quota.tpl') as file_:
+      env = SandboxedEnvironment()
+      template = env.from_string(file_.read())
+
+  try:
+    html = template.render(username=username, percent=percent)
+  except (jinja2.exceptions.SecurityError, jinja2.TemplateError) as ex:
+    print(f"SecurityError or TemplateError in template rendering: {ex}")
+    sys.exit(1)
+  ```
+
+test "rank1354: an in-process mapping's get() is not a stored-data read"
+  lang python
+  file quota_notify.py
+  reject VYQL-INJ-008
+  code
+  ```
+  import sys
+  from jinja2 import Template
+
+  username = str(sys.argv[2])
+
+  defaults = {'QW_HTML': 'Hello {{ username }}, your mailbox is {{ percent }}% full.'}
+
+  template = Template(defaults.get('QW_HTML'))
+  html = template.render(username=username, percent=90)
+  ```
+
+test "rank1354: Redis client built in a connect-retry loop loses its receiver type"
+  lang python
+  file quota_notify.py
+  reject VYQL-INJ-008
+  code
+  ```
+  import sys
+  import time
+  from jinja2 import Template
+  import redis
+
+  percent = int(sys.argv[1])
+  username = str(sys.argv[2])
+
+  while True:
+    try:
+      r = redis.StrictRedis(host='redis', decode_responses=True, port=6379, db=0)
+      r.ping()
+    except Exception as ex:
+      print('%s - trying again...' % (ex))
+      time.sleep(3)
+    else:
+      break
+
+  template = Template(r.get('QW_HTML'))
+  html = template.render(username=username, percent=percent)
+  ```
