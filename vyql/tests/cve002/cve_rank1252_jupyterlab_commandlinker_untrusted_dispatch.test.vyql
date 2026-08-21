@@ -1,0 +1,165 @@
+# Rank 1252 / CVE-2026-42557 (GHSA-mqcg-5x36-vfcg): JupyterLab's HTML
+# sanitizer allowlisted `data-commandlinker-command` / `data-commandlinker-args`
+# on `<button>` elements, and `CommandLinker` registered a single delegated
+# click listener on `document.body` that walked up from `event.target`,
+# reads those two attributes off whatever element is clicked, and executes
+# the named command with zero check that the element came from trusted
+# JupyterLab UI rather than from sanitized (but attacker-authored) notebook
+# output. A saved notebook with an HTML cell output containing a button
+# carrying those two data attributes triggered an arbitrary JupyterLab
+# command -- including kernel code execution -- on a single click, no code
+# cell execution required (CWE-79).
+#
+# The fixing diff (packages/apputils/src/commandlinker.ts and
+# .../sanitizer.ts among 23 files): `_evtClick` becomes async and calls
+# `_isTrusted(target)`, walking the target's ancestors against a WeakMap
+# (`_trustedBoundaries`) populated only in-memory by the new `markTrusted()`
+# API; when untrusted it shows a confirmation dialog
+# (`_requestTrust`/`showCommandLinkerTrustDialog`) before executing, or asks
+# the caller to run a `trustCommand` first. `sanitizer.ts` adds a
+# `setAllowCommandLinker(false)` toggle (default still `true`) that drops
+# the two data attributes from the `button` allowlist entirely. The GHSA
+# advisory's own remediation commit, c5f522db11d0, is the same fix rebased
+# onto the 4.5.x release branch (identical diff to commandlinker.ts and
+# sanitizer.ts, differing only in unrelated version-bump/tooling files from
+# being applied at a different point in history) -- confirms 5d9cb8c634e0 is
+# the genuine upstream fix, not a version bump, and
+# needed.
+#
+# ATTENTION, precision cost. vyql match on a trimmed but verbatim repro of
+# `_evtClick` (event.target walk, hasAttribute/getAttribute on
+# `data-commandlinker-command`/`-args`, `this._commands.execute(command,
+# args)`) labels no source at all on either revision: `getAttribute()` on a
+# DOM element is not bound anywhere in the JavaScript/TypeScript data as a
+# taint source, so the `.execute(...)` call -- which does match an existing
+# sink binding, coincidentally as code.SqlExecution purely off the method
+# name `execute` rather than as any command-dispatch concept -- never fires,
+# since a sink with no source reaching it reports nothing. vyql resolve
+# confirms `target.hasAttribute` and `event.preventDefault` terminate
+# unresolved (not a known source/sink/control); vyql explain reports no
+# findings. A bounded scan of the real packages/apputils checkout (--cache
+# off --max-ram 4GB, 42-43 javascript files) reports the identical 3
+# findings on both the vulnerable and patched revisions (two VYQL-CRY-003 in
+# windowresolver.ts, one VYQL-INJ-009 in toolbar/factory.ts), none touching
+# commandlinker.ts or sanitizer.ts.
+#
+# No binding closes this without an unacceptable precision cost. The two
+# concepts nearest by theme, code.HtmlSanitizerLogicReview ("review HTML
+# sanitizer/parser raw-text, comment-preservation, and serialization
+# behavior for sanitizer-bypass or mutation-XSS cases") and
+# code.UnsafeEmbeddableAllowlist, both describe a sanitizer emitting
+# attacker-reachable markup, not a sanitizer whose *permitted* markup is
+# safe on its own but becomes dangerous only because unrelated application
+# code (a global click delegate) later trusts one of its allowed attributes
+# as a command to execute -- the sanitizer here isn't bypassed or mutated,
+# it does exactly what its allowlist says. Emitting a source from any
+# `element.getAttribute()`/`.dataset` read inside a document- or
+# window-level delegated event handler would be the only way to name the
+# actual data flow, but that exact shape -- a global click/keyup handler
+# reading a `data-*` attribute off `event.target` to decide what to do --
+# is the ordinary, well-documented way Bootstrap's `data-toggle`, htmx's
+# `hx-*`, and countless other UI libraries and hand-rolled admin panels
+# wire up event delegation; it is not a documented "untrusted input" source
+# for any of them, and a security engineer unfamiliar with this CVE would
+# not derive "attribute read in a global click handler is tainted" from
+# sanitize-html's or DOM's own documentation. The genuinely CVE-specific
+# fact -- that this one attribute pair specifically means "execute a
+# privileged command" -- is app architecture, not API surface, so naming it
+# in a binding would be a repro-shaped patch matching nothing else in the
+# corpus, while generalizing it to any DOM-attribute read in a delegated
+# handler would flag ordinary, safe event-delegation code broadly. No
+# definition change attempted.
+#
+# verify_current_expected: attention-precision-cost, both revisions reject
+# VYQL-INJ-009 (the sink-adjacent DOM injection rule) and reject_review
+# code.HtmlSanitizerLogicReview (nearest review concept by theme).
+
+test "rank1252: _evtClick dispatches a data-commandlinker-command attribute with no trust check"
+  lang javascript
+  file commandlinker.ts
+  reject VYQL-INJ-009
+  reject_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  class CommandLinker {
+    private _evtClick(event: MouseEvent): void {
+      let target = event.target as HTMLElement;
+      while (target && target.parentElement) {
+        if (target.hasAttribute('data-commandlinker-command')) {
+          event.preventDefault();
+          const command = target.getAttribute('data-commandlinker-command');
+          if (!command) {
+            return;
+          }
+          const argsValue = target.getAttribute('data-commandlinker-args');
+          let args = {};
+          if (argsValue) {
+            args = JSON.parse(argsValue);
+          }
+          void this._commands.execute(command, args);
+          return;
+        }
+        target = target.parentElement;
+      }
+    }
+
+    private _commands: any;
+  }
+  ```
+
+test "rank1252: _evtClick asks for trust before dispatching an unmarked node"
+  lang javascript
+  file commandlinker.ts
+  reject VYQL-INJ-009
+  reject_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  class CommandLinker {
+    private async _evtClick(event: MouseEvent): Promise<void> {
+      let target = event.target as HTMLElement;
+      while (target && target.parentElement) {
+        if (target.hasAttribute('data-commandlinker-command')) {
+          event.preventDefault();
+          const command = target.getAttribute('data-commandlinker-command');
+          if (!command) {
+            return;
+          }
+          const argsValue = target.getAttribute('data-commandlinker-args');
+          let args = {};
+          if (argsValue) {
+            args = JSON.parse(argsValue);
+          }
+
+          if (!this._isTrusted(target)) {
+            const trustAction = await this._requestTrust(command, args);
+            if (trustAction === 'cancel') {
+              return;
+            }
+          }
+
+          void this._commands.execute(command, args);
+          return;
+        }
+        target = target.parentElement;
+      }
+    }
+
+    private _isTrusted(target: HTMLElement): boolean {
+      let node: HTMLElement | null = target;
+      while (node) {
+        if (this._trustedBoundaries.has(node)) {
+          return true;
+        }
+        node = node.parentElement;
+      }
+      return false;
+    }
+
+    private async _requestTrust(command: string, args: any): Promise<string> {
+      return 'cancel';
+    }
+
+    private _commands: any;
+    private _trustedBoundaries = new WeakMap<HTMLElement, true>();
+  }
+  ```
