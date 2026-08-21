@@ -2567,3 +2567,26 @@ binding httpInput456 {
   query pattern callExpr where callee.method == "getParameterNames"
   emit source code.HttpInput at call.result
 }
+
+binding authenticationRequiredOp457 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "intercept" and node.context.paramType contains "ActionInvocation" and node.context.call contains "getSession" and node.context.call contains "invoke" and not (containsAny(node.context.literal, ["login", "error", "input", "none"])) and not (containsAny(node.context.identifier, ["LOGIN", "ERROR", "INPUT", "NONE"]))
+  emit issue code.AuthenticationRequiredOp at node
+}
+
+binding authenticationCheck458 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "intercept" and node.context.paramType contains "ActionInvocation" and containsAny(node.context.literal, ["login", "error", "input", "none"])
+  emit check core.AuthenticationCheck at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}
+
+binding authenticationCheck459 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "intercept" and node.context.paramType contains "ActionInvocation" and containsAny(node.context.identifier, ["LOGIN", "ERROR", "INPUT", "NONE"])
+  emit check core.AuthenticationCheck at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}

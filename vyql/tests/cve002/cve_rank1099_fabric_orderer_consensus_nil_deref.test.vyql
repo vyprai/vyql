@@ -1,0 +1,44 @@
+# Rank 1099 / CVE-2022-31121: Hyperledger Fabric's orderer treats any
+# non-Submit gRPC StepRequest as a consensus message without checking that the
+# consensus field is populated, so a malformed request with neither oneof case
+# set reaches DispatchConsensus with a nil consensus request (CWE-20).
+#
+# ATTENTION: not mechanical. Protobuf oneof accessors have no generic Go
+# vocabulary; code.NullableDeref's only Go binding is a hardcoded free5gc call
+# chain, not a nil-guard on an alternate oneof path.
+#
+# verify_current_expected: attention-not-mechanical
+
+test "rank1099: a non-submit request is dispatched as consensus with no nil check"
+  lang go
+  file orderer/common/cluster/service.go
+  reject VYQL-MEM-006
+  code
+  ```
+  package cluster
+
+  func (s *Service) handleMessage(request *orderer.StepRequest, stream StepStream, addr string) error {
+    if submitReq := request.GetSubmitRequest(); submitReq != nil {
+      return s.handleSubmit(submitReq, stream, addr)
+    }
+    return s.Dispatcher.DispatchConsensus(stream.Context(), request.GetConsensusRequest())
+  }
+  ```
+
+test "rank1099: the fixed revision requires the consensus field to be populated"
+  lang go
+  file orderer/common/cluster/service.go
+  reject VYQL-MEM-006
+  code
+  ```
+  package cluster
+
+  func (s *Service) handleMessage(request *orderer.StepRequest, stream StepStream, addr string) error {
+    if submitReq := request.GetSubmitRequest(); submitReq != nil {
+      return s.handleSubmit(submitReq, stream, addr)
+    } else if consensusReq := request.GetConsensusRequest(); consensusReq != nil {
+      return s.Dispatcher.DispatchConsensus(stream.Context(), request.GetConsensusRequest())
+    }
+    return errors.Errorf("message is neither a Submit nor a Consensus request")
+  }
+  ```

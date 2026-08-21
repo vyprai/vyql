@@ -1,0 +1,63 @@
+# Rank 1108 / CVE-2025-55293: Meshtastic's NodeDB treats a NodeInfo update that
+# omits its public key as proof no key change is intended, so a forged update
+# that leaves the key field empty erases a node's pinned identity key
+# (CWE-287).
+#
+# ATTENTION: vocabulary gap. ProtocolStateReview states a related shape but its
+# C++ binding is a named TLS handshake analysis, with no generic notion of
+# preserving pinned state when the incoming field is absent.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1108: the pinned key is preserved only when the incoming packet also carries one"
+  lang cpp
+  file src/mesh/NodeDB.cpp
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  bool NodeDB::updateUser(uint32_t nodeId, meshtastic_User &p, uint8_t channelIndex)
+  {
+      meshtastic_NodeInfoLite *info = getOrCreateMeshNode(nodeId);
+      if (!info) {
+          return false;
+      }
+
+      if (p.public_key.size > 0) {
+          if (info->user.public_key.size > 0) {
+              // if we have a key for this user already, don't overwrite with a new one
+              memcpy(p.public_key.bytes, info->user.public_key.bytes, 32);
+          }
+      }
+
+      auto lite = TypeConversions::ConvertToUserLite(p);
+      info->user = lite;
+      info->has_user = true;
+      return true;
+  }
+  ```
+
+test "rank1108: the pinned key is preserved regardless of what the incoming packet carries"
+  lang cpp
+  file src/mesh/NodeDB.cpp
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  bool NodeDB::updateUser(uint32_t nodeId, meshtastic_User &p, uint8_t channelIndex)
+  {
+      meshtastic_NodeInfoLite *info = getOrCreateMeshNode(nodeId);
+      if (!info) {
+          return false;
+      }
+
+      if (info->user.public_key.size > 0) {
+          // if we have a key for this user already, don't overwrite with a new one
+          p.public_key.size = 32;
+          memcpy(p.public_key.bytes, info->user.public_key.bytes, 32);
+      }
+
+      auto lite = TypeConversions::ConvertToUserLite(p);
+      info->user = lite;
+      info->has_user = true;
+      return true;
+  }
+  ```

@@ -1,0 +1,124 @@
+# Rank 1101 / CVE-2026-54297: Faraday's nested params decoder puts no limit on
+# how deeply a query string may nest, so a key like a[b][c][d]... builds one
+# container per bracket pair and recurses once per level, exhausting the stack
+# (CWE-674).
+#
+# ATTENTION: vocabulary gap. No concept states unbounded nesting depth from
+# untrusted input; a binding on Faraday's own validate_params_depth! would not
+# transfer, and labelling callers fires on every user of the library.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1101: the decoder iterates unbounded subkeys"
+  lang ruby
+  file lib/faraday/encoders/nested_params_encoder.rb
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  module Faraday
+    module DecodeMethods
+      SUBKEYS_REGEX = /[^\[\]]+(?:\]?\[\])?/
+
+      def decode(query)
+        return nil if query.nil?
+
+        params = {}
+        query.split('&').each do |pair|
+          next if pair.empty?
+
+          key, value = pair.split('=', 2)
+          key = unescape(key)
+          value = unescape(value.tr('+', ' ')) if value
+          decode_pair(key, value, params)
+        end
+
+        dehash(params, 0)
+      end
+
+      def decode_pair(key, value, context)
+        subkeys = key.scan(SUBKEYS_REGEX)
+        subkeys.each_with_index do |subkey, i|
+          is_array = subkey =~ /[\[\]]+\Z/
+          subkey = Regexp.last_match.pre_match if is_array
+          last_subkey = i == subkeys.length - 1
+
+          context = prepare_context(context, subkey, is_array, last_subkey)
+          add_to_context(is_array, context, value, subkey) if last_subkey
+        end
+      end
+
+      def dehash(hash, depth)
+        hash.each do |key, value|
+          hash[key] = dehash(value, depth + 1) if value.is_a?(Hash)
+        end
+
+        if depth.positive? && !hash.empty? && hash.keys.all? { |k| k =~ /^\d+$/ }
+          hash.sort.map(&:last)
+        else
+          hash
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1101: the decoder raises once the subkey count passes the limit"
+  lang ruby
+  file lib/faraday/encoders/nested_params_encoder.rb
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  module Faraday
+    module DecodeMethods
+      SUBKEYS_REGEX = /[^\[\]]+(?:\]?\[\])?/
+
+      def decode(query)
+        return nil if query.nil?
+
+        params = {}
+        query.split('&').each do |pair|
+          next if pair.empty?
+
+          key, value = pair.split('=', 2)
+          key = unescape(key)
+          value = unescape(value.tr('+', ' ')) if value
+          decode_pair(key, value, params)
+        end
+
+        dehash(params, 0)
+      end
+
+      def decode_pair(key, value, context)
+        subkeys = key.scan(SUBKEYS_REGEX)
+        validate_params_depth!(subkeys.length)
+
+        subkeys.each_with_index do |subkey, i|
+          is_array = subkey =~ /[\[\]]+\Z/
+          subkey = Regexp.last_match.pre_match if is_array
+          last_subkey = i == subkeys.length - 1
+
+          context = prepare_context(context, subkey, is_array, last_subkey)
+          add_to_context(is_array, context, value, subkey) if last_subkey
+        end
+      end
+
+      def validate_params_depth!(depth)
+        return unless @param_depth_limit && depth > @param_depth_limit
+
+        raise Faraday::Error, "exceeded nested parameter depth limit of #{@param_depth_limit}"
+      end
+
+      def dehash(hash, depth)
+        hash.each do |key, value|
+          hash[key] = dehash(value, depth + 1) if value.is_a?(Hash)
+        end
+
+        if depth.positive? && !hash.empty? && hash.keys.all? { |k| k =~ /^\d+$/ }
+          hash.sort.map(&:last)
+        else
+          hash
+        end
+      end
+    end
+  end
+  ```
