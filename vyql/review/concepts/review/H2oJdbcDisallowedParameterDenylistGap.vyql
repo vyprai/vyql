@@ -1,0 +1,8 @@
+module code;
+
+review code.H2oJdbcDisallowedParameterDenylistGap {
+  category: code_execution
+  expected: [core.AllowlistValidation, core.CodeExecutionValidation]
+  kind: attention
+  text: "review H2O's default JDBC connection-parameter denylist for driver parameters, such as postgresql socketFactory or mysql statementInterceptors, that load and instantiate an arbitrary class"
+}

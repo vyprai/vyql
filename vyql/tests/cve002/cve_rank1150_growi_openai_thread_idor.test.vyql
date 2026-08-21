@@ -1,0 +1,93 @@
+# Rank 1150 / CVE-2026-25083: GROWI's OpenAI thread and message routes look
+# up a ThreadRelation by threadId alone, so a logged-in user who learns a
+# shared AI assistant's thread id can read or post into another user's
+# thread (CWE-862). postMessageHandlersFactory and its siblings
+# (get-messages, get-threads, delete-thread, edit) call
+#
+#   const threadRelation = await ThreadRelationModel.findOne({ threadId });
+#
+# with threadId taken straight from req.body/req.params and no filter tying
+# the row to req.user. The fixed revision adds userId: user._id to every
+# ThreadRelationModel query and to getThreadsByAiAssistantId's and
+# deleteThread's signatures.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports the same seven
+# VYQL-CFG-014 rows plus one VYQL-RF-003 row, all in unrelated login and
+# page-listing code; req.body is labelled code.HttpInput at the threadId
+# destructure but ThreadRelationModel.findOne itself carries no sink or
+# check label in either revision. code.IdorPolicyReview (VYQL-AUTH-081) is
+# the right concept and has JavaScript bindings, but every one of them keys
+# on a presence match naming one project's identifiers (a Prisma
+# accounts.update call missing "currentUserId", a phpReview marker string),
+# not on the general shape "a query object literal missing an ownership
+# key". Stating that shape as a binding without naming this project's
+# userId/ThreadRelationModel needs the engine to reason about which fields
+# an object literal omits relative to a schema it has never seen, and a
+# flat-bag negation of that kind reports a collection lookup that
+# legitimately owns every row it returns: an identical shape. No definition
+# change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1150: thread lookup keyed only by threadId, no owner filter"
+  lang javascript
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  export const postMessageHandlersFactory = (crowi) => {
+    return [
+      loginRequiredStrictly,
+      certifyAiService,
+      async (req, res) => {
+        const { user } = req;
+        const { aiAssistantId, threadId } = req.body;
+
+        const aiAssistant = await AiAssistantModel.findById(aiAssistantId);
+        if (aiAssistant == null) {
+          return res.apiv3Err(new ErrorV3('AI assistant not found'), 404);
+        }
+
+        const threadRelation = await ThreadRelationModel.findOne({ threadId });
+        if (threadRelation == null) {
+          return res.apiv3Err(new ErrorV3('ThreadRelation not found'), 404);
+        }
+
+        return streamMessageToThread(threadRelation, user);
+      },
+    ];
+  };
+  ```
+
+test "rank1150: thread lookup scoped to the requesting user's id"
+  lang javascript
+  reject VYQL-AUTH-081
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  export const postMessageHandlersFactory = (crowi) => {
+    return [
+      loginRequiredStrictly,
+      certifyAiService,
+      async (req, res) => {
+        const { user } = req;
+        const { aiAssistantId, threadId } = req.body;
+
+        const aiAssistant = await AiAssistantModel.findById(aiAssistantId);
+        if (aiAssistant == null) {
+          return res.apiv3Err(new ErrorV3('AI assistant not found'), 404);
+        }
+
+        const threadRelation = await ThreadRelationModel.findOne({
+          threadId,
+          userId: user._id,
+        });
+        if (threadRelation == null) {
+          return res.apiv3Err(new ErrorV3('ThreadRelation not found'), 404);
+        }
+
+        return streamMessageToThread(threadRelation, user);
+      },
+    ];
+  };
+  ```

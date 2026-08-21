@@ -1206,3 +1206,23 @@ binding httpPersistentAuthReuse205 {
   query pattern presenceNode where node.kind == "any" and node.analysis ~= "http.persistent_auth_reuse_without_reset"
   emit issue code.HttpPersistentAuthReuse at node
 }
+
+binding httpInput206 {
+  query pattern callExpr where callee.path ~= "gst_rtp_buffer_get_payload"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput207 {
+  query pattern callExpr where callee.path ~= "gst_rtp_buffer_get_payload_buffer"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput208 {
+  query pattern callExpr where callee.path ~= "gst_rtp_buffer_get_payload_subbuffer"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput209 {
+  query pattern callExpr where callee.path ~= "gst_rtp_buffer_get_payload_bytes"
+  emit source code.HttpInput at call.result
+}
