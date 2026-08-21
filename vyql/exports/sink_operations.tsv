@@ -20,6 +20,7 @@ UrlFetch	http_request
 RedirectTarget	redirect
 ResponseHeaderWrite	header_injection
 MailHeaderWrite	header_injection
+LineProtocolCommandWrite	header_injection
 Deserialization	deserialization
 XmlParse	xml_parse
 LdapQuery	ldap_query

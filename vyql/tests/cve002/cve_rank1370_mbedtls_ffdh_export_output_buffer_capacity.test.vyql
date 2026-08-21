@@ -1,0 +1,259 @@
+# PSA driver entry points receive the caller's output buffer as a pair: a
+# pointer `data` and, separately, its capacity `data_size`. The contract is that
+# a write longer than `data_size` must not happen -- the entry point returns
+# PSA_ERROR_BUFFER_TOO_SMALL instead. mbedtls_psa_ffdh_export_public_key
+# (library/psa_crypto_ffdh.c) honoured that on one path and not the other. The
+# public-key branch copies `key_buffer_size` bytes and guards it
+# (`if (key_buffer_size > data_size) return PSA_ERROR_BUFFER_TOO_SMALL;`); the
+# key-pair branch derives its own length from the key's metadata,
+# `size_t key_len = PSA_BITS_TO_BYTES(attributes->bits)`, and hands that straight
+# to `mbedtls_mpi_write_binary(&GX, data, key_len)`, a fixed-length write, without
+# ever comparing `key_len` against `data_size`. psa_export_public_key only rejects
+# `data_size == 0` before dispatching, so exporting the public half of an FFDH
+# key pair into any buffer smaller than the modulus writes past its end -- 512
+# bytes for a 4096-bit group.
+#
+# The weakness is the missing capacity comparison, not a copy of untrusted input:
+# a write length computed from key metadata is used against a caller-supplied
+# buffer whose separately-passed capacity parameter the function never consults.
+#
+# Fix commit 01bcc1f75457b7089a796f222abc28c62c3f2ef8 ("Add missing FFDH public
+# key buffer length check") is a single-parent non-merge commit that inserts
+# exactly the missing check ahead of the length's first use:
+#
+#   size_t key_len = PSA_BITS_TO_BYTES(attributes->bits);
+#   if (key_len > data_size) {
+#       status = PSA_ERROR_BUFFER_TOO_SMALL;
+#       goto cleanup;
+#   }
+#
+# It arrived inside pull request #1501, whose other commits are the unrelated
+# RFC 7919 peer-key validation work, and shipped in 3.6.6.
+#
+# ATTENTION, engine gap. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB
+# -flags with` over `library/` reports 3709 findings and 9345 flags at the
+# vulnerable revision and 3709 findings and 9345 flags at the fixed one, stable
+# across three runs each; the psa_crypto_ffdh.c rows are the same set at both,
+# shifted by the four inserted lines. What the engine does report in this very
+# function is the opposite of the defect: VYQL-MEM-016 (code.RawMemoryCopySize)
+# fires on the memcpy in the branch that *is* guarded, at :160 and :248, and
+# nothing fires on the unguarded mpi write at :182. `vyql match` over the
+# function reports no source and no sink, only code.NullableDeref and
+# code.PointerUse on `*data_length`; `vyql explain` reports one low VYQL-MEM-006
+# for that same deref.
+#
+# The call itself is reachable to a binding: an overlay binding on
+# `callee.method == "mbedtls_mpi_write_binary"` labels the write even though it
+# sits inside the `MBEDTLS_MPI_CHK(...)` macro invocation, so the macro-expansion
+# gap is not what blocks this. Precision is. That same overlay binding fires at 31
+# sites across `library/` -- asn1write.c, dhm.c, ecdh.c, ecdsa.c, ecjpake.c,
+# ecp.c, pk_wrap.c, psa_crypto.c, psa_crypto_ecp.c, rsa.c, x509write_crt.c and
+# the three ffdh ones -- for one true positive, and it fires on the fixed line
+# too. ecdsa.c:426 is the shape it cannot separate: the same call, the same
+# `data` destination name, a length that is correct because the destination is a
+# local `2 * grp_len` buffer.
+#
+# Separating them needs a fact nothing emits: whether the write length is
+# compared against the destination's capacity parameter before the write.
+# Binding predicates over `analysis.function.context` tokens are contains/
+# contains-any tests over independent token strings with no way to correlate one
+# token's captured text with another's, so the only expressible form of "the
+# length is never checked against the capacity" is a literal name pair
+# (`key_len>data_size`) -- and even that does not discriminate here, because the
+# vulnerable function carries `binary:key_buffer_size>data_size` from its
+# other branch. Per-function absence of PSA_ERROR_BUFFER_TOO_SMALL fails for the
+# same reason: the vulnerable function returns it, one branch over.
+#
+# Behaviour to add: for a C function whose parameters include an output pointer
+# and a separate capacity, observe a write into that pointer whose length
+# expression is never compared against the capacity on the path reaching the
+# write, and stay quiet when the destination is a local of known size. Not
+# mechanical: it is a new classification with a new correlation -- a write call's
+# length argument against a capacity parameter, and the dominance of the guard
+# over the write -- rather than a bounded correction to an existing extraction
+# path, and without that correlation the label costs 30 false positives on this
+# library alone.
+#
+# The pair below isolates the boundary. A length derived from a key-attribute
+# field is reported when it indexes the output buffer directly (VYQL-MEM-010,
+# code.FieldDerivedIndexAccess); the same length, in the same function, used
+# instead as the write-length argument of a call into that buffer while
+# `data_size` goes unread, is reported by nothing.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1370: ffdh public key export writes a metadata-derived length into the caller's buffer without checking its capacity"
+  lang c
+  file library/psa_crypto_ffdh.c
+  reject VYQL-MEM-010
+  reject VYQL-MEM-023
+  reject_review code.FieldDerivedIndexAccess
+  reject_review code.CompressedBlockSizeCapacityMismatch
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  psa_status_t mbedtls_psa_ffdh_export_public_key(
+      const psa_key_attributes_t *attributes,
+      const uint8_t *key_buffer,
+      size_t key_buffer_size,
+      uint8_t *data,
+      size_t data_size,
+      size_t *data_length)
+  {
+      int ret = MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
+      psa_status_t status = PSA_ERROR_CORRUPTION_DETECTED;
+      mbedtls_mpi GX, G, X, P;
+      psa_key_type_t type = attributes->type;
+
+      if (PSA_KEY_TYPE_IS_PUBLIC_KEY(type)) {
+          if (key_buffer_size > data_size) {
+              return PSA_ERROR_BUFFER_TOO_SMALL;
+          }
+          memcpy(data, key_buffer, key_buffer_size);
+          memset(data + key_buffer_size, 0, data_size - key_buffer_size);
+          *data_length = key_buffer_size;
+          return PSA_SUCCESS;
+      }
+
+      mbedtls_mpi_init(&GX); mbedtls_mpi_init(&G);
+      mbedtls_mpi_init(&X); mbedtls_mpi_init(&P);
+
+      size_t key_len = PSA_BITS_TO_BYTES(attributes->bits);
+
+      status = mbedtls_psa_ffdh_set_prime_generator(key_len, &P, &G);
+
+      if (status != PSA_SUCCESS) {
+          goto cleanup;
+      }
+
+      MBEDTLS_MPI_CHK(mbedtls_mpi_read_binary(&X, key_buffer, key_buffer_size));
+      MBEDTLS_MPI_CHK(mbedtls_mpi_exp_mod(&GX, &G, &X, &P, NULL));
+      MBEDTLS_MPI_CHK(mbedtls_mpi_write_binary(&GX, data, key_len));
+
+      *data_length = key_len;
+
+      ret = 0;
+  cleanup:
+      mbedtls_mpi_free(&P); mbedtls_mpi_free(&G);
+      mbedtls_mpi_free(&X); mbedtls_mpi_free(&GX);
+
+      if (status == PSA_SUCCESS && ret != 0) {
+          status = mbedtls_to_psa_error(ret);
+      }
+
+      return status;
+  }
+  ```
+
+test "rank1370: ffdh public key export rejects an output buffer smaller than the key before writing"
+  lang c
+  file library/psa_crypto_ffdh.c
+  reject VYQL-MEM-010
+  reject VYQL-MEM-023
+  reject_review code.FieldDerivedIndexAccess
+  reject_review code.CompressedBlockSizeCapacityMismatch
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  psa_status_t mbedtls_psa_ffdh_export_public_key(
+      const psa_key_attributes_t *attributes,
+      const uint8_t *key_buffer,
+      size_t key_buffer_size,
+      uint8_t *data,
+      size_t data_size,
+      size_t *data_length)
+  {
+      int ret = MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
+      psa_status_t status = PSA_ERROR_CORRUPTION_DETECTED;
+      mbedtls_mpi GX, G, X, P;
+      psa_key_type_t type = attributes->type;
+
+      if (PSA_KEY_TYPE_IS_PUBLIC_KEY(type)) {
+          if (key_buffer_size > data_size) {
+              return PSA_ERROR_BUFFER_TOO_SMALL;
+          }
+          memcpy(data, key_buffer, key_buffer_size);
+          memset(data + key_buffer_size, 0, data_size - key_buffer_size);
+          *data_length = key_buffer_size;
+          return PSA_SUCCESS;
+      }
+
+      mbedtls_mpi_init(&GX); mbedtls_mpi_init(&G);
+      mbedtls_mpi_init(&X); mbedtls_mpi_init(&P);
+
+      size_t key_len = PSA_BITS_TO_BYTES(attributes->bits);
+      if (key_len > data_size) {
+          status = PSA_ERROR_BUFFER_TOO_SMALL;
+          goto cleanup;
+      }
+
+      status = mbedtls_psa_ffdh_set_prime_generator(key_len, &P, &G);
+
+      if (status != PSA_SUCCESS) {
+          goto cleanup;
+      }
+
+      MBEDTLS_MPI_CHK(mbedtls_mpi_read_binary(&X, key_buffer, key_buffer_size));
+      MBEDTLS_MPI_CHK(mbedtls_mpi_exp_mod(&GX, &G, &X, &P, NULL));
+      MBEDTLS_MPI_CHK(mbedtls_mpi_write_binary(&GX, data, key_len));
+
+      *data_length = key_len;
+
+      ret = 0;
+  cleanup:
+      mbedtls_mpi_free(&P); mbedtls_mpi_free(&G);
+      mbedtls_mpi_free(&X); mbedtls_mpi_free(&GX);
+
+      if (status == PSA_SUCCESS && ret != 0) {
+          status = mbedtls_to_psa_error(ret);
+      }
+
+      return status;
+  }
+  ```
+
+test "rank1370: minimal pair -- a key-attribute length that indexes the output buffer directly is caught"
+  lang c
+  file library/psa_crypto_ffdh.c
+  expect VYQL-MEM-010
+  expect_review code.FieldDerivedIndexAccess
+  code
+  ```
+  #include <stdint.h>
+  #include <stddef.h>
+
+  int export_public_key(const psa_key_attributes_t *attributes,
+                        uint8_t *data, size_t data_size, size_t *data_length)
+  {
+      data[attributes->bits] = 0;
+      *data_length = data_size;
+      return 0;
+  }
+  ```
+
+test "rank1370: minimal pair -- the same length as a write call's length argument, with the capacity parameter unread, is not"
+  lang c
+  file library/psa_crypto_ffdh.c
+  reject VYQL-MEM-010
+  reject VYQL-MEM-016
+  reject VYQL-MEM-023
+  reject_review code.FieldDerivedIndexAccess
+  reject_review code.CompressedBlockSizeCapacityMismatch
+  code
+  ```
+  #include <stdint.h>
+  #include <stddef.h>
+
+  int export_public_key(const psa_key_attributes_t *attributes,
+                        uint8_t *data, size_t data_size, size_t *data_length)
+  {
+      size_t key_len = PSA_BITS_TO_BYTES(attributes->bits);
+      mbedtls_mpi_write_binary(&gx, data, key_len);
+      *data_length = key_len;
+      return 0;
+  }
+  ```

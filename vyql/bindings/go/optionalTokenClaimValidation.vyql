@@ -1,0 +1,40 @@
+module bindings.go.optionalTokenClaimValidation;
+
+// RFC 7519's registered `iss` and RFC 7662's introspection response both make the
+// issuer a claim the *token side* supplies, and both leave validating it to the
+// relying party: OpenID Connect Core 3.1.3.7 requires the issuer to match the
+// expected issuer exactly. A relying party that compares the two only when the
+// token actually carries an issuer has made the check optional for whoever mints
+// the token, and a token with no issuer claim -- from another authorization
+// server, or from an introspection endpoint that omits the field -- then passes
+// issuer validation on nothing at all (CWE-287/CWE-290).
+//
+// Three facts together are that shape. A guard on the *claim* being non-empty
+// (`iss != ""`, `claims.Issuer != ""`, `tokenIssuer != ""`); a `!=` comparison
+// whose two sides are both issuer-named, which is the mismatch rejection the
+// guard is wrapped around (`iss != a.issuer`, `claims.Issuer != v.expectedIssuer`,
+// `iss != v.trustedIssuer`); and nothing in the same body establishing that the
+// claim is empty. That last one is the neutraliser, and it is the documented
+// fail-closed form however it is spelled -- an empty or zero-length issuer claim
+// recognised anywhere in the body is what a handler needs in order to refuse one.
+//
+// Two nearby shapes are deliberately not this, and both were measured on real
+// code before the mismatch-comparison fact was required.
+//
+// Reading a configured issuer out of settings and acting on it only when it is
+// set -- `if cfg.Issuer != ""` -- is ordinary provider construction and says
+// nothing about any token, so the presence guard must name the claim rather than
+// the configuration. golang-jwt's Validator.Validate is the harder version of the
+// same thing: `if v.expectedIss != ""` calls verifyIssuer with required=true, and
+// verifyIssuer refuses an empty `iss` in a sibling function. The presence guard
+// there is on the expectation, not on the claim, and no comparison of the two
+// happens in that body at all -- which is what the mismatch-comparison fact
+// distinguishes.
+//
+// Both capitalisations of each side of the comparison are listed because the
+// engine matches binary-expression operands case-sensitively, and Go spells the
+// claim either `iss` or `Iss` and the expectation either `issuer` or `Issuer`.
+binding goOptionalTokenClaimValidation {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and containsAny(node.context.binary, ["iss!=\"\"", "tokenIssuer!=\"\"", "claimIssuer!=\"\"", "claims.Issuer!=\"\"", "token.Issuer!=\"\"", "payload.Issuer!=\"\""]) and containsAny(node.context.binary, ["iss!=issuer", "iss!=Issuer", "Iss!=issuer", "Iss!=Issuer"]) and not containsAny(node.context.binary, ["iss==\"\"", "tokenIssuer==\"\"", "claimIssuer==\"\"", "claims.Issuer==\"\"", "token.Issuer==\"\"", "payload.Issuer==\"\"", "len(iss)==0", "len(iss)<1"])
+  emit issue code.OptionalTokenClaimValidation at node
+}
