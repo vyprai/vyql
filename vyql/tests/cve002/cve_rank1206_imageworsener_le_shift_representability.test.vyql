@@ -1,0 +1,224 @@
+# Rank 1206 / CVE-2017-8326: ImageWorsener's little/big-endian byte-to-int
+# helpers in imagew-util.c -- iw_get_ui16le, iw_get_ui32le, iw_get_i32le,
+# iw_get_ui16be, iw_get_ui32be -- read four `iw_byte` (unsigned char) values
+# out of a caller-supplied buffer and assemble them with plain `<<`, e.g.
+# `b[0] | (b[1]<<8) | (b[2]<<16) | (b[3]<<24)`. Each `b[k]` is an unsigned
+# char, promoted to `int` for the shift; once a byte at the `<<24` or `<<16`
+# position has its high bit set (any value >= 0x80, which is most bytes in a
+# real image), the product is not representable in a 32-bit signed int --
+# "left shift cannot be represented in type int", undefined behaviour under
+# C11 6.5.7p4 (CWE-682, per NVD). imagew-bmp.c's find_high_bit/find_low_bit
+# have the same shape one level down: `x&(1<<i)` for `i` up to 31. Fix
+# a00183107d4b84bc8a714290e824ca9c68dac738 (`git show`, imagew-bmp.c and
+# imagew-util.c only) adds an explicit unsigned cast ahead of every one of
+# these shifts -- `1U<<(unsigned int)i` in the two bmp.c helpers, and
+# `(unsigned int)b[k]<<N` in each util.c helper -- moving the arithmetic into
+# an unsigned type, where left shift is well-defined modulo 2^32 regardless
+# of which bit ends up set. No behaviour changes on a compliant compiler; the
+# UB (and the sanitizer aborts/crashes it can produce, per the CVE) goes
+# away.
+#
+# Two separate reasons this cannot be caught today. Recorded together
+# because both sit on the only real call chain into these functions
+# (imagew-cmd.c's my_readfn -> the iw_iodescr.read_fn function pointer ->
+# imagew-bmp.c's bmpr_read -> iw_get_ui32le/find_high_bit), so fixing either
+# alone would not make rank 1206 detectable.
+#
+# 1. `find_high_bit`/`find_low_bit`'s UB is not data-dependent at all. `x &
+#    (1<<i)` is undefined the moment `i` reaches 31 (find_high_bit's `i`
+#    starts at 31; find_low_bit's loop reaches 31 on its last iteration
+#    whenever `x` is 0), regardless of what `x` holds -- there is no
+#    attacker-controlled *value* that gates the bug, only a loop counter.
+#    This has no taint story for a source/sink engine to trace: it needs a
+#    class of rule this campaign has not built, one that reasons about a
+#    shift amount's own numeric range against the operand type's width
+#    (CERT INT34-C), independent of any data flow. That is design work -- a
+#    new non-taint analysis class -- not a binding or rule-file change, so
+#    it is not carried in ENGINE-GAPS.md's mechanical table.
+#
+# 2. iw_get_ui32le's byte buffer is taint-shaped (file bytes -> shift), and
+#    the sink side already exists: `__binop.shl` is bound to
+#    code.IntegerSizeArithmeticSink (vyql/bindings/c/mce54b166.vyql,
+#    binding integerSizeArithmetic143), reachable by VYQL-NUM-003
+#    (TaintedIntegerSizeArithmetic, vyql/packs/numeric/vypr/numeric/
+#    TaintedIntegerSizeArithmetic.vyql). What never arrives is the source:
+#    `fread`'s own binding (binding httpInput4, same file) is
+#    `emit source code.HttpInput at call.result` -- fread's *return value*
+#    (a byte count) is the thing tagged as attacker-controlled, never the
+#    buffer its first argument writes into. Confirmed directly: a minimal,
+#    CVE-independent repro --
+#      FILE *f = fopen(path,"rb"); unsigned char buf[4]; size_t n;
+#      n = fread(buf,1,4,f);           // return value captured, like
+#                                       // imagew-cmd.c's my_readfn does with
+#                                       // *pbytesread
+#      v = buf[0]|(buf[1]<<8)|(buf[2]<<16)|(buf[3]<<24);
+#    -- reports nothing for the shift (`vyql trace -from code.HttpInput -to
+#    code.IntegerSizeArithmeticSink` shows the source dead-ending at the
+#    fread call itself, zero sinks reached). The one binding-level mechanism
+#    built for exactly this -- an output-parameter taint, `propagate value
+#    from call.result to args[0].pointee` -- parses and compiles cleanly
+#    (parser.v2_parser.go's `parseV2Location`, internal/bindings/
+#    compile_binding.go's `lowerV2Propagation`) but was never wired into
+#    execution: adding it to the `fread` binding and rebuilding makes every
+#    scan panic, `vyql: unsupported compiled v2 binding action kind
+#    "flow_path"`, because internal/bindings/bindings_spec.go's mapping
+#    switch (~line 641, the function converting compiled Actions into
+#    runtime specs) has no case for the "flow_path"/"flow_method" kinds
+#    `propagate value`/`propagate taint` produce -- confirmed by editing the
+#    binding, `make build`, and running the repro above (reverted; no
+#    binding change ships with this rank). Until that switch grows a case
+#    for propagated argument taint, no C binding for a read-into-buffer
+#    function (fread, recv, recvfrom, and by extension any project's own
+#    wrapper whose body calls one of them, exactly ImageWorsener's
+#    my_readfn) can mark its output buffer as attacker-controlled, which is
+#    what fread's own manual page documents it as doing.
+#
+# Aside, not part of the mechanical gap above: even a hypothetical working
+# fix to (2) would not make the `expect`/`reject` pair below discriminate.
+# VYQL-NUM-003 fires purely on "tainted data reaches `__binop.shl`"; it has
+# no notion of the shifted operand's signedness, so it cannot tell `b[k]<<N`
+# (UB) apart from `(unsigned int)b[k]<<N` (well-defined) -- confirmed with a
+# same-function, no-typedef, no-cast minimal pair
+# (chained-strcpy-into-array-then-shift, no ImageWorsener API named): with
+# an explicit unsigned cast on each byte read, VYQL-NUM-003 fires twice;
+# with no cast at all (plain `char`, sign-extension and all), it fires once.
+# Both directions of this CVE's own fix would fire equally were the source
+# gap fixed, so detecting *this* CWE-682 shape needs a signedness-aware rule
+# in addition to the source fix -- recorded here so a future fix to (2)
+# alone is not mistaken for closing this rank.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1206: iw_get_ui32le's byte assembly, fed by a captured fread(), is undetected"
+  lang c
+  file imageworsener_vuln.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stdio.h>
+
+  typedef unsigned char iw_byte;
+
+  static int find_high_bit(unsigned int x)
+  {
+    int i;
+    for(i=31;i>=0;i--) {
+      if(x&(1<<i)) return i;
+    }
+    return 0;
+  }
+
+  static unsigned int iw_get_ui32le(const iw_byte *b)
+  {
+    return b[0] | (b[1]<<8) | (b[2]<<16) | (b[3]<<24);
+  }
+
+  int main(void)
+  {
+    FILE *f;
+    iw_byte buf[4];
+    size_t n;
+    unsigned int mask;
+    int hb;
+
+    f = fopen("in.bmp", "rb");
+    n = fread(buf, 1, 4, f);
+    if (n != 4) return -1;
+    mask = iw_get_ui32le(buf);
+    hb = find_high_bit(mask);
+    return hb;
+  }
+  ```
+
+test "rank1206: the same helpers, cast to unsigned before shifting, are equally undetected"
+  lang c
+  file imageworsener_fixed.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stdio.h>
+
+  typedef unsigned char iw_byte;
+
+  static int find_high_bit(unsigned int x)
+  {
+    int i;
+    for(i=31;i>=0;i--) {
+      if(x&(1U<<(unsigned int)i)) return i;
+    }
+    return 0;
+  }
+
+  static unsigned int iw_get_ui32le(const iw_byte *b)
+  {
+    return (unsigned int)b[0] | ((unsigned int)b[1]<<8) |
+      ((unsigned int)b[2]<<16) | ((unsigned int)b[3]<<24);
+  }
+
+  int main(void)
+  {
+    FILE *f;
+    iw_byte buf[4];
+    size_t n;
+    unsigned int mask;
+    int hb;
+
+    f = fopen("in.bmp", "rb");
+    n = fread(buf, 1, 4, f);
+    if (n != 4) return -1;
+    mask = iw_get_ui32le(buf);
+    hb = find_high_bit(mask);
+    return hb;
+  }
+  ```
+
+# Isolating pair (CVE-independent, existing pipeline, no ImageWorsener API
+# named): the same shift sink is unreached when the byte buffer arrives via
+# `fread` with its return value captured, and reached once the identical
+# bytes arrive via a path the engine already tracks (two chained `strcpy`
+# calls, the same mechanism rank 1204's isolating pairs use) -- gap (2)
+# above.
+
+test "rank1206: fread's return value captured, the shift sink is unreachable"
+  lang c
+  file fread_source_gap.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stdio.h>
+
+  int main(void)
+  {
+    FILE *f;
+    unsigned char buf[4];
+    size_t n;
+    unsigned int v;
+
+    f = fopen("in.bin", "rb");
+    n = fread(buf, 1, 4, f);
+    if (n != 4) return -1;
+    v = buf[0] | (buf[1]<<8) | (buf[2]<<16) | (buf[3]<<24);
+    return (int)v;
+  }
+  ```
+
+test "rank1206: the identical shift is reachable once the bytes arrive through a path the engine tracks"
+  lang c
+  file chained_strcpy_reaches.c
+  expect VYQL-NUM-003
+  code
+  ```
+  #include <string.h>
+
+  int main(int argc, char **argv)
+  {
+    char buf1[256];
+    char buf2[256];
+    unsigned int v;
+
+    strcpy(buf1, argv[1]);
+    strcpy(buf2, buf1);
+    v = buf2[0] | (buf2[1]<<8) | (buf2[2]<<16) | (buf2[3]<<24);
+    return (int)v;
+  }
+  ```

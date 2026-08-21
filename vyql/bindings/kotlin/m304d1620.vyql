@@ -100,6 +100,23 @@ binding intentInput17 {
   emit source code.IntentInput at call.result
 }
 
+// Activity.intent (Kotlin's synthetic property for the SDK's getIntent()) and
+// Intent.data (Kotlin's property for getData()) are both plain property reads,
+// not calls, so the callExpr-based intentInput bindings above never see them:
+// they only match code that names a call like .getStringExtra or
+// .getQueryParameter, and intent.data has neither an intervening call nor a
+// getter suffix of its own. presenceNode with node.kind "any" ranges over the
+// Attr nodes every frontend emits for a plain property read, so it labels the
+// Uri wherever a caller reads it off the Intent that started the component,
+// regardless of what happens to it afterward -- passed straight to a sink,
+// stored in a field, or handed to a further Uri method. Both properties are
+// documented Android/AndroidX API (Activity.getIntent(), Intent.getData()),
+// not anything specific to one app.
+binding intentInput125 {
+  query pattern presenceNode where node.kind == "any" and node.path ~= "intent.data"
+  emit source code.IntentInput at node
+}
+
 binding commandExecution18 {
   query pattern callExpr where callee.method == "exec"
   emit sink code.CommandExecution at args[0]
@@ -257,6 +274,21 @@ binding filePathAccess48 {
 
 binding filePathAccess49 {
   query pattern callExpr where callee.method == "readBytes"
+  emit sink code.FilePathAccess at args[0]
+}
+
+// ContentResolver.openInputStream(Uri) is documented Android API: "Open a
+// stream on to the content associated with a content URI." Its argument
+// names the resource to read the same way a path argument does for
+// FileInputStream above, so an unvalidated Uri reaching it is the same
+// shape as an unvalidated path reaching a file constructor -- the
+// language's own way to name "give me the bytes behind this identifier".
+// Unqualified by receiver type to match the existing filePathAccess
+// bindings' method-name style (and org.apache.commons_commons-io's
+// dependency-gated openInputStream binding, which reads a File rather than
+// a Uri but is the same method name for the same purpose).
+binding filePathAccess126 {
+  query pattern callExpr where callee.method == "openInputStream"
   emit sink code.FilePathAccess at args[0]
 }
 

@@ -1,0 +1,157 @@
+# Rank 1214 / CVE-2023-4876: Inure's TTFViewerActivity reads whatever
+# content URI the Intent that started it carries and opens it directly, with
+# no check that the URI names a TTF font before handing it to the content
+# resolver:
+#
+#   val typeFace = TTFHelper.getTTFFile(contentResolver.openInputStream(intent.data!!)!!,
+#                                       applicationContext,
+#                                       DocumentFile.fromSingleUri(applicationContext, intent!!.data!!)!!.name!!)
+#
+# TTFViewerActivity is exported (android:exported="true") with an
+# intent-filter for android.intent.action.VIEW over content/file/http/https
+# data and no mimeType restriction, so any app on the device can start it
+# with an Intent naming any file the sender can grant read access to, and
+# Inure opens and displays that file's bytes as if it were a font, without
+# checking the Intent's declared type or the resolved name's extension
+# (CWE-200, exposure of sensitive information to an unauthorized actor).
+# Fix 1f0d4d0af47e ("Patched Exposure of Sensitive Information to an
+# Unauthorized Actor") wraps the read in a check --
+# `intent?.type == MimeConstants.ttfType && ...name.endsWith(".ttf")` --
+# and shows a warning instead of opening the stream when either fails.
+#
+# The fixing commit is 1f0d4d0af47e, the Build92 commit whose
+# message is literally "Patched Exposure of Sensitive Information to an
+# Unauthorized Actor" and whose diff touches exactly TTFViewerActivity.kt,
+# MimeConstants.kt (adds `const val ttfType = "font/ttf"`), and the
+# changelog's new "Security" section -- confirmed with `gh api
+# repos/Hamza417/Inure/commits/1f0d4d0af47e` and `git show` on both shas.
+# huntr's own report title for the CVE's bounty
+# (f729d2c8-a62e-4f30-ac24-e187b0a7892a), "Theft of Arbitrary Files due to
+# lack of intent validation and insecure usage of provider paths in
+# TTFViewerActivity.kt", matches 1f0d4d0af47e's diff, not 7db5511753's.
+# pool.tsv line for rank 1214 corrected in place to 1f0d4d0af47e.
+#
+# ATTENTION, engine gap. New bindings ship below (intentInput125 for
+# Activity.intent / Intent.data, filePathAccess126 for
+# ContentResolver.openInputStream, both in
+# vyql/bindings/kotlin/m304d1620.vyql) so VYQL-PATH-001
+# (core.UserControlledData -> code.FilePathAccess) reaches this shape in
+# general -- confirmed with `intent.data` (no `!!`) reaching
+# `contentResolver.openInputStream(...)`: `vyql scan` reports VYQL-PATH-001
+# cleanly, source and sink both at kotlin.flags@resolved /
+# kotlin.sinks@syntactic. The real vulnerable line wraps both `intent.data`
+# and the whole `openInputStream(...)` call in Kotlin's `!!`
+# non-null-assertion operator, and that alone silences the sink: `vyql
+# match` on the real shape with `!!` shows the IntentInput source labelled
+# and no sink at all, while the identical call with `!!` removed shows both.
+# Root cause: tree-sitter-kotlin's grammar (tree-sitter-grammars/
+# tree-sitter-kotlin, node-types.json) represents every unary operator --
+# prefix (`-x`, `!x`, `++x`, `--x`) and postfix (`x!!`, `x++`, `x--`) alike
+# -- as one node kind, `unary_expression`, distinguished only by whether the
+# `argument` or `operator` field comes first.
+# `internal/extract/frontend/treesitter/kotlin.go`'s expr() switch has no
+# case for `unary_expression` at all -- only for `prefix_expression`
+# (kotlin.go:558) and a `postfix_expression` arm folded into the
+# parenthesized/as_expression case (kotlin.go:554), and this grammar defines
+# neither of those node kinds, so both cases are dead. Every Kotlin unary
+# expression instead falls to the switch's generic default, which wraps the
+# operand in `nir.Seq{Parts: [...]}`. `internal/extract/lowering/
+# lowering.go`'s evalCall (:4139) records each call argument's NIR shape as
+# `vkind` on its Arg node via nirKind (:4080), and
+# `internal/bindings/bindings_apply.go`'s sink applicator (:590) explicitly
+# skips a non-collection sink's argument whenever `vkind == "Seq"` -- exactly
+# the tag a `!!`-wrapped argument now carries, so an "at args[N]" sink can
+# never label an argument spelled `x!!`, regardless of which language
+# binding names it. Confirmed independent of this CVE's own bindings: the
+# already-shipped `java.io.FileInputStream(path)` sink reports `code.Arg
+# code.FilePathAccess` under `vyql match`; the identical call spelled
+# `FileInputStream(path!!)` does not. `!!` is Kotlin's ordinary way to
+# assert non-null on a nullable platform type -- exactly what
+# android.content.Intent.getData() and most Android/Java interop calls
+# return -- so this silences every Kotlin sink binding across the corpus
+# whenever the tainted value is asserted non-null at the call site rather
+# than on an earlier line. Fix: add a `case "unary_expression"` to
+# kotlin.go's expr() that reads the `argument` and `operator` fields and
+# returns `nir.Thru{Inner: c.expr(argument)}` for a postfix operator (the
+# `x!!`, `x++`, `x--` shapes the dead `postfix_expression` arm was meant to
+# handle) and `nir.Unary{...}` for a prefix one (the shapes the dead
+# `prefix_expression` case was meant to handle); not attempted here, since
+# this loop stops at engine gaps rather than changing internal/extract.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1214: TTFViewerActivity opens the Intent's URI directly, asserted non-null"
+  lang kotlin
+  reject VYQL-PATH-001
+  code
+  ```
+  class TTFViewerActivity : BaseActivity() {
+      fun onCreate() {
+          lifecycleScope.launch(Dispatchers.Default) {
+              kotlin.runCatching {
+                  val typeFace = TTFHelper.getTTFFile(contentResolver.openInputStream(intent.data!!)!!,
+                                                      applicationContext,
+                                                      DocumentFile.fromSingleUri(applicationContext, intent!!.data!!)!!.name!!)
+
+                  withContext(Dispatchers.Main) {
+                      fontEditText.setTypeface(typeFace, Typeface.NORMAL)
+                  }
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1214: the fixed activity checks the Intent's declared type and the resolved name's extension first"
+  lang kotlin
+  reject VYQL-PATH-001
+  code
+  ```
+  class TTFViewerActivity : BaseActivity() {
+      fun onCreate() {
+          lifecycleScope.launch(Dispatchers.Default) {
+              kotlin.runCatching {
+                  if (intent?.type == MimeConstants.ttfType && DocumentFile.fromSingleUri(applicationContext, intent!!.data!!)?.name!!.endsWith(".ttf")) {
+                      val typeFace = TTFHelper.getTTFFile(contentResolver.openInputStream(intent.data!!)!!,
+                                                          applicationContext,
+                                                          DocumentFile.fromSingleUri(applicationContext, intent!!.data!!)!!.name!!)
+
+                      withContext(Dispatchers.Main) {
+                          fontEditText.setTypeface(typeFace, Typeface.NORMAL)
+                      }
+                  } else {
+                      showWarning("ERR: invalid file type ${intent?.type!!}")
+                  }
+              }
+          }
+      }
+  }
+  ```
+
+# The isolating pair. Same source (Activity.intent -> Intent.data), same
+# sink (ContentResolver.openInputStream), same taint path; only whether the
+# argument is asserted non-null at the call site differs.
+
+test "rank1214: engine gap isolated -- the Uri reaches openInputStream without an assertion"
+  lang kotlin
+  expect VYQL-PATH-001
+  code
+  ```
+  class Foo {
+      fun bar() {
+          val x = contentResolver.openInputStream(intent.data)
+      }
+  }
+  ```
+
+test "rank1214: engine gap isolated -- the identical call asserted non-null does not report"
+  lang kotlin
+  reject VYQL-PATH-001
+  code
+  ```
+  class Foo {
+      fun bar() {
+          val x = contentResolver.openInputStream(intent.data!!)
+      }
+  }
+  ```
