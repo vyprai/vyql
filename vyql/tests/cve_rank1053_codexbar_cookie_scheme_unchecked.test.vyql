@@ -1,0 +1,93 @@
+# Rank 1053 / CVE-2026-43625: CodexBar reattaches imported browser cookies to a
+# redirect target after checking the host and never the scheme, so a redirect
+# to `http://ampcode.com` sends them in cleartext (CWE-319).
+# AmpUsageFetcher.shouldAttachCookie in
+# Sources/CodexBarCore/Providers/Amp/AmpUsageFetcher.swift holds
+#
+#   static func shouldAttachCookie(to url: URL?) -> Bool {
+#       guard let host = url?.host?.lowercased() else { return false }
+#       if host == "ampcode.com" || host == "www.ampcode.com" { return true }
+#       return host.hasSuffix(".ampcode.com")
+#   }
+#
+# The fixed revision splits the host test into isAmpHost and requires
+# `url?.scheme?.lowercased() == "https"` before attaching, keeping the bare host
+# test for deciding whether a URL is a login redirect.
+#
+# ATTENTION. The concept is right and every binding for it is the wrong shape.
+# code.CleartextChannel carries CWE_319 and vulnerableTo
+# crypto.CleartextTransmission, and each binding that emits it requires a
+# literal `http://` in an argument, in Go, Python and elsewhere alike. That
+# finds a hardcoded insecure URL and cannot find this, where the URL arrives
+# from a redirect and the defect is that its scheme is never constrained. The
+# class "a credential is attached to a URL whose scheme was not checked" has no
+# vocabulary at all: there is no concept for a scheme constraint, so there is
+# nothing for the fixed revision's guard to satisfy either.
+#
+# Swift labels the two `code.UrlFetch` sinks in this file and no source and no
+# control, so even a scheme concept needs the cookie attachment bound as a
+# credential-carrying operation before a rule can pair them. Both revisions
+# report 0 findings.
+#
+# verify_current_expected: attention-binding-shape
+
+test "rank1053: cookies are attached after a host check with no scheme check"
+  lang swift
+  file Sources/CodexBarCore/Providers/Amp/AmpUsageFetcher.swift
+  reject VYQL-CFG-002
+  code
+  ```
+  public struct AmpUsageFetcher: Sendable {
+      static func shouldAttachCookie(to url: URL?) -> Bool {
+          guard let host = url?.host?.lowercased() else { return false }
+          if host == "ampcode.com" || host == "www.ampcode.com" { return true }
+          return host.hasSuffix(".ampcode.com")
+      }
+
+      static func isLoginRedirect(_ url: URL) -> Bool {
+          guard self.shouldAttachCookie(to: url) else { return false }
+
+          let path = url.path.lowercased()
+          let components = path.split(separator: "/").map(String.init)
+          return components.contains("login")
+      }
+
+      func attachCookies(to request: inout URLRequest) {
+          guard Self.shouldAttachCookie(to: request.url) else { return }
+          request.setValue(self.importedCookieHeader, forHTTPHeaderField: "Cookie")
+      }
+  }
+  ```
+
+test "rank1053: fix requires https before attaching"
+  lang swift
+  file Sources/CodexBarCore/Providers/Amp/AmpUsageFetcher.swift
+  reject VYQL-CFG-002
+  code
+  ```
+  public struct AmpUsageFetcher: Sendable {
+      static func shouldAttachCookie(to url: URL?) -> Bool {
+          guard url?.scheme?.lowercased() == "https" else { return false }
+          return self.isAmpHost(url)
+      }
+
+      private static func isAmpHost(_ url: URL?) -> Bool {
+          guard let host = url?.host?.lowercased() else { return false }
+          if host == "ampcode.com" || host == "www.ampcode.com" { return true }
+          return host.hasSuffix(".ampcode.com")
+      }
+
+      static func isLoginRedirect(_ url: URL) -> Bool {
+          guard self.isAmpHost(url) else { return false }
+
+          let path = url.path.lowercased()
+          let components = path.split(separator: "/").map(String.init)
+          return components.contains("login")
+      }
+
+      func attachCookies(to request: inout URLRequest) {
+          guard Self.shouldAttachCookie(to: request.url) else { return }
+          request.setValue(self.importedCookieHeader, forHTTPHeaderField: "Cookie")
+      }
+  }
+  ```

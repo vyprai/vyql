@@ -1,0 +1,161 @@
+# Rank 1052 / CVE-2025-55345: Codex CLI in workspace-write mode applies a patch
+# in process after checking only the text of the target path, so a symlink
+# inside the workspace redirects the write outside it (CWE-61).
+# is_write_patch_constrained_to_writable_paths in codex-rs/core/src/safety.rs
+# normalizes lexically and compares prefixes:
+#
+#   // Normalize a path by removing `.` and resolving `..` without touching the
+#   // filesystem (works even if the file does not exist).
+#   ...
+#   abs.starts_with(&root_abs)
+#
+# and an auto-approved patch is then written with SandboxType::None. The fixed
+# revision returns DelegateToExec(action) for the auto-approved case so the
+# write runs under the platform sandbox, which is the only thing that can see
+# where a link points.
+#
+# ATTENTION, for two reasons that are worth separating.
+#
+#  - The weakness class has a concept and no binding here.
+#    code.CanonicalPathStringPrefixContainment carries CWE_22 and CWE_184 and
+#    reads "canonical paths are compared with string-prefix containment instead
+#    of filesystem path containment", which is this function, and it is bound
+#    only for Java's getCanonicalPath().startsWith. The Python realpath-prefix
+#    form is likewise unbound; this is the Rust form, and it is the stronger
+#    case, because the path here is never resolved against the filesystem at
+#    all. The function's own comment says so.
+#  - Even with that binding, the two revisions do not separate. The check is
+#    byte-for-byte identical on both sides; what differs is which process
+#    performs the write. A binding keyed on the check reports the fixed revision
+#    too.
+#
+# Both revisions report 0 findings over the two files.
+#
+# verify_current_expected: attention-unbound-concept
+
+test "rank1052: the containment check never touches the filesystem"
+  lang rust
+  file codex-rs/core/src/safety.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  fn is_write_patch_constrained_to_writable_paths(
+      action: &ApplyPatchAction,
+      writable_roots: &[PathBuf],
+      cwd: &Path,
+  ) -> bool {
+      if writable_roots.is_empty() {
+          return false;
+      }
+
+      // Normalize a path by removing `.` and resolving `..` without touching the
+      // filesystem (works even if the file does not exist).
+      fn normalize(path: &Path) -> Option<PathBuf> {
+          let mut out = PathBuf::new();
+          for comp in path.components() {
+              match comp {
+                  Component::ParentDir => {
+                      out.pop();
+                  }
+                  Component::CurDir => { /* skip */ }
+                  other => out.push(other.as_os_str()),
+              }
+          }
+          Some(out)
+      }
+
+      let is_path_writable = |p: &PathBuf| {
+          let abs = if p.is_absolute() {
+              p.clone()
+          } else {
+              cwd.join(p)
+          };
+          let abs = match normalize(&abs) {
+              Some(v) => v,
+              None => return false,
+          };
+
+          writable_roots.iter().any(|root| {
+              let root_abs = if root.is_absolute() {
+                  root.clone()
+              } else {
+                  normalize(&cwd.join(root)).unwrap_or_else(|| cwd.join(root))
+              };
+
+              abs.starts_with(&root_abs)
+          })
+      };
+
+      action.changes().iter().all(|(path, _)| is_path_writable(path))
+  }
+  ```
+
+test "rank1052: the auto-approved patch is written in process"
+  lang rust
+  file codex-rs/core/src/apply_patch.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub(crate) async fn apply_patch(
+      sess: &Session,
+      sub_id: String,
+      call_id: String,
+      action: ApplyPatchAction,
+  ) -> ResponseInputItem {
+      let writable_roots_snapshot = {
+          let guard = sess.writable_roots.lock().unwrap();
+          guard.clone()
+      };
+
+      let auto_approved = match assess_patch_safety(
+          &action,
+          sess.approval_policy,
+          &writable_roots_snapshot,
+          &sess.cwd,
+      ) {
+          SafetyCheck::AutoApprove { .. } => true,
+          SafetyCheck::AskUser => false,
+          SafetyCheck::Reject { reason } => {
+              return ResponseInputItem::rejected(call_id, reason);
+          }
+      };
+
+      apply_changes_from_apply_patch_and_report(sess, &action, auto_approved).await
+  }
+  ```
+
+test "rank1052: fix sends the auto-approved patch to the sandboxed path"
+  lang rust
+  file codex-rs/core/src/apply_patch.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  pub(crate) async fn apply_patch(
+      sess: &Session,
+      sub_id: &str,
+      call_id: &str,
+      action: ApplyPatchAction,
+  ) -> InternalApplyPatchInvocation {
+      let writable_roots_snapshot = {
+          let guard = sess.writable_roots.lock().unwrap();
+          guard.clone()
+      };
+
+      match assess_patch_safety(
+          &action,
+          sess.approval_policy,
+          &writable_roots_snapshot,
+          &sess.cwd,
+      ) {
+          SafetyCheck::AutoApprove { .. } => {
+              InternalApplyPatchInvocation::DelegateToExec(action)
+          }
+          SafetyCheck::AskUser => {
+              InternalApplyPatchInvocation::Output(ask_user_for_patch(sess, sub_id, call_id, action).await)
+          }
+          SafetyCheck::Reject { reason } => {
+              InternalApplyPatchInvocation::Output(ResponseInputItem::rejected(call_id.to_string(), reason))
+          }
+      }
+  }
+  ```
