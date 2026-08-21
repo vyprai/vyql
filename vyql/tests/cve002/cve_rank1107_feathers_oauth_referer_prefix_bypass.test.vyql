@@ -1,0 +1,70 @@
+# Rank 1107 / CVE-2026-27192: Feathers' OAuth strategy validates the Referer
+# against allowed origins with a string prefix check, so a referer that only
+# starts with an allowed origin string passes while its real origin differs
+# (CWE-346).
+#
+# ATTENTION: vocabulary gap. CorsWildcardPrefixTruncation shares the CWE and
+# prefix-vs-exact theme but describes truncating a `*.host` CORS pattern, not
+# prefix-matching an unparsed Referer against a raw origin string.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1107: the referer is compared to allowed origins by string prefix"
+  lang javascript
+  file packages/authentication-oauth/src/strategy.ts
+  reject VYQL-CFG-018
+  code
+  ```
+  export class OAuthStrategy {
+    async getRedirectUrl(params: Params): Promise<string> {
+      const { origins } = this.authentication.configuration.oauth
+
+      if (Array.isArray(origins)) {
+        const referer = params?.headers?.referer || origins[0]
+        const allowedOrigin = origins.find((current) =>
+          referer.toLowerCase().startsWith(current.toLowerCase())
+        )
+
+        if (!allowedOrigin) {
+          throw new NotAuthenticated(`Referer "${referer}" is not allowed.`)
+        }
+      }
+
+      return origins[0]
+    }
+  }
+  ```
+
+test "rank1107: the referer is parsed to a URL and its origin compared exactly"
+  lang javascript
+  file packages/authentication-oauth/src/strategy.ts
+  reject VYQL-CFG-018
+  code
+  ```
+  export class OAuthStrategy {
+    async getRedirectUrl(params: Params): Promise<string> {
+      const { origins } = this.authentication.configuration.oauth
+
+      if (Array.isArray(origins)) {
+        const referer = params?.headers?.referer || origins[0]
+
+        let refererOrigin: string
+        try {
+          refererOrigin = new URL(referer).origin
+        } catch {
+          throw new NotAuthenticated(`Invalid referer "${referer}".`)
+        }
+
+        const allowedOrigin = origins.find(
+          (current) => refererOrigin.toLowerCase() === current.toLowerCase()
+        )
+
+        if (!allowedOrigin) {
+          throw new NotAuthenticated(`Referer "${referer}" is not allowed.`)
+        }
+      }
+
+      return origins[0]
+    }
+  }
+  ```

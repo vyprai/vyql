@@ -1,0 +1,73 @@
+# Rank 1106 / CVE-2021-24028: fbthrift's table-based deserializer
+# placement-news a new active Thrift union member without destructing the
+# member currently live, so wire data with two fields for the same union leaks
+# the first and can unwind through the wrong destructor (CWE-763).
+#
+# ATTENTION: vocabulary gap. No concept carries CWE_763; ThreadLocalScopeOverwriteWithoutCleanup
+# is the nearest overwrite-without-cleanup shape but is Java ThreadLocal /
+# CWE_362, not a tagged union deserializer.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1106: the new union member is constructed without releasing the old one"
+  lang cpp
+  file thrift/lib/cpp2/protocol/TableBasedSerializer.cpp
+  reject_review code.ThreadLocalScopeOverwriteWithoutCleanup
+  code
+  ```
+  const FieldID& activeUnionMemberId(const void* object, ptrdiff_t offset) {
+      return *reinterpret_cast<const FieldID*>(
+          offset + static_cast<const char*>(object));
+  }
+
+  template <typename Protocol_>
+  void readUnionField(
+          Protocol_* iprot,
+          const StructInfo& structInfo,
+          void* object,
+          ReadState& readState) {
+      const auto* fieldInfo = findFieldInfo(iprot, readState, structInfo);
+      if (fieldInfo) {
+          void* unionVal = getMember(*fieldInfo, object);
+          structInfo.unionExt->initMember[fieldInfo - structInfo.fieldInfos](
+              unionVal);
+          read(iprot, *fieldInfo->typeInfo, readState, unionVal);
+          const_cast<FieldID&>(activeUnionMemberId(
+              object, structInfo.unionExt->unionTypeOffset)) = fieldInfo->id;
+      } else {
+          skip(iprot, readState);
+      }
+  }
+  ```
+
+test "rank1106: the old member is cleared before the new one is constructed"
+  lang cpp
+  file thrift/lib/cpp2/protocol/TableBasedSerializer.cpp
+  reject_review code.ThreadLocalScopeOverwriteWithoutCleanup
+  code
+  ```
+  const int& getActiveId(const void* object, const StructInfo& info) {
+      return *reinterpret_cast<const int*>(
+          static_cast<const char*>(object) + info.unionExt->unionTypeOffset);
+  }
+
+  template <typename Protocol_>
+  void readUnionField(
+          Protocol_* iprot,
+          const StructInfo& structInfo,
+          void* object,
+          ReadState& readState) {
+      if (const auto* fieldInfo = findFieldInfo(iprot, readState, structInfo)) {
+          auto& activeId = const_cast<int&>(getActiveId(object, structInfo));
+          if (activeId != 0) {
+              structInfo.unionExt->clear(object);
+          }
+          void* value = getMember(*fieldInfo, object);
+          structInfo.unionExt->initMember[fieldInfo - structInfo.fieldInfos](value);
+          read(iprot, *fieldInfo->typeInfo, readState, value);
+          activeId = fieldInfo->id;
+      } else {
+          skip(iprot, readState);
+      }
+  }
+  ```

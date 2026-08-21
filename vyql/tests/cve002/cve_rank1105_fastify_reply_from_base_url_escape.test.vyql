@@ -1,0 +1,50 @@
+# Rank 1105 / CVE-2021-21321: fastify-reply-from's forwarding URL builder
+# compares the resolved destination to the configured base by origin only, so a
+# client-controlled path can leave the base's path prefix while sharing its
+# origin (CWE-20).
+#
+# ATTENTION: vocabulary gap. CanonicalPathStringPrefixContainment is Java
+# getCanonicalPath only and does not state "compare full base href including
+# path, not just origin," which is the condition that separates the revisions.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1105: the guard compares origins, not the full base path"
+  lang javascript
+  file lib/utils.js
+  reject VYQL-PATH-040
+  code
+  ```
+  function buildURL (source, reqBase) {
+    const dest = new URL(source, reqBase)
+
+    if (reqBase && !reqBase.startsWith(dest.origin)) {
+      throw new Error('source must be a relative path string')
+    }
+
+    return dest
+  }
+  ```
+
+test "rank1105: the guard compares the full resolved href against the full base"
+  lang javascript
+  file lib/utils.js
+  reject VYQL-PATH-040
+  code
+  ```
+  function buildURL (source, reqBase) {
+    const dest = new URL(source, reqBase)
+
+    if (reqBase) {
+      if (!reqBase.endsWith('/') && dest.href.length > reqBase.length) {
+        reqBase = reqBase + '/'
+      }
+
+      if (!dest.href.startsWith(reqBase)) {
+        throw new Error('source must be a relative path string')
+      }
+    }
+
+    return dest
+  }
+  ```

@@ -1,0 +1,85 @@
+# Rank 1104 / CVE-2026-25223: Fastify computes the request content type two
+# ways that disagree on whether a tab ends the media type, so
+# `application/json\t…` matches the JSON parser but misses the per-type body
+# schema and reaches the route unvalidated (CWE-436).
+#
+# ATTENTION: vocabulary gap. Nothing in the ontology carries CWE_436; the
+# nearest sibling (AmbiguousQueryParameterSeparator) is a Python qs idiom, not
+# a Content-Type delimiter conflict between two functions.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1104: the parser's prefix match treats a tab as a boundary"
+  lang javascript
+  file lib/content-type-parser.js
+  reject_review code.AmbiguousQueryParameterSeparator
+  code
+  ```
+  ContentTypeParser.prototype.getParser = function (contentType) {
+    let parser = this.customParsers.get(contentType)
+    if (parser !== undefined) return parser
+    parser = this.cache.get(contentType)
+    if (parser !== undefined) return parser
+
+    const caseInsensitiveContentType = contentType.toLowerCase()
+    for (let i = 0; i !== this.parserList.length; ++i) {
+      const parserListItem = this.parserList[i]
+      if (
+        caseInsensitiveContentType.slice(0, parserListItem.length) === parserListItem &&
+        (
+          caseInsensitiveContentType.length === parserListItem.length ||
+          caseInsensitiveContentType.charCodeAt(parserListItem.length) === 59 /* `;` */ ||
+          caseInsensitiveContentType.charCodeAt(parserListItem.length) === 32 /* ` ` */ ||
+          caseInsensitiveContentType.charCodeAt(parserListItem.length) === 9  /* `\t` */
+        )
+      ) {
+        parser = this.customParsers.get(parserListItem)
+        this.cache.set(contentType, parser)
+        return parser
+      }
+    }
+
+    return this.customParsers.get('')
+  }
+  ```
+
+test "rank1104: the schema lookup's split does not treat a tab as a boundary"
+  lang javascript
+  file lib/validation.js
+  reject_review code.AmbiguousQueryParameterSeparator
+  code
+  ```
+  function getEssenceMediaType (header) {
+    if (!header) return ''
+    return header.split(/[ ;]/, 1)[0].trim().toLowerCase()
+  }
+
+  function validate (context, request) {
+    const contentType = getEssenceMediaType(request.headers['content-type'])
+    const contentSchema = context[bodySchema][contentType]
+    if (contentSchema !== undefined) {
+      return contentSchema(request.body)
+    }
+    return true
+  }
+  ```
+
+test "rank1104: a single normalizer decides the parser and rejects a bad header before either lookup runs"
+  lang javascript
+  file lib/handle-request.js
+  reject_review code.AmbiguousQueryParameterSeparator
+  code
+  ```
+  const ContentType = require('./content-type')
+  const { FST_ERR_CTP_INVALID_MEDIA_TYPE } = require('./errors')
+
+  function handleRequest (err, request, reply) {
+    const ctHeader = request.headers['content-type']
+    const contentType = new ContentType(ctHeader)
+    if (contentType.isValid === false) {
+      reply.status(415).send(new FST_ERR_CTP_INVALID_MEDIA_TYPE())
+      return
+    }
+    request[kRouteContext].contentTypeParser.run(contentType.toString(), handler, request, reply)
+  }
+  ```
