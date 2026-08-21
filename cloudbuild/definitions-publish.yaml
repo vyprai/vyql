@@ -1,0 +1,80 @@
+# Publish definition bundles on definitions/v* tags as vypr-vyql-definitions@.
+# TAG_NAME comes from the Cloud Build tag trigger.
+timeout: 3600s
+options:
+  logging: CLOUD_LOGGING_ONLY
+  substitution_option: ALLOW_LOOSE
+  pool:
+    name: projects/valid-perigee-471809-r0/locations/europe-west3/workerPools/vypr-ci-amd64
+steps:
+  - id: publish
+    name: gcr.io/google.com/cloudsdktool/google-cloud-cli:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        apt-get update -qq
+        apt-get install -y -qq curl ca-certificates
+        # Pack scripts need a shell; gcloud is already in the image.
+        REF="$$TAG_NAME"
+        if [ -z "$$REF" ]; then
+          echo "TAG_NAME empty; this config is tag-triggered only"
+          exit 1
+        fi
+        case "$$REF" in
+          definitions/v*-free)
+            rest="$${REF#definitions/v}"
+            version="$${rest%-free}"
+            channel=free
+            ;;
+          definitions/v*)
+            version="$${REF#definitions/v}"
+            channel=commercial
+            ;;
+          *)
+            echo "unexpected tag: $$REF" >&2
+            exit 1
+            ;;
+        esac
+        case "$$version" in
+          [0-9]*.[0-9]*.[0-9]*) ;;
+          *) echo "tag must encode semver X.Y.Z (got $$version from $$REF)" >&2; exit 1 ;;
+        esac
+        case "$$version" in
+          *-*) echo "semver must not include prerelease in tag body: $$version" >&2; exit 1 ;;
+        esac
+        echo "publishing channel=$$channel version=$$version"
+        chmod +x scripts/pack-definitions.sh
+        OUT=/workspace/definitions-out
+        OUT_TESTS=/workspace/definitions-out-with-tests
+        case "$$channel" in
+          free)
+            runtime_url="https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz"
+            tests_url="https://dl.vyprsec.ai/vyql/definitions/free/with-tests/latest.tar.gz"
+            ;;
+          commercial)
+            runtime_url="gs://vypr-vyql-definitions-commercial/latest.tar.gz"
+            tests_url="gs://vypr-vyql-definitions-commercial/with-tests/latest.tar.gz"
+            ;;
+        esac
+        ./scripts/pack-definitions.sh --version "$$version" --channel "$$channel" \
+          --out "$$OUT" --url "$$runtime_url"
+        ./scripts/pack-definitions.sh --version "$$version" --channel "$$channel" \
+          --include-tests --out "$$OUT_TESTS" --url "$$tests_url"
+        if [ "$$channel" = free ]; then
+          prefix="gs://dl.vyprsec.ai/vyql/definitions/free"
+        else
+          prefix="gs://vypr-vyql-definitions-commercial"
+        fi
+        gcloud storage cp "$$OUT/definitions.tar.gz" "$$prefix/v$${version}.tar.gz"
+        gcloud storage cp "$$OUT/definitions.tar.gz.sha256" "$$prefix/v$${version}.tar.gz.sha256"
+        gcloud storage cp "$$OUT/definitions.tar.gz" "$$prefix/latest.tar.gz"
+        gcloud storage cp "$$OUT/definitions.tar.gz.sha256" "$$prefix/latest.tar.gz.sha256"
+        gcloud storage cp "$$OUT/latest.json" "$$prefix/latest.json"
+        gcloud storage cp "$$OUT_TESTS/definitions.tar.gz" "$$prefix/with-tests/v$${version}.tar.gz"
+        gcloud storage cp "$$OUT_TESTS/definitions.tar.gz.sha256" "$$prefix/with-tests/v$${version}.tar.gz.sha256"
+        gcloud storage cp "$$OUT_TESTS/definitions.tar.gz" "$$prefix/with-tests/latest.tar.gz"
+        gcloud storage cp "$$OUT_TESTS/definitions.tar.gz.sha256" "$$prefix/with-tests/latest.tar.gz.sha256"
+        gcloud storage cp "$$OUT_TESTS/latest.json" "$$prefix/with-tests/latest.json"
+        echo "published $$prefix v$$version"
