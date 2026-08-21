@@ -1,0 +1,375 @@
+# Rank 1316 / CVE-2019-20788: libvncclient's cursor-shape handler sizes its
+# pixel buffer from the server-supplied rectangle dimensions with no upper
+# bound:
+#
+#   bytesPerPixel = client->format.bitsPerPixel / 8;
+#   bytesPerRow   = (width + 7) / 8;
+#   bytesMaskData = bytesPerRow * height;
+#   if (width * height == 0) return TRUE;
+#   client->rcSource = malloc(width * height * bytesPerPixel);
+#
+# (libvncclient/cursor.c, HandleCursorShape). `width` and `height` come
+# straight off the wire: HandleRFBServerMessage reads a
+# rfbFramebufferUpdateRectHeader with ReadFromRFBServer, byte-swaps
+# rect.r.w/rect.r.h and passes them to HandleCursorShape as ints
+# (libvncclient/rfbproto.c:1766-1784). Two 16-bit values multiplied by up to
+# 4 bytes per pixel wrap the 32-bit product, so a malicious server gets an
+# undersized allocation that the XCursor/RichCursor decode loops then write
+# past -- heap overflow (CWE-190 -> CWE-787), reported by Pavel
+# Cheremushkin. Fix 54220248886b5001fbbb9fa73c4e1a2cb9413fed adds
+# `#define MAX_CURSOR_SIZE 1024` and rejects the rectangle before any
+# allocation: `if (width >= MAX_CURSOR_SIZE || height >= MAX_CURSOR_SIZE)
+# return FALSE;`.
+#
+# ATTENTION, and the blocking gaps are both on record. The sink is
+# present and the rule that judges it ships: `vyql match` on a repro
+# faithful to cursor.c labels the malloc argument
+# `code.IntegerSizeArithmeticSink` (c.flags, `__binop.mul`) on both
+# revisions, and `VYQL-NUM-003` (TaintedIntegerSizeArithmetic,
+# core.UserControlledData -> code.IntegerSizeArithmeticSink) reaches it as
+# soon as a source does. No source ever does, for two independent reasons,
+# each isolated below:
+#
+#  1. Rank 1206's gap -- `fread`/`recv`/`recvfrom` are bound `emit source
+#     code.HttpInput at call.result` (vyql/bindings/c/mce54b166.vyql,
+#     httpInput4/5/6), so a reader taints its return byte count and never
+#     the buffer its pointer argument fills. libvncclient reads the whole
+#     rectangle header that way -- `ReadFromRFBServer(client, (char *)&rect,
+#     sz_rfbFramebufferUpdateRectHeader)` over `read()`, itself
+#     `#define read(sock,buf,len) recv(sock,buf,len,0)` in
+#     libvncclient/sockets.c -- so rect.r.w and rect.r.h are untainted
+#     before they are ever swapped or passed on.
+#  2. Rank 1204's first gap -- c.go's `exprStmt` recognizes only a bare
+#     identifier as an assignment target, so a value stored through a
+#     dereferenced pointer or a struct field (`*out = v`, `h->w = v`) is
+#     dropped instead of modeled. That kills the taint a second time
+#     independently of (1): libvncclient's reader is a wrapper that returns
+#     a status and delivers its payload through an out-pointer, which is the
+#     shape the last two pairs below isolate. Even a tainted value stored
+#     through a local pointer alias in the same function loses its taint.
+#
+# Measured, all with `--cache off --max-ram 6GB`: the four minimal pairs
+# below reduce to "same malloc product, tainted count arrives by return
+# value versus through a pointer store", and only the return-value form
+# reports. A bounded scan of the real checkout at the vulnerable revision
+# confirms it end to end: 1174 findings over the repository, 7 of them in
+# libvncclient/cursor.c, and none is this vulnerability -- 3x VYQL-MEM-010
+# on `colors[client->rcSource[x]]` (cursor.c:112/116/120, the two-element
+# palette lookup, present unchanged at the fixed revision) and 4x VYQL-MEM-006
+# null-deref review flags. Nothing at cursor.c:61, the overflowing malloc.
+#
+# Not mechanical, and not a new gap: (1) needs a binding-declared
+# argument-to-argument propagation wired into the solver's dataflow graph
+# (ENGINE-GAPS.md, rank 1206: `propagate value from call.result to
+# args[0].pointee` compiles but no runtime case consumes the resulting
+# `flow_path` action kind), and (2) needs field/array/pointer-dereference
+# lvalues represented in NIR (`nir.Assign.Targets` is identifier-only) with
+# the taint solver keying state by that path -- a structural IR and solver
+# extension. Both are recorded; this rank belongs on both entries' "also
+# blocks" lists rather than in a new one.
+#
+# One further note for whoever sweeps those gaps: fixing them is necessary
+# but not sufficient to discriminate the two revisions here. The fixed revision's
+# `width >= MAX_CURSOR_SIZE` early return is not a `core.IntegerOverflowGuard`
+# -- the last pair below pins that -- and on the merits it should not be
+# one, since bounding one factor of a three-factor product leaves the
+# product unbounded. Telling the patched revision from the vulnerable one
+# additionally needs a guard concept that reasons about every factor of the
+# multiplication, not just the one it sees compared.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1316: cursor-shape pixel buffer is a malloc of an unbounded wire-dimension product"
+  lang c
+  file cursor.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stdlib.h>
+  #include <string.h>
+  #include <unistd.h>
+  #include <stdint.h>
+
+  #define TRUE  1
+  #define FALSE 0
+
+  typedef int rfbBool;
+
+  typedef struct { int bitsPerPixel; } rfbPixelFormat;
+
+  typedef struct {
+    int sock;
+    rfbPixelFormat format;
+    uint8_t *rcSource;
+  } rfbClient;
+
+  typedef struct { uint16_t x, y, w, h; } rfbRectangle;
+  typedef struct { rfbRectangle r; uint32_t encoding; } rfbFramebufferUpdateRectHeader;
+
+  static rfbBool ReadFromRFBServer(rfbClient *client, char *out, unsigned int n)
+  {
+    return read(client->sock, out, n) == (int) n;
+  }
+
+  rfbBool HandleCursorShape(rfbClient *client, int xhot, int yhot, int width, int height, uint32_t enc)
+  {
+    int bytesPerPixel;
+    size_t bytesPerRow, bytesMaskData;
+    char *buf;
+    uint8_t *ptr;
+    int x, y, b;
+
+    bytesPerPixel = client->format.bitsPerPixel / 8;
+    bytesPerRow = (width + 7) / 8;
+    bytesMaskData = bytesPerRow * height;
+
+    if (width * height == 0)
+      return TRUE;
+
+    if (client->rcSource)
+      free(client->rcSource);
+
+    client->rcSource = malloc(width * height * bytesPerPixel);
+    if (client->rcSource == NULL)
+      return FALSE;
+
+    buf = malloc(bytesMaskData);
+    if (buf == NULL) {
+      free(client->rcSource);
+      client->rcSource = NULL;
+      return FALSE;
+    }
+
+    if (!ReadFromRFBServer(client, buf, bytesMaskData)) {
+      free(client->rcSource);
+      client->rcSource = NULL;
+      free(buf);
+      return FALSE;
+    }
+
+    ptr = client->rcSource;
+    for (y = 0; y < height; y++) {
+      for (x = 0; x < width / 8; x++) {
+        for (b = 7; b >= 0; b--) {
+          *ptr = buf[y * bytesPerRow + x] >> b & 1;
+          ptr += bytesPerPixel;
+        }
+      }
+    }
+
+    free(buf);
+    return TRUE;
+  }
+
+  rfbBool HandleRFBServerMessage(rfbClient *client)
+  {
+    rfbFramebufferUpdateRectHeader rect;
+
+    if (!ReadFromRFBServer(client, (char *) &rect, sizeof(rect)))
+      return FALSE;
+
+    if (!HandleCursorShape(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h, rect.encoding))
+      return FALSE;
+    return TRUE;
+  }
+  ```
+
+test "rank1316: fix rejects the rectangle before allocating when either dimension exceeds the cursor cap"
+  lang c
+  file cursor.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stdlib.h>
+  #include <string.h>
+  #include <unistd.h>
+  #include <stdint.h>
+
+  #define TRUE  1
+  #define FALSE 0
+
+  #define MAX_CURSOR_SIZE 1024
+
+  typedef int rfbBool;
+
+  typedef struct { int bitsPerPixel; } rfbPixelFormat;
+
+  typedef struct {
+    int sock;
+    rfbPixelFormat format;
+    uint8_t *rcSource;
+  } rfbClient;
+
+  typedef struct { uint16_t x, y, w, h; } rfbRectangle;
+  typedef struct { rfbRectangle r; uint32_t encoding; } rfbFramebufferUpdateRectHeader;
+
+  static rfbBool ReadFromRFBServer(rfbClient *client, char *out, unsigned int n)
+  {
+    return read(client->sock, out, n) == (int) n;
+  }
+
+  rfbBool HandleCursorShape(rfbClient *client, int xhot, int yhot, int width, int height, uint32_t enc)
+  {
+    int bytesPerPixel;
+    size_t bytesPerRow, bytesMaskData;
+    char *buf;
+    uint8_t *ptr;
+    int x, y, b;
+
+    bytesPerPixel = client->format.bitsPerPixel / 8;
+    bytesPerRow = (width + 7) / 8;
+    bytesMaskData = bytesPerRow * height;
+
+    if (width * height == 0)
+      return TRUE;
+
+    if (width >= MAX_CURSOR_SIZE || height >= MAX_CURSOR_SIZE)
+      return FALSE;
+
+    if (client->rcSource)
+      free(client->rcSource);
+
+    client->rcSource = malloc(width * height * bytesPerPixel);
+    if (client->rcSource == NULL)
+      return FALSE;
+
+    buf = malloc(bytesMaskData);
+    if (buf == NULL) {
+      free(client->rcSource);
+      client->rcSource = NULL;
+      return FALSE;
+    }
+
+    if (!ReadFromRFBServer(client, buf, bytesMaskData)) {
+      free(client->rcSource);
+      client->rcSource = NULL;
+      free(buf);
+      return FALSE;
+    }
+
+    ptr = client->rcSource;
+    for (y = 0; y < height; y++) {
+      for (x = 0; x < width / 8; x++) {
+        for (b = 7; b >= 0; b--) {
+          *ptr = buf[y * bytesPerRow + x] >> b & 1;
+          ptr += bytesPerPixel;
+        }
+      }
+    }
+
+    free(buf);
+    return TRUE;
+  }
+
+  rfbBool HandleRFBServerMessage(rfbClient *client)
+  {
+    rfbFramebufferUpdateRectHeader rect;
+
+    if (!ReadFromRFBServer(client, (char *) &rect, sizeof(rect)))
+      return FALSE;
+
+    if (!HandleCursorShape(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h, rect.encoding))
+      return FALSE;
+    return TRUE;
+  }
+  ```
+
+test "rank1316: minimal pair -- an allocation product built from a reader's return value is caught"
+  lang c
+  file pair.c
+  expect VYQL-NUM-003
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  void *size_from_read_return(FILE *fp, int bytesPerPixel)
+  {
+    unsigned char b[4];
+    size_t width = fread(b, 1, sizeof(b), fp);
+    return malloc(width * width * bytesPerPixel);
+  }
+  ```
+
+test "rank1316: minimal pair -- the same product built from a struct the reader filled is not"
+  lang c
+  file pair.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  struct hdr { unsigned short w, h; };
+
+  void *size_from_read_buffer(FILE *fp, int bytesPerPixel)
+  {
+    struct hdr h;
+    if (fread(&h, 1, sizeof(h), fp) != sizeof(h))
+      return NULL;
+    return malloc(h.w * h.h * bytesPerPixel);
+  }
+  ```
+
+test "rank1316: minimal pair -- a reader wrapper that delivers its count through an out-pointer loses it too"
+  lang c
+  file pair.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  static void read_count(FILE *fp, size_t *out)
+  {
+    unsigned char b[4];
+    *out = fread(b, 1, sizeof(b), fp);
+  }
+
+  void *size_from_out_param(FILE *fp, int bytesPerPixel)
+  {
+    size_t width;
+    read_count(fp, &width);
+    return malloc(width * width * bytesPerPixel);
+  }
+  ```
+
+test "rank1316: minimal pair -- a tainted count stored through a local pointer alias loses it in the same function"
+  lang c
+  file pair.c
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  void *size_via_local_pointer_store(FILE *fp, int bytesPerPixel)
+  {
+    unsigned char b[4];
+    size_t width;
+    size_t *p = &width;
+    *p = fread(b, 1, sizeof(b), fp);
+    return malloc(width * width * bytesPerPixel);
+  }
+  ```
+
+test "rank1316: minimal pair -- an upper bound on one factor does not neutralise the product"
+  lang c
+  file pair.c
+  expect VYQL-NUM-003
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  #define MAX_CURSOR_SIZE 1024
+
+  void *size_from_read_return_capped(FILE *fp, int bytesPerPixel)
+  {
+    unsigned char b[4];
+    size_t width = fread(b, 1, sizeof(b), fp);
+    if (width >= MAX_CURSOR_SIZE)
+      return NULL;
+    return malloc(width * width * bytesPerPixel);
+  }
+  ```

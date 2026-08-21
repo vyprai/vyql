@@ -1,0 +1,46 @@
+module bindings.java.generated.m420f6b67;
+
+// com.liferay.portal.kernel.util.ParamUtil is Liferay's documented reader for
+// request parameters: every getX(request, name[, default]) overload returns the
+// named parameter of an HttpServletRequest, PortletRequest or UploadRequest
+// coerced to X, so the value is whatever the client sent. Liferay portlets and
+// MVC action commands read parameters through it rather than through
+// ServletRequest.getParameter, so without this the request surface of a Liferay
+// application is invisible.
+binding httpInput469 {
+  query pattern callExpr where callee.path ~= "ParamUtil"
+  emit source code.HttpInput at call.result
+}
+
+// com.liferay.portal.kernel.repository.model.FileEntry.getFileName returns the
+// name the file was stored under, and getExtension the suffix taken from it. For
+// an entry created from an upload (TempFileEntryUtil.addTempFileEntry and the
+// DLApp add* calls both take the caller's fileName verbatim) that name is the
+// one the client supplied, which is the same client-supplied-name source that
+// MultipartFile.getOriginalFilename already carries.
+binding fileUploadSource470 {
+  query pattern callExpr where callee.method == "getFileName" and callee.receiver.type in [FileEntry, DLFileEntry, Document, FileVersion]
+  emit source code.FileUploadSource at call.result
+}
+
+binding fileUploadSource471 {
+  query pattern callExpr where callee.method == "getExtension" and callee.receiver.type in [FileEntry, DLFileEntry, Document, FileVersion]
+  emit source code.FileUploadSource at call.result
+}
+
+// PortletFileRepository.addPortletFileEntry stores content under a caller-chosen
+// name and MIME type in a portlet's document-library repository, and the file it
+// writes is served back from that repository, so the stored name decides the
+// extension a later request resolves. Its three documented overloads place
+// fileName at index 7 (groupId first, byte[] content) and at index 8 (the
+// externalReferenceCode-prefixed File and InputStream forms), with mimeType
+// immediately after it in each.
+binding unsafeUpload472 {
+  query pattern callExpr where callee.method == "addPortletFileEntry"
+  emit sink code.UnsafeUpload at args[7]
+}
+
+binding unsafeUpload473 {
+  query pattern callExpr where callee.method == "addPortletFileEntry"
+  emit sink code.UnsafeUpload at args[8]
+}
