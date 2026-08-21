@@ -29,7 +29,11 @@ echo "== no references to unpublished content =="
 # cve-1000 is exempt inside the coverage gate that reads it: those are functional
 # paths in a test that skips when the corpus is absent, not citations a reader
 # would try to follow.
-hits="$(grep -rInE '(^|[^a-zA-Z])(plan/|poc/|design/|nomad\.md)' . \
+# The patterns name this repository's unpublished campaign directories, so they
+# match at the start of a path or citation, not inside an upstream file path:
+# lhc_web/design/defaulttheme/... is a real path in LiveHelperChat, not this
+# repository's design/ directory.
+hits="$(grep -rInE '(^|[[:space:]:('"'"'"])(plan/|poc/|design/|nomad\.md)' . \
   --exclude-dir=.git --exclude-dir=bin --exclude=check-hygiene.sh 2>/dev/null \
   | grep -v 'designDir' || true)"
 [ -n "$hits" ] && report "reference to content not in this repository" "$hits"
