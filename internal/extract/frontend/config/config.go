@@ -397,7 +397,8 @@ func scanTemplateExpressions(src []byte, file, scope string) []nir.Stmt {
 				}
 			}
 		}
-		if line == "" || !strings.Contains(line, profile.ExprStart) || containsAny(line, profile.SkipContains) {
+		if line == "" || !strings.Contains(line, profile.ExprStart) ||
+			(containsAny(line, profile.SkipContains) && !containsAny(line, profile.SkipNotContains)) {
 			continue
 		}
 		defaultEscape := escapeActive && containsAnyFold(line, profile.EscapeLineContains)
@@ -541,6 +542,7 @@ type templateProfile struct {
 	ExprEnd              string
 	InputPattern         *regexp.Regexp
 	SkipContains         []string
+	SkipNotContains      []string
 	InputEvent           string
 	RenderEvent          string
 	EscapePrefix         string
@@ -695,6 +697,7 @@ func loadProfile() configProfile {
 				ExprEnd:              firstNonEmpty(metaString(meta, "config_template_expr_end_"+scope), globalExprEnd),
 				InputPattern:         regexp.MustCompile(pattern),
 				SkipContains:         metaList(meta, "config_template_skip_contains_"+scope),
+				SkipNotContains:      metaList(meta, "config_template_skip_not_contains_"+scope),
 				InputEvent:           inputEvent,
 				RenderEvent:          renderEvent,
 				EscapePrefix:         metaString(meta, "config_template_escape_prefix_"+scope),

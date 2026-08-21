@@ -40,13 +40,13 @@ deserialization.DeserializationAbuse	lua
 deserialization.DeserializationAbuse	objc
 deserialization.DeserializationAbuse	php
 deserialization.DeserializationAbuse	powershell
+deserialization.UnsafeReflection	java
 deserialization.Xxe	bash
 deserialization.Xxe	lua
 deserialization.Xxe	powershell
 dos.ReDoS	bash
 dos.ReDoS	c
 dos.ReDoS	cpp
-dos.ReDoS	csharp
 dos.ReDoS	dart
 dos.ReDoS	elixir
 dos.ReDoS	go
@@ -118,6 +118,7 @@ injection.XpathInjection	solidity
 memory.IntegerOverflow	cpp
 memory.IntegerOverflow	objc
 memory.OobRead	go
+memory.OobRead	swift
 memory.OobWrite	c
 memory.OobWrite	cpp
 memory.OobWrite	go
@@ -125,6 +126,7 @@ memory.OobWrite	groovy
 memory.OobWrite	objc
 memory.OobWrite	rust
 memory.OobWrite	scala
+memory.OobWrite	swift
 path.FileInclusion	bash
 path.PathTraversal	solidity
 request_forgery.OpenRedirect	cpp

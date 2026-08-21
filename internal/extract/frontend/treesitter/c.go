@@ -1075,6 +1075,15 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{c.cSwitch(n)}
 	case "compound_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
+	case "labeled_statement": // `name:` marks live code; lower the statement it names
+		var out []nir.Stmt
+		for _, ch := range c.namedChildren(n) {
+			if ch.Kind() == "statement_identifier" {
+				continue
+			}
+			out = append(out, c.stmt(ch)...)
+		}
+		return out
 	}
 	return nil
 }

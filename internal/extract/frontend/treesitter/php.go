@@ -741,6 +741,9 @@ func (c *phConv) phpReviewTokens(n *tree_sitter.Node) []string {
 			add("raw_cookie_httponly_false")
 		}
 	}
+	if phpResolveFailureSentinelNotRejected(compact) {
+		add("resolve_failure_url_validation_bypass")
+	}
 	if phpTempPathJoinBeforeSeparatorCheck(compact) {
 		add("temp_path_join_before_separator_check")
 	}
@@ -1435,6 +1438,63 @@ func phpFatFreeClearEvalCompileWithoutKeyValidation(compact string) bool {
 		}
 	}
 	return true
+}
+
+// phpResolveFailureSentinelNotRejected reports the documented gethostbyname()
+// failure idiom handled by overwriting the resolved variable with a falsy
+// literal instead of rejecting the value. PHP documents gethostbyname() as
+// returning "a string containing the unmodified hostname" on failure, so the
+// caller that compares the answer with its input has detected the failure;
+// assigning a bare false back to the resolved variable records that failure
+// while the function continues, and the address test that follows is skipped
+// by its own truthiness guard, so a host string the resolver refused to
+// interpret is returned as validated. The correlation on the resolved
+// variable's name keeps an unrelated false assignment in the same function --
+// a same-host flag, a status default -- from satisfying the shape, and the
+// call must be the right side of an assignment, so diagnostic code that only
+// prints gethostbyname('example.org') decides nothing here. gethostbynamel(),
+// a different function, does not match the call marker.
+func phpResolveFailureSentinelNotRejected(compact string) bool {
+	search := 0
+	for {
+		callIdx := strings.Index(compact[search:], "gethostbyname(")
+		if callIdx < 0 {
+			return false
+		}
+		callIdx += search
+		search = callIdx + len("gethostbyname(")
+		k := callIdx
+		if k > 0 && compact[k-1] == '@' {
+			k--
+		}
+		// "<$name>=" must sit immediately before the call.
+		if k < 2 || compact[k-1] != '=' || (compact[k-2] != '$' && !phpVarNameByte(compact[k-2])) {
+			continue
+		}
+		vStart := k - 2
+		for vStart > 0 && phpVarNameByte(compact[vStart-1]) {
+			vStart--
+		}
+		if vStart == k-2 {
+			continue
+		}
+		v := "$" + compact[vStart:k-1]
+		cmpNeedle := v + "=="
+		cmpIdx := strings.Index(compact[callIdx:], cmpNeedle)
+		if cmpIdx < 0 {
+			continue
+		}
+		rest := compact[callIdx+cmpIdx+len(cmpNeedle):]
+		for _, lit := range []string{"false", "FALSE", "False"} {
+			if strings.Contains(rest, v+"="+lit) {
+				return true
+			}
+		}
+	}
+}
+
+func phpVarNameByte(b byte) bool {
+	return b == '_' || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
 }
 
 func phpBpDocsSaveMissingAccessPolicy(compact string) bool {

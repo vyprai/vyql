@@ -2152,6 +2152,63 @@ func isRegexApply(path, method string) bool {
 	return path == "re."+method || path == "regex."+method || strings.HasSuffix(path, ".re."+method)
 }
 
+// csharpRegexPatternArg reports which argument of a C# call is the regular-expression
+// pattern, or -1 when the call carries none. The Regex constructor takes the pattern
+// first (`new Regex("…")`, possibly namespace-qualified); the static helpers of the
+// same class take it second, after the input being matched
+// (`Regex.Match/IsMatch/Matches/Replace/Split(input, pattern)`). The instance form
+// (`compiled.IsMatch(input)`) has the pattern only in the compiled object and stays out.
+func csharpRegexPatternArg(path, method string) int {
+	if path == "Regex" || strings.HasSuffix(path, ".Regex") {
+		return 0
+	}
+	switch method {
+	case "Match", "IsMatch", "Matches", "Replace", "Split":
+		if path == "Regex."+method || strings.HasSuffix(path, ".Regex."+method) {
+			return 1
+		}
+	}
+	return -1
+}
+
+// csRegexPassesMatchTimeout reports whether a C# Regex construction passes the
+// matchTimeout argument -- the class's own documented defence against excessive
+// backtracking, in any overload, built inline (`TimeSpan.FromSeconds(…)`,
+// `new TimeSpan(…)`). A timeout held in a field is not resolvable from the call site
+// (a C# field declaration carries no declared type through the NIR) and stays with the
+// reviewer, as does Timeout.InfiniteTimeSpan, which lifts the limit rather than
+// setting one.
+func csRegexPassesMatchTimeout(args []nir.Expr, patIdx int) bool {
+	for i := patIdx + 1; i < len(args); i++ {
+		if c, ok := args[i].(nir.Call); ok {
+			segs := strings.Split(c.Path, ".")
+			last := segs[len(segs)-1]
+			secondLast := ""
+			if len(segs) >= 2 {
+				secondLast = segs[len(segs)-2]
+			}
+			if (c.IsCtor && last == "TimeSpan") || (secondLast == "TimeSpan" && strings.HasPrefix(last, "From")) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// csUnquoteVerbatim strips the C# verbatim-string wrapper a raw literal keeps after generic
+// unquoting: `@"…"` (and the interpolated `$@"…"`), where `""` escapes a quote. A pattern that
+// reached here already unquoted, or never carried the wrapper, is returned unchanged.
+func csUnquoteVerbatim(s string) string {
+	body := s
+	if strings.HasPrefix(body, "$@") {
+		body = body[2:]
+	}
+	if strings.HasPrefix(body, "@\"") && strings.HasSuffix(body, "\"") && len(body) >= 3 {
+		return strings.ReplaceAll(body[2:len(body)-1], "\"\"", "\"")
+	}
+	return s
+}
+
 // catastrophicRegex reports whether a regex has textbook super-linear backtracking structure —
 // a quantifier applied to a group that itself contains a quantifier or an alternation:
 // (a+)+  (a*)*  (.*)*  ((a)+)+  (\d+)*  (a|a)*  (a|ab)*  — the classic ReDoS shapes (CWE-1333/400).
@@ -3452,6 +3509,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		b := l.nextBranch()
 		exn := l.nodeInline("Exception", st.Loc, nil, "exception", "analysis.exception", "", "")
 		l.tryExceptionTargets = append(l.tryExceptionTargets, exn)
+		jcMark := len(sc.jc)
 		l.inRegion("try"+b, func() { l.block(st.Body, sc) })
 		l.tryExceptionTargets = l.tryExceptionTargets[:len(l.tryExceptionTargets)-1]
 		for i, h := range st.Handlers {
@@ -3462,6 +3520,19 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				}
 			}
 			l.inRegion("try"+b+".h"+strconv.Itoa(i), func() { l.block(h, sc) })
+		}
+		// The body and every handler are control regions — either may be skipped or
+		// left partway, so a variable whose constant was written (or cleared) inside
+		// one of them is no longer a known constant after the statement. Without
+		// this, the last write inside the region const-folds out and opaque-predicate
+		// pruning drops a following `if (x)` as a dead branch — the same join the
+		// if/loop merges perform through mergeDeltas' delCnst.
+		touched := make(map[string]bool, len(sc.jc)-jcMark)
+		for i := jcMark; i < len(sc.jc); i++ {
+			touched[sc.jc[i].key] = true
+		}
+		for v := range touched {
+			sc.delCnst(v)
 		}
 		// A `finally` runs on every path out of the try statement, so it belongs to the
 		// region the statement itself sits in — lowered after the body and the handlers,
@@ -4421,6 +4492,19 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	if len(call.Args) >= 1 && isRegexApply(calleePath, call.Method) {
 		if pat, ok := l.resolveRegexPattern(call.Args[0], sc); ok && catastrophicRegex(pat) {
 			l.syntheticCall("analysis.dos.catastrophic_regex", "catastrophic_regex", result, call.Loc, "redos")
+		}
+	}
+	// The C# spelling of the same weakness: .NET passes the pattern as a string-literal argument
+	// to the Regex constructor or one of the class's static helpers, rather than an `re.` call.
+	// Gated on the file's tech so a `Regex` symbol in another language is not read as the BCL
+	// class. A construction that passes the class's documented matchTimeout carries its own
+	// bound on the backtracking and is not reported.
+	if len(call.Args) >= 1 && moduleTech(l.curFile) == "csharp" {
+		if i := csharpRegexPatternArg(calleePath, call.Method); i >= 0 && i < len(call.Args) {
+			if pat, ok := l.resolveRegexPattern(call.Args[i], sc); ok && catastrophicRegex(csUnquoteVerbatim(pat)) &&
+				!csRegexPassesMatchTimeout(call.Args, i) {
+				l.syntheticCall("analysis.dos.catastrophic_regex", "catastrophic_regex", result, call.Loc, "redos")
+			}
 		}
 	}
 	// Dynamic SQL — a query built by f-string / concat / .format() passed straight to an execute()

@@ -391,7 +391,10 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Assign{Value: right}}
 	case "operator_assignment":
 		left := field(n, "left")
-		if left != nil && left.Kind() == "identifier" {
+		// Same target kinds the plain assignment case above accepts. `@memo ||= expr` is
+		// Ruby's ordinary memoization idiom; an instance_variable left that falls through
+		// evaluates the right side and binds it to nothing, so taint stops at the op-assign.
+		if left != nil && (left.Kind() == "identifier" || left.Kind() == "constant" || left.Kind() == "instance_variable") {
 			return []nir.Stmt{nir.AugAssign{Target: c.text(left), Value: c.expr(field(n, "right")), Loc: L}}
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(field(n, "right"))}}
@@ -440,6 +443,20 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// then the block body inline (see callBlockStmts).
 		out := []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 		return append(out, c.callBlockStmts(n)...)
+	case "binary":
+		// `bag[key] << v` appends into a container slot in place. The expression
+		// form keeps the taint-propagating Format, but in statement position that
+		// value is discarded and the write leaves no node a binding can label.
+		// Lower the slot append as a call on the element reference — its dotted
+		// path ends in `[]`, distinct from the element write's base path — so the
+		// appended value is reachable the way a written one is.
+		if c.text(field(n, "operator")) == "<<" {
+			if left := field(n, "left"); left != nil && left.Kind() == "element_reference" {
+				return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{c.expr(field(n, "right"))},
+					Path: c.dotted(left), Method: "<<", Loc: L}}}
+			}
+		}
+		return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 	}
 	// any other expression used as a statement
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}

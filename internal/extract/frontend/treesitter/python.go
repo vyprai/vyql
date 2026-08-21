@@ -410,31 +410,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		inner := kids[0]
 		switch inner.Kind() {
 		case "assignment":
-			right := field(inner, "right")
-			var val nir.Expr = nir.Const{Loc: L}
-			if right != nil {
-				val = c.expr(right)
-			}
-			left := field(inner, "left")
-			tgts := c.targets(left)
-			// subscript store `container[k] = v` (e.g. bag[key] = v, map[k] = param): no
-			// simple name target, so model it as a mutating setitem that taints the container
-			// from v — otherwise a later read `x = container[k]` loses the taint.
-			if len(tgts) == 0 && left != nil && left.Kind() == "subscript" {
-				base := c.expr(field(left, "value"))
-				args := []nir.Expr{val}
-				if k := field(left, "subscript"); k != nil {
-					args = append(args, c.expr(k)) // include the key: bag[dynamic_key] = x
-				}
-				path := c.dotted(field(left, "value"))
-				if path != "" {
-					path += ".__setitem__"
-				}
-				return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
-					Callee: nir.Attr{Base: base, Attr: "__setitem__", Loc: L},
-					Method: "__setitem__", Args: args, Path: path, Loc: L}}}
-			}
-			return []nir.Stmt{nir.Assign{Targets: tgts, Value: val}}
+			return c.assignStmts(inner, L)
 		case "augmented_assignment":
 			left := field(inner, "left")
 			if left != nil && left.Kind() == "identifier" {
@@ -1942,6 +1918,43 @@ func (c *pyConv) paramTypes(params *tree_sitter.Node) map[string]string {
 
 func pyParamName(name string) string {
 	return strings.TrimLeft(name, "*")
+}
+
+// assignStmts lowers an `assignment` node. A chained assignment `a = b = v`
+// nests the inner assignment on the right, which binds the inner targets as a
+// side effect — emit it first so every target receives the value, the same way
+// the JS frontend lowers its chained assignment expressions. Without this the
+// inner targets are never bound and later reads of them see no taint.
+func (c *pyConv) assignStmts(n *tree_sitter.Node, L string) []nir.Stmt {
+	right := field(n, "right")
+	var prefix []nir.Stmt
+	if right != nil && right.Kind() == "assignment" {
+		prefix = append(prefix, c.assignStmts(right, L)...)
+	}
+	var val nir.Expr = nir.Const{Loc: L}
+	if right != nil {
+		val = c.expr(right)
+	}
+	left := field(n, "left")
+	tgts := c.targets(left)
+	// subscript store `container[k] = v` (e.g. bag[key] = v, map[k] = param): no
+	// simple name target, so model it as a mutating setitem that taints the container
+	// from v — otherwise a later read `x = container[k]` loses the taint.
+	if len(tgts) == 0 && left != nil && left.Kind() == "subscript" {
+		base := c.expr(field(left, "value"))
+		args := []nir.Expr{val}
+		if k := field(left, "subscript"); k != nil {
+			args = append(args, c.expr(k)) // include the key: bag[dynamic_key] = x
+		}
+		path := c.dotted(field(left, "value"))
+		if path != "" {
+			path += ".__setitem__"
+		}
+		return append(prefix, nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Attr{Base: base, Attr: "__setitem__", Loc: L},
+			Method: "__setitem__", Args: args, Path: path, Loc: L}})
+	}
+	return append(prefix, nir.Assign{Targets: tgts, Value: val})
 }
 
 func (c *pyConv) targets(left *tree_sitter.Node) []string {
