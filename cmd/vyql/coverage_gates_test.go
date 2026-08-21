@@ -1716,6 +1716,16 @@ var cve1000AcceptedNoSpecRanks = map[int]bool{
 	// its spec are withdrawn, so the ledger row is all that verifies this rank.
 	406: true,
 	574: true, 588: true,
+	// Rank 1255 (kaml YAML anchor/alias billion-laughs DoS, CWE-400/776) is
+	// resource exhaustion via unbounded recursive expansion of a
+	// self-referential structure, not a taint-flow issue, so it has no
+	// source/sink shape to pin. The nearest concept, code.UnboundedResourceOperation,
+	// is populated per-language through a bespoke "<lang>Review" AST classifier
+	// that Kotlin entirely lacks, and the vulnerable revision's kaml exposes no consumer-facing
+	// "unsafe API name" a declarative binding could key on instead -- any
+	// pattern would have to match kaml's own private method names, which is a
+	// repro-shaped patch that transfers nowhere else. See ENGINE-GAPS.md.
+	1255: true,
 }
 
 func nonemptyTSVRows(src string) []string {
