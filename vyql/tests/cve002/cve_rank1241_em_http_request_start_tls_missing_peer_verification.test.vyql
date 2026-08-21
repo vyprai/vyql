@@ -1,0 +1,262 @@
+# Rank 1241 / CVE-2020-13482: em-http-request opened every https: request with
+# EventMachine::Connection#start_tls and never verified the server certificate.
+# HttpConnection#connect ran `@conn.start_tls(@connopts.tls)` on an
+# HttpStubConnection created by EventMachine.bind_connect, and that class
+# implemented neither ssl_verify_peer nor ssl_handshake_completed. EventMachine
+# documents both facts: :verify_peer defaults to off, and even with it on the
+# reactor only calls back into ssl_verify_peer, leaving the chain and hostname
+# check to user code. With no callback and no option, every https: connection
+# accepted any certificate for any hostname (CWE-295). Fix e5fa144f8d adds both
+# callbacks to HttpStubConnection: ssl_verify_peer builds an
+# OpenSSL::X509::Certificate, verifies it against an OpenSSL::X509::Store seeded
+# with the default paths and any :cert_chain_file, and adds it to the store;
+# ssl_handshake_completed calls OpenSSL::SSL.verify_certificate_identity against
+# the requested host.
+#
+# FIXED. code.CertValidationDisabled and VYQL-CFG-004 cover CWE-295, but
+# every Ruby binding for the concept keyed on an explicit disable -- a
+# verify_mode(... VERIFY_NONE) call, or a named project setting verify_ssl to
+# false -- and this weakness has no disabling call at all, only a verification
+# step that no binding states. The new binding states the EventMachine client
+# contract instead: a Ruby file that opens an outbound EventMachine connection
+# (EventMachine.connect / EventMachine.bind_connect), starts TLS on it, and
+# neither passes :verify_peer => true nor performs the OpenSSL certificate work
+# the reactor delegates (verify_certificate_identity, X509::Store#add_cert, or
+# the ssl_verify_peer / ssl_handshake_completed callbacks).
+#
+# Three clauses keep it off ordinary code. The outbound-connect requirement is
+# what separates the client role, where checking the peer certificate is
+# mandatory, from an EventMachine TLS server, where requesting a client
+# certificate is optional; a file that also calls start_server is excluded for
+# the same reason. EventMachine's own reactor primitive EventMachine.start_tls
+# is excluded because it is the C binding underneath Connection#start_tls, not
+# an application starting TLS.
+#
+# Measured bounded (timeout 180, --max-ram 4GB, --cache off): em-http-request at
+# e5fa144f8d^ goes from 12 to 13 findings, the extra one being VYQL-CFG-004 at
+# lib/em-http/http_connection.rb, and e5fa144f8d reports 12 with no VYQL-CFG-004.
+# eventmachine itself (126 ruby files) gains two findings,
+# lib/em/protocols/httpclient2.rb and lib/em/protocols/smtpclient.rb, both
+# bundled clients that call start_tls with no verification of any kind; its own
+# lib/em/connection.rb, lib/em/pure_ruby.rb and its TLS server tests are not
+# reported. faye-websocket-ruby reports lib/faye/websocket/client.rb before
+# f41e67c428 and nothing after it, while its spec/proxy_server.rb, which opens
+# an outbound connection and also calls start_server, is excluded by the server
+# clause. ruby-net-ldap reports none, and neither does jruby's test tree (1494
+# ruby files, 507 findings), whose two VYQL-CFG-004 rows both come from the
+# existing verify_mode bindings.
+
+test "rank1241: an EventMachine client starts TLS with no certificate verification"
+  lang ruby
+  file lib/em-http/http_connection.rb
+  expect VYQL-CFG-004
+  code
+  ```
+  module EventMachine
+
+    class HttpStubConnection < Connection
+      include Deferrable
+      attr_reader :parent
+
+      def parent=(p)
+        @parent = p
+        @parent.conn = self
+      end
+
+      def receive_data(data)
+        @parent.receive_data data
+      end
+
+      def connection_completed
+        @parent.connection_completed
+      end
+
+      def unbind(reason=nil)
+        @parent.unbind(reason)
+      end
+    end
+
+    class HttpConnection
+      attr_accessor :error, :connopts, :uri
+
+      def activate_connection(client)
+        EventMachine.bind_connect(@connopts.bind, @connopts.bind_port,
+                                  @connopts.host, @connopts.port,
+                                  HttpStubConnection) do |conn|
+          @conn = conn
+          conn.parent = self
+        end
+
+        finalize_request(client)
+      end
+
+      def connect(client)
+        @conn.start_tls(@connopts.tls) if client && client.req.ssl?
+      end
+    end
+  end
+  ```
+
+test "rank1241: the fixed revision verifies the chain and the hostname in the TLS callbacks"
+  lang ruby
+  file lib/em-http/http_connection.rb
+  reject VYQL-CFG-004
+  code
+  ```
+  module EventMachine
+
+    class HttpStubConnection < Connection
+      include Deferrable
+      attr_reader :parent
+
+      def parent=(p)
+        @parent = p
+        @parent.conn = self
+      end
+
+      def receive_data(data)
+        @parent.receive_data data
+      end
+
+      def ssl_verify_peer(cert_string)
+        cert = nil
+        begin
+          cert = OpenSSL::X509::Certificate.new(cert_string)
+        rescue OpenSSL::X509::CertificateError
+          return false
+        end
+
+        @last_seen_cert = cert
+
+        if certificate_store.verify(@last_seen_cert)
+          begin
+            certificate_store.add_cert(@last_seen_cert)
+          rescue OpenSSL::X509::StoreError => e
+            raise e unless e.message == 'cert already in hash table'
+          end
+          true
+        else
+          raise OpenSSL::SSL::SSLError.new(%(unable to verify the server certificate for "#{host}"))
+        end
+      end
+
+      def ssl_handshake_completed
+        unless OpenSSL::SSL.verify_certificate_identity(@last_seen_cert, host)
+          raise OpenSSL::SSL::SSLError.new(%(host "#{host}" does not match the server certificate))
+        else
+          true
+        end
+      end
+
+      def host
+        parent.connopts.host
+      end
+
+      def certificate_store
+        @certificate_store ||= begin
+          store = OpenSSL::X509::Store.new
+          store.set_default_paths
+          ca_file = parent.connopts.tls[:cert_chain_file]
+          store.add_file(ca_file) if ca_file
+          store
+        end
+      end
+    end
+
+    class HttpConnection
+      attr_accessor :error, :connopts, :uri
+
+      def activate_connection(client)
+        EventMachine.bind_connect(@connopts.bind, @connopts.bind_port,
+                                  @connopts.host, @connopts.port,
+                                  HttpStubConnection) do |conn|
+          @conn = conn
+          conn.parent = self
+        end
+
+        finalize_request(client)
+      end
+
+      def connect(client)
+        @conn.start_tls(@connopts.tls) if client && client.req.ssl?
+      end
+    end
+  end
+  ```
+
+test "rank1241: an EventMachine TLS server presenting its own certificate is not a client check"
+  lang ruby
+  file lib/echo/tls_server.rb
+  reject VYQL-CFG-004
+  code
+  ```
+  module Echo
+    class Handler < EventMachine::Connection
+      def post_init
+        start_tls(:private_key_file => '/etc/echo/server.key',
+                  :cert_chain_file  => '/etc/echo/server.crt')
+      end
+
+      def receive_data(data)
+        send_data(data)
+      end
+    end
+
+    def self.run
+      EventMachine.run do
+        EventMachine.start_server('0.0.0.0', 8443, Handler)
+      end
+    end
+  end
+  ```
+
+test "rank1241: a client that asks the reactor for peer verification is not reported"
+  lang ruby
+  file lib/echo/tls_client.rb
+  reject VYQL-CFG-004
+  code
+  ```
+  module Echo
+    class Client < EventMachine::Connection
+      def post_init
+        start_tls(:verify_peer => true, :sni_hostname => 'api.example.com')
+      end
+
+      def receive_data(data)
+        @buffer << data
+      end
+    end
+
+    def self.run(host, port)
+      EventMachine.run do
+        EventMachine.connect(host, port, Client)
+      end
+    end
+  end
+  ```
+
+test "rank1241: a TLS proxy that also accepts connections is not reported"
+  lang ruby
+  file spec/proxy_server.rb
+  reject VYQL-CFG-004
+  code
+  ```
+  module Echo
+    class ProxyHandler < EventMachine::Connection
+      def receive_data(data)
+        @backend ||= EventMachine.connect(@host, @port, BackendHandler, self)
+        @backend.send_data(data)
+      end
+
+      def start_backend_tls
+        @backend.start_tls
+      end
+    end
+
+    def self.run
+      EventMachine.run do
+        EventMachine.start_server('0.0.0.0', 8080, ProxyHandler)
+      end
+    end
+  end
+  ```

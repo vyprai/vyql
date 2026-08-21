@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule RecursionGuardIndexedByUnnormalizedKey {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_674, CWE_178]
+    id: "VYQL-DOS-045"
+    severity: high
+  }
+  issue code.RecursionGuardIndexedByUnnormalizedKey as guard
+}
