@@ -2,12 +2,12 @@
 # values without validating them, so an application that puts untrusted data
 # into a request header (a username read from a database, for example) lets an
 # attacker inject CR and LF and thereby add header fields or whole requests to
-# the stream (CWE-74, CWE-93). The fix 7f05a8da46 adds validateFieldValues()
+# the stream (CWE-74, CWE-93). The fixed revision adds validateFieldValues()
 # beside the existing validateFieldNames() in RequestValidation.swift, rejecting
 # CR, LF, NUL and other ASCII control characters per RFC 9110, with HTAB allowed.
 #
 # ATTENTION, on three counts.
-#  - The fix is library-internal hardening. The vulnerable code validates header
+#  - The hardening is library-internal. The vulnerable code validates header
 #    field names and simply has no field-value check; a binding for "a validator
 #    that checks names but not values" would be answerable to this commit rather
 #    than to any documentation, which is the repro-shaped patch the layering
@@ -26,7 +26,7 @@
 #    covering the request side needs either a generalised concept or a sibling
 #    for outbound request headers.
 # No Swift corpus is available here beyond this library itself, so a new sink
-# binding could not be measured for precision and none was shipped.
+# binding cannot be measured for precision and none ships.
 #
 # verify_current_expected: attention-coverage-gap
 

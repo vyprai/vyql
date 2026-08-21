@@ -2,11 +2,11 @@
 # handler read the filename query parameter and joined it onto the image
 # directory before opening it, so a traversal sequence reads any file the
 # process can reach, including configuration holding LLM provider API keys
-# (CWE-23). The fix cceadf222c reduces the name with os.path.basename, resolves
+# (CWE-23). The fixed revision reduces the name with os.path.basename, resolves
 # it with os.path.realpath, and rejects the request unless the resolved path
 # stays under the resolved image directory.
 #
-# Already covered: VYQL-PATH-001 reports the vulnerable form, taking
+# Covered: VYQL-PATH-001 reports the vulnerable form, taking
 # request.args.get as code.HttpInput into the open() call as
 # code.FilePathAccess, with neither core.PathCanonicalization nor
 # core.PathAccessCheck satisfied. On the patched form the canonicalisation and

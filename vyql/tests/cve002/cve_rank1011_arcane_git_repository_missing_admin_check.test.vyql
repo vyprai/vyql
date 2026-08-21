@@ -6,7 +6,7 @@
 # default-role user can therefore read and tamper with GitOps configurations,
 # and by repointing a repository URL to an attacker host while omitting the
 # token field (which the update path only rewrites when supplied) exfiltrate the
-# stored git credentials (CWE-862). The fix 7722068e5a adds checkAdmin(ctx) to
+# stored git credentials (CWE-862). The fixed revision adds checkAdmin(ctx) to
 # the handlers and rejects a URL change that would reuse stored credentials.
 #
 # ATTENTION, precision cost, measured. The obvious detection is peer
@@ -16,7 +16,7 @@
 # code, gives 269 handler methods and 75 checkAdmin calls:
 #  - package-scoped (any handler lacking the helper): 194 alerts for 8 true
 #    positives, 4.1% precision;
-#  - file-scoped (only files that already use the helper): 41 alerts for 8 true
+#  - file-scoped (only files that use the helper): 41 alerts for 8 true
 #    positives, 19.5% precision.
 # The reason is that most endpoints correctly have no admin check: 21 of 31
 # handler files (153 methods) never call checkAdmin because they serve

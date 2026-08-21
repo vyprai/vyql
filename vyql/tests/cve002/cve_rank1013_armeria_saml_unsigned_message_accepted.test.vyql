@@ -8,12 +8,12 @@
 #   }
 #
 # Returning normally means "valid", so an attacker forges an unsigned SAML
-# assertion and authenticates as any user (CWE-304, CWE-347). The fix
-# b2aa9f49b4 adds a signatureRequired property, defaulting to true, and throws
+# assertion and authenticates as any user (CWE-304, CWE-347). The fixed
+# revision adds a signatureRequired property, defaulting to true, and throws
 # InvalidSamlRequestException when the signature is absent.
 #
 # ATTENTION, engine gap: no fail-open branch fact. The right concept exists and
-# already covers this weakness, code.OptionalClientSignatureVerification
+# covers this weakness, code.OptionalClientSignatureVerification
 # (VYQL-AUTH-072, CWE-287/347): "client authentication verifies a signature only
 # when a supplied signature value is non-null". Its Java binding is pinned to
 # raw JCA (Signature.getInstance, initVerify, verify) and does not match the
@@ -24,20 +24,24 @@
 #    vulnerable and the fixed form. Both call isSigned, both contain a bare
 #    return, and both contain a throw; only the branch each sits in differs.
 #  - A binding keyed on node.context.expr is worse than useless here: it matches
-#    the fixed form and not the vulnerable one, because expr captures the fix's
-#    compound guard (signature == null || !signableObj.isSigned()) while the
-#    vulnerable guard is a bare unary negation that expr does not carry. Keying
-#    on it would report the patched code and stay silent on the flaw.
+#    the fixed form and not the vulnerable one, because expr captures the fixed
+#    revision's compound guard (signature == null || !signableObj.isSigned())
+#    while the vulnerable guard is a bare unary negation that expr does not
+#    carry. Keying on it reports the patched code and stays silent on the flaw.
 # The existing JCA binding works around the same problem by requiring a
 # "signature != null" expression and the absence of "signature == null", but
 # that trick does not transfer: the vulnerable code contains signature == null
-# already, for the later check that does throw.
+# in the later check that does throw.
+# Recording ATTENTION rather than shipping a binding that cannot tell the
+# fixed revision from the flaw.
+#
 # What is missing is a control-flow fact linking a guard condition to whether
 # its branch terminates in a throw or in a plain return. That one fact would
 # cover a whole family beyond this CVE: optional signature verification,
 # optional authorization checks, and verifiers that return success on error.
-# Recording ATTENTION rather than shipping a binding that cannot tell the fix
-# from the flaw.
+# on it would report the patched code and stay silent on the flaw; the
+# vulnerable code contains signature == null in the later check that does
+# throw.
 #
 # verify_current_expected: attention-engine-gap
 

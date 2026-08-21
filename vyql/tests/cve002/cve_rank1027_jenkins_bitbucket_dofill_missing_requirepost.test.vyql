@@ -1,9 +1,9 @@
 # Rank 1027 / CVE-2022-20619 (SECURITY-2467): the Bitbucket branch source
-# plugin's doFillRepositoryItems form method was reachable by GET. It resolves
+# plugin's doFillRepositoryItems form method is reachable by GET. It resolves
 # stored Jenkins credentials for a caller-supplied serverUrl and then calls the
 # Bitbucket API with them, so a crafted page could make a victim's browser
 # drive a connection to an attacker's server carrying those credentials
-# (CWE-352). The fix a596f651a4 adds a single annotation, @RequirePOST.
+# (CWE-352). The fixed revision adds a single annotation, @RequirePOST.
 #
 # ATTENTION, precision cost, measured, plus a concept that does not reach it.
 #
@@ -23,7 +23,7 @@
 # object" needs argument-to-call pairing the flat feature bag does not provide,
 # the same limit ranks 1017 and 1022 hit. No Jenkins corpus is available here
 # beyond this one plugin, so a narrower credentials-plus-remote-call binding
-# could not be measured for precision and none was written.
+# cannot be measured for precision and none is written.
 #
 # The existing concept misses this twice over.
 # code.JenkinsCredentialEndpointMissingPostPermission (VYQL-AUTH-073, CWE-862
@@ -31,7 +31,7 @@
 # method names doCreateApiToken, doCheckRepoAccess and doTestGithubAccess, and
 # it also requires the absence of checkPermission or hasPermission. This method
 # performs both an Item.EXTENDED_READ and a CredentialsProvider.USE_ITEM check;
-# the permissions were never the problem, only the missing POST requirement.
+# the permissions are never the problem, only the missing POST requirement.
 #
 # verify_current_expected: attention-precision-cost
 

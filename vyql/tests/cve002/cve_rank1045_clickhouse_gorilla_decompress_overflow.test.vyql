@@ -9,7 +9,7 @@
 #
 # and decompressDataForType received dest as a bare pointer with no size at all,
 # then wrote items_count items into it, items_count also coming from the input.
-# The fix 87fc2a1348 adds bytes_to_skip >= uncompressed_size before the memcpy,
+# The fixed revision adds bytes_to_skip >= uncompressed_size before the memcpy,
 # threads dest_size into decompressDataForType and throws when
 # items_count * sizeof(T) exceeds it, and adds a default arm to the bytes_size
 # switch.
@@ -19,13 +19,13 @@
 # one of them is the CVE's own line: the review condition reads "raw memory copy
 # size expression needs bounds review", with the advisory that the size or source
 # offset can exceed the destination or source object bounds. That is the question
-# the fix answers.
+# the fixed revision answers.
 #
 # Two limits, and the note is only worth having if it states them. The row does
 # not separate the revisions: the fixed file reports the same two rows at the
-# shifted lines, because the guard the fix adds is not recognised as bounding the
+# shifted lines, because the guard the fixed revision adds is not recognised as bounding the
 # copy. And the loop half is invisible. decompressDataForType writing
-# items_count items into a pointer whose size it was never given is the larger of
+# items_count items into a pointer whose size it is never given is the larger of
 # the two bugs and nothing reports it, which is the same shape as ranks 1026,
 # 1032 and 1038: the write is an unstructured index into a plain local, so the
 # index observation never fires.
@@ -63,7 +63,7 @@ test "rank1045: the header byte count is copied into the destination unchecked"
   }
   ```
 
-test "rank1045: the fix bounds the copy against the destination and still reports"
+test "rank1045: the fixed revision bounds the copy against the destination and still reports"
   lang cpp
   file src/Compression/CompressionCodecGorilla.cpp
   expect VYQL-MEM-016

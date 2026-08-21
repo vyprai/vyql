@@ -1,5 +1,5 @@
 # Rank 1044 / CVE-2026-25510: the ci4ms backend file editor writes request-named
-# paths, and before the fix it accepted any extension, so a .php file could be
+# paths, and at the vulnerable revision it accepted any extension, so a .php file could be
 # created or overwritten and then executed (CWE-94, CWE-434). saveFile and
 # createFile in modules/Fileeditor/Controllers/Fileeditor.php take the path and
 # the content straight from the request:
@@ -10,14 +10,14 @@
 #   ...
 #   file_put_contents($fullPath, $content);
 #
-# The fix 86be2930d1 adds $allowedExtensions = ['css','js','html','txt','json',
+# The fixed revision adds $allowedExtensions = ['css','js','html','txt','json',
 # 'sql','md'] and rejects anything else in both methods. It also lowercases the
-# route patterns in FileeditorConfig, because the filter was registered as
+# route patterns in FileeditorConfig, because the filter is registered as
 # backend/Fileeditor while routes match lowercase, so the login filter never ran.
 #
 # FIXED by a binding. CodeIgniter 4's IncomingRequest accessors had no binding at
-# all, so the source was missing and the file reported nothing while its sinks
-# were already labelled: four code.FilePathAccess rows and one basename control.
+# all, so the source is missing and the file reports nothing while its sinks
+# carry labels: four code.FilePathAccess rows and one basename control.
 # request.getVar, getGet, getPost, getPostGet, getGetPost, getJSON and
 # getRawInput now emit code.HttpInput, which is what the framework's request
 # documentation describes them as and nothing more.
@@ -30,8 +30,8 @@
 # move that score.
 #
 # What this does not do is separate the two revisions, and the reason is worth
-# keeping. The path containment the code already had, realpath plus
-# strpos(...) !== 0, is present in both, and the only thing the fix adds is the
+# keeping. The path containment the code has, realpath plus
+# strpos(...) !== 0, is present in both, and the only thing the fixed revision adds is the
 # extension allow-list, which is an in_array test against a property. Binding
 # in_array as a suppressing control is what rank 1034 declined to do, because it
 # is too common in PHP to bind without a measurement no single rank can make. So
@@ -69,7 +69,7 @@ test "rank1044: the file editor writes a path taken from the request"
   }
   ```
 
-test "rank1044: the extension allow-list is not a control, so the fix still reports"
+test "rank1044: the extension allow-list is not a control, so the finding still reports"
   lang php
   file modules/Fileeditor/Controllers/Fileeditor.php
   expect VYQL-PATH-001

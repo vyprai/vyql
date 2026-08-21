@@ -13,10 +13,10 @@
 # with EMIT_LINE a macro that begins buf[offset] = '\0'. A packet ending in
 # '\r' can leave offset at 0 while last_char stays '\r', so the next packet
 # starting with '\n' decrements to -1 and the macro writes buf[-1] (CWE-787).
-# The fix 6c0f101a62 adds the lower bound: when offset is 0 it swallows the
+# The fixed revision adds the lower bound: when offset is 0 it swallows the
 # character and re-sets last_char instead of decrementing.
 #
-# ATTENTION, engine gaps, and the first of them is the one already recorded at
+# ATTENTION, engine gaps, and the first of them is the one recorded at
 # rank 1026, now measured on a second codebase.
 #
 #  - The index guard analysis knows only upper bounds and only field-derived

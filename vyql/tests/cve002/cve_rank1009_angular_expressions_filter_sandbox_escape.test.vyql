@@ -2,12 +2,11 @@
 # filters. compile("a | __proto__")({}, {}) escapes the expression sandbox: the
 # filter name is resolved against JavaScript objects without rejecting
 # prototype-sensitive names, and the generated code reaches the Function
-# constructor, giving arbitrary code execution (CWE-95, CWE-1321). The pool
-# commit was a post-1.5.2 follow-up ("Allow enum of SyntaxType for
-# disabledSyntaxes"), not the fix; corrected to 026afe7 ("Improve security
-# hardening layers"), the core of the 1.5.1 -> 1.5.2 hardening series that
-# blocks __proto__ property keys, protects the Function.prototype.constructor
-# descriptor, and iterates with null-prototype contexts.
+# constructor, giving arbitrary code execution (CWE-95, CWE-1321). The fixed
+# revision ("Improve security hardening layers", the core of the 1.5.1 ->
+# 1.5.2 hardening series) blocks __proto__ property keys, protects the
+# Function.prototype.constructor descriptor, and iterates with
+# null-prototype contexts.
 #
 # ATTENTION, no precise generic detection for this repository.
 #  - The vulnerable code is the evaluator's own sandbox internals (an AST

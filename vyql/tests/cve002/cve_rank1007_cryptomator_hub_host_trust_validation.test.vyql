@@ -5,8 +5,7 @@
 # that config with no host authenticity check, so an attacker could mix a
 # legitimate auth endpoint with a malicious API endpoint and exfiltrate the
 # access token (MITM on Hub key loading; CWE-346 origin validation, CWE-923).
-# The pool commit was the release/1.12.3 merge, not the fix; corrected to the
-# real fix e4903a2 (PR #626, "Implement Hub Host trust validation"), which gates
+# The fixed revision (PR #626, "Implement Hub Host trust validation") gates
 # unlock behind isConsistentHubConfig (token and auth authorities match), an
 # allowed-hosts set, a trusted .cryptomator.cloud https check, an HTTP refusal,
 # and an explicit user host-trust confirmation dialog.

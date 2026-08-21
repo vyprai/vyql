@@ -10,7 +10,7 @@
 # char is signed on the usual platforms, so a length byte of 0x80 or above
 # arrives as a negative number, sails through the "< 32" check, and the write
 # lands before the start of the buffer (CWE-843 as assigned; the mechanism is a
-# signed conversion producing a negative index). The fix 03d1222ab9 declares the
+# signed conversion producing a negative index). The fixed revision declares the
 # buffer and the length as AP4_UI08, so the value is 0 to 255 and the existing
 # comparison finally means something.
 #

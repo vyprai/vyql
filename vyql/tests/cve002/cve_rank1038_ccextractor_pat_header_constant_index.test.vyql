@@ -9,12 +9,13 @@
 #   last_section_number = payload_start[7];
 #
 # pointer_field is the first byte of the packet, so a crafted stream makes
-# payload_length smaller than 8 and both reads land outside the buffer. The fix
+# payload_length smaller than 8 and both reads land outside the buffer. The
+# fixed revision
 # fd7271bae2 returns 0 when payload_length < 8, and adds the matching
 # ES_info_length bound to the two descriptor loops in parse_PMT that still
 # lacked it.
 #
-# ATTENTION, engine gap, and it is the one already recorded for ranks 1026 and
+# ATTENTION, engine gap, and it is the one recorded for ranks 1026 and
 # 1032, measured here on a third codebase. ccIndexAccessObservations in
 # internal/extract/frontend/treesitter/c.go emits the bounds observation only
 # when ccStructuredIndex holds for the index expression, that is only when the
@@ -30,7 +31,7 @@
 #
 # Both revisions of the real file report the same 27 rows, 12 VYQL-MEM-006,
 # 8 VYQL-MEM-010 and 7 VYQL-MEM-016, with 16 fingerprints identical and the rest
-# differing only by the line shift the fix introduces. None of the 8 VYQL-MEM-010
+# differing only by the line shift the fixed revision introduces. None of the 8 VYQL-MEM-010
 # rows is in parse_PAT or in either descriptor loop; they sit at the
 # ctx->pinfo[ctx->nb_program] and ctx->PIDs_programs[elementary_PID] accesses,
 # which are field-derived.

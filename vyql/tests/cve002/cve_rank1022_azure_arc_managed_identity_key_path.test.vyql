@@ -3,14 +3,14 @@
 # by the local IMDS endpoint and read it, then sent the contents as a Basic
 # authorization header. Whoever can answer that endpoint therefore chooses which
 # file is read and receives its contents, which is an elevation of privilege.
-# The fix 9279a4f38b adds ValidatePath: the name must end in .key, the path must
+# The fixed revision adds ValidatePath: the name must end in .key, the path must
 # sit under the platform's token directory, and the file must be at most 4096
 # bytes.
 #
 # ATTENTION, two engine gaps, both isolated with minimal pairs.
 #
 # First, taint does not cross a C# out parameter. In the real file both ends are
-# already labelled, response.Headers.TryGetValue as code.HttpInput and
+# labelled, response.Headers.TryGetValue as code.HttpInput and
 # File.ReadAllText as code.FilePathAccess, yet trace reports the source has no
 # outgoing flow at all. The pair below shows why: the identical read written
 # through an out parameter produces nothing, while the same read taking the
@@ -20,18 +20,18 @@
 # in C#.
 #
 # Second, a containment check is not recognised as a path control in C#. Even
-# with the value arriving by return, adding the fix's own guard, EndsWith(".key")
+# with the value arriving by return, adding the fixed revision's own guard, EndsWith(".key")
 # plus StartsWith against the expected token directory, leaves the finding in
 # place, whether the guard sits in a helper or is inlined. Only Path.GetFullPath,
 # Path.GetFileName and safePath emit core.PathCanonicalization for C#, and
 # StartsWith appears solely inside case-specific negations rather than as a
-# reusable control. Python already suppresses the equivalent realpath plus
+# reusable control. Python suppresses the equivalent realpath plus
 # startswith shape, so the two frontends disagree. Recognising it precisely
 # needs the guard-to-branch relationship, the same missing fact rank 1013 ran
 # into.
 #
 # Closing only the first gap would report the vulnerable code but also the
-# patched code, so both are needed before this rank can be caught.
+# patched code, so this rank needs both before it can report.
 #
 # verify_current_expected: attention-engine-gap
 
@@ -74,7 +74,7 @@ test "rank1022: the same read is reported when the value arrives as a return val
   }
   ```
 
-test "rank1022: the fix's directory containment guard does not suppress the finding"
+test "rank1022: the fixed revision's directory containment guard does not suppress the finding"
   lang csharp
   file sdk/identity/Azure.Identity/src/AzureArcManagedIdentitySource.cs
   expect VYQL-PATH-001

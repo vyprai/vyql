@@ -9,7 +9,7 @@
 #
 # and with len == 0 that closed range is bytes[2...1], a reversed range, which
 # traps at runtime. A broker or a network attacker sending one malformed PUBLISH
-# terminates the client. The fix 010bca6f61 rejects a zero topic length, switches
+# terminates the client. The fixed revision rejects a zero topic length, switches
 # to the half-open bytes[topicStart..<topicEnd], bounds-checks pos against
 # bytes.count, and turns every parse failure in the reader into a protocol error
 # that disconnects instead of continuing.
@@ -21,7 +21,7 @@
 # source and no sink, only four generic code.ResourceReview marks on the socket
 # reads. Both revisions report 0 findings.
 #
-# This is the Swift-side member of the family already recorded for C at ranks
+# This is the Swift-side member of the family recorded for C at ranks
 # 1026, 1032, 1038 and 1045, and it is a separate item rather than the same one:
 # the C gap is an index observation that fires only for field-derived indices,
 # while here the construct is a closed range whose upper bound is computed as

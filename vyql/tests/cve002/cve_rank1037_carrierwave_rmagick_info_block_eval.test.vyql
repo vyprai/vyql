@@ -7,7 +7,7 @@
 #   eval code
 #
 # An option value such as `density: "1 }; p 'Hacked'; {"` closes the lambda body
-# and runs whatever follows. The fix 387116f5c7 drops the generated source
+# and runs whatever follows. The fixed revision drops the generated source
 # entirely and builds a proc that assigns through img.public_send(:"#{k}=", v).
 #
 # CAUGHT by VYQL-INJ-003. The public-API parameter is the source through
@@ -17,7 +17,7 @@
 #
 # Measured on the real checkout, lib/ only: 19 findings at the vulnerable
 # revision, one of them this row at rmagick.rb:379 -> rmagick.rb:383, and 18 at
-# the fix with no rmagick row.
+# the fixed revision with no rmagick row.
 #
 # Both tests declare `profile library` because the source is the public-API
 # parameter. Under the generic profile a method parameter is not a trust

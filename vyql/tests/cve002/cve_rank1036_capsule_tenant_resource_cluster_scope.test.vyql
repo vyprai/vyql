@@ -21,7 +21,8 @@
 #    dynamic-object API: UniversalDeserializer, unstructured.Unstructured,
 #    SetNamespace and controllerutil.CreateOrUpdate have zero occurrences across
 #    the whole binding set, so there is nothing to label and no rule can fire.
-#  - The discriminator is a privilege property, not a code shape. The fix
+#  - The discriminator is a privilege property, not a code shape. The fixed
+# revision
 #    cc4fb45d706d writes the collected objects through a client built from an
 #    impersonated service account instead of the manager's client. The decode,
 #    the SetNamespace and the missing scope check are all still there afterwards,
@@ -30,7 +31,8 @@
 #    controller by an RBAC manifest outside the Go source.
 #
 # A function-scoped presence binding over decode + SetNamespace + write does
-# separate the two revisions, and it separates them for the wrong reason: the fix
+# separate the two revisions, and it separates them for the wrong reason: the
+# fixed revision
 # split HandleSection into handleRawItem and AddToAccumulation, so the three
 # elements stop sharing a function. That detects the refactor, not the weakness,
 # and an operator that keeps them together while writing with a scoped client
@@ -41,7 +43,7 @@
 # RESTMapper, exists only in later releases and is not what closed the advisory.
 # Precision for such a binding cannot be measured here either: no Kubernetes
 # operator corpus is available beyond this repository, and applying an embedded
-# manifest is ordinary operator code wherever the client is already scoped.
+# manifest is ordinary operator code wherever the client is scoped.
 #
 # verify_current_expected: attention-vocabulary-gap
 

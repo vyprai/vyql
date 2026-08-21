@@ -3,11 +3,11 @@
 # returns NULL when the request carries no Authorization header or one whose
 # realm does not match, and dereferenced it on the next statement to read the
 # digest algorithm, so a remote SIP request segfaults the process (CWE-253,
-# CWE-476). The fix 02993717b0 guards the dereference with a ternary and adds an
+# CWE-476). The fixed revision guards the dereference with a ternary and adds an
 # explicit auth_hdr == NULL branch returning PJSIP_SC_FORBIDDEN.
 #
 # ATTENTION, engine gap, and a narrow one. The concept, rule and C binding for
-# this already exist and work: code.UncheckedNullableResultDeref
+# this exist and work: code.UncheckedNullableResultDeref
 # (VYQL-MEM-018, CWE-476) fires from the extractor fact
 # analysis.nullable_result.unchecked_deref, computed in
 # ccUncheckedNullableResultDerefObservations. Three probes locate the gap
@@ -19,7 +19,7 @@
 #  - the same weakness written with a member target (st->auth_hdr = ...) is
 #    reported as VYQL-MEM-018;
 #  - adding the null guard to that member form suppresses it again.
-# So the detection already discriminates the vulnerable form from the patched
+# So the detection discriminates the vulnerable form from the patched
 # one correctly, and only the syntactic form of the assignment target blocks it.
 # Extending the pattern to accept a plain identifier target, including a
 # declaration with a pointer declarator, would make this rank CAUGHT. That is a
@@ -28,7 +28,7 @@
 # dereferences at other lines and none at the vulnerable one, so it is noise
 # rather than evidence here.
 #
-# The last two tests pin the behaviour that already works, so the engine change
+# The last two tests pin the behaviour that works, so the engine change
 # has a regression test waiting for it.
 #
 # verify_current_expected: attention-engine-gap

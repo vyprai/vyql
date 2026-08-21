@@ -2,7 +2,8 @@
 # read past the end of the request buffer. wpm_decode_object_property() called
 # decode_tag_number_and_value(), which takes no buffer size and so cannot stop
 # at the end of the message, and a truncated BACnet/IP packet made it read one
-# to seven bytes beyond the allocation on an embedded device (CWE-125). The fix
+# to seven bytes beyond the allocation on an embedded device (CWE-125). The
+# fixed revision
 # a70ce07507 moves the decoder onto the size-taking family, passing the
 # remaining length and checking the negative return.
 #
@@ -11,11 +12,11 @@
 # binding naming them answers to the library's own header rather than to this
 # CVE. That is what the new concept records: code.DeprecatedUnboundedDecoder
 # (VYQL-MEM-053, CWE-125) reports the presence of a decode primitive with no
-# size argument, in the same low-confidence style already used for strcpy and
+# size argument, in the same low-confidence style used for strcpy and
 # sprintf under code.UnboundedCopySmell. No existing concept covered the read
 # side; the copy smell is scoped to out-of-bounds writes.
 #
-# Measured. On the affected file the count is 7 before the fix and 0 after,
+# Measured. On the affected file the count is 7 at the vulnerable revision and 0 after,
 # because migrating away from the unbounded family is exactly how the
 # maintainers remediated it; across the whole source tree the deprecated calls
 # drop from 28 to 5. Two independent C corpora, asterisk res/ and asterisk
