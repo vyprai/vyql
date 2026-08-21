@@ -510,6 +510,11 @@ binding htmlSanitizerLogicReview99 {
   emit issue code.HtmlSanitizerLogicReview at call
 }
 
+binding htmlSanitizerLogicReview206 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.callPath contains "QuerySelectorAll" and node.context.callPath contains "RemoveAttribute" and not (node.context.identifier contains "IHtmlTemplateElement")
+  emit issue code.HtmlSanitizerLogicReview at node
+}
+
 binding htmlRender100 {
   query pattern callExpr where callee.path ~= "ConfirmModel"
   emit sink code.HtmlRender at args[1]

@@ -1,0 +1,129 @@
+# Rank 1185 / CVE-2025-68696: httparty ignores base_uri whenever the path
+# argument is itself an absolute URL (GHSA-hm5p-x4rq-38w4). A class that
+# pins base_uri to a trusted host and sets an API key header still routes to
+# whatever host a caller-supplied absolute path names, so an attacker who
+# controls that path value redirects the request -- and the configured
+# header -- to a server of their choosing (CWE-918, CWE-20). The fixed
+# revision adds Request#validate_uri_safety!, called from Request#uri right
+# after `path` resolves to `new_uri` and before the query string is
+# attached, comparing new_uri.host against the configured base_uri's host
+# and raising UnsafeURIError on a mismatch (skippable with
+# skip_uri_validation:, and skipped outright on redirects); the spec asserts
+# exactly the advisory's PoC shape.
+#
+# The advisory's own PoC is httparty's documented usage idiom -- a class
+# that `include`s HTTParty and calls its class methods on itself from the
+# outside:
+#
+#   class RepositoryClient
+#     include HTTParty
+#     base_uri 'http://example.test/api/v1/repositories/'
+#     headers 'X-API-KEY' => '1234567890'
+#   end
+#
+#   post '/issue' do
+#     request_body = JSON.parse(request.body.read)
+#     RepositoryClient.get(request_body['repository_id']).body
+#   end
+#
+# vyql match on this shape labels request.body/request.body.read as
+# code.HttpInput and nothing else -- RepositoryClient.get is not labelled at
+# all. vyql resolve confirms the call itself is unresolved
+# (RepositoryClient.get.body, "callee not traced"), and vyql trace from
+# code.HttpInput to code.UrlFetch dead-ends at that same call: "no outgoing
+# flow (callee not traced -- external or cross-package)". vyql scan reports
+# 0 findings on this file, and scanning the real jnunemaker/httparty
+# checkout itself (both at 0529bcd630^ and at 0529bcd630) reports nothing
+# SSRF-related either, because the exploitable call site is application
+# code that merely depends on httparty, not the gem's own source.
+#
+# The direct call form the library's README also documents --
+# HTTParty.get(path, base_uri: '...') with no wrapping class -- already
+# fires VYQL-RF-001 (vypr.request_forgery.Ssrf: taint core.UserControlledData
+# -> code.UrlFetch), because urlFetch119/urlFetch120 in
+# vyql/bindings/ruby/m5a48bf47.vyql key on the literal call path
+# "HTTParty.get"/"HTTParty.post". That binding cannot reach the subclass
+# idiom: "HTTParty.get" is dotted-segment text matching, and a subclass's
+# own name (RepositoryClient here) never contains the literal segment
+# "HTTParty" no matter what it includes.
+#
+# ATTENTION, engine gap. Recognizing the subclass idiom needs the engine to
+# know a given class body includes HTTParty, and Ruby's context-token
+# extraction cannot express that today. `include HTTParty` parses as a
+# `command` node; rbConv.dotted (internal/extract/frontend/treesitter/ruby.go)
+# returns only the command's method name ("include") for that node kind and
+# drops its argument entirely, so no call_path, call, or selector token for
+# "HTTParty" is ever produced. rbStructuredContextTokens's "call" case
+# builds every token from `dotted()`, so this loss is unconditional: no
+# combination of node.context.callPath/call/selector/literal can see which
+# module a class includes. Confirmed by reading the full walk in
+# rbStructuredContextTokens -- only assignment/binary/pair/call/
+# element_reference/string/regex nodes emit tokens, and calls made without
+# parentheses (Ruby's `command` node kind, which is how `include Foo`,
+# `extend Foo`, and `base_uri '...'` are all written) never contribute their
+# argument as a fact. Other frontends already solve this: c.go, php.go,
+# scala.go and rust.go all emit "call_arg:" tokens (matched by
+# node.context.callArg) for a call's arguments, not just its callee chain;
+# ruby.go has no equivalent. Adding one would let a class-scope binding
+# require both a `call` token for "include" and a `callArg` token for
+# "HTTParty" in the same class body, discriminating the mixin generically
+# (any class documented as `include HTTParty` per the library's own README,
+# not this CVE's class name) rather than matching on RepositoryClient by
+# name. That is a Go change to the extractor, not a binding or a rule, so it
+# is not attempted here; entered in ENGINE-GAPS.md with this file's minimal
+# pair as the regression test to isolate it.
+#
+# No definition change shipped.
+#
+# verify_current_expected: attention-precision-limit, the documented
+# subclass idiom produces no finding at all today
+
+test "rank1185: HTTParty.get called directly with a tainted absolute-URL path and a configured base_uri fires the generic SSRF rule"
+  lang ruby
+  file app.rb
+  expect VYQL-RF-001
+  code
+  ```
+  require 'sinatra'
+  require 'httparty'
+
+  post '/issue' do
+    request_body = JSON.parse(request.body.read)
+    HTTParty.get(request_body['repository_id'], base_uri: 'http://example.test/api/v1/repositories/').body
+  end
+  ```
+
+test "rank1185: the same direct call with a hardcoded URL carries no taint and does not fire"
+  lang ruby
+  file app.rb
+  reject VYQL-RF-001
+  code
+  ```
+  require 'sinatra'
+  require 'httparty'
+
+  post '/issue' do
+    HTTParty.get('http://example.test/api/v1/repositories/default', base_uri: 'http://example.test/api/v1/repositories/').body
+  end
+  ```
+
+test "rank1185: the advisory's own subclass idiom (include HTTParty, base_uri pinned, .get called on the class) reaches no sink at all"
+  lang ruby
+  file app.rb
+  reject VYQL-RF-001
+  code
+  ```
+  require 'sinatra'
+  require 'httparty'
+
+  class RepositoryClient
+    include HTTParty
+    base_uri 'http://example.test/api/v1/repositories/'
+    headers 'X-API-KEY' => '1234567890'
+  end
+
+  post '/issue' do
+    request_body = JSON.parse(request.body.read)
+    RepositoryClient.get(request_body['repository_id']).body
+  end
+  ```

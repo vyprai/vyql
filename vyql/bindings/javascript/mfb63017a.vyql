@@ -1130,6 +1130,15 @@ binding allowlistValidation202 {
   }
 }
 
+binding allowlistValidation905 {
+  query pattern callExpr where callee.path ~= "isLoopbackUri"
+  emit check core.AllowlistValidation at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
 binding externalResourceIntegrityReview203 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "integrityRegex.exec" and node.context.callPath contains "globalHashes[].set" and not (node.context.literal contains "Detectedreferencetonotexplicitlyallowedexternalresource")
   emit issue code.ExternalResourceIntegrityReview at node
@@ -3952,4 +3961,30 @@ binding csvFormulaProneExportRow900 {
 binding esmExportSpecifierEval901 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "split" and node.context.literal contains "$happy_dom.exports['" and not (node.context.expr contains "test(importName)")
   emit issue code.EsmExportSpecifierEval at node
+}
+
+binding databaseRead902 {
+  requires {
+    dependency("drizzle-orm")
+  }
+  query pattern callExpr where callee.method == "findFirst"
+  emit source code.DatabaseRead at call.result
+}
+
+binding databaseRead903 {
+  requires {
+    dependency("drizzle-orm")
+  }
+  query pattern callExpr where callee.method == "findMany"
+  emit source code.DatabaseRead at call.result
+}
+
+binding proxyClientIpSpoofingBypass904 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "req.header" and node.context.literal contains "x-forwarded-for" and node.context.subscript contains "split[0]" and node.context.assign contains "address"
+  emit issue code.ProxyClientIpSpoofingBypass at node
+}
+
+binding unanchoredHostPathRoutingMatch906 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "indexOf" and node.context.callPath contains "Object.entries" and node.context.selector contains "req.headers.host" and node.context.selector contains "req.url"
+  emit issue code.UnanchoredHostPathRoutingMatch at node
 }
