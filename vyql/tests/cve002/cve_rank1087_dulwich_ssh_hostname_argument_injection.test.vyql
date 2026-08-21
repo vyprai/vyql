@@ -1,0 +1,137 @@
+# Rank 1087 / CVE-2017-16228: Dulwich builds an ssh argv from an unvalidated
+# hostname parsed out of the clone URL, so a hostname beginning with a dash
+# reaches ssh as an option (CWE-88).
+#
+# ATTENTION: engine gap. A list literal only carries taint on its first element,
+# and list concatenation loses taint on both operands — Dulwich's
+# `Popen(args + [command])` shape. Vulnerable and fixed snippets reject
+# VYQL-INJ-002; index-0 and append-without-concat probes expect it; later-index
+# and concat probes reject it.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1087: an unvalidated hostname reaches ssh's argv through append and concat"
+  lang python
+  file dulwich/client.py
+  reject VYQL-INJ-002
+  code
+  ```
+  import subprocess
+
+
+  class SubprocessSSHVendor(object):
+      def run_command(self, host, command, username=None, port=None):
+          args = ['ssh', '-x']
+          if port is not None:
+              args.extend(['-p', str(port)])
+          if username is not None:
+              host = '%s@%s' % (username, host)
+          args.append(host)
+          proc = subprocess.Popen(args + [command], bufsize=0,
+                                  stdin=subprocess.PIPE,
+                                  stdout=subprocess.PIPE)
+          return proc
+  ```
+
+test "rank1087: the fixed revision rejects a hostname beginning with a dash"
+  lang python
+  file dulwich/client.py
+  reject VYQL-INJ-002
+  code
+  ```
+  import subprocess
+
+
+  class StrangeHostname(Exception):
+      def __init__(self, hostname):
+          super(StrangeHostname, self).__init__(hostname)
+
+
+  class SubprocessSSHVendor(object):
+      def run_command(self, host, command, username=None, port=None):
+          args = ['ssh', '-x']
+          if port is not None:
+              args.extend(['-p', str(port)])
+          if username is not None:
+              host = '%s@%s' % (username, host)
+          if host.startswith('-'):
+              raise StrangeHostname(hostname=host)
+          args.append(host)
+          proc = subprocess.Popen(args + [command], bufsize=0,
+                                  stdin=subprocess.PIPE,
+                                  stdout=subprocess.PIPE)
+          return proc
+  ```
+
+# The two isolated pairs. Same source, same sink, same subprocess.Popen call;
+# only the collection shape differs.
+
+test "rank1087: a tainted value at index 0 of a list literal reaches the sink"
+  lang python
+  file index0.py
+  expect VYQL-INJ-002
+  code
+  ```
+  import subprocess
+
+
+  def handler(request):
+      host = request.GET.get('host')
+      args = [host]
+      proc = subprocess.Popen(args, bufsize=0,
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+      return proc
+  ```
+
+test "rank1087: the same value at a later index in the same literal does not"
+  lang python
+  file index1.py
+  reject VYQL-INJ-002
+  code
+  ```
+  import subprocess
+
+
+  def handler(request):
+      host = request.GET.get('host')
+      args = ['ssh', host]
+      proc = subprocess.Popen(args, bufsize=0,
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+      return proc
+  ```
+
+test "rank1087: a value appended to a list reaches the sink through that list"
+  lang python
+  file append.py
+  expect VYQL-INJ-002
+  code
+  ```
+  import subprocess
+
+
+  def handler(request):
+      host = request.GET.get('host')
+      args = ['ssh', '-x']
+      args.append(host)
+      proc = subprocess.Popen(args, bufsize=0,
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+      return proc
+  ```
+
+test "rank1087: the same appended value does not survive a list concatenation"
+  lang python
+  file append_concat.py
+  reject VYQL-INJ-002
+  code
+  ```
+  import subprocess
+
+
+  def handler(request):
+      host = request.GET.get('host')
+      args = ['ssh', '-x']
+      args.append(host)
+      proc = subprocess.Popen(args + ['git-upload-pack'], bufsize=0,
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+      return proc
+  ```

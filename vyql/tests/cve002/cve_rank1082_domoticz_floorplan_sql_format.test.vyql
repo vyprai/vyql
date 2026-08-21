@@ -1,0 +1,107 @@
+# Rank 1082 / CVE-2019-10664: Domoticz formats a request floorplan id into SQL
+# with `%s` through a varargs query helper, so the value reaches SQLite
+# unsubstituted (CWE-89).
+#
+# ATTENTION: engine gap. Taint does not cross a C/C++ varargs wrapper, which is
+# this call shape; an inline format into sqlite3_exec expects VYQL-INJ-001, and
+# the same flow behind `...` rejects it. Vulnerable and fixed snippets both
+# reject VYQL-INJ-001.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1082: the floorplan id is formatted into the query with %s"
+  lang cpp
+  file main/WebServer.cpp
+  reject VYQL-INJ-001
+  code
+  ```
+  #include <string>
+  #include <vector>
+
+  void CWebServer::GetFloorplanImage(WebEmSession & session, const request& req, reply & rep)
+  {
+  	std::string idx = request::findValue(&req, "idx");
+  	if (idx == "") {
+  		return;
+  	}
+  	std::vector<std::vector<std::string> > result;
+  	result = m_sql.safe_queryBlob("SELECT Image FROM Floorplans WHERE ID=%s", idx.c_str());
+  	if (result.empty())
+  		return;
+  	reply::set_content(&rep, result[0][0].begin(), result[0][0].end());
+  }
+  ```
+
+test "rank1082: the id is converted to a number before formatting"
+  lang cpp
+  file main/WebServer.cpp
+  reject VYQL-INJ-001
+  code
+  ```
+  #include <string>
+  #include <vector>
+
+  void CWebServer::GetFloorplanImage(WebEmSession & session, const request& req, reply & rep)
+  {
+  	std::string idx = request::findValue(&req, "idx");
+  	if (idx == "") {
+  		return;
+  	}
+  	std::vector<std::vector<std::string> > result;
+  	result = m_sql.safe_queryBlob("SELECT Image FROM Floorplans WHERE ID=%d", atol(idx.c_str()));
+  	if (result.empty())
+  		return;
+  	reply::set_content(&rep, result[0][0].begin(), result[0][0].end());
+  }
+  ```
+
+# The varargs pair. Same source, same formatting, same sink; only the hop
+# through a `...` parameter differs, and it is the difference between a
+# high-confidence report and silence.
+
+test "rank1082: a formatted query reaching the sink in one function"
+  lang cpp
+  file inline.cpp
+  expect VYQL-INJ-001
+  code
+  ```
+  #include <cstdio>
+  #include <string>
+
+  void handler(int fd)
+  {
+  	char idx[128];
+  	recv(fd, idx, sizeof(idx), 0);
+  	char buf[512];
+  	snprintf(buf, sizeof(buf), "SELECT Image FROM Floorplans WHERE ID=%s", idx);
+  	sqlite3_exec(db, buf, 0, 0, 0);
+  }
+  ```
+
+test "rank1082: the same query formatted behind a varargs wrapper"
+  lang cpp
+  file wrapped.cpp
+  reject VYQL-INJ-001
+  code
+  ```
+  #include <cstdarg>
+  #include <cstdio>
+  #include <string>
+
+  int wrapper(const char *fmt, ...)
+  {
+  	va_list args;
+  	char buf[512];
+  	va_start(args, fmt);
+  	vsnprintf(buf, sizeof(buf), fmt, args);
+  	va_end(args);
+  	return sqlite3_exec(db, buf, 0, 0, 0);
+  }
+
+  void handler(int fd)
+  {
+  	char idx[128];
+  	recv(fd, idx, sizeof(idx), 0);
+  	wrapper("SELECT Image FROM Floorplans WHERE ID=%s", idx);
+  }
+  ```

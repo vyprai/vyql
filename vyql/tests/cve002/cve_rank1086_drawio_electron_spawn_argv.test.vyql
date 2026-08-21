@@ -1,0 +1,60 @@
+# Rank 1086 / CVE-2023-3975: draw.io's Electron main process spawns external
+# binaries with argv arrays built from renderer-supplied paths, so a value
+# beginning with a dash reaches the target as an option (CWE-78 as classified;
+# the shape is argument injection, CWE-88).
+#
+# ATTENTION: vocabulary gap. Non-shell `spawn` argv elements are not
+# CommandExecution sinks (correctly), and code.CommandOptionInjectionSink is
+# unbound for JavaScript's spawn family. Snippets reject VYQL-INJ-002 for
+# non-shell targets and expect it when the command is a shell.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1086: spawn's argv array carries a value the process did not originate"
+  lang javascript
+  file src/main/webapp/electron.js
+  reject VYQL-INJ-002
+  code
+  ```
+  const { spawn } = require('child_process');
+
+  function hideDraftFile(draftFileName) {
+    var child = spawn('attrib', ['+h', draftFileName]);
+    child.on('error', function (err) {
+      console.log('hiding draft file error: ' + err);
+    });
+  }
+  ```
+
+# The scoping pair. Both calls put the same tainted value in the argv array;
+# only the target program differs, and that is the whole difference between a
+# genuine CWE-78 shell-reinterpretation sink and a non-shell binary that spawn
+# alone does not make injectable.
+
+test "rank1086: the same argv element passed to a non-shell binary"
+  lang javascript
+  file non_shell.js
+  reject VYQL-INJ-002
+  code
+  ```
+  const { spawn } = require('child_process');
+
+  function handler(req, res) {
+    const path = req.query.path;
+    spawn('cp', [path, '/var/backups/']);
+  }
+  ```
+
+test "rank1086: the same argv element passed to a shell target"
+  lang javascript
+  file shell_target.js
+  expect VYQL-INJ-002
+  code
+  ```
+  const { spawn } = require('child_process');
+
+  function handler(req, res) {
+    const path = req.query.path;
+    spawn('cmd.exe', ['/c', path]);
+  }
+  ```
