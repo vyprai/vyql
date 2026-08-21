@@ -1,0 +1,82 @@
+# Rank 1124 / CVE-2026-40034: gitoxide's submodule update-command guard asks
+# whether any non-`.gitmodules` section exists for the submodule, not whether
+# the `update` value itself came from `.gitmodules`, so a command can still
+# smuggle through once a local override section exists (CWE-77, CWE-183,
+# CWE-349, CWE-501).
+#
+# ATTENTION: vocabulary gap. Stating the shape needs relating a config value's
+# read site to its own provenance across a merge; code.ProtocolStateReview is
+# nearby in spirit but unbound for Rust and does not name that distinction.
+# Both snippets reject.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1124: the guard checks whether ANY foreign section exists, not the value's own source"
+  lang rust
+  file access.rs
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  impl File {
+      pub fn update(&self, name: &BStr) -> Result<Option<Update>, config::update::Error> {
+          let value: Update = match self.config.string(&format!("submodule.{name}.update")) {
+              Some(v) => v.as_ref().try_into().map_err(|()| config::update::Error::Invalid {
+                  submodule: name.to_owned(),
+                  actual: v.into_owned(),
+              })?,
+              None => return Ok(None),
+          };
+
+          if let Update::Command(cmd) = &value {
+              let ours = self.config.meta();
+              let has_value_from_foreign_section = self
+                  .config
+                  .sections_by_name("submodule")
+                  .into_iter()
+                  .flatten()
+                  .any(|s| s.header().subsection_name() == Some(name) && !std::ptr::eq(s.meta(), ours));
+              if !has_value_from_foreign_section {
+                  return Err(config::update::Error::CommandForbiddenInModulesConfiguration {
+                      submodule: name.to_owned(),
+                      actual: cmd.to_owned(),
+                  });
+              }
+          }
+          Ok(Some(value))
+      }
+  }
+  ```
+
+test "rank1124: the guard checks whether the value actually read came from .gitmodules"
+  lang rust
+  file access.rs
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  impl File {
+      pub fn update(&self, name: &BStr) -> Result<Option<Update>, config::update::Error> {
+          let mut value_is_from_modules_file = None;
+          let our_meta = self.config.meta();
+          let value: Update = match self.config.string_filter(&format!("submodule.{name}.update"), |meta| {
+              value_is_from_modules_file = Some(std::ptr::eq(meta, our_meta));
+              true
+          }) {
+              Some(v) => v.as_ref().try_into().map_err(|()| config::update::Error::Invalid {
+                  submodule: name.to_owned(),
+                  actual: v.into_owned(),
+              })?,
+              None => return Ok(None),
+          };
+
+          if let Update::Command(cmd) = &value {
+              if value_is_from_modules_file.unwrap_or_default() {
+                  return Err(config::update::Error::CommandForbiddenInModulesConfiguration {
+                      submodule: name.to_owned(),
+                      actual: cmd.to_owned(),
+                  });
+              }
+          }
+          Ok(Some(value))
+      }
+  }
+  ```

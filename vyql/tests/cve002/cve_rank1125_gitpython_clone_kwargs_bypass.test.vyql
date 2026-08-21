@@ -1,0 +1,61 @@
+# Rank 1125 / CVE-2023-40267: GitPython's clone/clone_from denylist inspects
+# `multi_options` only, so the same dangerous option passed as a keyword
+# argument reaches `git clone` unchecked (CWE-78).
+#
+# ATTENTION: vocabulary gap. A guard covers one of two structurally parallel
+# paths to the same effect; the nearest CWE-matched concept is Ruby-only and
+# a different mechanism. Both snippets reject.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1125: the unsafe-options check only inspects multi_options, not kwargs"
+  lang python
+  file base.py
+  reject_review code.GitCloneBranchOptionShellInjection
+  code
+  ```
+  class Repo(object):
+      @classmethod
+      def _clone(cls, git, url, path, odb_default_type, progress, multi_options=None, **kwargs):
+          multi = None
+          if multi_options:
+              multi = shlex.split(" ".join(multi_options))
+
+          allow_unsafe_protocols = kwargs.pop("allow_unsafe_protocols", False)
+          allow_unsafe_options = kwargs.pop("allow_unsafe_options", False)
+
+          if not allow_unsafe_protocols:
+              Git.check_unsafe_protocols(str(url))
+          if not allow_unsafe_options and multi_options:
+              Git.check_unsafe_options(options=multi_options, unsafe_options=cls.unsafe_git_clone_options)
+
+          proc = git.clone(multi, Git.polish_url(str(url)), path, with_extended_output=True, as_process=True, v=True, **kwargs)
+          return cls._build_repo(path, odb_default_type, progress, proc)
+  ```
+
+test "rank1125: kwargs and multi_options both go through the same denylist check"
+  lang python
+  file base.py
+  reject_review code.GitCloneBranchOptionShellInjection
+  code
+  ```
+  class Repo(object):
+      @classmethod
+      def _clone(cls, git, url, path, odb_default_type, progress, multi_options=None, **kwargs):
+          multi = None
+          if multi_options:
+              multi = shlex.split(" ".join(multi_options))
+
+          allow_unsafe_protocols = kwargs.pop("allow_unsafe_protocols", False)
+          allow_unsafe_options = kwargs.pop("allow_unsafe_options", False)
+
+          if not allow_unsafe_protocols:
+              Git.check_unsafe_protocols(str(url))
+          if not allow_unsafe_options:
+              Git.check_unsafe_options(options=list(kwargs.keys()), unsafe_options=cls.unsafe_git_clone_options)
+          if not allow_unsafe_options and multi_options:
+              Git.check_unsafe_options(options=multi_options, unsafe_options=cls.unsafe_git_clone_options)
+
+          proc = git.clone(multi, Git.polish_url(str(url)), path, with_extended_output=True, as_process=True, v=True, **kwargs)
+          return cls._build_repo(path, odb_default_type, progress, proc)
+  ```
