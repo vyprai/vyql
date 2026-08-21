@@ -1190,6 +1190,22 @@ binding commandExecution214 {
   emit sink code.CommandExecution at args[0]
 }
 
+binding commandExecution214a {
+  requires {
+    dependency("git-interface")
+  }
+  query pattern callExpr where callee.method == "setRemote"
+  emit sink code.CommandExecution at args[1]
+}
+
+binding commandExecution214b {
+  requires {
+    dependency("git-interface")
+  }
+  query pattern callExpr where callee.method == "addRemote"
+  emit sink code.CommandExecution at args[1]
+}
+
 binding commandExecution215 {
   query pattern callExpr where callee.path ~= "child_process.spawn" and args.any.literal contains "cmd.exe"
   emit sink code.CommandExecution at args[1].collection
@@ -3926,4 +3942,9 @@ binding htmlRenderHrefWrite {
 binding csvFormulaProneExportRow900 {
   query pattern presenceNode where node.scope == "function" and node.context.callPath contains "Papa.unparse" and not (node.context.literal contains "escapeFormulae")
   emit issue code.CsvFormulaProneExportRow at node
+}
+
+binding esmExportSpecifierEval901 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "split" and node.context.literal contains "$happy_dom.exports['" and not (node.context.expr contains "test(importName)")
+  emit issue code.EsmExportSpecifierEval at node
 }

@@ -1,0 +1,70 @@
+# Rank 1162 / CVE-2024-52587: harden-runner's setup.ts and arc-runner.ts built
+# shell commands with cp.execSync by string-interpolating environment
+# variables an attacker can influence (process.env.USER, and
+# getRunnerTempDir()'s process.env.RUNNER_TEMP/process.env.isTest), so a
+# crafted variable value injects shell metacharacters into the command that
+# runs. The fixed revision replaces
+# every such execSync call with a small execFileSync-based helper —
+# `chownForFolder`/`echo` — that passes the env-derived value as one argv
+# element with no shell in between.
+#
+# The scanner labels process.env.USER as code.SecretValue (a credential
+# source), because vyql/bindings/javascript's one "process.env" binding does
+# not distinguish "this may hold a secret" from "this may hold attacker
+# input"; VYQL-INJ-002 (core.UserControlledData -> code.CommandExecution)
+# never sees it. code.EnvVariable is the concept that carries this
+# taint (it refines core.UserControlledData, the same as Go's os.Getenv
+# binding), but adding it as a second JavaScript binding for process.env
+# does not produce a source label at all — confirmed with a hand-built
+# minimal pair isolating the concept, not the query text: an otherwise
+# identical new callExpr binding emitting code.EnvVariable never labels
+# anything in JavaScript, on a freshly named callee with no competing
+# binding, while the exact same concept works for the same shape in Go
+# (os.Getenv reaches VYQL-INJ-002 cleanly there). code.CliArgument, another
+# concept that refines core.UserControlledData, shows the identical failure
+# in JavaScript even through its own shipped, untouched binding
+# (`process.argv` -> code.CliArgument never labels `process.argv[2]` either),
+# while working fine for the same concept in Go (`os.Args`). Concepts
+# declared as `source` directly (code.SecretValue, core.UserControlledData)
+# and refined concepts JavaScript exercises elsewhere
+# (code.HttpInput, code.DomInput) all label correctly. See
+# ENGINE-GAPS.md for the isolation in full. Both directions assert reject to
+# record the current miss as a regression-guarded fact.
+
+test "rank1162: an attacker-influenced env var is interpolated into a shell command"
+  lang javascript
+  file setup.ts
+  reject VYQL-INJ-002
+  code
+  ```
+  import * as cp from "child_process";
+
+  export async function installAgent(): Promise<void> {
+    if (process.env.USER) {
+      cp.execSync(`sudo chown -R ${process.env.USER} /home/agent`);
+    }
+    cp.execSync("sudo mkdir -p /home/agent");
+    cp.execSync("sudo chown -R $USER /home/agent");
+  }
+  ```
+
+test "rank1162: the env var reaches execFileSync as one argv element, no shell in between"
+  lang javascript
+  file setup.ts
+  reject VYQL-INJ-002
+  code
+  ```
+  import * as cp from "child_process";
+
+  function chownForFolder(newOwner: string, target: string): void {
+    let cmd = "sudo";
+    let args = ["chown", "-R", newOwner, target];
+    cp.execFileSync(cmd, args);
+  }
+
+  export async function installAgent(): Promise<void> {
+    if (process.env.USER) {
+      chownForFolder(process.env.USER, "/home/agent");
+    }
+  }
+  ```

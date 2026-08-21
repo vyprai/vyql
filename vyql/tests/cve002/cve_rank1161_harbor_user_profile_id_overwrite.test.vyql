@@ -1,0 +1,81 @@
+# Rank 1161 / CVE-2019-19023: Harbor's user-profile PUT handler set the
+# authenticated caller's own id on a models.User literal, then decoded the
+# request body into that same variable. encoding/json overwrites a field the
+# moment the body names it, so a caller who names "user_id" in the body
+# redirects the update to a different account and can reach the admin's
+# email and password reset. The struct then crosses into a separate
+# database package (dao.ChangeUserProfile) before the id field is read, so
+# there is no in-file taint path from the decode call to a labelled sink;
+# see ENGINE-GAPS.md for what is missing. Both directions assert reject to
+# record the current miss as a regression-guarded fact.
+
+test "rank1161: user profile struct pre-set with the caller id, then decoded over"
+  lang go
+  reject VYQL-AUTH-099
+  code
+  ```
+  package api
+
+  import (
+    "encoding/json"
+    "net/http"
+  )
+
+  type User struct {
+    UserID   int    `json:"user_id"`
+    Email    string `json:"email"`
+    Realname string `json:"realname"`
+  }
+
+  type UserAPI struct {
+    userID int
+  }
+
+  func (ua *UserAPI) Put(r *http.Request) error {
+    user := User{UserID: ua.userID}
+    if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+      return err
+    }
+    return changeUserProfile(user)
+  }
+
+  func changeUserProfile(u User) error {
+    return nil
+  }
+  ```
+
+test "rank1161: user profile decodes into a bare struct, id set from the session after"
+  lang go
+  reject VYQL-AUTH-099
+  code
+  ```
+  package api
+
+  import (
+    "encoding/json"
+    "net/http"
+  )
+
+  type User struct {
+    UserID   int    `json:"user_id"`
+    Email    string `json:"email"`
+    Realname string `json:"realname"`
+  }
+
+  type UserAPI struct {
+    userID int
+  }
+
+  func (ua *UserAPI) Put(r *http.Request) error {
+    user := User{}
+    if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+      return err
+    }
+    user.UserID = ua.userID
+    return changeUserProfile(user)
+  }
+
+  func changeUserProfile(u User) error {
+    return nil
+  }
+  ```
