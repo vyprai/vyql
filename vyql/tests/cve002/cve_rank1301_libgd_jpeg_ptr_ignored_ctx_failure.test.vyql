@@ -1,0 +1,90 @@
+# Rank 1301 / CVE-2019-6978: libgd's gdImageJpegPtr() (and the gdImageGifPtr()
+# and gdImageWBMPPtr() siblings) called the void gdImage*Ctx() writer and then
+# unconditionally handed the dynamic gdIOCtx to gdDPExtractData() and freed it
+# with out->gd_free(out). gdImageJpegCtx() has internal early-return failure
+# paths (a failed row allocation, a longjmp out of libjpeg's fatal error
+# handler) that leave the dynamic buffer never populated, but the void return
+# type gives the Ptr() wrapper no way to see that, so it extracts and frees an
+# IO context built from a write that never happens. The fixed revision
+# introduces static helpers (_gdImageJpegCtx() etc.) that return 0 on success
+# and 1 on failure, and gates the extract/free on that result.
+#
+# ATTENTION, engine gap: `vyql match` on the snippet below labels nothing at
+# all (no source, no sink, no control), and `vyql resolve` shows
+# gdImageJpegCtx and out.gd_free as unresolved calls with no known body — the
+# whole shape is invisible to the engine, not merely judged safe. Detecting it
+# needs a sequence-sensitive observation over two statements (a void call with
+# an internal early-return failure path, followed by an unconditional
+# extract-then-free of a resource that call is supposed to populate) that no
+# existing declarative binding predicate can express; the closest prior art,
+# ccLifetimeReleaseReturnObservations and ccReallocFailureInputFreeObservations
+# in internal/extract/frontend/treesitter/c.go, both introduced a new
+# classification for their own shape rather than reusing one, and this shape
+# is a third: return-value-free void writer + no-fail-signal caller. Minting
+# that classification and its regex is a design call this loop does not make
+# unreviewed, so this stays a gap rather than a same-iteration fix.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1301: JpegPtr extracts and frees the IO context without checking whether the Ctx writer failed"
+  lang c
+  file src/gd_jpeg.c
+  reject VYQL-MEM-008
+  reject VYQL-MEM-011
+  code
+  ```
+  typedef struct gdImageStruct *gdImagePtr;
+  typedef struct gdIOCtx gdIOCtx;
+
+  struct gdIOCtx {
+      void (*gd_free)(struct gdIOCtx *ctx);
+  };
+
+  gdIOCtx *gdNewDynamicCtx(int initialSize, void *data);
+  void *gdDPExtractData(gdIOCtx *ctx, int *size);
+  void gdImageJpegCtx(gdImagePtr im, gdIOCtx *outfile, int quality);
+
+  void *gdImageJpegPtr(gdImagePtr im, int *size, int quality)
+  {
+      void *rv;
+      gdIOCtx *out = gdNewDynamicCtx(2048, NULL);
+      if (out == NULL) return NULL;
+      gdImageJpegCtx(im, out, quality);
+      rv = gdDPExtractData(out, size);
+      out->gd_free(out);
+      return rv;
+  }
+  ```
+
+test "rank1301: fix gates the extract on the Ctx writer's own success/failure result"
+  lang c
+  file src/gd_jpeg.c
+  reject VYQL-MEM-008
+  reject VYQL-MEM-011
+  code
+  ```
+  typedef struct gdImageStruct *gdImagePtr;
+  typedef struct gdIOCtx gdIOCtx;
+
+  struct gdIOCtx {
+      void (*gd_free)(struct gdIOCtx *ctx);
+  };
+
+  gdIOCtx *gdNewDynamicCtx(int initialSize, void *data);
+  void *gdDPExtractData(gdIOCtx *ctx, int *size);
+  static int _gdImageJpegCtx(gdImagePtr im, gdIOCtx *outfile, int quality);
+
+  void *gdImageJpegPtr(gdImagePtr im, int *size, int quality)
+  {
+      void *rv;
+      gdIOCtx *out = gdNewDynamicCtx(2048, NULL);
+      if (out == NULL) return NULL;
+      if (!_gdImageJpegCtx(im, out, quality)) {
+          rv = gdDPExtractData(out, size);
+      } else {
+          rv = NULL;
+      }
+      out->gd_free(out);
+      return rv;
+  }
+  ```

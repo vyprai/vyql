@@ -1,0 +1,132 @@
+# Rank 1296 / CVE-2026-29013: libcoap's OSCORE CBOR decoder walks a
+# network-derived byte buffer with get_byte_inc() (src/oscore/oscore_cbor.c),
+# which bounds-checked the remaining length with nothing but
+# `assert((*buf_len) > 0)` before decrementing it and dereferencing the
+# buffer pointer. assert() compiles to a no-op in an NDEBUG release build, so
+# a crafted CoAP request whose OSCORE option encodes a CBOR length/array
+# count larger than the option actually carries walks get_byte_inc() past
+# the end of the buffer once buf_len reaches zero -- an out-of-bounds read
+# reachable straight from the wire, CWE-125/CWE-617. get_byte() has the same
+# defect one function above it. oscore_cbor_get_element_size() calls
+# get_byte_inc() in a loop (up to 8 times, once per length byte the attacker
+# claims), so a single crafted option can walk arbitrarily far past the
+# buffer.
+#
+# The assigned fix commit, b7847c4dbb0dbee7c90b09a673d4cae256f03718
+# ("sanitizer: Fix reported issues"), does not touch oscore_cbor.c at all --
+# it fixes an unrelated NULL-pointer-arithmetic bug in coap_cache.c and a
+# PDU-resize/assert bug in coap_pdu.c. The ChangeLog entry for the shared
+# 4.3.5b release ("Fixes the following CVE: CVE-2026-29013") sits directly
+# above "Add in sanitizer build support. / Fix issues raised by sanitizer
+# builds." as separate, later bullet points -- the CVE line does not describe
+# the sanitizer commit. Advisory summaries
+# (BitNinja, PT Security, securityvulnerability.io) all describe the same
+# defect: "get_byte_inc() ... relies solely on assert() for bounds checking,
+# which is removed in release builds compiled with NDEBUG" in
+# src/oscore/oscore_cbor.c. Commit a89ae8ea7cc1e33bf7b6358b86504f0b3ed824f0
+# ("OSCORE: Be more rigorous in boundary checking", 2026-04-02) matches that
+# description exactly -- it replaces `assert((*buf_len) > 0);` in both
+# get_byte() and get_byte_inc() with a real `if (*buf_len < 1) return 0;`
+# runtime check, plus matching hardening across oscore_cbor.c's CBOR
+# encoders. Corrected pool row uses that commit and its parent
+# (4f98e79...) as the vulnerable state.
+#
+# vyql match on the repro below labels no source at all for the network
+# buffer parameter, and no rule fires: only three low-confidence
+# VYQL-MEM-006 (code.NullableDeref) hits on the `**buffer` dereferences
+# inside get_byte_inc(), none of which mention the assert or the length
+# counter. code.ReachableAssertionReview / VYQL-DOS-040 (CWE-617) is exactly
+# the right concept and rule -- "externally reachable input can violate an
+# internal assertion or invariant and terminate the process" -- but its only
+# two C bindings (mce54b166.vyql: reachableAssertionReview129,
+# analysis.assertion.avahi_publish_flag_pair_reachable) route through Go
+# extractor functions hand-written for one specific function shape each
+# (ccAvahiReachableAssertionObservations, ccBrOnReachableAssertionObservations
+# in internal/extract/frontend/treesitter/c.go); there is no generic
+# extraction of "a function whose only bounds check on a decrementing length
+# counter is assert()". Matching this shape generically would need new
+# engine-level judgment about which functions constitute a bounds-check loop
+# and which counters are network-derived -- a new extraction capability, not
+# a fix confined to one function or a known construct's edge case. ATTENTION,
+# engine gap: extending code.ReachableAssertionReview's C coverage from
+# per-function hand extractors to something that generalizes past exactly
+# two library-specific shapes.
+#
+# Full spec suite green; no definition touched, so OWASP Java/Python numbers
+# are unaffected by this rank.
+
+test "rank1296: get_byte_inc's only bounds check is assert(), reachable from a network-controlled CBOR length"
+  lang c
+  file oscore_cbor.c
+  reject VYQL-DOS-040
+  code
+  ```
+  #include <assert.h>
+  #include <stddef.h>
+  #include <stdint.h>
+
+  static uint8_t
+  get_byte_inc(const uint8_t **buffer, size_t *buf_len) {
+      assert((*buf_len) > 0);
+      (*buf_len)--;
+      return ((*buffer)++)[0];
+  }
+
+  static size_t
+  oscore_cbor_get_element_size(const uint8_t **buffer, size_t *buf_len) {
+      uint8_t control = get_byte_inc(buffer, buf_len) & 0x1f;
+      size_t size = 0;
+      if (control >= 0x18) {
+          int num = 1 << (control & 0x3);
+          for (int i = 0; i < num; i++) {
+              size = (size << 8) + get_byte_inc(buffer, buf_len);
+          }
+      }
+      return size;
+  }
+
+  size_t
+  coap_oscore_decrypt_pdu(const uint8_t *option_value, size_t option_len) {
+      const uint8_t *ptr = option_value;
+      size_t length = option_len;
+      return oscore_cbor_get_element_size(&ptr, &length);
+  }
+  ```
+
+test "rank1296: fix replaces the assert with a runtime check that returns instead of reading past the buffer"
+  lang c
+  file oscore_cbor.c
+  reject VYQL-DOS-040
+  code
+  ```
+  #include <stddef.h>
+  #include <stdint.h>
+
+  static uint8_t
+  get_byte_inc(const uint8_t **buffer, size_t *buf_len) {
+      if (*buf_len < 1)
+          return 0;
+      (*buf_len)--;
+      return ((*buffer)++)[0];
+  }
+
+  static size_t
+  oscore_cbor_get_element_size(const uint8_t **buffer, size_t *buf_len) {
+      uint8_t control = get_byte_inc(buffer, buf_len) & 0x1f;
+      size_t size = 0;
+      if (control >= 0x18) {
+          int num = 1 << (control & 0x3);
+          for (int i = 0; i < num; i++) {
+              size = (size << 8) + get_byte_inc(buffer, buf_len);
+          }
+      }
+      return size;
+  }
+
+  size_t
+  coap_oscore_decrypt_pdu(const uint8_t *option_value, size_t option_len) {
+      const uint8_t *ptr = option_value;
+      size_t length = option_len;
+      return oscore_cbor_get_element_size(&ptr, &length);
+  }
+  ```
