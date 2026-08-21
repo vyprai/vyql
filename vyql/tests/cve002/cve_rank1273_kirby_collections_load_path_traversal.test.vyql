@@ -22,38 +22,36 @@
 #
 # is_file only confirms a file exists at the attacker-influenced path; it does
 # not restrict which file that can be, so a collection name walking outside
-# `site/collections` reaches include (CWE-22/CWE-98). Fix
-# 95a51480a426a8ed0df799cc017403be9b987ced replaces the is_file() check with
-# F::exists($file, $root), which resolves both paths with realpath() and
-# rejects anything outside $root before F::load() ever runs.
+# `site/collections` reaches include (CWE-22/CWE-98). The fixed revision
+# replaces the is_file() check with F::exists($file, $root), which resolves
+# both paths with realpath() and rejects anything outside $root before
+# F::load() runs.
 #
-# ATTENTION, engine gap. `vyql match` on the vulnerable snippet labels the
-# $_GET source but no sink at all -- two separate gaps in
-# internal/extract/frontend/treesitter/php.go compound to hide it:
+# Two separate gaps in internal/extract/frontend/treesitter/php.go compound
+# to hide this shape; both are closed in the engine:
 #
-# 1. `expr()` (php.go:1852) has no case for include_expression/
+# 1. `expr()` carries the same case as `exprStmt()` for include_expression/
 #    include_once_expression/require_expression/require_once_expression, so
-#    `return include $f;` (the shape loadIsolated() actually uses) falls
-#    through to the generic `parts = append(parts, c.expr(ch)); return
-#    nir.Seq{Parts: parts}` fallback, which drops the Call node and keeps
-#    only its argument. exprStmt() (php.go:337) builds the right
-#    node, but only for a bare `include $f;` statement -- this half is
-#    isolated and pinned in
+#    `return include $f;` (the shape loadIsolated() actually uses) builds
+#    the include Call node in expression position too; the isolating pair
+#    lives in
 #    cve_rank1201_ilias_import_component_file_inclusion.test.vyql's own
-#    pair (`include_once $path;` reports, `if (include_once $path) { ... }`
-#    does not).
-# 2. `dotted()` (php.go:2028) turns `static::loadIsolated(...)` into the
-#    literal path "static.loadIsolated", which names no method the resolver
-#    can ever match against a real class -- `self::` has the same problem.
-#    An explicit class name (`F::loadIsolated(...)`) resolves fine; late
-#    static binding and self-reference, PHP's ordinary way to call a
-#    sibling method on the current class, silently break the call graph
-#    instead.
+#    pair.
+# 2. `dotted()` substitutes the enclosing class name for `self`/`static`
+#    before building the path, the same way `$this` resolves, so
+#    `static::loadIsolated(...)` resolves to `<Class>.loadIsolated`. An
+#    explicit class name (`F::loadIsolated(...)`) resolves the same way;
+#    without the substitution, late static binding and self-reference --
+#    PHP's ordinary way to call a sibling method on the current class --
+#    break the call graph. `parent::` is untouched: the superclass is a
+#    different, unresolved target, not a wrong extraction of this one.
 #
 # Confirmed below with an isolating pair naming no CVE-specific API for gap
 # 2 alone: the same tainted include, reached through an explicit class name,
-# reports; routed through `static::` or `self::` instead, it does not.
+# reports either way; routed through `static::` or `self::`, it reports the
+# same way.
 #
+# CAUGHT by rule VYQL-PATH-002 (FileInclusion) once both gaps are fixed.
 # F::exists() is not recognised as a core.PathAccessCheck either -- no
 # binding names it, and it is a Kirby-specific wrapper around realpath(),
 # not documented API a generic binding could justify -- so the reject case
@@ -90,7 +88,7 @@ test "rank1273: a collection name from the query string reaches include through 
   }
   ```
   file src/Cms/Collections.php
-  reject VYQL-PATH-002
+  expect VYQL-PATH-002
   code
   ```
   <?php
@@ -202,10 +200,10 @@ test "rank1273: an explicit class name on the sibling call resolves"
   Loader::load($_GET['name']);
   ```
 
-test "rank1273: static:: on the sibling call reports nothing"
+test "rank1273: static:: on the sibling call resolves the same way"
   lang php
   file loader.php
-  reject VYQL-PATH-002
+  expect VYQL-PATH-002
   code
   ```
   <?php
@@ -224,10 +222,10 @@ test "rank1273: static:: on the sibling call reports nothing"
   Loader::load($_GET['name']);
   ```
 
-test "rank1273: self:: on the sibling call reports nothing"
+test "rank1273: self:: on the sibling call resolves the same way"
   lang php
   file loader.php
-  reject VYQL-PATH-002
+  expect VYQL-PATH-002
   code
   ```
   <?php

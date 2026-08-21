@@ -13,37 +13,19 @@
 # not restrict which file that can be, so a component value walking outside
 # the intended directory reaches include_once (CWE-98). Fix 6717c4ecc6 drops
 # the include_once call entirely: the method now only confirms the file
-# exists and returns the class name, relying on the class already being
+# exists and returns the class name, relying on the class being
 # autoloaded rather than pulling in a file from an attacker-chosen path.
 #
-# ATTENTION, engine gap. `vyql match` on the vulnerable snippet labels the
-# $_POST source but no sink at all: the include_once call sits inside an
-# `if (...)` condition, testing its own return value the way PHP's manual
-# documents doing, and that position is never converted to a sink.
-# `internal/extract/frontend/treesitter/php.go:337`'s exprStmt case builds
-# the right node -- `nir.Call{Path: "include", Method: "include", ...}` --
-# but only runs when include_expression/include_once_expression/
-# require_expression/require_once_expression is the whole statement.
-# `expr()` (php.go:1852), which converts every nested sub-expression
-# including an if-condition or an assignment's right-hand side, has no case
-# for any of the four include-family node kinds and falls through to the
-# generic `parts = append(parts, c.expr(ch)); return nir.Seq{Parts: parts}`
-# wrapper at the end of the switch (php.go:1971-1974), which carries no call
-# semantics a binding can match. Confirmed with an isolating pair naming no
-# CVE-specific API below: `include_once $path;` as its own statement reports
-# VYQL-PATH-002; the identical include, spelled `if (include_once $path) { ... }`,
-# reports nothing, and neither does the same include used as `$ok =
-# include_once($path);`. Fixing this means teaching expr() the same
-# conversion exprStmt already has for the four include-family kinds, so it
-# builds the same Call node regardless of statement or expression position;
-# not attempted here, since this loop stops at engine gaps rather than
-# changing internal/extract.
-#
-# verify_current_expected: attention-engine-gap
+# `expr()` (php.go) now carries the same include_expression/include_once_expression/
+# require_expression/require_once_expression case exprStmt has, so the include's
+# position -- its own statement, an if-condition testing its return value, or an assignment's
+# right-hand side does not change whether it becomes a code.FileInclude sink. The success
+# check around include_once's own return value tests whether the file loaded, not which file it
+# was, so it is not a core.PathAccessCheck and the finding holds.
 
 test "rank1201: an uploaded manifest's component name reaches include_once through its own success check"
   lang php
-  reject VYQL-PATH-002
+  expect VYQL-PATH-002
   code
   ```
   <?php
@@ -99,9 +81,8 @@ test "rank1201: the fixed factory returns the class without including it"
   }
   ```
 
-# The isolating pair. Same source ($_GET), same include-family construct,
-# same tainted path expression; only whether the include's return value is
-# consumed by a statement or by a surrounding expression differs.
+# Same source ($_GET), same include-family construct, same tainted path expression, whether the
+# include's return value is consumed by a statement or by a surrounding expression.
 
 test "rank1201: a dynamic include reports when it is its own statement"
   lang php
@@ -114,10 +95,10 @@ test "rank1201: a dynamic include reports when it is its own statement"
   include_once $path;
   ```
 
-test "rank1201: the identical include reports nothing once its result feeds a condition"
+test "rank1201: the identical include reports the same way once its result feeds a condition"
   lang php
   file loader.php
-  reject VYQL-PATH-002
+  expect VYQL-PATH-002
   code
   ```
   <?php
