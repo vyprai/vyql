@@ -1,0 +1,151 @@
+# Rank 1194 / CVE-2024-45059: i-Educar's funcionario_vinculo_det.php read
+# cod_func straight from $_GET and interpolated it into a SQL string literal:
+#
+#   $cod_func = $_GET['cod_func'] ?? null;
+#   $db = new clsBanco();
+#   $db->Consulta(consulta: "SELECT nm_vinculo, abreviatura FROM portal.funcionario_vinculo WHERE cod_funcionario_vinculo = '$cod_func'");
+#
+# clsBanco (clsBancoPgSql) is the application's own database wrapper; its
+# Consulta() method runs the string it is given as SQL (CWE-89,
+# GHSA-2v4w-7xqr-hxmr). The fixed revision replaces the raw query with an
+# Eloquent lookup, LegacyBondType::findOrFail(request('cod_func')),
+# removing the interpolated string and the wrapper call entirely.
+#
+# The GHSA advisory and NVD both name the vulnerable file as
+# funcionario_vinculo_det.php:17, the cod_func GET parameter, and CWE-89;
+# the fixing commit, dated the same day, is titled "Refatora para evitar
+# parâmetro direto" ("Refactors to avoid a direct parameter"), and its
+# diff removes exactly the interpolated-string query the advisory
+# describes.
+#
+# ATTENTION, engine gap. `vyql match` on the real vulnerable file (wrapped,
+# like every controller in this application, in `return new class extends
+# clsDetalhe { ... };`) labels no source and no sink at all -- not because
+# $_GET or Consulta() are unrecognized, but because nothing inside a PHP
+# anonymous class body is extracted. The identical method body inside a
+# named `class Foo extends Base { ... }` labels $_GET as code.HttpInput
+# normally. The gap is in `object_creation_expression` handling
+# (internal/extract/frontend/treesitter/php.go:1902), which reads a
+# constructor's type and arguments but never inspects an `anonymous_class`
+# child, so no `stmt()`/`FuncDef` is ever built for its methods -- and this
+# is not specific to i-Educar's shape: anonymous classes are documented PHP
+# syntax (https://www.php.net/manual/en/language.oop5.anonymous.php),
+# usable as a bare expression, assigned to a variable, or returned, and the
+# gap reproduces identically in all three forms. Isolated below with
+# core.CommandExecution (an ungated sink, to rule out the SqlExecution
+# binding gap as a separate variable): the same $_GET-to-system() flow
+# reports VYQL-INJ-002 inside a named class and reports nothing at all
+# inside an anonymous one.
+#
+# Recorded in ENGINE-GAPS.md under Mechanical: `anonymous_class.body` is the
+# same declaration_list field name and node type `class_declaration.body`
+# already walks, so the missing half is dispatch -- route an `anonymous_class` child
+# through the existing `c.block(field(n, "body"))` class-body walk instead
+# of dropping it -- not new traversal logic.
+#
+# No definition change shipped: even with a code.SqlExecution binding for
+# clsBanco/clsBancoPgSql's Consulta(), the real vulnerable file's anonymous
+# class wrapper means no source or sink is ever built to connect, so the
+# rank stays blocked on the parser gap regardless. A marker-token binding
+# keyed to this call's specific variable names and argument literal was
+# considered and rejected: it would answer to this diff, not to clsBanco's
+# own documented contract ("$consulta Consulta SQL"), and would not survive
+# the genericity test in AGENTS.md.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1194: cod_func is interpolated into a raw SQL string inside i-Educar's anonymous-class controller shape"
+  lang php
+  file funcionario_vinculo_det.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  return new class extends clsDetalhe
+  {
+      public function Gerar()
+      {
+          $cod_func = $_GET['cod_func'] ?? null;
+
+          $db = new clsBanco();
+
+          $db->Consulta(consulta: "SELECT nm_vinculo, abreviatura FROM portal.funcionario_vinculo WHERE cod_funcionario_vinculo = '$cod_func'");
+
+          if ($db->ProximoRegistro()) {
+              [$nm_vinculo, $abreviatura] = $db->Tupla();
+              $this->addDetalhe(detalhe: ['Nome', $nm_vinculo]);
+              $this->addDetalhe(detalhe: ['Abreviatura', $abreviatura]);
+          }
+
+          $this->url_editar = "funcionario_vinculo_cad.php?cod_funcionario_vinculo={$cod_func}";
+      }
+  };
+  ```
+
+test "rank1194: the fixed revision replaces the raw query with an Eloquent lookup"
+  lang php
+  file funcionario_vinculo_det.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  use App\Models\LegacyBondType;
+
+  return new class extends clsDetalhe
+  {
+      public function Gerar()
+      {
+          $legacyBondType = LegacyBondType::findOrFail(request('cod_func'));
+
+          $this->addDetalhe(detalhe: ['Nome', $legacyBondType->nm_vinculo]);
+          $this->addDetalhe(detalhe: ['Abreviatura', $legacyBondType->abreviatura]);
+
+          $this->url_editar = 'funcionario_vinculo_cad.php?cod_funcionario_vinculo=' . request('cod_func');
+      }
+  };
+  ```
+
+# The isolating pair. Same source, same sink, same taint rule; only the
+# named-class vs. anonymous-class wrapper differs, and it is the difference
+# between a high-confidence report and silence. core.CommandExecution is
+# used here instead of core.SqlExecution specifically to isolate the parser
+# gap from the separate (and, for this rank, moot) question of whether a
+# SqlExecution binding exists for clsBanco's Consulta().
+
+test "rank1194: the same GET-to-system() flow inside a named class"
+  lang php
+  file named.php
+  expect VYQL-INJ-002
+  code
+  ```
+  <?php
+
+  class Foo extends Base
+  {
+      public function run()
+      {
+          $cmd = $_GET['cmd'] ?? null;
+          system($cmd);
+      }
+  }
+  ```
+
+test "rank1194: the same flow, wrapped in an anonymous class"
+  lang php
+  file anon.php
+  reject VYQL-INJ-002
+  code
+  ```
+  <?php
+
+  return new class extends Base
+  {
+      public function run()
+      {
+          $cmd = $_GET['cmd'] ?? null;
+          system($cmd);
+      }
+  };
+  ```

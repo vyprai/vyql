@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule ArrayIdentityStringCoercionBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_697, CWE_1023]
+    id: "VYQL-AUTH-111"
+    severity: high
+  }
+  issue code.ArrayIdentityStringCoercionBypass as identity
+}
