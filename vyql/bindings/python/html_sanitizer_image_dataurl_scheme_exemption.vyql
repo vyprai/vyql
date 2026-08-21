@@ -1,0 +1,33 @@
+module bindings.python.html_sanitizer_image_dataurl_scheme_exemption;
+
+// An HTML sanitizer that filters URL values against an unsafe-scheme denylist
+// (javascript:, vbscript:, livescript:, jscript:, data:, about:, mocha:) has to
+// carve out `data:image/...;base64` URLs, because an inline raster image is the
+// one ordinary use of the data: scheme in an href, src or style value. The
+// carve-out is safe only when it excludes the image media types that are
+// themselves documents: `image/svg+xml`, and its `image/svg+xml-compressed`
+// variant, carry script elements and event-handler attributes that the browser
+// executes when the URL loads, so exempting every `data:image/*` URL on the
+// media-type prefix alone returns exactly the execution the denylist exists to
+// stop.
+//
+// A module carrying a `data:image/` pattern alongside a scheme denylist that
+// names javascript, vbscript, livescript or jscript is doing scheme filtering on
+// URL values. Any sanitizer that separates the scriptable image types from the
+// inert ones has to name the scriptable one, and every spelling of it contains
+// "svg" -- an `(xml|svg)` media-type pattern, an `image/svg+xml` entry in a
+// refused-type list -- so the absence of "svg" from the module says the
+// distinction is made nowhere and the exemption covers SVG along with PNG.
+//
+// Module scope rather than function scope: the media-type pattern and the scheme
+// denylist are module-level definitions and the predicate consuming them is a
+// separate small function, so a function-scope predicate would see the two call
+// names and none of the media types they match on.
+binding htmlSanitizerImageDataUrlSchemeExemption {
+  query pattern presenceNode where node.scope == "module"
+    and node.context.language == "python"
+    and node.context.literal contains "data:image/"
+    and containsAny(node.context.literal, ["javascript", "vbscript", "livescript", "jscript"])
+    and not containsAny(node.context.literal, ["svg"])
+  emit issue code.HtmlSanitizerLogicReview at node
+}

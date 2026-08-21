@@ -2159,16 +2159,51 @@ func catastrophicRegex(pat string) bool {
 
 // envDefaultConst returns the hardcoded DEFAULT literal of an os.getenv(name, default) /
 // os.environ.get(name, default) call — the fallback baked into source (CWE-798). "" if none.
+//
+// The stdlib spellings are rarely the ones application code calls: an application wraps them in one
+// accessor of its own so it can cast, log and default in a single place (get_env_var(key, default,
+// cast_type), read_env(key, default)), and the fallback literal is just as baked into the source
+// when read through the wrapper. envGetterCallee names the wrappers it accepts.
 func envDefaultConst(e nir.Expr, l *lowerer) string {
 	c, ok := e.(nir.Call)
 	if !ok || len(c.Args) < 2 {
 		return ""
 	}
-	d := exprDotted(c.Callee)
-	if !(strings.HasSuffix(d, "getenv") || strings.HasSuffix(d, "environ.get") || strings.HasSuffix(d, "config.get")) {
+	if !envGetterCallee(exprDotted(c.Callee)) {
 		return ""
 	}
 	return constStr(c.Args[1])
+}
+
+// envWrapperNames are the names an application gives its own (key, default) wrapper around the
+// stdlib environment accessors. envGetterCallee compares a callee's final segment against these
+// exactly. The list is closed on purpose: a substring or prefix test over "env" reads
+// envelope_decrypt(blob, "alias/production-cmk") and openEnvelope(blob, "AES-256-GCM") as
+// environment reads, and their second argument is a key alias or an algorithm name rather than a
+// default — while envelope crypto is precisely where secret-named targets live, so such a test's
+// false positives correlate with the secret-name guard meant to hold them back. Value-setting forms
+// (setenv, putenv) are absent for the same reason: their second argument is the value being
+// written, not a fallback. Extend this list by adding a name to it, never by loosening the match.
+var envWrapperNames = map[string]bool{
+	"getenv": true, "getEnv": true, "get_env_var": true, "env": true,
+	"read_env": true, "readEnv": true, "env_or": true, "envOr": true,
+}
+
+// envGetterCallee reports whether a callee reads an environment variable as (name, default) — the
+// stdlib accessors matched on their dotted suffix, or one of envWrapperNames matched exactly against
+// the final segment. Only the callee is judged here: what makes reading argument 1 correct is that it
+// is the default in every (key, default) accessor, so the caller reads the same argument whichever
+// spelling it went through. Whether the value it returns matters is the caller's decision — for a
+// hardcoded secret that stays secretNamedTarget plus plausibleSecretLiteral.
+func envGetterCallee(dotted string) bool {
+	if strings.HasSuffix(dotted, "environ.get") || strings.HasSuffix(dotted, "config.get") {
+		return true
+	}
+	base := dotted
+	if i := strings.LastIndexAny(base, ".:"); i >= 0 {
+		base = base[i+1:]
+	}
+	return envWrapperNames[base]
 }
 
 // truthyDefault reports whether e assigns/defaults DEBUG to an on value ("True"/"1"/true) —

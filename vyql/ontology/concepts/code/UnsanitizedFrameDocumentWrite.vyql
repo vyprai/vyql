@@ -1,0 +1,11 @@
+module code;
+
+concept UnsanitizedFrameDocumentWrite : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "the markup written into the frame can carry content a caller or a remote service supplies"
+  reviewCategory: xss
+  reviewCondition: "a frame's own document is filled with a markup string through its write method while the frame carries no sandbox restriction and the string passes through no sanitizer"
+  reviewConfidence: medium
+  reviewEvidence: "frame rendering context {pattern} reaches the frame's contentDocument and writes markup into it with neither a sandbox attribute on the frame nor a sanitizer on the markup"
+  vulnerableTo: [injection.Xss]
+}

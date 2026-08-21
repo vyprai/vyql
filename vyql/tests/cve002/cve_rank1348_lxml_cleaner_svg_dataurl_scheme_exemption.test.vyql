@@ -1,0 +1,202 @@
+# Rank 1348 / CVE-2021-43818 lxml/lxml: the HTML cleaner's own unsafe-scheme
+# filter exempts every base64 image data URL from the scheme denylist:
+#
+#   _is_image_dataurl = re.compile(r'^data:image/.+;base64', re.I).search
+#   _is_possibly_malicious_scheme = re.compile(
+#       r'(?:javascript|jscript|livescript|vbscript|data|about|mocha):', re.I).search
+#   def _is_javascript_scheme(s):
+#       if _is_image_dataurl(s):
+#           return None
+#       return _is_possibly_malicious_scheme(s)
+#
+# `data:` is on the denylist, so the exemption is the only thing that lets an
+# inline image through -- and it is granted on the `image/` media-type prefix
+# alone. `image/svg+xml` is an image media type whose payload is a document:
+# `data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9ImFsZXJ0KDEyMykiIC8+` is an
+# `<svg onload="alert(123)"/>` that the browser executes, and Cleaner returns the
+# href untouched (CWE-79, CWE-184). The same filter is what the style-content
+# path reaches through _has_sneaky_javascript, which in the vulnerable state
+# tests style text for the single literal 'javascript:' and so never sees a
+# data: or vbscript: URL inside url(...) at all.
+#
+The fixing commits are the three security commits in the 4.6.5 release, all
+# in src/lxml/html/clean.py:
+# f2330237440df7e8f39c3ad1b1aa8852be3b27c0 (GHSL-2021-1038, the SVG data URL
+# exemption above), 12fa9669007180a7bb87d990c375cf91ca5b664a (GHSL-2021-1037,
+# "@@importimport" surviving the single-pass @import removal) and
+# 69a747356655158fdf9abaecea5feafb3bd6b5f5 (routing style content through the
+# scheme filter). The pool row should point at 69a7473, the last and largest of
+# them, which carries the final form of the fixed predicate.
+#
+# The vulnerability is in plain Python. lxml is largely Cython, and none of
+# src/lxml/*.pyx, *.pxi or *.pxd is analysed at all: internal/extract/frontend/
+# registry.go registers the python frontend for `.py` only, no other frontend
+# claims those extensions, and vyql/bindings/textpattern's
+# text_pattern_extensions list does not include them either -- a directory
+# holding only etree.pyx and apihelpers.pxi is refused outright with "no
+# supported source found". That is not what blocks this rank -- clean.py is a
+# .py file and is analysed -- but it does bound what any lxml rank can reach.
+#
+# FIXED. Diagnosis: `vyql match` on the vulnerable clean.py labels nothing in
+# the scheme filter, and a bounded scan of the file reports only VYQL-AUTH-099
+# for Cleaner.__init__'s setattr loop, identically at both revisions. The
+# inversion here is that the sanitizer is the analysed code rather than a
+# control wrapping a render, so there is no source and no sink: VYQL-INJ-004
+# and core.HtmlEscape describe a caller that fails to wrap a render, and
+# VYQL-INJ-023's advisory-guard mechanism decides whether a guard at a caller
+# suppresses a taint finding. Neither can express a filter that is present,
+# reached, and wrong.
+#
+# Reused code.HtmlSanitizerLogicReview / VYQL-INJ-200 -- the existing concept
+# for a sanitizer's own logic carrying a bypass, emitted by a Python and
+# a C# binding -- so no concept and no rule is added. New Python binding
+# htmlSanitizerImageDataUrlSchemeExemption in
+# vyql/bindings/python/html_sanitizer_image_dataurl_scheme_exemption.vyql, a
+# module-scope presence predicate over three conditions:
+#
+#   * a `data:image/` media-type literal, which is a data-URL exemption;
+#   * a scheme denylist literal naming javascript, vbscript, livescript or
+#     jscript in the same module, which makes it URL-scheme filtering rather
+#     than image handling;
+#   * no "svg" anywhere in the module. Every spelling of the one image media
+#     type that carries script contains "svg" -- the fixed revision's `(xml|svg)` pattern,
+#     an `image/svg+xml` entry in a refused-type set -- so its absence says the
+#     scriptable type is never separated from the inert ones.
+#
+# Module scope, not function scope: the two patterns are module-level
+# definitions and the predicate consuming them is a three-line function, so a
+# function-scope predicate would see `call_path:_is_image_dataurl` and none of
+# the media types. "xml" cannot join the negative condition: the module-text
+# token of any file that imports lxml contains "xml" inside "lxml", which
+# silently declines the real clean.py unless the condition narrows to "svg".
+#
+# Measured (timeout 180, --max-ram 6GB, --cache off): vulnerable clean.py at
+# f233023^ reports VYQL-INJ-200 at clean.py:1, and the same file at 69a7473
+# reports nothing beyond the VYQL-AUTH-099 that both revisions share.
+# src/lxml/html (28 python files) goes from 25 findings to 26 at the vulnerable
+# revision -- VYQL-INJ-200 exactly once, at clean.py:1 -- and stays at 25
+# patched. Neither the whole repository nor src/lxml finishes inside the 180s
+# bound, so the measurement is the directory the fixed revision lands in.
+#
+# False positives: the binding derives its content gate from the `data:image/`
+# literal, and no `.py` file among the 4875 in this machine's python3.12 and
+# dist-packages trees carries that literal, so it cannot reach any of them.
+# Scanning the four HTML-sanitizing Python packages that do -- bleach, nh3,
+# html-sanitizer and lxml-html-clean, the maintained fork of this very file, 51
+# python files -- reports VYQL-INJ-200 zero times: lxml-html-clean is the only
+# one with the literal and it carries the `(xml|svg)` media-type pattern, which
+# is exactly the distinction the negative condition looks for. Neither OWASP
+# corpus can move: no file in BenchmarkJava or BenchmarkPython carries a
+# `data:image/` literal, and the binding is Python-only and adds no concept or
+# rule. OWASP Java +1.00 and Python +0.90.
+
+test "rank1348: a base64 image data URL exemption covering scriptable image types defeats the scheme denylist"
+  lang python
+  file clean.py
+  expect VYQL-INJ-200
+  expect_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  import re
+  from urllib.parse import unquote_plus
+
+  _is_image_dataurl = re.compile(
+      r'^data:image/.+;base64', re.I).search
+  _is_possibly_malicious_scheme = re.compile(
+      r'(?:javascript|jscript|livescript|vbscript|data|about|mocha):',
+      re.I).search
+
+  def _is_javascript_scheme(s):
+      if _is_image_dataurl(s):
+          return None
+      return _is_possibly_malicious_scheme(s)
+
+  _substitute_whitespace = re.compile(r'[\s\x00-\x08\x0B\x0C\x0E-\x19]+').sub
+
+
+  class Cleaner(object):
+      def _remove_javascript_link(self, link):
+          new = _substitute_whitespace('', unquote_plus(link))
+          if _is_javascript_scheme(new):
+              return ''
+          return link
+  ```
+
+test "rank1348: refusing the scriptable image media types closes the exemption"
+  lang python
+  file clean.py
+  reject VYQL-INJ-200
+  reject_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  import re
+  from urllib.parse import unquote_plus
+
+  _find_image_dataurls = re.compile(
+      r'data:image/(.+);base64,', re.I).findall
+  _possibly_malicious_schemes = re.compile(
+      r'(javascript|jscript|livescript|vbscript|data|about|mocha):',
+      re.I).findall
+  _is_unsafe_image_type = re.compile(r"(xml|svg)", re.I).search
+
+  def _has_javascript_scheme(s):
+      safe_image_urls = 0
+      for image_type in _find_image_dataurls(s):
+          if _is_unsafe_image_type(image_type):
+              return True
+          safe_image_urls += 1
+      return len(_possibly_malicious_schemes(s)) > safe_image_urls
+
+  _substitute_whitespace = re.compile(r'[\s\x00-\x08\x0B\x0C\x0E-\x19]+').sub
+
+
+  class Cleaner(object):
+      def _remove_javascript_link(self, link):
+          new = _substitute_whitespace('', unquote_plus(link))
+          if _has_javascript_scheme(new):
+              return ''
+          return link
+  ```
+
+test "rank1348: an inert-media-type allowlist is a sound exemption whatever its spelling"
+  lang python
+  file sanitize.py
+  reject VYQL-INJ-200
+  reject_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  import re
+
+  INERT_IMAGE_TYPES = frozenset({
+      "image/png", "image/gif", "image/jpeg", "image/webp", "image/bmp",
+  })
+  SCRIPTABLE_IMAGE_TYPES = frozenset({
+      "image/svg+xml", "image/svg+xml-compressed",
+  })
+  _image_dataurl = re.compile(r'^data:image/[^;,]+;base64,', re.I).match
+  _unsafe_scheme = re.compile(
+      r'^(?:javascript|jscript|livescript|vbscript|about|mocha):', re.I).match
+
+
+  def is_unsafe_url(url):
+      match = _image_dataurl(url)
+      if match:
+          media_type = url[len("data:"):url.index(";")].lower()
+          return media_type not in INERT_IMAGE_TYPES
+      return bool(_unsafe_scheme(url))
+  ```
+
+test "rank1348: building an image data URL is not scheme filtering"
+  lang python
+  file thumbnail.py
+  reject VYQL-INJ-200
+  reject_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  import base64
+
+
+  def inline_thumbnail(png_bytes):
+      encoded = base64.b64encode(png_bytes).decode("ascii")
+      return "data:image/png;base64," + encoded
+  ```
