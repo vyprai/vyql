@@ -516,6 +516,33 @@ binding xmlHardening92 {
   }
 }
 
+binding xmlHardening92a {
+  query pattern callExpr where callee.path ~= "setAttribute" and args.any.literal contains "ACCESS_EXTERNAL_DTD"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening92b {
+  query pattern callExpr where callee.path ~= "setAttribute" and args.any.literal contains "ACCESS_EXTERNAL_SCHEMA"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding xmlHardening92c {
+  query pattern callExpr where callee.path ~= "setAttribute" and args.any.literal contains "ACCESS_EXTERNAL_STYLESHEET"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
 binding xmlHardening93 {
   query pattern callExpr where callee.path ~= "setXIncludeAware" and args.any.literal contains "false"
   emit check core.XmlHardening at call {

@@ -1,0 +1,91 @@
+# Rank 1177 / CVE-2026-27700: Hono's AWS Lambda adapter falls back to
+# X-Forwarded-For for ALB events, reading the header's first comma-separated
+# entry as the client address (CWE-290, CWE-345):
+#
+#   const xff = c.req.header('x-forwarded-for')
+#   if (xff) {
+#     address = xff.split(',')[0].trim()
+#   }
+#
+# ALB appends the connection's real peer IP to the end of the header, so the
+# leading entries are whatever the client sent. A request carrying
+# `X-Forwarded-For: 10.0.0.1, <attacker-ip>` reads back as address
+# "10.0.0.1", spoofing past ipRestriction middleware built on getConnInfo's
+# result. The fixed revision reads the last entry instead, the one ALB
+# itself appends.
+#
+# FIXED. javascript.flags binds proxyClientIpSpoofingBypass904 in
+# mfb63017a.vyql: a function-scoped presence match on a `req.header(...)`
+# call naming "x-forwarded-for", a subscript keyed [0] on that call's `split`
+# result, and the split result assigned into something named "address". The
+# subscript key ties the match to the specific first-element read rather than
+# any array index in the function, and the "address" name follows Node's own
+# `socket.remoteAddress` convention that connection-info helpers across
+# Express, Fastify and Hono repeat, so the binding is answerable to that
+# convention rather than to this adapter's internals. It reuses
+# code.ProxyClientIpSpoofingBypass (VYQL-AUTH-012), shipped for rank330's
+# CasaOS gateway-forwarding case: same weakness -- a spoofable client-IP
+# header trusted for an access-control decision -- read out of a
+# header-parsing helper instead of a proxy hop. Selecting the header's last
+# entry (the fixed form) or any other subscript key does not match.
+#
+# Measured against both revisions and both directions below. Full spec
+# suite green. OWASP Java +1.00 and Python +0.90, unchanged (javascript-only
+# change, no other language's bindings touched).
+
+test "rank1177: ALB conn-info reads the first X-Forwarded-For entry as the client address"
+  lang javascript
+  file src/adapter/aws-lambda/conninfo.ts
+  expect VYQL-AUTH-012
+  expect_review code.ProxyClientIpSpoofingBypass
+  code
+  ```
+  export const getConnInfo = (c) => {
+    let address
+
+    if ('identity' in c.env.requestContext && c.env.requestContext.identity?.sourceIp) {
+      address = c.env.requestContext.identity.sourceIp
+    } else {
+      const xff = c.req.header('x-forwarded-for')
+      if (xff) {
+        // First IP is the client
+        address = xff.split(',')[0].trim()
+      }
+    }
+
+    return {
+      remote: {
+        address,
+      },
+    }
+  }
+  ```
+
+test "rank1177: ALB conn-info reads the last X-Forwarded-For entry, the one ALB appended"
+  lang javascript
+  file src/adapter/aws-lambda/conninfo.ts
+  reject VYQL-AUTH-012
+  reject_review code.ProxyClientIpSpoofingBypass
+  code
+  ```
+  export const getConnInfo = (c) => {
+    let address
+
+    if ('identity' in c.env.requestContext && c.env.requestContext.identity?.sourceIp) {
+      address = c.env.requestContext.identity.sourceIp
+    } else {
+      const xff = c.req.header('x-forwarded-for')
+      if (xff) {
+        const ips = xff.split(',')
+        // ALB appends the real client IP to the end of the header
+        address = ips[ips.length - 1].trim()
+      }
+    }
+
+    return {
+      remote: {
+        address,
+      },
+    }
+  }
+  ```

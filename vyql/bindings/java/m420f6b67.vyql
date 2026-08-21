@@ -2640,3 +2640,16 @@ binding h2oJdbcDisallowedParameterDenylistGap458 {
   query pattern presenceNode where node.scope == "class" and node.context.className contains "SQLManager" and node.context.identifier contains "DEFAULT_JDBC_DISALLOWED_PARAMETERS" and node.context.literal contains "autoDeserialize" and node.context.literal contains "allowLoadLocalInfile" and not (containsAny(node.context.literal, ["socketFactory", "sslfactory", "statementInterceptors"]))
   emit issue code.H2oJdbcDisallowedParameterDenylistGap at node
 }
+
+// publishReports already calls htmlAttributeEscape for the report and title fields
+// in both the vulnerable and the patched form, so a function-scoped "not (call
+// contains htmlAttributeEscape)" can never distinguish them: that token is present
+// either way. The fix instead swaps the span's attribute delimiter from a single
+// quote to an escaped double quote (SECURITY-3706's own regression test asserts on
+// exactly this), so the literal itself carries the signal: the single-quote-closed
+// class literal only exists before the patch wraps every field in htmlAttributeEscape
+// and re-quotes the attributes.
+binding jenkinsHtmlPublisherLegacyWrapperXss459 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "publishReports" and node.context.literal contains "links-data-holder'" and node.context.callPath contains "job.getName"
+  emit issue code.JenkinsHtmlPublisherLegacyWrapperXss at node
+}

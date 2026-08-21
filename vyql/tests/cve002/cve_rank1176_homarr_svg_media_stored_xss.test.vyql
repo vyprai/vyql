@@ -1,0 +1,165 @@
+# Rank 1176 / CVE-2025-64759: homarr's user-media route reads a previously
+# uploaded file's bytes and content type straight out of the database and
+# writes them into the response body verbatim:
+#
+#   const image = await db.query.medias.findFirst({ ... });
+#   headers.set("Content-Type", image.contentType);
+#   return new NextResponse(new Uint8Array(image.content), { status: 200, headers });
+#
+# A media uploaded as image/svg+xml can hold a <script> element, and SVG is
+# an active content type a browser executes when it loads the response
+# directly, so a stored upload is a stored XSS payload (CWE-79, CWE-434).
+# The fixed revision decodes the bytes, and when contentType is
+# image/svg+xml or image/svg, runs them through DOMPurify.sanitize before
+# they reach the response; every other content type still reaches
+# new NextResponse(...) unescaped.
+#
+# vyql match on the vulnerable route labels nothing: db.query.medias.findFirst
+# is Drizzle's own documented relational-query method and nothing in the JS/TS
+# bindings names it, so there is no code.DatabaseRead source anywhere in this
+# language, and `new NextResponse(...)` (a bare Web Response constructor, not
+# a member call like NextResponse.json) has no sink either.
+#
+# databaseRead902/903 in vyql/bindings/javascript/mfb63017a.vyql bind
+# findFirst/findMany under dependency("drizzle-orm") to code.DatabaseRead
+# -- Drizzle's relational-query API, not this route. The label is not
+# orphaned: paired with the shipped code.CommandExecution sink for
+# child_process.exec (StoredCommand, VYQL-INJ-032), a Drizzle read flowing
+# into exec() fires, and an untainted exec() call stays silent, both below.
+#
+# The NextResponse sink is evaluated and unshipped. Binding the bare
+# constructor to code.HtmlRender (mirroring how Response(...) is bound in
+# Python, excluding literal text/plain and application/json) makes
+# StoredXss (VYQL-INJ-018) fire on the vulnerable route, which is the
+# detection this rank wants -- but the same rule then fires identically on
+# the fixed revision's own route.ts: its neutralizing control,
+# DOMPurify.sanitize, is conditional on image.contentType, and every other
+# content type still flows the decoded bytes into the same
+# `return new NextResponse(content, { headers })` unescaped, so the taint
+# path the rule sees is untouched outside the one branch. A rule broad
+# enough to catch this CVE reports the vendor's own fix as still
+# vulnerable: with databaseRead902/903 plus a bare NextResponse sink added
+# locally, both the vulnerable and fixed route.ts report VYQL-INJ-018 at
+# the same call site. What would discriminate them is
+# not a dataflow relation but a value fact -- image.contentType is compared
+# against the one dangerous MIME string the app happens to allow through
+# upload validation elsewhere -- and no concept here states "the response's
+# content type is checked against known-active MIME types before the body
+# is written," as distinct from core.SafeResponseContentType's
+# "the content type is a hardcoded safe literal" (which does not apply here
+# either, since image.contentType is a stored value, never a literal in this
+# file). Minting that check and wiring it into StoredXss is a rule-layer
+# change with a blast radius across every rank StoredXss already covers, not
+# a binding fix for this one; not attempted here.
+#
+# verify_current_expected: attention-precision-cost
+#
+# No definition change beyond databaseRead902/903. OWASP Java and Python
+# unchanged at +1.00 and +0.90.
+
+test "rank1176: a media row's bytes reach the response with no sanitization"
+  lang javascript
+  file route.ts
+  reject VYQL-INJ-018
+  code
+  ```
+  import { NextResponse } from "next/server";
+  import { drizzle } from "drizzle-orm/node-postgres";
+  import { eq } from "drizzle-orm";
+
+  const db = drizzle(pool, { schema });
+
+  export async function GET(_req, props) {
+    const params = await props.params;
+    const image = await db.query.medias.findFirst({
+      where: eq(medias.id, params.id),
+      columns: {
+        content: true,
+        contentType: true,
+      },
+    });
+
+    const headers = new Headers();
+    headers.set("Content-Type", image.contentType);
+    headers.set("Content-Length", image.content.length.toString());
+
+    return new NextResponse(new Uint8Array(image.content), {
+      status: 200,
+      headers,
+    });
+  }
+  ```
+
+test "rank1176: svg bytes are sanitized before they reach the response"
+  lang javascript
+  file route.ts
+  reject VYQL-INJ-018
+  code
+  ```
+  import { NextResponse } from "next/server";
+  import { drizzle } from "drizzle-orm/node-postgres";
+  import { eq } from "drizzle-orm";
+  import DOMPurify from "isomorphic-dompurify";
+
+  const db = drizzle(pool, { schema });
+
+  export async function GET(_req, props) {
+    const params = await props.params;
+    const image = await db.query.medias.findFirst({
+      where: eq(medias.id, params.id),
+      columns: {
+        content: true,
+        contentType: true,
+      },
+    });
+
+    let content = new Uint8Array(image.content);
+
+    if (image.contentType === "image/svg+xml" || image.contentType === "image/svg") {
+      const svgText = new TextDecoder().decode(content);
+      const sanitized = DOMPurify.sanitize(svgText, {
+        USE_PROFILES: { svg: true, svgFilters: true },
+      });
+      content = new TextEncoder().encode(sanitized);
+    }
+
+    const headers = new Headers();
+    headers.set("Content-Type", image.contentType);
+    headers.set("Content-Length", content.length.toString());
+    headers.set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+    headers.set("X-Content-Type-Options", "nosniff");
+
+    return new NextResponse(content, {
+      status: 200,
+      headers,
+    });
+  }
+  ```
+
+test "rank1176: the shipped Drizzle source is not orphaned -- it reaches an existing command sink"
+  lang javascript
+  file job.ts
+  expect VYQL-INJ-032
+  code
+  ```
+  import { eq } from "drizzle-orm";
+  import { exec } from "child_process";
+
+  async function run(db, id) {
+    const row = await db.query.jobs.findFirst({ where: eq(jobs.id, id) });
+    exec(row.command);
+  }
+  ```
+
+test "rank1176: the same sink with no Drizzle read reaching it stays silent"
+  lang javascript
+  file job.ts
+  reject VYQL-INJ-032
+  code
+  ```
+  import { exec } from "child_process";
+
+  async function run() {
+    exec("echo hello");
+  }
+  ```
