@@ -1,0 +1,24 @@
+# Rank 1253 / CVE-2024-28102: jwcrypto's JWE DEF decompression fed the
+# ciphertext-derived plaintext bytes straight into zlib.decompress with no
+# limit on the compressed input size, letting a crafted token expand to
+# gigabytes of output. The fixed revision rejects any 'zip: DEF' payload whose
+# compressed size exceeds a fixed cap before calling zlib.decompress.
+
+test "rank1253: python jwcrypto JWE zip=DEF decompression requires resource review"
+  lang python
+  expect VYQL-DOS-042
+  expect_review code.UnboundedResourceOperation
+  code
+  ```
+  import zlib
+
+  class JWE:
+      def _decrypt(self, key, jh, data):
+          compress = jh.get('zip', None)
+          if compress == 'DEF':
+              self.plaintext = zlib.decompress(data, -zlib.MAX_WBITS)
+          elif compress is None:
+              self.plaintext = data
+          else:
+              raise ValueError('Unknown compression')
+  ```
