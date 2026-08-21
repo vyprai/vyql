@@ -1,0 +1,459 @@
+# Rank 1205 / CVE-2024-41131: ImageSharp's GIF LZW decoder trusts a single
+# byte read straight from the file being decoded as the number of bits per
+# LZW code, and the one check guarding that byte does not actually bound the
+# byte itself (CWE-787, out-of-bounds write; GHSA-63p8-c4ww-9cg7, "GIF
+# decoder allows an attacker to cause a crash using a specially crafted
+# gif"). GifDecoderCore.ReadFrameIndices reads the value directly off the
+# stream:
+#
+#   int minCodeSize = stream.ReadByte();
+#   using LzwDecoder lzwDecoder = new(this.configuration.MemoryAllocator, stream);
+#   lzwDecoder.DecodePixels(minCodeSize, indices);
+#
+# LzwDecoder allocates its `prefix`, `suffix` and `pixelStack` scratch
+# buffers at a fixed `MaxStackSize` (4096) `int`s in its constructor, then
+# DecodePixels guards `minCodeSize` with:
+#
+#   int clearCode = 1 << minCodeSize;
+#   if (minCodeSize < 2 || clearCode > MaxStackSize) { ...throw... }
+#
+# which only ever inspects the *derived* clearCode, never minCodeSize
+# itself. The decode loop that follows reads and writes those buffers
+# through `System.Runtime.CompilerServices.Unsafe.Add(ref T source, int
+# elementOffset)` -- documented by Microsoft as adding an element offset to
+# a reference with no bounds checking at all -- at indices derived from the
+# byte-stream-decoded `code` and the loop-local `availableCode`, both of
+# which are sized by `codeSize = minCodeSize + 1` and `codeMask = (1 <<
+# codeSize) - 1`. A crafted `minCodeSize` reaches those `Unsafe.Add` calls
+# with an index the fixed 4096-entry buffers were never sized for, without
+# ever tripping the clearCode check above.
+#
+# The advisory (GHSA-63p8-c4ww-9cg7) names PR #2754 (v3) and PR #2756 (2.1
+# backport); both are one-commit PRs whose sole commit is
+# 9f889f75e753e394de8839829d79d96d46c2a572, "Handle out of bounds Gif LZW
+# max code" -- present directly on `main` (PR #2754 merges it there, PR
+# #2756 backports the same commit to the 2.1 branch), touching only
+# `src/ImageSharp/Formats/Gif/LzwDecoder.cs`. It adds a `MaximumLzwBits = 12`
+# constant and changes the guard in both DecodePixels and SkipIndices to
+# `minCodeSize < 2 || minCodeSize > MaximumLzwBits || clearCode >
+# MaxStackSize`, bounding the byte itself instead of only its derived
+# clearCode, and changes the guarded branch from throwing to a silent
+# `return` (matching the sibling PNG-side behavior of skipping a corrupt
+# frame rather than aborting the whole decode). pool.tsv corrected in place
+# to this commit.
+#
+# ATTENTION, precision cost. `vyql match` on the vulnerable form labels no
+# source at all (Stream.ReadByte's result is not bound to any C# source
+# concept) and no genuine sink either: the only concept that lands on any
+# `Unsafe.Add` call is `code.TrustBoundary`, and only because an existing
+# binding matches on the bare method name `callee.method == "Add"` (meant
+# for collection/session "Add" calls feeding CWE-501 trust-boundary
+# findings) -- coincidence, not a memory-safety judgement.
+#
+# Tried: two C# bindings mirroring the ones this repository already ships
+# for other languages' unchecked pointer arithmetic -- `Stream.ReadByte()`
+# as a `code.HttpInput` source (the same bucket the C frontend already uses
+# for `fread`/`recv`) and `Unsafe.Add`'s offset argument as a
+# `code.IndexAccessSink` (the same concept C/C++/Rust/Objective-C already
+# bind their raw subscript/pointer-arithmetic sinks to; Microsoft's own
+# `Unsafe.Add` documentation states plainly that it performs no bounds
+# checking, so the binding needs nothing CVE-specific to justify it).
+# Rebuilt and reran: VYQL-MEM-005 (TaintedIndexAccess) fired 6 times on the
+# vulnerable repro, tracing `stream.ReadByte()` through `minCodeSize`
+# through the exact `Unsafe.Add` call sites the bug lives at -- but it fired
+# identically, at the identical shape, on the *patched* repro too, because
+# the fixed revision does not remove the reachability edge from the byte
+# read to `Unsafe.Add`; it only bounds the value that reaches it, which
+# `TaintedIndexAccess` (a bare `taint core.UserControlledData ->
+# code.IndexAccessSink` rule, no `unless` clause) has no way to see.
+# Scanning the real checkout confirms this is not a repro artifact:
+# bounded scan of the patched `main` checkout (`timeout 180 ./bin/vyql scan
+# --cache off --max-ram 4GB`, csharp:1943 files) reports VYQL-MEM-005 244
+# times, spread across every decoder in the library that reads bytes and
+# writes through `Unsafe.Add` -- ordinary, already-patched, security-review-
+# clean code, not corroborating findings. Reverted both bindings; shipping
+# them would convert VYQL-MEM-005 into a permanent, indiscriminate flag on
+# this library's entire decoder family rather than a signal tied to this
+# vulnerability.
+#
+# The coincidental `code.TrustBoundary`/`callee.method == "Add"` match
+# already present before any change was made behaves the same way at scale,
+# for the same underlying reason: bounded scans of the real checkout at
+# both revisions report the identical
+# 2416 findings (`grep -c '^\[P'`), with the `minCodeSize`-to-`Unsafe.Add`
+# `VYQL-CFG-014` witnesses present, unchanged in shape and count (12 on each
+# side), only their line numbers shifted by the fixed revision's own
+# insertions.
+# discriminator anywhere in the checkout, on the rule that happens to
+# reach this code or on the one built and measured for it. The underlying
+# gap is not a language construct the engine mishandles -- taint reaches
+# `Unsafe.Add` cleanly on both revisions -- it is that neither rule reasons
+# about whether a tainted value was range-checked before use, only whether
+# it reaches the sink at all, so no data-only binding fix can separate this
+# CVE's vulnerable and patched forms without also flagging every
+# already-safe call of the same shape. Not filed under ENGINE-GAPS.md: nothing
+# here is a mechanical, localised change; it is the same "reachability, not
+# range-validity" precision boundary IndexAccessSink and TrustBoundary
+# already carry deliberately (`reviewConfidence: medium`) for every other
+# language that binds to them.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1205: DecodePixels only bounds the derived clearCode, not minCodeSize itself"
+  lang csharp
+  file LzwDecoder.cs
+  reject VYQL-MEM-005
+  code
+  ```
+  using System.Buffers;
+  using System.Runtime.CompilerServices;
+  using System.Runtime.InteropServices;
+
+  namespace SixLabors.ImageSharp.Formats.Gif;
+
+  internal sealed class GifDecoderCore
+  {
+      private void ReadFrameIndices(BufferedReadStream stream, Buffer2D<byte> indices)
+      {
+          int minCodeSize = stream.ReadByte();
+          using LzwDecoder lzwDecoder = new(this.configuration.MemoryAllocator, stream);
+          lzwDecoder.DecodePixels(minCodeSize, indices);
+      }
+  }
+
+  internal sealed class LzwDecoder : IDisposable
+  {
+      private const int MaxStackSize = 4096;
+      private const int NullCode = -1;
+
+      private readonly BufferedReadStream stream;
+      private readonly IMemoryOwner<int> prefix;
+      private readonly IMemoryOwner<int> suffix;
+      private readonly IMemoryOwner<int> pixelStack;
+
+      public LzwDecoder(MemoryAllocator memoryAllocator, BufferedReadStream stream)
+      {
+          this.stream = stream ?? throw new ArgumentNullException(nameof(stream));
+          this.prefix = memoryAllocator.Allocate<int>(MaxStackSize, AllocationOptions.Clean);
+          this.suffix = memoryAllocator.Allocate<int>(MaxStackSize, AllocationOptions.Clean);
+          this.pixelStack = memoryAllocator.Allocate<int>(MaxStackSize + 1, AllocationOptions.Clean);
+      }
+
+      public void DecodePixels(int minCodeSize, Buffer2D<byte> pixels)
+      {
+          int clearCode = 1 << minCodeSize;
+
+          if (minCodeSize < 2 || clearCode > MaxStackSize)
+          {
+              GifThrowHelper.ThrowInvalidImageContentException("Gif Image does not contain a valid LZW minimum code.");
+          }
+
+          int width = pixels.Width;
+          int height = pixels.Height;
+          int length = width * height;
+
+          int codeSize = minCodeSize + 1;
+          int endCode = clearCode + 1;
+          int availableCode = clearCode + 2;
+
+          int code;
+          int oldCode = NullCode;
+          int codeMask = (1 << codeSize) - 1;
+          int bits = 0;
+          int top = 0;
+          int count = 0;
+          int bi = 0;
+          int xyz = 0;
+          int data = 0;
+          int first = 0;
+
+          ref int prefixRef = ref MemoryMarshal.GetReference(this.prefix.GetSpan());
+          ref int suffixRef = ref MemoryMarshal.GetReference(this.suffix.GetSpan());
+          ref int pixelStackRef = ref MemoryMarshal.GetReference(this.pixelStack.GetSpan());
+
+          for (code = 0; code < clearCode; code++)
+          {
+              Unsafe.Add(ref suffixRef, (uint)code) = (byte)code;
+          }
+
+          Span<byte> buffer = stackalloc byte[byte.MaxValue];
+          int y = 0;
+          int x = 0;
+          int rowMax = width;
+          ref byte pixelsRowRef = ref MemoryMarshal.GetReference(pixels.DangerousGetRowSpan(y));
+          while (xyz < length)
+          {
+              if (xyz == rowMax)
+              {
+                  x = 0;
+                  pixelsRowRef = ref MemoryMarshal.GetReference(pixels.DangerousGetRowSpan(++y));
+                  rowMax = (y * width) + width;
+              }
+
+              if (top == 0)
+              {
+                  if (bits < codeSize)
+                  {
+                      if (count == 0)
+                      {
+                          count = this.ReadBlock(buffer);
+                          if (count == 0)
+                          {
+                              break;
+                          }
+
+                          bi = 0;
+                      }
+
+                      data += buffer[bi] << bits;
+                      bits += 8;
+                      bi++;
+                      count--;
+                      continue;
+                  }
+
+                  code = data & codeMask;
+                  data >>= codeSize;
+                  bits -= codeSize;
+
+                  if (code > availableCode || code == endCode)
+                  {
+                      break;
+                  }
+
+                  if (code == clearCode)
+                  {
+                      codeSize = minCodeSize + 1;
+                      codeMask = (1 << codeSize) - 1;
+                      availableCode = clearCode + 2;
+                      oldCode = NullCode;
+                      continue;
+                  }
+
+                  if (oldCode == NullCode)
+                  {
+                      Unsafe.Add(ref pixelStackRef, (uint)top++) = Unsafe.Add(ref suffixRef, (uint)code);
+                      oldCode = code;
+                      first = code;
+                      continue;
+                  }
+
+                  int inCode = code;
+                  if (code == availableCode)
+                  {
+                      Unsafe.Add(ref pixelStackRef, (uint)top++) = (byte)first;
+                      code = oldCode;
+                  }
+
+                  while (code > clearCode)
+                  {
+                      Unsafe.Add(ref pixelStackRef, (uint)top++) = Unsafe.Add(ref suffixRef, (uint)code);
+                      code = Unsafe.Add(ref prefixRef, (uint)code);
+                  }
+
+                  int suffixCode = Unsafe.Add(ref suffixRef, (uint)code);
+                  first = suffixCode;
+                  Unsafe.Add(ref pixelStackRef, (uint)top++) = suffixCode;
+
+                  if (availableCode < MaxStackSize)
+                  {
+                      Unsafe.Add(ref prefixRef, (uint)availableCode) = oldCode;
+                      Unsafe.Add(ref suffixRef, (uint)availableCode) = first;
+                      availableCode++;
+                      if (availableCode == codeMask + 1 && availableCode < MaxStackSize)
+                      {
+                          codeSize++;
+                          codeMask = (1 << codeSize) - 1;
+                      }
+                  }
+
+                  oldCode = inCode;
+              }
+
+              top--;
+              xyz++;
+              Unsafe.Add(ref pixelsRowRef, (uint)x++) = (byte)Unsafe.Add(ref pixelStackRef, (uint)top);
+          }
+      }
+  }
+  ```
+
+test "rank1205: the fixed revision bounds minCodeSize itself and returns instead of decoding"
+  lang csharp
+  file LzwDecoder.cs
+  reject VYQL-MEM-005
+  code
+  ```
+  using System.Buffers;
+  using System.Runtime.CompilerServices;
+  using System.Runtime.InteropServices;
+
+  namespace SixLabors.ImageSharp.Formats.Gif;
+
+  internal sealed class GifDecoderCore
+  {
+      private void ReadFrameIndices(BufferedReadStream stream, Buffer2D<byte> indices)
+      {
+          int minCodeSize = stream.ReadByte();
+          using LzwDecoder lzwDecoder = new(this.configuration.MemoryAllocator, stream);
+          lzwDecoder.DecodePixels(minCodeSize, indices);
+      }
+  }
+
+  internal sealed class LzwDecoder : IDisposable
+  {
+      private const int MaxStackSize = 4096;
+      private const int MaximumLzwBits = 12;
+      private const int NullCode = -1;
+
+      private readonly BufferedReadStream stream;
+      private readonly IMemoryOwner<int> prefix;
+      private readonly IMemoryOwner<int> suffix;
+      private readonly IMemoryOwner<int> pixelStack;
+
+      public LzwDecoder(MemoryAllocator memoryAllocator, BufferedReadStream stream)
+      {
+          this.stream = stream ?? throw new ArgumentNullException(nameof(stream));
+          this.prefix = memoryAllocator.Allocate<int>(MaxStackSize, AllocationOptions.Clean);
+          this.suffix = memoryAllocator.Allocate<int>(MaxStackSize, AllocationOptions.Clean);
+          this.pixelStack = memoryAllocator.Allocate<int>(MaxStackSize + 1, AllocationOptions.Clean);
+      }
+
+      public void DecodePixels(int minCodeSize, Buffer2D<byte> pixels)
+      {
+          int clearCode = 1 << minCodeSize;
+
+          if (minCodeSize < 2 || minCodeSize > MaximumLzwBits || clearCode > MaxStackSize)
+          {
+              return;
+          }
+
+          int width = pixels.Width;
+          int height = pixels.Height;
+          int length = width * height;
+
+          int codeSize = minCodeSize + 1;
+          int endCode = clearCode + 1;
+          int availableCode = clearCode + 2;
+
+          int code;
+          int oldCode = NullCode;
+          int codeMask = (1 << codeSize) - 1;
+          int bits = 0;
+          int top = 0;
+          int count = 0;
+          int bi = 0;
+          int xyz = 0;
+          int data = 0;
+          int first = 0;
+
+          ref int prefixRef = ref MemoryMarshal.GetReference(this.prefix.GetSpan());
+          ref int suffixRef = ref MemoryMarshal.GetReference(this.suffix.GetSpan());
+          ref int pixelStackRef = ref MemoryMarshal.GetReference(this.pixelStack.GetSpan());
+
+          for (code = 0; code < clearCode; code++)
+          {
+              Unsafe.Add(ref suffixRef, (uint)code) = (byte)code;
+          }
+
+          Span<byte> buffer = stackalloc byte[byte.MaxValue];
+          int y = 0;
+          int x = 0;
+          int rowMax = width;
+          ref byte pixelsRowRef = ref MemoryMarshal.GetReference(pixels.DangerousGetRowSpan(y));
+          while (xyz < length)
+          {
+              if (xyz == rowMax)
+              {
+                  x = 0;
+                  pixelsRowRef = ref MemoryMarshal.GetReference(pixels.DangerousGetRowSpan(++y));
+                  rowMax = (y * width) + width;
+              }
+
+              if (top == 0)
+              {
+                  if (bits < codeSize)
+                  {
+                      if (count == 0)
+                      {
+                          count = this.ReadBlock(buffer);
+                          if (count == 0)
+                          {
+                              break;
+                          }
+
+                          bi = 0;
+                      }
+
+                      data += buffer[bi] << bits;
+                      bits += 8;
+                      bi++;
+                      count--;
+                      continue;
+                  }
+
+                  code = data & codeMask;
+                  data >>= codeSize;
+                  bits -= codeSize;
+
+                  if (code > availableCode || code == endCode)
+                  {
+                      break;
+                  }
+
+                  if (code == clearCode)
+                  {
+                      codeSize = minCodeSize + 1;
+                      codeMask = (1 << codeSize) - 1;
+                      availableCode = clearCode + 2;
+                      oldCode = NullCode;
+                      continue;
+                  }
+
+                  if (oldCode == NullCode)
+                  {
+                      Unsafe.Add(ref pixelStackRef, (uint)top++) = Unsafe.Add(ref suffixRef, (uint)code);
+                      oldCode = code;
+                      first = code;
+                      continue;
+                  }
+
+                  int inCode = code;
+                  if (code == availableCode)
+                  {
+                      Unsafe.Add(ref pixelStackRef, (uint)top++) = (byte)first;
+                      code = oldCode;
+                  }
+
+                  while (code > clearCode)
+                  {
+                      Unsafe.Add(ref pixelStackRef, (uint)top++) = Unsafe.Add(ref suffixRef, (uint)code);
+                      code = Unsafe.Add(ref prefixRef, (uint)code);
+                  }
+
+                  int suffixCode = Unsafe.Add(ref suffixRef, (uint)code);
+                  first = suffixCode;
+                  Unsafe.Add(ref pixelStackRef, (uint)top++) = suffixCode;
+
+                  if (availableCode < MaxStackSize)
+                  {
+                      Unsafe.Add(ref prefixRef, (uint)availableCode) = oldCode;
+                      Unsafe.Add(ref suffixRef, (uint)availableCode) = first;
+                      availableCode++;
+                      if (availableCode == codeMask + 1 && availableCode < MaxStackSize)
+                      {
+                          codeSize++;
+                          codeMask = (1 << codeSize) - 1;
+                      }
+                  }
+
+                  oldCode = inCode;
+              }
+
+              top--;
+              xyz++;
+              Unsafe.Add(ref pixelsRowRef, (uint)x++) = (byte)Unsafe.Add(ref pixelStackRef, (uint)top);
+          }
+      }
+  }
+  ```
