@@ -1,0 +1,89 @@
+# Rank 1144 / CVE-2023-34251: Grav guards Twig's `filter` and `map` callback
+# filters against dangerous function names but leaves `reduce` on Twig's stock
+# implementation, so `{{ array|reduce('system') }}` still reaches arbitrary PHP
+# execution (CWE-94).
+#
+# ATTENTION: vocabulary gap. A dangerous-function guard covers two of three
+# sibling Twig array-callback filters; no ontology concept names that check at
+# all. Both snippets reject VYQL-INJ-004.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1144: reduce has no dangerous-function guard, unlike its filter and map siblings"
+  lang php
+  file GravExtension.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+  class GravExtension extends AbstractExtension
+  {
+      public function getFilters()
+      {
+          return [
+              new TwigFilter('filter', [$this, 'filterFunc'], ['needs_environment' => true]),
+              new TwigFilter('map', [$this, 'mapFunc'], ['needs_environment' => true]),
+          ];
+      }
+
+      function filterFunc(Environment $env, $array, $arrow)
+      {
+          if (!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)) {
+              throw new RuntimeError('Twig |filter("' . $arrow . '") is not allowed.');
+          }
+          return twig_array_filter($env, $array, $arrow);
+      }
+
+      function mapFunc(Environment $env, $array, $arrow)
+      {
+          if (!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)) {
+              throw new RuntimeError('Twig |map("' . $arrow . '") is not allowed.');
+          }
+          return twig_array_map($env, $array, $arrow);
+      }
+  }
+  ```
+
+test "rank1144: reduce carries the same dangerous-function guard as its siblings"
+  lang php
+  file GravExtension.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+  class GravExtension extends AbstractExtension
+  {
+      public function getFilters()
+      {
+          return [
+              new TwigFilter('filter', [$this, 'filterFunc'], ['needs_environment' => true]),
+              new TwigFilter('map', [$this, 'mapFunc'], ['needs_environment' => true]),
+              new TwigFilter('reduce', [$this, 'reduceFunc'], ['needs_environment' => true]),
+          ];
+      }
+
+      function filterFunc(Environment $env, $array, $arrow)
+      {
+          if (!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)) {
+              throw new RuntimeError('Twig |filter("' . $arrow . '") is not allowed.');
+          }
+          return twig_array_filter($env, $array, $arrow);
+      }
+
+      function mapFunc(Environment $env, $array, $arrow)
+      {
+          if (!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)) {
+              throw new RuntimeError('Twig |map("' . $arrow . '") is not allowed.');
+          }
+          return twig_array_map($env, $array, $arrow);
+      }
+
+      function reduceFunc(Environment $env, $array, $arrow)
+      {
+          if (!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)) {
+              throw new RuntimeError('Twig |reduce("' . $arrow . '") is not allowed.');
+          }
+          return twig_array_map($env, $array, $arrow);
+      }
+  }
+  ```

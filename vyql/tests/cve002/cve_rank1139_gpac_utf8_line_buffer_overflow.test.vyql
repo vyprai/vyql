@@ -1,0 +1,54 @@
+# Rank 1139 / CVE-2024-0321: GPAC's UTF-8 line converter clamps the converted
+# length against its own conversion buffer but never against the caller-
+# supplied destination size before strcpy, so a long converted line overflows
+# the caller's buffer (CWE-121, CWE-787).
+#
+# ATTENTION: precision limit. VYQL-MEM-002 fires on strcpy at both revisions
+# identically; the rule has no unless for a clamp that relates a separate
+# destination-size parameter to the copy length. Both snippets expect the
+# finding.
+#
+# verify_current_expected: attention-precision-limit, both revisions fire identically
+
+test "rank1139: the converted line is copied with only the source buffer bound checked"
+  lang c
+  file load_text.c
+  expect VYQL-MEM-002
+  code
+  ```
+  char *gf_text_get_utf8_line(char *szLine, u32 lineSize, FILE *txt_in, s32 unicode_type) {
+      char szLineConv[1024];
+      u32 j;
+
+      j = convert_to_utf8(szLine, szLineConv, sizeof(szLineConv));
+      if (j >= GF_ARRAY_LENGTH(szLineConv)) {
+          j = GF_ARRAY_LENGTH(szLineConv) - 1;
+      }
+      szLineConv[j] = 0;
+      strcpy(szLine, szLineConv);
+      return szLine;
+  }
+  ```
+
+test "rank1139: the destination buffer's own size is also checked before the copy"
+  lang c
+  file load_text.c
+  expect VYQL-MEM-002
+  code
+  ```
+  char *gf_text_get_utf8_line(char *szLine, u32 lineSize, FILE *txt_in, s32 unicode_type) {
+      char szLineConv[1024];
+      u32 j;
+
+      j = convert_to_utf8(szLine, szLineConv, sizeof(szLineConv));
+      if (j >= GF_ARRAY_LENGTH(szLineConv)) {
+          j = GF_ARRAY_LENGTH(szLineConv) - 1;
+      }
+      if (j >= lineSize) {
+          j = lineSize - 1;
+      }
+      szLineConv[j] = 0;
+      strcpy(szLine, szLineConv);
+      return szLine;
+  }
+  ```

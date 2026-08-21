@@ -1,0 +1,56 @@
+# Rank 1146 / CVE-2025-53106: Graylog's token-creation endpoint checks whether
+# the requesting user may create tokens for themselves, then uses that answer
+# to authorize creating a token for whichever other user the URL names
+# (CWE-285).
+#
+# ATTENTION: vocabulary gap. Nearest IDOR concepts describe a missing ownership
+# constraint, not a permission check present but evaluated against the wrong
+# principal, and Java has no binding for them. Both snippets reject.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1146: the permission check runs against the requester, not the token's future owner"
+  lang java
+  file UsersResource.java
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  package org.graylog2.rest.resources.users;
+
+  public class UsersResource extends RestResource {
+      public Response createToken(@PathParam("userId") String userId, GenerateTokenTTL body) {
+          final User futureOwner = loadUserById(userId);
+          final User currentUser = getCurrentUser();
+
+          if (currentUser == null) {
+              throw new ForbiddenException("Not allowed to create tokens for unknown user.");
+          }
+          if (!isPermitted(USERS_TOKENCREATE, currentUser.getName())) {
+              throw new ForbiddenException(currentUser.getName() + " is not allowed to create token.");
+          }
+
+          return createTokenForUser(futureOwner);
+      }
+  }
+  ```
+
+test "rank1146: the permission check runs against the token's actual future owner"
+  lang java
+  file UsersResource.java
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  package org.graylog2.rest.resources.users;
+
+  public class UsersResource extends RestResource {
+      public Response createToken(@PathParam("userId") String userId, GenerateTokenTTL body) {
+          final User futureOwner = loadUserById(userId);
+
+          if (!isPermitted(USERS_TOKENCREATE, futureOwner.getName())) {
+              throw new ForbiddenException("You are not allowed to create a token for user " + futureOwner.getName() + ".");
+          }
+
+          return createTokenForUser(futureOwner);
+      }
+  }
+  ```

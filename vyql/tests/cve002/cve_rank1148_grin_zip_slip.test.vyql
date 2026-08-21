@@ -1,0 +1,78 @@
+# Rank 1148 / CVE-2019-9195: Grin's txhashset archive extractor joins a ZIP
+# entry's raw name onto the extraction directory with no sanitization, so a
+# `../` entry writes outside the directory (CWE-22).
+#
+# ATTENTION: engine gap. code.FilePathAccess labels the join/write sink, but no
+# source binding marks a ZIP entry name as attacker-controlled, so nothing
+# fires. Both snippets reject VYQL-PATH-001.
+#
+# verify_current_expected: attention-engine-gap, no source labelled in either revision
+
+test "rank1148: the archive entry's raw name is joined onto the extraction path unsanitized"
+  lang rust
+  file zip.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  use std::fs;
+  use std::io;
+  use std::path::Path;
+
+  pub fn decompress<R>(src_file: R, dest: &Path) -> zip_rs::result::ZipResult<()>
+  where
+      R: io::Read + io::Seek,
+  {
+      let mut archive = zip_rs::ZipArchive::new(src_file)?;
+
+      for i in 0..archive.len() {
+          let mut file = archive.by_index(i)?;
+          let file_path = dest.join(file.name());
+
+          if (&*file.name()).ends_with('/') {
+              fs::create_dir_all(&file_path)?;
+          } else {
+              let mut outfile = fs::File::create(&file_path)?;
+              io::copy(&mut file, &mut outfile)?;
+          }
+      }
+      Ok(())
+  }
+  ```
+
+test "rank1148: a sanitized, allowlisted name is required before extraction"
+  lang rust
+  file zip.rs
+  reject VYQL-PATH-001
+  code
+  ```
+  use std::fs;
+  use std::io;
+  use std::path::Path;
+
+  pub fn decompress<R, F>(src_file: R, dest: &Path, expected: F) -> zip_rs::result::ZipResult<usize>
+  where
+      R: io::Read + io::Seek,
+      F: Fn(&Path) -> bool,
+  {
+      let mut decompressed = 0;
+      let mut archive = zip_rs::ZipArchive::new(src_file)?;
+
+      for i in 0..archive.len() {
+          let mut file = archive.by_index(i)?;
+          let san_name = file.sanitized_name();
+          if san_name.to_str().unwrap_or("") != file.name() || !expected(&san_name) {
+              continue;
+          }
+          let file_path = dest.join(san_name);
+
+          if (&*file.name()).ends_with('/') {
+              fs::create_dir_all(&file_path)?;
+          } else {
+              let mut outfile = fs::File::create(&file_path)?;
+              io::copy(&mut file, &mut outfile)?;
+              decompressed += 1;
+          }
+      }
+      Ok(decompressed)
+  }
+  ```

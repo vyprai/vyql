@@ -1,0 +1,70 @@
+# Rank 1145 / CVE-2021-29439: Grav's admin plugin dispatches admin controller
+# tasks after a view blacklist and CSRF nonce only, with no check that the
+# requester is logged into the admin panel, and one task also lacks its own
+# permission check (CWE-863).
+#
+# ATTENTION: vocabulary gap. code.PrivilegedEntryPointReview matches the theme,
+# but the PHP binding keys on a frontend review marker generic task dispatch
+# does not carry. Both snippets reject.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1145: execute() dispatches a task after checking only the view blacklist and a nonce"
+  lang php
+  file AdminBaseController.php
+  reject_review code.PrivilegedEntryPointReview
+  code
+  ```
+  <?php
+  class AdminBaseController
+  {
+      public function execute()
+      {
+          if (in_array($this->view, $this->blacklist_views, true)) {
+              return false;
+          }
+
+          if (!$this->validateNonce()) {
+              return false;
+          }
+
+          $method = 'task' . ucfirst($this->task);
+          if (!method_exists($this, $method)) {
+              return false;
+          }
+          return $this->{$method}();
+      }
+  }
+  ```
+
+test "rank1145: execute() requires admin login before dispatching a task"
+  lang php
+  file AdminBaseController.php
+  reject_review code.PrivilegedEntryPointReview
+  code
+  ```
+  <?php
+  class AdminBaseController
+  {
+      public function execute()
+      {
+          if (in_array($this->view, $this->blacklist_views, true)) {
+              return false;
+          }
+
+          if (!$this->admin->authorize()) {
+              return false;
+          }
+
+          if (!$this->validateNonce()) {
+              return false;
+          }
+
+          $method = 'task' . ucfirst($this->task);
+          if (!method_exists($this, $method)) {
+              return false;
+          }
+          return $this->{$method}();
+      }
+  }
+  ```

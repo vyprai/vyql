@@ -1,0 +1,57 @@
+# Rank 1143 / CVE-2026-42544: Granian's ASGI WebSocket scope builder calls
+# `.unwrap()` on Sec-WebSocket-Protocol UTF-8 decoding, so an invalid header
+# from an unauthenticated client panics the worker (CWE-20, CWE-248, CWE-400).
+#
+# ATTENTION: vocabulary gap. Nearest concepts cover unhandled header-parse
+# failures in other languages/frameworks, not a Rust Result::unwrap on opaque
+# header bytes. Both snippets reject.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1143: an invalid header value panics via unwrap"
+  lang rust
+  file utils.rs
+  reject_review code.EmmettUnhandledCookieParseException
+  code
+  ```
+  use pyo3::prelude::*;
+  use pyo3::types::PyString;
+
+  pub(super) fn build_scope_ws(py: Python, req: &http::Request<()>) -> Bound<PyAny> {
+      let subprotocols: Vec<Bound<PyString>> = req
+          .headers()
+          .get_all("Sec-WebSocket-Protocol")
+          .iter()
+          .flat_map(|v| {
+              v.to_str().unwrap().split(',').map(|s| PyString::new(py, s.trim()))
+          })
+          .collect();
+      PyList::new(py, subprotocols).unwrap().into_any()
+  }
+  ```
+
+test "rank1143: an invalid header value degrades to empty instead of panicking"
+  lang rust
+  file utils.rs
+  reject_review code.EmmettUnhandledCookieParseException
+  code
+  ```
+  use pyo3::prelude::*;
+  use pyo3::types::PyString;
+
+  pub(super) fn build_scope_ws(py: Python, req: &http::Request<()>) -> Bound<PyAny> {
+      let subprotocols: Vec<Bound<PyString>> = req
+          .headers()
+          .get_all("Sec-WebSocket-Protocol")
+          .iter()
+          .flat_map(|v| {
+              v.to_str()
+                  .unwrap_or_default()
+                  .split(',')
+                  .filter(|s| !s.is_empty())
+                  .map(|s| PyString::new(py, s.trim()))
+          })
+          .collect();
+      PyList::new(py, subprotocols).unwrap().into_any()
+  }
+  ```
