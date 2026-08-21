@@ -1,0 +1,89 @@
+# Rank 1137 / CVE-2026-35392: goshs's PUT-upload handler builds the save path
+# by concatenating the request URL onto the upload folder with no cleaning or
+# containment check (CWE-22).
+#
+# VYQL-PATH-001 fires on the unconstrained write and separates the revisions
+# once a Clean+Join+prefix containment helper gates the path. Vulnerable
+# snippet expects the finding; fixed snippet rejects it.
+#
+# verify_current_expected: current-behavior
+
+test "rank1137: the save path is built by raw string concatenation"
+  lang go
+  file updown.go
+  expect VYQL-PATH-001
+  code
+  ```
+  package httpserver
+
+  import (
+      "fmt"
+      "net/http"
+      "os"
+      "strings"
+  )
+
+  func (fs *FileServer) put(w http.ResponseWriter, req *http.Request) {
+      upath := req.URL.Path
+
+      filename := strings.Split(upath, "/")
+      outName := filename[len(filename)-1]
+
+      targetpath := strings.Split(upath, "/")
+      targetpath = targetpath[:len(targetpath)-1]
+      target := strings.Join(targetpath, "/")
+
+      savepath := fmt.Sprintf("%s%s/%s", fs.UploadFolder, target, outName)
+
+      osFile, err := os.OpenFile(savepath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+      if err != nil {
+          return
+      }
+      defer osFile.Close()
+  }
+  ```
+
+test "rank1137: the save path is resolved and checked against the upload root"
+  lang go
+  file updown.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package httpserver
+
+  import (
+      "fmt"
+      "net/http"
+      "net/url"
+      "os"
+      "path/filepath"
+      "strings"
+  )
+
+  func sanitizePath(root, requestPath string) (string, error) {
+      decoded, err := url.QueryUnescape(requestPath)
+      if err != nil {
+          decoded = requestPath
+      }
+      clean := filepath.Clean("/" + strings.TrimLeft(decoded, "/"))
+      abs := filepath.Join(root, clean)
+      rootClean := filepath.Clean(root)
+      if abs != rootClean && !strings.HasPrefix(abs, rootClean+string(filepath.Separator)) {
+          return "", fmt.Errorf("path escapes root: %q", requestPath)
+      }
+      return abs, nil
+  }
+
+  func (fs *FileServer) put(w http.ResponseWriter, req *http.Request) {
+      savepath, err := sanitizePath(fs.UploadFolder, req.URL.Path)
+      if err != nil {
+          return
+      }
+
+      osFile, err := os.OpenFile(savepath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+      if err != nil {
+          return
+      }
+      defer osFile.Close()
+  }
+  ```

@@ -1,0 +1,69 @@
+# Rank 1132 / CVE-2022-29173: go-tuf's update client downloads new
+# timestamp/snapshot metadata without first loading locally verified
+# last-known-good versions, so it has nothing to compare a newly-served file
+# against for rollback protection (CWE-354).
+#
+# ATTENTION: vocabulary gap. code.ProtocolStateReview describes accepting new
+# state without the required prior-state check, but its Go binding is a named
+# TLS handshake analysis, not a generic load-prior-trusted-state pattern.
+# Both snippets reject.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1132: Update downloads new metadata with no prior trusted version loaded"
+  lang go
+  file client.go
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  package client
+
+  func (c *Client) Update() (data.TargetFiles, error) {
+      if err := c.getRootFileUnsafe(); err != nil {
+          return nil, err
+      }
+
+      timestampJSON, err := c.downloadMetaUnsafe("timestamp.json", defaultTimestampDownloadLimit)
+      if err != nil {
+          return nil, err
+      }
+      snapshotMeta, err := c.decodeTimestamp(timestampJSON)
+      if err != nil {
+          return nil, err
+      }
+      if err := c.local.SetMeta("timestamp.json", timestampJSON); err != nil {
+          return nil, err
+      }
+      return nil, nil
+  }
+  ```
+
+test "rank1132: Update loads and verifies prior trusted metadata before downloading anything new"
+  lang go
+  file client.go
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  package client
+
+  func (c *Client) Update() (data.TargetFiles, error) {
+      if err := c.getRootFileUnsafe(); err != nil {
+          return nil, err
+      }
+
+      c.getLocalMeta()
+
+      timestampJSON, err := c.downloadMetaUnsafe("timestamp.json", defaultTimestampDownloadLimit)
+      if err != nil {
+          return nil, err
+      }
+      snapshotMeta, err := c.decodeTimestamp(timestampJSON)
+      if err != nil {
+          return nil, err
+      }
+      if err := c.local.SetMeta("timestamp.json", timestampJSON); err != nil {
+          return nil, err
+      }
+      return nil, nil
+  }
+  ```

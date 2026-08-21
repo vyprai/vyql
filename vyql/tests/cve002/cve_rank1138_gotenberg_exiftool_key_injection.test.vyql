@@ -1,0 +1,72 @@
+# Rank 1138 / CVE-2026-40281: Gotenberg's ExifTool metadata writer accepts any
+# string as a tag key, and go-exiftool's line-based stdin protocol treats a
+# newline in that key as a new argument, so a key can inject ExifTool flags
+# (CWE-88).
+#
+# ATTENTION: vocabulary gap. code.CredentialProtocolNewlineInjection matches
+# the mechanism but is scoped to credential protocols and bound only in C;
+# nothing states the general form for keys written into a line-delimited
+# external-process protocol. Both snippets reject the review.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1138: a metadata key is written with no character restriction"
+  lang go
+  file exiftool.go
+  reject_review code.CredentialProtocolNewlineInjection
+  code
+  ```
+  package exiftool
+
+  import "strings"
+
+  func (engine *ExifTool) WriteMetadata(ctx context.Context, metadata map[string]string) error {
+      dangerousTags := []string{"FileName", "Directory", "HardLink", "SymLink"}
+
+      for key := range metadata {
+          for _, tag := range dangerousTags {
+              if strings.EqualFold(key, tag) {
+                  return fmt.Errorf("cannot write protected tag %q", key)
+              }
+          }
+      }
+
+      return engine.exiftool.WriteMetadata(metadata)
+  }
+  ```
+
+test "rank1138: a metadata key must match a safe character allowlist first"
+  lang go
+  file exiftool.go
+  reject_review code.CredentialProtocolNewlineInjection
+  code
+  ```
+  package exiftool
+
+  import (
+      "regexp"
+      "strings"
+  )
+
+  var safeKeyPattern = regexp.MustCompile(`^[a-zA-Z0-9\-_.:]+$`)
+
+  func (engine *ExifTool) WriteMetadata(ctx context.Context, metadata map[string]string) error {
+      dangerousTags := []string{"FileName", "Directory", "HardLink", "SymLink"}
+
+      for key := range metadata {
+          if !safeKeyPattern.MatchString(key) {
+              return fmt.Errorf("write PDF metadata with ExifTool: invalid metadata key %q", key)
+          }
+      }
+
+      for key := range metadata {
+          for _, tag := range dangerousTags {
+              if strings.EqualFold(key, tag) {
+                  return fmt.Errorf("cannot write protected tag %q", key)
+              }
+          }
+      }
+
+      return engine.exiftool.WriteMetadata(metadata)
+  }
+  ```
