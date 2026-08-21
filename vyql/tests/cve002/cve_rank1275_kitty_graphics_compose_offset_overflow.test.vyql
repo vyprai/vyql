@@ -1,0 +1,70 @@
+# Both revisions below are silent today: kitty's fix widens dest_x/dest_y/
+# src_x/src_y/width/height from `unsigned int` to `uint64_t` at their
+# *declaration*, leaving the `dest_x + width > img->width` comparison text
+# byte-for-byte identical between the vulnerable and patched forms. The
+# existing code.OffsetLengthBoundsOverflow / VYQL-NUM-014 concept (minted for
+# rank 708's Go BTF offset-plus-length overflow) matches this weakness
+# exactly by CWE and reviewCondition, but every C detector that inspects this
+# shape (ccPointerOffsetMissingRemainingSizeObservations,
+# ccCimgPnmDimensionOverflowObservations) discriminates vulnerable from fixed
+# by diffing the comparison/allocation expression's own text, because
+# compactCExprText strips all whitespace and merges a type keyword into the
+# very next identifier (`unsigned int width` -> `unsignedintwidth`), so no
+# existing extraction step can separate a declared type from the name it
+# qualifies. Recovering that requires walking the `declaration` AST node
+# (type field vs. each declarator) instead of the flattened body text --
+# real engine work, not a data-only addition. See ENGINE-GAPS.md.
+
+test "rank1275: graphics compose destination rectangle bounds check overflows at narrow width"
+  lang c
+  reject_review code.OffsetLengthBoundsOverflow
+  reject VYQL-NUM-014
+  code
+  ```
+  typedef struct { unsigned int width, height; } Image;
+  typedef struct { unsigned int width, height, x_offset, y_offset, cell_x_offset, cell_y_offset; } GraphicsCommand;
+  void set_command_failed_response(const char *code, const char *fmt, ...);
+
+  static void
+  handle_compose_command(bool *is_dirty, const GraphicsCommand *g, Image *img) {
+      const unsigned int width = g->width ? g->width : img->width;
+      const unsigned int height = g->height ? g->height : img->height;
+      const unsigned int dest_x = g->x_offset, dest_y = g->y_offset, src_x = g->cell_x_offset, src_y = g->cell_y_offset;
+      if (dest_x + width > img->width || dest_y + height > img->height) {
+          set_command_failed_response("EINVAL", "The destination rectangle is out of bounds");
+          return;
+      }
+      if (src_x + width > img->width || src_y + height > img->height) {
+          set_command_failed_response("EINVAL", "The source rectangle is out of bounds");
+          return;
+      }
+  }
+  ```
+
+test "rank1275: graphics compose bounds check widens offsets to uint64_t before adding"
+  lang c
+  reject_review code.OffsetLengthBoundsOverflow
+  reject VYQL-NUM-014
+  code
+  ```
+  #include <stdint.h>
+  typedef struct { unsigned int width, height; } Image;
+  typedef struct { unsigned int width, height, x_offset, y_offset, cell_x_offset, cell_y_offset; } GraphicsCommand;
+  void set_command_failed_response(const char *code, const char *fmt, ...);
+
+  static void
+  handle_compose_command(bool *is_dirty, const GraphicsCommand *g, Image *img) {
+      // Use uint64_t to avoid overflow when testing for validity. All dimensions are 32bit numbers.
+      const uint64_t width = g->width ? g->width : img->width;
+      const uint64_t height = g->height ? g->height : img->height;
+      const uint64_t dest_x = g->x_offset, dest_y = g->y_offset, src_x = g->cell_x_offset, src_y = g->cell_y_offset;
+      if (dest_x + width > img->width || dest_y + height > img->height) {
+          set_command_failed_response("EINVAL", "The destination rectangle is out of bounds");
+          return;
+      }
+      if (src_x + width > img->width || src_y + height > img->height) {
+          set_command_failed_response("EINVAL", "The source rectangle is out of bounds");
+          return;
+      }
+  }
+  ```

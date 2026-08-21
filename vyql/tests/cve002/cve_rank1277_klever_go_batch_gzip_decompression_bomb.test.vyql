@@ -1,0 +1,99 @@
+# Rank 1277 / CVE-2026-44697: klever-io/klever-go's data/batch.decompressGzip
+# reads a P2P gossip Batch's Stream through gzip.NewReader straight into
+# io.ReadAll with no output-size limit, so a small compressed batch can
+# inflate to multi-GB and OOM-kill a validator or relay (GHSA-74m6-4hjp-7226,
+# CWE-409/CWE-770).
+#
+# The pool row carries `nocommit`. 333f6ec910906e227705fc5767dc897d8fbfc862
+# is a merge commit ("Merge commit from fork") rather than a release bump --
+# read in full it is the real, targeted fix: it adds a package-level
+# MaxDecompressedBatchSize (10 MiB) constant, threads a `max int64` parameter
+# through decompressGzip/decompressLZ4, wraps the gzip.Reader in
+# io.LimitReader(reader, max+1) before io.ReadAll, and rejects the batch if
+# the inflated length disagrees with the batch's own declared DataSize.
+#
+# No existing rule labelled this shape (`vyql match` on the pre-fix
+# decompressGzip showed only a bare code.ResourceReview mark on io.ReadAll
+# with no rule attached, and a no-op auditreview.marks control on
+# reader.Close -- nothing a rule could consume). VYQL-DOS-041
+# (code.UnboundedAllocationReview, CWE_400/CWE_770) exists for
+# exactly this weakness class and reuses cleanly: a Go binding now flags a
+# function that calls a compress/gzip, compress/zlib or compress/flate
+# NewReader and then reads it fully via io.ReadAll/ioutil.ReadAll/io.Copy
+# without an intervening io.LimitReader -- the same shape gosec's G110 rule
+# flags for Go as a decompression-bomb review finding, so this is
+# documented library practice, not a repro-shaped pattern. See
+# vyql/bindings/go/m48a985c1.vyql, binding unboundedDecompressionReadAll348.
+
+test "rank1277: decompressGzip reads a gzip.Reader fully with no output-size limit"
+  lang go
+  expect VYQL-DOS-041
+  expect_review code.UnboundedAllocationReview
+  code
+  ```
+  package batch
+
+  import (
+  	"bytes"
+  	"compress/gzip"
+  	"io"
+  )
+
+  func decompressGzip(data []byte) ([]byte, error) {
+  	rdata := bytes.NewReader(data)
+
+  	reader, err := gzip.NewReader(rdata)
+  	if err != nil {
+  		return nil, err
+  	}
+
+  	result, err := io.ReadAll(reader)
+  	if err != nil {
+  		return nil, err
+  	}
+
+  	if err := reader.Close(); err != nil {
+  		return nil, err
+  	}
+
+  	return result, nil
+  }
+  ```
+
+test "rank1277: the fixed revision wraps the gzip.Reader in io.LimitReader before ReadAll"
+  lang go
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  package batch
+
+  import (
+  	"bytes"
+  	"compress/gzip"
+  	"io"
+  )
+
+  const MaxDecompressedBatchSize = 10 * 1024 * 1024
+
+  func decompressGzip(data []byte, max int64) ([]byte, error) {
+  	rdata := bytes.NewReader(data)
+
+  	reader, err := gzip.NewReader(rdata)
+  	if err != nil {
+  		return nil, err
+  	}
+  	defer func() { _ = reader.Close() }()
+
+  	limited := io.LimitReader(reader, max+1)
+  	result, err := io.ReadAll(limited)
+  	if err != nil {
+  		return nil, err
+  	}
+  	if int64(len(result)) > max {
+  		return nil, ErrDecompressionTooLarge
+  	}
+
+  	return result, nil
+  }
+  ```

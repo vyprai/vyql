@@ -1917,3 +1917,8 @@ binding tlsWeakClientAuth347 {
   query pattern presenceNode where node.kind == "any" and node.path ~= "tls.VerifyClientCertIfGiven"
   emit issue code.CertValidationDisabled at node
 }
+
+binding unboundedDecompressionReadAll348 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and containsAny(node.context.callPath, ["gzip.NewReader", "zlib.NewReader", "flate.NewReader"]) and containsAny(node.context.callPath, ["io.ReadAll", "ioutil.ReadAll", "io.Copy"]) and not (node.context.callPath contains "io.LimitReader")
+  emit issue code.UnboundedAllocationReview at node
+}
