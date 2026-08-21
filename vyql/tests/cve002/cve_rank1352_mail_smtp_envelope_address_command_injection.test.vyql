@@ -1,0 +1,141 @@
+# CVE-2015-9097: the mail gem's delivery methods took the SMTP envelope
+# addresses from the message and handed them to the SMTP conversation.
+# Mail::CheckDeliveryParams#check_delivery_params asserts only that the
+# addresses are non-blank:
+#
+#   def check_delivery_params(mail)
+#     raise ArgumentError.new('An SMTP From address is required ...') if Utilities.blank?(mail.smtp_envelope_from)
+#     raise ArgumentError.new('An SMTP To address is required ...')   if Utilities.blank?(mail.smtp_envelope_to)
+#     [mail.smtp_envelope_from, mail.smtp_envelope_to, message]
+#   end
+#
+# and Mail::SMTP#deliver! passed the results on unchanged:
+#
+#   smtp_from, smtp_to, message = check_delivery_params(mail)
+#   smtp_obj.sendmail(message, smtp_from, smtp_to)
+#
+# Net::SMTP writes those addresses verbatim into the MAIL FROM: and RCPT TO:
+# command lines. SMTP is line-oriented, so an address carrying CR or LF ends the
+# command and the remainder is read by the server as the next command (CWE-93).
+# The fixed revision rejects line breaks, and over-long addresses, before the
+# address can reach the conversation.
+
+test "rank1352: an envelope address taken from the request reaches the SMTP conversation"
+  lang ruby
+  file lib/mail/network/delivery_methods/smtp.rb
+  expect VYQL-INJ-017
+  code
+  ```
+  module Mail
+    class SMTP
+      def deliver!(params, message)
+        smtp_from = params[:sender]
+        smtp_to = params[:recipient]
+
+        raise ArgumentError.new('An SMTP From address is required to send a message.') if smtp_from.nil?
+        raise ArgumentError.new('An SMTP To address is required to send a message.') if smtp_to.nil?
+
+        smtp = Net::SMTP.new(settings[:address], settings[:port])
+        smtp.start(settings[:domain], settings[:user_name], settings[:password]) do |smtp_obj|
+          smtp_obj.sendmail(message, smtp_from, smtp_to)
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1352: the MAIL FROM and RCPT TO commands carry the same addresses"
+  lang ruby
+  file lib/mail/network/delivery_methods/smtp_connection.rb
+  expect VYQL-INJ-017
+  code
+  ```
+  module Mail
+    class SMTPConnection
+      def deliver!(params, message)
+        smtp.mailfrom(params[:sender])
+        smtp.rcptto(params[:recipient])
+        smtp.data(message)
+      end
+    end
+  end
+  ```
+
+test "rank1352: a configured envelope address is not an injection site"
+  lang ruby
+  file lib/mail/network/delivery_methods/smtp.rb
+  reject VYQL-INJ-017
+  code
+  ```
+  module Mail
+    class SMTP
+      def deliver_bounce_report!(message)
+        smtp = Net::SMTP.new(settings[:address], settings[:port])
+        smtp.start(settings[:domain], settings[:user_name], settings[:password]) do |smtp_obj|
+          smtp_obj.sendmail(message, 'bounces@example.com', 'postmaster@example.com')
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1352: the DATA payload is not an envelope address"
+  lang ruby
+  file lib/mail/network/delivery_methods/smtp.rb
+  reject VYQL-INJ-017
+  code
+  ```
+  module Mail
+    class SMTP
+      def deliver!(params)
+        smtp = Net::SMTP.new(settings[:address], settings[:port])
+        smtp.start(settings[:domain], settings[:user_name], settings[:password]) do |smtp_obj|
+          smtp_obj.sendmail(params[:body], 'bounces@example.com', 'postmaster@example.com')
+        end
+      end
+    end
+  end
+  ```
+
+# The vulnerable code reaches the sink through `smtp_from, smtp_to, message =
+# check_delivery_params(mail)`, and that is the one form of the flow the Ruby
+# frontend drops. The pair below differs only in how the returned array is taken
+# apart: read by index the addresses stay tainted, taken apart by multiple
+# assignment they do not, because rbConv.stmt's "assignment" case has no
+# left_assignment_list target and emits an nir.Assign with no Targets at all.
+#
+# verify_current_expected: attention-engine-gap, isolating pair below.
+
+test "rank1352: a returned envelope pair taken apart by multiple assignment loses its taint"
+  lang ruby
+  reject VYQL-INJ-017
+  code
+  ```
+  class Delivery
+    def check_delivery_params(params)
+      [params[:sender], params[:recipient]]
+    end
+
+    def deliver!(params, message)
+      smtp_from, smtp_to = check_delivery_params(params)
+      smtp.sendmail(message, smtp_from, smtp_to)
+    end
+  end
+  ```
+
+test "rank1352: the same returned envelope pair read by index stays tainted"
+  lang ruby
+  expect VYQL-INJ-017
+  code
+  ```
+  class Delivery
+    def check_delivery_params(params)
+      [params[:sender], params[:recipient]]
+    end
+
+    def deliver!(params, message)
+      pair = check_delivery_params(params)
+      smtp.sendmail(message, pair[0], pair[1])
+    end
+  end
+  ```
