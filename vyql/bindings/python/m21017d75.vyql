@@ -4338,3 +4338,8 @@ binding inputValidationPyStartswithGuardsDynamicCodeLoad908 {
     }
   }
 }
+
+binding unescapedHtmlPresenter909 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.functionName contains "html" and node.context.selector contains ".name" and node.context.literal contains "<div" and not (node.context.callPath contains "bleach_input") and not (node.context.callPath contains "escape")
+  emit issue code.UnescapedHtmlPresenter at node
+}
