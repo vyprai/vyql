@@ -1012,15 +1012,13 @@ func pySemanticReviewTokens(raw, name string) []string {
 		strings.Contains(compact, "__default_field__") {
 		add("unparameterized_sql_query_parser")
 	}
-	if name == "safe_extract" &&
+	if strings.Contains(strings.ToLower(name), "extract") &&
 		strings.Contains(compact, ".getmembers()") &&
-		strings.Contains(compact, "os.path.join(") &&
-		strings.Contains(compact, ".name") &&
-		strings.Contains(compact, "is_within_directory(") &&
-		strings.Contains(compact, ".extractall(") &&
+		(strings.Contains(compact, ".extractall(") || strings.Contains(compact, ".extract(")) &&
 		!strings.Contains(compact, ".issym()") &&
 		!strings.Contains(compact, ".islnk()") &&
-		!strings.Contains(compact, ".linkname") {
+		!strings.Contains(compact, ".linkname") &&
+		!strings.Contains(compact, "filter=") {
 		add("archive_symlink_filter_bypass")
 	}
 	if name == "_resolve_path" &&
