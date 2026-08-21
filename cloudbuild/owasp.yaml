@@ -1,0 +1,45 @@
+# OWASP BenchmarkJava + BenchmarkPython. Same pool as cloudbuild.yaml.
+# Corpora are cloned each run (Cloud Build has no actions/cache).
+timeout: 3600s
+options:
+  logging: CLOUD_LOGGING_ONLY
+  pool:
+    name: projects/valid-perigee-471809-r0/locations/europe-west3/workerPools/vypr-ci-amd64
+steps:
+  - id: owasp-java
+    name: golang:1.26
+    entrypoint: bash
+    env:
+      - CGO_ENABLED=1
+      - GOTOOLCHAIN=auto
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        apt-get update -qq
+        apt-get install -y -qq build-essential git
+        mkdir -p /workspace/benchmark-corpora
+        git clone --depth 1 --quiet \
+          https://github.com/OWASP-Benchmark/BenchmarkJava.git \
+          /workspace/benchmark-corpora/BenchmarkJava
+        VYQL_BENCH=1 BENCH_DIR=/workspace/benchmark-corpora/BenchmarkJava \
+          go test -count=1 -timeout 60m -v ./cmd/vyql/ -run TestOWASPBenchmark
+
+  - id: owasp-python
+    name: golang:1.26
+    entrypoint: bash
+    env:
+      - CGO_ENABLED=1
+      - GOTOOLCHAIN=auto
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        apt-get update -qq
+        apt-get install -y -qq build-essential git
+        mkdir -p /workspace/benchmark-corpora
+        git clone --depth 1 --quiet \
+          https://github.com/OWASP-Benchmark/BenchmarkPython.git \
+          /workspace/benchmark-corpora/BenchmarkPython
+        VYQL_BENCH=1 BENCH_DIR=/workspace/benchmark-corpora/BenchmarkPython \
+          go test -count=1 -timeout 60m -v ./cmd/vyql/ -run TestOWASPBenchmark
