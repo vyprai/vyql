@@ -1,0 +1,6 @@
+module bindings.php.request_supplied_site_url_notification;
+
+binding requestSuppliedSiteUrlNotification {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and containsAny(node.context.subscript, ["$_POST['baseURL']", "$_POST[\"baseURL\"]", "$_GET['baseURL']", "$_GET[\"baseURL\"]", "$_REQUEST['baseURL']", "$_REQUEST[\"baseURL\"]", "$_POST['base_url']", "$_POST[\"base_url\"]", "$_GET['base_url']", "$_GET[\"base_url\"]", "$_REQUEST['base_url']", "$_REQUEST[\"base_url\"]", "$_POST['baseURI']", "$_POST[\"baseURI\"]", "$_POST['base_uri']", "$_POST[\"base_uri\"]", "$_POST['siteURL']", "$_POST[\"siteURL\"]", "$_POST['site_url']", "$_POST[\"site_url\"]", "$_GET['siteURL']", "$_GET['site_url']", "$_REQUEST['siteURL']", "$_REQUEST['site_url']", "$_POST['rootURL']", "$_POST['root_url']", "$_POST['appURL']", "$_POST['app_url']", "$_POST['homeURL']", "$_POST['home_url']"]) and containsAny(node.context.call, ["send", "notify", "mail", "sendMail", "sendEmail", "sendNotification"]) and not (containsAny(node.context.call, ["getBaseURL", "getBaseURI", "getSiteURL", "getRootURL", "getAppURL", "getHomeURL", "getServerURL", "base_url", "site_url", "home_url", "root_url", "app_url"]))
+  emit issue code.UntrustedSupportUrlNotification at node
+}

@@ -1,0 +1,21 @@
+module bindings.go.backupConfigImportScopeReview;
+
+// LXD's backup package documents ParseConfigYamlFile as "decodes the YAML file
+// at path specified into a Config" -- it is a plain decoder over whatever
+// backup.yaml happens to sit in an instance's storage volume. On an import that
+// volume holds the payload of a user-uploaded tarball, so the decoded Config is
+// request data, not server state; the copy the import request was authorized
+// against is the backup index that backup.GetInfo already parsed and the project
+// restriction check already saw.
+//
+// instance.CreateInternal is the privileged step: it writes the instance database
+// record, and its own validation covers config key format, not project
+// restrictions. A function that decodes a backup config off the volume and hands
+// it to CreateInternal therefore creates an instance from metadata that no policy
+// check has been applied to, unless a project-restriction check
+// (project/limits.AllowInstanceCreation and its checkRestriction* helpers) runs
+// over that same decoded config in the same body.
+binding goBackupConfigFromDiskCreatesInstanceRecord {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.callPath contains "ParseConfigYamlFile" and node.context.callPath contains "CreateInternal" and not (containsAny(node.context.callPath, ["AllowInstanceCreation", "checkRestriction", "AllowVolumeCreation"]))
+  emit issue code.RequestScopePolicyReview at node
+}
