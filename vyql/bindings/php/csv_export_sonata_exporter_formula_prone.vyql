@@ -1,0 +1,6 @@
+module bindings.php.csv_export_sonata_exporter_formula_prone;
+
+binding csvExportSonataExporterFormulaProne {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "Handler::create" and node.token contains "CsvWriter" and not containsAny(node.token, ["'='", "\"=\"", "'@'", "\"@\"", "escapeCsv", "esc_csv", "escapeFormula", "escape_formula", "csvEscape", "sanitizeCsv"])
+  emit issue code.CsvFormulaProneExportRow at node
+}

@@ -1,0 +1,8 @@
+module code;
+
+concept LineProtocolCommandWrite : sink {
+  cwe: [CWE_93, CWE_20]
+  enabledBy: [taint.UntrustedData]
+  excludedChars: "\n\r "
+  vulnerableTo: [injection.CrlfInjection, injection.ProtocolStateConfusion]
+}

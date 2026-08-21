@@ -1,0 +1,318 @@
+# Rank 1354 / CVE-2025-53909: mailcow's dovecot quota- and quarantine-notifier
+# scripts read the notification body template out of Redis (`QW_HTML`,
+# `Q_HTML` -- written by the admin UI) and compiled it with `jinja2.Template`,
+# the plain non-sandboxed environment. Jinja2's default environment gives a
+# template author attribute access on every object it is handed, which is the
+# documented route from `{{ ... }}` markup to arbitrary Python inside the
+# dovecot container -- so anyone able to set the stored template escalated to
+# code execution (CWE-1336, SSTI).
+#
+# Fix commit 8c5f6c032 replaces `Template(r.get('QW_HTML'))` with
+# `SandboxedEnvironment().from_string(...)` in both scripts and wraps the
+# render in a `SecurityError`/`TemplateError` handler. The template source,
+# the render call and its keyword arguments are otherwise unchanged: the only
+# difference is which environment compiles the stored string.
+#
+# This is an ordinary source-to-sink shape once the stored read is named:
+# `code.StoredDataRead` on a Redis client's read methods reaches the
+# `code.TemplateRender` sink bound for `jinja2.Template`, which
+# VYQL-INJ-008 judges. The Redis reads are recognised by receiver type, so
+# only a `.get()` on a value assigned from a `redis` client constructor is a
+# stored-data source -- a bare `.get` (a dict, a mapping wrapper, a settings
+# object) is not, which is what the third case pins.
+#
+# The fourth case is the shape both real scripts actually use: the client is
+# built inside a `while True: try: ... else: break` connect-retry loop, so
+# every later `r.get(...)` names a control-flow merge of the loop's definitions
+# as its receiver rather than the constructor call. A merge holds no callee
+# path of its own, so receiver typing reads the merge's operands, and a merge
+# every operand of which is the same known constructor carries that
+# constructor's type as a MAY-type. The loop is incidental -- a branch merges
+# the same way, which the seventh case shows.
+#
+# Cases five through ten pin what that may-type must not do, because the
+# receiver types it can conjure are consumed in two opposite directions:
+# a known type is what ADMITS a receiver-constrained source and what WITHHOLDS
+# a receiver-constrained sink.
+#
+# Five and six: a merge is only typed when EVERY operand is a known
+# constructor and they agree. An arm calling something the constructor table
+# does not name, and an arm holding a parameter, each leave the receiver
+# untyped -- the value may be either thing at the use, so neither a source nor
+# a suppression may be built on it. Seven: two constructors that agree on the
+# type they return do type the merge, and do it through a branch rather than a
+# loop.
+#
+# Eight and nine are Java, and they are here because they are what the
+# operand-side rule is for. A receiver declared at a supertype and assigned in
+# a loop merges the declared type with the constructor, and a supertype is
+# precisely the type a constrained sink is entitled to reject: `Writer` is not
+# in `write`'s `[PrintWriter, ServletOutputStream, JspWriter]`, and `Context`
+# is not in `search`'s `[DirContext, InitialDirContext, InitialLdapContext]`.
+# Reading a declared type off a merge operand therefore deletes both findings.
+# Only the constructor table is read on an operand, so both stand.
+#
+# Ten pins the operand set itself. A merge's `FLOWS` in-edges are a superset of
+# its operands: a mutator call on the merged variable adds its argument as a
+# predecessor of the same node. Operands are recorded where the merge is built,
+# so `r.set(...)` between the retry loop and the read cannot cast an untyped
+# vote and withhold the type.
+
+test "rank1354: Redis-stored notification template compiled with a plain jinja2.Template"
+  lang python
+  file quota_notify.py
+  expect VYQL-INJ-008
+  code
+  ```
+  import os
+  import sys
+  import jinja2
+  from jinja2 import Template
+  import redis
+
+  percent = int(sys.argv[1])
+  username = str(sys.argv[2])
+
+  r = redis.StrictRedis(host='redis', decode_responses=True, port=6379, db=0)
+
+  if r.get('QW_HTML'):
+    try:
+      template = Template(r.get('QW_HTML'))
+    except:
+      print("Error: Cannot parse quota template, falling back to default template.")
+      with open('/templates/quota.tpl') as file_:
+        template = Template(file_.read())
+  else:
+    with open('/templates/quota.tpl') as file_:
+      template = Template(file_.read())
+
+  html = template.render(username=username, percent=percent)
+  ```
+
+test "rank1354: Redis-stored notification template compiled by a Jinja2 sandbox"
+  lang python
+  file quota_notify.py
+  reject VYQL-INJ-008
+  code
+  ```
+  import os
+  import sys
+  import jinja2
+  from jinja2.sandbox import SandboxedEnvironment
+  import redis
+
+  percent = int(sys.argv[1])
+  username = str(sys.argv[2])
+
+  r = redis.StrictRedis(host='redis', decode_responses=True, port=6379, db=0)
+
+  if r.get('QW_HTML'):
+    try:
+      env = SandboxedEnvironment()
+      template = env.from_string(r.get('QW_HTML'))
+    except Exception:
+      print("Error: Cannot parse quota template, falling back to default template.")
+      with open('/templates/quota.tpl') as file_:
+        env = SandboxedEnvironment()
+        template = env.from_string(file_.read())
+  else:
+    with open('/templates/quota.tpl') as file_:
+      env = SandboxedEnvironment()
+      template = env.from_string(file_.read())
+
+  try:
+    html = template.render(username=username, percent=percent)
+  except (jinja2.exceptions.SecurityError, jinja2.TemplateError) as ex:
+    print(f"SecurityError or TemplateError in template rendering: {ex}")
+    sys.exit(1)
+  ```
+
+test "rank1354: an in-process mapping's get() is not a stored-data read"
+  lang python
+  file quota_notify.py
+  reject VYQL-INJ-008
+  code
+  ```
+  import sys
+  from jinja2 import Template
+
+  username = str(sys.argv[2])
+
+  defaults = {'QW_HTML': 'Hello {{ username }}, your mailbox is {{ percent }}% full.'}
+
+  template = Template(defaults.get('QW_HTML'))
+  html = template.render(username=username, percent=90)
+  ```
+
+test "rank1354: Redis client built in a connect-retry loop keeps its receiver type"
+  lang python
+  file quota_notify.py
+  expect VYQL-INJ-008
+  code
+  ```
+  import sys
+  import time
+  from jinja2 import Template
+  import redis
+
+  percent = int(sys.argv[1])
+  username = str(sys.argv[2])
+
+  while True:
+    try:
+      r = redis.StrictRedis(host='redis', decode_responses=True, port=6379, db=0)
+      r.ping()
+    except Exception as ex:
+      print('%s - trying again...' % (ex))
+      time.sleep(3)
+    else:
+      break
+
+  template = Template(r.get('QW_HTML'))
+  html = template.render(username=username, percent=percent)
+  ```
+
+test "rank1354: a merge arm the constructor table does not name leaves the client untyped"
+  lang python
+  file quota_notify.py
+  reject VYQL-INJ-008
+  code
+  ```
+  import os
+  import sys
+  from jinja2 import Template
+  import redis
+
+  username = str(sys.argv[1])
+
+  if os.environ.get('REDIS_UNIX_SOCKET'):
+    r = make_client()
+  else:
+    r = redis.StrictRedis(host='redis', port=6379, db=0)
+
+  template = Template(r.get('QW_HTML'))
+  html = template.render(username=username)
+  ```
+
+test "rank1354: a parameter merged with a constructor leaves the client untyped"
+  lang python
+  file quota_notify.py
+  reject VYQL-INJ-008
+  code
+  ```
+  import sys
+  from jinja2 import Template
+  import redis
+
+  def render(client, username):
+    r = client
+    if len(sys.argv) > 2:
+      r = redis.StrictRedis(host='redis', port=6379, db=0)
+    template = Template(r.get('QW_HTML'))
+    return template.render(username=username)
+  ```
+
+test "rank1354: two constructors agreeing on their type do type the merged client"
+  lang python
+  file quota_notify.py
+  expect VYQL-INJ-008
+  code
+  ```
+  import sys
+  from jinja2 import Template
+  import redis
+
+  username = str(sys.argv[1])
+
+  if len(sys.argv) > 2:
+    r = redis.StrictRedis(host='primary', port=6379, db=0)
+  else:
+    r = redis.Redis(host='replica', port=6379, db=0)
+
+  template = Template(r.get('QW_HTML'))
+  html = template.render(username=username)
+  ```
+
+test "rank1354: a supertype-declared Writer assigned in a loop still reaches its response sink"
+  lang java
+  file src/main/java/servlet/WriteName.java
+  expect VYQL-INJ-004
+  code
+  ```
+  package servlet;
+
+  import java.io.IOException;
+  import java.io.Writer;
+  import javax.servlet.http.HttpServlet;
+  import javax.servlet.http.HttpServletRequest;
+  import javax.servlet.http.HttpServletResponse;
+
+  public class WriteName extends HttpServlet {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+      Writer w = null;
+      while (w == null) {
+        w = resp.getWriter();
+      }
+      w.write(req.getParameter("name"));
+    }
+  }
+  ```
+
+test "rank1354: a supertype-declared Context assigned in a loop still reaches its LDAP sink"
+  lang java
+  file src/main/java/servlet/LdapLookup.java
+  expect VYQL-INJ-005
+  code
+  ```
+  package servlet;
+
+  import java.util.Hashtable;
+  import javax.naming.Context;
+  import javax.naming.directory.DirContext;
+  import javax.naming.directory.InitialDirContext;
+  import javax.naming.directory.SearchControls;
+  import javax.servlet.http.HttpServlet;
+  import javax.servlet.http.HttpServletRequest;
+  import javax.servlet.http.HttpServletResponse;
+
+  public class LdapLookup extends HttpServlet {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+      String user = req.getParameter("user");
+      Hashtable<String, String> env = new Hashtable<String, String>();
+      Context ctx = null;
+      for (int i = 0; i < 3; i++) {
+        ctx = new InitialDirContext(env);
+      }
+      ((DirContext) ctx).search("ou=people", "(uid=" + user + ")", new SearchControls());
+    }
+  }
+  ```
+
+test "rank1354: a mutator writing back into the merged client does not withhold its type"
+  lang python
+  file quota_notify.py
+  expect VYQL-INJ-008
+  code
+  ```
+  import sys
+  import time
+  from jinja2 import Template
+  import redis
+
+  username = str(sys.argv[1])
+
+  while True:
+    try:
+      r = redis.StrictRedis(host='redis', port=6379, db=0)
+      r.ping()
+    except Exception as ex:
+      time.sleep(3)
+    else:
+      break
+
+  r.set('last_notify', 'fixed-literal')
+  r.expire('last_notify', 60)
+
+  template = Template(r.get('QW_HTML'))
+  html = template.render(username=username)
+  ```

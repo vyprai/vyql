@@ -1,0 +1,332 @@
+# Rank 1385 / CVE-2025-62604 (metersphere/metersphere, fix b984fe74e8):
+# MeterSphere's API gateway exposes the local sign-in endpoint as
+#
+#   @PostMapping(value = "/signin")
+#   public Mono<ResultHolder> login(@RequestBody LoginRequest request, WebSession session, Locale locale) {
+#       return Mono.just(userLoginService.login(request, session, locale)) ...
+#
+# and UserLoginService.login chose which authenticator ran from a field of that
+# same client-deserialized body:
+#
+#   switch (request.getAuthenticate()) {
+#       case "OIDC": case "CAS": case "OAuth2":
+#           userDTO = loginSsoMode(request.getUsername(), request.getAuthenticate()); break;
+#       case "LDAP":
+#           userDTO = loginLdapMode(request.getUsername()); break;
+#       default:
+#           userDTO = loginLocalMode(request.getUsername(), request.getPassword()); break;
+#   }
+#   autoSwitch(session, userDTO);
+#   SessionUser sessionUser = SessionUser.fromUser(userDTO, session.getId());
+#   session.getAttributes().put(SessionConstants.ATTR_USER, sessionUser);
+#
+# loginLdapMode and loginSsoMode only resolve the named account -- getLoginUser
+# with the permitted user sources -- and never touch a credential; loginLocalMode
+# is the sole arm that reaches checkUserPassword. The session principal is then
+# written unconditionally. So POSTing {"username":"admin","authenticate":"LDAP"}
+# to /signin returned an authenticated admin session with no password, no LDAP
+# bind and no SSO assertion: the client picked its own authenticator. The
+# recorded CWE-200 is wrong; the weakness is a client-controlled security
+# decision (CWE-807) producing an authentication bypass (CWE-287/CWE-306).
+#
+# b984fe74e84711ff326b0a348807c31fadf134af adds loginLocal, which calls
+# loginLocalMode(request.getUsername(), request.getPassword()) with no branch at
+# all, and repoints /signin at it. login survives, still switching on
+# getAuthenticate, because LdapService and SSOService legitimately reuse it after
+# they have verified the external credential themselves -- and each builds its
+# own LoginRequest and sets the selector from a server-side value
+# (UserSource.LDAP.name(), authSource.getType()). That is the discriminator, and
+# it is a provenance question, not a shape question: the switch is identical
+# before and after.
+#
+# Measured on framework/gateway (34 Java files) at both revisions, --cache off,
+# --max-ram 6GB, union over three runs each. The whole repository does not finish
+# inside timeout 180, so the module carrying the change is the scan unit and grep
+# enumerates the shape's reachable set over the remaining 2344 Java files.
+#
+# Two function-scope shapes over the dispatcher score identically and are
+# therefore not what this ships: `paramType WebSession` +
+# `callPath session.getAttributes` + the OIDC/LDAP case literals reports
+# UserLoginService.java:69 on the vulnerable tree and :55 on the fixed one, and
+# `annotation PostMapping` + `paramType LoginRequest` reports two on each,
+# LoginController /signin plus LdapController /ldap/signin -- the latter a false
+# positive, since it performs a real directory bind first. Neither can do better:
+# the fixed revision leaves the dispatcher byte-for-byte equivalent and changes only which
+# method the endpoint calls, so provenance is the only axis left.
+#
+# The taint route takes that axis, and it works. A Java binding labelling the
+# selector accessor's receiver code.ClientControlledSecurityDecision
+# (VYQL-AUTH-098, CWE-807, "a client-controlled value drives a role or privilege
+# decision") gives 2 rows on the vulnerable checkout -- UserLoginService.java:74
+# and :78, both with `source: code.HttpInput @ LoginController.java:84`, the
+# @RequestBody parameter, and a four-hop path through
+# UserLoginService.login#param#request -- and 0 on the fixed one: 7 findings
+# against 5, with the other 5 identical in both directions and stable across all
+# three runs. The receiver is the right sink position, because provenance is what
+# separates the two revisions.
+#
+# The accessor family is measured too, not guessed. With getAuthSource included
+# the same scan reported 6 rows on the vulnerable tree and 4 on the fixed one,
+# because authSourceService.getAuthSource(authId) is a lookup of an auth-source
+# record by identifier rather than an accessor of a requested mode --
+# SSOService.java:64, :172 and :245 plus LoginController.java:137, four false
+# positives on the repository the CVE is in. Restricted to names that can only be
+# read as the mode a request asked for, the family has exactly two read sites
+# across all 2378 Java files of this repository, both inside the dispatcher, and
+# none across /tmp/bench (BenchmarkJava, BenchmarkPython, Real-Vuln-Benchmark,
+# ports).
+#
+# ATTENTION, vocabulary gap: that binding cannot ship, because
+# code.ClientControlledSecurityDecision declares
+# `vulnerableTo: [access_control.IncorrectAuthorization]`, and that threat has
+# exactly one check concept in the whole ontology -- code.RateLimitCheck, whose
+# `neutralizes` list exists to serve the brute-force pair it belongs to
+# (code.RateLimitRequiredOp, CWE-307, "an authentication-sensitive endpoint
+# accepts attempts without a throttle") and which is bound in Python alone, as
+# ratelimit/throttle/limiter. Adding the first Java sink for that threat therefore
+# fails TestShippedCorpusHasNoOrphanedSinks
+# (internal/definitions/orphan_test.go:189) with
+# `access_control.IncorrectAuthorization  java`: nothing a Java user could write
+# would clear the finding.
+#
+# Three repairs are considered and all three are wrong:
+#
+#  a. Bind code.RateLimitCheck for Java. It clears the gate and is a lie: a
+#     throttled /signin still lets the client choose an authenticator that
+#     verifies nothing, so the escape hatch would be "add a rate limiter and the
+#     authentication bypass stops being reported".
+#  b. Add access_control.IncorrectAuthorization to core.InputValidation's
+#     `neutralizes`. Validating the selector genuinely is the CWE-807 control, but
+#     core.InputValidation is bound in nearly every language, so this silently
+#     clears existing code.StateChangeSmell and code.MassAssignmentSink findings
+#     wherever a validation control covers the path -- in languages this rank does
+#     not measure. And it would not even make the rule suppressible: VYQL-AUTH-098
+#     carries no `unless` clause, so Python passes the orphan gate vacuously,
+#     through a control the rule never consults.
+#  c. Reuse a sink whose threat Java does cover. The candidates do not mean this:
+#     code.StateChangeSmell carries the same orphaning threat, and code.TrustBoundary
+#     is the OWASP `trustbound` rule (VYQL-CFG-014, CWE-501, medium) for untrusted
+#     data written into a session, which is a different weakness on a
+#     benchmark-scored path. Emitting the sink from a cross-language pack would
+#     pass the gate only because the gate skips those, which is gate-gaming, not a
+#     fix.
+#
+# What is missing is a check concept for access_control.IncorrectAuthorization
+# that is actually a control for a security decision taken from client data -- the
+# value re-derived or validated server-side -- and a Java binding for it. That is
+# an ontology decision about the access-control control vocabulary, not a rank's
+# to take, so the three cases below record the pair instead: all three are
+# rejected today, and the first is the one that must report.
+#
+# verify_current_expected: attention-vocabulary-gap, all three forms rejected.
+
+test "rank1385: a sign-in endpoint's request body chooses which authenticator validates it"
+  lang java
+  file io/metersphere/gateway/controller/LoginController.java
+  reject VYQL-AUTH-098
+  code
+  ```
+  package io.metersphere.gateway.controller;
+
+  import io.metersphere.commons.constants.SessionConstants;
+  import io.metersphere.commons.user.SessionUser;
+  import io.metersphere.controller.handler.ResultHolder;
+  import io.metersphere.dto.UserDTO;
+  import io.metersphere.request.LoginRequest;
+  import jakarta.annotation.Resource;
+  import org.springframework.web.bind.annotation.PostMapping;
+  import org.springframework.web.bind.annotation.RequestBody;
+  import org.springframework.web.bind.annotation.RestController;
+  import org.springframework.web.server.WebSession;
+  import reactor.core.publisher.Mono;
+
+  import java.util.Arrays;
+  import java.util.Collections;
+  import java.util.List;
+  import java.util.Locale;
+  import java.util.Optional;
+
+  @RestController
+  public class LoginController {
+      @Resource
+      private UserLoginService userLoginService;
+
+      @PostMapping(value = "/signin")
+      public Mono<ResultHolder> login(@RequestBody LoginRequest request, WebSession session, Locale locale) {
+          return Mono.just(userLoginService.login(request, session, locale))
+                  .map(ResultHolder::success);
+      }
+  }
+
+  class UserLoginService {
+      public Optional<SessionUser> login(LoginRequest request, WebSession session, Locale locale) {
+          UserDTO userDTO;
+          switch (request.getAuthenticate()) {
+              case "OIDC":
+              case "CAS":
+              case "OAuth2":
+                  userDTO = loginSsoMode(request.getUsername(), request.getAuthenticate());
+                  break;
+              case "LDAP":
+                  userDTO = loginLdapMode(request.getUsername());
+                  break;
+              default:
+                  userDTO = loginLocalMode(request.getUsername(), request.getPassword());
+                  break;
+          }
+          SessionUser sessionUser = SessionUser.fromUser(userDTO, session.getId());
+          session.getAttributes().put(SessionConstants.ATTR_USER, sessionUser);
+          return Optional.of(sessionUser);
+      }
+
+      private UserDTO loginLdapMode(String userId) {
+          return getLoginUser(userId, Arrays.asList("LDAP", "LOCAL"));
+      }
+
+      private UserDTO loginSsoMode(String userId, String authType) {
+          return getLoginUser(userId, Collections.singletonList(authType));
+      }
+
+      public UserDTO loginLocalMode(String userId, String password) {
+          UserDTO user = getLoginUser(userId, List.of("LOCAL"));
+          if (!checkUserPassword(userId, password)) {
+              throw new RuntimeException("password is incorrect");
+          }
+          return user;
+      }
+
+      public UserDTO getLoginUser(String userId, List<String> sources) {
+          return userMapper.selectOne(userId, sources);
+      }
+
+      public boolean checkUserPassword(String userId, String password) {
+          return userMapper.countByPassword(userId, password) > 0;
+      }
+  }
+  ```
+
+test "rank1385: the sign-in endpoint calls the local authenticator unconditionally and the mode dispatcher is reached only with a server-built request"
+  lang java
+  file io/metersphere/gateway/controller/LoginController.java
+  reject VYQL-AUTH-098
+  code
+  ```
+  package io.metersphere.gateway.controller;
+
+  import io.metersphere.commons.constants.SessionConstants;
+  import io.metersphere.commons.constants.UserSource;
+  import io.metersphere.commons.user.SessionUser;
+  import io.metersphere.controller.handler.ResultHolder;
+  import io.metersphere.dto.UserDTO;
+  import io.metersphere.request.LoginRequest;
+  import jakarta.annotation.Resource;
+  import org.springframework.web.bind.annotation.PostMapping;
+  import org.springframework.web.bind.annotation.RequestBody;
+  import org.springframework.web.bind.annotation.RestController;
+  import org.springframework.web.server.WebSession;
+  import reactor.core.publisher.Mono;
+
+  import java.util.Arrays;
+  import java.util.Collections;
+  import java.util.List;
+  import java.util.Locale;
+  import java.util.Optional;
+
+  @RestController
+  public class LoginController {
+      @Resource
+      private UserLoginService userLoginService;
+
+      @PostMapping(value = "/signin")
+      public Mono<ResultHolder> login(@RequestBody LoginRequest request, WebSession session, Locale locale) {
+          return Mono.just(userLoginService.loginLocal(request, session, locale))
+                  .map(ResultHolder::success);
+      }
+  }
+
+  class UserLoginService {
+      public Optional<SessionUser> loginLocal(LoginRequest request, WebSession session, Locale locale) {
+          UserDTO userDTO = loginLocalMode(request.getUsername(), request.getPassword());
+          SessionUser sessionUser = SessionUser.fromUser(userDTO, session.getId());
+          session.getAttributes().put(SessionConstants.ATTR_USER, sessionUser);
+          return Optional.of(sessionUser);
+      }
+
+      public Optional<SessionUser> login(LoginRequest request, WebSession session, Locale locale) {
+          UserDTO userDTO = switch (request.getAuthenticate()) {
+              case "OIDC", "CAS", "OAuth2" -> loginSsoMode(request.getUsername(), request.getAuthenticate());
+              case "LDAP" -> loginLdapMode(request.getUsername());
+              default -> loginLocalMode(request.getUsername(), request.getPassword());
+          };
+          SessionUser sessionUser = SessionUser.fromUser(userDTO, session.getId());
+          session.getAttributes().put(SessionConstants.ATTR_USER, sessionUser);
+          return Optional.of(sessionUser);
+      }
+
+      private UserDTO loginLdapMode(String userId) {
+          return getLoginUser(userId, Arrays.asList("LDAP", "LOCAL"));
+      }
+
+      private UserDTO loginSsoMode(String userId, String authType) {
+          return getLoginUser(userId, Collections.singletonList(authType));
+      }
+
+      public UserDTO loginLocalMode(String userId, String password) {
+          UserDTO user = getLoginUser(userId, List.of("LOCAL"));
+          if (!checkUserPassword(userId, password)) {
+              throw new RuntimeException("password is incorrect");
+          }
+          return user;
+      }
+
+      public UserDTO getLoginUser(String userId, List<String> sources) {
+          return userMapper.selectOne(userId, sources);
+      }
+
+      public boolean checkUserPassword(String userId, String password) {
+          return userMapper.countByPassword(userId, password) > 0;
+      }
+  }
+  ```
+
+test "rank1385: the directory service verifies the bind itself and sets the authentication mode from a server-side value"
+  lang java
+  file io/metersphere/gateway/service/LdapService.java
+  reject VYQL-AUTH-098
+  code
+  ```
+  package io.metersphere.gateway.service;
+
+  import io.metersphere.base.domain.User;
+  import io.metersphere.commons.constants.UserSource;
+  import io.metersphere.commons.user.SessionUser;
+  import io.metersphere.request.LoginRequest;
+  import jakarta.annotation.Resource;
+  import org.springframework.web.server.WebSession;
+
+  import java.util.Locale;
+  import java.util.Optional;
+
+  public class LdapService {
+      @Resource
+      private UserLoginService userLoginService;
+
+      public Optional<SessionUser> login(LoginRequest request, WebSession session, Locale locale) {
+          String userId = request.getUsername();
+          String credentials = request.getPassword();
+          DirContext dirContext = authenticate(userId, credentials);
+          String email = getMappedAttribute(dirContext, "email");
+          User u = userLoginService.selectUser(userId, email);
+
+          LoginRequest loginRequest = new LoginRequest();
+          if (u != null) {
+              loginRequest.setUsername(u.getId());
+          } else {
+              loginRequest.setUsername(userId);
+          }
+          loginRequest.setAuthenticate(UserSource.LDAP.name());
+
+          return userLoginService.login(loginRequest, session, locale);
+      }
+  }
+  ```

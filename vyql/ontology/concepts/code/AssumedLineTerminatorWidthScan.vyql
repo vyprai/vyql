@@ -1,0 +1,11 @@
+module code;
+
+concept AssumedLineTerminatorWidthScan : issue {
+  cwe: [CWE_193, CWE_125]
+  reviewAssumption: "a client can terminate a command line with a bare LF, making the line one byte shorter than the assumed CRLF trailer"
+  reviewCategory: memory
+  reviewCondition: "a delimiter scan is bounded by a received length reduced by a fixed line-terminator width that no byte inspection in the function confirms"
+  reviewConfidence: high
+  reviewEvidence: "line-parsing context {pattern} passes a length-minus-constant as the memchr scan bound and never reads the byte at that length-relative offset to measure the terminator"
+  vulnerableTo: [memory.OobRead, memory.IntegerOverflow]
+}

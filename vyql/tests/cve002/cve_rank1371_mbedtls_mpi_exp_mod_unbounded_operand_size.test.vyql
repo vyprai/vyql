@@ -1,0 +1,401 @@
+# Rank 1371 / CVE-2020-36475: Mbed TLS's modular exponentiation primitive,
+# mbedtls_mpi_exp_mod() in library/bignum.c, validates its big-integer
+# operands for sign and parity but never for magnitude:
+#
+#   if( mbedtls_mpi_cmp_int( N, 0 ) <= 0 || ( N->p[0] & 1 ) == 0 )
+#       return( MBEDTLS_ERR_MPI_BAD_INPUT_DATA );
+#
+#   if( mbedtls_mpi_cmp_int( E, 0 ) < 0 )
+#       return( MBEDTLS_ERR_MPI_BAD_INPUT_DATA );
+#
+#   /* ... straight into the sliding-window exponentiation ... */
+#   i = mbedtls_mpi_bitlen( E );
+#   j = N->n + 1;
+#   MBEDTLS_MPI_CHK( mbedtls_mpi_grow( X, j ) );
+#   MBEDTLS_MPI_CHK( mbedtls_mpi_grow( &W[1], j ) );
+#   MBEDTLS_MPI_CHK( mbedtls_mpi_grow( &T, j * 2 ) );
+#
+# Everything after those two guards scales with the operands' size: the
+# window table and temporaries are grown to N->n limbs, and the main loop
+# performs one Montgomery multiplication (itself O(N->n^2) limb operations)
+# per bit of E. Neither E's nor N's bit length is compared against the
+# library's own configured ceiling, MBEDTLS_MPI_MAX_BITS, so a peer that
+# supplies oversized Diffie-Hellman parameters -- P and G arrive straight off
+# the wire in mbedtls_dhm_read_params(), are stored in the context, and reach
+# this function as ctx->P from mbedtls_dhm_make_public() (library/dhm.c:190,
+# :305, :406, :447) -- makes the library spend effectively unbounded CPU and
+# memory inside one call. The weakness is an unbounded-cost operation entered
+# with no upper bound on the attacker-supplied size that drives its cost, not
+# a buffer-size miscalculation; the corpus records CWE-131, and the real class
+# is CWE-400/CWE-770 (uncontrolled resource consumption / allocation without
+# limits), matching the advisory's own "denial of service" wording and its
+# availability-only CVSS vector.
+#
+# The fixed revision ("Fix potential DoS by
+# limiting number sizes in exponentiation") adds the missing ceiling
+# comparison immediately after the sign check and before any of the expensive
+# work:
+#
+#   if( mbedtls_mpi_bitlen( E ) > MBEDTLS_MPI_MAX_BITS ||
+#       mbedtls_mpi_bitlen( N ) > MBEDTLS_MPI_MAX_BITS )
+#       return ( MBEDTLS_ERR_MPI_BAD_INPUT_DATA );
+#
+# The rank line's 1c54b5410fd48d6bcada97e30cac417c5c7eea67 is the GitHub merge
+# commit for PR #786, "Prepare Release Candidate for Mbed TLS 2.25.0": a
+# release-preparation merge
+# whose diff is 166 lines of collated ChangeLog plus the deletion of ~40
+# ChangeLog.d fragments, and it touches no library source at all. Its
+# ChangeLog is what identifies this CVE ("Limit the size of calculations
+# performed by mbedtls_mpi_exp_mod to MBEDTLS_MPI_MAX_SIZE to prevent a
+# potential denial of service when generating Diffie-Hellman key pairs.
+# Credit to OSS-Fuzz."). The actual four-line code change is
+# 9246d041500b96fb0694cbda1d833e420696827e on the development branch, an
+# ancestor of that release merge; the same patch is 8b1f65ea (2.7 LTS) and
+# ad59a2a4 (2.16 LTS). The row uses 9246d041 as the fixing commit, and its parent
+# bbc60324 carries the vulnerable state quoted above.
+#
+# Measured, at the vulnerable parent:
+#
+#   * `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over
+#     mbedtls/library (90 C files) reports 1802 findings. Inside
+#     mbedtls_mpi_exp_mod (bignum.c:2095-2307) there are exactly two:
+#     code.RawMemoryCopySize at bignum.c:2162 and :2165. Both are the
+#     constant-size `memcpy( _RR, &RR, sizeof( mbedtls_mpi ) )` pair that
+#     caches the Montgomery R^2 value -- fixed-size copies of a struct, with
+#     no attacker influence at all. The scanner reports the two safe copies in
+#     this function and nothing about the unbounded exponentiation, the same
+#     inversion rank 1370 measured on this library for a different missing
+#     check.
+#   * `./bin/vyql match` over the vulnerable and patched forms of the function
+#     produces byte-identical label sets: three code.ComputedSizeValue
+#     sources, ten sinks (code.IndexAccessSink,
+#     code.IntegerSizeArithmeticSink), zero findings and nine
+#     code.IntegerSizeArithmetic flags on each side. The added
+#     `mbedtls_mpi_bitlen( E ) > MBEDTLS_MPI_MAX_BITS` comparison contributes
+#     no label of any kind -- not core.IntegerOverflowGuard, not a check
+#     concept, nothing -- so the patched revision is indistinguishable from
+#     the vulnerable one.
+#
+# ATTENTION, engine gap: the discriminator is missing on both sides.
+#
+# 1. Nothing marks an operation whose cost scales with an operand's
+#    magnitude. The C frontend's analysis families
+#    (internal/extract/frontend/treesitter/c.go) include
+#    `allocation.unbounded_accumulated_count` and
+#    `bidi.isolate_level_increment_without_cap`, but no fact for
+#    super-linear-in-operand-size computation. The closest existing detection
+#    is VYQL-DOS-041 (code.UnboundedAllocationReview), whose C/C++ route is
+#    ccUnboundedAccumulatedAllocationObservations
+#    (internal/extract/frontend/treesitter/c.go:2592), gated on
+#    ccAccumulatedAllocationRe (same file, line 235) -- the literal regex
+#    `\b(ident)\+=\*(ident)`, i.e. `total += *elem` immediately before an
+#    allocation. `mbedtls_mpi_grow( X, N->n + 1 )` does not match it, and rank
+#    1300 records that widening that regex is inventing a second
+#    narrow pattern rather than generalising the first.
+# 2. Nothing marks a magnitude bound against a configured maximum. C does emit
+#    `binary:` context tokens, so `node.context.binary` can see the constant's
+#    name, but there is no control concept for "this operand's size is capped
+#    before the expensive work"; core.IntegerOverflowGuard is about wraparound
+#    in address/size arithmetic and its only binding
+#    (vyql/bindings/cpp/m4e783366.vyql, integerOverflowGuard163) allowlists
+#    stdint/limits.h maxima, not a library's own configuration ceiling.
+# 3. There is no taint story to fall back on. Both operands are `const
+#    mbedtls_mpi *` parameters; the untrusted bytes are read three functions
+#    away in library/dhm.c and reach this call through a context struct field,
+#    which the C frontend does not carry. The control case below shows the
+#    same allocation shape being caught the moment the size is a value copied
+#    from a labelled source inside the same function.
+#
+# Not mechanical. Closing it needs a new classification -- which primitives
+# are expensive enough in an operand's magnitude that the magnitude must be
+# capped -- plus a control concept for an operand-magnitude ceiling. Neither
+# exists, and "expensive" is a judgement about algorithmic cost the engine has
+# no representation for.
+#
+# Measured why the shortcut is not shippable either. The tempting binding is a
+# presence clause over the enclosing function: an MPI operand sized into
+# mbedtls_mpi_grow with no MBEDTLS_MPI_MAX_* comparison anywhere in the body.
+# Enumerated over mbedtls/library at the vulnerable parent:
+#
+#   * grow-from-an-operand and no cap constant: 16 functions, 1 true positive
+#     (mbedtls_mpi_shrink, _copy, _safe_cond_assign, _safe_cond_swap, _lset,
+#     _set_bit, _read_string, _read_binary, _read_binary_le, _shift_l,
+#     _add_abs, _mul_mpi, _div_mpi, _exp_mod, _fill_random, and
+#     ecp_curves.c's ecp_mod_p192).
+#   * adding "and the body also calls mbedtls_mpi_bitlen" narrows it to 3
+#     (mbedtls_mpi_shift_l, mbedtls_mpi_div_mpi, mbedtls_mpi_exp_mod) -- but
+#     that conjunction is two of this one library's internal helper names plus
+#     a negation of exactly the constant the fixed revision introduces, which is the
+#     fixing commit's own layout used as the discriminator rather than
+#     anything derivable from the library's documentation.
+#   * a caller-side label instead (calls to mbedtls_mpi_exp_mod without a
+#     preceding size bound) fires on all 14 exp_mod call sites in
+#     mbedtls/library -- ordinary, correct RSA, DHM and ECP code -- and scores
+#     identically across revisions, because the change is centralised in
+#     the callee and changes no call site.
+#
+# verify_current_expected: attention-engine-gap, the first two cases record
+# the current miss and the third isolates the construct that is missing.
+
+test "rank1371: exp_mod validates operand sign and parity, then exponentiates over an uncapped bit length"
+  lang c
+  file library/bignum.c
+  reject VYQL-NUM-001
+  reject VYQL-NUM-003
+  reject VYQL-DOS-041
+  reject VYQL-DOS-042
+  code
+  ```
+  #include <stddef.h>
+  #include <string.h>
+
+  #define MBEDTLS_ERR_MPI_BAD_INPUT_DATA -0x0004
+  #define MBEDTLS_MPI_MAX_BITS 65536
+  #define MBEDTLS_MPI_WINDOW_SIZE 6
+
+  typedef unsigned long mbedtls_mpi_uint;
+
+  typedef struct {
+      int s;
+      size_t n;
+      mbedtls_mpi_uint *p;
+  } mbedtls_mpi;
+
+  int mbedtls_mpi_cmp_int( const mbedtls_mpi *X, long z );
+  size_t mbedtls_mpi_bitlen( const mbedtls_mpi *X );
+  int mbedtls_mpi_grow( mbedtls_mpi *X, size_t nblimbs );
+  int mbedtls_mpi_lset( mbedtls_mpi *X, long z );
+  int mbedtls_mpi_shift_l( mbedtls_mpi *X, size_t count );
+  int mbedtls_mpi_mod_mpi( mbedtls_mpi *R, const mbedtls_mpi *A, const mbedtls_mpi *B );
+  void mbedtls_mpi_init( mbedtls_mpi *X );
+  void mbedtls_mpi_free( mbedtls_mpi *X );
+  void mpi_montg_init( mbedtls_mpi_uint *mm, const mbedtls_mpi *N );
+  void mpi_montmul( mbedtls_mpi *A, const mbedtls_mpi *B, const mbedtls_mpi *N,
+                    mbedtls_mpi_uint mm, const mbedtls_mpi *T );
+  void mpi_montred( mbedtls_mpi *A, const mbedtls_mpi *N, mbedtls_mpi_uint mm,
+                    const mbedtls_mpi *T );
+
+  #define MBEDTLS_MPI_CHK(f) do { if( ( ret = (f) ) != 0 ) goto cleanup; } while( 0 )
+
+  int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
+                           const mbedtls_mpi *E, const mbedtls_mpi *N,
+                           mbedtls_mpi *_RR )
+  {
+      int ret = -1;
+      size_t wbits, wsize, one = 1;
+      size_t i, j, nblimbs;
+      size_t bufsize, nbits;
+      mbedtls_mpi_uint ei, mm, state;
+      mbedtls_mpi RR, T, W[ 2 << MBEDTLS_MPI_WINDOW_SIZE ], Apos;
+
+      if( mbedtls_mpi_cmp_int( N, 0 ) <= 0 || ( N->p[0] & 1 ) == 0 )
+          return( MBEDTLS_ERR_MPI_BAD_INPUT_DATA );
+
+      if( mbedtls_mpi_cmp_int( E, 0 ) < 0 )
+          return( MBEDTLS_ERR_MPI_BAD_INPUT_DATA );
+
+      mpi_montg_init( &mm, N );
+      mbedtls_mpi_init( &RR ); mbedtls_mpi_init( &T );
+      mbedtls_mpi_init( &Apos );
+      memset( W, 0, sizeof( W ) );
+
+      i = mbedtls_mpi_bitlen( E );
+
+      wsize = ( i > 671 ) ? 6 : ( i > 239 ) ? 5 :
+              ( i >  79 ) ? 4 : ( i >  23 ) ? 3 : 1;
+
+      j = N->n + 1;
+      MBEDTLS_MPI_CHK( mbedtls_mpi_grow( X, j ) );
+      MBEDTLS_MPI_CHK( mbedtls_mpi_grow( &W[1],  j ) );
+      MBEDTLS_MPI_CHK( mbedtls_mpi_grow( &T, j * 2 ) );
+
+      MBEDTLS_MPI_CHK( mbedtls_mpi_lset( &RR, 1 ) );
+      MBEDTLS_MPI_CHK( mbedtls_mpi_shift_l( &RR, N->n * 2 * 64 ) );
+      MBEDTLS_MPI_CHK( mbedtls_mpi_mod_mpi( &RR, &RR, N ) );
+
+      nblimbs = E->n;
+      bufsize = 0;
+      nbits = 0;
+      wbits = 0;
+      state = 0;
+
+      while( 1 )
+      {
+          if( bufsize == 0 )
+          {
+              if( nblimbs == 0 )
+                  break;
+
+              nblimbs--;
+
+              bufsize = sizeof( mbedtls_mpi_uint ) << 3;
+          }
+
+          bufsize--;
+
+          ei = ( E->p[nblimbs] >> bufsize ) & 1;
+
+          if( ei == 0 && state == 0 )
+              continue;
+
+          nbits++;
+          mpi_montmul( X, X, N, mm, &T );
+          wbits |= ( ei << ( wsize - nbits ) );
+      }
+
+      mpi_montred( X, N, mm, &T );
+
+  cleanup:
+      mbedtls_mpi_free( &RR ); mbedtls_mpi_free( &T );
+      mbedtls_mpi_free( &Apos );
+      return( ret );
+  }
+  ```
+
+test "rank1371: fix caps both operands against MBEDTLS_MPI_MAX_BITS before any of the expensive work"
+  lang c
+  file library/bignum.c
+  reject VYQL-NUM-001
+  reject VYQL-NUM-003
+  reject VYQL-DOS-041
+  reject VYQL-DOS-042
+  code
+  ```
+  #include <stddef.h>
+  #include <string.h>
+
+  #define MBEDTLS_ERR_MPI_BAD_INPUT_DATA -0x0004
+  #define MBEDTLS_MPI_MAX_BITS 65536
+  #define MBEDTLS_MPI_WINDOW_SIZE 6
+
+  typedef unsigned long mbedtls_mpi_uint;
+
+  typedef struct {
+      int s;
+      size_t n;
+      mbedtls_mpi_uint *p;
+  } mbedtls_mpi;
+
+  int mbedtls_mpi_cmp_int( const mbedtls_mpi *X, long z );
+  size_t mbedtls_mpi_bitlen( const mbedtls_mpi *X );
+  int mbedtls_mpi_grow( mbedtls_mpi *X, size_t nblimbs );
+  int mbedtls_mpi_lset( mbedtls_mpi *X, long z );
+  int mbedtls_mpi_shift_l( mbedtls_mpi *X, size_t count );
+  int mbedtls_mpi_mod_mpi( mbedtls_mpi *R, const mbedtls_mpi *A, const mbedtls_mpi *B );
+  void mbedtls_mpi_init( mbedtls_mpi *X );
+  void mbedtls_mpi_free( mbedtls_mpi *X );
+  void mpi_montg_init( mbedtls_mpi_uint *mm, const mbedtls_mpi *N );
+  void mpi_montmul( mbedtls_mpi *A, const mbedtls_mpi *B, const mbedtls_mpi *N,
+                    mbedtls_mpi_uint mm, const mbedtls_mpi *T );
+  void mpi_montred( mbedtls_mpi *A, const mbedtls_mpi *N, mbedtls_mpi_uint mm,
+                    const mbedtls_mpi *T );
+
+  #define MBEDTLS_MPI_CHK(f) do { if( ( ret = (f) ) != 0 ) goto cleanup; } while( 0 )
+
+  int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
+                           const mbedtls_mpi *E, const mbedtls_mpi *N,
+                           mbedtls_mpi *_RR )
+  {
+      int ret = -1;
+      size_t wbits, wsize, one = 1;
+      size_t i, j, nblimbs;
+      size_t bufsize, nbits;
+      mbedtls_mpi_uint ei, mm, state;
+      mbedtls_mpi RR, T, W[ 2 << MBEDTLS_MPI_WINDOW_SIZE ], Apos;
+
+      if( mbedtls_mpi_cmp_int( N, 0 ) <= 0 || ( N->p[0] & 1 ) == 0 )
+          return( MBEDTLS_ERR_MPI_BAD_INPUT_DATA );
+
+      if( mbedtls_mpi_cmp_int( E, 0 ) < 0 )
+          return( MBEDTLS_ERR_MPI_BAD_INPUT_DATA );
+
+      if( mbedtls_mpi_bitlen( E ) > MBEDTLS_MPI_MAX_BITS ||
+          mbedtls_mpi_bitlen( N ) > MBEDTLS_MPI_MAX_BITS )
+          return ( MBEDTLS_ERR_MPI_BAD_INPUT_DATA );
+
+      mpi_montg_init( &mm, N );
+      mbedtls_mpi_init( &RR ); mbedtls_mpi_init( &T );
+      mbedtls_mpi_init( &Apos );
+      memset( W, 0, sizeof( W ) );
+
+      i = mbedtls_mpi_bitlen( E );
+
+      wsize = ( i > 671 ) ? 6 : ( i > 239 ) ? 5 :
+              ( i >  79 ) ? 4 : ( i >  23 ) ? 3 : 1;
+
+      j = N->n + 1;
+      MBEDTLS_MPI_CHK( mbedtls_mpi_grow( X, j ) );
+      MBEDTLS_MPI_CHK( mbedtls_mpi_grow( &W[1],  j ) );
+      MBEDTLS_MPI_CHK( mbedtls_mpi_grow( &T, j * 2 ) );
+
+      MBEDTLS_MPI_CHK( mbedtls_mpi_lset( &RR, 1 ) );
+      MBEDTLS_MPI_CHK( mbedtls_mpi_shift_l( &RR, N->n * 2 * 64 ) );
+      MBEDTLS_MPI_CHK( mbedtls_mpi_mod_mpi( &RR, &RR, N ) );
+
+      nblimbs = E->n;
+      bufsize = 0;
+      nbits = 0;
+      wbits = 0;
+      state = 0;
+
+      while( 1 )
+      {
+          if( bufsize == 0 )
+          {
+              if( nblimbs == 0 )
+                  break;
+
+              nblimbs--;
+
+              bufsize = sizeof( mbedtls_mpi_uint ) << 3;
+          }
+
+          bufsize--;
+
+          ei = ( E->p[nblimbs] >> bufsize ) & 1;
+
+          if( ei == 0 && state == 0 )
+              continue;
+
+          nbits++;
+          mpi_montmul( X, X, N, mm, &T );
+          wbits |= ( ei << ( wsize - nbits ) );
+      }
+
+      mpi_montred( X, N, mm, &T );
+
+  cleanup:
+      mbedtls_mpi_free( &RR ); mbedtls_mpi_free( &T );
+      mbedtls_mpi_free( &Apos );
+      return( ret );
+  }
+  ```
+
+test "rank1371: the same limb count sizing the same allocation is caught when it is read in this function"
+  lang c
+  file library/dhm.c
+  expect VYQL-NUM-001
+  code
+  ```
+  #include <stddef.h>
+  #include <stdlib.h>
+  #include <sys/socket.h>
+
+  typedef unsigned long mbedtls_mpi_uint;
+
+  int dhm_grow_from_wire( int fd )
+  {
+      unsigned char hdr[2];
+      size_t nblimbs;
+      mbedtls_mpi_uint *p;
+
+      recv( fd, hdr, sizeof( hdr ), 0 );
+      nblimbs = (size_t) hdr[0];
+
+      p = calloc( nblimbs + 1, sizeof( mbedtls_mpi_uint ) );
+      if( p == NULL )
+          return -1;
+      free( p );
+      return 0;
+  }
+  ```

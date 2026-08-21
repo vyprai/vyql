@@ -1,0 +1,10 @@
+module vypr.injection;
+
+rule HttpHeaderValidationDisabled {
+  meta {
+    cwe: [CWE_113, CWE_444]
+    id: "VYQL-INJ-247"
+    severity: high
+  }
+  issue code.HttpHeaderValidationDisabled as c
+}

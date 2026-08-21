@@ -1,0 +1,11 @@
+module code;
+
+concept UploadDeclaredResponseContentType : issue {
+  cwe: [CWE_79, CWE_434]
+  reviewAssumption: "the content type recorded with a stored attachment is the one its uploader declared, and a browser parses and executes an active content type it is served inline"
+  reviewCategory: xss
+  reviewCondition: "a stored file's recorded content type becomes the response content type without forcing renderable types to an inert one"
+  reviewConfidence: high
+  reviewEvidence: "file download context {pattern} fills the response body's content type from a runtime value and never names an inert type, an attachment disposition, a nosniff header or the renderable content types"
+  vulnerableTo: [injection.Xss]
+}

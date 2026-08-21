@@ -1,0 +1,274 @@
+# Rank 1396 / CVE-2026-33079: mistune's link-title regular expression,
+# LINK_TITLE_RE in src/mistune/helpers.py, matches the body of a quoted
+# markdown link title as an alternation inside a `*` repeat whose two branches
+# can both consume the same character:
+#
+#   PUNCTUATION = r"[" + re.escape(string.punctuation) + r"]"
+#
+#   LINK_TITLE_RE = re.compile(
+#       r"[ \t\n]+("
+#       r'"(?:\\' + PUNCTUATION + r'|[^"\x00])*"|'   # "title"
+#       r"'(?:\\" + PUNCTUATION + r"|[^'\x00])*'"    # 'title'
+#       r")"
+#   )
+#
+# The first branch is an escape sequence -- a backslash followed by one
+# punctuation character, two characters per iteration. The second branch is
+# "any character that is not the closing quote or NUL", and that negated class
+# does not exclude the backslash. So every `\<punct>` pair in the input has two
+# derivations that end at the same position: one iteration of the escape branch,
+# or two iterations of the any-character branch. n pairs give 2^n distinct ways
+# for the repeat to cover the same span, and when no closing quote follows, the
+# engine has to try all of them before the match can fail. This is CWE-1333,
+# inefficient regular expression complexity by ambiguous alternation, and it is
+# a distinct family from the nested-quantifier `(a+)+` shape: no branch here
+# repeats at all, the ambiguity is purely between the branches.
+#
+# The pattern is reached from parse_link_title(), which the inline and block
+# link parsers call on document text, so the input is entirely the author's. A
+# markdown document holding a link reference definition with an unterminated
+# title -- `[a]: /url "\!\!\!\!...` -- hangs the parser. Measured against
+# Python 3 with the pattern as shipped, the failing match takes 0.003 s at 14
+# escape pairs, 0.045 s at 18, 0.72 s at 22 and 11.5 s at 26: an even factor of
+# 16 per four added pairs, i.e. 2^n. The patched pattern completes in under a
+# microsecond at every one of those lengths.
+#
+# The fixed revision (85eb54ff17da26327399bf188f9ff9b8fd515278, "fix: update link
+# reference") adds the backslash to both negated classes:
+#
+#       r'"(?:\\' + PUNCTUATION + r'|[^"\\\x00])*"|'
+#       r"'(?:\\" + PUNCTUATION + r"|[^'\\\x00])*'"
+#
+# A backslash can now only be consumed by the escape branch, the two branches
+# start on disjoint characters, each input character selects exactly one of
+# them, and the repeat is deterministic. The commit also adds
+# `link_reference_definitions_202` to the CommonMark suite's IGNORE_CASES,
+# since a lone trailing backslash inside a title does not parse as a title.
+#
+# The pool row is flagged `nocommit` (the advisory names only a release), but
+# the SHA resolves on `main` and `git show` prints the change in full: two source
+# lines plus one test-list line. It is the real, targeted fix, neither a merge
+# nor a release bump, and the vulnerable form is present at its parent. No pool
+# correction is needed and nothing here is reconstructed.
+#
+# ATTENTION, engine gap, and two independent absences block it. The concept and
+# the rule both exist -- `code.CatastrophicRegex` and VYQL-DOS-003 --
+# and the Python plumbing that feeds them works: lowering.go's regex-apply hook
+# (internal/extract/lowering/lowering.go:4421) resolves a `re.compile(pattern)`
+# argument through `resolveRegexPattern` and asks `catastrophicRegex` about it,
+# which defers to `regexambig.Ambiguous`
+# (internal/extract/regexambig/regexambig.go:311). What is missing is on both
+# sides of that call.
+#
+# First and blocking: `regexambig.Ambiguous` does not model ambiguous
+# alternation at all. `regexAltHasAmbiguousRepeat` only considers a quantified
+# group when `regexBodyHasRepeat(a.body)` is true (regexambig.go:328) -- the
+# body must itself contain a `*` or `+`. The branch-first-set intersection test
+# that would answer this case exists, in
+# `regexLoopBodyDisambiguated`, but it is only reachable behind that
+# precondition and only ever *withdraws* a report. With no repeat inside the
+# body there is nothing to withdraw and nothing to report, so the whole
+# alternation family is invisible: `Ambiguous` answers false for `(a|a)*`,
+# `(a|ab)*`, `(a|aa)*`, `(?:a|ab)*c`, for the textbook quoted-string form
+# `"(?:\\.|[^"])*"`, and for mistune's pattern -- while answering true for
+# `(a+)+`. Two doc comments claim otherwise: `catastrophicRegex`
+# (lowering.go:2155) lists `(a|a)*  (a|ab)*` among the shapes it covers, and
+# the call site's comment says "nested-quantifier / overlapping-alternation
+# structure". Only the nested-quantifier half is implemented.
+#
+# Second and independent: `resolveRegexPattern` (lowering.go:2131) folds an
+# inline literal, a const-propped local, or a module-level constant referenced
+# by name, but has no case for `+` string concatenation -- `constStrVal`
+# (lowering.go:408) handles Const, Name, Thru, Index and Attr and no BinOp. A
+# pattern spelled `r"a" r"b"` is one string node and resolves; the same bytes
+# spelled `r"a" + r"b"` do not. The two cases below that carry the
+# recognised nested-quantifier pattern isolate exactly that, with the
+# pattern byte-identical between them. This gap alone does not explain the
+# miss, though: folding mistune's concatenation cannot help while
+# `re.escape(string.punctuation)` stays unresolvable, and `Ambiguous` answers
+# false for the pattern with the PUNCTUATION fragment erased
+# (`[ \t\n]+("(?:\\|[^"\x00])*"|…)`) and false with a punctuation class
+# substituted for it. The alternation gap is the one that has to close first.
+#
+# Neither absence is mechanical. `regexambig` is a leaf package deliberately
+# shared by the Ruby frontend (ruby.go:1157), the JavaScript frontend
+# (javascript.go:1113) and the lowering, so adding an ambiguity relation there
+# is a new classification reaching every language at once, not a missing switch
+# case; dropping the `regexBodyHasRepeat` precondition would put every
+# not-provably-disjoint alternation in every regex in every corpus into a
+# medium-severity rule, which is a precision decision and needs its own
+# measurement. The concatenation fold is smaller but does not change this
+# rank's outcome, so it ships with no number attached to it either.
+#
+# That precision decision does have a first number, and it is a favourable one,
+# which is why the gap is worth stating precisely rather than filed as another
+# regex heuristic. Over the 913 distinct single-literal regex patterns reachable
+# from `re.<op>(...)`/`.compile(...)` first arguments across fifteen cloned
+# Python repositories (llama_index, mlflow, mindsdb, pipelines, maxkb, metagpt,
+# litestar, litellm, lms, lollms, mobsf, lxml, mistune, misp, localai),
+# `Ambiguous` reports 6. The family it skips -- a `*`/`+` group over a >=2-branch
+# alternation with no repeat inside it -- occurs in 4 of the 913, and in 0 of
+# those 4 do two branches' first sets intersect with neither branch nullable. So
+# the narrow relation, branch-first-set overlap rather than "not provably
+# disjoint", would add nothing at all on real Python code while separating this
+# pair: run over the two forms of mistune's pattern plus `"(?:\\.|[^"])*"`,
+# `"(?:\\.|[^"\\])*"`, `(a|ab)*` and `(a|b)*`, it selects exactly the three
+# vulnerable ones. The sweep covers single literals only, because the
+# concatenation gap keeps every built-up pattern out of reach; and it is Python,
+# so the Ruby and JavaScript first-set behaviour is still unmeasured and has to
+# be before anything lands in a package all three share.
+#
+# The measured state, `--cache off --max-ram 6GB`, mistune at the vulnerable revision:
+# 56 findings over three identical runs, 36 at or above high, and VYQL-DOS-003
+# fires four times -- `block_parser.py:34`, `directives/_fenced.py:16`,
+# `directives/_rst.py:14`, `plugins/def_list.py:24` -- none of them the
+# vulnerable pattern, and identically four times at the fixed revision. Zero
+# discrimination. `src/mistune/helpers.py` carries no finding and no flag at
+# all: `vyql match` over the vulnerable module reports no source, no control
+# and only `code.CodeEval` / `code.RegexCompileSink` on `re.compile`'s
+# argument at helpers.py:20 and :103, and `-flags only` reports nothing there.
+# Findings elsewhere in the tree are not coverage of this one.
+#
+# Noted in passing, not this rank's to fix: `re.escape` is labelled
+# `core.HtmlEscape` (helpers.py:8), and `re.compile` is labelled a
+# `code.CodeEval` sink.
+#
+# verify_current_expected: attention-engine-gap. The first two cases record the
+# miss and its absence of discrimination; the next two strip the concatenation
+# away and show the ambiguity is still invisible as a single literal; the last
+# two isolate the concatenation fold with a pattern the analysis does
+# recognise.
+
+test "rank1396: a quoted link title repeats an escape branch against an any-character class that admits the escape"
+  lang python
+  file src/mistune/helpers.py
+  reject VYQL-DOS-003
+  code
+  ```
+  import re
+  import string
+
+  PUNCTUATION = r"[" + re.escape(string.punctuation) + r"]"
+
+  LINK_TITLE_RE = re.compile(
+      r"[ \t\n]+("
+      r'"(?:\\' + PUNCTUATION + r'|[^"\x00])*"|'
+      r"'(?:\\" + PUNCTUATION + r"|[^'\x00])*'"
+      r")"
+  )
+
+  _ESCAPE_CHAR_RE = re.compile(r"\\(" + PUNCTUATION + r")")
+
+
+  def unescape_char(text):
+      return _ESCAPE_CHAR_RE.sub(r"\1", text)
+
+
+  def parse_link_title(src, start_pos, max_pos):
+      m = LINK_TITLE_RE.match(src, start_pos, max_pos)
+      if m:
+          title = m.group(1)[1:-1]
+          return unescape_char(title), m.end()
+      return None, None
+  ```
+
+test "rank1396: the fixed revision excludes the escape character from the any-character class in both quote forms"
+  lang python
+  file src/mistune/helpers.py
+  reject VYQL-DOS-003
+  code
+  ```
+  import re
+  import string
+
+  PUNCTUATION = r"[" + re.escape(string.punctuation) + r"]"
+
+  LINK_TITLE_RE = re.compile(
+      r"[ \t\n]+("
+      r'"(?:\\' + PUNCTUATION + r'|[^"\\\x00])*"|'
+      r"'(?:\\" + PUNCTUATION + r"|[^'\\\x00])*'"
+      r")"
+  )
+
+  _ESCAPE_CHAR_RE = re.compile(r"\\(" + PUNCTUATION + r")")
+
+
+  def unescape_char(text):
+      return _ESCAPE_CHAR_RE.sub(r"\1", text)
+
+
+  def parse_link_title(src, start_pos, max_pos):
+      m = LINK_TITLE_RE.match(src, start_pos, max_pos)
+      if m:
+          title = m.group(1)[1:-1]
+          return unescape_char(title), m.end()
+      return None, None
+  ```
+
+test "rank1396: the same ambiguous alternation as one inline literal is still not classified as backtracking-prone"
+  lang python
+  file src/mistune/helpers.py
+  reject VYQL-DOS-003
+  code
+  ```
+  import re
+
+  LINK_TITLE_RE = re.compile(r'[ \t\n]+("(?:\\[.!?]|[^"\x00])*")')
+
+
+  def parse_link_title(src, start_pos, max_pos):
+      m = LINK_TITLE_RE.match(src, start_pos, max_pos)
+      if m:
+          return m.group(1)[1:-1], m.end()
+      return None, None
+  ```
+
+test "rank1396: excluding the escape character from the class makes the branches disjoint, and is equally unclassified"
+  lang python
+  file src/mistune/helpers.py
+  reject VYQL-DOS-003
+  code
+  ```
+  import re
+
+  LINK_TITLE_RE = re.compile(r'[ \t\n]+("(?:\\[.!?]|[^"\\\x00])*")')
+
+
+  def parse_link_title(src, start_pos, max_pos):
+      m = LINK_TITLE_RE.match(src, start_pos, max_pos)
+      if m:
+          return m.group(1)[1:-1], m.end()
+      return None, None
+  ```
+
+test "rank1396: a nested-quantifier pattern from the same parser is classified when its fragments are adjacent literals"
+  lang python
+  file src/mistune/block_parser.py
+  expect VYQL-DOS-003
+  code
+  ```
+  import re
+
+  _STRICT_BLOCK_QUOTE = re.compile(r"( {0,3}>[^\n]*" r"(?:\n|$))+")
+
+
+  def parse_block_quote(src, pos):
+      m = _STRICT_BLOCK_QUOTE.match(src, pos)
+      return m.group(0) if m else None
+  ```
+
+test "rank1396: the same nested-quantifier pattern joined with + instead resolves to no pattern at all"
+  lang python
+  file src/mistune/block_parser.py
+  reject VYQL-DOS-003
+  code
+  ```
+  import re
+
+  _STRICT_BLOCK_QUOTE = re.compile(r"( {0,3}>[^\n]*" + r"(?:\n|$))+")
+
+
+  def parse_block_quote(src, pos):
+      m = _STRICT_BLOCK_QUOTE.match(src, pos)
+      return m.group(0) if m else None
+  ```

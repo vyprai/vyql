@@ -1,0 +1,11 @@
+module code;
+
+concept UnvalidatedDeserializedCollection : issue {
+  cwe: [CWE_20, CWE_248, CWE_1287]
+  reviewAssumption: "the serialized value is chosen by whoever authored the record it travels on, so it can be absent, not a string, not valid JSON, or valid JSON of the wrong shape"
+  reviewCategory: input_validation
+  reviewCondition: "a deserialized untrusted value is consumed as a collection of typed records without a runtime check that it is one"
+  reviewConfidence: high
+  reviewEvidence: "context {pattern} deserializes an untrusted serialized value and iterates the result, with no runtime element or array-shape check standing between them"
+  vulnerableTo: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+}

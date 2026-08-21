@@ -366,6 +366,28 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right},
 				Path: c.dotted(left), Method: "", Loc: L}}}
 		}
+		// multiple assignment (a, b = f()) — every name on the left takes the value,
+		// same as Go's a, b := f() and Python's tuple unpacking. Without this the
+		// value is evaluated and bound to nothing, so taint stops at the assignment.
+		if left != nil && left.Kind() == "left_assignment_list" {
+			var tgts []string
+			for _, ch := range c.namedChildren(left) {
+				switch ch.Kind() {
+				case "identifier", "constant", "instance_variable":
+					tgts = append(tgts, c.text(ch))
+				case "splat_parameter", "rest_assignment":
+					// *rest = the remaining elements; the inner name still takes them.
+					for _, in := range c.namedChildren(ch) {
+						if in.Kind() == "identifier" {
+							tgts = append(tgts, c.text(in))
+						}
+					}
+				}
+			}
+			if len(tgts) > 0 {
+				return []nir.Stmt{nir.Assign{Targets: tgts, Value: right, Loc: L}}
+			}
+		}
 		return []nir.Stmt{nir.Assign{Value: right}}
 	case "operator_assignment":
 		left := field(n, "left")

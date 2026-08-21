@@ -1,0 +1,8 @@
+module code;
+
+review code.UnvalidatedDeserializedCollection {
+  category: input_validation
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review deserialization of untrusted serialized fields so a parse failure and a wrong-shaped payload are both handled before the result is iterated"
+}

@@ -1,0 +1,6 @@
+module bindings.c.generated.m7b41e0d9;
+
+binding assumedLineTerminatorWidthScan1 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and containsAny(node.context.assignShape, ["=memchr(ID,NUM,ID-NUM)", "=memchr(ID,NUM,ID.FIELD-NUM)", "=memchr(ID.FIELD,NUM,ID-NUM)", "=memchr(ID.FIELD,NUM,ID.FIELD-NUM)"]) and not (node.context.indexShape contains "ID[ID-NUM]")
+  emit issue code.AssumedLineTerminatorWidthScan at node
+}

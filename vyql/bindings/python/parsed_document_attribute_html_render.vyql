@@ -1,0 +1,36 @@
+module bindings.python.parsed_document_attribute_html_render;
+
+// `getAttribute` is the DOM accessor (`xml.dom.minidom`, `xml.dom.pulldom`, and
+// every third-party wrapper that follows the W3C DOM interface): it returns an
+// attribute of a parsed document as text, exactly as the document spelled it,
+// with no escaping of any kind. The document is a file the program was handed --
+// an uploaded archive member, a manifest, a configuration file, a feed -- so its
+// attribute values are content, never markup.
+//
+// An assignment whose right-hand side both reads a document attribute and
+// carries a string literal that opens an HTML element is assembling markup out
+// of that document's text. Whatever escaping the eventual template applies is
+// defeated there, because a fragment built to carry its own tags has to be
+// emitted as HTML for those tags to render at all.
+//
+// The neutralising control is an HTML-escaping call on the value before it
+// reaches the fragment: `django.utils.html.escape`, `html.escape`,
+// `markupsafe.escape`, `bleach.clean`, `strip_tags`, or a wrapper whose name
+// carries one of those verbs. `django.utils.html.format_html` counts too --
+// it is documented to escape every interpolated argument, so building the
+// fragment through it is the safe spelling of the same assignment.
+// Both clauses read AST-derived tokens of this
+// function's own body, so neither a commented-out escape nor an HTML literal
+// belonging to a neighbouring function decides the result.
+//
+// The tag list holds no whitespace: assignment tokens are whitespace-stripped,
+// so an element with attributes reaches the clause as `<divclass=...` and only
+// the prefix up to the first space is matchable.
+binding unescapedParsedDocumentAttributeHtmlRender {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "python"
+    and node.context.assign contains "getAttribute"
+    and containsAny(node.context.assign, ["<strong>", "<b>", "<br", "</br", "<div", "<span", "<td", "<tr", "<li", "<pre", "<p>"])
+    and not containsAny(node.context.callPath, ["escape", "format_html", "bleach.clean", "strip_tags"])
+  emit issue code.UnescapedLocalFileContentHtmlRender at node
+}

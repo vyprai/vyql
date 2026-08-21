@@ -1,0 +1,8 @@
+module code;
+
+review code.AuthEndpointRawRequestUriExemption {
+  category: auth
+  expected: [core.AuthorizationCheck]
+  kind: attention
+  text: "review this authentication-endpoint decision against the parsed request path rather than the raw request URI, which carries the query string"
+}

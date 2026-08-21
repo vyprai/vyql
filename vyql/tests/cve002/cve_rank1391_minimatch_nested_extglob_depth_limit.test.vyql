@@ -1,0 +1,455 @@
+# Rank 1391 / CVE-2026-27904 (GHSA-23c5-xmqv-rm74, CWE-1333):
+# isaacs/minimatch compiles a glob pattern to a JavaScript RegExp. Extended-glob
+# groups -- `*(a|b)`, `+(a|b)`, `?(a|b)`, `@(a|b)`, `!(a|b)`, the ksh/bash
+# `extglob` syntax minimatch documents and gates behind its `noext` option --
+# each become one quantified alternation in the generated source: `AST.type` '*'
+# closes with `)*`, '+' with `)+', '?' with `)?`. The parser that builds them,
+# `AST.#parseAST` in src/ast.ts, is a recursive descent that calls itself once per
+# group, and in the vulnerable revision the recursion has no ceiling at all --
+# the only bound is the length of the pattern string:
+#
+#   static #parseAST(str: string, ast: AST, pos: number, opt: MinimatchOptions): number {
+#     ...
+#     if (!opt.noext && isExtglobType(c) && str.charAt(i) === '(') {
+#       ast.push(acc); acc = ''
+#       const ext = new AST(c, ast)
+#       i = AST.#parseAST(str, ext, i, opt)        // <-- no depth argument
+#       ast.push(ext)
+#       continue
+#     }
+#     ...
+#     if (isExtglobType(c) && str.charAt(i) === '(') {
+#       part.push(acc); acc = ''
+#       const ext = new AST(c, part)
+#       part.push(ext)
+#       i = AST.#parseAST(str, ext, i, opt)        // <-- nor here
+#       continue
+#     }
+#
+# Nesting the groups nests the quantifiers, and nested unbounded quantification
+# over overlapping alternatives is the textbook catastrophic-backtracking shape.
+# `*(*(*(*(*(*(a|f)|g)|h)|i)|j)|k)` is 31 characters and compiles to six nested
+# `(?:...)*` groups; the regression test the fixed revision ships asserts that matching
+# `'a'.repeat(15) + 'z'` against it completes in under 100ms, which the
+# vulnerable revision does not. The pattern is the first argument of the
+# documented entry points -- `minimatch(path, pattern)`, `new Minimatch(pattern)`,
+# `AST.fromGlob(pattern)` -- so any caller that matches against a
+# caller-supplied or config-supplied glob is exposed. The weakness is not a bad
+# regex literal and not a match-semantics error: no regex in the repository is
+# wrong, and no path escapes an exclusion. It is an input-driven expansion whose
+# cost grows with a nesting depth nothing bounds.
+#
+# 11d0df6165d15a955462316b26d52e5efae06fce ("limit nested extglob recursion,
+# flatten extglobs") fixes it in two halves. The recursion gains a depth
+# parameter compared against a configured ceiling, so past the limit the extglob
+# characters are simply not parsed and that sub-pattern falls back to
+# `noextglob: true` behaviour:
+#
+#   static #parseAST(str, ast, pos, opt, extDepth): number {
+#     const maxDepth = opt.maxExtglobRecursion ?? 2
+#     ...
+#     const doRecurse = !opt.noext && isExtglobType(c) && str.charAt(i) === '(' && extDepth <= maxDepth
+#     if (doRecurse) { ... i = AST.#parseAST(str, ext, i, opt, extDepth + 1) ... }
+#
+# and `#flatten`/`adopt` coalesce nested groups whose types compose --
+# `*(a|@(b|c)|d)` becomes `*(a|b|c|d)` -- via an `adoptionMap` recording which
+# outer type may absorb which inner type, so the common deep-but-harmless pattern
+# never reaches the new ceiling. src/index.ts documents `maxExtglobRecursion`
+# alongside the existing `maxGlobstarRecursion`, default 2.
+#
+# The pool row is correct: repository, CVE and commit all resolve, the metadata
+# flags check out, and the vulnerable `#parseAST` with no depth
+# parameter is present at the parent, c3448c4. The recorded CWE-1333 is right.
+# No corpus correction.
+#
+# What fires without this. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`
+# over the vulnerable checkout reported **zero findings** on the whole tree, so
+# nothing to reuse and nothing to suppress. `vyql match` labels 75 nodes in
+# src/, including `code.RegexCompileSink` on the `new RegExp(re, flags)` at
+# ast.ts:400 -- but the fixed revision leaves that call byte-identical, so the ReDoS rule
+# VYQL-DOS-001 (`core.UserControlledData -> code.RegexCompileSink`) could not
+# discriminate the revisions even with a library parameter as a taint source.
+# `code.CatastrophicRegex` reads a regex *literal's* structure and there is no
+# such literal here: the dangerous pattern is assembled at run time from the
+# caller's glob. Rank 1343 measured the regex-literal-shape route unshippable
+# anyway (1 real in 7-11 across 268 literals).
+#
+# Rank 1381's `module.exports = class X` gap does not bite: minimatch is
+# TypeScript with a real `export class AST`, and `vyql query -type Param`
+# reports `AST.#parseAST#param#str|ast|pos|opt`, while `vyql query -call
+# parseAST` resolves all three call sites with `path=AST.#parseAST`.
+#
+# Self-recursion itself is still not expressible, which is why the binding does
+# not key on it. Both `function_name:` and `call_path:` reach a JavaScript
+# function-scope presence node -- `node.context.functionName contains "parseAST"`
+# matches ast.ts:245 alone -- but a binding cannot unify two facts on one node,
+# so `node.context.callPath contains "AST.#parseAST"` matches ast.ts:245 (the
+# recursion) *and* ast.ts:371 (`fromGlob`, an ordinary caller) alike. That is the
+# JavaScript instance of the missing self-recursion/depth-cap fact rank 1320
+# recorded for C. The binding therefore keys on what the library documents
+# instead: the read of the `noext` extglob switch, which in the whole of minimatch
+# occurs exactly once and exactly at the recursion decision.
+#
+# code.NestedExtglobExpansionWithoutDepthLimit is minted rather than reused.
+# code.CatastrophicRegex and code.UnboundedEmailRegexValidation are the two
+# existing ReDoS-class review concepts and both judge a pattern's own text;
+# code.UnboundedAllocationReview reads "allocation sizes derived from parsed
+# counts", which this is not; code.GsonObjectTypeAdapterRecursiveRead is the same
+# weakness shape (recursive parse, no depth limit) welded to one Java API.
+# VYQL-DOS-047 is minted above the DOS-045 ceiling, skipping the released
+# DOS-046.
+#
+# Measured, `--cache off`, union over three runs. The A/B is `src/` at the fixed
+# commit and at its parent: **1 flag on the vulnerable revision (src/ast.ts:245),
+# 0 on the patched revision**, and each negation half discriminates on its own --
+# dropping the selector list still gives 1/0, dropping the identifier list still
+# gives 1/0. The reachable set is enumerated rather than sampled, because a
+# five-file library gives a vacuous zero: across every JavaScript/TypeScript tree
+# cloned for this campaign a member read of `.noext`/`.noextglob` appears in
+# exactly five files outside minimatch, all vendored glob matchers. Two of them
+# (`browser-es-module-loader/dist/babel-worker.js` in libvncserver's noVNC
+# vendor tree, and the identical `f5_babel-worker.js` twice over) bundle
+# minimatch 3.x, whose `parse()` builds the same nested `plTypes` quantifiers,
+# caps pattern *length* at 64KB and nesting depth not at all: 2 flags each, one
+# on `parse` and one on the browserify module wrapper that encloses it, since a
+# JavaScript function context inherits its nested functions' tokens. Those are
+# true positives on an end-of-life copy. The other three are yarn 4.0.2 and
+# 4.6.0 releases, which bundle picomatch: 0 flags, because picomatch parses
+# extglobs iteratively against a paren stack instead of recursing, and it has no
+# nesting ceiling either -- an honest false negative of the same weakness in a
+# different implementation, not a suppression. Full scans of lodash, marked,
+# markdown-it, mathjs and graphql-js report 0 of this concept and no change in
+# their totals; none contains `noext`, so that zero is corroboration, not
+# evidence.
+#
+# The three cases below differ only in the ceiling: absent, read from the
+# documented option, and held in a differently-named local -- the third is there
+# because a negation that only knows `maxExtglobRecursion` would be this fix's
+# own identifier rather than the remediation.
+
+test "rank1391: an extglob parser recurses into a nested group with no ceiling on nesting depth"
+  lang javascript
+  file src/ast.ts
+  expect VYQL-DOS-047
+  expect_review code.NestedExtglobExpansionWithoutDepthLimit
+  code
+  ```
+  const types = new Set(['!', '?', '+', '*', '@']);
+  const isExtglobType = (c) => types.has(c);
+
+  export class AST {
+    constructor(type, parent, options = {}) {
+      this.type = type;
+      this.parts = [];
+      this.parent = parent;
+    }
+
+    push(...parts) {
+      for (const p of parts) {
+        if (p === '') continue;
+        this.parts.push(p);
+      }
+    }
+
+    static parseAST(str, ast, pos, opt) {
+      let escaping = false;
+      let inBrace = false;
+      let braceStart = -1;
+
+      if (ast.type === null) {
+        let i = pos;
+        let acc = '';
+        while (i < str.length) {
+          const c = str.charAt(i++);
+          if (escaping || c === '\\') {
+            escaping = !escaping;
+            acc += c;
+            continue;
+          }
+          if (inBrace) {
+            if (c === ']' && i !== braceStart + 1) inBrace = false;
+            acc += c;
+            continue;
+          } else if (c === '[') {
+            inBrace = true;
+            braceStart = i;
+            acc += c;
+            continue;
+          }
+          if (!opt.noext && isExtglobType(c) && str.charAt(i) === '(') {
+            ast.push(acc);
+            acc = '';
+            const ext = new AST(c, ast);
+            i = AST.parseAST(str, ext, i, opt);
+            ast.push(ext);
+            continue;
+          }
+          acc += c;
+        }
+        ast.push(acc);
+        return i;
+      }
+
+      let i = pos + 1;
+      let part = new AST(null, ast);
+      const parts = [];
+      let acc = '';
+      while (i < str.length) {
+        const c = str.charAt(i++);
+        if (escaping || c === '\\') {
+          escaping = !escaping;
+          acc += c;
+          continue;
+        }
+        if (isExtglobType(c) && str.charAt(i) === '(') {
+          part.push(acc);
+          acc = '';
+          const ext = new AST(c, part);
+          part.push(ext);
+          i = AST.parseAST(str, ext, i, opt);
+          continue;
+        }
+        if (c === '|') {
+          part.push(acc);
+          acc = '';
+          parts.push(part);
+          part = new AST(null, ast);
+          continue;
+        }
+        if (c === ')') {
+          part.push(acc);
+          acc = '';
+          ast.push(...parts, part);
+          return i;
+        }
+        acc += c;
+      }
+      ast.type = null;
+      ast.parts = [str.substring(pos - 1)];
+      return i;
+    }
+
+    static fromGlob(pattern, options = {}) {
+      const ast = new AST(null, undefined, options);
+      AST.parseAST(pattern, ast, 0, options);
+      return ast;
+    }
+  }
+  ```
+
+test "rank1391: the same parser refusing to recurse past a configured extglob recursion ceiling"
+  lang javascript
+  file src/ast.ts
+  reject_review code.NestedExtglobExpansionWithoutDepthLimit
+  code
+  ```
+  const types = new Set(['!', '?', '+', '*', '@']);
+  const isExtglobType = (c) => types.has(c);
+
+  export class AST {
+    constructor(type, parent, options = {}) {
+      this.type = type;
+      this.parts = [];
+      this.parent = parent;
+    }
+
+    push(...parts) {
+      for (const p of parts) {
+        if (p === '') continue;
+        this.parts.push(p);
+      }
+    }
+
+    static parseAST(str, ast, pos, opt, extDepth) {
+      const maxDepth = opt.maxExtglobRecursion ?? 2;
+      let escaping = false;
+      let inBrace = false;
+      let braceStart = -1;
+
+      if (ast.type === null) {
+        let i = pos;
+        let acc = '';
+        while (i < str.length) {
+          const c = str.charAt(i++);
+          if (escaping || c === '\\') {
+            escaping = !escaping;
+            acc += c;
+            continue;
+          }
+          if (inBrace) {
+            if (c === ']' && i !== braceStart + 1) inBrace = false;
+            acc += c;
+            continue;
+          } else if (c === '[') {
+            inBrace = true;
+            braceStart = i;
+            acc += c;
+            continue;
+          }
+          const doRecurse =
+            !opt.noext &&
+            isExtglobType(c) &&
+            str.charAt(i) === '(' &&
+            extDepth <= maxDepth;
+          if (doRecurse) {
+            ast.push(acc);
+            acc = '';
+            const ext = new AST(c, ast);
+            i = AST.parseAST(str, ext, i, opt, extDepth + 1);
+            ast.push(ext);
+            continue;
+          }
+          acc += c;
+        }
+        ast.push(acc);
+        return i;
+      }
+
+      let i = pos + 1;
+      let part = new AST(null, ast);
+      const parts = [];
+      let acc = '';
+      while (i < str.length) {
+        const c = str.charAt(i++);
+        if (escaping || c === '\\') {
+          escaping = !escaping;
+          acc += c;
+          continue;
+        }
+        const doRecurse =
+          isExtglobType(c) && str.charAt(i) === '(' && extDepth <= maxDepth;
+        if (doRecurse) {
+          part.push(acc);
+          acc = '';
+          const ext = new AST(c, part);
+          part.push(ext);
+          i = AST.parseAST(str, ext, i, opt, extDepth + 1);
+          continue;
+        }
+        if (c === '|') {
+          part.push(acc);
+          acc = '';
+          parts.push(part);
+          part = new AST(null, ast);
+          continue;
+        }
+        if (c === ')') {
+          part.push(acc);
+          acc = '';
+          ast.push(...parts, part);
+          return i;
+        }
+        acc += c;
+      }
+      ast.type = null;
+      ast.parts = [str.substring(pos - 1)];
+      return i;
+    }
+
+    static fromGlob(pattern, options = {}) {
+      const ast = new AST(null, undefined, options);
+      AST.parseAST(pattern, ast, 0, options, 0);
+      return ast;
+    }
+  }
+  ```
+
+test "rank1391: the same parser bounding nesting through a differently named local ceiling"
+  lang javascript
+  file src/ast.ts
+  reject_review code.NestedExtglobExpansionWithoutDepthLimit
+  code
+  ```
+  const types = new Set(['!', '?', '+', '*', '@']);
+  const isExtglobType = (c) => types.has(c);
+
+  export class AST {
+    constructor(type, parent, options = {}) {
+      this.type = type;
+      this.parts = [];
+      this.parent = parent;
+    }
+
+    push(...parts) {
+      for (const p of parts) {
+        if (p === '') continue;
+        this.parts.push(p);
+      }
+    }
+
+    static parseAST(str, ast, pos, opt, nestingDepth) {
+      const maxNesting = 2;
+      let escaping = false;
+
+      if (ast.type === null) {
+        let i = pos;
+        let acc = '';
+        while (i < str.length) {
+          const c = str.charAt(i++);
+          if (escaping || c === '\\') {
+            escaping = !escaping;
+            acc += c;
+            continue;
+          }
+          if (
+            !opt.noext &&
+            isExtglobType(c) &&
+            str.charAt(i) === '(' &&
+            nestingDepth < maxNesting
+          ) {
+            ast.push(acc);
+            acc = '';
+            const ext = new AST(c, ast);
+            i = AST.parseAST(str, ext, i, opt, nestingDepth + 1);
+            ast.push(ext);
+            continue;
+          }
+          acc += c;
+        }
+        ast.push(acc);
+        return i;
+      }
+
+      let i = pos + 1;
+      let part = new AST(null, ast);
+      const parts = [];
+      let acc = '';
+      while (i < str.length) {
+        const c = str.charAt(i++);
+        if (
+          isExtglobType(c) &&
+          str.charAt(i) === '(' &&
+          nestingDepth < maxNesting
+        ) {
+          part.push(acc);
+          acc = '';
+          const ext = new AST(c, part);
+          part.push(ext);
+          i = AST.parseAST(str, ext, i, opt, nestingDepth + 1);
+          continue;
+        }
+        if (c === '|') {
+          part.push(acc);
+          acc = '';
+          parts.push(part);
+          part = new AST(null, ast);
+          continue;
+        }
+        if (c === ')') {
+          part.push(acc);
+          acc = '';
+          ast.push(...parts, part);
+          return i;
+        }
+        acc += c;
+      }
+      return i;
+    }
+
+    static fromGlob(pattern, options = {}) {
+      const ast = new AST(null, undefined, options);
+      AST.parseAST(pattern, ast, 0, options, 0);
+      return ast;
+    }
+  }
+  ```
