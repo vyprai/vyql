@@ -1,0 +1,389 @@
+# Rank 1399 / CVE-2024-41110 (GHSA-v23v-6jw2-98fq, CWE-187): the Docker daemon
+# hands every API request to each configured authorization plugin before acting on
+# it. pkg/authorization/authz.go builds the object the plugins see: AuthZRequest
+# copies the request line, the headers and -- conditionally -- the request body into
+# an authorization.Request, and a plugin's allow/deny decision is made on that copy
+# alone while the daemon then serves the real request.
+#
+# The condition on the body copy is wrong in two independent ways, and the fixed revision
+# (merge 42f40b1d6dd7562342f832b9cd2adf9e668eeb76, readable via
+# `git diff b201b1b3d..42f40b1d6d` -- `git show` prints an empty combined diff)
+# closes both:
+#
+#	if sendBody(ctx.requestURI, r.Header) && r.ContentLength > 0 && r.ContentLength < maxBodySize {
+#		body, r.Body, err = drainBody(r.Body)
+#	}
+#	...
+#	func sendBody(url string, header http.Header) bool {
+#		// Skip body for auth endpoint
+#		if strings.HasSuffix(url, "/auth") {
+#			return false
+#		}
+#
+# Either way the plugin authorizes an empty body while the daemon executes the real
+# one, which is the whole bypass: a plugin that refuses privileged container creation
+# by reading HostConfig out of the body sees no body and allows the request.
+#
+#   1. `r.ContentLength > 0`. RFC 7230 says Content-Length is to be ignored when
+#      Transfer-Encoding is chunked, and net/http sets ContentLength to -1 for a
+#      chunked server request, so sending the payload chunked skips the body copy.
+#      The fixed revision adds `|| isChunked(r)`.
+#   2. `strings.HasSuffix(url, "/auth")`. `url` here is ctx.requestURI, which the
+#      middleware fills from r.RequestURI -- documented as "the unmodified
+#      request-target ... as sent by the client", query string included. So
+#      `POST /v1.43/containers/create?x=/auth` ends in "/auth", sendBody returns
+#      false, and the body never reaches the plugin. The fixed revision parses the target and
+#      anchors the match on the path alone:
+#
+#	u, err := url.Parse(inURL)
+#	if err != nil { return false }
+#	isAuth, err := isAuthEndpoint(u.Path)
+#	if isAuth || err != nil { return false }
+#
+# Detection covers the second axis. It is code.AuthEndpointRawRequestUriExemption
+# (VYQL-AUTH-120, CWE-187/CWE-863), emitted by the
+# goAuthEndpointRawRequestUriExemption binding on a Go function that tests a value
+# named for the raw request target with a strings containment predicate against one
+# of the conventional authentication endpoint paths, and never derives a path from
+# that target in the same body. The endpoint list is the conventional one -- `/auth`,
+# `/login`, `/token`, `/oauth`, `/signin`, `/session`, `/authenticate` -- and the
+# neutraliser is net/url's documented url.Parse / url.ParseRequestURI, or a URL.Path
+# the handler holds. Nothing in it is keyed on this repository: the third
+# case is a session middleware that exempts `/login` by prefix on r.RequestURI and
+# is reported, the fourth is the same middleware comparing u.Path and is not.
+#
+# The first axis is not covered, and the reason is a known engine gap rather than a
+# vocabulary one. The fixed revision's Transfer-Encoding check lives in a new sibling function
+# isChunked, so the only documented signal a correct AuthZRequest carries --
+# r.TransferEncoding, or a "Transfer-Encoding" header read -- is outside the body
+# whose facts decide the flag, and `isChunked(r)` is a local call, so there is no
+# API-documented call left inside the guarded method to key on either. A draft
+# binding keyed on `binary:r.ContentLength>0` with a function-scoped negation on
+# every Transfer-Encoding spelling is written and measured on both revisions of the
+# pkg/authorization + api subtree: it flags AuthZRequest at authz.go:56 on the
+# vulnerable revision and the same function at authz.go:71 on the patched one --
+# identical, plus the same two collateral rows either way on ordinary body-length
+# checks in api/server/middleware/debug.go:18 and
+# api/server/router/container/container_routes.go:178. That is the sibling-function
+# gap measured at rank 1377 (endpointGuarded, internal/engine/engine.go:1160) in the
+# form rank 1389 found behind an interface dispatch, and rank 1380's
+# API-documented-call refinement does not rescue it here. The draft is deleted
+# rather than shipped: a fact scoring identically on both revisions is not detection.
+#
+# Measured with `--cache off`, counts taken as the union of three runs. moby is far
+# too large to scan whole inside the review budget, so the second axis is measured
+# two ways. A bounded scan of pkg/authorization together with the api tree that calls
+# it (149 Go files) reports 7 findings on the fully-vulnerable revision b201b1b3d and
+# 6 on the patched revision 42f40b1d6d, 2 at or above high against 1; the whole
+# difference is one VYQL-AUTH-120 row at pkg/authorization/authz.go:150, sendBody,
+# which is gone on the patched revision because the same function now calls
+# url.Parse. And an exhaustive grep enumeration of the shape's reachable set over all
+# 5519 Go files of the tree at both revisions: of 1908 strings.HasSuffix / HasPrefix
+# / Contains calls, exactly one has an authentication endpoint path as its literal --
+# authz.go:152 on the vulnerable revision, none on the patched one. Nine further
+# containment calls anywhere in the tree carry an authentication *word* in their
+# literal and none is an endpoint path: eight are integration-cli assertions on
+# command output ("no basic auth credentials", "401 Unauthorized") and one is a
+# `"session:"` map-key prefix in vendored buildkit.
+#
+# Ten other Go trees, 7833 Go files and 2040 candidate containment calls between
+# them, hold exactly one call site in the reachable set: argo-cd's
+# util/dex/dex_test.go:766, `strings.HasPrefix(location.RequestURI(), "/login?...")`,
+# an assertion that a redirect landed on the login page. It reported before the
+# assertion clause and does not now -- 1 to 0 on argo-cd/util, which still reports 24
+# findings at or above high. Zero rows on the other nine: minder (192 findings at or
+# above high), mattermost-server (188), grpc-gateway (69),
+# exposure-notifications-server (63) and mcp-toolbox (43) scanned whole, plus bounded
+# subtree scans of lxd/lxd (446), kubeflow pipelines/backend (154), chaos-mesh (32)
+# and waypoint/internal (19). grpc-gateway and lxd are what make that set worth
+# quoting: both route on request paths for a living, and lxd alone holds 529
+# containment calls.
+#
+# Pool row: the row is correct, but `git show` on it prints an empty
+# combined diff -- the third instance of that symptom in this batch. `git diff
+# b201b1b3d..42f40b1d6d` reads the change in full, and b201b1b3d carries both
+# vulnerable constructs, so the row stands as the scan target.
+
+test "rank1399: an authorization plugin's body-forwarding decision suffix-matches the raw request target"
+  lang go
+  file pkg/authorization/authz.go
+  expect VYQL-AUTH-120
+  expect_review code.AuthEndpointRawRequestUriExemption
+  code
+  ```
+  package authorization
+
+  import (
+  	"mime"
+  	"net/http"
+  	"strings"
+  )
+
+  const maxBodySize = 1048576 // 1MB
+
+  // sendBody returns true when request/response body should be sent to AuthZPlugin
+  func sendBody(url string, header http.Header) bool {
+  	// Skip body for auth endpoint
+  	if strings.HasSuffix(url, "/auth") {
+  		return false
+  	}
+
+  	// body is sent only for text or json messages
+  	contentType, _, err := mime.ParseMediaType(header.Get("Content-Type"))
+  	if err != nil {
+  		return false
+  	}
+
+  	return contentType == "application/json"
+  }
+  ```
+
+test "rank1399: the same decision taken on the parsed path is not a raw-target match"
+  lang go
+  file pkg/authorization/authz.go
+  reject VYQL-AUTH-120
+  reject_review code.AuthEndpointRawRequestUriExemption
+  code
+  ```
+  package authorization
+
+  import (
+  	"mime"
+  	"net/http"
+  	"net/url"
+  	"regexp"
+  )
+
+  const maxBodySize = 1048576 // 1MB
+
+  func isAuthEndpoint(urlPath string) (bool, error) {
+  	// eg www.test.com/v1.24/auth/optional?optional1=something (version optional)
+  	matched, err := regexp.MatchString(`^[^\/]*\/(v\d[\d\.]*\/)?auth.*`, urlPath)
+  	if err != nil {
+  		return false, err
+  	}
+  	return matched, nil
+  }
+
+  // sendBody returns true when request/response body should be sent to AuthZPlugin
+  func sendBody(inURL string, header http.Header) bool {
+  	u, err := url.Parse(inURL)
+  	// Assume no if the URL cannot be parsed - an empty request will still be forwarded to the plugin and should be rejected
+  	if err != nil {
+  		return false
+  	}
+
+  	// Skip body for auth endpoint
+  	isAuth, err := isAuthEndpoint(u.Path)
+  	if isAuth || err != nil {
+  		return false
+  	}
+
+  	// body is sent only for text or json messages
+  	contentType, _, err := mime.ParseMediaType(header.Get("Content-Type"))
+  	if err != nil {
+  		return false
+  	}
+
+  	return contentType == "application/json"
+  }
+  ```
+
+test "rank1399: a session middleware spelled nothing like the daemon exempts its login endpoint by raw-target prefix"
+  lang go
+  file internal/httpserver/session.go
+  expect VYQL-AUTH-120
+  expect_review code.AuthEndpointRawRequestUriExemption
+  code
+  ```
+  package httpserver
+
+  import (
+  	"net/http"
+  	"strings"
+  )
+
+  type Store interface {
+  	Lookup(token string) (string, bool)
+  }
+
+  type Middleware struct {
+  	store Store
+  }
+
+  func (m *Middleware) Wrap(next http.Handler) http.Handler {
+  	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+  		m.serve(w, r, next, r.RequestURI)
+  	})
+  }
+
+  func (m *Middleware) serve(w http.ResponseWriter, r *http.Request, next http.Handler, requestURI string) {
+  	if strings.HasPrefix(requestURI, "/login") {
+  		next.ServeHTTP(w, r)
+  		return
+  	}
+
+  	cookie, err := r.Cookie("session")
+  	if err != nil {
+  		http.Error(w, "unauthorized", http.StatusUnauthorized)
+  		return
+  	}
+
+  	user, ok := m.store.Lookup(cookie.Value)
+  	if !ok {
+  		http.Error(w, "unauthorized", http.StatusUnauthorized)
+  		return
+  	}
+
+  	r.Header.Set("X-User", user)
+  	next.ServeHTTP(w, r)
+  }
+  ```
+
+test "rank1399: the same middleware exempting its login endpoint on the parsed path is not this shape"
+  lang go
+  file internal/httpserver/session.go
+  reject VYQL-AUTH-120
+  reject_review code.AuthEndpointRawRequestUriExemption
+  code
+  ```
+  package httpserver
+
+  import (
+  	"net/http"
+  	"net/url"
+  )
+
+  type Store interface {
+  	Lookup(token string) (string, bool)
+  }
+
+  type Middleware struct {
+  	store Store
+  }
+
+  func (m *Middleware) Wrap(next http.Handler) http.Handler {
+  	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+  		m.serve(w, r, next, r.RequestURI)
+  	})
+  }
+
+  func (m *Middleware) serve(w http.ResponseWriter, r *http.Request, next http.Handler, requestURI string) {
+  	u, err := url.Parse(requestURI)
+  	if err != nil {
+  		http.Error(w, "bad request", http.StatusBadRequest)
+  		return
+  	}
+
+  	if u.Path == "/login" {
+  		next.ServeHTTP(w, r)
+  		return
+  	}
+
+  	cookie, err := r.Cookie("session")
+  	if err != nil {
+  		http.Error(w, "unauthorized", http.StatusUnauthorized)
+  		return
+  	}
+
+  	user, ok := m.store.Lookup(cookie.Value)
+  	if !ok {
+  		http.Error(w, "unauthorized", http.StatusUnauthorized)
+  		return
+  	}
+
+  	r.Header.Set("X-User", user)
+  	next.ServeHTTP(w, r)
+  }
+  ```
+
+test "rank1399: a raw-target suffix test that decides nothing about authentication is not this shape"
+  lang go
+  file internal/httpserver/upgrade.go
+  reject VYQL-AUTH-120
+  reject_review code.AuthEndpointRawRequestUriExemption
+  code
+  ```
+  package httpserver
+
+  import (
+  	"net/http"
+  	"strings"
+  )
+
+  func wantsUpgrade(r *http.Request) bool {
+  	uri := r.RequestURI
+  	if strings.HasSuffix(uri, "/attach/ws") || strings.HasSuffix(uri, "/events") {
+  		return true
+  	}
+  	return strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
+  }
+  ```
+
+test "rank1399: a containment test on a path the handler parses is not a raw-target match"
+  lang go
+  file internal/httpserver/audit.go
+  reject VYQL-AUTH-120
+  reject_review code.AuthEndpointRawRequestUriExemption
+  code
+  ```
+  package httpserver
+
+  import (
+  	"net/http"
+  	"strings"
+  )
+
+  func redactAuditBody(r *http.Request) bool {
+  	uri := r.URL.Path
+  	if strings.Contains(uri, "/auth") || strings.HasSuffix(uri, "/token") {
+  		return true
+  	}
+  	return false
+  }
+  ```
+
+test "rank1399: a test asserting a redirect landed on the login endpoint decides nothing"
+  lang go
+  file util/dex/dex_test.go
+  reject VYQL-AUTH-120
+  reject_review code.AuthEndpointRawRequestUriExemption
+  code
+  ```
+  package dex
+
+  import (
+  	"net/http"
+  	"net/http/httptest"
+  	"strings"
+  	"testing"
+
+  	"github.com/stretchr/testify/assert"
+  )
+
+  func TestDexReverseProxy(t *testing.T) {
+  	t.Run("Bad case", func(t *testing.T) {
+  		fakeDex := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+  			rw.WriteHeader(http.StatusInternalServerError)
+  		}))
+  		defer fakeDex.Close()
+
+  		client := &http.Client{
+  			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+  				return http.ErrUseLastResponse
+  			},
+  		}
+
+  		req, err := http.NewRequest(http.MethodGet, fakeDex.URL, http.NoBody)
+  		assert.NoError(t, err)
+
+  		resp, err := client.Do(req)
+  		assert.NoError(t, err)
+  		assert.Equal(t, http.StatusSeeOther, resp.StatusCode)
+
+  		location, _ := resp.Location()
+  		assert.True(t, strings.HasPrefix(location.RequestURI(), "/login?has_sso_error=true"))
+  		assert.NoError(t, resp.Body.Close())
+  	})
+  }
+  ```

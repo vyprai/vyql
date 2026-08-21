@@ -101,7 +101,7 @@ test "rank1352: the DATA payload is not an envelope address"
 # check_delivery_params(mail)`. The pair below differs only in how the returned
 # array is taken apart, and both forms keep the taint: rbConv.stmt's "assignment"
 # case gives a left_assignment_list one nir.Assign target per name, the way Go's
-# `a, b := f()` and Python's tuple unpacking already do.
+# `a, b := f()` and Python's tuple unpacking do.
 #
 # verify_current_expected: fixed
 
