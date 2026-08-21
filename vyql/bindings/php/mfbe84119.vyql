@@ -2729,3 +2729,8 @@ binding httpInput57 {
   query pattern callExpr where callee.path ~= "request.getRawInput"
   emit source code.HttpInput at call.result
 }
+
+binding storedHtmlWrite473 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "save" and node.context.assign contains "$page->description=$data[\"attributes\"][\"description\"]" and not (node.context.assign contains "$page->description=strip_tags(")
+  emit issue code.StoredHtmlWrite at node
+}
