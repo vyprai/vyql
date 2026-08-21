@@ -1,0 +1,174 @@
+# Rank 1221 / CVE-2021-39155 (GHSA-7774-7vr3-cc8j): Istio's AuthorizationPolicy
+# "hosts" field compiles to an Envoy RBAC filter permission built by
+# pilot/pkg/security/authz/model/generator.go's hostGenerator.permission,
+# which handed the policy's host value straight to
+# pilot/pkg/security/authz/matcher/header.go's HeaderMatcher. HeaderMatcher
+# builds an exact/prefix/suffix HeaderMatcher over the literal string, all
+# three case-sensitive. Envoy itself routes and matches the HTTP :authority
+# (Host) header case-insensitively per RFC 4343, so a policy written to
+# reject "httpbin.foo" for some source could be bypassed by requesting
+# "Httpbin.Foo" — the data plane still routes it to the same backend, but
+# the case-sensitive RBAC comparison against the policy's literal host no
+# longer matches the header Envoy actually saw (CWE-178).
+#
+# Fix 084b417a486dbe9b9024d4812877016a484572b1 (verified: the only functional
+# diff for this GHSA is a new HostMatcher in header.go — a "*" present
+# match, and a case-insensitive `(?i)` SafeRegexMatch for every other case,
+# generated the same way HeaderMatcher generates ExactMatch/PrefixMatch/
+# SuffixMatch — and switching hostGenerator.permission to call it instead of
+# HeaderMatcher; the bundled URL-fragment-stripping bootstrap change in the
+# same commit is for a different advisory and does not touch this file set.
+#
+# ATTENTION, vocabulary gap. `vyql match` on a repro faithful to both
+# revisions of header.go and generator.go labels nothing at all — no
+# source, sink, or control — because there is no data flow here to label:
+# Istio's own Go code never performs a string comparison at all, vulnerable
+# or fixed. It builds an Envoy protobuf oneof (HeaderMatcher_ExactMatch vs.
+# HeaderMatcher_SafeRegexMatch with a `(?i)` prefix); the actual header
+# comparison happens later, at request time, inside Envoy's C++ RBAC filter,
+# entirely outside any code this scan ever sees. A bounded scan of the real
+# checkout's pilot/pkg/security/authz/ directory at the vulnerable commit
+# (timeout 180, --max-ram 4GB, --cache off; go:20 textpattern:20) reports
+# zero findings, confirming nothing nearby is reachable either. The nearest
+# concept by CWE (CaseInsensitiveLocalIdentityAuthorizationBypass, CWE-178,
+# rule VYQL-AUTH-032) does not apply: its binding keys on CUPS's
+# `_cups_strcasecmp` local-identity comparison specifically, the opposite
+# direction of this bug (an identity meant to be case-sensitive is compared
+# case-insensitively, not a header meant to be case-insensitive compared
+# case-sensitively), and Go carries no binding for it at all. No concept
+# generalizes "an authorization policy builds a case-sensitive matcher for a
+# value the underlying protocol treats case-insensitively" without a
+# call-site signal distinguishing an authz-relevant host/header comparison
+# from any other case-sensitive string check, and Envoy's HeaderMatcher oneof
+# selection is go-control-plane-specific vocabulary with no natural home in
+# the existing ontology — minting a concept from this one call site would
+# fail the genericity test outright, since the shape to bind against (which
+# protobuf field variant a config generator populates) is not a pattern any
+# library's own documentation would lead someone to write a general binding
+# for. No binding, concept, or rule change was attempted.
+
+test "rank1221: hostGenerator.permission builds a case-sensitive HeaderMatcher for the policy's host value"
+  lang go
+  reject VYQL-AUTH-032
+  file header.go
+  ```
+  package matcher
+
+  import (
+  	"strings"
+
+  	routepb "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
+  )
+
+  func HeaderMatcher(k, v string) *routepb.HeaderMatcher {
+  	if v == "*" {
+  		return &routepb.HeaderMatcher{
+  			Name: k,
+  			HeaderMatchSpecifier: &routepb.HeaderMatcher_PresentMatch{
+  				PresentMatch: true,
+  			},
+  		}
+  	} else if strings.HasPrefix(v, "*") {
+  		return &routepb.HeaderMatcher{
+  			Name: k,
+  			HeaderMatchSpecifier: &routepb.HeaderMatcher_SuffixMatch{
+  				SuffixMatch: v[1:],
+  			},
+  		}
+  	} else if strings.HasSuffix(v, "*") {
+  		return &routepb.HeaderMatcher{
+  			Name: k,
+  			HeaderMatchSpecifier: &routepb.HeaderMatcher_PrefixMatch{
+  				PrefixMatch: v[:len(v)-1],
+  			},
+  		}
+  	}
+  	return &routepb.HeaderMatcher{
+  		Name: k,
+  		HeaderMatchSpecifier: &routepb.HeaderMatcher_ExactMatch{
+  			ExactMatch: v,
+  		},
+  	}
+  }
+  ```
+  file generator.go
+  ```
+  package model
+
+  import "fmt"
+
+  type hostGenerator struct {
+  }
+
+  func (hostGenerator) permission(key, value string, forTCP bool) (*rbacpb.Permission, error) {
+  	if forTCP {
+  		return nil, fmt.Errorf("%q is HTTP only", key)
+  	}
+
+  	m := matcher.HeaderMatcher(hostHeader, value)
+  	return permissionHeader(m), nil
+  }
+  ```
+
+test "rank1221: hostGenerator.permission builds a case-insensitive HostMatcher for the policy's host value"
+  lang go
+  reject VYQL-AUTH-032
+  file header.go
+  ```
+  package matcher
+
+  import (
+  	"regexp"
+  	"strings"
+
+  	routepb "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
+  	matcherpb "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
+  )
+
+  func HostMatcher(k, v string) *routepb.HeaderMatcher {
+  	var regex string
+  	if v == "*" {
+  		return &routepb.HeaderMatcher{
+  			Name: k,
+  			HeaderMatchSpecifier: &routepb.HeaderMatcher_PresentMatch{
+  				PresentMatch: true,
+  			},
+  		}
+  	} else if strings.HasPrefix(v, "*") {
+  		regex = `.*` + regexp.QuoteMeta(v[1:])
+  	} else if strings.HasSuffix(v, "*") {
+  		regex = regexp.QuoteMeta(v[:len(v)-1]) + `.*`
+  	} else {
+  		regex = regexp.QuoteMeta(v)
+  	}
+  	return &routepb.HeaderMatcher{
+  		Name: k,
+  		HeaderMatchSpecifier: &routepb.HeaderMatcher_SafeRegexMatch{
+  			SafeRegexMatch: &matcherpb.RegexMatcher{
+  				EngineType: &matcherpb.RegexMatcher_GoogleRe2{
+  					GoogleRe2: &matcherpb.RegexMatcher_GoogleRE2{},
+  				},
+  				Regex: `(?i)` + regex,
+  			},
+  		},
+  	}
+  }
+  ```
+  file generator.go
+  ```
+  package model
+
+  import "fmt"
+
+  type hostGenerator struct {
+  }
+
+  func (hostGenerator) permission(key, value string, forTCP bool) (*rbacpb.Permission, error) {
+  	if forTCP {
+  		return nil, fmt.Errorf("%q is HTTP only", key)
+  	}
+
+  	m := matcher.HostMatcher(hostHeader, value)
+  	return permissionHeader(m), nil
+  }
+  ```

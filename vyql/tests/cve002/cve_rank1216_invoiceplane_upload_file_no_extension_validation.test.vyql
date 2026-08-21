@@ -1,0 +1,134 @@
+# Rank 1216 / CVE-2024-56975: InvoicePlane's customer-file upload endpoint
+# wrote every posted file straight to the web-served uploads folder with no
+# check on its type (CWE-434). Upload::upload_file in
+# application/modules/upload/controllers/Upload.php did
+#
+#   $fileName = preg_replace('/\s+/', '_', $_FILES['file']['name']);
+#   $targetFile = $this->targetPath . '/' . $url_key . '_' . $fileName;
+#   ...
+#   move_uploaded_file($tempFile, $targetFile);
+#
+# with $targetFile built from the posted file name and no extension or
+# content-type check anywhere in the method, so a request naming its upload
+# `shell.php` landed a PHP file under customer_files, executable by any
+# visitor who requested it. The fixing commit is
+# 2a04a03ddeeb71566bf200c1259c41d4638e01e0 (PR #1141, mainline commit "fix
+# upload_file function"), which adds a validate_file_extension() gate against
+# an allow-list (gif, jpg, jpeg, pdf, png, txt, xml) before the move, plus a
+# CSRF check and a validate_upload() call confirming the temp file came
+# through PHP's own upload machinery.
+# cede414c56ac429b0ab29b0eb273b2d5af5a7eff to
+# 2a04a03ddeeb71566bf200c1259c41d4638e01e0.
+#
+# CAUGHT by VYQL-INJ-015. Scanning the real checkout at 2a04a03ddeeb71566bf20^
+# (the vulnerable parent) reports it directly: source code.HttpInput at
+# Upload.php:52 (the $_FILES['file']['name'] read), sink code.UnsafeUpload at
+# Upload.php:67 (move_uploaded_file's destination argument).
+#
+# The reject case does not use the literal patched form, because it would
+# still fire: scanning the checkout at the fixed revision
+# 1ba32beac378113ca285e5d54fb1404f985417fd (which layers on 2a04a03d with a
+# mime_content_type() check) reports VYQL-INJ-015 twice more, at Upload.php:76
+# and Upload.php:234, because the destination path is still built from the
+# posted file name regardless of the extension or MIME check that runs before
+# the move. This is the same gap already measured at ranks 1046 and 1051:
+# VYQL-INJ-015 is `taint core.UserControlledData -> code.UnsafeUpload` with no
+# `unless`, and no control concept in the ontology neutralises
+# injection.UnrestrictedUpload, so a validated upload handler reports exactly
+# like an unvalidated one. The reject direction below instead demonstrates the
+# rule's actual discriminator, matching rank 1046's convention: a destination
+# built from server-generated data only, with no posted file name in it.
+
+test "rank1216: the destination file name comes straight from the upload"
+  lang php
+  file application/modules/upload/controllers/Upload.php
+  expect VYQL-INJ-015
+  code
+  ```
+  <?php
+
+  class Upload extends Admin_Controller
+  {
+      public $targetPath;
+
+      public function __construct()
+      {
+          parent::__construct();
+          $this->load->model('upload/mdl_uploads');
+          $this->targetPath = UPLOADS_FOLDER . '/customer_files';
+      }
+
+      public function upload_file($customerId, $url_key)
+      {
+          Upload::create_dir($this->targetPath . '/');
+
+          if (!empty($_FILES)) {
+              $tempFile = $_FILES['file']['tmp_name'];
+              $fileName = preg_replace('/\s+/', '_', $_FILES['file']['name']);
+              $targetFile = $this->targetPath . '/' . $url_key . '_' . $fileName;
+              $file_exists = file_exists($targetFile);
+
+              if (!$file_exists) {
+                  $data = array(
+                      'client_id' => $customerId,
+                      'url_key' => $url_key,
+                      'file_name_original' => $fileName,
+                      'file_name_new' => $url_key . '_' . $fileName
+                  );
+
+                  $this->mdl_uploads->create($data);
+
+                  move_uploaded_file($tempFile, $targetFile);
+
+                  echo json_encode([
+                      'success' => true
+                  ]);
+              } else {
+                  echo json_encode([
+                      'success' => false,
+                      'message' => trans('error_duplicate_file')
+                  ]);
+                  http_response_code(404);
+              }
+          } else {
+              Upload::show_files($url_key, $customerId);
+          }
+      }
+  }
+  ```
+
+test "rank1216: a move whose destination carries no posted file name"
+  lang php
+  file application/modules/upload/controllers/Upload.php
+  reject VYQL-INJ-015
+  code
+  ```
+  <?php
+
+  class Upload extends Admin_Controller
+  {
+      public $targetPath;
+
+      public function __construct()
+      {
+          parent::__construct();
+          $this->targetPath = UPLOADS_FOLDER . '/customer_files';
+      }
+
+      public function regenerate_default_avatar($customerId, $url_key)
+      {
+          Upload::create_dir($this->targetPath . '/');
+
+          $tempFile = APPPATH . 'assets/default_avatar.png';
+          $targetFile = $this->targetPath . '/' . $url_key . '_avatar.png';
+
+          if (!file_exists($targetFile)) {
+              move_uploaded_file($tempFile, $targetFile);
+
+              echo json_encode([
+                  'success' => true
+              ]);
+          }
+      }
+  }
+  ```

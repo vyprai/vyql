@@ -1,0 +1,134 @@
+# Rank 1219 / CVE-2015-5607: IPython Notebook's base Tornado handler
+# authenticated every request with a secure session cookie
+# (AuthenticatedHandler.get_current_user calls self.get_secure_cookie) but
+# defined no prepare() hook to validate the request's Origin, so any page a
+# logged-in user visited could drive cross-origin requests against the
+# notebook API carrying the ambient auth cookie (CWE-352). The fixed
+# revision adds check_origin_api(), which compares urlparse(origin).netloc
+# against the Host header (falling back to configured CORS
+# allow_origin/allow_origin_pat), and calls it from a new
+# IPythonHandler.prepare() that raises web.HTTPError(404) when the check
+# fails.
+#
+# FIXED. Nothing existing labelled this: baseline match/scan on the real
+# vulnerable handlers.py reports only the unrelated HttpInput/sink findings
+# already present in the file (JSON body parsing, redirect targets, response
+# headers); no CSRF/origin concept fires either side. Added
+# code.CookieAuthHandlerMissingPrepareOriginCheck (VYQL-RF-044) and a Python
+# binding gated on dependency("tornado"), matched at module scope: a
+# get_secure_cookie call is present (the class authenticates from a secure
+# cookie -- Tornado's documented session-auth idiom) and the module defines
+# neither an Origin/Host netloc comparison (urlparse(...).netloc, the
+# standard Python idiom for it, which is what this fix and rank 1169's
+# hermes-agent fix both use) nor Tornado's own built-in check_xsrf_cookie/
+# xsrf_cookies alternative -- so a Tornado app that instead uses Tornado's
+# native XSRF token mechanism is not flagged.
+#
+# A single get_secure_cookie call was not enough on its own: the vulnerable
+# file's Template404 class already defines an unrelated prepare() (it always
+# raises 404), so gating on "no prepare() anywhere in the module" -- the
+# first binding tried -- silenced the true positive too. get_origin() in the
+# same vulnerable file also already reads the Origin header for WebSocket
+# naming, so gating on the Origin literal being absent does not discriminate
+# either; both the vulnerable and fixed revisions read it. urlparse(...)
+# .netloc is the one identifier that appears only at the fixed revision.
+#
+# Measured on the real checkout: scanning IPython/html/base at the vulnerable
+# revision reports VYQL-RF-044 at handlers.py:1; scanning the
+# same directory at the fixed revision is silent for it. The full repository
+# scan (740 Python files) exceeds the 180s bound regardless of this change --
+# confirmed by running the same bounded scan with these three files held out,
+# which times out identically -- so the directory holding the changed file is
+# the real-checkout evidence here. OWASP Java and Python are unchanged at
+# +1.00 and +0.90.
+
+test "rank1219: cookie-authenticated handler has no Origin check before dispatch"
+  lang python
+  file handlers.py
+  expect VYQL-RF-044
+  expect_review code.CookieAuthHandlerMissingPrepareOriginCheck
+  code
+  ```
+  from tornado import web
+
+
+  class AuthenticatedHandler(web.RequestHandler):
+      """A RequestHandler with an authenticated user."""
+
+      def get_current_user(self):
+          user_id = self.get_secure_cookie(self.cookie_name)
+          if user_id is None:
+              self.clear_cookie(self.cookie_name)
+              user_id = 'anonymous'
+          return user_id
+
+
+  class IPythonHandler(AuthenticatedHandler):
+      """IPython-specific extensions to authenticated handling"""
+
+      def get_origin(self):
+          if "Origin" in self.request.headers:
+              return self.request.headers.get("Origin")
+          return self.request.headers.get("Sec-Websocket-Origin", None)
+
+
+  class Template404(IPythonHandler):
+      """Render our 404 template"""
+      def prepare(self):
+          raise web.HTTPError(404)
+  ```
+
+test "rank1219: prepare() validates Origin against Host before dispatch"
+  lang python
+  file handlers.py
+  reject VYQL-RF-044
+  reject_review code.CookieAuthHandlerMissingPrepareOriginCheck
+  code
+  ```
+  from tornado import web
+  try:
+      from urllib.parse import urlparse # Py 3
+  except ImportError:
+      from urlparse import urlparse # Py 2
+
+
+  class AuthenticatedHandler(web.RequestHandler):
+      """A RequestHandler with an authenticated user."""
+
+      def get_current_user(self):
+          user_id = self.get_secure_cookie(self.cookie_name)
+          if user_id is None:
+              self.clear_cookie(self.cookie_name)
+              user_id = 'anonymous'
+          return user_id
+
+
+  class IPythonHandler(AuthenticatedHandler):
+      """IPython-specific extensions to authenticated handling"""
+
+      def get_origin(self):
+          if "Origin" in self.request.headers:
+              return self.request.headers.get("Origin")
+          return self.request.headers.get("Sec-Websocket-Origin", None)
+
+      def check_origin_api(self):
+          if self.allow_origin == '*':
+              return True
+          host = self.request.headers.get("Host")
+          origin = self.request.headers.get("Origin")
+          if origin is None or host is None:
+              return True
+          origin_host = urlparse(origin.lower()).netloc
+          return origin_host == host
+
+      def prepare(self):
+          if not self.check_origin_api():
+              raise web.HTTPError(404)
+          return super(IPythonHandler, self).prepare()
+
+
+  class Template404(IPythonHandler):
+      """Render our 404 template"""
+      def prepare(self):
+          raise web.HTTPError(404)
+  ```

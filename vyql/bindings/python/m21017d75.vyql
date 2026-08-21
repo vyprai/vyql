@@ -4309,3 +4309,8 @@ binding webSocketUpgradeMissingOriginCheckPy905 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.decoratorMethod contains "websocket" and node.context.call contains "accept" and not (containsAny(node.context.identifier, ["origin", "Origin"]))
   emit issue code.WebSocketUpgradeMissingOriginCheck at node
 }
+
+binding sensitiveDataInResponsePassthruAsDict906 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.decoratorMethod contains "passthru" and node.context.call contains "as_dict" and not (node.context.call contains "mask_password")
+  emit issue code.SensitiveDataInResponse at node
+}
