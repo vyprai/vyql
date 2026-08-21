@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UploadDeclaredResponseContentType {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79, CWE_434]
+    id: "VYQL-INJ-246"
+    severity: high
+  }
+  issue code.UploadDeclaredResponseContentType as sink
+}

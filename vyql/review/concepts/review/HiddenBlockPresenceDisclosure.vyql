@@ -1,0 +1,7 @@
+module code;
+
+review code.HiddenBlockPresenceDisclosure {
+  category: privacy
+  kind: attention
+  text: "exclude autoblock-type block records before a block lookup decides which block-management link a viewer is shown, so the presence of a hidden autoblock on the target is not revealed"
+}

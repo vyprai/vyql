@@ -1,0 +1,211 @@
+# Rank 1380 / CVE-2022-30947 (SECURITY-2478): a Jenkins SCM implementation's
+# repository location is job configuration, and Jenkins SCM URLs accept every
+# scheme the underlying tool accepts -- including `file://` and a bare local
+# directory. hudson.plugins.mercurial.MercurialSCM keeps that location in its
+# `source` field and hands it to `hg clone` unchanged, so a caller who can only
+# configure a pipeline (a weaker permission than administering the controller)
+# can point `source` at a path on the controller's own filesystem. When the
+# checkout runs in a controller-side workspace rather than on an agent,
+# Mercurial reads that repository and copies it into the job's workspace,
+# disclosing other projects' SCM contents. The recorded CWE-22 is the right
+# family but the axis is CWE-73: the weakness is that an externally-controlled
+# repository location is never restricted to remote sources, not that a
+# traversal sequence slips past a filter.
+#
+# Pool row 1381 is correct as written and needs no repointing. Its
+# metadata-report REPO_MISMATCH flag is a false alarm: GHSA-84cm-vjwm-m979
+# covers three plugins at once and names a fix commit in each, so the
+# advisory's single repository field records only the first of them
+# (jenkinsci/git-plugin) while 55904fbb8c resolves in jenkinsci/mercurial-plugin
+# and nowhere else.
+#
+# The fixed revision adds `abortIfSourceLocal()` -- rejecting a `source` that starts with
+# `file://` or names an existing path -- and calls it from `checkout` under
+# `if (!ALLOW_LOCAL_CHECKOUT && !workspace.isRemote())`. The same advisory is
+# fixed identically in git-plugin (b295606e0b, `abortIfSourceIsLocal`) and
+# repo-plugin (3c8e6236b1, `abortIfUrlLocal`), which is what makes the shape
+# bindable without encoding one commit's layout: all three guards differ in
+# name and in which field they inspect, and all three are reached from
+# `checkout` through the same `FilePath.isRemote()` branch.
+#
+# code.JenkinsScmCheckoutAllowsLocalSource (jenkinsScmCheckoutAllowsLocalSource469
+# in vyql/bindings/java/m420f6b67.vyql) is keyed on that API contract rather
+# than on any of the three helper names: the `hudson.scm.SCM#checkout(Run,
+# Launcher, FilePath, TaskListener, File, SCMRevisionState)` parameter list
+# identifies the override that materialises the configured repository, and
+# `FilePath.isRemote()` is the documented way to tell a controller-side
+# workspace from an agent one. A checkout override that never consults it has
+# nowhere to have made the decision.
+#
+# Measured on all three plugins in the advisory, vulnerable parent against fix
+# commit, `-flags only`:
+#
+#   mercurial-plugin  1 flag at MercurialSCM.java:559  -> 0
+#   git-plugin        1 flag at GitSCM.java:1268       -> 0
+#   repo-plugin       1 flag at RepoScm.java:876       -> 0
+#
+# One flag per tree, at exactly the checkout override, and nothing else in any
+# of the three. Two of those trees go unread while authoring the binding.
+# `MercurialSCM.java` also calls `workspace.isRemote()` at line 960, inside the
+# sibling method `cachedSource`, and that call does not satisfy the negation --
+# `node.context.scopeCall` stays inside the same-or-nested lexical scope, so
+# the guard has to be reachable from `checkout` itself to count.
+
+test "rank1380: Jenkins SCM checkout clones the configured source with no controller-side restriction"
+  lang java
+  expect_review code.JenkinsScmCheckoutAllowsLocalSource
+  code
+  ```
+  package hudson.plugins.mercurial;
+
+  import hudson.AbortException;
+  import hudson.EnvVars;
+  import hudson.FilePath;
+  import hudson.Launcher;
+  import hudson.model.Node;
+  import hudson.model.Run;
+  import hudson.model.TaskListener;
+  import hudson.scm.SCM;
+  import hudson.scm.SCMRevisionState;
+  import hudson.util.ArgumentListBuilder;
+  import java.io.File;
+  import java.io.IOException;
+
+  public class MercurialSCM extends SCM {
+
+      private final String source;
+      private final String installation;
+
+      public MercurialSCM(String installation, String source) {
+          this.installation = installation;
+          this.source = source;
+      }
+
+      public String getSource() {
+          return source;
+      }
+
+      private String getSource(EnvVars env) {
+          return env.expand(source);
+      }
+
+      @Override
+      public void checkout(Run<?, ?> build, Launcher launcher, FilePath workspace, TaskListener listener, File changelogFile, SCMRevisionState baseline)
+              throws IOException, InterruptedException {
+
+          MercurialInstallation mercurialInstallation = findInstallation(installation);
+          Node node = workspaceToNode(workspace);
+          FilePath repository = workspace2Repo(workspace, build.getEnvironment(listener));
+          String revToBuild = getRevToBuild(build, workspace, build.getEnvironment(listener));
+          if (canReuseWorkspace(repository, node, build, launcher, listener)) {
+              update(build, launcher, repository, node, listener, revToBuild);
+          } else {
+              clone(build, launcher, repository, node, listener, revToBuild);
+          }
+      }
+
+      private void clone(Run<?, ?> build, Launcher launcher, FilePath repository, Node node, TaskListener listener, String toRevision)
+              throws InterruptedException, IOException {
+          EnvVars env = build.getEnvironment(listener);
+          ArgumentListBuilder args = new ArgumentListBuilder();
+          args.add("hg");
+          args.add("clone");
+          args.add("--noupdate");
+          args.add(getSource(env));
+          args.add(repository.getRemote());
+          if (launcher.launch().cmds(args).join() != 0) {
+              throw new AbortException("Failed to clone " + getSource(env));
+          }
+      }
+  }
+  ```
+
+test "rank1380: Jenkins SCM checkout rejects a local source when the workspace is on the controller"
+  lang java
+  reject_review code.JenkinsScmCheckoutAllowsLocalSource
+  code
+  ```
+  package hudson.plugins.mercurial;
+
+  import hudson.AbortException;
+  import hudson.EnvVars;
+  import hudson.FilePath;
+  import hudson.Launcher;
+  import hudson.Main;
+  import hudson.model.Node;
+  import hudson.model.Run;
+  import hudson.model.TaskListener;
+  import hudson.scm.SCM;
+  import hudson.scm.SCMRevisionState;
+  import hudson.util.ArgumentListBuilder;
+  import java.io.File;
+  import java.io.IOException;
+  import java.nio.file.Files;
+  import java.nio.file.Paths;
+  import java.util.Locale;
+  import org.apache.commons.lang.StringUtils;
+
+  public class MercurialSCM extends SCM {
+
+      static final String ALLOW_LOCAL_CHECKOUT_PROPERTY = MercurialSCM.class.getName() + ".ALLOW_LOCAL_CHECKOUT";
+      static boolean ALLOW_LOCAL_CHECKOUT =
+              Boolean.parseBoolean(System.getProperty(ALLOW_LOCAL_CHECKOUT_PROPERTY, String.valueOf(Main.isUnitTest)));
+
+      private final String source;
+      private final String installation;
+
+      public MercurialSCM(String installation, String source) {
+          this.installation = installation;
+          this.source = source;
+      }
+
+      public String getSource() {
+          return source;
+      }
+
+      private String getSource(EnvVars env) {
+          return env.expand(source);
+      }
+
+      @Override
+      public void checkout(Run<?, ?> build, Launcher launcher, FilePath workspace, TaskListener listener, File changelogFile, SCMRevisionState baseline)
+              throws IOException, InterruptedException {
+
+          MercurialInstallation mercurialInstallation = findInstallation(installation);
+
+          if (!ALLOW_LOCAL_CHECKOUT && !workspace.isRemote()) {
+              abortIfSourceLocal();
+          }
+
+          Node node = workspaceToNode(workspace);
+          FilePath repository = workspace2Repo(workspace, build.getEnvironment(listener));
+          String revToBuild = getRevToBuild(build, workspace, build.getEnvironment(listener));
+          if (canReuseWorkspace(repository, node, build, launcher, listener)) {
+              update(build, launcher, repository, node, listener, revToBuild);
+          } else {
+              clone(build, launcher, repository, node, listener, revToBuild);
+          }
+      }
+
+      private void abortIfSourceLocal() throws IOException {
+          if (StringUtils.isNotEmpty(source) &&
+                  (source.toLowerCase(Locale.ENGLISH).startsWith("file://") || Files.exists(Paths.get(source)))) {
+              throw new AbortException("Checkout of Mercurial source '" + source + "' aborted because it references a local directory, which may be insecure.");
+          }
+      }
+
+      private void clone(Run<?, ?> build, Launcher launcher, FilePath repository, Node node, TaskListener listener, String toRevision)
+              throws InterruptedException, IOException {
+          EnvVars env = build.getEnvironment(listener);
+          ArgumentListBuilder args = new ArgumentListBuilder();
+          args.add("hg");
+          args.add("clone");
+          args.add("--noupdate");
+          args.add(getSource(env));
+          args.add(repository.getRemote());
+          if (launcher.launch().cmds(args).join() != 0) {
+              throw new AbortException("Failed to clone " + getSource(env));
+          }
+      }
+  }
+  ```

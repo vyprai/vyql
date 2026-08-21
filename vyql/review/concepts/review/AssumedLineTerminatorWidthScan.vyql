@@ -1,0 +1,8 @@
+module code;
+
+review code.AssumedLineTerminatorWidthScan {
+  category: memory
+  expected: [core.InputValidation]
+  kind: attention
+  text: "measure the line terminator by inspecting the trailing bytes before deriving a scan bound from the received length"
+}

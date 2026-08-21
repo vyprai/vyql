@@ -1,0 +1,43 @@
+module bindings.javascript.url_scheme_denylist_by_substitution;
+
+// Deciding whether a URL may be emitted into an `href`, `src` or `xlink:href`
+// means reading its scheme and comparing that against the schemes the page is
+// willing to navigate to. Deleting the schemes it is not willing to navigate to
+// -- passing the string through `replace(/javascript:/g, '')` and treating
+// whatever comes back as safe -- does not establish the same thing, for two
+// reasons that hold for every spelling of the substitution.
+//
+// The first is that a substitution never re-examines its own output. `replace`
+// scans left to right once, so the characters either side of a removed
+// occurrence become adjacent and can spell the removed token again:
+// `javajavascript:script:alert(1)` contains one occurrence of `javascript:`, at
+// offset 4, and deleting it joins `java` to `script:alert(1)` -- precisely the
+// `javascript:alert(1)` the filter exists to refuse. Nesting a forbidden token
+// inside itself defeats any single-pass removal (CWE-182), which is why a
+// removal-based filter has to iterate until its output stops changing while an
+// allowlist never has to.
+//
+// The second is that a browser resolves a scheme far more liberally than a
+// literal comparison does. `java&#9;script:`, a leading newline or NUL byte,
+// `javascript&colon;` in an HTML attribute, and percent-encoded forms all reach
+// the same handler, so the set of strings a denylist would have to enumerate is
+// open-ended. Parsing the URL and requiring its scheme to be one of the handful
+// a document actually needs closes that set instead, which is what a URL
+// sanitizer library and the platform's own URL parser are for.
+//
+// The fact recorded here is therefore the substitution itself: a `replace` or
+// `replaceAll` whose pattern names a scheme a browser executes documents from
+// -- `javascript:`, `vbscript:`, `livescript:`, or `data:text/html`. The
+// replacement text does not enter the predicate, because it does not change the
+// reasoning: an empty replacement adds the reconstruction above to the encoding
+// variants, and a non-empty one still leaves the encoding variants unhandled.
+//
+// Each scheme is matched with its colon so the predicate stays off code that
+// merely mentions the word. Bare `javascript` is a language name, a MIME
+// subtype and a directory name in most projects; `javascript:` inside a
+// substitution pattern is a URL scheme being filtered out.
+binding urlSchemeDenylistBySubstitution {
+  query pattern callExpr where callee.method in ["replace", "replaceAll"]
+    and containsAny(args.any.literal, ["javascript:", "vbscript:", "livescript:", "data:text/html"])
+  emit issue code.HtmlSanitizerLogicReview at call
+}
