@@ -1,0 +1,145 @@
+# Rank 1154 / CVE-2018-19333: gVisor's SysV shared-memory segment drops its
+# own self-reference every time shmctl(IPC_RMID) runs, not only the first
+# time, so a process can force a segment to be destroyed and its backing
+# memory reused by another process while the original process still holds a
+# live mapping to it (CWE-415/CWE-416).
+#
+# Shm embeds refs.AtomicRefCount and destroy() releases the segment's
+# backing memory. MarkDestroyed, called from Shmctl's IPC_RMID case, is
+# meant to drop the segment's own reference exactly once — the reference
+# the registry holds on the segment's behalf — leaving any outstanding
+# attach/mmap references to keep it alive until they are dropped
+# separately. The vulnerable revision sets pendingDestruction and calls
+# s.DecRef() unconditionally on every call, so a second IPC_RMID on the
+# same segment (nothing prevents a caller from issuing shmctl(IPC_RMID)
+# more than once) drops the refcount a second time and can drive it to
+# zero — running destroy() — while an earlier mmap of the segment is still
+# live. The fixed revision guards the field write in shm.go behind `if
+# !s.pendingDestruction`, so only the first call sets the flag and calls
+# DecRef; every later call is a no-op.
+#
+# ATTENTION, vocabulary gap. Nothing is labelled in either the vulnerable
+# or the fixed repro: neither s.DecRef() nor s.pendingDestruction carries
+# any concept in the Go bindings, because no binding anywhere in the corpus
+# names the refs.AtomicRefCount / DecRef reference-counting idiom gVisor
+# (and other Go projects using the same convention) build state machines
+# on. PotentialDoubleFree (VYQL-MEM-008) would not fire even with a
+# binding added: its query is `PointerFree reaches PointerFree`, two free
+# calls reachable in sequence within one scanned path, and this bug has
+# only one DecRef call site in the source, invoked twice through the
+# *runtime* by repeated external triggering of the same code path — a
+# property of how many times a guard is satisfied across calls, not of two
+# free sites reachable from each other. Detecting it needs a different
+# question: does an irreversible resource-release statement sit inside a
+# conditional guarded by a boolean that this same statement sets, so the
+# source can show whether the guard actually wraps the release or the
+# release runs unconditionally beside it. That is a control-flow shape,
+# not a taint path, and no concept in the corpus states it; the nearest is
+# code.ReentrantQueueCleanupReview, which is specific to
+# queue-cleanup/cancellation reentrancy, a different mechanism producing
+# the same CWE-415/416 threats. A concept for "guard variable set but not
+# required by a release call" minted from this one call site would be a
+# repro-shaped patch: nothing here shows the shape generalizes past
+# gVisor's own refcounting convention without seeing it fail to generalize
+# on other codebases first. No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1154: MarkDestroyed drops the segment's self-reference on every call"
+  lang go
+  file pkg/sentry/kernel/shm/shm.go
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  code
+  ```
+  package shm
+
+  import (
+      "sync"
+
+      "gvisor.googlesource.com/gvisor/pkg/refs"
+  )
+
+  type Shm struct {
+      refs.AtomicRefCount
+
+      mu                  sync.Mutex
+      key                 int32
+      pendingDestruction  bool
+  }
+
+  func (s *Shm) destroy() {
+      s.registry.remove(s)
+      s.p.Memory().DecRef(s.fr)
+  }
+
+  // DecRef overrides refs.RefCount.DecRef with a destructor.
+  func (s *Shm) DecRef() {
+      s.DecRefWithDestructor(s.destroy)
+  }
+
+  // MarkDestroyed marks a shm for destruction. The shm is actually destroyed
+  // once it has no references. See shmctl(IPC_RMID).
+  func (s *Shm) MarkDestroyed() {
+      s.mu.Lock()
+      defer s.mu.Unlock()
+      // Prevent the segment from being found in the registry.
+      s.key = IPC_PRIVATE
+      s.pendingDestruction = true
+      s.DecRef()
+  }
+  ```
+
+test "rank1154: MarkDestroyed only drops the self-reference the first time it runs"
+  lang go
+  file pkg/sentry/kernel/shm/shm.go
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  code
+  ```
+  package shm
+
+  import (
+      "sync"
+
+      "gvisor.googlesource.com/gvisor/pkg/refs"
+  )
+
+  type Shm struct {
+      refs.AtomicRefCount
+
+      mu                  sync.Mutex
+      key                 int32
+      pendingDestruction  bool
+  }
+
+  func (s *Shm) destroy() {
+      s.registry.remove(s)
+      s.p.Memory().DecRef(s.fr)
+  }
+
+  // DecRef overrides refs.RefCount.DecRef with a destructor.
+  func (s *Shm) DecRef() {
+      s.DecRefWithDestructor(s.destroy)
+  }
+
+  // MarkDestroyed marks a shm for destruction. The shm is actually destroyed
+  // once it has no references. See shmctl(IPC_RMID).
+  func (s *Shm) MarkDestroyed() {
+      s.mu.Lock()
+      defer s.mu.Unlock()
+
+      // Prevent the segment from being found in the registry.
+      s.key = IPC_PRIVATE
+
+      // Only drop the segment's self-reference once, when destruction is
+      // requested. Otherwise, repeated calls shmctl(IPC_RMID) would force a
+      // segment to be destroyed prematurely, potentially with active maps to
+      // the segment's address range. Remaining references are dropped when
+      // the segment is detached or unmaped.
+      if !s.pendingDestruction {
+          s.pendingDestruction = true
+          s.DecRef()
+      }
+  }
+  ```

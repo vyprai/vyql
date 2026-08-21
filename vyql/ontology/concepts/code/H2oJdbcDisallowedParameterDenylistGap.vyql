@@ -1,0 +1,11 @@
+module code;
+
+concept H2oJdbcDisallowedParameterDenylistGap : issue {
+  cwe: [CWE_94]
+  reviewAssumption: "connection_url reaches SQLManager.validateJdbcUrl as a caller-supplied JDBC URL before any driver opens a connection with it"
+  reviewCategory: code_execution
+  reviewCondition: "H2O's default JDBC connection-parameter denylist omits a parameter that a supported driver uses to load and instantiate an arbitrary class"
+  reviewConfidence: high
+  reviewEvidence: "DEFAULT_JDBC_DISALLOWED_PARAMETERS context {pattern} lists the mysql and h2 parameters but omits the postgresql socketFactory/sslfactory family and mysql statementInterceptors"
+  vulnerableTo: [injection.CodeInjection]
+}

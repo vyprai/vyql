@@ -2620,3 +2620,8 @@ binding authenticationCheck459 {
     }
   }
 }
+
+binding h2oJdbcDisallowedParameterDenylistGap458 {
+  query pattern presenceNode where node.scope == "class" and node.context.className contains "SQLManager" and node.context.identifier contains "DEFAULT_JDBC_DISALLOWED_PARAMETERS" and node.context.literal contains "autoDeserialize" and node.context.literal contains "allowLoadLocalInfile" and not (containsAny(node.context.literal, ["socketFactory", "sslfactory", "statementInterceptors"]))
+  emit issue code.H2oJdbcDisallowedParameterDenylistGap at node
+}

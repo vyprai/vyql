@@ -1,0 +1,98 @@
+# Rank 1153 / CVE-2022-29248: Guzzle's cookie jar stores every Set-Cookie
+# header from a response against the jar with no check that the cookie's
+# domain matches the request the response answered, so a redirect (or any
+# response) from a domain the application does not intend to trust can
+# plant or overwrite a cookie that a later request to an unrelated domain
+# then sends, leaking it across origins (CWE-200, CWE-565).
+#
+# CookieJar::extractCookies in src/Cookie/CookieJar.php reads each
+# Set-Cookie header with SetCookie::fromString(), fills in a missing Domain
+# attribute from the request's own host, then calls $this->setCookie($sc)
+# unconditionally; nothing compares the cookie's domain against the host
+# that actually produced the response. The fixed revision inserts `if
+# (!$sc->matchesDomain($request->getUri()->getHost())) { continue; }`
+# between the domain-fill step and setCookie(), so a cookie whose domain
+# does not match (by RFC 6265 domain-suffix rules) the request host is
+# dropped instead of stored, and lowercases both sides of the comparison in
+# SetCookie::domainMatches.
+#
+# ATTENTION, vocabulary gap, the same class rank 1112 records for
+# follow-redirects (JS): an HTTP client library trusting response-derived
+# data across an origin/domain boundary without an explicit check before
+# that data reaches persistent client state. There it is headers carried
+# across a redirect; here it is a cookie carried into the jar. Nothing in
+# the repro is labelled -- $response->getHeader('Set-Cookie'),
+# SetCookie::fromString and $this->setCookie carry no source, sink or
+# control mark in either revision, and all seven call sites are unresolved.
+# No concept states "a value read from an HTTP response is written into a
+# cookie/header store that a later, possibly different-origin request will
+# resend" for any language, so there is no binding to add that would land
+# on judgement made elsewhere; closing this needs a new concept plus
+# bindings across every HTTP-client language the corpus covers, which is
+# design work, not a mechanical addition to one rank.
+#
+# code.ExternalLinkReferrerLeak (VYQL-SEC-025, CWE_200/CWE_598) is nearest
+# by theme -- a secret crossing an origin boundary through an HTTP
+# mechanism -- and is the same nearest-by-theme concept rank 1112 names,
+# but its condition is a rendered HTML external link lacking
+# rel=noreferrer, not a client library's own cookie-jar bookkeeping; it
+# does not fire on either revision, as expected.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected
+
+test "rank1153: extractCookies stores a Set-Cookie header with no domain check against the request"
+  lang php
+  file CookieJar.php
+  reject VYQL-SEC-025
+  code
+  ```
+  <?php
+  namespace GuzzleHttp\Cookie;
+
+  class CookieJar
+  {
+      public function extractCookies($request, $response)
+      {
+          if ($cookieHeader = $response->getHeader('Set-Cookie')) {
+              foreach ($cookieHeader as $cookie) {
+                  $sc = SetCookie::fromString($cookie);
+                  if (!$sc->getDomain()) {
+                      $sc->setDomain($request->getUri()->getHost());
+                  }
+                  $this->setCookie($sc);
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1153: the fixed form drops a cookie whose domain does not match the request host"
+  lang php
+  file CookieJar.php
+  reject VYQL-SEC-025
+  code
+  ```
+  <?php
+  namespace GuzzleHttp\Cookie;
+
+  class CookieJar
+  {
+      public function extractCookies($request, $response)
+      {
+          if ($cookieHeader = $response->getHeader('Set-Cookie')) {
+              foreach ($cookieHeader as $cookie) {
+                  $sc = SetCookie::fromString($cookie);
+                  if (!$sc->getDomain()) {
+                      $sc->setDomain($request->getUri()->getHost());
+                  }
+                  if (!$sc->matchesDomain($request->getUri()->getHost())) {
+                      continue;
+                  }
+                  $this->setCookie($sc);
+              }
+          }
+      }
+  }
+  ```
