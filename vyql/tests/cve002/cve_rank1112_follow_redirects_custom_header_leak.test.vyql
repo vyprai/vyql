@@ -1,0 +1,41 @@
+# Rank 1112 / CVE-2026-40895: follow-redirects strips only three hardcoded
+# header names on a cross-domain or protocol-downgrade redirect, so custom
+# auth headers (X-Api-Key, X-Auth-Token, …) follow the redirect to the next
+# host (CWE-200, CWE-212).
+#
+# ATTENTION: vocabulary gap. No concept states that an HTTP client's redirect
+# path forwards headers outside an explicit allowlist across an origin change;
+# ExternalLinkReferrerLeak is a template Referer leak, not this mechanism.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1112: a custom auth header has nothing telling the client to strip it on redirect"
+  lang javascript
+  file app.js
+  reject VYQL-SEC-025
+  code
+  ```
+  const followRedirects = require('follow-redirects');
+
+  function fetchWithApiKey(url, apiKey) {
+    return followRedirects.https.request(url, {
+      headers: { 'X-Api-Key': apiKey },
+    });
+  }
+  ```
+
+test "rank1112: the custom header is named so the client strips it across origins"
+  lang javascript
+  file app.js
+  reject VYQL-SEC-025
+  code
+  ```
+  const followRedirects = require('follow-redirects');
+
+  function fetchWithApiKey(url, apiKey) {
+    return followRedirects.https.request(url, {
+      headers: { 'X-Api-Key': apiKey },
+      sensitiveHeaders: ['X-Api-Key'],
+    });
+  }
+  ```

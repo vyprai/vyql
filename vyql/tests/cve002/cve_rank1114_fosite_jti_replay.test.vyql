@@ -1,0 +1,78 @@
+# Rank 1114 / CVE-2020-15222: fosite's private_key_jwt client authentication
+# requires a jti claim but never records accepted jti values, so a captured,
+# still-valid assertion authenticates the client repeatedly until expiry
+# (CWE-287, CWE-345).
+#
+# ATTENTION: vocabulary gap. No concept states that a single-use nonce claim's
+# presence is checked while its value is never compared to or stored in a set
+# of previously accepted values.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1114: the jti claim is checked for presence, never recorded"
+  lang go
+  file client_authentication.go
+  reject_review code.ForgeableIdentityToken
+  code
+  ```
+  package fosite
+
+  func (f *Fosite) AuthenticateClient(ctx context.Context, r *http.Request, form url.Values) (Client, error) {
+      token, err := jwt.ParseWithClaims(assertion, &jwt.MapClaims{}, keyFunc)
+      if err != nil {
+          return nil, err
+      }
+      claims, ok := token.Claims.(*jwt.MapClaims)
+      if !ok {
+          return nil, ErrInvalidClient
+      }
+
+      if !claims.VerifyIssuer(clientID, true) {
+          return nil, ErrInvalidClient.WithHint("Claim \"iss\" must match the \"client_id\".")
+      } else if sub, ok := (*claims)["sub"].(string); !ok || sub != clientID {
+          return nil, ErrInvalidClient.WithHint("Claim \"sub\" must match the \"client_id\".")
+      } else if jti, ok := (*claims)["jti"].(string); !ok || len(jti) == 0 {
+          return nil, ErrInvalidClient.WithHint("Claim \"jti\" must be set but is not.")
+      }
+
+      return client, nil
+  }
+  ```
+
+test "rank1114: the jti claim is checked against and recorded in the store"
+  lang go
+  file client_authentication.go
+  reject_review code.ForgeableIdentityToken
+  code
+  ```
+  package fosite
+
+  func (f *Fosite) AuthenticateClient(ctx context.Context, r *http.Request, form url.Values) (Client, error) {
+      token, err := jwt.ParseWithClaims(assertion, &jwt.MapClaims{}, keyFunc)
+      if err != nil {
+          return nil, err
+      }
+      claims, ok := token.Claims.(*jwt.MapClaims)
+      if !ok {
+          return nil, ErrInvalidClient
+      }
+
+      var jti string
+      if !claims.VerifyIssuer(clientID, true) {
+          return nil, ErrInvalidClient.WithHint("Claim \"iss\" must match the \"client_id\".")
+      } else if sub, ok := (*claims)["sub"].(string); !ok || sub != clientID {
+          return nil, ErrInvalidClient.WithHint("Claim \"sub\" must match the \"client_id\".")
+      } else if jti, ok = (*claims)["jti"].(string); !ok || len(jti) == 0 {
+          return nil, ErrInvalidClient.WithHint("Claim \"jti\" must be set but is not.")
+      } else if f.Store.ClientAssertionJWTValid(context.Background(), jti) != nil {
+          return nil, ErrJTIKnown.WithHint("Claim \"jti\" MUST only be used once.")
+      }
+
+      expiry := int64((*claims)["exp"].(float64))
+      if err := f.Store.SetClientAssertionJWT(context.Background(), jti, time.Unix(expiry, 0)); err != nil {
+          return nil, err
+      }
+
+      return client, nil
+  }
+  ```

@@ -1,0 +1,47 @@
+# Rank 1116 / CVE-2021-31409: Vaadin Framework's legacy EmailValidator carries
+# a catastrophic-backtracking email regex with nested unbounded groups, so
+# crafted input can hang the validating thread (CWE-400).
+#
+# ATTENTION: engine gap. code.CatastrophicRegex / VYQL-DOS-003 bindings match
+# literal substrings of known-vulnerable regexes, not nested-quantifier
+# structure; there is no regex-AST or backtracking-complexity analysis.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1116: the domain group nests an unbounded repetition inside another"
+  lang java
+  file EmailValidator.java
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  package com.vaadin.v7.data.validator;
+
+  public class EmailValidator {
+      private static final String PATTERN =
+          "^([a-zA-Z0-9_\\.\\-+])+@(([a-zA-Z0-9-])+\\.)+([a-zA-Z0-9]{2,4})+$";
+
+      public boolean isValid(String value) {
+          return value.matches(PATTERN);
+      }
+  }
+  ```
+
+test "rank1116: the domain suffix is one dot literal and a bounded tail class"
+  lang java
+  file EmailValidator.java
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  package com.vaadin.v7.data.validator;
+
+  public class EmailValidator {
+      private static final String PATTERN = "^" + "([a-zA-Z0-9_\\.\\-+])+" // local
+              + "@" + "[a-zA-Z0-9-.]+" // domain
+              + "\\." + "[a-zA-Z0-9-]{2,}" // tld
+              + "$";
+
+      public boolean isValid(String value) {
+          return value.matches(PATTERN);
+      }
+  }
+  ```
