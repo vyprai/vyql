@@ -1,0 +1,176 @@
+# Rank 1321 / CVE-2025-43766: Liferay's style-book preview upload stored the
+# uploaded file under a name whose extension came from the upload itself, with
+# no check on the extension or the MIME type (CWE-434).
+# UpdateStyleBookEntryPreviewMVCActionCommand.doProcessAction in
+# modules/apps/style-book/style-book-web did
+#
+#   long styleBookEntryId = ParamUtil.getLong(actionRequest, "styleBookEntryId");
+#   long fileEntryId = ParamUtil.getLong(actionRequest, "fileEntryId");
+#   FileEntry fileEntry = _dlAppLocalService.getFileEntry(fileEntryId);
+#   ...
+#   String fileName = styleBookEntryId + "_preview." + fileEntry.getExtension();
+#   fileEntry = PortletFileRepositoryUtil.addPortletFileEntry(
+#       null, ..., repository.getDlFolderId(), fileEntry.getContentStream(),
+#       fileName, fileEntry.getMimeType(), false);
+#
+# so the request named a temp file entry, and whatever extension and MIME type
+# that entry carried became the extension and MIME type of a file written into
+# the style-book portlet repository and served back from it. Fix d4a5b8fc9f
+# ("LPD-42742 validate style book thumbnail file extension") wraps the store in
+# `if (!matcher.find() || !mimeType.startsWith("image/"))`, matching the
+# extension against Pattern.compile("(bmp|jpeg|jpg|png|tiff)$") and adding the
+# same allow-list to the item-selector criterion.
+#
+# FIXED by bindings, not by a new rule: over the vulnerable revision nothing is
+# labelled at all -- `vyql match` reported no source and no sink in the method,
+# because Liferay reads request parameters through ParamUtil rather than
+# ServletRequest.getParameter, and because the portlet document-library store
+# carries no sink. Three binding families close that, all answerable to Liferay's
+# own API:
+#
+#   * ParamUtil.getX(request, name) -> code.HttpInput, Liferay's documented
+#     request-parameter reader;
+#   * FileEntry.getFileName / getExtension -> code.FileUploadSource, the
+#     client-supplied name an uploaded entry carries;
+#   * PortletFileRepository.addPortletFileEntry -> code.UnsafeUpload at the
+#     fileName argument, index 7 in the byte[] overload and index 8 in the two
+#     externalReferenceCode-prefixed forms.
+#
+# With those, VYQL-INJ-015 reports the vulnerable revision directly: source
+# code.HttpInput at UpdateStyleBookEntryPreviewMVCActionCommand.java:53, sink
+# code.UnsafeUpload at :88. Over the whole style-book module the bindings move
+# 66 findings to 69: this one, plus the preview copy in
+# StyleBookEntryLocalServiceImpl.copyStyleBookEntry and the preview import in
+# StyleBookEntryZipProcessorImpl, both of which write a repository file entry
+# whose name is derived from data the caller supplied.
+#
+# The reject case is not the literal patched form, because the patched form
+# still reports: VYQL-INJ-015 is `taint core.UserControlledData ->
+# code.UnsafeUpload` with no `unless`, and core.AllowlistValidation neutralizes
+# only injection.CommandInjection and request_forgery.Ssrf, so no control
+# concept in the ontology neutralises injection.UnrestrictedUpload and a
+# validated upload handler reports exactly like an unvalidated one. That is the
+# same missing control measured at ranks 1046, 1051 and 1216, and rank 1051
+# establishes what it has to carry -- which property is checked, not
+# merely that something is. The reject direction therefore demonstrates the
+# rule's actual discriminator, matching rank 1046's convention: a repository
+# store whose file name and MIME type are server-generated constants, with
+# nothing request-derived in either.
+
+test "rank1321: the stored preview name carries the upload's own extension"
+  lang java
+  file modules/apps/style-book/style-book-web/src/main/java/com/liferay/style/book/web/internal/portlet/action/UpdateStyleBookEntryPreviewMVCActionCommand.java
+  expect VYQL-INJ-015
+  code
+  ```
+  package com.liferay.style.book.web.internal.portlet.action;
+
+  import com.liferay.document.library.kernel.service.DLAppLocalService;
+  import com.liferay.portal.kernel.model.Repository;
+  import com.liferay.portal.kernel.portlet.bridges.mvc.BaseMVCActionCommand;
+  import com.liferay.portal.kernel.portletfilerepository.PortletFileRepositoryUtil;
+  import com.liferay.portal.kernel.repository.model.FileEntry;
+  import com.liferay.portal.kernel.theme.ThemeDisplay;
+  import com.liferay.portal.kernel.util.ParamUtil;
+  import com.liferay.portal.kernel.util.WebKeys;
+  import com.liferay.style.book.constants.StyleBookPortletKeys;
+  import com.liferay.style.book.model.StyleBookEntry;
+  import com.liferay.style.book.service.StyleBookEntryService;
+
+  import javax.portlet.ActionRequest;
+  import javax.portlet.ActionResponse;
+
+  import org.osgi.service.component.annotations.Reference;
+
+  public class UpdateStyleBookEntryPreviewMVCActionCommand
+      extends BaseMVCActionCommand {
+
+      @Override
+      protected void doProcessAction(
+              ActionRequest actionRequest, ActionResponse actionResponse)
+          throws Exception {
+
+          ThemeDisplay themeDisplay = (ThemeDisplay)actionRequest.getAttribute(
+              WebKeys.THEME_DISPLAY);
+
+          long styleBookEntryId = ParamUtil.getLong(
+              actionRequest, "styleBookEntryId");
+
+          long fileEntryId = ParamUtil.getLong(actionRequest, "fileEntryId");
+
+          FileEntry fileEntry = _dlAppLocalService.getFileEntry(fileEntryId);
+
+          Repository repository =
+              PortletFileRepositoryUtil.fetchPortletRepository(
+                  themeDisplay.getScopeGroupId(),
+                  StyleBookPortletKeys.STYLE_BOOK);
+
+          String fileName =
+              styleBookEntryId + "_preview." + fileEntry.getExtension();
+
+          fileEntry = PortletFileRepositoryUtil.addPortletFileEntry(
+              null, themeDisplay.getScopeGroupId(), themeDisplay.getUserId(),
+              StyleBookEntry.class.getName(), styleBookEntryId,
+              StyleBookPortletKeys.STYLE_BOOK, repository.getDlFolderId(),
+              fileEntry.getContentStream(), fileName, fileEntry.getMimeType(),
+              false);
+
+          _styleBookEntryService.updatePreviewFileEntryId(
+              styleBookEntryId, fileEntry.getFileEntryId());
+      }
+
+      @Reference
+      private DLAppLocalService _dlAppLocalService;
+
+      @Reference
+      private StyleBookEntryService _styleBookEntryService;
+
+  }
+  ```
+
+test "rank1321: a repository store whose name and type are server constants"
+  lang java
+  file modules/apps/style-book/style-book-web/src/main/java/com/liferay/style/book/web/internal/portlet/action/ResetStyleBookEntryPreviewMVCActionCommand.java
+  reject VYQL-INJ-015
+  code
+  ```
+  package com.liferay.style.book.web.internal.portlet.action;
+
+  import com.liferay.portal.kernel.model.Repository;
+  import com.liferay.portal.kernel.portlet.bridges.mvc.BaseMVCActionCommand;
+  import com.liferay.portal.kernel.portletfilerepository.PortletFileRepositoryUtil;
+  import com.liferay.portal.kernel.repository.model.FileEntry;
+  import com.liferay.portal.kernel.theme.ThemeDisplay;
+  import com.liferay.portal.kernel.util.WebKeys;
+  import com.liferay.style.book.constants.StyleBookPortletKeys;
+  import com.liferay.style.book.model.StyleBookEntry;
+
+  import javax.portlet.ActionRequest;
+  import javax.portlet.ActionResponse;
+
+  public class ResetStyleBookEntryPreviewMVCActionCommand
+      extends BaseMVCActionCommand {
+
+      @Override
+      protected void doProcessAction(
+              ActionRequest actionRequest, ActionResponse actionResponse)
+          throws Exception {
+
+          ThemeDisplay themeDisplay = (ThemeDisplay)actionRequest.getAttribute(
+              WebKeys.THEME_DISPLAY);
+
+          Repository repository =
+              PortletFileRepositoryUtil.fetchPortletRepository(
+                  themeDisplay.getScopeGroupId(),
+                  StyleBookPortletKeys.STYLE_BOOK);
+
+          FileEntry fileEntry = PortletFileRepositoryUtil.addPortletFileEntry(
+              null, themeDisplay.getScopeGroupId(), themeDisplay.getUserId(),
+              StyleBookEntry.class.getName(), 0,
+              StyleBookPortletKeys.STYLE_BOOK, repository.getDlFolderId(),
+              _getDefaultPreviewInputStream(), "default_preview.png",
+              "image/png", false);
+      }
+
+  }
+  ```

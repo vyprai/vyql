@@ -1,0 +1,149 @@
+# Rank 1319 / CVE-2019-19334: libyang canonicalized an identityref value into
+# a 512-byte stack buffer with sprintf/strcpy and no length check, so a long
+# identityref default value in a supplied YANG module overflowed it
+# (CWE-120, CWE-787).
+#
+# make_canonical in src/parser.c declares `const uint16_t buf_len = 511;`
+# followed by `char buf[buf_len + 1];` and switches on the value's type. The
+# LY_TYPE_IDENT arm took the parsed value and either prefixed it with the
+# local module's name, `sprintf(buf, "%s:%s", module_name, *value)`, or copied
+# it verbatim, `strcpy(buf, *value)`, in both branches without comparing any
+# length against buf_len. lyp_parse_value reaches that arm at parser.c:1612
+# with a value taken from a schema default or a data node, so a value longer
+# than 511 bytes wrote past the 512-byte stack array. The LY_TYPE_BITS arm a
+# few lines above the same switch guards its own sprintf and strcpy
+# with `LY_CHECK_ERR_RETURN(strlen(...) > buf_len, LOGBUF(...), -1)`; the
+# identityref arm is the one that does not.
+#
+# The fixed revision (one file, two added lines, "parser BUGFIX long
+# identityref default value buffer overflow / STRING_OVERFLOW (CWE-120)")
+# adds the same LY_CHECK_ERR_RETURN length check the BITS arm has to each
+# identityref branch, keeping sprintf and strcpy.
+#
+# ATTENTION. code.UnboundedCopySmell (VYQL-MEM-002) reports both
+# calls, at src/parser.c:1024 and :1026 in the real tree, but it reports them
+# identically at the fixed revision: the rule carries no `unless` clause, so it is an
+# unconditional low-confidence smell on the unbounded copy family
+# (strcpy/strcat/sprintf/vsprintf) rather than a discriminator between a
+# guarded and an unguarded call. The same limitation is on record for rank
+# 1139, whose fix likewise added a length clamp instead of switching API. What
+# discrimination would take here is narrower than 1139's but still out of
+# reach: the added guard compares `strlen(*value)` against `buf_len`, the very
+# variable that sizes the destination in `char buf[buf_len + 1]`, and no
+# feature exposes a local declaration's size or type in C or C++ — the gap
+# recorded for the C index-guard family at ranks 1026, 1032 and 1038 —
+# while VYQL-MEM-002's `code.UnboundedCopySmell` is a presenceNode issue with
+# no endpoint for a coverage `unless` to attach to. Suppressing the smell
+# whenever any strlen comparison sits in the same function would trade the
+# rule's recall on 12 shipped specs for one guarded shape.
+#
+# The third snippet pins where the rule does discriminate: rewriting the same
+# two copies onto the bounded-destination family (snprintf, strlcpy) drops
+# VYQL-MEM-002 entirely, because the smell keys on the unbounded API rather
+# than on the guard.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-precision-limit, the fixed revision's added length
+# check does not change what fires
+
+test "rank1319: the identityref value is canonicalized into a fixed stack buffer with no length check"
+  lang c
+  file parser.c
+  expect VYQL-MEM-002
+  code
+  ```
+  static int
+  make_canonical(struct ly_ctx *ctx, int type, const char **value, void *data1, void *data2)
+  {
+      const uint16_t buf_len = 511;
+      char buf[buf_len + 1];
+      const char *module_name;
+
+      switch (type) {
+      case LY_TYPE_IDENT:
+          module_name = (const char *)data1;
+          /* identity must always have a prefix */
+          if (!strchr(*value, ':')) {
+              sprintf(buf, "%s:%s", module_name, *value);
+          } else {
+              strcpy(buf, *value);
+          }
+          break;
+      default:
+          return 0;
+      }
+
+      lydict_remove(ctx, *value);
+      *value = lydict_insert(ctx, buf, 0);
+      return 1;
+  }
+  ```
+
+test "rank1319: the length check the fixed revision adds before each copy leaves the smell unchanged"
+  lang c
+  file parser.c
+  expect VYQL-MEM-002
+  code
+  ```
+  static int
+  make_canonical(struct ly_ctx *ctx, int type, const char **value, void *data1, void *data2)
+  {
+      const uint16_t buf_len = 511;
+      char buf[buf_len + 1];
+      const char *module_name;
+
+      switch (type) {
+      case LY_TYPE_IDENT:
+          module_name = (const char *)data1;
+          /* identity must always have a prefix */
+          if (!strchr(*value, ':')) {
+              LY_CHECK_ERR_RETURN(strlen(module_name) + 1 + strlen(*value) > buf_len, LOGBUF(*value), -1);
+              sprintf(buf, "%s:%s", module_name, *value);
+          } else {
+              LY_CHECK_ERR_RETURN(strlen(*value) > buf_len, LOGBUF(*value), -1);
+              strcpy(buf, *value);
+          }
+          break;
+      default:
+          return 0;
+      }
+
+      lydict_remove(ctx, *value);
+      *value = lydict_insert(ctx, buf, 0);
+      return 1;
+  }
+  ```
+
+test "rank1319: the same canonicalization on the bounded-destination copy family is not reported"
+  lang c
+  file parser.c
+  reject VYQL-MEM-002
+  code
+  ```
+  static int
+  make_canonical(struct ly_ctx *ctx, int type, const char **value, void *data1, void *data2)
+  {
+      const uint16_t buf_len = 511;
+      char buf[buf_len + 1];
+      const char *module_name;
+
+      switch (type) {
+      case LY_TYPE_IDENT:
+          module_name = (const char *)data1;
+          /* identity must always have a prefix */
+          if (!strchr(*value, ':')) {
+              snprintf(buf, buf_len + 1, "%s:%s", module_name, *value);
+          } else {
+              strlcpy(buf, *value, buf_len + 1);
+          }
+          break;
+      default:
+          return 0;
+      }
+
+      lydict_remove(ctx, *value);
+      *value = lydict_insert(ctx, buf, 0);
+      return 1;
+  }
+  ```

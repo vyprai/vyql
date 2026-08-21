@@ -1,0 +1,202 @@
+# Rank 1322 / CVE-2020-11455: LimeSurvey's admin file manager exposes
+# `getZipFile` as a routed subaction whose method signature is
+#
+#   public function getZipFile($path) {
+#       $filename = basename($path);
+#       if (is_file($path) || true) { ... @readfile($path); unlink($path); }
+#   }
+#
+# (application/controllers/admin/LimeSurveyFileManager.php:398 on the
+# vulnerable parent of daf50ebb16). `LimeSurveyFileManager extends
+# Survey_Common_Action extends CAction`, and `Survey_Common_Action::runWithParams`
+# picks the method named by the `sa` request parameter and hands it to Yii's
+# `CAction::runWithParamsInternal`, which fills the method's parameters by name
+# from the request. `$path` is therefore raw request text, and it reaches
+# `readfile` and `unlink` unmodified -- `basename` is applied only to the
+# separate `$filename` used in the Content-Disposition header, never to the
+# value the file helpers receive -- so any absolute or `../`-bearing path is
+# read out and then deleted. Fix daf50ebb16 removes the parameter entirely:
+# `downloadFiles` stashes the generated temp-file path in `$_SESSION['__path']`,
+# `getZipFile()` takes no arguments and reads it back from the session, and the
+# `|| true` that had neutered the `is_file($path)` guard is dropped.
+#
+# ATTENTION, engine gap on record: "A PHP binding cannot say which
+# class a method belongs to" (ENGINE-GAPS.md, Mechanical, blocking rank 1060,
+# spec cve_rank1060_coolify_ssh_command_injection).
+# `internal/extract/frontend/treesitter/php.go:1799` `phpParamEntries` emits
+# only `function_param_type`, `function_name`, `param_name`, `param_index` and
+# `param_type`, and the `class_declaration` case at `php.go:205` builds
+# `nir.ClassDef` without `Bases`, so `context.className` and
+# `context.classBase` are both empty on every PHP parameter entry. No binding
+# can express "a parameter of a method on a Yii action/controller class",
+# which is the only vocabulary that separates a routed subaction's parameter
+# from an ordinary helper's.
+#
+# The rule and the sinks are right; only the source label is missing.
+# `vyql match` on the vulnerable method labels `readfile` and `unlink` as
+# `code.FilePathAccess` and `basename` as `core.PathCanonicalization`, and
+# reports no source at all. The pair below isolates exactly that: the same
+# method body fires VYQL-PATH-001 the moment `$path` arrives through a
+# labelled source (`$_GET['path']`) or through the parameter entrypoint the
+# library profile turns on -- `code.ExternalEntryInput by
+# library.param-source@syntactic` at the `$path` parameter, taint path
+# `LimeSurveyFileManager.getZipFile#param#$path -> Arg`, `unless path
+# coveredBy core.PathCanonicalization` correctly unsatisfied because
+# `basename` only covers the sibling `$filename` path -- and stays silent
+# under the generic/web profile that an application checkout selects.
+#
+# A bounded scan (timeout 180, --cache off, --max-ram 6GB) of the vulnerable
+# parent commit confirms this on the real repository. The whole checkout does
+# not finish inside the bound (21991 files), so the affected subdirectory
+# `application/controllers/admin` scans instead: under `--profile web`
+# VYQL-PATH-001 reports nothing at LimeSurveyFileManager.php:414/417, while
+# under `--profile library` it reports both, sourced at
+# LimeSurveyFileManager.php:398 -- the CVE's exact source and sinks.
+#
+# No definition change shipped, because closing it in data costs more than it
+# returns. Even granting the class token, `class_base` is the direct base
+# clause only, so the Yii names (`CAction`, `CController`) never match a class
+# that goes through the application's own `Survey_Common_Action`; the binding
+# would have to name `Survey_Common_Action` and treat every parameter of every
+# method on its subclasses as `code.HttpInput`. That is the same
+# "every public parameter is attacker-controlled" behaviour the library
+# profile implements and deliberately gates off for applications, and
+# it is measured on this checkout: `application/controllers/admin` (50 PHP
+# files) reports 419 findings under `--profile web` and 507 under
+# `--profile library`, so +88 findings buys the one true positive here.
+#
+# verify_current_expected: attention-engine-gap; the vulnerable and patched
+# revisions are both rejected under the default profile, and the two
+# discriminating snippets show the missing label is the whole difference.
+
+test "rank1322: a routed action method's path parameter reaches readfile and unlink unmodified"
+  lang php
+  file LimeSurveyFileManager.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  class LimeSurveyFileManager extends Survey_Common_Action
+  {
+      public function getZipFile($path) {
+          $filename = basename($path);
+
+          if (is_file($path) || true) {
+              header("Expires: 0");
+              header("Cache-Control: must-revalidate");
+              header("Content-Type: application/force-download");
+              header("Content-Disposition: attachment; filename=$filename");
+              header("Content-Description: File Transfer");
+
+              @readfile($path);
+
+              unlink($path);
+          }
+      }
+  }
+  ```
+
+test "rank1322: the same action method is reported once its parameter is an entrypoint"
+  lang php
+  file LimeSurveyFileManager.php
+  profile library
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  class LimeSurveyFileManager extends Survey_Common_Action
+  {
+      public function getZipFile($path) {
+          $filename = basename($path);
+
+          if (is_file($path) || true) {
+              header("Expires: 0");
+              header("Cache-Control: must-revalidate");
+              header("Content-Type: application/force-download");
+              header("Content-Disposition: attachment; filename=$filename");
+              header("Content-Description: File Transfer");
+
+              @readfile($path);
+
+              unlink($path);
+          }
+      }
+  }
+  ```
+
+test "rank1322: the same body is reported when the path arrives through a labelled request read"
+  lang php
+  file LimeSurveyFileManager.php
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  class LimeSurveyFileManager extends Survey_Common_Action
+  {
+      public function getZipFile() {
+          $path = $_GET['path'];
+          $filename = basename($path);
+
+          if (is_file($path) || true) {
+              header("Expires: 0");
+              header("Cache-Control: must-revalidate");
+              header("Content-Type: application/force-download");
+              header("Content-Disposition: attachment; filename=$filename");
+              header("Content-Description: File Transfer");
+
+              @readfile($path);
+
+              unlink($path);
+          }
+      }
+  }
+  ```
+
+test "rank1322: the patched action takes no parameter and reads the server-generated path from the session"
+  lang php
+  file LimeSurveyFileManager.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  class LimeSurveyFileManager extends Survey_Common_Action
+  {
+      public function downloadFiles() {
+          App()->loadLibrary('admin.pclzip');
+
+          $folder = basename(Yii::app()->request->getPost('folder', 'global'));
+
+          $tempdir = Yii::app()->getConfig('tempdir');
+          $randomizedFileName = $folder.'_'.substr(md5(time()),3,13).'.zip';
+          $zipfile = $tempdir.DIRECTORY_SEPARATOR.$randomizedFileName;
+
+          $_SESSION['__path'] = $zipfile;
+      }
+
+      /**
+       * @return void
+       */
+      public function getZipFile()
+      {
+          $path = $_SESSION['__path'];
+          unset($_SESSION['__path']);
+          $filename = basename($path);
+
+          if (is_file($path)) {
+              header("Expires: 0");
+              header("Cache-Control: must-revalidate");
+              header("Content-Type: application/force-download");
+              header("Content-Disposition: attachment; filename=$filename");
+              header("Content-Description: File Transfer");
+
+              @readfile($path);
+
+              unlink($path);
+          }
+      }
+  }
+  ```

@@ -1,0 +1,236 @@
+# Rank 1314 / CVE-2026-33021: libsixel's encoder frees the buffer held by its
+# `bgcolor` field and leaves the field pointing at the released memory, so the
+# encoder's own destructor releases the same allocation a second time
+# (CWE-415 double free, CWE-416 use after free).
+#
+# sixel_encoder_setopt's SIXEL_OPTFLAG_BGCOLOR case (src/encoder.c:1558) reads
+# `if (encoder->bgcolor) { sixel_allocator_free(encoder->allocator,
+# encoder->bgcolor); }` and then re-initialises the field through its address,
+# `sixel_parse_x_colorspec(&encoder->bgcolor, value, encoder->allocator)`.
+# That call only writes through the out-parameter on success; every failure
+# path returns without touching it. So a `--bgcolor` value that does not parse
+# -- after an earlier `--bgcolor` or the SIXEL_BGCOLOR environment default has
+# allocated the field (src/encoder.c:1166) -- leaves `encoder->bgcolor`
+# holding a freed pointer, the case reports SIXEL_BAD_ARGUMENT and jumps to
+# `end`, and sixel_encoder_destroy (src/encoder.c:1224) then runs
+# `sixel_allocator_free(allocator, encoder->bgcolor)` on it. Reaching it needs
+# only two command-line options, `img2sixel -B '#fff' -B nonsense`.
+#
+# The fixing commit touches src/encoder.c only and adds exactly one line,
+# `encoder->bgcolor = NULL;`, after the free in that case, so the failure
+# path leaves the field null and the destructor's free is a no-op.
+#
+# ATTENTION, engine gap, and two separate absences block it.
+#
+# First, nothing is labelled on either revision. `vyql match` over a repro of
+# both functions reports no source, no sink and no control at all, because the
+# only C binding for code.PointerFree is `node.path ~= "free"` and path
+# matching is dotted-segment aware, so libsixel's documented deallocation entry
+# point `sixel_allocator_free(allocator, p)` -- a single identifier segment --
+# never matches. A bounded scan of the real checkout at the vulnerable revision
+# (`--cache off --max-ram 6GB`, 2062 findings, 693 at or above high) reports
+# nothing anywhere near src/encoder.c:1558-1571.
+#
+# Second, and this is why the binding is not the discriminator: a probe binding emitting
+# code.PointerFree at `node.path ~= "sixel_allocator_free"` labels both release
+# sites (`vyql match` confirms both, at the setopt case and at the destructor)
+# and still reports nothing on either revision, because PotentialDoubleFree
+# (VYQL-MEM-008) asks for one code.PointerFree to reach another and the two
+# releases of `encoder->bgcolor` sit in different functions joined only by the
+# struct field, with no call edge between them. The probe costs precision
+# immediately and buys nothing: on the real checkout it moves VYQL-MEM-008 from
+# 3 to 21 and VYQL-MEM-007 from 22 to 42, 38 new findings at or above high and
+# not one of them the vulnerability -- the loudest of them lands at
+# src/encoder.c:1223/1224, the destructor, where the two consecutive releases
+# free `encoder->mapfile` and `encoder->bgcolor`, two distinct buffers, because
+# the rule pairs any two code.PointerFree issues without asking whether they
+# name the same pointer.
+#
+# The isolating pair below places the boundary with plain `free` and no
+# libsixel API: one struct field released twice inside a single function
+# reports VYQL-MEM-008; the same field released once in each of two functions
+# reports nothing. The gap is the relation the fixed revision adds -- a release of a field
+# with no clearing assignment to that field before a path that leaves the
+# function, correlated with a sibling function that releases the same field --
+# which is the C form of the observation rank 1232 records as missing
+# for Java. It is not a mechanical correction: the nearest existing C frontend
+# analysis, `lifetime.release_then_return`
+# (ccLifetimeReleaseReturnObservations, internal/extract/frontend/treesitter/
+# c.go:245), keys on `delete X;` followed by a literal `return false` within a
+# fixed window and checks for no clearing assignment at all, and deciding how
+# broadly "released and not cleared" may match without flagging every correct
+# destructor is design work. No definition change attempted.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1314: the bgcolor field keeps a freed pointer when the re-parse fails"
+  lang c
+  file src/encoder.c
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-011
+  code
+  ```
+  typedef struct sixel_allocator sixel_allocator_t;
+
+  typedef struct sixel_encoder {
+      sixel_allocator_t *allocator;
+      char *mapfile;
+      unsigned char *bgcolor;
+  } sixel_encoder_t;
+
+  static int
+  sixel_encoder_setopt(
+      sixel_encoder_t /* in */ *encoder,
+      int             /* in */ arg,
+      char const      /* in */ *value)
+  {
+      int status = SIXEL_FALSE;
+
+      switch (arg) {
+      case SIXEL_OPTFLAG_BGCOLOR:  /* B */
+          /* parse --bgcolor option */
+          if (encoder->bgcolor) {
+              sixel_allocator_free(encoder->allocator, encoder->bgcolor);
+          }
+          status = sixel_parse_x_colorspec(&encoder->bgcolor,
+                                           value,
+                                           encoder->allocator);
+          if (SIXEL_FAILED(status)) {
+              sixel_helper_set_additional_message(
+                  "cannot parse bgcolor option.");
+              status = SIXEL_BAD_ARGUMENT;
+              goto end;
+          }
+          break;
+      default:
+          break;
+      }
+
+      status = SIXEL_OK;
+
+  end:
+      return status;
+  }
+
+  static void
+  sixel_encoder_destroy(sixel_encoder_t *encoder)
+  {
+      sixel_allocator_t *allocator;
+
+      if (encoder) {
+          allocator = encoder->allocator;
+          sixel_allocator_free(allocator, encoder->mapfile);
+          sixel_allocator_free(allocator, encoder->bgcolor);
+          sixel_allocator_free(allocator, encoder);
+          sixel_allocator_unref(allocator);
+      }
+  }
+  ```
+
+test "rank1314: the bgcolor field is cleared before the re-parse can fail"
+  lang c
+  file src/encoder.c
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-011
+  code
+  ```
+  typedef struct sixel_allocator sixel_allocator_t;
+
+  typedef struct sixel_encoder {
+      sixel_allocator_t *allocator;
+      char *mapfile;
+      unsigned char *bgcolor;
+  } sixel_encoder_t;
+
+  static int
+  sixel_encoder_setopt(
+      sixel_encoder_t /* in */ *encoder,
+      int             /* in */ arg,
+      char const      /* in */ *value)
+  {
+      int status = SIXEL_FALSE;
+
+      switch (arg) {
+      case SIXEL_OPTFLAG_BGCOLOR:  /* B */
+          /* parse --bgcolor option */
+          if (encoder->bgcolor) {
+              sixel_allocator_free(encoder->allocator, encoder->bgcolor);
+              encoder->bgcolor = NULL;
+          }
+          status = sixel_parse_x_colorspec(&encoder->bgcolor,
+                                           value,
+                                           encoder->allocator);
+          if (SIXEL_FAILED(status)) {
+              sixel_helper_set_additional_message(
+                  "cannot parse bgcolor option.");
+              status = SIXEL_BAD_ARGUMENT;
+              goto end;
+          }
+          break;
+      default:
+          break;
+      }
+
+      status = SIXEL_OK;
+
+  end:
+      return status;
+  }
+
+  static void
+  sixel_encoder_destroy(sixel_encoder_t *encoder)
+  {
+      sixel_allocator_t *allocator;
+
+      if (encoder) {
+          allocator = encoder->allocator;
+          sixel_allocator_free(allocator, encoder->mapfile);
+          sixel_allocator_free(allocator, encoder->bgcolor);
+          sixel_allocator_free(allocator, encoder);
+          sixel_allocator_unref(allocator);
+      }
+  }
+  ```
+
+test "rank1314: one function releasing the same struct field twice is reported"
+  lang c
+  file same_function_release.c
+  expect VYQL-MEM-008
+  code
+  ```
+  #include <stdlib.h>
+
+  struct box { unsigned char *field; };
+
+  void reset(struct box *b)
+  {
+      free(b->field);
+      free(b->field);
+  }
+  ```
+
+test "rank1314: two functions releasing the same struct field are not connected"
+  lang c
+  file split_function_release.c
+  reject VYQL-MEM-008
+  code
+  ```
+  #include <stdlib.h>
+
+  struct box { unsigned char *field; };
+
+  int reset(struct box *b, char const *value)
+  {
+      if (b->field) {
+          free(b->field);
+      }
+      return parse_value(&b->field, value);
+  }
+
+  void destroy(struct box *b)
+  {
+      free(b->field);
+  }
+  ```
