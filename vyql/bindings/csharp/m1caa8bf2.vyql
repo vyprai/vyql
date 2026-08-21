@@ -1173,3 +1173,8 @@ binding sensitiveOperation208 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.functionName contains "MigrateEmail" and node.context.call contains "CheckPasswordAsync" and node.context.call contains "GenerateEmailConfirmationTokenAsync" and not (node.context.scopeCall contains "GetAdminUsersAsync")
   emit issue code.SensitiveOperation at node
 }
+
+binding xmlParserCreate209 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and containsAny(node.context.assign, [".DtdProcessing=DtdProcessing.Parse", ".ProhibitDtd=false"]) and not (containsAny(node.context.assign, [".XmlResolver=null", ".XmlResolver=newXmlSecureResolver"]))
+  emit issue code.XmlParserCreate at node
+}
