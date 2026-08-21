@@ -2,7 +2,7 @@
 # parameters burns CPU in Bouncy Castle. The binary-field curve degree m comes
 # from the certificate and drives the field arithmetic, and nothing limited it,
 # so a large m makes curve evaluation run far longer than any real key requires
-# (CWE-400, with CWE-125 also assigned). The fix 56daa6eac5 caps it:
+# (CWE-400, with CWE-125 also assigned). The fixed revision caps it:
 #
 #   int maxM = ImplGetInteger("Org.BouncyCastle.EC.F2m_MaxSize", 1142); // 2 * 571
 #   if (m > maxM)
@@ -16,7 +16,7 @@
 # namespace and 336 across crypto/src. Exactly one of them, the F2m degree,
 # needed the ceiling this CVE added, so a rule requiring an upper bound on such
 # parameters would report on the order of 336 sites for one true positive in
-# the very library the CVE was filed against.
+# the very library the CVE is filed against.
 #
 # The judgement is also not structural. Knowing that the degree drives
 # superlinear field arithmetic, and that 1142 is the sane ceiling because the
@@ -26,7 +26,7 @@
 # describes a parsed length controlling an allocation, while here the cost is
 # computation time and nothing is allocated from m.
 #
-# Current behaviour on the real file is unchanged by the patch: both revisions
+# Current behaviour on the real file is unchanged at both revisions: both revisions
 # report the same four VYQL-NUM-005 rows and one VYQL-CFG-014 row, none of which
 # concern the degree, so there is no focused evidence either side.
 #

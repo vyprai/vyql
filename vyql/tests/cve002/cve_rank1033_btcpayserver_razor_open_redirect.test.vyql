@@ -8,7 +8,7 @@
 #   <a href="@backUrl" id="GoBack">
 #   <a href="@cancelUrl" id="CancelWizard" class="cancel">
 #
-# and PostRedirect.cshtml does the same with a form action. The fix f2ced20c42
+# and PostRedirect.cshtml does the same with a form action. The fixed revision
 # adds IUrlHelper.EnsureLocal, which returns the address only when IsLocalUrl
 # accepts it or its host equals the request host, and wraps every one of those
 # attributes in it.
@@ -22,8 +22,8 @@
 #
 # The weakness class itself is covered wherever a frontend exists, which is what
 # the two cases below pin. The same model value reaching a C# redirect sink is
-# reported as VYQL-RF-002, and routing it through the fix's own EnsureLocal
-# helper suppresses it interprocedurally, so core.RedirectAllowlist already
+# reported as VYQL-RF-002, and routing it through the fixed revision's own EnsureLocal
+# helper suppresses it interprocedurally, so core.RedirectAllowlist
 # recognises the control the maintainers wrote. Adding a Razor frontend is
 # design work, not a localised change, and it is the only thing that would close
 # this rank.
@@ -47,7 +47,7 @@ test "rank1033: a bound return address reaching a redirect sink is an open redir
   }
   ```
 
-test "rank1033: the fix's EnsureLocal helper neutralises the same value"
+test "rank1033: the fixed revision's EnsureLocal helper neutralises the same value"
   lang csharp
   file BTCPayServer/Extensions/UrlHelperExtensions.cs
   reject VYQL-RF-002

@@ -2,23 +2,24 @@
 # caller harvest account details. It matched the supplied term against the email
 # column with a LIKE wildcard and returned the matching users, and it required no
 # permission at all, so email addresses could be extracted a fragment at a time
-# (CWE-284). The fix e765e61854 gates the endpoint behind signedInUser() plus one
+# (CWE-284). The fixed revision gates the endpoint behind signedInUser() plus one
 # of users-manage, restrictions-manage-own or restrictions-manage-all, and drops
 # email from the search so only the name is matched.
 #
-# ATTENTION. Nothing fires on either revision, and neither half of the fix
+# ATTENTION. Nothing fires on either revision, and neither half of the fixed
+# revision
 # yields a rule.
 #
 # The permission half is the shape this batch has now measured three times and
 # rejected each time: rank 1011 on a Go service at 4.1 per cent package-scoped
 # and 19.5 per cent file-scoped, rank 1027 on a Jenkins plugin where 19 form
-# methods shared one annotation after its own security fix, and rank 1028 on
+# methods share one annotation between them, and rank 1028 on
 # another Jenkins plugin with 46 endpoint methods against 16 files checking any
 # permission. Endpoints legitimately differ in whether they need a guard.
 #
 # The email half looks more promising, since matching a sensitive column with a
 # leading wildcard is what makes harvesting possible, but it is legitimate
-# whenever the caller is trusted. The fix says so itself, in a comment kept on
+# whenever the caller is trusted. The fixed revision says so itself, in a comment kept on
 # the repository method: the email search "should only be used when user is
 # assumed to be trusted. (Admin users)". So the weakness is not the LIKE query,
 # it is the LIKE query without the trust gate, which collapses back into the

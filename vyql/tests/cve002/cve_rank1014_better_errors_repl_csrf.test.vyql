@@ -2,17 +2,17 @@
 # development, and its internal endpoints accepted cross-site requests. A
 # malicious page could POST to the local endpoint and reach
 # @error_page.send("do_#{opts[:method]}", ...), executing Ruby in the developer's
-# application (CWE-352 leading to code execution). The fix 8e8e796bfb issues a
+# application (CWE-352 leading to code execution). The fixed revision issues a
 # BetterErrors-CSRF-Token cookie with the error page and requires the request
 # body to echo it before dispatching.
 #
 # The pool row for this rank named apache/arrow CVE-2024-52338 as ruby, but that
 # advisory states the flaw affects only the arrow R package, and VyQL has no R
-# frontend, so scanning it as ruby could never succeed. The row was replaced in
-# place with the next unranked ruby candidate, keeping the rank number stable.
+# frontend, so scanning it as ruby cannot succeed. The row names the next
+# unranked ruby candidate, keeping the rank number stable.
 #
 # ATTENTION, on two counts, both measured.
-#  - The fix is a hand-rolled double-submit cookie comparison
+#  - The mitigation is a hand-rolled double-submit cookie comparison
 #    (request.cookies[NAME] == body['csrfToken']), not a named framework call.
 #    Every core.CsrfProtection binding recognises a named API instead
 #    (protect_from_forgery, verify_authenticity_token, validate_csrf_token,
@@ -22,11 +22,11 @@
 #  - The reflective dispatch itself is unmodelled: ruby binds only require and
 #    load as dynamic-load sinks, and code.ReflectionInvoke (CWE-470,
 #    VYQL-DESER-003) has Java bindings only, though ruby send, public_send and
-#    __send__ are its direct equivalents. Adding them was tried and measured,
-#    then reverted: on activeadmin, an ordinary Ruby project of 382 files, the
-#    send binding produced 29 high-severity findings and the narrower
-#    public_send/__send__ binding produced 9, with no true positive in either.
-#    All were framework metaprogramming whose method name comes from
+#    __send__ are its direct equivalents. Adding them is measured and rejected:
+#    on activeadmin, an ordinary Ruby project of 382 files, a
+#    send binding produces 29 high-severity findings and the narrower
+#    public_send/__send__ binding 9, with no true positive in either.
+#    All are framework metaprogramming whose method name comes from
 #    configuration rather than a request (send(symbol_or_proc, *args),
 #    router.send(verb, *args), chain.public_send scope.scope_method). The cause
 #    is that library-mode param-source labels public method parameters as

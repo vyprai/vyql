@@ -7,7 +7,7 @@
 # has replaced, which is reachable from ordinary script such as
 # `class async extends A { constructor() { super(); let Q = async A => { A }; } }`.
 #
-# The fix 402f3d967c records `savedTopAsyncRef = pid->GetTopRef()` before the
+# The fixed revision records `savedTopAsyncRef = pid->GetTopRef()` before the
 # speculative parse and, when the token is `tkDArrow`, pops references with
 # RemovePrevPidRef until the stack is back to the saved top.
 #
@@ -24,7 +24,7 @@
 # that other ranks also want, it is one parser's internal protocol. Rank 358
 # covered a different ChakraCore memory bug with a frontend analysis feature
 # (analysis.chakra.scope_slot_array_unchecked_index), which worked because that
-# bug was a missing index guard inside one function. This bug spans a save,
+# bug is a missing index guard inside one function. This bug spans a save,
 # a reparse and an unwind, so the same approach does not carry over.
 #
 # Both revisions of the real file report the same 208 findings, every one

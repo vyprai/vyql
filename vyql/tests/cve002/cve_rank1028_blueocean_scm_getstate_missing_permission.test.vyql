@@ -2,7 +2,7 @@
 # attacker make Jenkins connect to a server of their choosing. getState() on the
 # Github, Bitbucket and Git SCM classes validated a caller-supplied endpoint and
 # reached out to it with no permission check, and the enclosing resource was
-# annotated @PUT rather than @POST. The fix 9f44b895d0 adds a shared
+# annotated @PUT rather than @POST. The fixed revision adds a shared
 # checkPermission() on AbstractScm requiring Item.CREATE on the root org folder,
 # calls it from each getState(), and changes the verb to @POST.
 #
@@ -11,13 +11,14 @@
 # GithubScm.java both report the same four rows, one VYQL-DESER-001 and three
 # VYQL-INJ-004, none of which concern the missing permission check.
 #
-# The two rules this CVE invites are the ones already measured and rejected here.
+# The two rules this CVE invites are the ones measured and rejected here.
 # Requiring a permission check on REST endpoints: the plugin has 46 endpoint
 # methods in its main sources while only 16 files call hasPermission or
-# checkPermission at all, and three endpoints needed the fix, so the rule reports
+# checkPermission at all, and the fixed revision carries three such endpoints,
+# so the rule reports
 # on the order of thirty sites for three true positives. Requiring a particular
 # HTTP verb annotation: rank 1027 measured that on another Jenkins plugin, where
-# 19 form methods carried one annotation between them after its own security fix.
+# 19 form methods carry one annotation between them.
 # Rank 1011 measured the authorization variant on a Go service at 4.1 per cent
 # package-scoped and 19.5 per cent file-scoped. Three independent codebases, the
 # same answer: endpoints legitimately differ in whether they need a guard, and

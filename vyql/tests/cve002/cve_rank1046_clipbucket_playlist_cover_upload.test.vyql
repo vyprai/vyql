@@ -7,7 +7,8 @@
 #   $uploaded_file = DirPath::get('playlist_covers') . $folder . '/' . $filename . '.' . $extension;
 #   if (move_uploaded_file($args['tmp_name'], $uploaded_file)) { ... }
 #
-# with $args coming from $_FILES['playlist_cover'] in the admin page. The fix
+# with $args coming from $_FILES['playlist_cover'] in the admin page. The fixed
+# revision
 # 893bfb0f12 removes the cover upload entirely: the handler block, the function,
 # the covers directory creation and the constant all go.
 #

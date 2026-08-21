@@ -9,14 +9,14 @@
 #       os.path.join(HISTORY_DIR, self.user_name,
 #                    os.path.basename(new_history_file_path)))
 #
-# so the read side takes whatever path the upload names. The fix 952fc8c3cb adds
+# so the read side takes whatever path the upload names. The fixed revision adds
 # two realpath/startswith assertions and an auth_list membership check.
 #
 # ATTENTION, and the finding is narrow: everything except the source works. The
 # first snippet proves the chain end to end with an ordinary request parameter as
 # the source, reporting VYQL-PATH-001 at high with the taint path running through
 # the method parameter into the copy, and both `unless` clauses correctly
-# unsatisfied. The sink is already labelled in the real file too, code.FilePathAccess
+# unsatisfied. The sink is labelled in the real file too, code.FilePathAccess
 # on the copyfile, as are the os.path.basename controls around it.
 #
 # What is missing is the source. The upload arrives through Gradio, wired as
@@ -28,7 +28,7 @@
 # Only one Gradio application is available here, so the precision cost cannot be
 # measured. Scanning the real file reports nothing at either revision.
 #
-# Worth a later rank, and separate from this CVE: the fix's own guard is bare
+# Worth a later rank, and separate from this CVE: the fixed revision's own guard is bare
 # prefix containment. os.path.realpath(t).startswith(os.path.realpath(HISTORY_DIR))
 # accepts a sibling directory sharing the prefix, so the last snippet still
 # reports and that is correct rather than a false positive. The Python
@@ -117,7 +117,7 @@ test "rank1043: the same copy is silent when the upload arrives through the fram
       uploadFileBtn.upload(upload_chat_history, [current_model, uploadFileBtn], [])
   ```
 
-test "rank1043: the fix's prefix containment is not a control, and reporting it is right"
+test "rank1043: the fixed revision's prefix containment is not a control, and reporting it is right"
   lang python
   file modules/models/base_model.py
   expect VYQL-PATH-001

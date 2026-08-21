@@ -1,4 +1,4 @@
-# Rank 1042 / CVE-2022-3741: Chatwoot's rate limits were keyed on exact request
+# Rank 1042 / CVE-2022-3741: Chatwoot's rate limits are keyed on exact request
 # path equality, so appending a format suffix skipped every throttle (CWE-307).
 # config/initializers/rack_attack.rb throttled with
 #
@@ -7,7 +7,7 @@
 #   end
 #
 # and Rails routes /auth/sign_in.json to the same action, so the comparison is
-# false and the request is never counted. The fix 9525d4f034 adds
+# false and the request is never counted. The fixed revision adds
 #
 #   def path_without_extentions
 #     path[/^[^.]+/]
@@ -38,7 +38,7 @@
 #    reports, so the positive side cannot say "compared for equality against any
 #    string" and would have to enumerate sign-in paths.
 #
-# This is the prefix half of the trap the ENGINE-GAPS file already records for
+# This is the prefix half of the trap the ENGINE-GAPS file records for
 # negations: path matching elsewhere is segment-aware, so Random does not match
 # SecureRandom, and here the shorter accessor does match the longer one.
 #

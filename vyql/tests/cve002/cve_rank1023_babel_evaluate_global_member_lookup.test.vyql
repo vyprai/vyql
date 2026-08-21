@@ -9,16 +9,16 @@
 #
 # The member lookup walks the prototype chain, so a name the deny-list misses,
 # or a polluted prototype member, is reachable and gets called (CWE-184,
-# CWE-697). The fix b13376b346 takes the member only when the object owns it,
+# CWE-697). The fixed revision takes the member only when the object owns it,
 # via Object.hasOwnProperty.call(context, key).
 #
 # Detection: the existing concept code.ExpressionEvaluatorPrototypeNameAccess
-# (VYQL-INJ-167, CWE-1321) already describes an evaluator resolving member
+# (VYQL-INJ-167, CWE-1321) describes an evaluator resolving member
 # tokens against JavaScript objects without rejecting prototype-sensitive names,
-# but its only binding was pinned to another evaluator's token names. A second
+# but its only binding is pinned to another evaluator's token names. A second
 # binding now covers the general shape: a function that indexes the global
 # object with a dynamic key and carries no own-property guard. The guard side is
-# an extractor fact that already distinguishes these two revisions.
+# an extractor fact that distinguishes these two revisions.
 #
 # The base match is exact rather than a substring. Matching "global" loosely
 # also hits ordinary code such as state.prefs.global?.[prefName] and

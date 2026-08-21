@@ -2,13 +2,13 @@
 # AjaxPro.parse runs eval('(' + text + ')') on the XMLHttpRequest responseText,
 # after a loose regex rewrites date-shaped quoted strings into raw JavaScript
 # via regExDate. A crafted response can therefore break out of string context
-# and execute attacker code (CWE-79, CWE-94/95). The fix c89e39b967 tightens the
+# and execute attacker code (CWE-79, CWE-94/95). The fixed revision tightens the
 # date regex to only the numeric \/Date(digits)\/ form and removes the ISO-date
 # rewriting branch, but keeps eval, so the underlying eval-of-response weakness
 # remains in the patched library.
 #
 # Detection: xhr.responseText and responseXML are untrusted response data, the
-# same class already labelled for response.json / res.json / getJSON / ajax.
+# same class labelled for response.json / res.json / getJSON / ajax.
 # Labelling them as code.DomInput lets the code-injection rule (VYQL-INJ-003)
 # fire when the response flows to eval. The safe form parses the response with
 # JSON.parse instead of eval and does not fire, which is the real safe/unsafe

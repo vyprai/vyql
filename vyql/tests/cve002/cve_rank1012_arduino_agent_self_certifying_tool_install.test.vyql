@@ -1,6 +1,6 @@
 # Rank 1012 / CVE-2023-43800: Arduino Create Agent privilege escalation through
 # the /v2/pkgs/tools/installed endpoint. Tools.Install accepted a caller-supplied
-# URL and installed from it, and the only integrity control was a checksum taken
+# URL and installed from it, and the only integrity control is a checksum taken
 # from the same request payload:
 #
 #   if payload.URL != nil {
@@ -12,7 +12,7 @@
 # attacker supplies both the URL and the checksum, the comparison proves the
 # bytes arrived intact but proves nothing about who produced them, so anyone who
 # can reach the localhost endpoint installs an arbitrary archive and runs code as
-# the agent user (CWE-345). The pool commit was a later HEAD-handler feature;
+# the agent user (CWE-345).
 # corrected to the real fix 33080c3, which requires a signature and verifies it
 # against a trusted RSA public key before installing:
 # utilities.VerifyInput(*payload.URL, *payload.Signature).
@@ -34,8 +34,8 @@
 #    walks straight past it, so it fails the genericity test.
 #  - The available taint framing is also wrong and would not discriminate the
 #    fix. Labelling the request payload as a source makes the URL reach the
-#    code.UrlFetch sink already detected at tools.go:181 and reports SSRF
-#    (CWE-918), but the fix still fetches the same caller-supplied URL and only
+#    code.UrlFetch sink detected at tools.go:181 and reports SSRF
+#    (CWE-918), but the fixed revision still fetches the same caller-supplied URL and only
 #    adds a signature check, so that finding would fire on the vulnerable and
 #    fixed revisions alike.
 #

@@ -4,7 +4,8 @@
 #
 #   $url = getinfo('site_protocol') . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 #
-# and the result reaches markup, so a crafted request path is reflected. The fix
+# and the result reaches markup, so a crafted request path is reflected. The
+# fixed revision
 # 6b0ab1de9f wraps the request URI in mso_clean_str, whose default rules run
 # trim, the framework's xss_clean and strip_tags, in mso_current_url,
 # mso_url_get, mso_segment_array and two plugins.
@@ -14,8 +15,8 @@
 # interprocedurally through mso_current_url#ret#, with unless path coveredBy
 # core.HtmlEscape unsatisfied and no escape found anywhere on the flows.
 #
-# The row survives the fix, and that is the tool being right rather than blind.
-# The fix cleans $_SERVER['REQUEST_URI'] and leaves $_SERVER['HTTP_HOST'] beside
+# The row survives the fixed revision, and that is the tool being right rather than blind.
+# The fixed revision cleans $_SERVER['REQUEST_URI'] and leaves $_SERVER['HTTP_HOST'] beside
 # it in the same concatenation, and the Host header is attacker-influenced too,
 # so what remains reported is a true positive upstream did not close. Measured
 # four ways on minimal snippets: cleaning neither reports, cleaning only the

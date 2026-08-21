@@ -3,16 +3,16 @@
 # the backend's own package directory and imports it, and it is marked
 # disabled=True for that reason. The direct block-execution endpoint honoured
 # that flag, but graph validation did not, so an authenticated user embedded the
-# block as a node in a graph and reached the import anyway (CWE-285). The fix
-# 062fe1aa70 adds two guards, one in GraphModel validation and one in
+# block as a node in a graph and reached the import anyway (CWE-285). The
+# fixed revision adds two guards, one in GraphModel validation and one in
 # execute_node, each raising when block.disabled is set.
 #
 # ATTENTION, on both faces of this CVE.
-#  - The fix enforces a boolean flag on a path that skipped it. Detecting that
+#  - The fixed revision enforces a boolean flag on a path that skipped it. Detecting that
 #    generically means flagging any flag consulted on one path and not another,
 #    which describes ordinary feature flags everywhere, and nothing marks
 #    block.disabled as security-relevant rather than a normal capability switch.
-#  - The dangerous primitive is already half modelled and still does not fire.
+#  - The dangerous primitive is half modelled and still does not fire.
 #    In blocks/block.py the file write is labelled code.FilePathAccess and the
 #    dynamic import is labelled code.DynamicCodeLoad, but no source labels the
 #    block input, so the path from input_data.code to __import__ never

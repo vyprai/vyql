@@ -8,7 +8,7 @@
 #
 # BookingController::bookSlot is a @PublicPage, so $email arrives from an
 # unauthenticated caller, passes through BookingService::book and reaches
-# BookingCalendarWriter. The fix 7b70edfb8a injects OCP\Mail\IMailer and rejects
+# BookingCalendarWriter. The fixed revision injects OCP\Mail\IMailer and rejects
 # the request with 422 when validateMailAddress fails.
 #
 # ATTENTION. Three layers are missing at once, and the middle one carries a
@@ -28,7 +28,7 @@
 # Binding the iCalendar property as a CRLF sink is the tempting middle step and
 # the measurement argues against it: the same function writes 'CN' =>
 # $displayName and DESCRIPTION => $description from equally unvalidated request
-# data, so the rule reports 3 sites in the one function the fix touched, for 1
+# data, so the rule reports 3 sites in the one function the fixed revision touched, for 1
 # true positive, and the maintainers left the other two alone. What separates
 # the address is that it becomes a mail recipient rather than a document field,
 # and the sending happens in another component entirely.

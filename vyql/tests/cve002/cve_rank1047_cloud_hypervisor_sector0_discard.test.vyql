@@ -9,11 +9,11 @@
 # Discard and WriteZeroes carry their own sector numbers inside the request
 # payload, read later in Request::execute_async in block/src/lib.rs, and nothing
 # checked those, so a guest could still zero sector 0 and rewrite the header that
-# decides how the host interprets the image. The fix a63315df54 threads
+# decides how the host interprets the image. The fixed revision threads
 # disable_sector0_writes into execute_async and rejects discard_sector == 0 and
 # wz_offset == 0 there.
 #
-# ATTENTION, and it is the same missing relation already recorded for ranks 1039
+# ATTENTION, and it is the same missing relation recorded for ranks 1039
 # and 1040: a guard covers one branch of a request-type dispatch and not the
 # siblings that have the same effect. No branch is wrong when read alone, and
 # nothing compares a guard across the arms of a dispatch, so there is no

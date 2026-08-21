@@ -13,7 +13,8 @@
 # UpdateReq reaches that point because DecryptPKIEnvelope in scep/authority.go
 # lists it beside PKCSReq and RenewalReq, so the envelope parses and a CSR is
 # produced. The same switch also ends with a bare `return nil` and no default,
-# so any further message type is reported as decrypted successfully. The fix
+# so any further message type is reported as decrypted successfully. The fixed
+# revision
 # e6da031d51 adds an else branch that fails the request, drops UpdateReq from the
 # parsing case, and replaces the trailing return with a default that errors.
 #

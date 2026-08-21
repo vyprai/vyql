@@ -2,10 +2,10 @@
 # provider's CA thumbprint over a TLS socket opened with
 # rejectUnauthorized: false, so the certificate is never verified and the
 # thumbprint can be taken from whoever answers the connection (CWE-347,
-# CWE-295). The fix 3e4f3773bf makes the setting a parameter, so the caller
+# CWE-295). The fixed revision makes the setting a parameter, so the caller
 # decides and a feature flag turns verification on.
 #
-# Already covered: VYQL-CFG-004 reports the disabled certificate check on the
+# Covered: VYQL-CFG-004 reports the disabled certificate check on the
 # vulnerable file and is silent once the literal false is replaced by the
 # parameter.
 

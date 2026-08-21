@@ -2,7 +2,7 @@
 # handed that container the whole Linux capability set through
 # all_capabilities(), CAP_SYS_ADMIN included. With mount powers the code inside
 # can remount a read-only directory read-write and write wherever it likes
-# (CWE-284). The fix 2c26968ec5 replaces the full set with default_capabilities(),
+# (CWE-284). The fixed revision replaces the full set with default_capabilities(),
 # an allow-list that leaves out CAP_SYS_ADMIN, CAP_NET_ADMIN, CAP_SYS_MODULE and
 # CAP_BPF, and enforces the read-only mount at the hypervisor level as well.
 #
@@ -22,7 +22,7 @@
 # rather than being an enumeration or prose, which needs dataflow from the
 # capability set into the spec and an awareness of comments that the flat
 # feature bag does not provide. A runtime library also has legitimate reason to
-# name every capability, which is exactly what the vulnerable function was for.
+# name every capability, which is exactly what the vulnerable function is for.
 #
 # verify_current_expected: attention-precision-cost
 

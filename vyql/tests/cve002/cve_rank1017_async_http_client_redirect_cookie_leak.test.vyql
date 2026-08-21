@@ -2,8 +2,8 @@
 # redirect security boundary. Redirect30xInterceptor.propagatedHeaders strips
 # AUTHORIZATION and PROXY_AUTHORIZATION when the redirect crosses origins or
 # downgrades HTTPS to HTTP, but leaves COOKIE in place, so session cookies are
-# sent to a redirect target the attacker may control (CWE-200, CWE-522). The fix
-# 3b0e3e9e removes COOKIE on the same boundary, keeping the NTLM and SCRAM case
+# sent to a redirect target the attacker may control (CWE-200, CWE-522). The
+# fixed revision removes COOKIE on the same boundary, keeping the NTLM and SCRAM case
 # in a separate branch, and relies on the URI-scoped cookie store to re-add
 # cookies that legitimately match the new target.
 #
@@ -25,10 +25,10 @@
 # vulnerable function also names Cookie, CookieStore, cookieStore and
 # addCookieIfUnset while re-adding cookies from the store, so the negation
 # suppresses the true positive. A rule that works on a trimmed snippet and not
-# on the code the CVE was filed against is a repro-shaped patch, so the concept,
-# rule and bindings drafted here were reverted rather than shipped.
+# on the code the CVE is filed against is a repro-shaped patch, so the concept,
+# rule and bindings go unshipped.
 #
-# The C frontend already has the feature this needs, node.context.callArgAt,
+# The C frontend has the feature this needs, node.context.callArgAt,
 # holding entries shaped like "callee:index:value" so a binding can require
 # "remove:0:AUTHORIZATION" and forbid "remove:0:COOKIE". Probing every form of
 # that key against this Java file matches nothing, and the Java frontend never

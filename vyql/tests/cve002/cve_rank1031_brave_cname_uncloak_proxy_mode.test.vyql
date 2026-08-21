@@ -16,7 +16,7 @@
 # fallback_proxies routes every request as well, which is exactly what a
 # proxying extension with a SOCKS fallback installs, so the DNS query for the
 # CNAME went out over the system resolver and disclosed the browsing target
-# (CWE-200). The fix 0c2580eb78 adds the second arm, PROXY_LIST_PER_SCHEME with
+# (CWE-200). The fixed revision adds the second arm, PROXY_LIST_PER_SCHEME with
 # a non-empty fallback_proxies.
 #
 # ATTENTION, precision cost, because the only available discriminator is the

@@ -8,7 +8,7 @@
 # client could therefore create and delete unmanaged snapshots on pools it has
 # no write access to.
 #
-# The fix 975528f632 hoists the check into a new enforce_pool_op_caps called at
+# The fixed revision hoists the check into a new enforce_pool_op_caps called at
 # the top of preprocess_pool_op, so every operation passes it, and adds
 # is_unmanaged_snap_op_permitted for the two unmanaged-snap operations, which
 # accepts either an explicit mon cap for the command or an OSD cap granting
@@ -26,8 +26,8 @@
 # monitor rather than the weakness.
 #
 # Both revisions of the real file report the same thing: 150 findings at the
-# vulnerable revision and 153 at the fix, every one of them VYQL-MEM-006 at low
-# confidence, and the three extra rows are further dereferences the fix itself
+# vulnerable revision and 153 at the fixed revision, every one of them VYQL-MEM-006 at low
+# confidence, and the three extra rows are further dereferences the fixed revision itself
 # adds. Nothing about authorization is reported on either side.
 #
 # verify_current_expected: attention-analysis-gap

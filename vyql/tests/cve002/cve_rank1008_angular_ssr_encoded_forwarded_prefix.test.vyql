@@ -5,8 +5,7 @@
 # like /%2e%2e/evil contains no literal "..", so it passes the denylist, and a
 # downstream consumer (the browser handling the redirect Location, or the
 # router) percent-decodes it into ../ and steers the redirect (CWE-22, CWE-601).
-# The fix 94023f62c5 (COMMIT_NONE in the advisory DB, but this is the referenced
-# @angular/ssr fix) replaces the denylist with an allow-list regex
+# The fixed revision replaces the denylist with an allow-list regex
 # (VALID_PREFIX_REGEX = /^\/([a-z0-9_-]+\/)*[a-z0-9_-]*$/i) that rejects the "%"
 # character, and adds the trustProxyHeaders option to strip or gate proxy
 # headers.
