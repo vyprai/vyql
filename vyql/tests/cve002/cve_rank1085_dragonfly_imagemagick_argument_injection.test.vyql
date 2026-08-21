@@ -1,0 +1,106 @@
+# Rank 1085 / CVE-2021-33564: Dragonfly's URL-driven job API lets a request
+# supply a raw `:convert` argument string that reaches ImageMagick shell-escaped
+# per word but never constrained against a leading dash (CWE-88, CWE-94).
+#
+# ATTENTION: vocabulary gap. Ruby has no CommandOptionInjectionSink binding, and
+# no pack rule consumes that sink in any language. core.ShellEscape also fails
+# to cover map-then-join escaping. Vulnerable and fixed snippets reject
+# VYQL-INJ-031; a direct Shellwords.escape rejects VYQL-INJ-002; the same escape
+# inside map-then-join expects it.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1085: a url-controlled argument string reaches convert unconstrained"
+  lang ruby
+  file lib/dragonfly/image_magick/processors/convert.rb
+  reject VYQL-INJ-031
+  code
+  ```
+  module Dragonfly
+    module ImageMagick
+      module Processors
+        class Convert
+          def call(content, args = "", opts = {})
+            convert_command = content.env[:convert_command] || "convert"
+            format = opts["format"]
+
+            content.shell_update ext: format do |old_path, new_path|
+              "#{convert_command} #{args} #{old_path} #{new_path}"
+            end
+
+            if format
+              content.meta["format"] = format.to_s
+              content.ext = format
+            end
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1085: the fixed revision drops raw args and validates the one shortcut kept"
+  lang ruby
+  file lib/dragonfly/image_magick/plugin.rb
+  reject VYQL-INJ-031
+  code
+  ```
+  module Dragonfly
+    module ImageMagick
+      class Plugin
+        def call(app, opts = {})
+          app.env[:convert_command] = opts[:convert_command] || "convert"
+
+          app.add_processor :encode, Processors::Encode.new
+          app.add_processor :thumb, Processors::Thumb.new
+          app.add_processor :rotate do |content, amount|
+            ParamValidators.validate!(amount, &ParamValidators.is_number)
+            Commands.convert(content, "-rotate #{amount}")
+          end
+        end
+      end
+    end
+  end
+  ```
+
+# The dominance pair. Shellwords.escape is bound as core.ShellEscape and
+# suppresses called directly. Wrapped in the map-then-join idiom Dragonfly's own
+# escape_args uses, the same value still reaches the sink and still reports.
+
+test "rank1085: a direct Shellwords.escape call suppresses the finding"
+  lang ruby
+  file direct.rb
+  reject VYQL-INJ-002
+  code
+  ```
+  require "shellwords"
+  require "open3"
+
+  class ImageController < ApplicationController
+    def show
+      args = params[:args]
+      escaped = Shellwords.escape(args)
+      command = "convert #{escaped} #{path} #{new_path}"
+      Open3.capture3(command)
+    end
+  end
+  ```
+
+test "rank1085: the same escape wrapped in map-then-join does not"
+  lang ruby
+  file mapped.rb
+  expect VYQL-INJ-002
+  code
+  ```
+  require "shellwords"
+  require "open3"
+
+  class ImageController < ApplicationController
+    def show
+      args = params[:args]
+      escaped = args.shellsplit.map { |a| Shellwords.escape(a) }.join(" ")
+      command = "convert #{escaped} #{path} #{new_path}"
+      Open3.capture3(command)
+    end
+  end
+  ```

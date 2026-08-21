@@ -1,0 +1,122 @@
+# Rank 1088 / CVE-2022-29078: EJS concatenates the `outputFunctionName` compile
+# option into generated template source and compiles it with `Function`, so a
+# non-identifier value becomes executable code (CWE-74).
+#
+# ATTENTION: vocabulary gap. code.CodeEval for Function anchors only at args[0],
+# missing the body argument where injected code runs, and a call through a local
+# alias of Function is invisible to the binding. Vulnerable and fixed snippets
+# reject VYQL-INJ-003; a tainted first argument and a direct Function call
+# expect it; body-argument and aliased-callee probes reject it.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1088: outputFunctionName is concatenated into the generated source"
+  lang javascript
+  file lib/ejs.js
+  reject VYQL-INJ-003
+  code
+  ```
+  function compile(template, opts) {
+    var prepended = '';
+    var src;
+    var ctor = Function;
+
+    prepended += '  var __output = "";\n' +
+      '  function __append(s) { if (s !== undefined && s !== null) __output += s }\n';
+    if (opts.outputFunctionName) {
+      prepended += '  var ' + opts.outputFunctionName + ' = __append;' + '\n';
+    }
+
+    src = prepended + template;
+    var fn = new ctor(opts.localsName + ', escapeFn, include, rethrow', src);
+    return fn;
+  }
+  ```
+
+test "rank1088: the fixed revision requires outputFunctionName to be a plain identifier"
+  lang javascript
+  file lib/ejs.js
+  reject VYQL-INJ-003
+  code
+  ```
+  var _JS_IDENTIFIER = /^[a-zA-Z_$][0-9a-zA-Z_$]*$/;
+
+  function compile(template, opts) {
+    var prepended = '';
+    var src;
+    var ctor = Function;
+
+    prepended += '  var __output = "";\n' +
+      '  function __append(s) { if (s !== undefined && s !== null) __output += s }\n';
+    if (opts.outputFunctionName) {
+      if (!_JS_IDENTIFIER.test(opts.outputFunctionName)) {
+        throw new Error('outputFunctionName is not a valid JS identifier.');
+      }
+      prepended += '  var ' + opts.outputFunctionName + ' = __append;' + '\n';
+    }
+
+    src = prepended + template;
+    var fn = new ctor(opts.localsName + ', escapeFn, include, rethrow', src);
+    return fn;
+  }
+  ```
+
+# The argument-position pair. Same source, same Function constructor call;
+# only which argument carries the tainted value differs.
+
+test "rank1088: a tainted first argument to Function reaches the sink"
+  lang javascript
+  file args0.js
+  expect VYQL-INJ-003
+  code
+  ```
+  function compile(req) {
+    var opts = req.query;
+    var fn = new Function(opts.params, 'return 1;');
+    return fn;
+  }
+  ```
+
+test "rank1088: the same value as Function's body argument does not"
+  lang javascript
+  file args1.js
+  reject VYQL-INJ-003
+  code
+  ```
+  function compile(req) {
+    var opts = req.query;
+    var fn = new Function('a, b', opts.body);
+    return fn;
+  }
+  ```
+
+# The alias pair. Same tainted argument at args[0], where a direct call
+# reports; only whether the constructor is called by name or through a local
+# variable differs.
+
+test "rank1088: a direct call to Function is a recognized sink"
+  lang javascript
+  file direct.js
+  expect VYQL-INJ-003
+  code
+  ```
+  function compile(req) {
+    var opts = req.query;
+    var fn = new Function(opts.params, 'return 1;');
+    return fn;
+  }
+  ```
+
+test "rank1088: the same call through a local alias of Function is not"
+  lang javascript
+  file aliased.js
+  reject VYQL-INJ-003
+  code
+  ```
+  function compile(req) {
+    var opts = req.query;
+    var ctor = Function;
+    var fn = new ctor(opts.params, 'return 1;');
+    return fn;
+  }
+  ```

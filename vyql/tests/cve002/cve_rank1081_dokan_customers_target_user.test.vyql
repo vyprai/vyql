@@ -1,0 +1,164 @@
+# Rank 1081 / CVE-2026-49780: Dokan's customers REST permission callback checks
+# only that the caller is a vendor and never consults the request's target user
+# id, so any vendor can edit or delete any user (CWE-266, CWE-639).
+#
+# ATTENTION: vocabulary gap. code.IdorPolicyReview and VYQL-AUTH-081 exist, but
+# every PHP binding for the review keys on hardcoded phpReview tokens rather
+# than data, and the generic condition needs a negation over the callback body.
+# All three snippets reject VYQL-AUTH-081.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1081: the permission callback checks the caller's role only"
+  lang php
+  file includes/REST/CustomersController.php
+  reject VYQL-AUTH-081
+  code
+  ```
+  <?php
+
+  class CustomersController extends WC_REST_Customers_Controller {
+
+      protected function check_permission( $request, $action ) {
+          if ( ! $this->check_vendor_permission() ) {
+              $messages = [
+                  'view'   => __( 'Sorry, you cannot list resources.', 'dokan-lite' ),
+                  'edit'   => __( 'Sorry, you are not allowed to edit this resource.', 'dokan-lite' ),
+                  'delete' => __( 'Sorry, you are not allowed to delete this resource.', 'dokan-lite' ),
+              ];
+              return new WP_Error( "dokan_rest_cannot_$action", $messages[ $action ], [ 'status' => rest_authorization_required_code() ] );
+          }
+          return true;
+      }
+
+      public function check_vendor_permission(): bool {
+          return dokan_is_user_seller( dokan_get_current_user_id() );
+      }
+
+      public function update_item( $request ) {
+          return $this->perform_vendor_action(
+              function () use ( $request ) {
+                  return parent::update_item( $request );
+              }
+          );
+      }
+
+      public function delete_item( $request ) {
+          return $this->perform_vendor_action(
+              function () use ( $request ) {
+                  return parent::delete_item( $request );
+              }
+          );
+      }
+  }
+  ```
+
+test "rank1081: the callback constrains the target user as well"
+  lang php
+  file includes/REST/CustomersController.php
+  reject VYQL-AUTH-081
+  code
+  ```
+  <?php
+
+  class CustomersController extends WC_REST_Customers_Controller {
+
+      protected function check_permission( $request, $action ) {
+          $messages = [
+              'view'   => __( 'Sorry, you cannot list resources.', 'dokan-lite' ),
+              'edit'   => __( 'Sorry, you are not allowed to edit this resource.', 'dokan-lite' ),
+              'delete' => __( 'Sorry, you are not allowed to delete this resource.', 'dokan-lite' ),
+          ];
+
+          if ( ! $this->check_vendor_permission() ) {
+              return new WP_Error( "dokan_rest_cannot_$action", $messages[ $action ], [ 'status' => rest_authorization_required_code() ] );
+          }
+
+          $target_id = isset( $request['id'] ) ? (int) $request['id'] : 0;
+          if ( $target_id > 0 && in_array( $action, [ 'view', 'edit', 'delete' ], true ) ) {
+              $allowed = $this->is_target_user_allowed( $target_id );
+              if ( is_wp_error( $allowed ) ) {
+                  $status = $allowed->get_error_data();
+                  $status = isset( $status['status'] ) ? (int) $status['status'] : 403;
+                  return new WP_Error( "dokan_rest_cannot_$action", $messages[ $action ], [ 'status' => $status ] );
+              }
+          }
+
+          return true;
+      }
+
+      protected function is_target_user_allowed( int $target_id ) {
+          if ( $target_id <= 0 || ! get_userdata( $target_id ) ) {
+              return new WP_Error( 'dokan_rest_invalid_target', __( 'Invalid user.', 'dokan-lite' ), [ 'status' => 404 ] );
+          }
+
+          foreach ( [ 'manage_options', 'manage_woocommerce', 'edit_users', 'delete_users' ] as $cap ) {
+              if ( user_can( $target_id, $cap ) ) {
+                  return new WP_Error( 'dokan_rest_forbidden_target', __( 'You cannot operate on this user.', 'dokan-lite' ), [ 'status' => 403 ] );
+              }
+          }
+
+          if ( dokan_is_user_seller( $target_id ) ) {
+              return new WP_Error( 'dokan_rest_forbidden_target', __( 'You cannot operate on this user.', 'dokan-lite' ), [ 'status' => 403 ] );
+          }
+
+          if ( ! dokan_customer_has_order_from_this_seller( $target_id, dokan_get_current_user_id() ) ) {
+              return new WP_Error( 'dokan_rest_forbidden_target', __( 'You cannot operate on this customer.', 'dokan-lite' ), [ 'status' => 403 ] );
+          }
+
+          return true;
+      }
+
+      public function check_vendor_permission(): bool {
+          return dokan_is_user_seller( dokan_get_current_user_id() );
+      }
+
+      public function update_item( $request ) {
+          return $this->perform_vendor_action(
+              function () use ( $request ) {
+                  return parent::update_item( $request );
+              }
+          );
+      }
+  }
+  ```
+
+# A capability check in a sibling method is what makes class-level control
+# presence useless here: this class carries a recognized core.AuthorizationCheck
+# while the CRUD path it guards nothing on stays open.
+
+test "rank1081: a capability check guards a different method in the same class"
+  lang php
+  file includes/REST/CustomersController.php
+  reject VYQL-AUTH-081
+  code
+  ```
+  <?php
+
+  class CustomersController extends WC_REST_Customers_Controller {
+
+      protected function check_permission( $request, $action ) {
+          if ( ! $this->check_vendor_permission() ) {
+              return new WP_Error( 'dokan_rest_cannot_edit', __( 'Denied.', 'dokan-lite' ), [ 'status' => 401 ] );
+          }
+          return true;
+      }
+
+      public function search_customers( $request ) {
+          if ( ! current_user_can( 'edit_shop_orders' ) ) {
+              return new WP_Error( 'dokan_rest_cannot_search', __( 'You do not have permission to search customers.', 'dokan-lite' ), [ 'status' => rest_authorization_required_code() ] );
+          }
+
+          $term = $request->get_param( 'search' );
+          return $this->get_customers( $term );
+      }
+
+      public function delete_item( $request ) {
+          return $this->perform_vendor_action(
+              function () use ( $request ) {
+                  return parent::delete_item( $request );
+              }
+          );
+      }
+  }
+  ```
