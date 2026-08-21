@@ -1,0 +1,116 @@
+# Rank 1110 / CVE-2025-59841: FlagForge's NextAuth config never sets a session
+# lifetime, so a JWT session lives for the implicit thirty-day default with no
+# server-side revocation; logout only clears the browser cookie (CWE-384,
+# CWE-613).
+#
+# ATTENTION: vocabulary gap. MissingSessionRotationAfterAuthentication is a
+# Java session.regenerateId idiom for server-side stores; NextAuth JWT has no
+# server session to rotate, and the missing pieces are an absent maxAge and an
+# absent invalidation endpoint.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1110: the auth config sets no session lifetime and no logout route exists"
+  lang javascript
+  file lib/authOptions.ts
+  reject_review code.MissingSessionRotationAfterAuthentication
+  code
+  ```
+  import { AuthOptions } from "next-auth";
+  import GoogleProvider from "next-auth/providers/google";
+  import connect from "@/utlis/db";
+  import UserModel from "@/models/userSchema";
+
+  export const authOptions: AuthOptions = {
+    providers: [
+      GoogleProvider({
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        authorization: { params: { scope: 'email profile' } },
+      }),
+    ],
+    callbacks: {
+      async signIn({ user, account }) {
+        if (account?.provider === "google") {
+          await connect();
+          const existingUser = await UserModel.findOne({ email: user.email });
+          if (!existingUser) {
+            await new UserModel({ email: user.email, name: user.name }).save();
+          }
+          return true;
+        }
+        return false;
+      },
+      async jwt({ token, user }) {
+        if (user) {
+          token.id = user.id;
+          token.email = user.email;
+        }
+        return token;
+      },
+      async session({ session, token }) {
+        if (token) {
+          session.user = { ...session.user, email: token.email };
+        }
+        return session;
+      },
+    },
+  };
+  ```
+
+test "rank1110: the auth config bounds the session and a logout route revokes the cookie"
+  lang javascript
+  file lib/authOptions.ts
+  reject_review code.MissingSessionRotationAfterAuthentication
+  code
+  ```
+  import { AuthOptions } from "next-auth";
+  import GoogleProvider from "next-auth/providers/google";
+  import connect from "@/utlis/db";
+  import UserModel from "@/models/userSchema";
+
+  export const authOptions: AuthOptions = {
+    providers: [
+      GoogleProvider({
+        clientId: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        authorization: { params: { scope: "email profile" } },
+      }),
+    ],
+    session: {
+      strategy: "jwt",
+      maxAge: 60 * 60,
+      updateAge: 15 * 60,
+    },
+    jwt: {
+      secret: process.env.NEXTAUTH_SECRET,
+      maxAge: 60 * 60,
+    },
+    callbacks: {
+      async signIn({ user, account }) {
+        if (account?.provider === "google") {
+          await connect();
+          const existingUser = await UserModel.findOne({ email: user.email });
+          if (!existingUser) {
+            await new UserModel({ email: user.email, name: user.name }).save();
+          }
+          return true;
+        }
+        return false;
+      },
+      async jwt({ token, user }) {
+        if (user) {
+          token.id = user.id;
+          token.email = user.email;
+        }
+        return token;
+      },
+      async session({ session, token }) {
+        if (token) {
+          session.user = { ...session.user, id: token.id as string, email: token.email as string };
+        }
+        return session;
+      },
+    },
+  };
+  ```

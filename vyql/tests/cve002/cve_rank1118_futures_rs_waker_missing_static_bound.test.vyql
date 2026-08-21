@@ -1,0 +1,53 @@
+# Rank 1118 / CVE-2020-35906: futures-rs's public waker() accepts Arc<W> with
+# no 'static bound on W, so a Waker can wrap shorter-lived data; the raw
+# vtable later wake() is unsound once that data is gone (CWE-416).
+#
+# ATTENTION: engine gap. The defect is a missing trait bound on a type-erasing
+# constructor, not a free/use dataflow relation that CWE_416 concepts target;
+# there is no Rust binding for that shape.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1118: waker() accepts a non-'static ArcWake with no lifetime bound"
+  lang rust
+  file futures-task/src/waker.rs
+  reject VYQL-MEM-007
+  code
+  ```
+  use std::sync::Arc;
+  use std::task::{RawWaker, RawWakerVTable, Waker};
+
+  pub trait ArcWake {
+      fn wake(self: Arc<Self>);
+  }
+
+  pub fn waker<W>(wake: Arc<W>) -> Waker
+  where
+      W: ArcWake,
+  {
+      let ptr = Arc::into_raw(wake) as *const ();
+      unsafe { Waker::from_raw(RawWaker::new(ptr, waker_vtable::<W>())) }
+  }
+  ```
+
+test "rank1118: waker() requires the ArcWake type to be 'static"
+  lang rust
+  file futures-task/src/waker.rs
+  reject VYQL-MEM-007
+  code
+  ```
+  use std::sync::Arc;
+  use std::task::{RawWaker, RawWakerVTable, Waker};
+
+  pub trait ArcWake {
+      fn wake(self: Arc<Self>);
+  }
+
+  pub fn waker<W>(wake: Arc<W>) -> Waker
+  where
+      W: ArcWake + 'static,
+  {
+      let ptr = Arc::into_raw(wake) as *const ();
+      unsafe { Waker::from_raw(RawWaker::new(ptr, waker_vtable::<W>())) }
+  }
+  ```

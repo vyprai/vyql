@@ -1,0 +1,47 @@
+# Rank 1111 / CVE-2021-31405: Vaadin's EmailField validates input against a
+# hand-written regex whose domain-suffix group backtracks catastrophically on
+# crafted input, hanging the JVM thread that re-validates it (CWE-400).
+#
+# ATTENTION: engine gap. code.CatastrophicRegex / VYQL-DOS-003 exist, but every
+# binding matches a literal substring of one known-vulnerable regex rather than
+# nested-quantifier structure; there is no regex-AST or backtracking analysis.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1111: the domain-suffix group repeats an unescaped dot inside an unbounded class"
+  lang java
+  file EmailField.java
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  package com.vaadin.flow.component.textfield;
+
+  public class EmailField {
+      private static final String EMAIL_PATTERN =
+          "^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:.[a-zA-Z0-9-]+)*$";
+
+      public boolean isValid(String value) {
+          return value.matches(EMAIL_PATTERN);
+      }
+  }
+  ```
+
+test "rank1111: the domain suffix is one dot literal and a bounded tail class"
+  lang java
+  file EmailField.java
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  package com.vaadin.flow.component.textfield;
+
+  public class EmailField {
+      private static final String EMAIL_PATTERN = "^" + "([a-zA-Z0-9_\\.\\-+])+" // local
+              + "@" + "[a-zA-Z0-9-.]+" // domain
+              + "\\." + "[a-zA-Z0-9-]{2,}" // tld
+              + "$";
+
+      public boolean isValid(String value) {
+          return value.matches(EMAIL_PATTERN);
+      }
+  }
+  ```
