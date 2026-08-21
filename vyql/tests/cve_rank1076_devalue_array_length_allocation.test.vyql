@@ -1,0 +1,94 @@
+# Rank 1076 / CVE-2026-42570: devalue's parser allocates an array of whatever
+# length the payload declares, so a few bytes can ask for gigabytes (CWE-770).
+#
+# ATTENTION: vocabulary gap. code.LengthDerivedAllocation / VYQL-DOS-006 state
+# the weakness, but have no JavaScript binding; a presence over `new Array(n)`
+# would flag the idiom rather than untrusted parsed length. Both snippets reject
+# VYQL-DOS-006.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1076: the declared length sizes the allocation"
+  lang javascript
+  file src/parse.js
+  reject VYQL-DOS-006
+  code
+  ```
+  export function unflatten(parsed, revivers) {
+      const values = parsed;
+
+      function hydrate(index) {
+          const value = values[index];
+
+          if (Array.isArray(value) && value[0] === 'Array') {
+              const len = value[1];
+
+              if (!Number.isInteger(len) || len < 0) {
+                  throw new Error('Invalid array length');
+              }
+
+              const array = new Array(len);
+
+              for (let i = 2; i < value.length; i += 2) {
+                  const idx = value[i];
+                  if (!Number.isInteger(idx) || idx < 0 || idx >= len) {
+                      throw new Error('Invalid array index');
+                  }
+                  array[idx] = hydrate(value[i + 1]);
+              }
+
+              return array;
+          }
+
+          return value;
+      }
+
+      return hydrate(0);
+  }
+  ```
+
+test "rank1076: the same length applied after the elements are placed"
+  lang javascript
+  file src/parse.js
+  reject VYQL-DOS-006
+  code
+  ```
+  const MAX_ARRAY_LEN = 2 ** 32 - 1;
+  const MAX_ARRAY_INDEX = MAX_ARRAY_LEN - 1;
+
+  export function unflatten(parsed, revivers) {
+      const values = parsed;
+
+      function hydrate(index) {
+          const value = values[index];
+
+          if (Array.isArray(value) && value[0] === 'Array') {
+              const len = value[1];
+
+              if (!Number.isInteger(len) || len < 0 || len > MAX_ARRAY_LEN) {
+                  throw new Error('Invalid array length');
+              }
+
+              const array = [];
+              array[MAX_ARRAY_INDEX] = undefined;
+              delete array[MAX_ARRAY_INDEX];
+
+              for (let i = 2; i < value.length; i += 2) {
+                  const idx = value[i];
+                  if (!Number.isInteger(idx) || idx < 0 || idx > MAX_ARRAY_INDEX || idx >= len) {
+                      throw new Error('Invalid array index');
+                  }
+                  array[idx] = hydrate(value[i + 1]);
+              }
+
+              array.length = len;
+
+              return array;
+          }
+
+          return value;
+      }
+
+      return hydrate(0);
+  }
+  ```

@@ -1,3 +1,10 @@
+# Rank 107 / CVE-2025-65105: Apptainer writes selinux/apparmor --security
+# profiles through an ordinary procfs open, so a redirected /proc mount can make
+# the label write ineffective (CWE-61, CWE-706).
+#
+# The spec pins code.SpecialFileAccessReview on the procfs profile load; the
+# snippet expects that review observation.
+
 test "rank107: Apptainer procfs profile load requires special-file access review"
   expect_review code.SpecialFileAccessReview
   graph

@@ -1,0 +1,80 @@
+# Rank 1078 / CVE-2026-35172: the registry's repository-scoped blob descriptor
+# cache checks that a digest belongs to the caller's repository and then clears
+# it everywhere (CWE-284).
+#
+# ATTENTION: analysis gap. The membership check is correct but authorizes an
+# unscoped upstream Clear; nothing in the ontology distinguishes the receiver a
+# check names from the receiver the effect runs on. Both snippets
+# reject VYQL-AUTH-081.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1078: the scoped check authorizes an unscoped delete"
+  lang go
+  file registry/storage/cache/redis/redis.go
+  reject VYQL-AUTH-081
+  code
+  ```
+  package redis
+
+  import (
+  	"context"
+
+  	"github.com/opencontainers/go-digest"
+  )
+
+  func (rsrbds *repositoryScopedRedisBlobDescriptorService) Clear(ctx context.Context, dgst digest.Digest) error {
+  	if err := dgst.Validate(); err != nil {
+  		return err
+  	}
+
+  	member, err := rsrbds.upstream.pool.SIsMember(ctx, rsrbds.repositoryBlobSetKey(rsrbds.repo), dgst.String()).Result()
+  	if err != nil {
+  		return err
+  	}
+  	if !member {
+  		return ErrBlobUnknown
+  	}
+
+  	return rsrbds.upstream.Clear(ctx, dgst)
+  }
+  ```
+
+test "rank1078: the same check authorizing a scoped delete"
+  lang go
+  file registry/storage/cache/redis/redis.go
+  reject VYQL-AUTH-081
+  code
+  ```
+  package redis
+
+  import (
+  	"context"
+
+  	"github.com/opencontainers/go-digest"
+  )
+
+  func (rsrbds *repositoryScopedRedisBlobDescriptorService) Clear(ctx context.Context, dgst digest.Digest) error {
+  	if err := dgst.Validate(); err != nil {
+  		return err
+  	}
+
+  	pool := rsrbds.upstream.pool
+
+  	member, err := pool.SIsMember(ctx, rsrbds.repositoryBlobSetKey(rsrbds.repo), dgst.String()).Result()
+  	if err != nil {
+  		return err
+  	}
+  	if !member {
+  		return ErrBlobUnknown
+  	}
+
+  	pipe := pool.TxPipeline()
+  	pipe.SRem(ctx, rsrbds.repositoryBlobSetKey(rsrbds.repo), dgst.String())
+  	pipe.Del(ctx, rsrbds.blobDescriptorHashKey(dgst))
+  	pipe.HDel(ctx, rsrbds.upstream.blobDescriptorHashKey(dgst), "digest", "size", "mediatype")
+
+  	_, err = pipe.Exec(ctx)
+  	return err
+  }
+  ```

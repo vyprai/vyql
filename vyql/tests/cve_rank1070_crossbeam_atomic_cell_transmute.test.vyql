@@ -1,0 +1,60 @@
+# Rank 1070 / CVE-2022-23639: crossbeam-utils' AtomicCell does its arithmetic by
+# casting the cell's storage to an atomic of matching width and calling
+# fetch_add, whether or not the type can live in that atomic (CWE-362).
+#
+# ATTENTION: analysis gap. Vulnerable and fixed code perform the same cast; the
+# discriminator is per-target type layout under a can_transmute guard, which no
+# source, sink, or presence pattern can state. Both snippets expect VYQL-MEM-006
+# on the unrelated raw dereference review.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1070: the cell's storage is cast to an atomic unconditionally"
+  lang rust
+  file crossbeam-utils/src/atomic/atomic_cell.rs
+  expect VYQL-MEM-006
+  code
+  ```
+  use std::sync::atomic::{AtomicU64, Ordering};
+  use std::cell::UnsafeCell;
+
+  pub struct AtomicCell<T> {
+      value: UnsafeCell<T>,
+  }
+
+  impl AtomicCell<u64> {
+      pub fn fetch_add(&self, val: u64) -> u64 {
+          let a = unsafe { &*(self.value.get() as *const AtomicU64) };
+          a.fetch_add(val, Ordering::AcqRel)
+      }
+  }
+  ```
+
+test "rank1070: the same cast taken only when the type transmutes"
+  lang rust
+  file crossbeam-utils/src/atomic/atomic_cell.rs
+  expect VYQL-MEM-006
+  code
+  ```
+  use std::sync::atomic::{AtomicU64, Ordering};
+  use std::cell::UnsafeCell;
+
+  pub struct AtomicCell<T> {
+      value: UnsafeCell<T>,
+  }
+
+  impl AtomicCell<u64> {
+      pub fn fetch_add(&self, val: u64) -> u64 {
+          if can_transmute::<u64, AtomicU64>() {
+              let a = unsafe { &*(self.value.get() as *const AtomicU64) };
+              a.fetch_add(val, Ordering::AcqRel)
+          } else {
+              let _guard = lock(self.value.get() as usize).write();
+              let value = unsafe { &mut *(self.value.get()) };
+              let old = *value;
+              *value = value.wrapping_add(val);
+              old
+          }
+      }
+  }
+  ```
