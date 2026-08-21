@@ -7,6 +7,7 @@ package sca
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"sort"
 	"strings"
 
@@ -457,6 +458,145 @@ func ParseComposerLock(content string) []Dep {
 type composerPackage struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
+}
+
+// ParsePomXML reads declared dependencies from a Maven POM, naming each one by its
+// full coordinate "groupId:artifactId" because that is how the Maven ecosystem
+// identifies a package. Maven projects overwhelmingly hold the release in a
+// <properties> entry and reference it as ${name} from the dependency, so property
+// references are resolved against the POM's own properties and its project version.
+// A dependency with no version element inherits one from a parent POM or from
+// dependencyManagement; the file alone does not say which release is used, so that
+// entry is skipped rather than reported as an unpinned range.
+func ParsePomXML(content string) []Dep {
+	var project pomProject
+	if xml.Unmarshal([]byte(content), &project) != nil {
+		return nil
+	}
+	props := project.Properties.Entries
+	if props == nil {
+		props = map[string]string{}
+	}
+	selfVersion := strings.TrimSpace(project.Version)
+	if selfVersion == "" {
+		selfVersion = strings.TrimSpace(project.Parent.Version)
+	}
+	seen := map[string]bool{}
+	var out []Dep
+	for _, dep := range project.allDependencies() {
+		groupID := resolvePomValue(dep.GroupID, props, selfVersion)
+		artifactID := resolvePomValue(dep.ArtifactID, props, selfVersion)
+		version := resolvePomValue(dep.Version, props, selfVersion)
+		if groupID == "" || artifactID == "" || version == "" {
+			continue
+		}
+		name := NormalizePackageName(groupID + ":" + artifactID)
+		key := name + "@" + version
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, Dep{name, version})
+	}
+	return out
+}
+
+type pomProject struct {
+	Version      string          `xml:"version"`
+	Parent       pomParent       `xml:"parent"`
+	Properties   pomProperties   `xml:"properties"`
+	Dependencies []pomDependency `xml:"dependencies>dependency"`
+	Managed      []pomDependency `xml:"dependencyManagement>dependencies>dependency"`
+	Profiles     []pomProfile    `xml:"profiles>profile"`
+}
+
+type pomProfile struct {
+	Dependencies []pomDependency `xml:"dependencies>dependency"`
+	Managed      []pomDependency `xml:"dependencyManagement>dependencies>dependency"`
+}
+
+type pomParent struct {
+	Version string `xml:"version"`
+}
+
+type pomDependency struct {
+	GroupID    string `xml:"groupId"`
+	ArtifactID string `xml:"artifactId"`
+	Version    string `xml:"version"`
+}
+
+// allDependencies flattens every place a POM may declare a coordinate: the build
+// dependencies, the dependencyManagement block that pins versions for child modules,
+// and the same two inside each profile.
+func (p pomProject) allDependencies() []pomDependency {
+	out := make([]pomDependency, 0, len(p.Dependencies)+len(p.Managed))
+	out = append(out, p.Dependencies...)
+	out = append(out, p.Managed...)
+	for _, profile := range p.Profiles {
+		out = append(out, profile.Dependencies...)
+		out = append(out, profile.Managed...)
+	}
+	return out
+}
+
+// pomProperties captures a <properties> block, whose child element names are the
+// property names and therefore cannot be described by a fixed struct.
+type pomProperties struct {
+	Entries map[string]string
+}
+
+func (p *pomProperties) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	p.Entries = map[string]string{}
+	for {
+		tok, err := d.Token()
+		if err != nil {
+			return err
+		}
+		switch t := tok.(type) {
+		case xml.StartElement:
+			var value string
+			if err := d.DecodeElement(&value, &t); err != nil {
+				return err
+			}
+			p.Entries[t.Name.Local] = strings.TrimSpace(value)
+		case xml.EndElement:
+			if t.Name.Local == start.Name.Local {
+				return nil
+			}
+		}
+	}
+}
+
+// resolvePomValue expands ${...} references. It returns "" when a reference cannot be
+// resolved from this file, because a coordinate whose version is only known after the
+// parent POM is fetched must not be reported as if the version were absent.
+func resolvePomValue(raw string, props map[string]string, selfVersion string) string {
+	const maxPomPropertyDepth = 5
+	value := strings.TrimSpace(raw)
+	for i := 0; i < maxPomPropertyDepth && strings.Contains(value, "${"); i++ {
+		start := strings.Index(value, "${")
+		end := strings.Index(value[start:], "}")
+		if end < 0 {
+			return ""
+		}
+		end += start
+		key := strings.TrimSpace(value[start+2 : end])
+		replacement, ok := props[key]
+		if !ok {
+			switch key {
+			case "project.version", "pom.version", "version":
+				replacement, ok = selfVersion, selfVersion != ""
+			}
+		}
+		if !ok {
+			return ""
+		}
+		value = value[:start] + replacement + value[end+1:]
+	}
+	if strings.Contains(value, "${") {
+		return ""
+	}
+	return strings.TrimSpace(value)
 }
 
 // ParseGitmodules turns git submodule pins into SBOM dependencies. .gitmodules carries
