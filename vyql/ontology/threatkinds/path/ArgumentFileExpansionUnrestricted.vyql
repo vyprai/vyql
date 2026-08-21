@@ -1,0 +1,6 @@
+module path;
+
+threat ArgumentFileExpansionUnrestricted {
+  cwe: [CWE_22]
+  desc: "Command-line parser expanding @-prefixed arguments into file contents"
+}

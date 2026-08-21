@@ -59,5 +59,17 @@
         "min_safe": "v1.0.3"
       }
     ]
+  },
+  "maven": {
+    "org.jeecgframework.jimureport:jimureport-spring-boot-starter": [
+      {
+        "version": "*",
+        "id": "CVE-2023-40989",
+        "cwe": [
+          "CWE-89"
+        ],
+        "min_safe": "1.6.2"
+      }
+    ]
   }
 }

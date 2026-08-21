@@ -1,0 +1,198 @@
+# Rank 1230 / CVE-2024-23897: Jenkins builds every CLI command's argument parser
+# with the args4j default:
+#
+#   protected CmdLineParser getCmdLineParser() {
+#       return new CmdLineParser(this);
+#   }
+#
+# args4j's "at-syntax" is on unless the caller says otherwise: an argument of the
+# form `@path` is replaced, before option parsing, by the lines of the file that
+# path names. The Jenkins CLI accepts commands over HTTP and over the remoting
+# channel, so anyone who can reach that endpoint can name a server-side file and
+# read its contents back out of the parser's own error message -- CWE-22 plus
+# CWE-200. The fixed revision adds `CLICommand.ALLOW_AT_SYNTAX`, a boolean read from
+# the `hudson.cli.CLICommand.allowAtSyntax` system property and therefore false
+# unless an administrator opts in, and threads it through
+# `ParserProperties.defaults().withAtSyntax(ALLOW_AT_SYNTAX)` into both parser
+# constructions -- `CLICommand.getCmdLineParser()` and `CLIRegisterer`'s
+# `bindMethod`. Its Security3314Test asserts the argument `@<tempfile>` is echoed
+# back verbatim instead of the file's contents.
+#
+# Detection needs vocabulary for the weakness, because nothing is labelled:
+# `vyql match` on the vulnerable file reported no source, no sink and no control.
+# The shape is the one `code.XmlParserCreate` / `core.XmlHardening` model
+# for XXE -- a library default that is only safe while nobody feeds the API
+# untrusted input, plus the documented call that turns the default off -- so it is
+# expressed the same way:
+#
+#   code.ArgumentFileExpansion (issue)          a command-line parser that expands
+#                                               @-prefixed arguments into file
+#                                               contents
+#   core.ArgumentFileExpansionControl (check)   the expansion mode is set
+#                                               explicitly instead of inherited
+#   path.ArgumentFileExpansionUnrestricted      the threat kind both refer to
+#   VYQL-PATH-061                               fires on the first unless the
+#                                               second covers its endpoint or path
+#
+# The bindings name only what args4j documents (`vyql/bindings/java/m420f6b67.vyql`,
+# argumentFileExpansion465 and argumentFileExpansionControl466): constructing a
+# `CmdLineParser` expands @-arguments, and `withAtSyntax` is the switch. Coverage is
+# by the presence of the switch rather than by its argument value, because the fixed
+# revision
+# passes a field (`ALLOW_AT_SYNTAX`), not a literal -- once a codebase sets the mode
+# at all, the value is its own decision and not the library's default.
+#
+# The rule keeps the judgement: an argument parser is only a file-read primitive
+# when its arguments come from somewhere the caller does not control, so it is
+# medium severity with a low confidence floor, in the same register as
+# VYQL-DESER-004 over `newDocumentBuilder()`.
+#
+# Real checkout, bounded, on the vulnerable revision (jenkins is large enough that a
+# whole-repo scan does not fit the 180s bound, so the scan targets the module
+# holding the changed files): `vyql scan --max-ram 4GB
+# core/src/main/java/hudson/cli` reports 1 finding, VYQL-PATH-061 at
+# CLICommand.java:310 -- the `new CmdLineParser(this)` the advisory names. The
+# patched form of the same function clears it.
+#
+# The fixed revision's second site, `CLIRegisterer.bindMethod`, is not reported, and the cause
+# is not this rule: it sits inside an anonymous class body (`new
+# CloneableCLICommand() { ... }`), and the Java frontend extracts nothing from
+# those. The fourth and fifth cases below are the isolating pair -- identical
+# statements, differing only in whether the enclosing class is named or anonymous;
+# the named one reports VYQL-PATH-061 and the anonymous one reports nothing. The
+# same pair holds for an unrelated sink: `Runtime.getRuntime().exec(v)` is labelled
+# `code.CommandExecution` in a named class and labelled nothing inside `new
+# Runnable() { ... }`. This is the Java twin of the PHP anonymous-class gap
+# recorded for rank 1194, and it is entered in ENGINE-GAPS.md rather than worked
+# around here.
+#
+# verify_current_expected: fixed
+#
+# vyql/ontology/concepts/code/ArgumentFileExpansion.vyql,
+# vyql/ontology/concepts/core/ArgumentFileExpansionControl.vyql,
+# vyql/ontology/threatkinds/path/ArgumentFileExpansionUnrestricted.vyql,
+# vyql/packs/path/vypr/path/ArgumentFileExpansionUnrestricted.vyql (VYQL-PATH-061),
+# vyql/bindings/java/m420f6b67.vyql (argumentFileExpansion465,
+# argumentFileExpansionControl466). OWASP Java and Python unchanged at +1.00 and
+# +0.90; neither corpus nor the RealVuln corpus contains args4j.
+
+test "rank1230: a CLI command parser built on the args4j default expands @-file arguments"
+  lang java
+  file CLICommand.java
+  expect VYQL-PATH-061
+  code
+  ```
+  package hudson.cli;
+
+  import java.util.List;
+  import org.kohsuke.args4j.CmdLineParser;
+
+  public abstract class CLICommand {
+
+      protected CmdLineParser getCmdLineParser() {
+          return new CmdLineParser(this);
+      }
+
+      public int run(List<String> args) throws Exception {
+          CmdLineParser parser = getCmdLineParser();
+          parser.parseArgument(args.toArray(new String[0]));
+          return 0;
+      }
+  }
+  ```
+
+test "rank1230: setting the at-syntax mode explicitly clears the finding"
+  lang java
+  file CLICommand.java
+  reject VYQL-PATH-061
+  code
+  ```
+  package hudson.cli;
+
+  import java.util.List;
+  import org.kohsuke.args4j.CmdLineParser;
+  import org.kohsuke.args4j.ParserProperties;
+  import jenkins.util.SystemProperties;
+
+  public abstract class CLICommand {
+
+      public static boolean ALLOW_AT_SYNTAX = SystemProperties.getBoolean(CLICommand.class.getName() + ".allowAtSyntax");
+
+      protected CmdLineParser getCmdLineParser() {
+          ParserProperties properties = ParserProperties.defaults().withAtSyntax(ALLOW_AT_SYNTAX);
+          return new CmdLineParser(this, properties);
+      }
+
+      public int run(List<String> args) throws Exception {
+          CmdLineParser parser = getCmdLineParser();
+          parser.parseArgument(args.toArray(new String[0]));
+          return 0;
+      }
+  }
+  ```
+
+test "rank1230: a parser built from ParserProperties that never touches at-syntax still expands @-file arguments"
+  lang java
+  file CLICommand.java
+  expect VYQL-PATH-061
+  code
+  ```
+  package hudson.cli;
+
+  import org.kohsuke.args4j.CmdLineParser;
+  import org.kohsuke.args4j.ParserProperties;
+
+  public abstract class CLICommand {
+
+      protected CmdLineParser getCmdLineParser() {
+          ParserProperties properties = ParserProperties.defaults().withUsageWidth(120);
+          return new CmdLineParser(this, properties);
+      }
+  }
+  ```
+
+test "rank1230: the same construction in a named class is reported"
+  lang java
+  file CLIRegisterer.java
+  expect VYQL-PATH-061
+  code
+  ```
+  package hudson.cli.declarative;
+
+  import java.util.List;
+  import org.kohsuke.args4j.CmdLineParser;
+
+  public class CLIRegisterer {
+
+      static class Command extends CloneableCLICommand {
+          private CmdLineParser bindMethod(List<MethodBinder> binders) {
+              CmdLineParser parser = new CmdLineParser(null);
+              return parser;
+          }
+      }
+  }
+  ```
+
+test "rank1230: the Java frontend extracts nothing from an anonymous class body, so the same construction there is not reported"
+  lang java
+  file CLIRegisterer.java
+  reject VYQL-PATH-061
+  code
+  ```
+  package hudson.cli.declarative;
+
+  import java.util.List;
+  import org.kohsuke.args4j.CmdLineParser;
+
+  public class CLIRegisterer {
+
+      Object discover() {
+          return new CloneableCLICommand() {
+              private CmdLineParser bindMethod(List<MethodBinder> binders) {
+                  CmdLineParser parser = new CmdLineParser(null);
+                  return parser;
+              }
+          };
+      }
+  }
+  ```

@@ -1,0 +1,6 @@
+module code;
+
+concept ArgumentFileExpansion : issue {
+  cwe: [CWE_22, CWE_200]
+  vulnerableTo: [path.ArgumentFileExpansionUnrestricted]
+}

@@ -4314,3 +4314,8 @@ binding sensitiveDataInResponsePassthruAsDict906 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.decoratorMethod contains "passthru" and node.context.call contains "as_dict" and not (node.context.call contains "mask_password")
   emit issue code.SensitiveDataInResponse at node
 }
+
+binding incompleteTemplateValidationEnvFilterRawGetattr907 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.decoratorMethod == "pass_environment" and node.context.callPath == "getattr" and not (node.context.callPath contains ".getattr")
+  emit issue code.IncompleteTemplateValidation at node
+}

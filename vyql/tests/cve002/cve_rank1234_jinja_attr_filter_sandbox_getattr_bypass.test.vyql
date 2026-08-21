@@ -1,0 +1,137 @@
+# Rank 1234 / CVE-2025-27516: Jinja's `|attr` filter (do_attr in filters.py)
+# read the attribute with the builtin getattr() and then applied only one half
+# of the sandbox policy -- the is_safe_attribute allowlist -- instead of
+# delegating to environment.getattr(). SandboxedEnvironment.getattr does two
+# things: it runs is_safe_attribute, and it passes the value through
+# wrap_str_format, which replaces a str.format/str.format_map bound method with
+# a format implementation that sandboxes the field expressions. Because the
+# filter never called wrap_str_format, a template could reach the unwrapped
+# str.format through `|attr("format")` and evaluate a format string such as
+# "{0.__call__.__builtins__[__import__]}", which walks straight out of the
+# sandbox to __import__ (CWE-1336, GHSA-cpwx-vrp4-4pq7). The fixed
+# revision probes existence with
+# inspect.getattr_static/hasattr (so environment.getattr's item fallback cannot
+# trigger) and then returns environment.getattr(obj, name), which is the single
+# accessor the sandbox documents as the place its checks live.
+#
+# FIXED. Nothing existing labelled this: a baseline scan of the vulnerable
+# checkout (033c200, the vulnerable revision) reports 133 findings across the
+# repository and none of them at filters.py:1411. Reuses the existing
+# code.IncompleteTemplateValidation concept (VYQL-INJ-024, CWE-1336), which
+# carries the Jinja-sandbox family of Python bindings, with one new
+# binding: a function decorated with @pass_environment -- Jinja's documented
+# way for a filter or test to receive the Environment -- that calls the builtin
+# getattr and never calls anything ending in .getattr. That last clause is what
+# discriminates the two revisions, because the fixed revision's only attribute read is
+# environment.getattr; a filter that goes through the environment is exactly
+# the safe form the sandbox documentation asks for.
+#
+# The binding is deliberately gated on the decorator rather than on getattr
+# alone. Raw getattr is ordinary Python and appears twice more in this same
+# file (do_round resolves math.ceil/math.floor by name, a docstring example
+# reads a username), so a binding on the call alone would fire on both; neither
+# function receives the Environment, so neither matches. Across the whole
+# vulnerable repository the new binding produces exactly one finding, at
+# filters.py:1411, and the same bounded scan of the fixed tree (90457bbf33)
+# reports VYQL-INJ-024 zero times.
+
+test "rank1234: attr filter reads the attribute with builtin getattr instead of environment.getattr"
+  lang python
+  file filters.py
+  expect VYQL-INJ-024
+  code
+  ```
+  import typing as t
+
+  from .runtime import Undefined
+  from .utils import pass_environment
+
+
+  @pass_environment
+  def do_attr(
+      environment: "Environment", obj: t.Any, name: str
+  ) -> t.Union[Undefined, t.Any]:
+      """Get an attribute of an object.  ``foo|attr("bar")`` works like
+      ``foo.bar`` just that always an attribute is returned and items are not
+      looked up.
+      """
+      try:
+          name = str(name)
+      except UnicodeError:
+          pass
+      else:
+          try:
+              value = getattr(obj, name)
+          except AttributeError:
+              pass
+          else:
+              if environment.sandboxed:
+                  environment = t.cast("SandboxedEnvironment", environment)
+
+                  if not environment.is_safe_attribute(obj, name, value):
+                      return environment.unsafe_undefined(obj, name)
+
+              return value
+
+      return environment.undefined(obj=obj, name=name)
+  ```
+
+test "rank1234: attr filter delegates the read to environment.getattr"
+  lang python
+  file filters.py
+  reject VYQL-INJ-024
+  code
+  ```
+  import typing as t
+  from inspect import getattr_static
+
+  from .runtime import Undefined
+  from .utils import pass_environment
+
+
+  @pass_environment
+  def do_attr(
+      environment: "Environment", obj: t.Any, name: str
+  ) -> t.Union[Undefined, t.Any]:
+      """Get an attribute of an object. ``foo|attr("bar")`` works like
+      ``foo.bar``, but returns undefined instead of falling back to
+      ``foo["bar"]`` if the attribute doesn't exist.
+      """
+      # Environment.getattr will fall back to obj[name] if obj.name doesn't
+      # exist. But we want to call env.getattr to get behavior such as
+      # sandboxing. Determine if the attr exists first, so we know the
+      # fallback won't trigger.
+      try:
+          getattr_static(obj, name)
+      except AttributeError:
+          if not hasattr(obj, name):
+              return environment.undefined(obj=obj, name=name)
+
+      return environment.getattr(obj, name)
+  ```
+
+test "rank1234: a filter that does not receive the environment is not a sandbox accessor"
+  lang python
+  file filters.py
+  reject VYQL-INJ-024
+  code
+  ```
+  import math
+  import typing as t
+
+  from .exceptions import FilterArgumentError
+
+
+  def do_round(
+      value: float, precision: int = 0, method: str = "common"
+  ) -> float:
+      """Round the number to a given precision."""
+      if method not in {"common", "ceil", "floor"}:
+          raise FilterArgumentError("method must be common, ceil or floor")
+
+      if method == "common":
+          return round(value, precision)
+
+      func = getattr(math, method)
+      return t.cast(float, func(value * (10**precision)) / (10**precision))
+  ```
