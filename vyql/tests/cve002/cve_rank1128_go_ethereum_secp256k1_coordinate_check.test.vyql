@@ -1,0 +1,62 @@
+# Rank 1128 / CVE-2026-26314: go-ethereum's secp256k1 IsOnCurve accepts (x, y)
+# without confirming both are reduced modulo the field prime, so an
+# out-of-canonical-range point can still satisfy the curve equation (CWE-20).
+#
+# ATTENTION: vocabulary gap. Nearest concepts assume IsOnCurve itself is
+# trustworthy and ask only whether the caller calls it; here IsOnCurve's own
+# coordinate-range precondition is missing, and neither concept has a Go
+# binding. Both snippets reject the review.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1128: IsOnCurve accepts coordinates without checking they're reduced mod P"
+  lang go
+  file curve.go
+  reject_review code.EcdhPeerPublicKeyMissingCurveValidation
+  code
+  ```
+  package secp256k1
+
+  import "math/big"
+
+  func (bitCurve *BitCurve) IsOnCurve(x, y *big.Int) bool {
+      y2 := new(big.Int).Mul(y, y)
+      y2.Mod(y2, bitCurve.P)
+
+      y23 := new(big.Int).Mul(x, x)
+      y23.Mul(y23, x)
+
+      y23.Add(y23, bitCurve.B)
+      y23.Mod(y23, bitCurve.P)
+
+      return y2.Cmp(y23) == 0
+  }
+  ```
+
+test "rank1128: IsOnCurve rejects coordinates at or past the field prime first"
+  lang go
+  file curve.go
+  reject_review code.EcdhPeerPublicKeyMissingCurveValidation
+  code
+  ```
+  package secp256k1
+
+  import "math/big"
+
+  func (bitCurve *BitCurve) IsOnCurve(x, y *big.Int) bool {
+      if x.Cmp(bitCurve.P) >= 0 || y.Cmp(bitCurve.P) >= 0 {
+          return false
+      }
+
+      y2 := new(big.Int).Mul(y, y)
+      y2.Mod(y2, bitCurve.P)
+
+      y23 := new(big.Int).Mul(x, x)
+      y23.Mul(y23, x)
+
+      y23.Add(y23, bitCurve.B)
+      y23.Mod(y23, bitCurve.P)
+
+      return y2.Cmp(y23) == 0
+  }
+  ```

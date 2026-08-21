@@ -1,0 +1,88 @@
+# Rank 1120 / CVE-2024-36401: GeoTools builds a JXPathContext with Commons
+# JXPath's default configuration, which resolves Java method calls embedded in
+# an XPath string, and feeds it a property name OGC requests control directly
+# (CWE-94, CWE-95).
+#
+# VYQL-INJ-189 fires on the unhardened JXPathContext.newContext + iterate/
+# setValue sites and separates the revisions: installing an empty FunctionLibrary
+# (JXPathUtils.newSafeContext) stops method resolution in the expression.
+# Vulnerable snippet expects the finding.
+#
+# verify_current_expected: current-behavior
+
+test "rank1120: the accessor iterates an unsafe JXPathContext"
+  lang java
+  file FeaturePropertyAccessorFactory.java
+  expect VYQL-INJ-189
+  code
+  ```
+  package org.geotools.data.complex.expression;
+
+  import java.util.ArrayList;
+  import java.util.Enumeration;
+  import java.util.Iterator;
+  import java.util.List;
+  import org.apache.commons.jxpath.JXPathContext;
+  import org.apache.commons.jxpath.Pointer;
+  import org.xml.sax.helpers.NamespaceSupport;
+
+  public class FeaturePropertyAccessorFactory {
+
+      static class ComplexFeaturePropertyAccessor {
+          NamespaceSupport namespaces;
+
+          public <T> T get(Object object, String xpath, Class<T> target) {
+              JXPathContext context = JXPathContext.newContext(object);
+              Enumeration declaredPrefixes = namespaces.getDeclaredPrefixes();
+              while (declaredPrefixes.hasMoreElements()) {
+                  String prefix = (String) declaredPrefixes.nextElement();
+                  String uri = namespaces.getURI(prefix);
+                  context.registerNamespace(prefix, uri);
+              }
+
+              Iterator it = context.iteratePointers(xpath);
+              List results = new ArrayList<>();
+              while (it.hasNext()) {
+                  Pointer pointer = (Pointer) it.next();
+                  results.add(pointer.getValue());
+              }
+              return (T) results;
+          }
+      }
+  }
+  ```
+
+test "rank1120: the accessor builds a safe context with an empty function library"
+  lang java
+  file FeaturePropertyAccessorFactory.java
+  reject VYQL-INJ-189
+  code
+  ```
+  package org.geotools.data.complex.expression;
+
+  import java.util.ArrayList;
+  import java.util.Iterator;
+  import java.util.List;
+  import org.apache.commons.jxpath.JXPathContext;
+  import org.apache.commons.jxpath.Pointer;
+  import org.geotools.xsd.impl.jxpath.JXPathUtils;
+  import org.xml.sax.helpers.NamespaceSupport;
+
+  public class FeaturePropertyAccessorFactory {
+
+      static class ComplexFeaturePropertyAccessor {
+          NamespaceSupport namespaces;
+
+          public <T> T get(Object object, String xpath, Class<T> target) {
+              JXPathContext context = JXPathUtils.newSafeContext(object, false, this.namespaces, true);
+              Iterator it = context.iteratePointers(xpath);
+              List results = new ArrayList<>();
+              while (it.hasNext()) {
+                  Pointer pointer = (Pointer) it.next();
+                  results.add(pointer.getValue());
+              }
+              return (T) results;
+          }
+      }
+  }
+  ```

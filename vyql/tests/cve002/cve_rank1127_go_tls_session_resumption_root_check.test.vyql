@@ -1,0 +1,69 @@
+# Rank 1127 / CVE-2025-68121: Go's crypto/tls resumes a session from a cached
+# certificate chain after checking expiry only, never re-checking that the
+# chain's root is still trusted under the current Config (CWE-295).
+#
+# ATTENTION: vocabulary gap. The defect is inside the standard library's
+# resumption path; application call sites look identical on both revisions.
+# code.CertValidationDisabled looks for validation turned off outright, not a
+# stale trust-store decision between handshakes. Both snippets reject
+# VYQL-CFG-004.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1127: resumption accepts a cached chain checked only for expiry"
+  lang go
+  file common.go
+  reject VYQL-CFG-004
+  code
+  ```
+  package tls
+
+  import (
+      "crypto/x509"
+      "slices"
+      "time"
+  )
+
+  func anyUnexpiredChain(verifiedChains [][]*x509.Certificate, now time.Time) bool {
+      for _, chain := range verifiedChains {
+          if len(chain) != 0 && !slices.ContainsFunc(chain, func(cert *x509.Certificate) bool {
+              return now.Before(cert.NotBefore) || now.After(cert.NotAfter)
+          }) {
+              return true
+          }
+      }
+      return false
+  }
+  ```
+
+test "rank1127: resumption also revalidates the cached chain's root against the current Config"
+  lang go
+  file common.go
+  reject VYQL-CFG-004
+  code
+  ```
+  package tls
+
+  import (
+      "crypto/x509"
+      "slices"
+  )
+
+  func anyValidVerifiedChain(verifiedChains [][]*x509.Certificate, opts x509.VerifyOptions) bool {
+      for _, chain := range verifiedChains {
+          if len(chain) == 0 {
+              continue
+          }
+          if slices.ContainsFunc(chain, func(cert *x509.Certificate) bool {
+              return opts.CurrentTime.Before(cert.NotBefore) || opts.CurrentTime.After(cert.NotAfter)
+          }) {
+              continue
+          }
+          root := chain[len(chain)-1]
+          if _, err := root.Verify(opts); err == nil {
+              return true
+          }
+      }
+      return false
+  }
+  ```

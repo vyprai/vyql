@@ -1,0 +1,78 @@
+# Rank 1122 / CVE-2026-6951: simple-git's unsafe-operation plugin blocks only a
+# short denylist of git config keys and no CLI flags, so other keys and flags
+# that run attacker-named programs still pass through (CWE-94).
+#
+# ATTENTION: vocabulary gap. The defect is entirely inside the library's own
+# denylists; application call sites look identical on both revisions, and
+# simple-git is unbound as a sink or control. Both snippets reject VYQL-INJ-004.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1122: the config denylist has six entries and no flag denylist exists"
+  lang javascript
+  file detect-config-writes.ts
+  reject VYQL-INJ-004
+  code
+  ```
+  function preventConfigBuilder(config, category, message) {
+    const regex = typeof config === 'string' ? new RegExp('\\s*' + config, 'i') : config;
+    return function preventCommand(key) {
+      if (regex.test(key)) {
+        return { category, message: 'Configuring ' + (message || config) + ' is not permitted without enabling ' + category };
+      }
+    };
+  }
+
+  const preventUnsafeConfig = [
+    preventConfigBuilder('core.sshCommand', 'allowUnsafeSshCommand'),
+    preventConfigBuilder('core.fsmonitor', 'allowUnsafeFsMonitor'),
+    preventConfigBuilder('core.gitProxy', 'allowUnsafeGitProxy'),
+    preventConfigBuilder('core.hooksPath', 'allowUnsafeHooksPath'),
+    preventConfigBuilder('diff.external', 'allowUnsafeDiffExternal'),
+  ];
+
+  function* detectConfigWrites({ write }) {
+    for (const config of write) {
+      for (const helper of preventUnsafeConfig) {
+        const vulnerability = helper(config.key);
+        if (vulnerability) yield vulnerability;
+      }
+    }
+  }
+  ```
+
+test "rank1122: the denylist covers textconv, filter hooks and CLI flags too"
+  lang javascript
+  file detect-vulnerable-config-writes.ts
+  reject VYQL-INJ-004
+  code
+  ```
+  function preventConfigBuilder(config, category, message) {
+    const regex = typeof config === 'string' ? new RegExp('\\s*' + config, 'i') : config;
+    return function preventCommand(key) {
+      if (regex.test(key)) {
+        return { category, message: 'Configuring ' + (message || config) + ' is not permitted without enabling ' + category };
+      }
+    };
+  }
+
+  const preventUnsafeConfig = [
+    preventConfigBuilder('core.sshCommand', 'allowUnsafeSshCommand'),
+    preventConfigBuilder('core.fsmonitor', 'allowUnsafeFsMonitor'),
+    preventConfigBuilder('core.gitProxy', 'allowUnsafeGitProxy'),
+    preventConfigBuilder('core.hooksPath', 'allowUnsafeHooksPath'),
+    preventConfigBuilder('diff.external', 'allowUnsafeDiffExternal'),
+    preventConfigBuilder('diff.textconv', 'allowUnsafeDiffTextconv'),
+    preventConfigBuilder('filter.*.clean', 'allowUnsafeFilterClean'),
+    preventConfigBuilder('filter.*.smudge', 'allowUnsafeFilterSmudge'),
+  ];
+
+  function* detectConfigWrites({ write }) {
+    for (const config of write) {
+      for (const helper of preventUnsafeConfig) {
+        const vulnerability = helper(config.key);
+        if (vulnerability) yield vulnerability;
+      }
+    }
+  }
+  ```
