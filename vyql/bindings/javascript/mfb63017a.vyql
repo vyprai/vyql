@@ -1763,6 +1763,11 @@ binding filePathAccess325 {
   emit sink code.FilePathAccess at args[0]
 }
 
+binding filePathAccess325a {
+  query pattern callExpr where callee.path ~= "readFileSync"
+  emit sink code.FilePathAccess at args[0]
+}
+
 binding filePathAccess326 {
   query pattern callExpr where callee.path ~= "fs.writeFile"
   emit sink code.FilePathAccess at args[0]

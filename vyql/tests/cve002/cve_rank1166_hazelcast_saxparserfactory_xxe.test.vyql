@@ -1,0 +1,74 @@
+# Rank 1166 / CVE-2022-0265: AbstractXmlConfigRootTagRecognizer built its
+# SAXParser from a raw SAXParserFactory, so a config stream carrying a DOCTYPE
+# declaration can define and expand external entities during root-tag
+# recognition. The fixed revision routes construction through
+# XmlUtil.getSAXParserFactory(), which disables DTD processing before
+# returning the factory.
+
+test "rank1166: raw SAXParserFactory in the root-tag recognizer is XXE"
+  lang java
+  expect VYQL-DESER-004
+  code
+  ```
+  import javax.xml.parsers.SAXParser;
+  import javax.xml.parsers.SAXParserFactory;
+  import org.xml.sax.helpers.DefaultHandler;
+
+  public class AbstractXmlConfigRootTagRecognizer {
+    private final SAXParser saxParser;
+
+    public AbstractXmlConfigRootTagRecognizer(String expectedRootNode) throws Exception {
+      SAXParserFactory factory = SAXParserFactory.newInstance();
+      saxParser = factory.newSAXParser();
+    }
+
+    public boolean isRecognized(ConfigStream configStream) throws Exception {
+      saxParser.parse(configStream, new DefaultHandler());
+      return true;
+    }
+  }
+  ```
+
+test "rank1166: XmlUtil.getSAXParserFactory() hardens the parser before use"
+  lang java
+  reject VYQL-DESER-004
+  code
+  ```
+  import javax.xml.parsers.SAXParser;
+  import javax.xml.parsers.SAXParserFactory;
+  import javax.xml.parsers.ParserConfigurationException;
+  import org.xml.sax.SAXException;
+  import org.xml.sax.helpers.DefaultHandler;
+
+  public class AbstractXmlConfigRootTagRecognizer {
+    private final SAXParser saxParser;
+
+    public AbstractXmlConfigRootTagRecognizer(String expectedRootNode) throws Exception {
+      SAXParserFactory factory = XmlUtil.getSAXParserFactory();
+      saxParser = factory.newSAXParser();
+    }
+
+    public boolean isRecognized(ConfigStream configStream) throws Exception {
+      saxParser.parse(configStream, new DefaultHandler());
+      return true;
+    }
+  }
+
+  final class XmlUtil {
+    private static final String FEATURES_DISALLOW_DOCTYPE = "http://apache.org/xml/features/disallow-doctype-decl";
+
+    private XmlUtil() {
+    }
+
+    public static SAXParserFactory getSAXParserFactory() throws ParserConfigurationException, SAXException {
+      SAXParserFactory factory = SAXParserFactory.newInstance();
+      setFeature(factory, FEATURES_DISALLOW_DOCTYPE);
+      return factory;
+    }
+
+    static void setFeature(SAXParserFactory saxParserFactory, String featureName)
+        throws ParserConfigurationException, SAXException {
+      saxParserFactory.setFeature(featureName, true);
+    }
+  }
+  ```

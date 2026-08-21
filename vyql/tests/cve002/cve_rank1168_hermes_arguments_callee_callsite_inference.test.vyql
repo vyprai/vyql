@@ -1,0 +1,98 @@
+# Rank 1168 / CVE-2023-30470: Hermes's optimizer inferred a JavaScript
+# function's call sites from its IR use-list alone, so a non-strict function
+# aliased through `arguments.callee` (or `Function.prototype.caller`) let an
+# interprocedural optimization run on an incomplete set of callers and later
+# read or write past what it had assumed about the function's actual callers
+# (CWE-416, GHSA-prjh-7gr6-423r).
+#
+# identifyCallsites in lib/Optimizer/Scalar/SimpleCallGraphProvider.cpp walked
+# every use of a Function value (F->getUsers()) that was a direct CallInst to
+# build the set of call sites an optimization pass could safely specialize
+# for. In non-strict mode, JavaScript lets a function reach itself through
+# `arguments.callee` (directly or via a helper that returns `arguments`, or
+# indirectly through a computed property access) without that reference ever
+# showing up as a use of the Function value in Hermes's own IR, so the walk
+# silently under-counted the function's real callers and a pass trusting that
+# set as exhaustive could misoptimize a call it never saw.
+#
+# The fixed revision adds `if (!F->isStrictMode()) return false;` at the
+# top of identifyCallsites, so a non-strict function's call sites are never
+# treated as fully known and no aliasing path through arguments.callee can
+# be missed. The rank's language is cpp: Hermes's product is a JavaScript
+# engine, but the defect and its fix live entirely in this C++ compiler
+# pass; there is no JavaScript-level snippet that carries the defect.
+#
+# ATTENTION, engine gap that is not mechanical. Scanning either revision of
+# the real checkout reports nothing at this file, and nothing in the ontology
+# reaches this shape: every CWE-416 concept in the corpus states a dataflow
+# relation between an explicit release site (PointerFree, a delete/free/close
+# call) and a later use of the same value. This bug has neither: the code
+# never frees anything, and the eventual memory corruption happens later, in
+# JIT-generated code for a call the optimizer never saw, not in this
+# function. What distinguishes the vulnerable revision from the fixed one is
+# that the vulnerable form treats an IR def-use chain (F->getUsers()) as a
+# complete enumeration of a JS function's callers without accounting for the
+# language's own aliasing rules (arguments.callee, Function.prototype.caller)
+# that let a caller reach a function by a path the IR never records as a use.
+# Recognizing that gap requires knowing both Hermes's specific IR classes
+# (Function, CallInst, the llvh:: use-list) and JavaScript's non-strict
+# aliasing semantics together; there is no library documentation a binding
+# could be written from, so any binding narrow enough to fire only here would
+# answer to this one file, not to a weakness class, failing the genericity
+# test outright. No definition change attempted, and no ENGINE-GAPS.md entry:
+# the gap is "an interprocedural optimization pass in this engine trusts an
+# incomplete callsite enumeration," which is design work specific to one
+# compiler's IR, not a mechanical one-line addition to an existing relation.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1168: identifyCallsites treats every Function use as its full callsite set"
+  lang cpp
+  file lib/Optimizer/Scalar/SimpleCallGraphProvider.cpp
+  reject VYQL-MEM-007
+  code
+  ```
+  static bool identifyCallsites(
+      Function *F,
+      llvh::DenseSet<CallInst *> &callSites) {
+    for (auto *CU : F->getUsers()) {
+      if (auto *CI = llvh::dyn_cast<CallInst>(CU)) {
+        if (!isDirectCallee(F, CI))
+          return false;
+        callSites.insert(CI);
+      } else {
+        return false;
+      }
+    }
+    return true;
+  }
+  ```
+
+test "rank1168: identifyCallsites bails out for non-strict functions that can alias through arguments.callee"
+  lang cpp
+  file lib/Optimizer/Scalar/SimpleCallGraphProvider.cpp
+  reject VYQL-MEM-007
+  code
+  ```
+  static bool identifyCallsites(
+      Function *F,
+      llvh::DenseSet<CallInst *> &callSites) {
+    // Non-strict functions can be aliased in multiple ways (
+    // arguments.callee, Function.prototype.caller etc). Do not try to identify
+    // the callsites for those.
+    if (!F->isStrictMode()) {
+      return false;
+    }
+
+    for (auto *CU : F->getUsers()) {
+      if (auto *CI = llvh::dyn_cast<CallInst>(CU)) {
+        if (!isDirectCallee(F, CI))
+          return false;
+        callSites.insert(CI);
+      } else {
+        return false;
+      }
+    }
+    return true;
+  }
+  ```
