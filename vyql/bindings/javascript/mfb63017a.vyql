@@ -4014,3 +4014,14 @@ binding catastrophicRegex911 {
   emit issue code.CatastrophicRegex at node
   emit sink code.CatastrophicRegexSink at node
 }
+
+binding catastrophicRegex960 {
+  query pattern presenceNode where node.context.language == "javascript" and node.context.literal contains "(?:.*" and node.context.literal contains ".*)*"
+  emit issue code.CatastrophicRegex at node
+  emit sink code.CatastrophicRegexSink at node
+}
+
+binding openedWindowConcatenatedDocumentWrite961 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "document.write" and node.context.callPath contains "open" and containsAny(node.context.literal, ["src=\"", "href=\"", "src='", "href='"]) and not (node.context.callPath contains "createElement")
+  emit issue code.OpenedWindowConcatenatedDocumentWrite at node
+}

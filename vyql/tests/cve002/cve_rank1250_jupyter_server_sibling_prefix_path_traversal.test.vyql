@@ -1,0 +1,164 @@
+# Rank 1250 / CVE-2026-35397 jupyter-server/jupyter_server: FileManagerMixin.
+# _get_os_path resolves an API path under the configured root_dir and then
+# guards it with
+#
+#   if not (os.path.abspath(os_path) + os.path.sep).startswith(root):
+#       raise HTTPError(404, ...)
+#
+# The separator is appended to the resolved path rather than to root, so the
+# comparison is bare string-prefix containment: any sibling directory whose
+# name starts with root's name (e.g. root "/srv/notebooks" and a sibling
+# "/srv/notebooks-evil") satisfies startswith and is treated as inside root
+# (CWE-22, CWE-184).
+#
+# The fixing diff is one line in
+# jupyter_server/services/contents/fileio.py, changing the startswith argument
+# from `root` to `root + os.path.sep`, plus a regression test named for the
+# CVE asserting the sibling-directory bypass raises 404.
+#
+# FIXED. A bounded scan of jupyter_server/services/contents/fileio.py at both
+# revisions reports nothing without this change: the taint engine has no
+# HttpInput reaching _get_os_path (the API path arrives through Tornado
+# handler methods the Python bindings do not source), and the existing check
+# binding pathAccessCheck549 (core.PathAccessCheck, `startswith(...)` whose
+# argument literal contains "os.sep") does not recognise the `os.path.sep`
+# spelling either revision actually uses -- so this is judged as an issue, not
+# a taint path, matching AGENTS.md's routing for a real vulnerability with no
+# taint path reaching it.
+#
+# code.CanonicalPathStringPrefixContainment / VYQL-PATH-040 exists for
+# exactly this weakness ("canonical paths are compared with string-prefix
+# containment instead of filesystem path containment") but is bound only for
+# Java's getCanonicalPath().startsWith -- the gap ENGINE-GAPS.md records
+# against ranks 1043 and 1052, both of which hit the same missing Python form.
+# The binding canonicalPathStringPrefixContainment in
+# vyql/bindings/python/canonical_path_string_prefix_containment.vyql, reusing
+# the concept and rule rather than minting new ones.
+#
+# The Python frontend has no shape/structure extraction for call arguments or
+# binary expressions (unlike the C, Java and C# frontends, which is how the
+# Java binding tells `getCanonicalPath().startsWith(x)` apart from
+# `getCanonicalFile().toPath().startsWith(x)` by argument shape) -- confirmed
+# against internal/extract/frontend/treesitter/python.go, which emits only
+# call/assign/selector/literal-style context tokens, no binary-op or
+# call-argument shape tokens. A first version worked around that with a
+# reachability check instead (a canonicalisation call somewhere "in scope" of
+# the startswith call), and is wrong: for a module-level statement "in scope"
+# turned out to mean the whole module, so `sys.platform.startswith("win")`
+# fired for merely sharing a file with an unrelated os.path.abspath call.
+#
+# The shipped binding uses callee.path instead, which resolves per call
+# without that reachability step: a call receiver resolves to its own dotted
+# path, so `os.path.realpath(x).startswith(y)` resolves to
+# "os.path.realpath.startswith" directly, and a receiver the resolver cannot
+# reduce to a name at all -- the shape `abspath(x) + os.sep` takes, this CVE's
+# actual mistake -- resolves to "?". Either shape then declines whenever the
+# startswith call's own argument literal carries any separator evidence -- the
+# substrings "sep", "/", "\\", or "join" (covering os.sep, os.path.sep, a
+# literal slash or backslash suffix, and os.path.join(prefix, "")) -- on
+# whichever operand it appears, not just the correct one, so the finding does
+# not depend on which side of the comparison the separator is misapplied to.
+# The cost is a plain-identifier receiver (`full.startswith(base)`, where
+# `full` is canonicalized on an earlier line) is not covered: nothing at the
+# call site says whether that identifier is ever canonicalized, and the
+# reachability check that could say so is what produced the false positive
+# above.
+#
+# Measured (timeout 180, --max-ram 4GB, --cache off) against a bounded clone
+# of jupyter_server: the vulnerable parent's
+# jupyter_server/services/contents/fileio.py reports VYQL-PATH-040 at line 325
+# (the real _get_os_path); the fixed revision reports nothing there. Sweeping the
+# whole checkout (196 python files) reports VYQL-PATH-040 three times: fileio.py:325,
+# and two more instances of the same weakness elsewhere in the same
+# repository -- jupyter_server/base/handlers.py:1086 repeats this CVE's exact
+# mistake (`(absolute_path + os.sep).startswith(root)`, separator on the
+# resolved-path side instead of root) in validate_absolute_path, and
+# jupyter_server/auth/login.py:60 applies the same bare-prefix comparison to a
+# URL path against self.base_url rather than a filesystem path -- neither is
+# this rank's CVE and neither is filed here, but both are the same structural
+# bug the concept describes and confirm the binding generalises rather than
+# matching only the repro. False positives: sweeping 13 unrelated real
+# packages present in this environment (boto3, botocore, jinja2,
+# setuptools, apport, pip, requests, urllib3, yaml, apt, dbus, systemd,
+# distro -- 228MB combined) reports VYQL-PATH-040 zero times, including the
+# `sys.platform.startswith("win")` shape the reachability-based first version
+# misfired on. OWASP Java +1.00 and Python +0.90, both unchanged -- confirmed
+# identical pathtraver counts (65 TP / 36 FP, both pre-existing) with the
+# binding and spec set aside, so neither corpus exercises this idiom either
+# way.
+
+test "rank1250: the separator is appended to the resolved path, not to root, so a sibling directory passes"
+  lang python
+  file fileio.py
+  expect VYQL-PATH-040
+  expect_review code.CanonicalPathStringPrefixContainment
+  code
+  ```
+  import os
+
+  from tornado.web import HTTPError
+
+
+  class FileManagerMixin:
+      root_dir = "/srv/notebooks"
+
+      def _get_os_path(self, path):
+          root = os.path.abspath(self.root_dir)
+          os_path = os.path.join(root, path)
+          if not (os.path.abspath(os_path) + os.path.sep).startswith(root):
+              raise HTTPError(404, "%s is outside root contents directory" % path)
+          return os_path
+  ```
+
+test "rank1250: appending the separator to root instead closes the sibling-directory gap"
+  lang python
+  file fileio.py
+  reject VYQL-PATH-040
+  reject_review code.CanonicalPathStringPrefixContainment
+  code
+  ```
+  import os
+
+  from tornado.web import HTTPError
+
+
+  class FileManagerMixin:
+      root_dir = "/srv/notebooks"
+
+      def _get_os_path(self, path):
+          root = os.path.abspath(self.root_dir)
+          os_path = os.path.join(root, path)
+          if not (os.path.abspath(os_path) + os.path.sep).startswith(root + os.path.sep):
+              raise HTTPError(404, "%s is outside root contents directory" % path)
+          return os_path
+  ```
+
+test "rank1250: os.path.join(root, '') is an equally valid separator boundary"
+  lang python
+  file pathguard.py
+  reject VYQL-PATH-040
+  reject_review code.CanonicalPathStringPrefixContainment
+  code
+  ```
+  import os
+
+
+  def safe_join(root, name):
+      full = os.path.realpath(os.path.join(root, name))
+      if not full.startswith(os.path.join(root, "")):
+          raise ValueError("outside")
+      return full
+  ```
+
+test "rank1250: a startswith check with no path canonicalisation in scope is not this weakness"
+  lang python
+  file urls.py
+  reject VYQL-PATH-040
+  reject_review code.CanonicalPathStringPrefixContainment
+  code
+  ```
+  def is_secure(url):
+      if not url.startswith("https"):
+          raise ValueError("insecure url")
+      return url
+  ```
