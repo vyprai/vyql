@@ -50,7 +50,12 @@ type lowerer struct {
 	selfName       string
 	resolveImports bool
 	ctorTypes      map[string]string // constructor callee-path -> returned type name
-	g              usg.Store
+	// phiOperands holds, per control-flow merge node, the values that merge joins.
+	// A merge's FLOWS in-edges are not the same set: a later mutator call or an
+	// alias can add an edge into the same node, so the operands are captured where
+	// mergeDeltas builds the merge and nowhere else.
+	phiOperands map[string][]string
+	g           usg.Store
 	// storeErr holds the FIRST graph-write failure. Every node and edge the
 	// lowering produces goes through the two call sites that set it, and neither
 	// can report upward -- they are called from deep inside expression lowering,
@@ -765,6 +770,7 @@ func (l *lowerer) mergeDeltas(sc *scope, before map[string]string, deltas []map[
 		for _, s := range srcIDs {
 			l.flow(s, phi)
 		}
+		l.phiOperands[phi] = srcIDs
 		sc.setNode(v, phi)
 		sc.delCnst(v) // a merged value is no longer a known constant
 	}
@@ -2307,6 +2313,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		selfName:        prog.Self(),
 		resolveImports:  resolveImports,
 		ctorTypes:       ctorTypes,
+		phiOperands:     map[string][]string{},
 		g:               newGraphStore(estimateGraphNodeHint(prog)),
 		modCtr:          map[string]int{},
 		modOrder:        map[string]int{},
@@ -4170,6 +4177,50 @@ func (l *lowerer) recvType(nodeID string) string {
 	return ""
 }
 
+// recvMergeCtorType returns the constructor type a control-flow merge carries when
+// every value the merge joins is a call to the same known constructor. A receiver
+// assigned in both arms of a branch, or in a loop body and used after the loop,
+// reaches its uses through such a merge, and a merge holds no callee path of its
+// own, so recvType leaves it untyped however the arms were built.
+//
+// This is a MAY-type and is deliberately weaker than recvType in three ways.
+// Operands are read from the merge's recorded operand list, never from its FLOWS
+// in-edges, so a mutator or an alias writing into the same node cannot join the
+// vote. Only the constructor table is consulted on an operand -- never a declared
+// or inferred type -- so a merge of locals declared at a supertype stays untyped
+// rather than reporting the supertype. And every operand must be typed and must
+// agree: one arm the table does not name, one arm holding a parameter or a null,
+// or two arms built by different constructors all withhold the type, because the
+// receiver may be any of them at the use.
+//
+// Because of that weakness it is stamped apart from recv_type, and only the
+// receiver-constrained SOURCE path reads it. For a source a known type is what
+// admits the label, so a may-type can only add; for a sink a known type is what
+// withholds one, and a may-type is not the authoritative disproof that withholding
+// requires.
+func (l *lowerer) recvMergeCtorType(nodeID string) string {
+	if nodeID == "" || len(l.ctorTypes) == 0 {
+		return ""
+	}
+	operands := l.phiOperands[nodeID]
+	if len(operands) == 0 {
+		return ""
+	}
+	merged := ""
+	for _, op := range operands {
+		n, ok, _ := l.g.GetNode(op)
+		if !ok {
+			return ""
+		}
+		t := l.ctorTypes[n.Prop("callee_path")]
+		if t == "" || (merged != "" && t != merged) {
+			return ""
+		}
+		merged = t
+	}
+	return merged
+}
+
 func (l *lowerer) typedBindingNode(val, typ string) string {
 	loc := ""
 	if n, ok, _ := l.g.GetNode(val); ok {
@@ -4263,8 +4314,11 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	}
 	// resolve the receiver once; if it was assigned from a known constructor,
 	// stamp recv_type so type-constrained sink binding applicators can reason about it.
+	// A receiver reached through a control-flow merge gets recv_may_type instead,
+	// which only the receiver-constrained source path reads (see recvMergeCtorType).
 	var recvNode string
 	var recvType string
+	var recvMayType string
 	if attr, ok := call.Callee.(nir.Attr); ok {
 		if mutatorMethods[call.Method] {
 			if nm, ok := attr.Base.(nir.Name); ok && sc.node[nm.ID] == "" {
@@ -4273,6 +4327,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		}
 		recvNode = l.eval(attr.Base, sc)
 		recvType = l.recvType(recvNode)
+		if recvType == "" {
+			recvMayType = l.recvMergeCtorType(recvNode)
+		}
 	}
 	propCount := len(args)
 	propCount += litCount
@@ -4280,6 +4337,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		propCount++
 	}
 	if recvType != "" {
+		propCount++
+	}
+	if recvMayType != "" {
 		propCount++
 	}
 	// Which package this call is made on, so a binding gated on package P can
@@ -4307,6 +4367,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		}
 		if recvType != "" {
 			props["recv_type"] = recvType
+		}
+		if recvMayType != "" {
+			props["recv_may_type"] = recvMayType
 		}
 		if recvPackage != "" {
 			props["recv_package"] = recvPackage
