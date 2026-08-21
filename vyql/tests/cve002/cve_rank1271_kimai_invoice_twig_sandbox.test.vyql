@@ -1,0 +1,141 @@
+# Rank 1271 / CVE-2023-46245: Kimai let a user holding the
+# `upload_invoice_template` permission upload a custom Twig template for
+# invoices and exports, then rendered that template through the same shared
+# `TwigRendererTrait::renderTwigTemplateWithLanguage` used for every invoice
+# and export document -- a plain `$twig->render($template, $options)` with no
+# Twig sandbox. Twig without a sandbox lets any template author reach
+# arbitrary object methods and PHP functions from template markup, so the
+# upload permission (meant only to let a customer style their own invoices)
+# is effectively full code execution (CWE-94, SSTI).
+#
+# The fixed revision (release 2.1.0) has
+# `renderTwigTemplateWithLanguage` add a `SandboxExtension` wrapping a new
+# `InvoicePolicy`/`ExportPolicy` allow-list (tags, filters, functions, and
+# object methods) and call `enableSandbox()` before every render -- the
+# template path and rendering call are otherwise unchanged, so nothing about
+# the render's arguments differs between the two revisions; the only change
+# is that the environment used for the render is sandboxed first.
+#
+# This is not a taint-reaches-a-sink shape: the payload lives in the
+# uploaded template file's content, which static analysis never sees, and
+# `$template` is a filesystem-loader path either way. It is a structural gap
+# reused from the same shape caught for Jinja2 (rank 661,
+# VYQL-INJ-024 / code.IncompleteTemplateValidation, "a template environment
+# rendering caller-authored templates is built without a sandbox"): here
+# the renderer that serves the upload-a-custom-invoice-template feature
+# builds and uses its Twig environment with no SandboxExtension at all.
+
+test "rank1271: invoice/export Twig renderer has no sandbox before render"
+  lang php
+  file TwigRendererTrait.php
+  expect VYQL-INJ-024
+  code
+  ```
+  <?php
+  namespace App\Twig;
+
+  use Symfony\Bridge\Twig\Extension\TranslationExtension;
+  use Symfony\Contracts\Translation\LocaleAwareInterface;
+  use Twig\Environment;
+
+  trait TwigRendererTrait
+  {
+      protected function renderTwigTemplateWithLanguage(Environment $twig, string $template, array $options = [], ?string $language = null, ?string $formatLocale = null): string
+      {
+          $previousTranslation = null;
+          if ($language !== null) {
+              $previousTranslation = $this->switchTranslationLocale($twig, $language);
+          }
+
+          $content = $twig->render($template, $options);
+
+          if ($previousTranslation !== null) {
+              $this->switchTranslationLocale($twig, $previousTranslation);
+          }
+
+          return $content;
+      }
+  }
+
+  abstract class AbstractTwigRenderer
+  {
+      use TwigRendererTrait;
+
+      public function __construct(private Environment $twig)
+      {
+      }
+
+      protected function renderTwigTemplate(InvoiceDocument $document, InvoiceModel $model, array $options = []): string
+      {
+          $template = '@invoice/' . basename($document->getFilename());
+          $entries = [];
+          foreach ($model->getCalculator()->getEntries() as $entry) {
+              $entries[] = $model->itemToArray($entry);
+          }
+
+          return $this->renderTwigTemplateWithLanguage($this->twig, $template, $options);
+      }
+  }
+  ```
+
+test "rank1271: invoice/export Twig renderer sandboxes the environment before render"
+  lang php
+  file TwigRendererTrait.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+  namespace App\Twig;
+
+  use App\Twig\SecurityPolicy\InvoicePolicy;
+  use Symfony\Bridge\Twig\Extension\TranslationExtension;
+  use Symfony\Contracts\Translation\LocaleAwareInterface;
+  use Twig\Environment;
+  use Twig\Extension\SandboxExtension;
+
+  trait TwigRendererTrait
+  {
+      protected function renderTwigTemplateWithLanguage(Environment $twig, string $template, array $options = [], ?string $language = null, ?string $formatLocale = null): string
+      {
+          $previousTranslation = null;
+          if ($language !== null) {
+              $previousTranslation = $this->switchTranslationLocale($twig, $language);
+          }
+
+          // enable basic security measures
+          if (!$twig->hasExtension(SandboxExtension::class)) {
+              $sandbox = new SandboxExtension(new InvoicePolicy());
+              $sandbox->enableSandbox();
+              $twig->addExtension($sandbox);
+          }
+
+          $content = $twig->render($template, $options);
+
+          if ($previousTranslation !== null) {
+              $this->switchTranslationLocale($twig, $previousTranslation);
+          }
+
+          return $content;
+      }
+  }
+
+  abstract class AbstractTwigRenderer
+  {
+      use TwigRendererTrait;
+
+      public function __construct(private Environment $twig)
+      {
+      }
+
+      protected function renderTwigTemplate(InvoiceDocument $document, InvoiceModel $model, array $options = []): string
+      {
+          $template = '@invoice/' . basename($document->getFilename());
+          $entries = [];
+          foreach ($model->getCalculator()->getEntries() as $entry) {
+              $entries[] = $model->itemToArray($entry);
+          }
+
+          return $this->renderTwigTemplateWithLanguage($this->twig, $template, $options);
+      }
+  }
+  ```

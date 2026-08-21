@@ -1,0 +1,60 @@
+# Rank 1272 / CVE-2020-19825: Kimai rendered a timesheet entry's
+# user-supplied description through its Markdown-to-HTML helper and echoed
+# the result directly into the response. The Twig `desc2html` filter that
+# wraps this call is declared `is_safe: ['html']`, so nothing downstream
+# escapes the converted output, and the Markdown parser itself runs with
+# HTML passthrough enabled — a description containing raw `<script>` markup
+# reaches the browser unescaped. The real fix (kimai/kimai@a0e8aa3a43,
+# PR #962) touches only `.twig` templates: every `{{ entry.description|desc2html }}`
+# call site becomes `{{ entry.description|escape|desc2html }}`, so any HTML
+# special characters in the source text are inert entities by the time the
+# converter (and the later unescaped render) sees them.
+#
+# VyQL has no Twig frontend at all -- every `.twig` file in a real checkout
+# is skipped with "matched no frontend" -- so the actual vulnerable and
+# patched lines can never be scanned. This spec instead pins the equivalent
+# taint shape in the PHP half of the same data flow (untrusted description
+# reaching a non-sanitizing Markdown-to-HTML call, then an unescaped HTML
+# sink) to show the existing rule judging this shape correctly
+# in isolation; the miss is specific to the Twig template layer, not to the
+# rule or binding. See the ENGINE-GAPS.md entry for the frontend gap this
+# rank is blocked on.
+
+test "rank1272: timesheet description reaches markdown-to-html and is echoed raw"
+  lang php
+  profile web
+  file TimesheetController.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+  class TimesheetController {
+    private $markdown;
+
+    public function renderDescription() {
+      $description = $_POST['description'];
+      $html = $this->markdown->toHtml($description, false);
+      echo $html;
+    }
+  }
+  ```
+
+test "rank1272: timesheet description is escaped before markdown-to-html"
+  lang php
+  profile web
+  file TimesheetController.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+  class TimesheetController {
+    private $markdown;
+
+    public function renderDescription() {
+      $description = $_POST['description'];
+      $escaped = htmlspecialchars($description, ENT_QUOTES, 'UTF-8');
+      $html = $this->markdown->toHtml($escaped, false);
+      echo $html;
+    }
+  }
+  ```

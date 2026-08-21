@@ -1,0 +1,107 @@
+# Rank 1267 / CVE-2022-39382: @keystone-6/core's own build-time invocation of
+# esbuild to compile a project's `keystone.ts` config left esbuild's
+# `platform` option unset. Per esbuild's documented `platform` behaviour
+# (https://esbuild.github.io/api/#platform), an unset platform defaults to
+# "browser", under which esbuild automatically substitutes
+# `process.env.NODE_ENV` expressions with a compile-time constant; that
+# substitution is skipped only when `platform: 'node'` is set explicitly,
+# because Node supplies the real variable at runtime. Compiling a Node-only,
+# CommonJS-format bundle (`format: 'cjs'`) without `platform: 'node'`
+# therefore silently freezes `process.env.NODE_ENV` inside the compiled
+# config to whatever esbuild picked at build time, regardless of the actual
+# runtime value -- and any user code the config wraps that branches on
+# `NODE_ENV` for production-only or security-sensitive behaviour runs with
+# that frozen value instead.
+#
+# packages/core/src/lib/config/loadConfig.ts built the esbuild `BuildOptions`
+# for this exact compile step and called `esbuild.build` with it, bundling to
+# `format: 'cjs'` without setting `platform`. Fix commit 38114340
+# ("Use platform node for esbuild config", PR #8031, GHSA-25mx-2mxm-6343 /
+# CVE-2022-39382) adds `platform: 'node'` to that same options object; nothing
+# else in the file changes. Pool's flagged commit d07f20ab3f is a regression
+# regression test (PR #8063, "Test that process.env.NODE_ENV is production
+# when set to that in production") that exercises the shipped fix rather
+# than being the fixing change itself.
+#
+# No existing concept or binding names esbuild's `platform` option or this
+# NODE_ENV-inlining behaviour; scanning both the vulnerable and patched
+# revisions with the pre-existing rule set reports nothing either way.
+#
+# FIXED. Minted code.BundlerEnvironmentInliningMisconfig (CWE_1188, CWE_693;
+# reviewConfidence possibility, since whether the frozen NODE_ENV value
+# matters depends on what the bundled config actually branches on) and bound
+# it in vyql/bindings/javascript/bundler_env_inlining_misconfig.vyql: a
+# module-scope esbuild.build/buildSync call whose options set `bundle: true`
+# and `format: 'cjs'` without also setting `platform: 'node'`. The binding
+# names only esbuild's own documented `platform`, `format` and `bundle`
+# option keys, not this project's file or function names, so it generalises
+# to any esbuild-driven Node bundling step with the same omission, not just
+# this one. VYQL-CFG-025 fires on the vulnerable shape below and not on the
+# patched one.
+#
+# verify_current_expected: current-behavior
+
+test "rank1267: esbuild builds a Node-format bundle without platform: 'node'"
+  lang javascript
+  file packages/core/src/lib/config/loadConfig.ts
+  expect VYQL-CFG-025
+  code
+  ```
+  import esbuild, { BuildOptions } from 'esbuild';
+  import { KeystoneConfig } from '../../types';
+  import { getBuiltConfigPath } from '../../scripts/utils';
+  import { initConfig } from './initConfig';
+
+  export function getEsbuildConfig(cwd: string): BuildOptions {
+    return {
+      entryPoints: ['./keystone'],
+      absWorkingDir: cwd,
+      bundle: true,
+      outfile: '.keystone/config.js',
+      format: 'cjs',
+      plugins: [],
+    };
+  }
+
+  export function loadBuiltConfig(cwd: string): KeystoneConfig {
+    return initConfig(require(getBuiltConfigPath(cwd)).default);
+  }
+
+  export async function loadConfigOnce(cwd: string): Promise<KeystoneConfig> {
+    await esbuild.build(getEsbuildConfig(cwd));
+    return loadBuiltConfig(cwd);
+  }
+  ```
+
+test "rank1267: the same build sets platform: 'node' explicitly"
+  lang javascript
+  file packages/core/src/lib/config/loadConfig.ts
+  reject VYQL-CFG-025
+  code
+  ```
+  import esbuild, { BuildOptions } from 'esbuild';
+  import { KeystoneConfig } from '../../types';
+  import { getBuiltConfigPath } from '../../scripts/utils';
+  import { initConfig } from './initConfig';
+
+  export function getEsbuildConfig(cwd: string): BuildOptions {
+    return {
+      entryPoints: ['./keystone'],
+      absWorkingDir: cwd,
+      bundle: true,
+      outfile: '.keystone/config.js',
+      format: 'cjs',
+      platform: 'node',
+      plugins: [],
+    };
+  }
+
+  export function loadBuiltConfig(cwd: string): KeystoneConfig {
+    return initConfig(require(getBuiltConfigPath(cwd)).default);
+  }
+
+  export async function loadConfigOnce(cwd: string): Promise<KeystoneConfig> {
+    await esbuild.build(getEsbuildConfig(cwd));
+    return loadBuiltConfig(cwd);
+  }
+  ```

@@ -2734,3 +2734,18 @@ binding storedHtmlWrite473 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "save" and node.context.assign contains "$page->description=$data[\"attributes\"][\"description\"]" and not (node.context.assign contains "$page->description=strip_tags(")
   emit issue code.StoredHtmlWrite at node
 }
+
+// A renderTwigTemplateWithLanguage-shaped method (the trait a Twig-based
+// document renderer uses to render caller-selected templates) that calls
+// $twig->render(...) with no SandboxExtension anywhere in its own body is
+// the same structural gap already caught for Jinja2 (rank 661,
+// code.IncompleteTemplateValidation / VYQL-INJ-024): a template environment
+// that renders caller-authored templates was built and used with no
+// sandbox, so a template's own markup can reach arbitrary methods and
+// functions rather than only what a sandbox policy allows. Requiring the
+// method body to be free of "SandboxExtension" keeps this from firing once
+// the sandbox is wired up, regardless of where in the body it is added.
+binding customTemplateRenderMissingSandbox474 {
+  query pattern presenceNode where node.analysis == "function.context" and node.token contains "renderTwigTemplateWithLanguage" and node.token contains "$twig->render(" and not (node.token contains "SandboxExtension")
+  emit issue code.IncompleteTemplateValidation at node
+}
