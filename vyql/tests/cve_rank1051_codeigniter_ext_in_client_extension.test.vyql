@@ -1,0 +1,113 @@
+# Rank 1051 / CVE-2026-48062: CodeIgniter's `ext_in` upload rule validates the
+# extension guessed from the file's content and never the one the client sends
+# (CWE-434). FileRules::ext_in in system/Validation/StrictRules/FileRules.php
+# holds
+#
+#   if (! in_array($file->guessExtension(), $params, true)) {
+#       return false;
+#   }
+#
+# so uploading GIF bytes under the name `shell.php` satisfies `ext_in[avatar,gif]`
+# while the stored file keeps the `.php` name. The fixed revision also reads
+# getClientExtension, rejects an empty one, requires it to be in the allowed
+# list, and requires the guessed and client extensions to agree.
+#
+# ATTENTION, and the missing piece is the mirror of the unrestricted-upload
+# case: VYQL-INJ-015 is `taint core.UserControlledData -> code.UnsafeUpload`
+# with no `unless`, and no control concept anywhere neutralises
+# injection.UnrestrictedUpload, so a correct handler reports exactly like a
+# vulnerable one. Here the framework's own upload validation is not recognised
+# as a control either, so the code that decides whether an upload is acceptable
+# is invisible.
+#
+# One concept closes both, and this rank says what it has to carry. A control
+# that only records "the upload was validated" marks this vulnerable revision
+# safe, because it does validate, against the wrong property. The concept has
+# to name which property was checked, so that a rule can require the
+# client-supplied name to be among them. Without that distinction, binding
+# `ext_in` as a control suppresses the true positives of the unrestricted-upload
+# rule and endorses the bug here.
+#
+# Both revisions report nothing over the file, and vyql match labels no source
+# and no control, only an unrelated code.CodeEval at line 45.
+#
+# verify_current_expected: attention-missing-control-concept
+
+test "rank1051: the rule checks only the extension guessed from content"
+  lang php
+  file system/Validation/StrictRules/FileRules.php
+  reject VYQL-INJ-015
+  code
+  ```
+  <?php
+
+  namespace CodeIgniter\Validation\StrictRules;
+
+  class FileRules
+  {
+      public function ext_in(?string $blank, string $params): bool
+      {
+          $params = explode(',', $params);
+          $name = array_shift($params);
+
+          foreach ($this->request->getFileMultiple($name) ?? [$this->request->getFile($name)] as $file) {
+              if ($file === null) {
+                  return false;
+              }
+
+              if ($file->getError() === UPLOAD_ERR_NO_FILE) {
+                  return true;
+              }
+
+              if (! in_array($file->guessExtension(), $params, true)) {
+                  return false;
+              }
+          }
+
+          return true;
+      }
+  }
+  ```
+
+test "rank1051: fix requires the client extension to be allowed and to agree"
+  lang php
+  file system/Validation/StrictRules/FileRules.php
+  reject VYQL-INJ-015
+  code
+  ```
+  <?php
+
+  namespace CodeIgniter\Validation\StrictRules;
+
+  class FileRules
+  {
+      public function ext_in(?string $blank, string $params): bool
+      {
+          $params = explode(',', $params);
+          $name = array_shift($params);
+
+          foreach ($this->request->getFileMultiple($name) ?? [$this->request->getFile($name)] as $file) {
+              if ($file === null) {
+                  return false;
+              }
+
+              if ($file->getError() === UPLOAD_ERR_NO_FILE) {
+                  return true;
+              }
+
+              // Check the real filename extension, not only the guessed extension.
+              $clientExtension = strtolower($file->getClientExtension());
+
+              if ($clientExtension === '' || ! in_array($clientExtension, $params, true)) {
+                  return false;
+              }
+
+              if ($file->guessExtension() !== $clientExtension) {
+                  return false;
+              }
+          }
+
+          return true;
+      }
+  }
+  ```
