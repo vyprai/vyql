@@ -1,0 +1,8 @@
+module code;
+
+review code.UncanonicalizedPathContainmentCheck {
+  category: path
+  expected: [core.PathCanonicalization]
+  kind: attention
+  text: "review path containment that compares a joined candidate against its base directory without canonicalizing the candidate first"
+}
