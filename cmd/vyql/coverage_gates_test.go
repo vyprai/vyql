@@ -1484,6 +1484,13 @@ func TestCVELedgerCoverageGate(t *testing.T) {
 		if _, ok := digest[rank]; !ok {
 			t.Fatalf("CVE spec %s references rank %d which is not in the ledger digest", filepath.Base(path), rank)
 		}
+		// Each spec belongs to the thousand-rank directory its rank falls in, so
+		// the directory never grows past about a thousand files.
+		wantDir := fmt.Sprintf("cve%03d", rank/1000+1)
+		if gotDir := filepath.Base(filepath.Dir(path)); gotDir != wantDir {
+			t.Fatalf("CVE spec %s for rank %d sits in tests/%s; it belongs in tests/%s",
+				filepath.Base(path), rank, gotDir, wantDir)
+		}
 		specNamesByRank[rank] = append(specNamesByRank[rank], filepath.Base(path))
 	}
 	uniqueSpecRanks := map[int]bool{}
@@ -1734,16 +1741,21 @@ func cve1000LedgerRepoMatches(ledgerRepo string, poolFields []string) bool {
 func readCVERankSpecFiles(t *testing.T) []string {
 	t.Helper()
 	testsDir := filepath.Join(datadir.Root(), "tests")
-	entries, err := os.ReadDir(testsDir)
-	if err != nil {
-		t.Fatalf("read tests dir: %v", err)
-	}
+	// Rank specs live in thousand-rank subdirectories (tests/cve001, tests/cve002,
+	// ...), so the whole tree is walked instead of one directory level.
 	var out []string
-	for _, entry := range entries {
-		name := entry.Name()
-		if !entry.IsDir() && strings.HasPrefix(name, "cve_rank") && strings.HasSuffix(name, ".test.vyql") {
-			out = append(out, filepath.Join(testsDir, name))
+	err := filepath.WalkDir(testsDir, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
+		name := d.Name()
+		if !d.IsDir() && strings.HasPrefix(name, "cve_rank") && strings.HasSuffix(name, ".test.vyql") {
+			out = append(out, p)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk tests dir: %v", err)
 	}
 	sort.Strings(out)
 	return out
