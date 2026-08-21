@@ -1,0 +1,287 @@
+# Rank 1312 / CVE-2019-20914: LibreDWG's encoder treats one bit of the
+# global `dwg->opts` word as an ownership declaration. `DWG_OPTS_INDXF`
+# (0x20) means "this Dwg_Data came from the DXF importer", and the importer
+# is the only producer that allocates `obj->dxfname` on the heap; every
+# other path aliases it to `klass->dxfname`, a const string owned by
+# `dwg->dwg_class[]`. `src/free.c:773` reads that bit and nothing else
+# before releasing the pointer:
+#
+#   /* With this importer the dxfname is dynamic, just the name is const */
+#   if (dwg->opts & DWG_OPTS_INDXF)
+#     FREE_IF (obj->dxfname);
+#
+# and `free.c`'s `VALUE_HANDLE`/`FIELD_CMC` macros key the same bit for the
+# same reason (`free.c:92`, `:168`, `:173`), so the bit decides the lifetime
+# of handle refs and colour names too.
+#
+# `dwg_encode_header_variables` (`src/encode.c:2421`) then sets that bit on
+# an error path that has nothing to do with the DXF importer -- a file whose
+# HANDSEED header variable is missing, which a fuzzed input trivially
+# produces:
+#
+#   if (!_obj->HANDSEED) // minimal or broken DXF
+#     {
+#       dwg->opts |= (DWG_OPTS_MINIMAL | DWG_OPTS_INDXF);
+#       dat->from_version = dat->version - 1;
+#
+# A crafted file therefore makes `dwg_free_object` free storage the object
+# never owned and free globally-shared handle refs a second time, and the
+# resulting dangling refs are what NULL-dereference in
+# `dwg_encode_common_entity_handle_data` -- the function the advisory names
+# (CWE-476, reached through `dwgrewrite`, GH #178 `null_pointer2`). Fix
+# 3b837bb72d6b9ab4d563faa211f90efc257e3c96 drops `DWG_OPTS_INDXF` from that
+# `|=`, keeping only `DWG_OPTS_MINIMAL`, and masks the CLI's verbosity value
+# in `programs/dwgrewrite.c:200` (`dwg.opts = opts & 0xf`) so a verbosity
+# digit can never land on a flag bit either -- the low nibble of the same
+# word is `DWG_OPTS_LOGLEVEL`.
+#
+# ATTENTION, not an engine gap of the "taint stops at a construct" kind:
+# the analysis this needs does not exist at any strength. The blocker is not
+# the flag. `vyql match` on the free half labels the release site
+# `code.PointerFree` and the aliasing site `code.IndexAccess` and reports no
+# source at all, and the minimal pair below shows the flag condition is
+# irrelevant to the outcome: `obj->dxfname = dwg->dwg_class[i].dxfname;`
+# followed by an *unconditional* `free (obj->dxfname);` reports nothing
+# (third snippet), and gating that same free on `dwg->opts & 0x20` also
+# reports nothing (fourth snippet). So there is no flag-sensitivity gap to
+# close on top of an existing invalid-free notion; the notion itself is
+# absent -- no concept relates a freed pointer to the provenance of the
+# storage it aliases, so neither `code.PotentialDoubleFree` (VYQL-MEM-008)
+# nor `code.FailurePathOwnedBufferFree` (VYQL-MEM-011) can be reached.
+#
+# Building it is not mechanical and not obviously shippable. Discriminating
+# the vulnerable revision from the patched one means (a) an interprocedural
+# ownership relation -- which producer wrote the field, across
+# translation units, `encode.c` setting a bit that `free.c` reads -- and
+# (b) mode-bit sensitivity on a plain `unsigned int` that simultaneously
+# carries a log level, so the bit's value is not a constant the solver can
+# fold. Short of that, the two revisions differ by exactly one macro name
+# inside an `|=`, and any rule that separated them would have to name
+# `DWG_OPTS_INDXF`, which is a repro-shaped patch by AGENTS.md's genericity
+# test. The weaker forms all cost more precision than they buy: flagging a
+# `free()` whose only gate is a flag-word bit test flags ordinary
+# conditional cleanup everywhere, and flagging any `free()` of a field
+# assigned from another struct's member flags every correct ownership
+# transfer in C.
+#
+# One existing rule does fire inside the patched function, and it is not
+# this vulnerability: VYQL-MEM-018 (`code.UncheckedNullableResultDeref`,
+# `nullable_result.unchecked_deref`) reports `src/encode.c:2416`, the
+# unchecked `_obj->HANDSEED = calloc (1, sizeof (Dwg_Object_Ref));`
+# immediately followed by `_obj->HANDSEED->absolute_ref = 0x72E;` two lines
+# below the patched `|=`. A bounded real-repository scan (timeout 180,
+# --max-ram 6GB, --cache off) over the whole checkout reports it identically
+# on both revisions -- 2304 findings, 254 at or above high, the same
+# `src/encode.c:2416` row on both revisions -- so it
+# is a genuine latent CWE-476 the fixed revision leaves in place, not a
+# discriminator.
+#
+# verify_current_expected: attention-missing-analysis, all four snippets
+# rejected on both revisions.
+
+test "rank1312: broken-header fallback claims DXF-import ownership of a const class name"
+  lang c
+  file encode.c
+  reject VYQL-MEM-008
+  reject VYQL-MEM-011
+  code
+  ```
+  #include <stdlib.h>
+
+  #define DWG_OPTS_LOGLEVEL 0xf
+  #define DWG_OPTS_MINIMAL  0x10
+  #define DWG_OPTS_INDXF    0x20
+
+  typedef struct { unsigned int absolute_ref; } Dwg_Object_Ref;
+  typedef struct { const char *dxfname; } Dwg_Class;
+  typedef struct { char *dxfname; int type; } Dwg_Object;
+  typedef struct { Dwg_Object_Ref *HANDSEED; } Dwg_Header_Variables;
+  typedef struct {
+    unsigned int opts;
+    Dwg_Header_Variables header_vars;
+    Dwg_Class *dwg_class;
+    Dwg_Object *object;
+    unsigned long num_objects;
+  } Dwg_Data;
+  typedef struct { int version; int from_version; unsigned int opts; } Bit_Chain;
+
+  static int
+  dwg_encode_header_variables (Bit_Chain *dat, Dwg_Data *dwg)
+  {
+    Dwg_Header_Variables *_obj = &dwg->header_vars;
+
+    if (!_obj->HANDSEED) /* minimal or broken DXF */
+      {
+        dwg->opts |= (DWG_OPTS_MINIMAL | DWG_OPTS_INDXF);
+        dat->from_version = dat->version - 1;
+        _obj->HANDSEED = calloc (1, sizeof (Dwg_Object_Ref));
+        if (!_obj->HANDSEED)
+          return 1;
+        _obj->HANDSEED->absolute_ref = 0x72E;
+      }
+    return 0;
+  }
+
+  static void
+  dwg_free_object (Dwg_Data *dwg, Dwg_Object *obj)
+  {
+    /* With this importer the dxfname is dynamic, just the name is const */
+    if (dwg->opts & DWG_OPTS_INDXF)
+      free (obj->dxfname);
+    obj->type = -1;
+  }
+
+  int
+  main (int argc, char *argv[])
+  {
+    Dwg_Data dwg;
+    Bit_Chain dat;
+    int opts = 1;
+    unsigned long i;
+
+    opts = argv[1][2] ? argv[1][2] - '0' : 1;
+    if (opts < 0 || opts > 9)
+      return 1;
+
+    dwg.opts = opts;
+    dat.version = 33;
+    dat.from_version = 33;
+    dwg.header_vars.HANDSEED = NULL;
+
+    dwg_encode_header_variables (&dat, &dwg);
+    for (i = 0; i < dwg.num_objects; i++)
+      dwg_free_object (&dwg, &dwg.object[i]);
+    return 0;
+  }
+  ```
+
+test "rank1312: broken-header fallback records only the minimal flag"
+  lang c
+  file encode.c
+  reject VYQL-MEM-008
+  reject VYQL-MEM-011
+  code
+  ```
+  #include <stdlib.h>
+
+  #define DWG_OPTS_LOGLEVEL 0xf
+  #define DWG_OPTS_MINIMAL  0x10
+  #define DWG_OPTS_INDXF    0x20
+
+  typedef struct { unsigned int absolute_ref; } Dwg_Object_Ref;
+  typedef struct { const char *dxfname; } Dwg_Class;
+  typedef struct { char *dxfname; int type; } Dwg_Object;
+  typedef struct { Dwg_Object_Ref *HANDSEED; } Dwg_Header_Variables;
+  typedef struct {
+    unsigned int opts;
+    Dwg_Header_Variables header_vars;
+    Dwg_Class *dwg_class;
+    Dwg_Object *object;
+    unsigned long num_objects;
+  } Dwg_Data;
+  typedef struct { int version; int from_version; unsigned int opts; } Bit_Chain;
+
+  static int
+  dwg_encode_header_variables (Bit_Chain *dat, Dwg_Data *dwg)
+  {
+    Dwg_Header_Variables *_obj = &dwg->header_vars;
+
+    if (!_obj->HANDSEED) /* minimal or broken DXF */
+      {
+        dwg->opts |= DWG_OPTS_MINIMAL;
+        dat->from_version = dat->version - 1;
+        _obj->HANDSEED = calloc (1, sizeof (Dwg_Object_Ref));
+        if (!_obj->HANDSEED)
+          return 1;
+        _obj->HANDSEED->absolute_ref = 0x72E;
+      }
+    return 0;
+  }
+
+  static void
+  dwg_free_object (Dwg_Data *dwg, Dwg_Object *obj)
+  {
+    /* With this importer the dxfname is dynamic, just the name is const */
+    if (dwg->opts & DWG_OPTS_INDXF)
+      free (obj->dxfname);
+    obj->type = -1;
+  }
+
+  int
+  main (int argc, char *argv[])
+  {
+    Dwg_Data dwg;
+    Bit_Chain dat;
+    int opts = 1;
+    unsigned long i;
+
+    opts = argv[1][2] ? argv[1][2] - '0' : 1;
+    if (opts < 0 || opts > 9)
+      return 1;
+
+    dwg.opts = opts & 0xf;
+    dat.version = 33;
+    dat.from_version = 33;
+    dwg.header_vars.HANDSEED = NULL;
+
+    dwg_encode_header_variables (&dat, &dwg);
+    for (i = 0; i < dwg.num_objects; i++)
+      dwg_free_object (&dwg, &dwg.object[i]);
+    return 0;
+  }
+  ```
+
+test "rank1312: a class name aliased into an object is freed unconditionally"
+  lang c
+  file free.c
+  reject VYQL-MEM-008
+  reject VYQL-MEM-011
+  code
+  ```
+  #include <stdlib.h>
+
+  typedef struct { const char *dxfname; } Dwg_Class;
+  typedef struct { char *dxfname; int type; } Dwg_Object;
+  typedef struct { unsigned int opts; Dwg_Class *dwg_class; } Dwg_Data;
+
+  void
+  dwg_object_set_dxfname (Dwg_Data *dwg, Dwg_Object *obj, int i)
+  {
+    obj->dxfname = (char *)dwg->dwg_class[i].dxfname;
+  }
+
+  void
+  dwg_free_object (Dwg_Data *dwg, Dwg_Object *obj)
+  {
+    free (obj->dxfname);
+    obj->type = -1;
+  }
+  ```
+
+test "rank1312: the same aliased class name is freed under a mode-bit test"
+  lang c
+  file free.c
+  reject VYQL-MEM-008
+  reject VYQL-MEM-011
+  code
+  ```
+  #include <stdlib.h>
+
+  typedef struct { const char *dxfname; } Dwg_Class;
+  typedef struct { char *dxfname; int type; } Dwg_Object;
+  typedef struct { unsigned int opts; Dwg_Class *dwg_class; } Dwg_Data;
+
+  void
+  dwg_object_set_dxfname (Dwg_Data *dwg, Dwg_Object *obj, int i)
+  {
+    obj->dxfname = (char *)dwg->dwg_class[i].dxfname;
+  }
+
+  void
+  dwg_free_object (Dwg_Data *dwg, Dwg_Object *obj)
+  {
+    if (dwg->opts & 0x20)
+      free (obj->dxfname);
+    obj->type = -1;
+  }
+  ```

@@ -1,0 +1,92 @@
+# Rank 1309 / CVE-2021-3311: October CMS's authentication manager cleared the
+# logged-out user's session data but never rotated the session identifier
+# itself, so a session ID an attacker had captured before logout came back to
+# life the next time the same user logged in (CWE-613).
+#
+# Auth/Manager::logout() in src/Auth/Manager.php called Session::flush(),
+# which empties the session's stored data but leaves the session ID (and its
+# backing store record) intact. A subsequent login re-populated that same
+# session under the same ID rather than issuing a new one, so a cookie
+# captured while the victim is still logged in keeps working across a
+# logout/login cycle: good logs in, bad captures the cookie, good logs out
+# (the captured cookie stops working), good logs in again, and the captured
+# cookie is valid once more because it names the same session slot.
+#
+# The fixed revision replaces Session::flush() with
+# Session::invalidate(), which both clears the session data and regenerates
+# the session ID, so a captured pre-logout identifier can never be revived by
+# a later login.
+#
+# ATTENTION, vocabulary gap. Scanning either revision reports 0 findings.
+# code.MissingSessionRotationAfterAuthentication is the nearest concept,
+# declined for the same reasoning at rank 1110 (NextAuth config) and
+# rank 1115 (FOSSBilling password change): it carries CWE_384 rather than
+# this CVE's CWE_613, and its reviewCondition, "authentication completes
+# without rotating or invalidating the existing HTTP session", is written for
+# the moment a session begins (login), not the moment one ends (logout). Its
+# only binding is Java's `setAuthentication` + `getSession` idiom at login;
+# nothing recognizes a logout handler at all, in any language. Stating the
+# general condition — a logout handler clears session data without also
+# rotating the identifier, so a stolen cookie can be revived by the victim's
+# next login — needs recognizing "logout" as its own security-relevant event
+# distinct from login, which is judgement rather than a port, and is exactly
+# the category the same nearest concept stays narrow to avoid at
+# rank 1115.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1309: logout clears session data without rotating the session id"
+  lang php
+  file src/Auth/Manager.php
+  reject_review code.MissingSessionRotationAfterAuthentication
+  code
+  ```
+  class Manager
+  {
+      public function logout()
+      {
+          if (is_null($this->user) && !$this->check()) {
+              return;
+          }
+
+          if ($this->user) {
+              $this->user->setRememberToken(null);
+              $this->user->forceSave();
+          }
+
+          $this->user = null;
+
+          Session::flush();
+          Cookie::queue(Cookie::forget($this->sessionKey));
+      }
+  }
+  ```
+
+test "rank1309: logout invalidates the session, rotating the session id"
+  lang php
+  file src/Auth/Manager.php
+  reject_review code.MissingSessionRotationAfterAuthentication
+  code
+  ```
+  class Manager
+  {
+      public function logout()
+      {
+          if (is_null($this->user) && !$this->check()) {
+              return;
+          }
+
+          if ($this->user) {
+              $this->user->setRememberToken(null);
+              $this->user->forceSave();
+          }
+
+          $this->user = null;
+
+          Session::invalidate();
+          Cookie::queue(Cookie::forget($this->sessionKey));
+      }
+  }
+  ```
