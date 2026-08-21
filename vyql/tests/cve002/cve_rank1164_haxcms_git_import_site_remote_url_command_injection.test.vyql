@@ -1,0 +1,87 @@
+# Rank 1164 / CVE-2025-49141: haxcms-nodejs's gitImportSite endpoint took a
+# repository URL straight from the request body and handed it to
+# git-interface's setRemote(), which builds `git remote set-url <name> <url>`
+# with no end-of-options delimiter before the URL — an attacker-supplied
+# git transport (`ext::...`) or option-shaped value executes as the server.
+#
+# The setRemote()/addRemote() call sites carry no CommandExecution sink at
+# all: git-interface is an external package, so nothing labels what its
+# documented API means. The new binding is gated on the project depending on
+# git-interface (not on the file's own import statement) because the real
+# code imports the package with `const { Git } = require('git-interface')`,
+# and destructured CommonJS requires do not register as import evidence —
+# the package.json-backed dependency gate does not have that gap.
+
+test "rank1164: gitImportSite passes the request-body URL to git-interface's setRemote"
+  lang javascript
+  profile api
+  file package.json
+  code
+  ```
+  {
+    "name": "haxcms-nodejs",
+    "dependencies": {
+      "git-interface": "2.1.2"
+    }
+  }
+  ```
+  file src/routes/gitImportSite.js
+  expect VYQL-INJ-002
+  code
+  ```
+  const { Git } = require('git-interface');
+  const filter_var = require('../lib/filter_var.js');
+
+  class GitPlus extends Git {}
+
+  async function gitImportSite(req, res) {
+    if (HAXCMS.validateRequestToken()) {
+      const repoUrl = req.body['site']['git']['url'];
+      if (filter_var(repoUrl, "FILTER_VALIDATE_URL") !== false && repoUrl.indexOf('.git') !== -1) {
+        const repo = new GitPlus({ dir: HAXCMS.sitesDirectory });
+        repo.setRemote('origin', repoUrl);
+        await repo.pull('origin', 'master');
+      }
+    }
+    res.send(500);
+  }
+  ```
+
+test "rank1164: gitImportSite validates the host before calling setRemote"
+  lang javascript
+  profile api
+  file package.json
+  code
+  ```
+  {
+    "name": "haxcms-nodejs",
+    "dependencies": {
+      "git-interface": "2.1.2"
+    }
+  }
+  ```
+  file src/routes/gitImportSite.js
+  reject VYQL-INJ-002
+  code
+  ```
+  const { Git } = require('git-interface');
+
+  class GitPlus extends Git {}
+
+  function isAllowedHost(hostname) {
+    return ALLOWED_GIT_HOSTS.has(hostname);
+  }
+
+  async function gitImportSite(req, res) {
+    if (HAXCMS.validateRequestToken()) {
+      const repoUrl = req.body['site']['git']['url'];
+      const hostname = new URL(repoUrl).hostname;
+      if (isAllowedHost(hostname) && repoUrl.indexOf('.git') !== -1) {
+        const repo = new GitPlus({ dir: HAXCMS.sitesDirectory });
+        repo.setRemote('origin', repoUrl);
+        await repo.pull('origin', 'master');
+      }
+    }
+    res.send(500);
+  }
+  ```
