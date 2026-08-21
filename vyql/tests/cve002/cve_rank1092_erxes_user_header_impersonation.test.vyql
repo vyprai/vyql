@@ -1,0 +1,63 @@
+# Rank 1092 / CVE-2024-57190: erxes's gateway only overwrites a client-supplied
+# User header when authenticated, so on an unauthenticated request the header
+# passes through and internal GraphQL services treat it as identity (CWE-284,
+# CWE-287).
+#
+# ATTENTION: vocabulary gap. A self-asserted identity header is trusted without
+# validation or an unconditional clear. Both snippets reject VYQL-AUTH-108.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1092: the identity header is only overwritten, never cleared"
+  lang javascript
+  file packages/gateway/src/middlewares/userMiddleware.ts
+  reject VYQL-AUTH-108
+  code
+  ```
+  const generateBase64 = (req) => {
+    if (req.user) {
+      const userJson = JSON.stringify(req.user);
+      const userJsonBase64 = Buffer.from(userJson, 'utf8').toString('base64');
+      req.headers.user = userJsonBase64;
+    }
+  };
+
+  export default async function userMiddleware(req, _res, next) {
+    const erxesCoreToken = req.headers['erxes-core-token'];
+
+    if (erxesCoreToken) {
+      req.user = { _id: 'userId', customPermissions: [] };
+    }
+
+    generateBase64(req);
+    next();
+  }
+  ```
+
+test "rank1092: the fixed revision clears the header before any authentication logic runs"
+  lang javascript
+  file packages/gateway/src/middlewares/userMiddleware.ts
+  reject VYQL-AUTH-108
+  code
+  ```
+  const generateBase64 = (req) => {
+    if (req.user) {
+      const userJson = JSON.stringify(req.user);
+      const userJsonBase64 = Buffer.from(userJson, 'utf8').toString('base64');
+      req.headers.user = userJsonBase64;
+    }
+  };
+
+  export default async function userMiddleware(req, _res, next) {
+    delete req.headers['user'];
+
+    const erxesCoreToken = req.headers['erxes-core-token'];
+
+    if (erxesCoreToken) {
+      req.user = { _id: 'userId', customPermissions: [] };
+    }
+
+    generateBase64(req);
+    next();
+  }
+  ```

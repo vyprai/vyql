@@ -1,0 +1,79 @@
+# Rank 1090 / CVE-2020-15133: faye-websocket-ruby connects wss: URLs with
+# EventMachine `start_tls` and never sets `:verify_peer`, whose library default
+# is off, so every secure connection accepts any certificate (CWE-295).
+#
+# ATTENTION: vocabulary gap. code.CertValidationDisabled and VYQL-CFG-004 exist,
+# but Ruby bindings key on an explicit disable (`VERIFY_NONE`, `verify_ssl=false`)
+# and cannot state that an option is never turned on against an unsafe default.
+# Both snippets reject VYQL-CFG-004.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1090: start_tls is called with no verify_peer option set"
+  lang ruby
+  file lib/faye/websocket/client.rb
+  reject VYQL-CFG-004
+  code
+  ```
+  module Faye
+    module WebSocket
+      class Client
+        def initialize(url, protocols = nil, options = {})
+          @url = url
+          @origin_tls = options.fetch(:tls, {})
+          @socket_tls = @origin_tls
+        end
+
+        def on_connect(stream)
+          @stream = stream
+          secure = @url.start_with?('wss:')
+
+          if secure
+            socket_tls = { :sni_hostname => URI.parse(@url).host }.merge(@socket_tls)
+            @stream.start_tls(socket_tls)
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1090: the fixed revision enables verify_peer and implements the callbacks"
+  lang ruby
+  file lib/faye/websocket/client.rb
+  reject VYQL-CFG-004
+  code
+  ```
+  module Faye
+    module WebSocket
+      class Client
+        def initialize(url, protocols = nil, options = {})
+          @url = url
+          @origin_tls = options.fetch(:tls, {})
+          @socket_tls = @origin_tls
+        end
+
+        def start_tls(uri, options)
+          return unless uri.scheme == 'wss'
+
+          tls_options = { :sni_hostname => uri.host, :verify_peer => true }.merge(options)
+          @ssl_verifier = SslVerifier.new(uri.host, tls_options)
+          @stream.start_tls(tls_options)
+        end
+
+        def on_connect(stream)
+          @stream = stream
+          start_tls(URI.parse(@url), @socket_tls)
+        end
+
+        def ssl_verify_peer(cert)
+          @ssl_verifier.ssl_verify_peer(cert)
+        end
+
+        def ssl_handshake_completed
+          @ssl_verifier.ssl_handshake_completed
+        end
+      end
+    end
+  end
+  ```

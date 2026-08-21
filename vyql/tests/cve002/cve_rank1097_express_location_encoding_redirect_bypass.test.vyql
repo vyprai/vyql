@@ -1,0 +1,76 @@
+# Rank 1097 / CVE-2024-29041: Express's `res.location()` encodes a URL such that
+# a malformed value can differ between an application's redirect allowlist check
+# and what the browser receives (CWE-601, CWE-1286).
+#
+# ATTENTION: vocabulary gap. The flaw is inside the dependency after a correct
+# allowlist; core.AllowlistValidation correctly suppresses VYQL-RF-002 on the
+# validated call. Validated redirect rejects; unvalidated expects; host-aware
+# encoding form rejects.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1097: a validated redirect target is not reported, whatever the express version"
+  lang javascript
+  file app.js
+  reject VYQL-RF-002
+  code
+  ```
+  const ALLOWED_HOSTS = new Set(['app.example.com', 'www.example.com']);
+
+  function isAllowedRedirect(url) {
+    try {
+      const parsed = new URL(url, 'https://app.example.com');
+      return ALLOWED_HOSTS.has(parsed.host);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function handler(req, res) {
+    const target = req.query.next;
+    if (isAllowedRedirect(target)) {
+      res.redirect(target);
+    } else {
+      res.redirect('/');
+    }
+  }
+  ```
+
+test "rank1097: the same call with no allowlist at all is reported"
+  lang javascript
+  file app.js
+  expect VYQL-RF-002
+  code
+  ```
+  function handler(req, res) {
+    const target = req.query.next;
+    res.redirect(target);
+  }
+  ```
+
+# The library's own fix, kept so a later reader can see what changed inside
+# Express rather than inferring it from the advisory text.
+
+test "rank1097: the fixed revision encodes only the portion of the url after its host"
+  lang javascript
+  file lib/response.js
+  reject VYQL-RF-002
+  code
+  ```
+  var schemaAndHostRegExp = /^(?:[a-zA-Z][a-zA-Z0-9+.-]*:)?\/\/[^\\\/\?]+/;
+
+  res.location = function location(url) {
+    var loc;
+    if (url === 'back') {
+      loc = this.req.get('Referrer') || '/';
+    } else {
+      loc = String(url);
+    }
+
+    var m = schemaAndHostRegExp.exec(loc);
+    var pos = m ? m[0].length + 1 : 0;
+    loc = loc.slice(0, pos) + encodeUrl(loc.slice(pos));
+
+    return this.set('Location', loc);
+  };
+  ```

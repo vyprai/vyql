@@ -683,12 +683,12 @@ binding commandExecution128 {
 
 binding deserialization129 {
   query pattern callExpr where callee.method == "readObject"
-  emit sink code.Deserialization at args[0]
+  emit sink code.Deserialization at call
 }
 
 binding deserialization130 {
   query pattern callExpr where callee.method == "readUnshared"
-  emit sink code.Deserialization at args[0]
+  emit sink code.Deserialization at call
 }
 
 binding deserialization131 {
