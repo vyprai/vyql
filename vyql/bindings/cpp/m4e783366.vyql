@@ -793,6 +793,16 @@ binding weakCipher148 {
   emit issue code.WeakCipher at node
 }
 
+binding weakCipher160 {
+  query pattern presenceNode where node.path ~= "TLSv1_client_method"
+  emit issue code.WeakCipher at node
+}
+
+binding weakCipher161 {
+  query pattern presenceNode where node.path ~= "TLSv1_server_method"
+  emit issue code.WeakCipher at node
+}
+
 binding staticIv149 {
   query pattern callExpr where callee.path ~= "EVP_EncryptInit_ex" and args.any.literal contains "0000000000000000"
   emit issue code.StaticIv at call

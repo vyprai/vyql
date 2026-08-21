@@ -1,0 +1,137 @@
+# Rank 1169 / CVE-2026-53869: Hermes Agent's dashboard WebSocket routes
+# accept an upgrade after checking only the auth token and the client IP,
+# never the Host or Origin header (CWE-306). hermes_cli/web_server.py already
+# runs a Host-header check as HTTP middleware to stop DNS rebinding against
+# the loopback-bound dashboard (GHSA-ppp5-vxwm-4cf7), documented right there
+# in the module: "FastAPI HTTP middleware does not run for WebSocket routes."
+# /api/pty, /api/pub and /api/events call ws.accept() straight after
+# _ws_client_is_allowed(ws), which only compares ws.client.host against a
+# loopback allowlist. A page on an attacker-controlled hostname that DNS-
+# rebinds to 127.0.0.1 still presents as a loopback client at the TCP layer,
+# so the same rebinding the HTTP middleware blocks reaches the WebSocket
+# upgrade unchecked.
+#
+# The fixed revision adds _ws_host_origin_is_allowed() (Host via the
+# existing _is_accepted_host(), then Origin's netloc against the same bound
+# host) and folds it into _ws_request_is_allowed(), called ahead of
+# _ws_client_is_allowed() at every WebSocket route.
+#
+# CAUGHT at the concept layer, new binding at the binding layer. The
+# language-neutral concept code.WebSocketUpgradeMissingOriginCheck and its
+# rule (VYQL-RF-031) exist for rank 815's JavaScript HMR-socket CVE and
+# need no change; only Python lacks a binding emitting it. The new
+# binding is written from FastAPI/Starlette's own WebSocket API: a function
+# decorated with @app.websocket(...) that calls .accept() with no "origin"
+# identifier anywhere in its body. Origin validation is checked against the
+# whole function body rather than any specific prior check, because the
+# concept's condition is "validates ... but not the Origin header" --
+# whatever else the handler validates, Origin is what's missing. The
+# reject case inlines the origin comparison in the same function scope
+# (presenceNode only sees a single function's body, not what a helper it
+# calls does) using the same ws.headers.get("origin", "") the fixed
+# revision uses, rather than factoring it into a helper.
+#
+# The negation checks node.context.identifier, not node.context.literal.
+# python.go's pyFunctionContext folds a module-wide literal blob
+# (pyModuleLiteralContext, every string constant anywhere in the file) into
+# every function's context args unprefixed, so a literal-based `not
+# containsAny(..., ["origin"])` false-negatives on any file that mentions
+# "origin" in an unrelated string anywhere at all -- confirmed against the
+# real checkout, which has 11 unrelated "origin" mentions (CORS headers
+# elsewhere in the same 4671-line module) that silenced the literal form
+# entirely. node.context.identifier is built only from the walk over the
+# function's own body, so it stays scoped to that one function; an inline
+# origin check almost always introduces an identifier naming it (`origin`,
+# `req_origin`, ...), which is what the reject snippet below does.
+#
+# On the real checkout at the vulnerable revision, pty_ws, pub_ws and
+# events_ws in hermes_cli/web_server.py all match --
+# each decorated @app.websocket(...), each calling ws.accept() with no
+# "origin" identifier in the function. gateway_ws delegates to a separate
+# handle_ws() and so has no in-function accept() call to match; the other
+# three are enough to report the CVE. The full spec suite stays green and
+# OWASP Java and Python are unchanged at +1.00 and +0.90.
+
+test "rank1169: dashboard websocket accepts after a loopback check with no origin check"
+  lang python
+  file hermes_cli/web_server.py
+  expect VYQL-RF-031
+  expect_review code.WebSocketUpgradeMissingOriginCheck
+  code
+  ```
+  import hmac
+
+  from fastapi import FastAPI, WebSocket
+
+  app = FastAPI()
+
+  _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost", "testclient"})
+
+
+  def _ws_client_is_allowed(ws: "WebSocket") -> bool:
+      client_host = ws.client.host if ws.client else ""
+      if not client_host:
+          return True
+      return client_host in _LOOPBACK_HOSTS
+
+
+  @app.websocket("/api/pty")
+  async def pty_ws(ws: WebSocket) -> None:
+      token = ws.query_params.get("token", "")
+      expected = _SESSION_TOKEN
+      if not hmac.compare_digest(token.encode(), expected.encode()):
+          await ws.close(code=4401)
+          return
+
+      if not _ws_client_is_allowed(ws):
+          await ws.close(code=4403)
+          return
+
+      await ws.accept()
+  ```
+
+test "rank1169: dashboard websocket also validates the Host and Origin headers"
+  lang python
+  file hermes_cli/web_server.py
+  reject VYQL-RF-031
+  reject_review code.WebSocketUpgradeMissingOriginCheck
+  code
+  ```
+  import hmac
+  import urllib.parse
+
+  from fastapi import FastAPI, WebSocket
+
+  app = FastAPI()
+
+  _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost", "testclient"})
+
+
+  def _ws_client_is_allowed(ws: "WebSocket") -> bool:
+      client_host = ws.client.host if ws.client else ""
+      if not client_host:
+          return True
+      return client_host in _LOOPBACK_HOSTS
+
+
+  @app.websocket("/api/pty")
+  async def pty_ws(ws: WebSocket) -> None:
+      token = ws.query_params.get("token", "")
+      expected = _SESSION_TOKEN
+      if not hmac.compare_digest(token.encode(), expected.encode()):
+          await ws.close(code=4401)
+          return
+
+      if not _ws_client_is_allowed(ws):
+          await ws.close(code=4403)
+          return
+
+      origin = ws.headers.get("origin", "")
+      if origin:
+          parsed = urllib.parse.urlparse(origin)
+          if parsed.netloc not in ("127.0.0.1:9119", "localhost:9119"):
+              await ws.close(code=4403)
+              return
+
+      await ws.accept()
+  ```

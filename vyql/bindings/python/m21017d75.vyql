@@ -4304,3 +4304,8 @@ binding cliArgumentPyArgparse904 {
   query pattern callExpr where callee.method == "parse_args"
   emit source code.CliArgument at call.result
 }
+
+binding webSocketUpgradeMissingOriginCheckPy905 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.decoratorMethod contains "websocket" and node.context.call contains "accept" and not (containsAny(node.context.identifier, ["origin", "Origin"]))
+  emit issue code.WebSocketUpgradeMissingOriginCheck at node
+}

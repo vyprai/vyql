@@ -1,0 +1,308 @@
+# Rank 1175 / CVE-2022-41137: Apache Hive's metastore Thrift server
+# deserializes a partition-filter expression with Kryo and no restriction on
+# which classes may come back. HMSHandler.get_partitions_by_expr (Thrift
+# service method, `implements ThriftHiveMetastore.Iface`) hands the request's
+# raw `exprBytes` to PartitionExpressionForMetastore.filterPartitionsByExpr,
+# which calls deserializeExpr, which calls
+# SerializationUtilities.deserializeObjectWithTypeInformation(bytes) --
+# `kryo.readClassAndObject(inp)` on the caller-supplied bytes, unregistered,
+# so any class on the classpath can be the object Kryo builds (CWE-502): a
+# client with metastore access can hand get_partitions_by_expr a gadget-chain
+# payload instead of a serialized ExprNodeDesc.
+#
+# The fixed revision does not stop calling
+# readClassAndObject on the raw bytes -- it adds a class allowlist at the
+# point Kryo resolves each class. SerializationUtilities.KryoWithHooks (a
+# private static nested Kryo subclass) overrides Kryo's own extension point
+# `getRegistration(Class type)`; when a new `isExprNodeFirst` flag is set,
+# the first class the deserializer resolves must be assignable from
+# ExprNodeDesc or the override throws UnsupportedOperationException.
+# deserializeObjectWithTypeInformation gained an `isPartFilter` parameter,
+# and PartitionExpressionForMetastore.deserializeExpr now passes `true`,
+# arming the check before readClassAndObject runs.
+#
+# Two independent gaps, diagnosed with `vyql match` on a reduced repro of
+# both revisions (neither labels anything):
+#
+# 1. Sink, fixed here: the shipped binding for readClassAndObject
+#    (vyql/bindings/packages/generated/java/com.esotericsoftware_kryo.vyql,
+#    deserialization2) gates on dependency("com.esotericsoftware:kryo").
+#    That gate can never open for Java: internal/extract/sca/discover.go's
+#    manifest table has no pom.xml or build.gradle reader, so no Java
+#    project's Kryo dependency is ever recorded, confirmed by adding a
+#    pom.xml declaring the dependency to the repro and re-running `vyql
+#    match` -- still nothing. readClassAndObject is Kryo's own method name,
+#    not shared with an unrelated API, so binding deserialization762 in
+#    vyql/bindings/java/m420f6b67.vyql drops the gate, mirroring
+#    deserialization129/130 immediately above it (readObject/readUnshared,
+#    already ungated for the same reason).
+#
+# 2. Source, not fixed here: nothing labels a Thrift service method's
+#    parameters as network-controlled. `implements *.Iface` is Thrift's own
+#    generated marker for "this class receives requests over the wire," a
+#    generic pattern with no library-specific judgement, but adding it here
+#    is not enough by itself -- see below.
+#
+# Shipping both a source and the sink fix together would make VYQL-DESER-001
+# fire on the fixed revision too, because the taint dataflow from exprBytes
+# to readClassAndObject is identical at both revisions; the
+# neutralizing control is not a call on the tainted value, it is a class
+# check that runs later, inside KryoWithHooks.getRegistration, arming a
+# nested Kryo subclass that deserializeExpr's caller never touches
+# directly. core.SafeDeserialization has no Java binding for that shape, and
+# the two candidate ways to add one both fail the genericity test:
+#   - keying on `setExprNodeFirst`/`isPartFilter` names Hive's own method,
+#     invented for this patch, not a Kryo API -- the definition of a
+#     repro-shaped binding.
+#   - keying on a `getRegistration` override structurally (a real, public
+#     Kryo extension point) needs to relate that override, declared in
+#     KryoWithHooks, to a readClassAndObject call in the enclosing
+#     SerializationUtilities class. presenceNode's class-scope context
+#     aggregates only the direct class body (internal/extract/lowering/
+#     lowering.go's classMemberContextTokens explicitly excludes nested
+#     classes), so a class-scope check keyed on
+#     `node.context.functionName contains "getRegistration"` at
+#     SerializationUtilities never sees KryoWithHooks's override -- it
+#     would fire on the fixed file exactly as it fires on the vulnerable
+#     one. Distinguishing them needs an object-identity relationship (this
+#     specific Kryo instance is configured by that override ahead of this
+#     specific readClassAndObject call), which is a dataflow relation the
+#     binding layer's structural matching does not express.
+#
+# So the source binding stays unshipped rather than pair with the sink fix
+# to produce a rule that cannot tell the two revisions apart. Both cases
+# below assert reject on the real Hive shapes, pinning that today's state
+# (post sink-fix) is silence on both, not false coverage on either. The
+# sink fix's own effect is proven separately, against an already-covered
+# source, in the two regression cases at the end.
+#
+# verify_current_expected: attention-missing-control-concept
+
+test "rank1175: vulnerable Hive PartitionExpressionForMetastore reaches Kryo readClassAndObject with no class check"
+  lang java
+  file org/apache/hadoop/hive/metastore/HMSHandler.java
+  reject VYQL-DESER-001
+  code
+  ```
+  package org.apache.hadoop.hive.metastore;
+
+  public class HMSHandler implements ThriftHiveMetastore.Iface {
+    private PartitionExpressionProxy expressionProxy;
+
+    @Override
+    public PartitionsByExprResult get_partitions_by_expr(PartitionsByExprRequest req) throws MetaException {
+      byte[] exprBytes = req.getExpr();
+      boolean hasUnknown = expressionProxy.filterPartitionsByExpr(
+          req.getPartColumns(), exprBytes, req.getDefaultPartitionName(), new ArrayList<String>());
+      return new PartitionsByExprResult(hasUnknown);
+    }
+  }
+  ```
+  file org/apache/hadoop/hive/ql/optimizer/ppr/PartitionExpressionForMetastore.java
+  code
+  ```
+  package org.apache.hadoop.hive.ql.optimizer.ppr;
+
+  import org.apache.hadoop.hive.metastore.api.MetaException;
+  import org.apache.hadoop.hive.ql.exec.SerializationUtilities;
+  import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+
+  public class PartitionExpressionForMetastore implements PartitionExpressionProxy {
+
+    public boolean filterPartitionsByExpr(List<FieldSchema> partColumns, byte[] exprBytes,
+        String defaultPartitionName, List<String> partitionNames) throws MetaException {
+      ExprNodeDesc expr = deserializeExpr(exprBytes);
+      return PartitionPruner.prunePartitionNames(partColumns, expr, defaultPartitionName, partitionNames);
+    }
+
+    private ExprNodeDesc deserializeExpr(byte[] exprBytes) throws MetaException {
+      ExprNodeDesc expr = null;
+      try {
+        expr = SerializationUtilities.deserializeObjectWithTypeInformation(exprBytes);
+      } catch (Exception ex) {
+        throw new MetaException(ex.getMessage());
+      }
+      if (expr == null) {
+        throw new MetaException("Failed to deserialize expression - ExprNodeDesc not present");
+      }
+      return expr;
+    }
+  }
+  ```
+  file org/apache/hadoop/hive/ql/exec/SerializationUtilities.java
+  code
+  ```
+  package org.apache.hadoop.hive.ql.exec;
+
+  import com.esotericsoftware.kryo.Kryo;
+  import com.esotericsoftware.kryo.io.Input;
+  import java.io.ByteArrayInputStream;
+
+  public class SerializationUtilities {
+
+    public static <T> T deserializeObjectWithTypeInformation(byte[] bytes) {
+      Kryo kryo = borrowKryo();
+      try (Input inp = new Input(new ByteArrayInputStream(bytes))) {
+        return (T) kryo.readClassAndObject(inp);
+      } finally {
+        releaseKryo(kryo);
+      }
+    }
+
+    public static Kryo borrowKryo() {
+      return new Kryo();
+    }
+
+    public static void releaseKryo(Kryo kryo) {
+    }
+  }
+  ```
+
+test "rank1175: fixed Hive still calls readClassAndObject on the same bytes -- the guard is a nested Kryo subclass, not a call site"
+  lang java
+  file org/apache/hadoop/hive/metastore/HMSHandler.java
+  reject VYQL-DESER-001
+  code
+  ```
+  package org.apache.hadoop.hive.metastore;
+
+  public class HMSHandler implements ThriftHiveMetastore.Iface {
+    private PartitionExpressionProxy expressionProxy;
+
+    @Override
+    public PartitionsByExprResult get_partitions_by_expr(PartitionsByExprRequest req) throws MetaException {
+      byte[] exprBytes = req.getExpr();
+      boolean hasUnknown = expressionProxy.filterPartitionsByExpr(
+          req.getPartColumns(), exprBytes, req.getDefaultPartitionName(), new ArrayList<String>());
+      return new PartitionsByExprResult(hasUnknown);
+    }
+  }
+  ```
+  file org/apache/hadoop/hive/ql/optimizer/ppr/PartitionExpressionForMetastore.java
+  code
+  ```
+  package org.apache.hadoop.hive.ql.optimizer.ppr;
+
+  import org.apache.hadoop.hive.metastore.api.MetaException;
+  import org.apache.hadoop.hive.ql.exec.SerializationUtilities;
+  import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+
+  public class PartitionExpressionForMetastore implements PartitionExpressionProxy {
+
+    public boolean filterPartitionsByExpr(List<FieldSchema> partColumns, byte[] exprBytes,
+        String defaultPartitionName, List<String> partitionNames) throws MetaException {
+      ExprNodeDesc expr = deserializeExpr(exprBytes);
+      return PartitionPruner.prunePartitionNames(partColumns, expr, defaultPartitionName, partitionNames);
+    }
+
+    private ExprNodeDesc deserializeExpr(byte[] exprBytes) throws MetaException {
+      ExprNodeDesc expr = null;
+      try {
+        expr = SerializationUtilities.deserializeObjectWithTypeInformation(exprBytes, true);
+      } catch (Exception ex) {
+        throw new MetaException(ex.getMessage());
+      }
+      if (expr == null) {
+        throw new MetaException("Failed to deserialize expression - ExprNodeDesc not present");
+      }
+      return expr;
+    }
+  }
+  ```
+  file org/apache/hadoop/hive/ql/exec/SerializationUtilities.java
+  code
+  ```
+  package org.apache.hadoop.hive.ql.exec;
+
+  import com.esotericsoftware.kryo.Kryo;
+  import com.esotericsoftware.kryo.Registration;
+  import com.esotericsoftware.kryo.io.Input;
+  import java.io.ByteArrayInputStream;
+  import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+
+  public class SerializationUtilities {
+
+    private static class KryoWithHooks extends Kryo {
+      private boolean isExprNodeFirst = false;
+      private long classCounter = 0;
+
+      @Override
+      public Registration getRegistration(Class type) {
+        if (isExprNodeFirst && classCounter == 0) {
+          if (!ExprNodeDesc.class.isAssignableFrom(type)) {
+            throw new UnsupportedOperationException(
+                "The object to be deserialized must be an ExprNodeDesc, but encountered: " + type);
+          }
+        }
+        classCounter++;
+        return super.getRegistration(type);
+      }
+
+      public void setExprNodeFirst(boolean isPartFilter) {
+        this.isExprNodeFirst = isPartFilter;
+      }
+    }
+
+    public static <T> T deserializeObjectWithTypeInformation(byte[] bytes, boolean isPartFilter) {
+      KryoWithHooks kryo = (KryoWithHooks) borrowKryo();
+      kryo.setExprNodeFirst(isPartFilter);
+      try (Input inp = new Input(new ByteArrayInputStream(bytes))) {
+        return (T) kryo.readClassAndObject(inp);
+      } finally {
+        releaseKryo(kryo);
+      }
+    }
+
+    public static Kryo borrowKryo() {
+      return new KryoWithHooks();
+    }
+
+    public static void releaseKryo(Kryo kryo) {
+    }
+  }
+  ```
+
+test "rank1175: binding regression -- readClassAndObject on an HTTP-controlled buffer is unrestricted deserialization"
+  lang java
+  expect VYQL-DESER-001
+  code
+  ```
+  import com.esotericsoftware.kryo.Kryo;
+  import com.esotericsoftware.kryo.io.Input;
+  import java.io.ByteArrayInputStream;
+
+  @RestController
+  public class ExprController {
+    @PostMapping("/expr")
+    public Object evalExpr(@RequestBody byte[] exprBytes) throws Exception {
+      Kryo kryo = new Kryo();
+      try (Input inp = new Input(new ByteArrayInputStream(exprBytes))) {
+        return kryo.readClassAndObject(inp);
+      }
+    }
+  }
+  ```
+
+test "rank1175: binding regression -- readClassAndObject on a locally built buffer has no attacker-controlled source"
+  lang java
+  reject VYQL-DESER-001
+  code
+  ```
+  import com.esotericsoftware.kryo.Kryo;
+  import com.esotericsoftware.kryo.io.Input;
+  import java.io.ByteArrayInputStream;
+
+  public class TrustedTemplateLoader {
+    public Object loadBundledTemplate() throws Exception {
+      byte[] exprBytes = readClasspathResource("/templates/default.bin");
+      Kryo kryo = new Kryo();
+      try (Input inp = new Input(new ByteArrayInputStream(exprBytes))) {
+        return kryo.readClassAndObject(inp);
+      }
+    }
+
+    private byte[] readClasspathResource(String path) {
+      return new byte[0];
+    }
+  }
+  ```

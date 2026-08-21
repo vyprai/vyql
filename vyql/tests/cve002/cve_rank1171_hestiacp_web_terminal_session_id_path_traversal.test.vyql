@@ -1,0 +1,64 @@
+# Rank 1171 / CVE-2026-43633: hestiaCP's web-terminal server read the
+# session file straight off the client-supplied HESTIASID cookie, with no
+# validation on the cookie value before it became part of the file path.
+
+test "rank1171: web-terminal reads a session file built from the raw cookie"
+  lang javascript
+  expect VYQL-PATH-001
+  code
+  ```
+  import { readFileSync } from 'node:fs';
+
+  const sessionName = 'HESTIASID';
+
+  wss.on('connection', (ws, req) => {
+    const sessionID = req.headers.cookie.split(`${sessionName}=`)[1].split(';')[0];
+
+    const file = readFileSync(`${process.env.HESTIA}/data/sessions/sess_${sessionID}`);
+    if (!file) {
+      ws.close(1000, 'Your session has expired.');
+      return;
+    }
+    const session = file.toString();
+    const login = session.split('user|s:')[1].split('"')[1];
+  });
+  ```
+
+test "rank1171: web-terminal hands the cookie value to a PHP session helper as an argv element"
+  lang javascript
+  reject VYQL-PATH-001
+  code
+  ```
+  import { execFileSync } from 'node:child_process';
+
+  const sessionName = 'HESTIASID';
+
+  wss.on('connection', (ws, req) => {
+    const cookies = parseCookies(req.headers.cookie);
+    const sessionIDs = cookies[sessionName] || [];
+    if (sessionIDs.length !== 1 || sessionIDs[0].length === 0) {
+      ws.close(1000, 'You are not authenticated.');
+      return;
+    }
+    const sessionID = sessionIDs[0];
+
+    let authResult;
+    try {
+      const raw = execFileSync(
+        `${process.env.HESTIA}/php/bin/php`,
+        [`${process.env.HESTIA}/web-terminal/web-terminal-session-auth.php`, sessionID],
+        { encoding: 'utf8' },
+      );
+      authResult = JSON.parse(raw);
+    } catch (error) {
+      ws.close(1000, 'Your session has expired.');
+      return;
+    }
+
+    if (!authResult?.ok || typeof authResult.user !== 'string' || authResult.user.length === 0) {
+      ws.close(1000, 'You are not authenticated.');
+      return;
+    }
+    const login = authResult.user;
+  });
+  ```

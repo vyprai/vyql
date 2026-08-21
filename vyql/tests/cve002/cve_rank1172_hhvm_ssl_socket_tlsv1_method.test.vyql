@@ -1,0 +1,111 @@
+# Rank 1172 / CVE-2022-36937: HHVM's stream extension lets a `tls://` URL
+# passed to stream_socket_server/stream_socket_client negotiate down to TLS
+# 1.0 (CWE-327, use of a broken/risky cryptographic algorithm; GHSA-f3qf-gc58-29p6:
+# "Disable TLS 1.0 in stream extension URLs"). SSLSocket::setupCrypto in
+# hphp/runtime/base/ssl-socket.cpp picks the OpenSSL SSL_METHOD for the
+# requested CryptoMethod with a switch, then hands the chosen method straight
+# to SSL_CTX_new:
+#
+#   case CryptoMethod::ClientTLS:
+#     smethod = TLSv1_client_method();
+#     break;
+#   ...
+#   case CryptoMethod::ServerTLS:
+#     smethod = TLSv1_server_method();
+#     break;
+#   ...
+#   SSL_CTX *ctx = SSL_CTX_new(smethod);
+#
+# TLSv1_client_method()/TLSv1_server_method() are OpenSSL's version-locked
+# constructors: they build a context that offers TLS 1.0 only, deprecated
+# since OpenSSL 1.1.0 for exactly this reason. Fix commit 083f5ffdee swaps
+# both calls for TLS_client_method()/TLS_server_method(), the version-flexible
+# constructors that negotiate the highest mutually supported protocol instead
+# of hard-coding the weakest one. Confirmed as the real fix by reading its
+# diff: a two-line change in ssl-socket.cpp, nothing else touched, matching
+# the advisory title exactly.
+#
+# FIXED. `vyql match` on the vulnerable form labelled nothing: the shipped
+# cpp openssl.vyql binding only covers `sslv3_method` (lowercase), which
+# cannot match the real API's `SSLv3_method`/`TLSv1_*_method` casing --
+# `callee.method ==` is an exact, non-folded comparison (bindings_core.go's
+# valuePredicateLowerValues "equals" branch) -- and it additionally requires
+# `dependency("openssl")`, which no C/C++ source scan can ever satisfy: the
+# extractor emits no code.Import for #include, and the SBOM reader has no
+# CMake/vcpkg/conan manifest parser, so the package-evidence gate is always
+# empty for cpp. Missing binding, not an engine gap: added weakCipher160/161
+# to vyql/bindings/cpp/m4e783366.vyql, alongside the existing DES/RC4/BF
+# weak-cipher entries, matching on `node.path ~= "TLSv1_client_method"` /
+# `"TLSv1_server_method"` (path match folds case, so the casing trap above
+# does not recur) with no dependency gate, consistent with how this file's
+# other libc/OpenSSL presence bindings are ungated. Reuses code.WeakCipher
+# (CWE_327/CWE_326) rather than minting a concept -- the existing VYQL-CRY-002
+# rule already judges it. Scope is deliberately the two functions this CVE's
+# diff actually renamed, not the wider SSLv2/SSLv3 family: the *fixed*
+# ssl-socket.cpp still calls SSLv3_client_method()/SSLv2_client_method() for
+# its explicit legacy-protocol CryptoMethod cases (compiled out only when
+# OPENSSL_NO_SSL3/OPENSSL_NO_SSL2 are defined), so a binding covering that
+# family would fire on the patched file too.
+
+test "rank1172: setupCrypto picks the TLS-1.0-locked client method"
+  lang cpp
+  file hphp/runtime/base/ssl-socket.cpp
+  expect VYQL-CRY-002
+  code
+  ```
+  bool SSLSocket::setupCrypto() {
+    const SSL_METHOD *smethod;
+    switch (m_method) {
+    case CryptoMethod::ClientTLS:
+      smethod = TLSv1_client_method();
+      break;
+    default:
+      return false;
+    }
+    SSL_CTX *ctx = SSL_CTX_new(smethod);
+    return ctx != nullptr;
+  }
+  ```
+
+test "rank1172: setupCrypto picks the TLS-1.0-locked server method"
+  lang cpp
+  file hphp/runtime/base/ssl-socket.cpp
+  expect VYQL-CRY-002
+  code
+  ```
+  bool SSLSocket::setupCrypto() {
+    const SSL_METHOD *smethod;
+    switch (m_method) {
+    case CryptoMethod::ServerTLS:
+      smethod = TLSv1_server_method();
+      break;
+    default:
+      return false;
+    }
+    SSL_CTX *ctx = SSL_CTX_new(smethod);
+    return ctx != nullptr;
+  }
+  ```
+
+test "rank1172: fix negotiates the highest mutually supported protocol"
+  lang cpp
+  file hphp/runtime/base/ssl-socket.cpp
+  reject VYQL-CRY-002
+  code
+  ```
+  bool SSLSocket::setupCrypto() {
+    const SSL_METHOD *smethod;
+    switch (m_method) {
+    case CryptoMethod::ClientTLS:
+      smethod = TLS_client_method();
+      break;
+    case CryptoMethod::ServerTLS:
+      smethod = TLS_server_method();
+      break;
+    default:
+      return false;
+    }
+    SSL_CTX *ctx = SSL_CTX_new(smethod);
+    return ctx != nullptr;
+  }
+  ```

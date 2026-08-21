@@ -1902,3 +1902,18 @@ binding goStaticPosixCleanWindowsTraversal344 {
   query pattern presenceNode where node.scope == "function" and node.context.callPath contains "url.PathUnescape" and node.context.callPath contains "filepath.Join" and node.context.callPath contains "path.Clean" and containsAny(node.context.callPath, ["os.Stat", "File"]) and not (node.context.callPath contains "filepath.Clean")
   emit issue code.GoStaticPosixCleanWindowsTraversal at node
 }
+
+binding tlsWeakClientAuth345 {
+  query pattern presenceNode where node.kind == "any" and node.path ~= "tls.RequestClientCert"
+  emit issue code.CertValidationDisabled at node
+}
+
+binding tlsWeakClientAuth346 {
+  query pattern presenceNode where node.kind == "any" and node.path ~= "tls.RequireAnyClientCert"
+  emit issue code.CertValidationDisabled at node
+}
+
+binding tlsWeakClientAuth347 {
+  query pattern presenceNode where node.kind == "any" and node.path ~= "tls.VerifyClientCertIfGiven"
+  emit issue code.CertValidationDisabled at node
+}

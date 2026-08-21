@@ -691,6 +691,21 @@ binding deserialization130 {
   emit sink code.Deserialization at call
 }
 
+// Kryo's readClassAndObject instantiates whatever class the input stream names, so an
+// unregistered call on untrusted bytes is unrestricted deserialization (the same risk
+// Kryo's own docs describe for using it without setRegistrationRequired or a
+// ClassResolver allowlist). The package-derived binding for this method
+// (vyql/bindings/packages/generated/java/com.esotericsoftware_kryo.vyql) gates on
+// dependency("com.esotericsoftware:kryo"), which never resolves for Java: the SCA
+// manifest table (internal/extract/sca/discover.go) has no pom.xml or build.gradle
+// reader, so that gate stays closed on every real Java project and the sink never
+// fires. readClassAndObject is Kryo's own method name and not used elsewhere, so this
+// mirrors deserialization129/130 above and drops the unreachable gate.
+binding deserialization762 {
+  query pattern callExpr where callee.method == "readClassAndObject"
+  emit sink code.Deserialization at args[0]
+}
+
 binding deserialization131 {
   query pattern callExpr where callee.path ~= "XMLDecoder"
   emit sink code.Deserialization at args[0]

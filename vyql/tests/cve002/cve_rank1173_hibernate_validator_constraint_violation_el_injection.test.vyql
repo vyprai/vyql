@@ -1,0 +1,122 @@
+# Rank 1173 / CVE-2025-35036: Hibernate Validator, before 6.2.0 and 7.0.0,
+# evaluates a custom `ConstraintViolationBuilder` message template with
+# Expression Language by default (GHSA-7v6m-28jr-rg84, CWE-917). The fixed
+# revision threads an `expressionLanguageEnabled` flag through every builder
+# path of ConstraintValidatorContextImpl's
+# buildConstraintViolationWithTemplate, defaulting to false, and the new
+# `enableExpressionLanguage()` method on HibernateConstraintViolationBuilder
+# is the only way to opt back in.
+#
+# The commit's own reference-guide examples are the vulnerable/safe pair a
+# ConstraintValidator author would actually write, so this spec is modelled on
+# them verbatim (documentation/src/test/java/.../chapter06/elinjection/
+# {Unsafe,Safe}Validator.java). Vulnerable: `isValid`'s validated value is
+# concatenated directly into the template string handed to
+# `buildConstraintViolationWithTemplate`, so any EL metacharacters in the
+# value are part of the template text -- exploitable by default before the
+# fixed revision, and still an EL-injection-shaped sink after it if the
+# caller opts in with
+# `enableExpressionLanguage()` (the fixed UnsafeValidator.java keeps this
+# exact call, marked "THIS IS UNSAFE, DO NOT COPY THIS EXAMPLE", to make that
+# point). Safe: the value is passed as a bound `addExpressionVariable`
+# instead, referenced from the template as `${validatedValue}`; the raw value
+# is data handed to the interpolator, never concatenated into the template
+# text the interpolator parses as code, so it is safe independent of whether
+# EL is enabled.
+#
+# CAUGHT by VYQL-INJ-016 (vypr.injection.ExpressionInjection, CWE_917): the
+# `buildConstraintViolationWithTemplate` sink (expressionEval357 in
+# vyql/bindings/java/m420f6b67.vyql, `callee.method ==
+# "buildConstraintViolationWithTemplate"` at args[0]) and the source that
+# labels `isValid`'s first parameter as code.HttpInput when the method also
+# declares a ConstraintValidatorContext parameter (httpInput21, same file)
+# exist -- added for the injection.test.vyql regression pinning
+# `e.getMessage()` reaching this sink. No definition change needed here; this
+# spec pins the same rule against the real CVE's own vulnerable/safe pair
+# rather than a synthetic one, since the corpus's coverage gate finds a rank
+# by its own spec, not by another rank's.
+#
+# Real checkout: `vyql scan --cache off --max-ram 4GB` on the vulnerable
+# checkout's documentation/src/test/java/.../elinjection/UnsafeValidator.java
+# reports VYQL-INJ-016 at the buildConstraintViolationWithTemplate call; the
+# same scan on SafeValidator.java, both revisions, reports nothing there.
+
+test "rank1173: value concatenated into the EL-evaluated violation template"
+  lang java
+  file documentation/src/test/java/org/hibernate/validator/referenceguide/chapter06/elinjection/UnsafeValidator.java
+  expect VYQL-INJ-016
+  code
+  ```
+  package org.hibernate.validator.referenceguide.chapter06.elinjection;
+
+  import javax.validation.ConstraintValidator;
+  import javax.validation.ConstraintValidatorContext;
+
+  public class UnsafeValidator implements ConstraintValidator<ZipCode, String> {
+
+    @Override
+    public boolean isValid(String value, ConstraintValidatorContext context) {
+      if (value == null) {
+        return true;
+      }
+
+      context.disableDefaultConstraintViolation();
+
+      if (isInvalid(value)) {
+        context
+            .buildConstraintViolationWithTemplate(value + " is not a valid ZIP code")
+            .addConstraintViolation();
+
+        return false;
+      }
+
+      return true;
+    }
+
+    private boolean isInvalid(String value) {
+      return false;
+    }
+  }
+  ```
+
+test "rank1173: value passed as a bound expression variable, never concatenated into the template"
+  lang java
+  file documentation/src/test/java/org/hibernate/validator/referenceguide/chapter06/elinjection/SafeValidator.java
+  reject VYQL-INJ-016
+  code
+  ```
+  package org.hibernate.validator.referenceguide.chapter06.elinjection;
+
+  import org.hibernate.validator.constraintvalidation.HibernateConstraintValidatorContext;
+  import javax.validation.ConstraintValidator;
+  import javax.validation.ConstraintValidatorContext;
+
+  public class SafeValidator implements ConstraintValidator<ZipCode, String> {
+
+    @Override
+    public boolean isValid(String value, ConstraintValidatorContext context) {
+      if (value == null) {
+        return true;
+      }
+
+      HibernateConstraintValidatorContext hibernateContext = context.unwrap(
+          HibernateConstraintValidatorContext.class);
+      hibernateContext.disableDefaultConstraintViolation();
+
+      if (isInvalid(value)) {
+        hibernateContext
+            .addExpressionVariable("validatedValue", value)
+            .buildConstraintViolationWithTemplate("${validatedValue} is not a valid ZIP code")
+            .addConstraintViolation();
+
+        return false;
+      }
+
+      return true;
+    }
+
+    private boolean isInvalid(String value) {
+      return false;
+    }
+  }
+  ```
