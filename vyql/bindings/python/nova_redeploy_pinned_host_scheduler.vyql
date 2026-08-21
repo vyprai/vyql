@@ -1,0 +1,42 @@
+module bindings.python.nova_redeploy_pinned_host_scheduler;
+
+// A compute workload is admitted onto a host by the placement scheduler, and the
+// scheduler is the only place the operator's host policy is enforced -- image
+// property isolation, aggregate membership, trusted-host and tenant-isolation
+// filters all run there and nowhere else. Nova's conductor task API documents
+// that passing an explicit `host` to `rebuild_instance` (and a destination to
+// `live_migrate_instance`) dispatches the work straight to that host and bypasses
+// the scheduler entirely; the scheduler is asked only when the caller leaves the
+// host unset.
+//
+// Skipping it is correct while the workload's placement inputs are unchanged,
+// because the decision that put the instance where it is was already made against
+// those inputs. It stops being correct the moment the redeploy carries a
+// caller-supplied replacement image: the new image has never been offered to a
+// single filter, so any constraint the operator expressed about which images may
+// run on which hosts is simply not consulted. A tenant who can rebuild an
+// instance can then place any image it likes on a host reserved for other images.
+//
+// The documented way to keep the workload where it is *and* still be admitted is
+// to constrain the scheduling request rather than to skip it: nova's
+// `RequestSpec` carries `requested_destination` (pin the scheduler to one
+// host/node), `ignore_hosts` (exclude hosts) and `reset_forced_destinations()`.
+// A dispatch function that loads the instance's persisted `RequestSpec`, reads
+// the instance's current host, and hands both to the conductor without setting
+// any of those fields is asking for the placement decision to be reused, not
+// re-made.
+//
+// The three constraint fields are read from the enclosing function's assignment
+// tokens, which Python emits per function and which carry no sibling function's
+// statements, so a neighbouring move operation that does constrain its request
+// does not speak for this one. Matching the `=` and `(` the declaration itself
+// carries keeps prose and attribute reads out of it.
+binding novaRedeployPinnedHostSchedulerBypass {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "python"
+    and containsAny(node.context.callPath, ["compute_task_api.rebuild_instance", "compute_task_api.live_migrate_instance", "conductor_api.rebuild_instance"])
+    and node.context.callPath contains "RequestSpec.get_by_instance_uuid"
+    and node.context.selector contains "instance.host"
+    and not containsAny(node.context.assign, ["requested_destination=", "ignore_hosts=", "reset_forced_destinations("])
+  emit issue code.RedeployPinnedHostSchedulerBypass at node
+}

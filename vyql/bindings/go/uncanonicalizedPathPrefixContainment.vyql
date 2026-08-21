@@ -1,0 +1,51 @@
+module bindings.go.uncanonicalizedPathPrefixContainment;
+
+// path/filepath documents Clean as purely lexical: it collapses "." and ".."
+// by text alone, never consults the filesystem, and never turns a relative
+// path into an absolute one -- "Clean does not modify a path that is already
+// clean, and it does not resolve symbolic links". filepath.Abs is the
+// documented way to get "an absolute representation of path",
+// filepath.EvalSymlinks the documented way to resolve links, and filepath.Rel
+// the documented way to ask how one path sits relative to another.
+//
+// A function that lexically cleans a path and then decides whether it lies
+// under a base directory with strings.HasPrefix is comparing two path strings
+// whose form was never established. If the base is relative -- filepath.Dir of
+// a relative template name is "." -- the prefix test accepts "../../etc/passwd";
+// if the base is absolute and the candidate relative it accepts nothing. Either
+// way the comparison does not answer the containment question it is written to
+// answer, and the candidate's dot segments survive it (CWE-22, CWE-184).
+//
+// The Go frontend emits per-function call_path and call_arg tokens
+// (golang.go goFunctionTokens), so this is a function-scope presence predicate.
+// Three conditions keep it on the containment-guard use:
+//
+//   * the function calls a lexical path cleaner (filepath.Clean or path.Clean),
+//     composes or splits a path with Join or Dir, and compares with
+//     strings.HasPrefix, the string-prefix containment operator. That is the
+//     shape of a containment guard: a candidate built under, or measured
+//     against, a base directory the same function derived. Cleaning a path
+//     without comparing it, prefix-testing a string that was never treated as a
+//     path, or comparing two paths handed in from elsewhere are ordinary work
+//     and are not covered.
+//   * no argument of any strings.HasPrefix call in the function is a string
+//     literal. A prefix test against a literal is a syntactic marker test -- a
+//     leading dot, a "~/" home shorthand, a URL scheme -- not a comparison
+//     against a base directory computed at run time.
+//   * nothing in the same function resolves a path: filepath.Abs,
+//     filepath.EvalSymlinks, filepath.Rel, filepath.IsAbs, os.Readlink,
+//     securejoin.SecureJoin or fs.ValidPath. Any of those establishes the
+//     operands' form before the comparison.
+//
+// Function scope rather than file scope is deliberate: a resolver called
+// somewhere else in the same package says nothing about this guard's operands.
+binding goUncanonicalizedPathPrefixContainment {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "go"
+    and node.context.callPath contains "strings.HasPrefix"
+    and node.context.callPath contains "path.Clean"
+    and containsAny(node.context.callPath, ["path.Join", "path.Dir"])
+    and not (node.context.callArg contains "strings.HasPrefix:\"")
+    and not containsAny(node.context.callPath, ["filepath.Abs", "filepath.EvalSymlinks", "filepath.Rel", "filepath.IsAbs", "os.Readlink", "SecureJoin", "fs.ValidPath"])
+  emit issue code.UncanonicalizedPathContainmentCheck at node
+}

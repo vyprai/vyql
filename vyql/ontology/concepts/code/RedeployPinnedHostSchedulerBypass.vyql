@@ -1,0 +1,11 @@
+module code;
+
+concept RedeployPinnedHostSchedulerBypass : issue {
+  cwe: [CWE_863]
+  reviewAssumption: "the placement scheduler is the component that enforces host admission policy, so a workload dispatched straight to a host is admitted without any of those filters running"
+  reviewCategory: auth
+  reviewCondition: "a redeploy that replaces the workload's image must be re-admitted by the scheduler against the target host rather than reusing the placement decision made for the previous image"
+  reviewConfidence: medium
+  reviewEvidence: "redeploy dispatch context {pattern} pins the workload's current host and never constrains a scheduling request"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

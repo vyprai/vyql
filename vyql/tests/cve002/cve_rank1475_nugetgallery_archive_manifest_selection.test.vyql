@@ -1,0 +1,200 @@
+# Rank 1475 / CVE-2026-39399 (NuGet/NuGetGallery, fix 0e80f87628349207cdcaf55358491f8a6f1ca276,
+# "Harden validation of package metadata"). A .nupkg is a zip, and the package's identity --
+# the id and the version that later become the blob path `{container}/{id}/{version}/{id}.{version}.nupkg`
+# -- is read out of the .nuspec inside it. Two different readers in the same service located
+# that .nuspec by walking the zip's entry list themselves:
+#
+#   src/Catalog/Helpers/Utils.cs (GetNuspec)
+#     foreach (ZipArchiveEntry part in package.Entries)
+#         if (part.FullName.EndsWith(".nuspec") && part.FullName.IndexOfAny(Slashes) == -1)
+#             return XDocument.Load(part.Open());
+#
+#   src/Catalog/Dnx/DnxCatalogCollector.cs (GetNuspec)
+#     foreach (ZipArchiveEntry entry in archive.Entries)
+#         if (entry.FullName.Equals($"{id}.nuspec", ...)) return ...;
+#     foreach (ZipArchiveEntry entry in archive.Entries)
+#         if (entry.FullName.EndsWith(".nuspec", ...)) return ...;
+#
+# Neither loop requires the archive to hold exactly one manifest, and the two disagree about
+# which one wins: the first takes the first root-level `.nuspec`, the second prefers
+# `{id}.nuspec` at any depth and otherwise takes the first `.nuspec` anywhere. A package
+# carrying two .nuspec entries is therefore validated from one manifest and stored under the
+# identity read from the other -- and since neither the id nor the version is checked against
+# the package-id grammar, the identity the storage path is built from could carry separators.
+# That is the CWE-436 half of the advisory's CWE-20/CWE-22 pair, and it is the half with a
+# discriminator that does not depend on the fixed revision's own vocabulary.
+#
+# The fixed revision deletes both loops in favour of NuGet.Packaging's own accessor --
+# `new PackageArchiveReader(archive).GetNuspec()`, documented to require exactly one manifest
+# at the archive root -- and, on the gallery side, adds `CheckNuspecCount` rejecting an upload
+# whose entry list holds more than one `.nuspec`. The rest of the commit (Utils.AssertValidPackageId,
+# Utils.AssertValidPackageVersion, Storage.AssertSimpleBlobName, NormalizeVersion throwing on an
+# unparseable version) is the CWE-22 half.
+#
+# Step 0: no metadata flag; the row is right. `git show` reads the commit, the two entry-scanning
+# loops are present at the parent and both are gone at the fixed revision, replaced by the packaging API's
+# accessor. Recorded CWE-20,CWE-22; the mechanism detected here is CWE-436, so the concept
+# carries both CWE-436 and CWE-20. No pool row correction.
+#
+# What is not shippable, and why. The CWE-22 half -- `FlatContainerPackagePathProvider.GetPackagePath`
+# and `PackageUtility.GetPackageFileName` interpolating an unvalidated id and version into a blob
+# path -- is unchanged at the fixed revision except for the two added `Utils.AssertValid*` calls. There is no
+# API-documented call left inside either builder to key on (the 1380 counterweight test fails
+# here: `PackageIdValidator.IsValidPackageId` and `NuGetVersion.TryParse` both live inside the
+# fix's new helper, not inside the guarded method), so any negation would be keyed on
+# `AssertValidPackageId` -- the fixing commit's own method name, which is exactly what rank 1394
+# measured as no discrimination at all. `code.CallerControlledFilenameComponentPathTraversal`
+# exists for that shape and stays Java-only for that reason.
+#
+# The shipped route needs no negation on the fixed revision's vocabulary: the entry-scanning loop itself is
+# the evidence, and the patched form has neither `.Entries` nor a manifest filename literal.
+# Measured on src/Catalog at both revisions, three `--cache off` runs each: 2 -> 0, landing on
+# Utils.cs:117 and DnxCatalogCollector.cs:457, the two vulnerable functions exactly. Collateral
+# over the whole corpus: 59 C# files under /tmp/cve-work/rank*/ mention `.Entries`, 8 of those
+# also carry a package-manifest filename literal, and the five that are not these two functions
+# (three NuGet.Client test helpers, NuGetGallery's own TestPackage.cs at both revisions) all
+# report 0 -- they build archives rather than select a manifest out of one.
+
+test "rank1475: a package reader picks the manifest out of the archive by scanning entry names"
+  lang csharp
+  file src/Catalog/Helpers/NuspecLoader.cs
+  expect VYQL-VAL-030
+  code
+  ```
+  using System;
+  using System.IO;
+  using System.IO.Compression;
+
+  namespace NuGet.Services.Metadata.Catalog.Helpers
+  {
+      public static class NuspecLoader
+      {
+          public static string GetNuspec(Stream stream, string id)
+          {
+              string name = $"{id}.nuspec";
+
+              using (var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true))
+              {
+                  foreach (ZipArchiveEntry entry in archive.Entries)
+                  {
+                      if (entry.FullName.Equals(name, StringComparison.InvariantCultureIgnoreCase))
+                      {
+                          using (TextReader reader = new StreamReader(entry.Open()))
+                          {
+                              return reader.ReadToEnd();
+                          }
+                      }
+                  }
+
+                  foreach (ZipArchiveEntry entry in archive.Entries)
+                  {
+                      if (entry.FullName.EndsWith(".nuspec", StringComparison.InvariantCultureIgnoreCase))
+                      {
+                          using (TextReader reader = new StreamReader(entry.Open()))
+                          {
+                              return reader.ReadToEnd();
+                          }
+                      }
+                  }
+              }
+
+              return null;
+          }
+      }
+  }
+  ```
+
+test "rank1475: the fixed revision reads the manifest through the packaging API's accessor instead of the entry list"
+  lang csharp
+  file src/Catalog/Helpers/NuspecLoader.cs
+  reject VYQL-VAL-030
+  code
+  ```
+  using System;
+  using System.IO;
+  using System.IO.Compression;
+  using NuGet.Packaging;
+
+  namespace NuGet.Services.Metadata.Catalog.Helpers
+  {
+      public static class NuspecLoader
+      {
+          public static string GetNuspec(Stream stream, string id)
+          {
+              using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
+              using var packageArchiveReader = new PackageArchiveReader(archive);
+
+              var actualId = packageArchiveReader.GetIdentity().Id;
+              if (!StringComparer.OrdinalIgnoreCase.Equals(id, actualId))
+              {
+                  throw new InvalidOperationException($"The package ID in the catalog leaf '{id}' does not match the package ID in the .nupkg '{actualId}'.");
+              }
+
+              using var nuspecStream = packageArchiveReader.GetNuspec();
+              using var nuspecReader = new StreamReader(nuspecStream);
+              return nuspecReader.ReadToEnd();
+          }
+      }
+  }
+  ```
+
+test "rank1475: an entry scan that requires exactly one manifest is not ambiguous"
+  lang csharp
+  file src/Catalog/Helpers/NuspecLoader.cs
+  reject VYQL-VAL-030
+  code
+  ```
+  using System;
+  using System.IO;
+  using System.IO.Compression;
+  using System.Linq;
+
+  namespace NuGet.Services.Metadata.Catalog.Helpers
+  {
+      public static class NuspecLoader
+      {
+          public static string GetNuspec(Stream stream, string id)
+          {
+              using (var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true))
+              {
+                  var manifest = archive.Entries.Single(entry => entry.FullName.EndsWith(".nuspec", StringComparison.OrdinalIgnoreCase));
+
+                  using (TextReader reader = new StreamReader(manifest.Open()))
+                  {
+                      return reader.ReadToEnd();
+                  }
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1475: a build helper that writes a manifest into a new archive is not a manifest lookup"
+  lang csharp
+  file tests/TestUtils/TestPackage.cs
+  reject VYQL-VAL-030
+  code
+  ```
+  using System.IO;
+  using System.IO.Compression;
+
+  namespace NuGetGallery.TestUtils
+  {
+      public static class TestPackage
+      {
+          public static void WriteNuspec(ZipArchive archive, string id, string nuspec)
+          {
+              var entry = archive.CreateEntry(id + ".nuspec");
+              using (var writer = new StreamWriter(entry.Open()))
+              {
+                  writer.Write(nuspec);
+              }
+
+              foreach (var existing in archive.Entries)
+              {
+                  System.Console.WriteLine(existing.FullName);
+              }
+          }
+      }
+  }
+  ```

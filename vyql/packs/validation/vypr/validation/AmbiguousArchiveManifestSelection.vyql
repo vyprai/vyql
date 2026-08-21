@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule AmbiguousArchiveManifestSelection {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_436]
+    id: "VYQL-VAL-030"
+    severity: medium
+  }
+  issue code.AmbiguousArchiveManifestSelection as sink
+}

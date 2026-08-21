@@ -1,0 +1,11 @@
+module code;
+
+concept AmbiguousArchiveManifestSelection : issue {
+  cwe: [CWE_436, CWE_20]
+  reviewAssumption: "an archive can carry more than one entry whose name matches the manifest, and a second reader of the same archive selects a different one"
+  reviewCategory: input_validation
+  reviewCondition: "an archive's manifest is picked by scanning entry names for a filename match instead of the packaging API's manifest accessor or an exactly-one check"
+  reviewConfidence: medium
+  reviewEvidence: "archive reading context {pattern} walks the entry list and returns the first entry matching a package manifest filename without asserting the archive holds exactly one"
+  vulnerableTo: [validation.ImproperInputValidation]
+}

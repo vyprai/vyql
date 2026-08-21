@@ -1,0 +1,207 @@
+# CVE-2021-32798 (GHSA-hwvq-6gjx-j797, CWE-79/CWE-80): an untrusted notebook's
+# text/html output executes script the moment the notebook opens.
+#
+# notebook/static/notebook/js/outputarea.js hands every untrusted text/html
+# output to security.sanitize_html_and_parse before inserting it, so the whole
+# defence is notebook/static/base/js/security.js. That file sanitized with
+# google-caja's html-css-sanitizer, and it did not use the library as shipped --
+# it rewrote the library's own policy tables on the way in.
+#
+# caja publishes html4.ELEMENTS (tag -> html4.eflags bitmask, UNSAFE marking what
+# must never be emitted) and html4.ATTRIBS (a `tag::attr` key -> html4.atype,
+# where URI means "check this value against the URI policy" and NONE, spelled 0,
+# means "emit it unexamined"). sanitize_html cleared and reset the UNSAFE bit on
+# html4.ELEMENTS.style per call, and sanitizeAttribs -- the tag policy caja
+# invokes for every element -- assigned NONE to html4.ATTRIBS['img::src'] and
+# added a NONE entry for every `data-` attribute it saw in the document being
+# sanitized. The advisory's own payload,
+# `<select><iframe></select><img src=x: onerror=alert('xss')>`, needs both
+# halves: the select/iframe prefix is where caja's string parser and the
+# browser's tree construction disagree, and `src=x:` survives only because the
+# URI check on img::src had been switched off, so the image fails to load and
+# its onerror handler runs.
+#
+# The fixed revision ("Merge pull request from GHSA-hwvq-6gjx-j797") drops
+# google-caja from bower.json and webpack.config.js, imports
+# components/sanitizer/index -- @jupyterlab/apputils' DOMPurify-backed
+# defaultSanitizer -- and calls defaultSanitizer.sanitize(html, options),
+# passing allowedStyles through the documented options object. No policy table
+# is reachable from the caller any more, which is what the second reject case
+# isolates: caja kept, its tables left alone, and the flag gone.
+#
+# The row is fine as recorded: the SHA is the GHSA merge, `git show` prints it
+# in full, and the parent 903f2d3 carries the whole caja integration.
+#
+# Reported by VYQL-INJ-200 through code.HtmlSanitizerLogicReview, the concept
+# that carries "a sanitizer's own policy is not what decides the output"
+# for the Python image data-URL exemption and the two JavaScript scheme-denylist
+# bindings. The gap is a JavaScript binding for the caller rewriting the
+# sanitizer's element and attribute tables:
+# cajaSanitizerPolicyTableWidenedByCaller in
+# vyql/bindings/javascript/html_sanitizer_policy_table_widened_by_caller.vyql.
+
+test "rank1467: the caller rewrites the html sanitizer's attribute policy table before sanitizing"
+  lang javascript
+  file notebook/static/base/js/security.js
+  expect VYQL-INJ-200
+  code
+  ```
+  define([
+      'jquery',
+      'components/google-caja/html-css-sanitizer-minified',
+  ], function($, sanitize) {
+      "use strict";
+
+      var noop = function (x) { return x; };
+
+      var caja;
+      if (window && window.html) {
+          caja = window.html;
+          caja.html4 = window.html4;
+      }
+
+      var sanitizeAttribs = function (tagName, attribs, opt_naiveUriRewriter, opt_nmTokenPolicy, opt_logger) {
+          var ATTRIBS = caja.html4.ATTRIBS;
+          for (var i = 0; i < attribs.length; i += 2) {
+              var attribName = attribs[i];
+              if (attribName.substr(0,5) == 'data-') {
+                  var attribKey = '*::' + attribName;
+                  if (!ATTRIBS.hasOwnProperty(attribKey)) {
+                      ATTRIBS[attribKey] = 0;
+                  }
+              }
+          }
+          ATTRIBS['img::src'] = 0;
+          return caja.sanitizeAttribs(tagName, attribs, opt_naiveUriRewriter, opt_nmTokenPolicy, opt_logger);
+      };
+
+      var sanitize_html = function (html, allow_css) {
+          var html4 = caja.html4;
+
+          if (allow_css) {
+              html4.ELEMENTS.style &= ~html4.eflags.UNSAFE;
+              html4.ATTRIBS.style = html4.atype.STYLE;
+          } else {
+              html4.ELEMENTS.style |= html4.eflags.UNSAFE;
+              html4.ATTRIBS.style = html4.atype.SCRIPT;
+          }
+
+          var policy = function (tagName, attribs) {
+              if (!(html4.ELEMENTS[tagName] & html4.eflags.UNSAFE)) {
+                  return { 'attribs': sanitizeAttribs(tagName, attribs, noop, noop, noop) };
+              }
+          };
+
+          return caja.sanitizeWithPolicy(html, policy);
+      };
+
+      return { sanitize_html: sanitize_html };
+  });
+  ```
+
+test "rank1467: the sanitizer's own options object carries the policy"
+  lang javascript
+  file notebook/static/base/js/security.js
+  reject VYQL-INJ-200
+  code
+  ```
+  define([
+      'jquery',
+      'components/sanitizer/index',
+  ], function($, sanitizer) {
+      "use strict";
+
+      var defaultSanitizer = sanitizer.defaultSanitizer;
+
+      var sanitize_html = function (html, allow_css) {
+          const options = {};
+          if (!allow_css) {
+              options.allowedStyles = {};
+          }
+          return defaultSanitizer.sanitize(html, options);
+      };
+
+      var sanitize_html_and_parse = function (html, allow_css) {
+          var sanitized_html = sanitize_html(html, allow_css);
+          var prev_htmlPrefilter = $.htmlPrefilter;
+          $.htmlPrefilter = function(html) { return html; };
+          try {
+              return $.parseHTML(sanitized_html);
+          } finally {
+              $.htmlPrefilter = prev_htmlPrefilter;
+          }
+      };
+
+      return { sanitize_html: sanitize_html, sanitize_html_and_parse: sanitize_html_and_parse };
+  });
+  ```
+
+test "rank1467: the same sanitizer is used with the element and attribute tables it ships"
+  lang javascript
+  file notebook/static/base/js/security.js
+  reject VYQL-INJ-200
+  code
+  ```
+  define([
+      'jquery',
+      'components/google-caja/html-css-sanitizer-minified',
+  ], function($, sanitize) {
+      "use strict";
+
+      var caja;
+      if (window && window.html) {
+          caja = window.html;
+          caja.html4 = window.html4;
+      }
+
+      var record_messages = function (msg, opts) {
+          console.log("HTML Sanitizer", msg, opts);
+      };
+
+      var sanitize_html = function (html) {
+          var html4 = caja.html4;
+
+          var policy = function (tagName, attribs) {
+              if (!(html4.ELEMENTS[tagName] & html4.eflags.UNSAFE)) {
+                  return { 'attribs': caja.sanitizeAttribs(tagName, attribs) };
+              }
+              record_messages(tagName + " removed", { change: "removed", tagName: tagName });
+          };
+
+          return caja.sanitizeWithPolicy(html, policy);
+      };
+
+      return { sanitize_html: sanitize_html };
+  });
+  ```
+
+test "rank1467: the policy table is widened through a local alias"
+  lang javascript
+  file notebook/static/base/js/security.js
+  expect VYQL-INJ-200
+  code
+  ```
+  define([
+      'jquery',
+      'components/google-caja/html-css-sanitizer-minified',
+  ], function($, sanitize) {
+      "use strict";
+
+      var caja = window.html;
+      caja.html4 = window.html4;
+
+      var tagAttrPolicy = function (tagName, attribs, opt_naiveUriRewriter, opt_nmTokenPolicy, opt_logger) {
+          var allowed = caja.html4.ATTRIBS;
+          for (var i = 0; i < attribs.length; i += 2) {
+              var attribName = attribs[i];
+              if (attribName.substr(0,5) == 'data-') {
+                  allowed['*::' + attribName] = 0;
+              }
+          }
+          allowed['img::src'] = 0;
+          return caja.sanitizeAttribs(tagName, attribs, opt_naiveUriRewriter, opt_nmTokenPolicy, opt_logger);
+      };
+
+      return { tagAttrPolicy: tagAttrPolicy };
+  });
+  ```

@@ -1188,3 +1188,13 @@ binding archiveEntryRawPrefixContainment210 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.callPath contains "Path.Combine" and node.context.callPath contains "Path.GetFullPath.StartsWith" and containsAny(node.context.selector, [".Name", ".FullName", ".FileName", ".Key"]) and containsAny(node.context.callPath, ["File.Create", "File.OpenWrite", "File.WriteAllBytes", "File.WriteAllText", "File.Move", "File.Copy", "ExtractToFile", "Directory.CreateDirectory"]) and not (node.context.callArgShape contains "Path.GetFullPath.StartsWith:ID+")
   emit issue code.ArchiveEntryRawPrefixContainment at node
 }
+
+binding certValidationDisabled260 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and containsAny(node.context.selector, [".ChainPolicy"]) and containsAny(node.context.selector, [".ChainStatus.Any", ".ChainStatus.All", ".ChainStatus.Where", ".ChainStatus.FirstOrDefault", ".ChainStatus.SingleOrDefault"]) and not (containsAny(node.context.expr, [".ChainStatus.Length==0", ".ChainStatus.Length>0", ".ChainStatus.Length!=0", ".ChainStatus.Length<1", ".ChainStatus.Count==0", ".ChainStatus.Count>0"]))
+  emit issue code.CertValidationDisabled at node
+}
+
+binding ambiguousArchiveManifestSelection260 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and containsAny(node.context.selector, [".Entries"]) and containsAny(node.context.call, ["EndsWith", "Equals", "StartsWith"]) and containsAny(node.context.literal, [".nuspec", ".gemspec", ".podspec", "META-INF/MANIFEST.MF", "AndroidManifest.xml", "package.json"]) and not (containsAny(node.context.call, ["Single", "Count"]))
+  emit issue code.AmbiguousArchiveManifestSelection at node
+}
