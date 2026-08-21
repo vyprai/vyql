@@ -1,0 +1,88 @@
+# A datepicker widget reads its per-element settings back out of `$.data` and
+# then builds the append span and the trigger button by concatenating option
+# values into an HTML string that `$()` parses. Options such as `appendText`,
+# `buttonText`, `prevText` and `closeText` are labels, so a page that fills them
+# from a URL parameter or a stored profile field gets script execution. Building
+# the element with `$( "<span>" )` and setting the label through `.text()` is
+# what keeps the value a text node instead of markup.
+
+test "rank1239: datepicker option label is concatenated into a parsed HTML string"
+  lang javascript
+  file datepicker.js
+  expect VYQL-INJ-004
+  code
+  ```
+  $.extend( Datepicker.prototype, {
+
+  	_getInst: function( target ) {
+  		return $.data( target, "datepicker" );
+  	},
+
+  	_get: function( inst, name ) {
+  		return inst.settings[ name ] !== undefined ?
+  			inst.settings[ name ] : this._defaults[ name ];
+  	},
+
+  	_attachments: function( input, inst ) {
+  		var appendText = this._get( inst, "appendText" ),
+  			isRTL = this._get( inst, "isRTL" );
+
+  		if ( appendText ) {
+  			inst.append = $( "<span class='" + this._appendClass + "'>" + appendText + "</span>" );
+  			input[ isRTL ? "before" : "after" ]( inst.append );
+  		}
+  	},
+
+  	_connectDatepicker: function( target, inst ) {
+  		this._attachments( $( target ), inst );
+  	},
+
+  	_setDateDatepicker: function( target ) {
+  		var inst = this._getInst( target );
+  		this._connectDatepicker( target, inst );
+  	}
+  } );
+  ```
+
+test "rank1239: datepicker option label is set as text on a constructed element"
+  lang javascript
+  file datepicker.js
+  reject VYQL-INJ-004
+  code
+  ```
+  $.extend( Datepicker.prototype, {
+
+  	_getInst: function( target ) {
+  		return $.data( target, "datepicker" );
+  	},
+
+  	_get: function( inst, name ) {
+  		return inst.settings[ name ] !== undefined ?
+  			inst.settings[ name ] : this._defaults[ name ];
+  	},
+
+  	_attachments: function( input, inst ) {
+  		var appendText = this._get( inst, "appendText" ),
+  			isRTL = this._get( inst, "isRTL" );
+
+  		if ( appendText ) {
+
+  			// The label stays a text node, so an option value holding markup
+  			// cannot become an element.
+  			inst.append = $( "<span>" )
+  				.addClass( this._appendClass )
+  				.text( appendText );
+  			input[ isRTL ? "before" : "after" ]( inst.append );
+  		}
+  	},
+
+  	_connectDatepicker: function( target, inst ) {
+  		this._attachments( $( target ), inst );
+  	},
+
+  	_setDateDatepicker: function( target ) {
+  		var inst = this._getInst( target );
+  		this._connectDatepicker( target, inst );
+  	}
+  } );
+  ```

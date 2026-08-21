@@ -4003,3 +4003,14 @@ binding incompleteHtmlEntityEscape909 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.prop contains "decodeEntities=true" and node.context.prop contains "ontext=" and node.context.literal contains "script" and node.context.literal contains "iframe" and node.context.callPath contains ".join" and not (node.context.literal contains "&lt;") and not (node.context.callPath contains "escapeHtml") and not (node.context.callPath contains "htmlentities") and not (node.context.callPath contains "encode") and not (node.context.callPath contains "sanitizeHtml") and not (node.context.callPath contains "DOMPurify")
   emit issue code.IncompleteHtmlEntityEscape at node
 }
+
+binding recursionGuardIndexedByUnnormalizedKey910 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.subscript contains "jQuery.attrHooks[name.toLowerCase()]" and node.context.subscript contains "attrHandle[name]" and node.context.callPath contains "jQuery.find.attr" and node.context.callPath contains "name.toLowerCase" and not (node.context.subscript contains "attrHandle[lowercaseName]") and not (node.context.assign contains "name=name.toLowerCase()")
+  emit issue code.RecursionGuardIndexedByUnnormalizedKey at node
+}
+
+binding catastrophicRegex911 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.literal contains "\\S+(?::\\S*)?@"
+  emit issue code.CatastrophicRegex at node
+  emit sink code.CatastrophicRegexSink at node
+}

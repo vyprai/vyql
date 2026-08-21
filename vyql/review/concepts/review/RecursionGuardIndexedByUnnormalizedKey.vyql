@@ -1,0 +1,8 @@
+module code;
+
+review code.RecursionGuardIndexedByUnnormalizedKey {
+  category: resource
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review handler tables that clear their own slot to break recursion, so the slot is indexed by the same normalized key the dispatch used to find the handler"
+}
