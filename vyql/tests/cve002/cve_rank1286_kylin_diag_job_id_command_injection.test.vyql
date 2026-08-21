@@ -1,0 +1,194 @@
+# Rank 1286 / CVE-2022-44621: Apache Kylin's DiagnosisController exposes GET
+# /diag/job/{jobId}/download, which hands the path-variable jobId straight to
+# DiagnosisService.dumpJobDiagnosisInfo. That method builds a String[] of {
+# jobId, exportPath }, joins it with spaces onto "<KYLIN_HOME>/bin/diag.sh",
+# and hands the resulting string to CliCommandExecutor.execute(), which runs
+# it as `bash -c <command>` (runNativeCommand). Nothing between the
+# controller and the shell rejects shell metacharacters in jobId, so a jobId
+# containing `; <cmd>` or a command substitution executes as the server
+# (CWE-78). The fixed revision wraps the id at the controller,
+# ParameterFilter.checkParameter(jobId), which strips
+# `[ &`>|{}()$;\-#~!+*\\]+` before the value reaches the service.
+# dumpProjectDiagnosisInfo's sibling parameter, project, passes
+# through ValidateUtil.convertStringToBeAlphanumericUnderscore inside the
+# service, so only the job path goes unguarded.
+#
+# ATTENTION. VYQL-INJ-001 (vypr.injection.Sql) fires on this file at
+# both revisions, and it discriminates nothing: its finding is not the rule
+# the shape actually needs. `vyql match` shows CliCommandExecutor.execute is
+# labelled code.SqlExecution by binding sqlExecution96 in
+# vyql/bindings/java/m420f6b67.vyql (`callee.method == "execute"`, unscoped
+# by receiver type or package) -- the same method name JDBC's
+# Statement/PreparedStatement use, so every "execute" call in the codebase is
+# treated as a SQL sink regardless of what class defines it. There is no
+# `code.CommandExecution` sink for this call at all: commandExecution125-128
+# in the same file key on "exec", "ProcessBuilder", and "command", never
+# "execute", so the real shell-out is invisible to VYQL-INJ-002
+# (vypr.injection.Command) on both revisions. `vyql scan` on the real
+# checkout confirms VYQL-INJ-001 fires at the same source (DiagnosisController
+# jobId) and the same sink (DiagnosisService.java, the executor.execute(diagCmd)
+# line) whether or not ParameterFilter.checkParameter runs first: its `unless
+# path coveredBy core.SqlParameterization` clause asks whether the path
+# excludes SQL metacharacters (quotes), and ParameterFilter's shell-oriented
+# regex strips `;&|$()` but not `'` or `"`, so the clause never dominates the
+# path at either revision -- a coincidentally-correct verdict (both
+# revisions really are worth flagging) for the wrong reason (SQL injection,
+# not command injection), that would misreport the patched revision as
+# unfixed too would a complete fix leave them.
+#
+# No fix confined to this construct is available. A `code.CommandExecution`
+# binding for CliCommandExecutor.execute, and a `core.ShellEscape` binding for
+# ParameterFilter.checkParameter, would each name a class that exists only in
+# Kylin's own server-base/core-common modules -- neither is a documented
+# third-party API, so both fail the genericity test the same way a
+# repro-shaped binding does: nobody who has not seen this CVE would write
+# them from a library's documentation. Widening either binding to something
+# generic (any zero-arg-named "execute" call as CommandExecution; any regex
+# character-strip as ShellEscape) is a rule-wide precision change -- Java has
+# no `core.ShellEscape` or `core.CommandArgumentValidation` binding at all
+# today, in any file under vyql/bindings/java or vyql/bindings/packages/java
+# -- and needs the OWASP command-injection corpus to judge, which is step 6's
+# job, not a per-rank binding edit. No definition change attempted.
+#
+# verify_current_expected: attention-precision-limit, both revisions fire identically
+
+test "rank1286: dumpJobDiagnosisInfo passes the raw path-variable jobId into the shelled-out diag command"
+  lang java
+  file org/apache/kylin/rest/controller/DiagnosisController.java
+  code
+  ```
+  package org.apache.kylin.rest.controller;
+
+  import javax.servlet.http.HttpServletRequest;
+  import javax.servlet.http.HttpServletResponse;
+
+  import org.springframework.stereotype.Controller;
+  import org.springframework.web.bind.annotation.PathVariable;
+  import org.springframework.web.bind.annotation.RequestMapping;
+  import org.springframework.web.bind.annotation.RequestMethod;
+  import org.springframework.web.bind.annotation.ResponseBody;
+
+  @Controller
+  @RequestMapping(value = "/diag")
+  public class DiagnosisController extends BasicController {
+
+      private DiagnosisService dgService;
+
+      @RequestMapping(value = "/job/{jobId}/download", method = { RequestMethod.GET })
+      @ResponseBody
+      public void dumpJobDiagnosisInfo(@PathVariable String jobId, final HttpServletRequest request,
+              final HttpServletResponse response) {
+          try (AutoDeleteDirectory diagDir = new AutoDeleteDirectory("diag_job", "")) {
+              String filePath = dgService.dumpJobDiagnosisInfo(jobId, diagDir.getFile());
+              setDownloadResponse(filePath, response);
+          } catch (IOException e) {
+              throw new InternalErrorException("Failed to dump job diagnosis info. " + e.getMessage(), e);
+          }
+      }
+  }
+  ```
+  file org/apache/kylin/rest/service/DiagnosisService.java
+  expect VYQL-INJ-001
+  code
+  ```
+  package org.apache.kylin.rest.service;
+
+  import java.io.File;
+  import java.io.IOException;
+
+  import org.apache.commons.lang.StringUtils;
+  import org.apache.kylin.common.KylinConfig;
+  import org.apache.kylin.common.util.CliCommandExecutor;
+  import org.apache.kylin.common.util.Pair;
+
+  public class DiagnosisService {
+
+      public String dumpJobDiagnosisInfo(String jobId, File exportPath) throws IOException {
+          String[] args = { jobId, exportPath.getAbsolutePath() };
+          runDiagnosisCLI(args);
+          return getDiagnosisPackageName(exportPath);
+      }
+
+      private void runDiagnosisCLI(String[] args) throws IOException {
+          File script = new File(KylinConfig.getKylinHome() + File.separator + "bin", "diag.sh");
+          String diagCmd = script.getAbsolutePath() + " " + StringUtils.join(args, " ");
+          CliCommandExecutor executor = KylinConfig.getInstanceFromEnv().getCliCommandExecutor();
+          Pair<Integer, String> cmdOutput = executor.execute(diagCmd);
+      }
+
+      private String getDiagnosisPackageName(File exportPath) {
+          return exportPath.getAbsolutePath();
+      }
+  }
+  ```
+
+test "rank1286: the controller filters jobId for shell metacharacters, but VYQL-INJ-001 still fires on the same SQL-oriented rule"
+  lang java
+  file org/apache/kylin/rest/controller/DiagnosisController.java
+  code
+  ```
+  package org.apache.kylin.rest.controller;
+
+  import javax.servlet.http.HttpServletRequest;
+  import javax.servlet.http.HttpServletResponse;
+
+  import org.apache.kylin.common.util.ParameterFilter;
+  import org.springframework.stereotype.Controller;
+  import org.springframework.web.bind.annotation.PathVariable;
+  import org.springframework.web.bind.annotation.RequestMapping;
+  import org.springframework.web.bind.annotation.RequestMethod;
+  import org.springframework.web.bind.annotation.ResponseBody;
+
+  @Controller
+  @RequestMapping(value = "/diag")
+  public class DiagnosisController extends BasicController {
+
+      private DiagnosisService dgService;
+
+      @RequestMapping(value = "/job/{jobId}/download", method = { RequestMethod.GET })
+      @ResponseBody
+      public void dumpJobDiagnosisInfo(@PathVariable String jobId, final HttpServletRequest request,
+              final HttpServletResponse response) {
+          try (AutoDeleteDirectory diagDir = new AutoDeleteDirectory("diag_job", "")) {
+              String filePath = dgService.dumpJobDiagnosisInfo(ParameterFilter.checkParameter(jobId), diagDir.getFile());
+              setDownloadResponse(filePath, response);
+          } catch (IOException e) {
+              throw new InternalErrorException("Failed to dump job diagnosis info. " + e.getMessage(), e);
+          }
+      }
+  }
+  ```
+  file org/apache/kylin/rest/service/DiagnosisService.java
+  expect VYQL-INJ-001
+  code
+  ```
+  package org.apache.kylin.rest.service;
+
+  import java.io.File;
+  import java.io.IOException;
+
+  import org.apache.commons.lang.StringUtils;
+  import org.apache.kylin.common.KylinConfig;
+  import org.apache.kylin.common.util.CliCommandExecutor;
+  import org.apache.kylin.common.util.Pair;
+
+  public class DiagnosisService {
+
+      public String dumpJobDiagnosisInfo(String jobId, File exportPath) throws IOException {
+          String[] args = { jobId, exportPath.getAbsolutePath() };
+          runDiagnosisCLI(args);
+          return getDiagnosisPackageName(exportPath);
+      }
+
+      private void runDiagnosisCLI(String[] args) throws IOException {
+          File script = new File(KylinConfig.getKylinHome() + File.separator + "bin", "diag.sh");
+          String diagCmd = script.getAbsolutePath() + " " + StringUtils.join(args, " ");
+          CliCommandExecutor executor = KylinConfig.getInstanceFromEnv().getCliCommandExecutor();
+          Pair<Integer, String> cmdOutput = executor.execute(diagCmd);
+      }
+
+      private String getDiagnosisPackageName(File exportPath) {
+          return exportPath.getAbsolutePath();
+      }
+  }
+  ```

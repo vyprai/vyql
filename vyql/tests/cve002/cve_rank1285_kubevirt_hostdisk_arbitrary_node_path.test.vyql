@@ -1,0 +1,230 @@
+# Rank 1285 / CVE-2020-14316: KubeVirt let anyone who could create a
+# VirtualMachineInstance mount an arbitrary path from the node's filesystem
+# into their VM. pkg/virt-controller/services/template.go's pod-template
+# builder took `volume.HostDisk.Path` -- a field on the admitted VMI object,
+# populated verbatim from the caller's request body during admission
+# (pkg/util/webhooks/webhooks.go's GetAdmissionReview does
+# `json.Unmarshal(body, ar)`; vmi-create-admitter.go's Admit then does
+# `json.Unmarshal(ar.Request.Object.Raw, &newVMI)`) -- and used it, with only
+# `filepath.Dir()` applied, as a Kubernetes HostPath volume source:
+#
+#   volumes = append(volumes, k8sv1.Volume{
+#     Name: volume.Name,
+#     VolumeSource: k8sv1.VolumeSource{
+#       HostPath: &k8sv1.HostPathVolumeSource{
+#         Path: filepath.Dir(volume.HostDisk.Path),
+#         Type: &hostPathType,
+#       },
+#     },
+#   })
+#
+# filepath.Dir neither canonicalizes nor restricts the result to any root --
+# `filepath.Dir("/etc/shadow")` is still `/etc` -- so any user permitted to
+# create a VMI could point a HostPath mount, and therefore the VM's virtual
+# disk, at any directory on the node (CWE-284/CWE-862). Fix
+# 7f5e7551554d6a7827988c932120e4d01d70033b (a merge that cherry-picks
+# 42316512 onto release-0.30; its diff against its first parent 2ea6ba41
+# carries the real change, so the pool's `nocommit` flag is a false
+# positive -- this is the actual fix, not a release bump) adds a
+# `HostDiskGate` feature gate (pkg/virt-config/feature-gates.go) and rejects
+# the volume in vmi-create-admitter.go's validateVolumes unless a cluster
+# admin has opted in with `config.HostDiskEnabled()`. It does not sanitize
+# or restrict the path itself -- even with the gate on, the path is still
+# unrestricted; the mitigation is an authorization gate on a dangerous feature, not
+# a path check.
+#
+# ATTENTION, engine gap. `vyql match` on a minimal pair extracted from this
+# shape (an *http.Request-sourced path threaded through a HostDisk-shaped
+# struct into a `k8sv1.HostPathVolumeSource{Path: ...}` composite literal)
+# labels the HTTP source but emits no sink at all -- `vyql resolve` does not
+# even count the composite literal as a call site, and `vyql explain`
+# reports no findings on either the vulnerable or the gated form. Scanning
+# the real checkout at both revisions with
+# `vyql scan --cache off --max-ram 5GB` reports the same finding count both
+# times (VYQL-PATH-001 does not fire in pkg/virt-controller/services on
+# either revision).
+#
+# Not mechanical. `internal/extract/frontend/golang/golang.go`'s CompositeLit
+# case (line ~1722) models a NAMED struct literal (`T{...}` / `pkg.T{...}`)
+# as an `nir.Call` -- Path/Method set from the type name, each keyed field a
+# `nir.Pair` argument -- specifically so, per its own comment, "field values
+# are reachable by binding value-matching." In practice they are not: adding
+# a scratch binding (`query pattern callExpr where callee.path ~=
+# "HostPathVolumeSource"`, `emit sink code.FilePathAccess at args[0]`) and
+# rebuilding changed nothing -- `vyql match`/`resolve` call-site counts on a
+# composite-literal-only repro are byte-for-byte identical with and without
+# the binding present (5 resolved/3 unresolved either way; the isolating
+# pair below reproduces this without needing any new binding). The identical
+# tainted value, routed instead through an ordinary call argument
+# (`os.Create(path)`), is caught by VYQL-PATH-001 every time. Whatever stage
+# turns `nir.Call` into the call-site list the pattern compiler queries
+# (`internal/extract/lowering/lowering.go`'s `usg.Store`, referenced from
+# `internal/bindings/callflows.go`) does not carry composite-literal-derived
+# calls through, or carries them in a shape declarative bindings cannot
+# address -- either way that is new lowering/query-surface work, not a
+# missing switch case, and it is shared by every Go binding, not specific to
+# Kubernetes types. Recognizing "a struct literal field is a sink" is also a
+# new dataflow relation the solver does not have today (composite-literal
+# args currently only ever flow taint forward into the literal's own result,
+# per `nir.Call.IsCtor`'s doc comment -- and that flag is not even set for
+# this construct). Blocks any Go CVE whose vulnerable shape is a tainted
+# value written into a struct-literal field rather than passed as a call
+# argument -- which covers most Kubernetes client-go/controller-runtime
+# object construction, the idiomatic way Go builds API objects.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1285: an admitted VMI's HostDisk.Path becomes an unrestricted node HostPath mount"
+  lang go
+  reject VYQL-PATH-001
+  reject VYQL-AUTH-080
+  code
+  ```
+  package services
+
+  import (
+  	"net/http"
+  	"path/filepath"
+
+  	k8sv1 "k8s.io/api/core/v1"
+  )
+
+  type HostDisk struct {
+  	Path string
+  	Type string
+  }
+
+  type Volume struct {
+  	Name     string
+  	HostDisk *HostDisk
+  }
+
+  type VirtualMachineInstanceSpec struct {
+  	Volumes []Volume
+  }
+
+  func renderPodTemplate(w http.ResponseWriter, r *http.Request) []k8sv1.Volume {
+  	requestedPath := r.URL.Query().Get("hostDiskPath")
+  	spec := VirtualMachineInstanceSpec{
+  		Volumes: []Volume{{Name: "disk0", HostDisk: &HostDisk{Path: requestedPath}}},
+  	}
+
+  	var volumes []k8sv1.Volume
+  	for _, volume := range spec.Volumes {
+  		if volume.HostDisk != nil {
+  			var hostPathType k8sv1.HostPathType
+  			volumes = append(volumes, k8sv1.Volume{
+  				Name: volume.Name,
+  				VolumeSource: k8sv1.VolumeSource{
+  					HostPath: &k8sv1.HostPathVolumeSource{
+  						Path: filepath.Dir(volume.HostDisk.Path),
+  						Type: &hostPathType,
+  					},
+  				},
+  			})
+  		}
+  	}
+  	return volumes
+  }
+  ```
+
+test "rank1285: the same HostDisk.Path is gated behind an admin feature flag before it reaches the mount"
+  lang go
+  reject VYQL-PATH-001
+  reject VYQL-AUTH-080
+  code
+  ```
+  package admitters
+
+  import (
+  	"net/http"
+  )
+
+  type HostDisk struct {
+  	Path string
+  	Type string
+  }
+
+  type Volume struct {
+  	Name     string
+  	HostDisk *HostDisk
+  }
+
+  type VirtualMachineInstanceSpec struct {
+  	Volumes []Volume
+  }
+
+  type ClusterConfig struct {
+  	hostDiskGateEnabled bool
+  }
+
+  func (c *ClusterConfig) HostDiskEnabled() bool {
+  	return c.hostDiskGateEnabled
+  }
+
+  type StatusCause struct {
+  	Message string
+  }
+
+  func validateVolumes(volumes []Volume, config *ClusterConfig) []StatusCause {
+  	var causes []StatusCause
+  	for _, volume := range volumes {
+  		if volume.HostDisk != nil {
+  			if !config.HostDiskEnabled() {
+  				causes = append(causes, StatusCause{Message: "HostDisk feature gate is not enabled"})
+  			}
+  		}
+  	}
+  	return causes
+  }
+
+  func admit(w http.ResponseWriter, r *http.Request, config *ClusterConfig) []StatusCause {
+  	requestedPath := r.URL.Query().Get("hostDiskPath")
+  	spec := VirtualMachineInstanceSpec{
+  		Volumes: []Volume{{Name: "disk0", HostDisk: &HostDisk{Path: requestedPath}}},
+  	}
+  	return validateVolumes(spec.Volumes, config)
+  }
+  ```
+
+# Isolating pair: the same tainted value, the only difference is whether it
+# reaches a plain call argument or a composite-literal field. Names no
+# Kubernetes or CVE-specific API -- `Sink` here is a project-local type, not
+# `k8sv1.HostPathVolumeSource`, so this isolates the construct alone.
+
+test "rank1285: tainted data into a call argument is caught (baseline, not the gap)"
+  lang go
+  expect VYQL-PATH-001
+  code
+  ```
+  package repro
+
+  import (
+  	"net/http"
+  	"os"
+  )
+
+  func handler(w http.ResponseWriter, r *http.Request) {
+  	name := r.URL.Query().Get("name")
+  	os.Create(name)
+  }
+  ```
+
+test "rank1285: the identical tainted data into a struct-literal field is not caught (the gap)"
+  lang go
+  reject VYQL-PATH-001
+  code
+  ```
+  package repro
+
+  import "net/http"
+
+  type Sink struct {
+  	Path string
+  }
+
+  func handler(w http.ResponseWriter, r *http.Request) Sink {
+  	name := r.URL.Query().Get("name")
+  	return Sink{Path: name}
+  }
+  ```
