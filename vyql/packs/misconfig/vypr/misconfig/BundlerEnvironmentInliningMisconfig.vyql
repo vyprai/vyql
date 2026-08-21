@@ -1,0 +1,11 @@
+module vypr.misconfig;
+
+rule BundlerEnvironmentInliningMisconfig {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_1188, CWE_693]
+    id: "VYQL-CFG-025"
+    severity: medium
+  }
+  issue code.BundlerEnvironmentInliningMisconfig as c
+}

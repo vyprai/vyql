@@ -1,0 +1,18 @@
+module bindings.javascript.bundler_env_inlining_misconfig;
+
+// esbuild's `platform` option controls how it targets a build. Per its
+// documented `platform` behaviour (https://esbuild.github.io/api/#platform):
+// when `platform` is left unset, esbuild targets the browser by default and
+// automatically substitutes `process.env.NODE_ENV` expressions with a
+// compile-time constant -- this substitution is skipped only when
+// `platform: 'node'` is set, because Node already provides that variable at
+// runtime. A build config that bundles to CommonJS (`format: 'cjs'`, the
+// format Node consumes) without also setting `platform: 'node'` therefore
+// silently bakes in a `NODE_ENV` value at build time instead of reading the
+// real one at runtime -- any code the bundle wraps that branches on
+// `process.env.NODE_ENV` for production-only or security-sensitive behaviour
+// runs with the baked-in value regardless of the actual environment.
+binding bundlerEnvironmentInliningMisconfig {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.literal contains "esbuild" and containsAny(node.context.callPath, ["esbuild.build", "esbuild.buildSync"]) and node.context.prop contains "bundle=true" and node.context.prop contains "format=cjs" and not (node.context.prop contains "platform=node")
+  emit issue code.BundlerEnvironmentInliningMisconfig at node
+}
