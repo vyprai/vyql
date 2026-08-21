@@ -1,0 +1,308 @@
+# An IRC bridge takes a channel name from a Matrix caller and hands it to the
+# IRC client library as a protocol argument. node-irc and its forks build each
+# outbound line by joining `send`'s arguments with spaces and appending CRLF,
+# and `join`/`part` split their channel argument on spaces into separate
+# parameters first, so the identifier is command syntax rather than payload: a
+# space smuggles extra parameters (a channel key, another channel) and a CR or
+# LF ends the line and starts a command of the caller's choosing, issued by the
+# bridge bot. The provisioning API's `remote_room_channel` reaches
+# `client.join` through caseFold -> getOperators -> joinChannel and
+# `client.part` through leaveChannel; the admin-room `!join`/`!plumb` commands
+# reach the same calls from a message body split on " " alone, which keeps any
+# newline the body carried inside the argument.
+#
+# The identifier arguments of the documented command helpers are labelled;
+# the message body of say/notice/action is not, because the library splits
+# text into one PRIVMSG per line and relaying user text is what a bridge is
+# for. Labelling the body would fire on every bridge and bot.
+#
+# The fixed revision is 11f0d073949bc794105e97eb4ccaf4b801af8bd8, "Refactor the command
+# parser": it adds `validateChannelName` (an anchored `/^#([^\s\cG,]){1,199}$/`
+# test) in front of the provisioning link, unlink and query bodies and in front
+# of `!join`/`!plumb`, and it parses an admin command out of the first line of
+# the body only, splitting on `\n` and NUL before splitting on " ". Commit
+# 0afb064635d37e039067b5b3d6423448b93026d3 is a different change in the same
+# release -- an e2e test that ISUPPORT state is not re-appended on VERSION,
+# plus a matrix-org-irc dependency bump.
+#
+# A prefix test is not the control. `ircChannel.startsWith("#")` passes for
+# "#chan JOIN #other" and for "#chan\nPRIVMSG target :text" alike; only a
+# rejection of whitespace and control characters, or a strip of them, keeps
+# the value inside one parameter of one command.
+#
+# Known limitation, pinned by the last case: an anchored allowlist regex
+# behind a named predicate does not reject. Both revisions of the bridge
+# report the same four rows -- two P3 (the provisioning link and unlink
+# bodies) and two P4 library-profile rows on nick paths -- because the
+# predicate's `.test` sits in another module and no check label lands on the
+# taint path. A character strip on the value does reject, since the sink
+# concept declares the character set the filter has to exclude.
+
+test "rank1362 matrix-appservice-irc: a provisioning request body's channel name becomes an IRC JOIN argument"
+  lang javascript
+  file package.json
+  code
+  ```
+  {
+    "name": "matrix-appservice-irc",
+    "dependencies": {
+      "matrix-org-irc": "^2.0.1",
+      "matrix-appservice-bridge": "^9.0.0"
+    }
+  }
+  ```
+  file src/irc/BridgedClient.ts
+  code
+  ```
+  import { Client } from "matrix-org-irc";
+
+  export class BridgedClient {
+      private client: Client;
+
+      public caseFold(channel: string) {
+          return channel.toLowerCase();
+      }
+
+      public async getOperators(channel: string, opts: { key?: string } = {}) {
+          await this.joinChannel(channel, opts.key);
+          return this.getNicks(channel);
+      }
+
+      public joinChannel(channel: string, key?: string) {
+          return this._joinChannel(channel, key);
+      }
+
+      private async _joinChannel(channel: string, key?: string) {
+          const client = this.client;
+          client.join(channel + (key ? " " + key : ""), () => {
+              this.log.debug("Joined %s", channel);
+          });
+      }
+  }
+  ```
+  file src/provisioning/Provisioner.ts
+  expect VYQL-INJ-245
+  code
+  ```
+  import { BridgedClient } from "../irc/BridgedClient";
+
+  export class Provisioner {
+      public async queryLink(req: ProvisioningRequest) {
+          const body = req.body as unknown;
+          const ircDomain = body.remote_room_server;
+          let ircChannel = body.remote_room_channel;
+          const key = body.key ?? undefined;
+
+          const server = this.ircBridge.getServer(ircDomain);
+          if (!server) {
+              throw new Error(`Server not found ${ircDomain}`);
+          }
+          const botClient = await this.ircBridge.getBotClient(server);
+
+          ircChannel = botClient.caseFold(ircChannel);
+
+          const opsInfo = await botClient.getOperators(ircChannel, { key });
+          return { operators: opsInfo.operatorNicks };
+      }
+  }
+  ```
+
+test "rank1362 matrix-appservice-irc: a startsWith prefix test leaves the rest of the channel argument free"
+  lang javascript
+  file package.json
+  code
+  ```
+  {
+    "name": "matrix-appservice-irc",
+    "dependencies": {
+      "matrix-org-irc": "^2.0.1",
+      "matrix-appservice-bridge": "^9.0.0"
+    }
+  }
+  ```
+  file src/irc/BridgedClient.ts
+  code
+  ```
+  import { Client } from "matrix-org-irc";
+
+  export class BridgedClient {
+      private client: Client;
+
+      public async leaveChannel(channel: string, reason = "User left") {
+          const client = this.client;
+          client.part(channel, reason, () => {
+              this.log.debug("Left %s", channel);
+          });
+      }
+  }
+  ```
+  file src/provisioning/Provisioner.ts
+  expect VYQL-INJ-245
+  code
+  ```
+  import { BridgedClient } from "../irc/BridgedClient";
+
+  export class Provisioner {
+      public async unlink(req: ProvisioningRequest) {
+          const body = req.body as unknown;
+          const ircChannel = body.remote_room_channel;
+          if (!ircChannel || !ircChannel.startsWith("#")) {
+              throw new Error("The channel name must start with a #");
+          }
+          const botClient = await this.ircBridge.getBotClient(this.server);
+          await botClient.leaveChannel(ircChannel);
+      }
+  }
+  ```
+
+test "rank1362 matrix-appservice-irc: the relayed message body of a PRIVMSG is not a protocol argument"
+  lang javascript
+  file package.json
+  code
+  ```
+  {
+    "name": "matrix-appservice-irc",
+    "dependencies": {
+      "matrix-org-irc": "^2.0.1",
+      "matrix-appservice-bridge": "^9.0.0"
+    }
+  }
+  ```
+  file src/irc/BridgedClient.ts
+  code
+  ```
+  import { Client } from "matrix-org-irc";
+
+  export class BridgedClient {
+      private client: Client;
+
+      public async sendAction(room: IrcRoom, action: IrcAction) {
+          const client = this.client;
+          if (action.type === "emote") {
+              await client.action(room.channel, action.text);
+              return;
+          }
+          await client.say(room.channel, action.text);
+      }
+  }
+  ```
+  file src/bridge/MatrixHandler.ts
+  reject VYQL-INJ-245
+  code
+  ```
+  import { BridgedClient } from "../irc/BridgedClient";
+
+  export class MatrixHandler {
+      public async onMessage(req: ProvisioningRequest, ircRoom: IrcRoom) {
+          const body = req.body as unknown;
+          const text = body.content.body;
+          const bridgedClient = await this.ircBridge.getBridgedClient(ircRoom.server);
+          await bridgedClient.sendAction(ircRoom, { type: "message", text });
+      }
+  }
+  ```
+
+test "rank1362 matrix-appservice-irc: stripping whitespace and line breaks keeps the channel inside one parameter"
+  lang javascript
+  file package.json
+  code
+  ```
+  {
+    "name": "matrix-appservice-irc",
+    "dependencies": {
+      "matrix-org-irc": "^2.0.1",
+      "matrix-appservice-bridge": "^9.0.0"
+    }
+  }
+  ```
+  file src/irc/BridgedClient.ts
+  code
+  ```
+  import { Client } from "matrix-org-irc";
+
+  export class BridgedClient {
+      private client: Client;
+
+      public joinChannel(channel: string) {
+          const client = this.client;
+          client.join(channel, () => {
+              this.log.debug("Joined %s", channel);
+          });
+      }
+  }
+  ```
+  file src/provisioning/Provisioner.ts
+  reject VYQL-INJ-245
+  code
+  ```
+  import { BridgedClient } from "../irc/BridgedClient";
+
+  export class Provisioner {
+      public async requestLink(req: ProvisioningRequest) {
+          const body = req.body as unknown;
+          const raw = body.remote_room_channel;
+          const ircChannel = raw.replace(/[\s\r\n\0,]/g, "");
+          const botClient = await this.ircBridge.getBotClient(this.server);
+          await botClient.joinChannel(ircChannel);
+      }
+  }
+  ```
+
+test "rank1362 matrix-appservice-irc: the anchored allowlist the fixed revision adds sits behind a named predicate and does not reject"
+  lang javascript
+  file package.json
+  code
+  ```
+  {
+    "name": "matrix-appservice-irc",
+    "dependencies": {
+      "matrix-org-irc": "^2.0.1",
+      "matrix-appservice-bridge": "^9.0.0"
+    }
+  }
+  ```
+  file src/models/IrcRoom.ts
+  code
+  ```
+  export function validateChannelName(channel: string) {
+      // According to https://www.rfc-editor.org/rfc/rfc1459#section-1.3
+      return /^#([^\s\cG,]){1,199}$/.test(channel);
+  }
+  ```
+  file src/irc/BridgedClient.ts
+  code
+  ```
+  import { Client } from "matrix-org-irc";
+
+  export class BridgedClient {
+      private client: Client;
+
+      public joinChannel(channel: string) {
+          const client = this.client;
+          client.join(channel, () => {
+              this.log.debug("Joined %s", channel);
+          });
+      }
+  }
+  ```
+  file src/provisioning/Provisioner.ts
+  expect VYQL-INJ-245
+  code
+  ```
+  import { validateChannelName } from "../models/IrcRoom";
+  import { BridgedClient } from "../irc/BridgedClient";
+
+  export class Provisioner {
+      public async requestLink(req: ProvisioningRequest) {
+          const body = req.body as unknown;
+          const ircChannel = body.remote_room_channel;
+
+          if (!validateChannelName(ircChannel)) {
+              throw new Error("Channel name isn't valid");
+          }
+
+          const botClient = await this.ircBridge.getBotClient(this.server);
+          await botClient.joinChannel(ircChannel);
+      }
+  }
+  ```

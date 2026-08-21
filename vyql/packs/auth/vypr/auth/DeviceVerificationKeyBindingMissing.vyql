@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule DeviceVerificationKeyBindingMissing {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_287, CWE_322]
+    id: "VYQL-AUTH-115"
+    severity: critical
+  }
+  issue code.DeviceVerificationKeyBindingMissing as event
+}
