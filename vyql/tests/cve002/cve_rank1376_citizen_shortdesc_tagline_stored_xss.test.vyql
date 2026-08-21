@@ -38,7 +38,7 @@
 #   -   $tagline = $shortdesc;
 #   +   $tagline = htmlspecialchars( $shortdesc, ENT_QUOTES );
 #
-# The row is correct: REPO_OK, COMMIT_OK, and the single-line change above is
+# The row is correct: repository and commit both check out, and the single-line change above is
 # the whole fix. The vulnerable construct is present at the parent, c85a40bddc^,
 # at includes/Components/CitizenComponentPageHeading.php:251. The recorded CWE-79
 # is right. No corpus correction.

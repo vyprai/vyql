@@ -1,0 +1,33 @@
+module bindings.php.request_input_sanitizer_missing_template_delimiter_escape;
+
+// A global input-sanitising middleware or filter reads the whole request
+// payload (Laravel's Request::all/input/post/query/json/getParsedBody),
+// rewrites each value through an HTML sanitiser -- HTMLPurifier's purify(),
+// graham-campbell/security's clean(), voku/anti-xss's xss_clean(), or
+// strip_tags/htmlspecialchars -- and writes the result back with
+// Request::merge()/replace(), which the Laravel request documentation defines
+// as replacing the request's own input array. Every controller and view
+// downstream then reads those values as already neutralised.
+//
+// An HTML sanitiser neutralises markup and nothing else. Blade's `{{ ... }}`
+// and `{!! ... !!}` delimiters contain no markup, so they pass through
+// sanitising untouched, and Blade evaluates them as PHP wherever the value is
+// rendered as template text rather than as a bound variable. The Blade
+// documentation is explicit that a literal brace pair has to be escaped --
+// `@{{`, or entity-encoded to `&#123;&#123;` -- to stay inert, so a sanitising
+// pass that rewrites request input without touching the delimiters leaves
+// template syntax inside the values it declares clean.
+//
+// The negation accepts any neutralisation of the delimiters themselves: an
+// array replacement over `{{`/`}}`, an entity encoding to `&#123;`/`&#125;`, an
+// escaped regex, or Blade's own `@{{`. Keying it on the delimiter literals
+// rather than on the call that rewrites them means an equivalent fix written
+// with strtr, str_ireplace or preg_replace clears it too. Every positive clause
+// matches a whole token: after a token prefix is stripped the remainder is
+// substring-matched, so `contains` on `assign_call_method:sanitize` would also
+// accept `sanitize_path` and `call_arg_method:merge:` would accept
+// `array_merge`.
+binding requestInputSanitizerMissingTemplateDelimiterEscape {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.assignCall in ["$request.all", "$request.input", "$request.post", "$request.query", "$request.json", "$request.toArray", "$request.getParsedBody", "$request.request.all", "$this.request.all"] and node.context.call in ["merge", "replace", "mergeIfMissing"] and node.context.assignCallMethod in ["clean", "purify", "xss_clean", "sanitize", "strip_tags", "htmlspecialchars", "htmlentities", "escapeHtml", "sanitizeHtml"] and not containsAny(node.token, ["assign_literal:{{", "assign_literal:}}", "assign_literal:{!!", "assign_literal:!!}", "assign_literal:&#123;", "assign_literal:&#125;", "assign_literal:\\{\\{", "assign_literal:\\}\\}", "assign_literal:@{{"])
+  emit issue code.IncompleteTemplateValidation at node
+}

@@ -1,0 +1,51 @@
+module bindings.java.netty_header_validation_disabled;
+
+// Netty's HTTP codec validates header names and values as they are added: a
+// name containing a separator or control character, and a value containing CR,
+// LF or NUL, are rejected with IllegalArgumentException. That check is what
+// stops a header value from carrying its own line terminator onto the wire, so
+// it is the control standing between an application that puts an untrusted
+// string in a header and HTTP response splitting or request smuggling against
+// whatever parses the message next.
+//
+// Every constructor below documents a `validate` / `validateHeaders` parameter
+// for it, and passing false is the documented way to turn it off -- javadoc for
+// DefaultHttpHeaders(boolean validate) reads "validate -- validate header
+// names and values", and DefaultHttpRequest, DefaultHttpResponse and
+// DefaultLastHttpContent hand the same flag through to the DefaultHttpHeaders
+// they build. The classes named here are the ones whose only boolean parameter
+// is that flag, in every overload, so a false literal in the argument list can
+// only be the validation switch; constructors that also take an unrelated
+// boolean (HttpClientCodec's failOnMissingResponse, DefaultFullHttpResponse's
+// singleFieldHeaders) are deliberately left out rather than guessed at by
+// position. The second binding is the builder and configuration spelling of the
+// same switch, Http2FrameCodecBuilder.validateHeaders(boolean) and
+// HttpDecoderConfig.setValidateHeaders(boolean), where the method is named for
+// the flag and no positional reasoning is needed at all.
+//
+// Disabling validation is a property of the code that constructs the header
+// store, not of any particular value that later reaches it: the object hands
+// out an unvalidated setter to every caller it is passed to, including callers
+// in other modules, so there is no taint path to wait for. A framework that
+// does this in its own header type removes the guarantee for every application
+// built on it.
+//
+// The predicate is callee.method rather than callee.path because a Java call
+// node's path carries its whole receiver chain: `new DefaultHttpHeaders()
+// .setBoolean(name, false)` resolves to DefaultHttpHeaders.setBoolean and
+// `builder.validateHeaders(true).autoAckSettingsFrame(false)` to
+// ...validateHeaders.autoAckSettingsFrame. A segment-aware path match therefore
+// accepts every later call in the chain and reads the wrong call's arguments,
+// which turns both of those safe lines into findings. callee.method compares the
+// final segment only, so the argument list examined is the constructor's or the
+// flag setter's own.
+
+binding nettyHeaderStoreValidationDisabled {
+  query pattern callExpr where callee.method in ["DefaultHttpHeaders", "CombinedHttpHeaders", "ReadOnlyHttpHeaders", "DefaultHttp2Headers", "DefaultHttp2HeadersDecoder", "DefaultHttpRequest", "DefaultHttpResponse", "DefaultLastHttpContent"] and args.any.literal contains "false"
+  emit issue code.HttpHeaderValidationDisabled at call
+}
+
+binding nettyHeaderValidationFlagDisabled {
+  query pattern callExpr where callee.method in ["validateHeaders", "setValidateHeaders"] and args.any.literal contains "false"
+  emit issue code.HttpHeaderValidationDisabled at call
+}

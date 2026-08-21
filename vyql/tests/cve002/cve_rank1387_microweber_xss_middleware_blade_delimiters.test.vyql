@@ -1,0 +1,301 @@
+# Rank 1387 / CVE-2023-1877: Microweber's global XSS middleware
+# (src/MicroweberPackages/App/Http/Middleware/XSS.php) read the whole request
+# payload with `$request->all()`, ran every string through HTMLClean -- a
+# wrapper over HTMLPurifier plus its own XSSClean pass -- and wrote the result
+# back with `$request->merge($input)`. From that point on every controller and
+# every view in the application reads those values as neutralised.
+#
+#   $input = $request->all();
+#   if (($request->isMethod('post') or ...) and !empty($input)) {
+#       $clean = new HTMLClean();
+#       array_walk_recursive($input, function (&$input) use ($clean) {
+#           if (is_string($input)) {
+#               $input = $clean->clean($input);
+#           }
+#       });
+#   }
+#   $request->merge($input);
+#
+# HTMLPurifier neutralises markup. `{{` and `}}` are not markup, so they pass
+# through untouched -- and Microweber renders content through Blade, which
+# evaluates `{{ ... }}` as PHP wherever the sanitised value lands as template
+# text rather than as a bound variable. The recorded CWE-77 is wrong for this:
+# nothing is passed to a shell, the class is CWE-1336 (improper neutralisation
+# of special elements used in a template engine), reached through the
+# sanitiser's own blind spot.
+#
+# Fix 93a906d0bf adds the neutralisation the sanitiser lacks, inside the same
+# walk callback:
+#
+#   $input = str_replace(['{{', '}}'], ['&#123;&#123;', '&#125;&#125;'], $input);
+#
+# which is what the Blade documentation prescribes for a literal brace pair
+# (`@{{`, or the entity form).
+#
+# Detection is the php binding requestInputSanitizerMissingTemplateDelimiterEscape
+# emitting code.IncompleteTemplateValidation / VYQL-INJ-024, the concept that
+# carries "a template engine is used without the neutralisation that
+# makes caller-supplied template syntax inert" for Jinja2 and Twig. The three
+# facts are the request-wide read, the write-back into the request, and an
+# HTML-only sanitiser on the values in between; the negation is keyed on the
+# delimiter literals rather than on `str_replace`, so strtr, str_ireplace and an
+# escaped preg_replace all clear it.
+#
+# Measured on the vulnerable revision over the 1785 PHP files of src/: two findings,
+# XSS.php and its sibling RemoveHtml.php, and nothing else; at the fixed revision
+# one, RemoveHtml.php, which the fixed revision does not touch and which has the identical
+# defect. An exhaustive enumeration over all 3526 PHP files in the tree finds
+# exactly those two instances of the shape, so the subtree scan covers the whole
+# reachable set.
+#
+# Recall limit worth stating: the sibling PostCommentMiddleware.php runs the
+# same walk through `$clean->onlyTags($input)`, a method name that belongs to
+# Microweber's own helper rather than to any documented sanitiser API, so the
+# sanitiser clause does not accept it. Naming it would make the binding answer
+# to this codebase instead of to the libraries it uses.
+
+test "rank1387: a request-wide HTML sanitiser that merges its output back into the request leaves Blade delimiters intact"
+  lang php
+  file src/MicroweberPackages/App/Http/Middleware/XSS.php
+  expect VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  namespace MicroweberPackages\App\Http\Middleware;
+
+  use Closure;
+  use Illuminate\Http\Request;
+  use MicroweberPackages\Helper\HTMLClean;
+
+  class XSS
+  {
+      public function handle(Request $request, Closure $next)
+      {
+          $input = $request->all();
+
+          if (($request->isMethod('post')  or $request->isMethod('patch') or $request->isMethod('put') ) and !empty($input)) {
+              $clean = new HTMLClean();
+              array_walk_recursive($input, function (&$input) use ($clean) {
+                  if (is_string($input)) {
+                      $input = $clean->clean($input);
+                  }
+              });
+          }
+
+          $request->merge($input);
+          return $next($request);
+      }
+
+  }
+  ```
+
+test "rank1387: entity-encoding the delimiters in the same walk callback is the neutralisation the sanitiser lacked"
+  lang php
+  file src/MicroweberPackages/App/Http/Middleware/XSS.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  namespace MicroweberPackages\App\Http\Middleware;
+
+  use Closure;
+  use Illuminate\Http\Request;
+  use MicroweberPackages\Helper\HTMLClean;
+
+  class XSS
+  {
+      public function handle(Request $request, Closure $next)
+      {
+          $input = $request->all();
+
+          if (($request->isMethod('post')  or $request->isMethod('patch') or $request->isMethod('put') ) and !empty($input)) {
+              $clean = new HTMLClean();
+              array_walk_recursive($input, function (&$input) use ($clean) {
+                  if (is_string($input)) {
+                      $input = $clean->clean($input);
+                      // clean also blade curly braces
+                      $input = str_replace(['{{', '}}'], ['&#123;&#123;', '&#125;&#125;'], $input);
+                  }
+              });
+          }
+
+          $request->merge($input);
+          return $next($request);
+      }
+
+  }
+  ```
+
+test "rank1387: the sibling middleware sanitising with Security::clean and strip_tags has the same blind spot"
+  lang php
+  file src/MicroweberPackages/App/Http/Middleware/RemoveHtml.php
+  expect VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  namespace MicroweberPackages\App\Http\Middleware;
+
+  use Closure;
+  use Illuminate\Http\Request;
+  use GrahamCampbell\SecurityCore\Security;
+
+  class RemoveHtml
+  {
+      public function handle(Request $request, Closure $next)
+      {
+          $input = $request->all();
+
+          array_walk_recursive($input, function (&$input) {
+              if (is_string($input)) {
+                  $input = Security::create()->clean($input);
+              }
+          });
+
+          array_walk_recursive($input, function(&$input) {
+              $input = strip_tags($input);
+          });
+
+          $request->merge($input);
+          return $next($request);
+      }
+
+  }
+  ```
+
+test "rank1387: stripping the delimiters with an escaped regex clears it too, not only the array replacement the fixed revision uses"
+  lang php
+  file src/MicroweberPackages/App/Http/Middleware/RemoveHtml.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  namespace MicroweberPackages\App\Http\Middleware;
+
+  use Closure;
+  use Illuminate\Http\Request;
+  use GrahamCampbell\SecurityCore\Security;
+
+  class RemoveHtml
+  {
+      public function handle(Request $request, Closure $next)
+      {
+          $input = $request->all();
+
+          array_walk_recursive($input, function (&$input) {
+              if (is_string($input)) {
+                  $input = Security::create()->clean($input);
+                  $input = preg_replace('/\{\{|\}\}/', '', $input);
+              }
+          });
+
+          $request->merge($input);
+          return $next($request);
+      }
+
+  }
+  ```
+
+test "rank1387: escaping HTML instead of sanitising it does not neutralise the delimiters either"
+  lang php
+  file src/MicroweberPackages/App/Http/Middleware/EscapeInput.php
+  expect VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  namespace MicroweberPackages\App\Http\Middleware;
+
+  use Closure;
+  use Illuminate\Http\Request;
+
+  class EscapeInput
+  {
+      public function handle(Request $request, Closure $next)
+      {
+          $input = $request->all();
+
+          array_walk_recursive($input, function (&$input) {
+              if (is_string($input)) {
+                  $input = htmlspecialchars($input, ENT_QUOTES);
+              }
+          });
+
+          $request->merge($input);
+          return $next($request);
+      }
+
+  }
+  ```
+
+test "rank1387: a controller sanitising its own copy of the input without writing it back into the request is not this shape"
+  lang php
+  file src/MicroweberPackages/Post/Http/Controllers/Admin/PostController.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  namespace MicroweberPackages\Post\Http\Controllers\Admin;
+
+  use Illuminate\Http\Request;
+
+  class PostController
+  {
+      public function store(Request $request)
+      {
+          $input = $request->all();
+          $input['content'] = strip_tags($input['content']);
+          $title = htmlspecialchars($request->input('title'));
+
+          return Post::create($input);
+      }
+  }
+  ```
+
+# The positive clauses match a whole token, not a substring of one. Every token
+# prefix is stripped before the remainder is compared, and the remainder is then
+# substring-matched, so a `contains` clause on `assign_call_method:sanitize`
+# also accepts `sanitize_path` and one on `call_arg_method:merge:` also accepts
+# `array_merge`. This export method has both of those and no request write-back
+# at all; a substring-shaped version of the binding reported it.
+
+test "rank1387: sanitize_path plus array_merge in one method is not a request-wide sanitiser writing back"
+  lang php
+  file src/MicroweberPackages/Translation/Http/Controllers/TranslationController.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  namespace MicroweberPackages\Translation\Http\Controllers;
+
+  use Illuminate\Http\Request;
+
+  class TranslationController
+  {
+      public function export(Request $request) {
+
+          $namespace = $request->post('namespace','*');
+          $locale = $request->post('locale', 'en');
+
+          $namespace = sanitize_path($namespace);
+
+          $getTranslations = [];
+          $getTranslationsQuery = TranslationKey::where('translation_namespace', $namespace)->get();
+          if ($getTranslationsQuery !== null) {
+              $getTranslations = $getTranslationsQuery->toArray();
+          }
+
+          $getTranslationsWithoutTexts = TranslationKey::whereNull('translation_key')->get();
+          if ($getTranslationsWithoutTexts !== null) {
+              $getTranslations = array_merge($getTranslations, $getTranslationsWithoutTexts->toArray());
+          }
+
+          return $getTranslations;
+      }
+  }
+  ```

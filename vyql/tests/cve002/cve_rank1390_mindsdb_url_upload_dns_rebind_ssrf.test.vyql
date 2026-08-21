@@ -1,0 +1,91 @@
+# Rank 1390 / CVE-2024-24759: MindsDB's file-upload-by-URL endpoint took the
+# URL straight from the request body and guarded it only with is_private_url(),
+# which resolves the hostname once with socket.gethostbyname() and asks whether
+# that single address is private. The fetch that follows is issued with the URL,
+# not with the vetted address, so requests resolves the name a second time; a
+# name that answers publicly for the check and 127.0.0.1 for the fetch reaches
+# the internal network. The remediation drops resolution-based validation and
+# gates on the URL's netloc against a host allowlist, a property of the URL
+# itself that a second resolution cannot change.
+# Readable remediation diff: e2859499301d (the advisory names the release
+# commit 5f7496481b, whose tree still carries the vulnerable is_private_url).
+
+test "rank1390: url upload fetches the request URL past a resolve-once private-address check"
+  lang python
+  file file.py
+  expect VYQL-RF-001
+  code
+  ```
+  import ipaddress
+  import socket
+  from urllib.parse import urlparse
+
+  import requests
+  from flask import request
+  from flask_restx import Resource
+
+
+  def is_private_url(url: str):
+      hostname = urlparse(url).hostname
+      if not hostname:
+          return True
+      ip = socket.gethostbyname(hostname)
+      return ipaddress.ip_address(ip).is_private
+
+
+  class File(Resource):
+      def put(self, name: str):
+          data = request.json
+          if data.get("source_type") == "url":
+              url = data["source"]
+              if is_private_url(url):
+                  return {"error": f"URL is private: {url}"}, 400
+              info = requests.head(url)
+              file_size = int(info.headers.get("Content-Length"))
+              if file_size > 1024 * 1024 * 100:
+                  return {"error": "File is too big"}, 400
+              with requests.get(url, stream=True) as r:
+                  return r.text
+  ```
+
+test "rank1390: url upload restricted to an allowlisted netloc before the fetch"
+  lang python
+  file file.py
+  reject VYQL-RF-001
+  code
+  ```
+  from urllib.parse import urlparse
+
+  import requests
+  from flask import request
+  from flask_restx import Resource
+
+  ALLOWED_DOMAINS = [
+      "s3.amazonaws.com",
+      "drive.google.com",
+      "blob.core.windows.net",
+      "dropbox.com",
+      "githubusercontent.com",
+      "onedrive.live.com",
+  ]
+
+
+  def is_allowed_url(url):
+      parsed_url = urlparse(url.lower())
+      return parsed_url.netloc in ALLOWED_DOMAINS
+
+
+  class File(Resource):
+      def put(self, name: str):
+          data = request.json
+          if data.get("source_type") == "url":
+              url = data["source"]
+              if not is_allowed_url(url):
+                  return {"error": "Invalid File URL source."}, 400
+              info = requests.head(url)
+              file_size = int(info.headers.get("Content-Length"))
+              if file_size > 1024 * 1024 * 100:
+                  return {"error": "File is too big"}, 400
+              with requests.get(url, stream=True) as r:
+                  return r.text
+  ```

@@ -1,0 +1,61 @@
+module bindings.javascript.fastify_encapsulated_middleware_reprefix;
+
+// A Fastify plugin that offers connect-style middleware has to decide what a
+// middleware path means, and the documented answer is that it is relative to
+// the scope registering it: `instance.prefix` is that scope's route prefix, so
+// `use('/admin', fn)` inside a plugin mounted at `/api` guards `/api/admin`.
+// A plugin implements that by prepending `this.prefix` to the path it is given
+// and storing the absolute result, which is what its middleware engine needs.
+//
+// Encapsulation is the other half. A child plugin gets a fresh context that
+// inherits nothing by reference -- decorators do not cross the boundary -- so
+// the plugin subscribes to `onRegister`, documented as firing when a new
+// encapsulation context is created, re-decorates `use` on the child, and
+// re-registers whatever the parent had so the child's routes stay covered.
+//
+// Those two halves do not compose. The stored paths are already absolute,
+// because the prefixing registration function is what stored them; the child's
+// `prefix` is longer than the parent's, so handing them back to that same
+// function prepends the child's prefix a second time. A middleware registered
+// at `/admin` becomes `/admin/admin` inside a child mounted at `/admin`, which
+// matches nothing the child serves. The middleware does not error and does not
+// warn -- it silently stops running, and if it was the authentication,
+// authorization or rate-limiting middleware, every route in that child scope
+// and in each of its nested scopes is served unguarded.
+//
+// The correct propagation hands the stored pair to the middleware engine
+// underneath the instance, which takes an absolute path and applies no prefix
+// of its own, and keeps the plugin's own bookkeeping in sync by hand.
+//
+// So the binding reads four facts out of the plugin function, which is where
+// all of them are visible together because the registration function and the
+// hook are nested declarations inside it:
+//
+//   * the registration function is prefix-relative -- it reads `this.prefix`;
+//   * the plugin installs the `onRegister` encapsulation hook;
+//   * something re-decorates a context, which is the boundary-crossing that
+//     hook exists for;
+//   * and the prefix-prepending registration function is called on that
+//     context: `instance.use(...)`.
+//
+// The fourth is the defect and it is stated positively, as the call the
+// vulnerable plugin makes, rather than as the absence of whatever a fix put in
+// its place -- the two fixes of this shape reach the engine by different routes
+// (a symbol-keyed subscript in one, a decorated `express` app in the other) and
+// the binding names neither.
+//
+// Every conjunct is an exact token rather than a substring, because `contains`
+// would read `instance.user` and `instance.useCache` as `instance.use` and
+// `this.prefixLength` as `this.prefix`. `instance` is how Fastify's own
+// onRegister documentation spells the encapsulation context it hands the hook;
+// a plugin that names that parameter something else is not matched, which is
+// the price of the exact form.
+binding fastifyEncapsulatedMiddlewareReprefix {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "javascript"
+    and node.context.selector == "this.prefix"
+    and node.context.literal == "onRegister"
+    and node.context.call == "decorate"
+    and node.context.callPath == "instance.use"
+  emit issue code.EncapsulatedMiddlewarePathReprefixed at node
+}

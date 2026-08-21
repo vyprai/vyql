@@ -1,0 +1,11 @@
+module code;
+
+concept NestedExtglobExpansionWithoutDepthLimit : issue {
+  cwe: [CWE_1333, CWE_400]
+  reviewAssumption: "a caller can supply the glob pattern, so its extended-glob groups can be nested arbitrarily deep"
+  reviewCategory: resource
+  reviewCondition: "extended-glob groups are expanded into a regular expression one nesting level at a time, with no ceiling on how deep the nesting may go"
+  reviewConfidence: medium
+  reviewEvidence: "extglob parse context {pattern} consults the extglob switch and expands a nested group without comparing its nesting depth against a limit"
+  vulnerableTo: [dos.ReDoS, dos.UncontrolledResourceConsumption]
+}

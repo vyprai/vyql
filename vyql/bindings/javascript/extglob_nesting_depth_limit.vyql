@@ -1,0 +1,44 @@
+module bindings.javascript.extglob_nesting_depth_limit;
+
+// Extended-glob syntax -- `*(a|b)`, `+(a|b)`, `?(a|b)`, `@(a|b)`, `!(a|b)`, the
+// ksh/bash `extglob` forms -- is compiled by every JavaScript glob matcher into
+// one quantified alternation per group: `*` closes with `)*`, `+` with `)+`, `?`
+// with `)?`. Nesting the groups nests the quantifiers, and nested unbounded
+// quantification over overlapping alternatives backtracks catastrophically, so
+// the cost of a match grows with the pattern's nesting depth rather than its
+// length. A matcher that expands one group at a time therefore needs a ceiling
+// on how deep it will go, and needs it independently of any cap on pattern
+// length: a thirty-character pattern is enough to nest six groups.
+//
+// The documented switch that decides whether extglob syntax is parsed at all is
+// `noext` -- minimatch, node-glob, micromatch, nanomatch -- or `noextglob`, the
+// spelling picomatch normalizes it to. A matcher reads it in exactly the place
+// that opens a group, so a member read of it identifies the expansion decision
+// from the library's own documentation rather than from any one implementation's
+// internals. Pairing it with character-at-a-time scanning of the pattern and a
+// parenthesis literal keeps the query on the scanning loop and off the option
+// plumbing that merely forwards the flag.
+//
+// The remediation is a nesting ceiling, so the negation names that quantity in
+// the spellings a matcher would use -- a configured option read through the
+// options object, or a depth counter held locally -- rather than any single
+// library's identifier. Whether the parser recurses or walks an explicit stack
+// is deliberately not part of the query: both shapes expand the same
+// quantifiers, and self-recursion is not expressible over a function-scope
+// presence node anyway, since `function_name:` and `call_path:` both reach it but
+// no predicate can unify them.
+//
+// Function scope rather than module scope: the option read, the scan and the
+// ceiling all sit in one function, and a module-scope context carries the
+// module's own source text, so a comment describing the recursion limit would
+// satisfy the negation the query depends on.
+binding extglobNestingWithoutDepthLimit {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "javascript"
+    and containsAny(node.context.selector, ["opt.noext", "opts.noext", "options.noext", "o.noext", "this.noext", "opt.noextglob", "opts.noextglob", "options.noextglob", "o.noextglob", "this.noextglob"])
+    and containsAny(node.context.call, ["charAt", "charCodeAt", "codePointAt"])
+    and node.context.literal contains "("
+    and not containsAny(node.context.identifier, ["maxExtglobRecursion", "maxExtglobDepth", "maxGlobstarRecursion", "maxRecursion", "recursionLimit", "recursionDepth", "maxDepth", "depthLimit", "maxNesting", "nestingLimit", "nestingDepth", "extDepth", "parseDepth", "globDepth"])
+    and not containsAny(node.context.selector, [".maxExtglobRecursion", ".maxExtglobDepth", ".maxGlobstarRecursion", ".maxRecursion", ".maxNesting", ".maxDepth", ".recursionLimit", ".depthLimit", ".nestingLimit"])
+  emit issue code.NestedExtglobExpansionWithoutDepthLimit at node
+}
