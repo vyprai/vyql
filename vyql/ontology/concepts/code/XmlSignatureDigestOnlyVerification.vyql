@@ -1,0 +1,11 @@
+module code;
+
+concept XmlSignatureDigestOnlyVerification : issue {
+  cwe: [CWE_347, CWE_290]
+  reviewAssumption: "an attacker who authors the signed document can compute the reference digests, which need no key, and supply any signature value"
+  reviewCategory: auth
+  reviewCondition: "XML signature verification checks the SignedInfo reference digests and never the signature value against a key"
+  reviewConfidence: high
+  reviewEvidence: "signature verification context {pattern} verifies SignedInfo, which takes no key, instead of the signature"
+  vulnerableTo: [authentication.ImproperAuthentication, crypto.ImproperSignatureCheck]
+}

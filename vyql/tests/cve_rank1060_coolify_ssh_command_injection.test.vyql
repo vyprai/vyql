@@ -1,0 +1,190 @@
+# Rank 1060 / CVE-2025-66209: coolify interpolates user-chosen names into shell
+# command strings and runs them on the target server over ssh (CWE-78).
+#
+# ATTENTION: engine gap. The CommandExecution sink is labelled and the
+# escaped-path snippet rejects VYQL-INJ-002, but a Livewire action parameter is
+# not HttpInput — PHP parameter sources key on resource-controller names, and
+# bindings have no class context for a Livewire action. Snippets that reach the
+# sink from a matching request-style source expect the finding; the Livewire
+# parameter name rejects it.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1060: a request-named proxy file reaches the ssh command string"
+  lang php
+  file composer.lock
+  code
+  ```
+  {
+      "packages": [
+          {"name": "symfony/process", "version": "v7.1.0"}
+      ],
+      "packages-dev": []
+  }
+  ```
+  file app/Livewire/Server/Proxy/DynamicConfigurationNavbar.php
+  expect VYQL-INJ-002
+  code
+  ```
+  <?php
+
+  use Illuminate\Support\Facades\Process;
+
+  function generateSshCommand($server, string $command): string
+  {
+      return "timeout 30 ssh {$server} '{$command}'";
+  }
+
+  function instant_remote_process(array $command, $server): ?string
+  {
+      $command_string = implode("\n", $command);
+      $sshCommand = generateSshCommand($server, $command_string);
+      $process = Process::timeout(30)->run($sshCommand);
+
+      return trim($process->output());
+  }
+
+  function deleteDynamicConfiguration($server): void
+  {
+      $file = str_replace('|', '.', $_GET['fileName']);
+      instant_remote_process(["rm -f /data/proxy/dynamic/{$file}"], $server);
+  }
+  ```
+
+test "rank1060: escaping the interpolated path clears it"
+  lang php
+  file composer.lock
+  code
+  ```
+  {
+      "packages": [
+          {"name": "symfony/process", "version": "v7.1.0"}
+      ],
+      "packages-dev": []
+  }
+  ```
+  file app/Livewire/Server/Proxy/DynamicConfigurationNavbar.php
+  reject VYQL-INJ-002
+  code
+  ```
+  <?php
+
+  use Illuminate\Support\Facades\Process;
+
+  function generateSshCommand($server, string $command): string
+  {
+      return "timeout 30 ssh {$server} '{$command}'";
+  }
+
+  function instant_remote_process(array $command, $server): ?string
+  {
+      $command_string = implode("\n", $command);
+      $sshCommand = generateSshCommand($server, $command_string);
+      $process = Process::timeout(30)->run($sshCommand);
+
+      return trim($process->output());
+  }
+
+  function deleteDynamicConfiguration($server): void
+  {
+      $file = str_replace('|', '.', $_GET['fileName']);
+      $escaped = escapeshellarg("/data/proxy/dynamic/{$file}");
+      instant_remote_process(["rm -f {$escaped}"], $server);
+  }
+  ```
+
+test "rank1060: the same path from a livewire action parameter"
+  lang php
+  file composer.lock
+  code
+  ```
+  {
+      "packages": [
+          {"name": "livewire/livewire", "version": "v3.5.0"},
+          {"name": "symfony/process", "version": "v7.1.0"}
+      ],
+      "packages-dev": []
+  }
+  ```
+  file app/Livewire/Server/Proxy/DynamicConfigurationNavbar.php
+  reject VYQL-INJ-002
+  code
+  ```
+  <?php
+
+  use Illuminate\Support\Facades\Process;
+  use Livewire\Component;
+
+  function generateSshCommand($server, string $command): string
+  {
+      return "timeout 30 ssh {$server} '{$command}'";
+  }
+
+  function instant_remote_process(array $command, $server): ?string
+  {
+      $command_string = implode("\n", $command);
+      $sshCommand = generateSshCommand($server, $command_string);
+      $process = Process::timeout(30)->run($sshCommand);
+
+      return trim($process->output());
+  }
+
+  class DynamicConfigurationNavbar extends Component
+  {
+      public $server;
+
+      public function delete(string $fileName): void
+      {
+          $file = str_replace('|', '.', $fileName);
+          instant_remote_process(["rm -f /data/proxy/dynamic/{$file}"], $this->server);
+      }
+  }
+  ```
+
+test "rank1060: the same action parameter under the route-model name"
+  lang php
+  file composer.lock
+  code
+  ```
+  {
+      "packages": [
+          {"name": "livewire/livewire", "version": "v3.5.0"},
+          {"name": "symfony/process", "version": "v7.1.0"}
+      ],
+      "packages-dev": []
+  }
+  ```
+  file app/Livewire/Server/Proxy/DynamicConfigurationNavbar.php
+  expect VYQL-INJ-002
+  code
+  ```
+  <?php
+
+  use Illuminate\Support\Facades\Process;
+  use Livewire\Component;
+
+  function generateSshCommand($server, string $command): string
+  {
+      return "timeout 30 ssh {$server} '{$command}'";
+  }
+
+  function instant_remote_process(array $command, $server): ?string
+  {
+      $command_string = implode("\n", $command);
+      $sshCommand = generateSshCommand($server, $command_string);
+      $process = Process::timeout(30)->run($sshCommand);
+
+      return trim($process->output());
+  }
+
+  class DynamicConfigurationNavbar extends Component
+  {
+      public $server;
+
+      public function delete(string $id): void
+      {
+          $file = str_replace('|', '.', $id);
+          instant_remote_process(["rm -f /data/proxy/dynamic/{$file}"], $this->server);
+      }
+  }
+  ```

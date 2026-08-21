@@ -1,0 +1,66 @@
+# Rank 1064 / CVE-2018-20226: Cortex lets an organisation administrator create a
+# user holding the superadmin role, because the guard compares the role object's
+# source name to the wire name (CWE-178, CWE-863).
+#
+# ATTENTION: analysis gap. Both revisions call contains on the same list with
+# the same shape and differ only in whether the argument reads toString or name;
+# no presence pattern can state that the two sides denote the same role in
+# different representations. Both snippets reject VYQL-AUTH-032.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1064: the role guard compares the object's source name"
+  lang scala
+  file app/org/thp/cortex/controllers/UserCtrl.scala
+  reject VYQL-AUTH-032
+  code
+  ```
+  package org.thp.cortex.controllers
+
+  import scala.concurrent.Future
+
+  import org.thp.cortex.models.{ OrganizationStatus, Roles }
+
+  class UserCtrl(userSrv: UserSrv, organizationSrv: OrganizationSrv, authenticated: Authenticated) {
+    def create: Action[Fields] = authenticated(Roles.orgAdmin, Roles.superAdmin).async(fieldsBodyParser) { implicit request ⇒
+      (for {
+        userOrganizationId ← userSrv.getOrganizationId(request.userId)
+        organizationId = request.body.getString("organization").getOrElse(userOrganizationId)
+        organization ← organizationSrv.get(organizationId)
+        if organization.status() == OrganizationStatus.Active &&
+          (request.roles.contains(Roles.superAdmin) ||
+            (userOrganizationId == organizationId &&
+              !request.body.getStrings("roles").getOrElse(Nil).contains(Roles.superAdmin.toString)))
+        user ← userSrv.create(request.body.set("organization", organizationId))
+      } yield renderer.toOutput(CREATED, user))
+    }
+  }
+  ```
+
+test "rank1064: the same guard comparing the role's own name"
+  lang scala
+  file app/org/thp/cortex/controllers/UserCtrl.scala
+  reject VYQL-AUTH-032
+  code
+  ```
+  package org.thp.cortex.controllers
+
+  import scala.concurrent.Future
+
+  import org.thp.cortex.models.{ OrganizationStatus, Roles }
+
+  class UserCtrl(userSrv: UserSrv, organizationSrv: OrganizationSrv, authenticated: Authenticated) {
+    def create: Action[Fields] = authenticated(Roles.orgAdmin, Roles.superAdmin).async(fieldsBodyParser) { implicit request ⇒
+      (for {
+        userOrganizationId ← userSrv.getOrganizationId(request.userId)
+        organizationId = request.body.getString("organization").getOrElse(userOrganizationId)
+        organization ← organizationSrv.get(organizationId)
+        if organization.status() == OrganizationStatus.Active &&
+          (request.roles.contains(Roles.superAdmin) ||
+            (userOrganizationId == organizationId &&
+              !request.body.getStrings("roles").getOrElse(Nil).contains(Roles.superAdmin.name)))
+        user ← userSrv.create(request.body.set("organization", organizationId))
+      } yield renderer.toOutput(CREATED, user))
+    }
+  }
+  ```
