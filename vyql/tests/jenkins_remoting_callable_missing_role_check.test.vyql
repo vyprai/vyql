@@ -1,0 +1,67 @@
+# A Jenkins remoting hudson.remoting.Callable's checkRoles(RoleChecker) is the
+# caller's only hook to restrict which channel role may enter call(); Jenkins'
+# own remoting documentation has the correct body call roleChecker.check(this,
+# ...) against an expected Role, which is exactly what extending
+# jenkins.security.MasterToSlaveCallable already does. A checkRoles override
+# present but never calling .check anywhere in the class leaves every role able
+# to enter call(), regardless of what call() does -- generalizes the
+# System.getProperties()-specific VYQL-SEC-013 (JenkinsRemotingCallableSystemPropertiesLeak)
+# to the weakness class its narrower binding is one case of.
+
+test "auth: Jenkins remoting Callable with an empty checkRoles is reported"
+  lang java
+  expect VYQL-AUTH-113
+  expect_review code.JenkinsRemotingCallableMissingRoleCheck
+  code
+  ```
+  import hudson.remoting.Callable;
+  import org.jenkinsci.remoting.RoleChecker;
+
+  public class RemoteExec implements Callable<Boolean, Exception> {
+      public Boolean call() throws Exception {
+          return Runner.run();
+      }
+
+      @Override
+      public void checkRoles(RoleChecker roleChecker) throws SecurityException {
+      }
+  }
+  ```
+
+test "auth: MasterToSlaveCallable enforces the expected role for the same call"
+  lang java
+  reject VYQL-AUTH-113
+  reject_review code.JenkinsRemotingCallableMissingRoleCheck
+  code
+  ```
+  import jenkins.security.MasterToSlaveCallable;
+
+  public class RemoteExec extends MasterToSlaveCallable<Boolean, Exception> {
+      public Boolean call() throws Exception {
+          return Runner.run();
+      }
+  }
+  ```
+
+test "auth: a raw Callable that itself calls RoleChecker.check is reported neither"
+  lang java
+  reject VYQL-AUTH-113
+  reject_review code.JenkinsRemotingCallableMissingRoleCheck
+  code
+  ```
+  import hudson.remoting.Callable;
+  import org.jenkinsci.remoting.RoleChecker;
+  import hudson.remoting.Role;
+  import hudson.remoting.Roles;
+
+  public class RemoteExec implements Callable<Boolean, Exception> {
+      public Boolean call() throws Exception {
+          return Runner.run();
+      }
+
+      @Override
+      public void checkRoles(RoleChecker roleChecker) throws SecurityException {
+          roleChecker.check(this, Roles.SLAVE);
+      }
+  }
+  ```

@@ -1168,3 +1168,8 @@ binding commandExecution207 {
   query pattern callExpr where callee.path ~= "ProcessStartInfo"
   emit sink code.CommandExecution at args.any.collection
 }
+
+binding sensitiveOperation208 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.functionName contains "MigrateEmail" and node.context.call contains "CheckPasswordAsync" and node.context.call contains "GenerateEmailConfirmationTokenAsync" and not (node.context.scopeCall contains "GetAdminUsersAsync")
+  emit issue code.SensitiveOperation at node
+}

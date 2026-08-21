@@ -1,0 +1,92 @@
+# RedirectUtils.matchesRedirects() stripped a trailing wildcard '*' from a
+# client's registered "Valid Redirect URIs" entry and matched the candidate
+# redirect_uri (or SAML AssertionConsumerServiceURL) against the remaining
+# prefix with startsWith/equals. Nothing in the match ever inspected the
+# candidate's scheme, so a client configured with a broad wildcard (a common
+# "*" or "https://host/*" pattern) accepted "javascript:alert('XSS')" just as
+# readily as an http(s) URL, and Keycloak's FORM_POST response mode and SAML
+# POST binding reflect that value back into the browser. The fixed revision reads the
+# candidate URI's scheme and rejects the match unless the scheme is http(s)
+# or is explicitly named by the matched pattern itself.
+
+test "rank1265: wildcard redirect URI matcher accepts a javascript: scheme"
+  lang java
+  expect VYQL-INJ-241
+  code
+  ```
+  package org.keycloak.protocol.oidc.utils;
+
+  import java.util.Set;
+
+  public class RedirectUtils {
+
+      public static String verifyRedirectUri(String redirectUri, Set<String> validRedirects) {
+          if (redirectUri == null || validRedirects.isEmpty()) {
+              return null;
+          }
+          boolean valid = matchesRedirects(validRedirects, redirectUri, true);
+          return valid ? redirectUri : null;
+      }
+
+      private static boolean matchesRedirects(Set<String> validRedirects, String redirect, boolean allowWildcards) {
+          for (String validRedirect : validRedirects) {
+              if (validRedirect.endsWith("*") && !validRedirect.contains("?") && allowWildcards) {
+                  String r = redirect.contains("?") ? redirect.substring(0, redirect.indexOf("?")) : redirect;
+                  int length = validRedirect.length() - 1;
+                  validRedirect = validRedirect.substring(0, length);
+                  if (r.startsWith(validRedirect)) return true;
+                  if (length - 1 > 0 && validRedirect.charAt(length - 1) == '/') length--;
+                  validRedirect = validRedirect.substring(0, length);
+                  if (validRedirect.equals(r)) return true;
+              } else if (validRedirect.equals(redirect)) return true;
+          }
+          return false;
+      }
+  }
+  ```
+
+test "rank1265: matcher rejects a scheme the matched pattern does not name"
+  lang java
+  reject VYQL-INJ-241
+  code
+  ```
+  package org.keycloak.protocol.oidc.utils;
+
+  import java.net.URI;
+  import java.util.Set;
+
+  public class RedirectUtils {
+
+      public static String verifyRedirectUri(String redirectUri, Set<String> validRedirects) {
+          if (redirectUri == null || validRedirects.isEmpty()) {
+              return null;
+          }
+          URI decodedRedirect = URI.create(redirectUri);
+          String valid = matchesRedirects(validRedirects, redirectUri, true);
+
+          String scheme = decodedRedirect.getScheme();
+          if (valid != null && scheme != null) {
+              // scheme must be http(s), or explicitly named by the matched pattern
+              if (!valid.startsWith(scheme + ":") && !"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
+                  valid = null;
+              }
+          }
+          return valid != null ? redirectUri : null;
+      }
+
+      private static String matchesRedirects(Set<String> validRedirects, String redirect, boolean allowWildcards) {
+          for (String validRedirect : validRedirects) {
+              if (validRedirect.endsWith("*") && !validRedirect.contains("?") && allowWildcards) {
+                  String r = redirect.contains("?") ? redirect.substring(0, redirect.indexOf("?")) : redirect;
+                  int length = validRedirect.length() - 1;
+                  validRedirect = validRedirect.substring(0, length);
+                  if (r.startsWith(validRedirect)) return validRedirect;
+                  if (length - 1 > 0 && validRedirect.charAt(length - 1) == '/') length--;
+                  validRedirect = validRedirect.substring(0, length);
+                  if (validRedirect.equals(r)) return validRedirect;
+              } else if (validRedirect.equals(redirect)) return validRedirect;
+          }
+          return null;
+      }
+  }
+  ```
