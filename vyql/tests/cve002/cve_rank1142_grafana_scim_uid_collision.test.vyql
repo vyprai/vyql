@@ -1,0 +1,45 @@
+# Rank 1142 / CVE-2025-41115: Grafana's SCIM provisioning lets a numeric
+# externalId become the user's internal UID and collide with an existing
+# internal user ID (CWE-266).
+#
+# ATTENTION: closed-source gap. The runtime mapping lives in Grafana Enterprise;
+# only a public data-remediation migration is observable, so the two revisions
+# cannot separate in this repository. Both snippets reject.
+#
+# verify_current_expected: attention-closed-source, both revisions rejected.
+
+test "rank1142: the migration retroactively prefixes provisioned users' uid"
+  lang go
+  file user_mig.go
+  reject_review code.UserIdentityMappingReview
+  code
+  ```
+  package migrations
+
+  func addUserMigrations(mg *Migrator) {
+      mg.AddMigration("Expand user.uid length to 190", NewRawSQLMigration("").
+          SQLite("SELECT 1;").
+          Postgres("ALTER TABLE `user` ALTER COLUMN uid TYPE VARCHAR(190);").
+          Mysql("ALTER TABLE user MODIFY uid VARCHAR(190);"))
+
+      mg.AddMigration("Prefix SCIM uid for provisioned users", NewRawSQLMigration("").
+          SQLite("UPDATE user SET uid = 'scim-' || uid WHERE is_provisioned = 1 AND uid NOT LIKE 'scim-%';").
+          Postgres("UPDATE `user` SET uid = 'scim-' || uid WHERE is_provisioned = TRUE AND uid NOT LIKE 'scim-%';").
+          Mysql("UPDATE user SET uid = CONCAT('scim-', uid) WHERE is_provisioned = 1 AND uid NOT LIKE 'scim-%';"))
+  }
+  ```
+
+test "rank1142: the same migration file without the uid prefixing migration"
+  lang go
+  file user_mig.go
+  reject_review code.UserIdentityMappingReview
+  code
+  ```
+  package migrations
+
+  func addUserMigrations(mg *Migrator) {
+      mg.AddMigration("Add index on user.is_service_account and user.last_seen_at", NewAddIndexMigration(userV2, &Index{
+          Cols: []string{"is_service_account", "last_seen_at"}, Type: IndexType,
+      }))
+  }
+  ```

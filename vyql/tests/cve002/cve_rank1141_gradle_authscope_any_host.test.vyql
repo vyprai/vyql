@@ -1,0 +1,76 @@
+# Rank 1141 / CVE-2019-15052: Gradle registers HTTP repository credentials
+# against Apache HttpClient's wildcard AuthScope, so any host the build client
+# contacts during resolution receives those credentials (CWE-522).
+#
+# ATTENTION: vocabulary gap. Nothing reaches an HTTP client's credential-scope
+# registration matching any host; nearest secret-handling rules cover a
+# different shape. Both snippets reject VYQL-SEC-040.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1141: credentials are registered against a wildcard host and port"
+  lang java
+  file HttpClientConfigurer.java
+  reject VYQL-SEC-040
+  code
+  ```
+  package org.gradle.internal.resource.transport.http;
+
+  import org.apache.http.auth.AuthScope;
+  import org.apache.http.auth.Credentials;
+  import org.apache.http.auth.UsernamePasswordCredentials;
+  import org.apache.http.client.CredentialsProvider;
+  import org.apache.http.impl.client.HttpClientBuilder;
+
+  public class HttpClientConfigurer {
+      private void configureCredentials(HttpClientBuilder builder, CredentialsProvider credentialsProvider, Collection<Authentication> authentications) {
+          if (authentications.size() > 0) {
+              useCredentials(credentialsProvider, AuthScope.ANY_HOST, AuthScope.ANY_PORT, authentications);
+          }
+      }
+
+      private void useCredentials(CredentialsProvider credentialsProvider, String host, int port, Collection<? extends Authentication> authentications) {
+          for (Authentication authentication : authentications) {
+              PasswordCredentials passwordCredentials = (PasswordCredentials) ((AuthenticationInternal) authentication).getCredentials();
+              Credentials httpCredentials = new UsernamePasswordCredentials(passwordCredentials.getUsername(), passwordCredentials.getPassword());
+              credentialsProvider.setCredentials(new AuthScope(host, port, AuthScope.ANY_REALM, "basic"), httpCredentials);
+          }
+      }
+  }
+  ```
+
+test "rank1141: credentials are registered only against the hosts the authentication declares"
+  lang java
+  file HttpClientConfigurer.java
+  reject VYQL-SEC-040
+  code
+  ```
+  package org.gradle.internal.resource.transport.http;
+
+  import org.apache.http.auth.AuthScope;
+  import org.apache.http.auth.Credentials;
+  import org.apache.http.auth.UsernamePasswordCredentials;
+  import org.apache.http.client.CredentialsProvider;
+  import org.apache.http.impl.client.HttpClientBuilder;
+
+  public class HttpClientConfigurer {
+      private void configureCredentials(HttpClientBuilder builder, CredentialsProvider credentialsProvider, Collection<Authentication> authentications) {
+          if (authentications.size() > 0) {
+              useCredentials(credentialsProvider, authentications);
+          }
+      }
+
+      private void useCredentials(CredentialsProvider credentialsProvider, Collection<? extends Authentication> authentications) {
+          for (Authentication authentication : authentications) {
+              AuthenticationInternal authenticationInternal = (AuthenticationInternal) authentication;
+              PasswordCredentials passwordCredentials = (PasswordCredentials) authenticationInternal.getCredentials();
+
+              Collection<AuthenticationInternal.HostAndPort> hostsForAuthentication = authenticationInternal.getHostsForAuthentication();
+              for (AuthenticationInternal.HostAndPort hostAndPort : hostsForAuthentication) {
+                  Credentials httpCredentials = new UsernamePasswordCredentials(passwordCredentials.getUsername(), passwordCredentials.getPassword());
+                  credentialsProvider.setCredentials(new AuthScope(hostAndPort.getHost(), hostAndPort.getPort(), AuthScope.ANY_REALM, "basic"), httpCredentials);
+              }
+          }
+      }
+  }
+  ```
