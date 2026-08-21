@@ -98,17 +98,16 @@ test "rank1352: the DATA payload is not an envelope address"
   ```
 
 # The vulnerable code reaches the sink through `smtp_from, smtp_to, message =
-# check_delivery_params(mail)`, and that is the one form of the flow the Ruby
-# frontend drops. The pair below differs only in how the returned array is taken
-# apart: read by index the addresses stay tainted, taken apart by multiple
-# assignment they do not, because rbConv.stmt's "assignment" case has no
-# left_assignment_list target and emits an nir.Assign with no Targets at all.
+# check_delivery_params(mail)`. The pair below differs only in how the returned
+# array is taken apart, and both forms keep the taint: rbConv.stmt's "assignment"
+# case gives a left_assignment_list one nir.Assign target per name, the way Go's
+# `a, b := f()` and Python's tuple unpacking already do.
 #
-# verify_current_expected: attention-engine-gap, isolating pair below.
+# verify_current_expected: fixed
 
-test "rank1352: a returned envelope pair taken apart by multiple assignment loses its taint"
+test "rank1352: a returned envelope pair taken apart by multiple assignment stays tainted"
   lang ruby
-  reject VYQL-INJ-017
+  expect VYQL-INJ-017
   code
   ```
   class Delivery
