@@ -1,0 +1,8 @@
+module code;
+
+review code.UnsanitizedFrameDocumentWrite {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review markup written into a frame's own document, so the frame carries a sandbox attribute and the markup passes through a sanitizer before it reaches the frame's HTML parser"
+}

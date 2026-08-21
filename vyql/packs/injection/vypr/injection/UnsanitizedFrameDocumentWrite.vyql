@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnsanitizedFrameDocumentWrite {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_79]
+    id: "VYQL-INJ-243"
+    severity: high
+  }
+  issue code.UnsanitizedFrameDocumentWrite as sink
+}

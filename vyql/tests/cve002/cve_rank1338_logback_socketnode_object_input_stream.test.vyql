@@ -1,0 +1,376 @@
+# Rank 1338 / CVE-2017-5929: logback's socket-based log receivers read
+# serialized ILoggingEvent objects off a network socket with a plain
+# java.io.ObjectInputStream, so anything that can connect to the listening
+# port controls which classes get instantiated -- the textbook Java native
+# deserialization gadget-chain shape (CWE-502). SocketNode.run() opens
+# `new ObjectInputStream(new BufferedInputStream(socket.getInputStream()))`
+# and loops on `ois.readObject()`; SocketReceiver and
+# RemoteAppenderStreamClient carry the identical pattern, and logback-access
+# has its own SocketNode copy.
+#
+# The fixing commit ("harden serialization") adds
+# logback-core/src/main/java/ch/qos/logback/core/net/HardenedObjectInputStream.java,
+# an ObjectInputStream subclass whose resolveClass() override throws
+# InvalidClassException for any class name outside an explicit allowlist plus
+# the java.lang/java.util packages. That commit only introduces the class and
+# uses it from a test; the receivers are switched over one commit later in
+# 979b042c, which replaces SocketNode's ObjectInputStream field with
+# HardenedLoggingEventInputStream (a HardenedObjectInputStream subclass
+# carrying logback's own event-class allowlist) and does the same for
+# RemoteAppenderStreamClient. Both revisions below are taken from those two
+# points.
+#
+# ATTENTION, and the reason is that the change is hardening rather than the
+# removal of a sink, so nothing shipped discriminates the two revisions.
+# VYQL-DESER-001 fires on the vulnerable revision at exactly the CVE's sites
+# -- SocketNode.java:83, SocketReceiver.java:162,
+# RemoteAppenderStreamClient.java:95 -- and it fires on the patched revision
+# at the same three sites (SocketNode shifts to :82), five findings on each
+# side with an identical sink set. `vyql match` shows why:
+# deserialization129 in vyql/bindings/java/m420f6b67.vyql keys on
+# `callee.method == "readObject"` alone, so
+# `hardenedLoggingEventInputStream.readObject()` is labelled
+# code.Deserialization exactly as `ois.readObject()` is, and
+# `socket.getInputStream()` is a code.HttpInput source either way
+# (httpInput29, same file). `vyql explain` reports both of the rule's
+# suppressing clauses unsatisfied on both revisions -- "no neutralizing
+# control dominates the path; none found anywhere on flows" -- because the
+# only Java core.SafeDeserialization binding is SnakeYAML's Yaml.safeLoad
+# (safeDeserialization23 in vyql/bindings/packages/java/m9ef49b0f.vyql) and
+# nothing covers ObjectInputStream at all.
+#
+# This is the control gap recorded at rank 1089, whose own fix ships
+# the readObject()/readUnshared() sink knowing no allowlist control existed to
+# balance it. This rank adds a second requirement to that entry rather than a
+# new one. Two things would discriminate these revisions, and neither is
+# mechanical:
+#
+#   1. A control recognizing that a resolveClass()/readClassDescriptor()
+#      override rejects class names outside a bounded set. "Overrides
+#      resolveClass" on its own is not a safety signal and must not be used as
+#      one: rank 1089's *vulnerable* revision overrode readClassDescriptor to
+#      resolve whatever the stream named, so a control keyed on the override
+#      alone would suppress that rank's true positive -- the same self-
+#      endorsing-control failure rank 1051 settled for core.AllowlistValidation.
+#      The judgement has to come from the override's body comparing the
+#      incoming name against a bounded set and throwing
+#      (InvalidClassException here, NotSerializableException at 1089), which is
+#      presence analysis over an arbitrary method body.
+#   2. Attribution of that class-level control to readObject() calls whose
+#      receiver is statically an instance of the hardened subclass, across
+#      files. Neither `unless path coveredBy` nor `unless endpoint coveredBy`
+#      can reach it: HardenedObjectInputStream.resolveClass sits in
+#      logback-core, off the socket-to-readObject path in logback-classic, and
+#      is never on any flow the rule sees. That is a new control-attribution
+#      relation, not a binding.
+#
+# Narrowing the sink instead is not available either. The generic, documented
+# Java allowlist hooks -- ObjectInputStream.setObjectInputFilter/
+# ObjectInputFilter.Config (JEP 290) and commons-io's
+# ValidatingObjectInputStream.accept -- are both worth binding as
+# core.SafeDeserialization on their own merit, but neither appears here:
+# logback's fix predates JDK 9 and rolls its own subclass. A binding naming
+# HardenedObjectInputStream or HardenedLoggingEventInputStream would name a
+# class that exists only in logback, failing the genericity test.
+#
+# Both revisions therefore assert the finding: the vulnerable one as a true
+# positive, the patched one as the false positive the missing control would
+# suppress. No definition change attempted.
+#
+# Diagnosing the patched revision surfaced a second, separate engine gap, the
+# reason the patched revision's report depends on the shape of the hardened
+# class rather than on anything about the allowlist: taint entering a resolved
+# user-defined constructor is dropped when the constructor's only use of the
+# argument is an explicit constructor invocation, `super(in)`. The pair below
+# isolates it -- identical source, identical `readObject` sink, differing only
+# in whether the socket stream reaches ObjectInputStream directly or through a
+# one-line subclass constructor that delegates with `super(in)`. The subclass
+# form reports nothing, and `vyql trace` shows the source with no outgoing
+# edge at all ("0 reach a sink, 1 dead-end", no frontier), because
+# `explicit_constructor_invocation` has no case in
+# internal/extract/frontend/treesitter/java.go, so `super(in)` never becomes a
+# flow and the constructed instance never inherits its argument's taint.
+# logback's own patched revision escapes this only because
+# HardenedObjectInputStream and HardenedLoggingEventInputStream each carry two
+# overloaded constructors: the call does not resolve to a single body, so the
+# opaque arg-to-result propagation applies instead and the sink is reached.
+# Not mechanical: making `super(...)`/`this(...)` propagate its arguments to
+# the enclosing instance is a new dataflow relation on every Java class that
+# delegates to a base constructor, not a corrected extraction path, and it
+# widens taint rather than narrowing it, so it needs the OWASP Java corpus to
+# judge. It also cannot fix this rank -- it would make the patched revision
+# report on more shapes, not fewer.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions fire identically
+
+test "rank1338: SocketNode reads logging events off a socket through a plain ObjectInputStream"
+  lang java
+  file ch/qos/logback/classic/net/SocketNode.java
+  expect VYQL-DESER-001
+  code
+  ```
+  package ch.qos.logback.classic.net;
+
+  import java.io.BufferedInputStream;
+  import java.io.IOException;
+  import java.io.ObjectInputStream;
+  import java.net.Socket;
+
+  import ch.qos.logback.classic.Logger;
+  import ch.qos.logback.classic.LoggerContext;
+  import ch.qos.logback.classic.spi.ILoggingEvent;
+
+  public class SocketNode implements Runnable {
+
+      Socket socket;
+      LoggerContext context;
+      ObjectInputStream ois;
+
+      Logger logger;
+      boolean closed = false;
+
+      public SocketNode(Socket socket, LoggerContext context) {
+          this.socket = socket;
+          this.context = context;
+          logger = context.getLogger(SocketNode.class);
+      }
+
+      public void run() {
+          try {
+              ois = new ObjectInputStream(new BufferedInputStream(socket.getInputStream()));
+          } catch (Exception e) {
+              logger.error("Could not open ObjectInputStream to " + socket, e);
+              closed = true;
+          }
+
+          ILoggingEvent event;
+          Logger remoteLogger;
+
+          try {
+              while (!closed) {
+                  event = (ILoggingEvent) ois.readObject();
+                  remoteLogger = context.getLogger(event.getLoggerName());
+                  if (remoteLogger.isEnabledFor(event.getLevel())) {
+                      remoteLogger.callAppenders(event);
+                  }
+              }
+          } catch (IOException e) {
+              logger.info("Caught java.io.IOException: " + e);
+          } catch (Exception e) {
+              logger.error("Unexpected exception. Closing connection.", e);
+          }
+          close();
+      }
+
+      void close() {
+          closed = true;
+      }
+  }
+  ```
+
+test "rank1338: SocketNode reads through an allowlisting ObjectInputStream subclass and reports the same"
+  lang java
+  file ch/qos/logback/classic/net/SocketNode.java
+  expect VYQL-DESER-001
+  code
+  ```
+  package ch.qos.logback.classic.net;
+
+  import java.io.BufferedInputStream;
+  import java.io.IOException;
+  import java.net.Socket;
+
+  import ch.qos.logback.classic.Logger;
+  import ch.qos.logback.classic.LoggerContext;
+  import ch.qos.logback.classic.net.server.HardenedLoggingEventInputStream;
+  import ch.qos.logback.classic.spi.ILoggingEvent;
+
+  public class SocketNode implements Runnable {
+
+      Socket socket;
+      LoggerContext context;
+      HardenedLoggingEventInputStream hardenedLoggingEventInputStream;
+
+      Logger logger;
+      boolean closed = false;
+
+      public SocketNode(Socket socket, LoggerContext context) {
+          this.socket = socket;
+          this.context = context;
+          logger = context.getLogger(SocketNode.class);
+      }
+
+      public void run() {
+          try {
+              hardenedLoggingEventInputStream = new HardenedLoggingEventInputStream(new BufferedInputStream(socket.getInputStream()));
+          } catch (Exception e) {
+              logger.error("Could not open ObjectInputStream to " + socket, e);
+              closed = true;
+          }
+
+          ILoggingEvent event;
+          Logger remoteLogger;
+
+          try {
+              while (!closed) {
+                  event = (ILoggingEvent) hardenedLoggingEventInputStream.readObject();
+                  remoteLogger = context.getLogger(event.getLoggerName());
+                  if (remoteLogger.isEnabledFor(event.getLevel())) {
+                      remoteLogger.callAppenders(event);
+                  }
+              }
+          } catch (IOException e) {
+              logger.info("Caught java.io.IOException: " + e);
+          } catch (Exception e) {
+              logger.error("Unexpected exception. Closing connection.", e);
+          }
+          close();
+      }
+
+      void close() {
+          closed = true;
+      }
+  }
+  ```
+  file ch/qos/logback/core/net/HardenedObjectInputStream.java
+  code
+  ```
+  package ch.qos.logback.core.net;
+
+  import java.io.IOException;
+  import java.io.InputStream;
+  import java.io.InvalidClassException;
+  import java.io.ObjectInputStream;
+  import java.io.ObjectStreamClass;
+  import java.util.ArrayList;
+  import java.util.List;
+
+  public class HardenedObjectInputStream extends ObjectInputStream {
+
+      final List<String> whitelistedClassNames;
+      final static String[] JAVA_PACKAGES = new String[] { "java.lang", "java.util" };
+
+      public HardenedObjectInputStream(InputStream in, String[] whilelist) throws IOException {
+          super(in);
+          this.whitelistedClassNames = new ArrayList<String>();
+          if (whilelist != null) {
+              for (int i = 0; i < whilelist.length; i++) {
+                  this.whitelistedClassNames.add(whilelist[i]);
+              }
+          }
+      }
+
+      public HardenedObjectInputStream(InputStream in, List<String> whitelist) throws IOException {
+          super(in);
+          this.whitelistedClassNames = new ArrayList<String>();
+          this.whitelistedClassNames.addAll(whitelist);
+      }
+
+      @Override
+      protected Class<?> resolveClass(ObjectStreamClass anObjectStreamClass) throws IOException, ClassNotFoundException {
+          String incomingClassName = anObjectStreamClass.getName();
+          if (!isWhitelisted(incomingClassName)) {
+              throw new InvalidClassException("Unauthorized deserialization attempt", anObjectStreamClass.getName());
+          }
+          return super.resolveClass(anObjectStreamClass);
+      }
+
+      private boolean isWhitelisted(String incomingClassName) {
+          for (int i = 0; i < JAVA_PACKAGES.length; i++) {
+              if (incomingClassName.startsWith(JAVA_PACKAGES[i]))
+                  return true;
+          }
+          for (String whiteListed : whitelistedClassNames) {
+              if (incomingClassName.equals(whiteListed))
+                  return true;
+          }
+          return false;
+      }
+
+      protected void addToWhitelist(List<String> additionalAuthorizedClasses) {
+          whitelistedClassNames.addAll(additionalAuthorizedClasses);
+      }
+  }
+  ```
+  file ch/qos/logback/classic/net/server/HardenedLoggingEventInputStream.java
+  code
+  ```
+  package ch.qos.logback.classic.net.server;
+
+  import java.io.IOException;
+  import java.io.InputStream;
+  import java.util.ArrayList;
+  import java.util.List;
+
+  import ch.qos.logback.classic.Level;
+  import ch.qos.logback.classic.Logger;
+  import ch.qos.logback.classic.spi.LoggerContextVO;
+  import ch.qos.logback.classic.spi.LoggingEventVO;
+  import ch.qos.logback.classic.spi.ThrowableProxyVO;
+  import ch.qos.logback.core.net.HardenedObjectInputStream;
+
+  public class HardenedLoggingEventInputStream extends HardenedObjectInputStream {
+
+      static public List<String> getWhilelist() {
+          List<String> whitelist = new ArrayList<String>();
+          whitelist.add(LoggingEventVO.class.getName());
+          whitelist.add(LoggerContextVO.class.getName());
+          whitelist.add(ThrowableProxyVO.class.getName());
+          whitelist.add(Level.class.getName());
+          whitelist.add(Logger.class.getName());
+          whitelist.add(StackTraceElement.class.getName());
+          return whitelist;
+      }
+
+      public HardenedLoggingEventInputStream(InputStream is) throws IOException {
+          super(is, getWhilelist());
+      }
+
+      public HardenedLoggingEventInputStream(InputStream is, List<String> additionalAuthorizedClasses) throws IOException {
+          this(is);
+          super.addToWhitelist(additionalAuthorizedClasses);
+      }
+  }
+  ```
+
+test "rank1338: a socket stream handed straight to ObjectInputStream reaches the readObject sink"
+  lang java
+  file ObjectInputStreamDirect.java
+  expect VYQL-DESER-001
+  code
+  ```
+  import java.io.ObjectInputStream;
+  import java.net.Socket;
+
+  public class ObjectInputStreamDirect {
+      public Object read(Socket socket) throws Exception {
+          ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
+          return ois.readObject();
+      }
+  }
+  ```
+
+test "rank1338: the same stream reaching ObjectInputStream through a delegating super(in) loses its taint"
+  lang java
+  file ObjectInputStreamViaSuper.java
+  reject VYQL-DESER-001
+  code
+  ```
+  import java.io.IOException;
+  import java.io.InputStream;
+  import java.io.ObjectInputStream;
+  import java.net.Socket;
+
+  class EventInputStream extends ObjectInputStream {
+      EventInputStream(InputStream in) throws IOException {
+          super(in);
+      }
+  }
+
+  public class ObjectInputStreamViaSuper {
+      public Object read(Socket socket) throws Exception {
+          EventInputStream eis = new EventInputStream(socket.getInputStream());
+          return eis.readObject();
+      }
+  }
+  ```

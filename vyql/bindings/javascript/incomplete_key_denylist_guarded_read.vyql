@@ -1,0 +1,29 @@
+module bindings.javascript.incomplete_key_denylist_guarded_read;
+
+// A deep merge, deep defaults, or nested path walker that accepts
+// caller-supplied keys usually routes every property read through one small
+// helper whose whole job is to make those keys safe: compare the key against
+// the prototype-mutating names, and otherwise return the property. The helper
+// is what the rest of the library trusts, so whatever its denylist omits is
+// reachable from every entry point that uses it.
+//
+// `__proto__` alone is not the whole denylist. Reading `object.__proto__`
+// hands back the prototype directly, which is why it is the name everyone
+// blocks first, but `object.constructor` reaches the same object one step
+// later: for a plain object it returns `Object`, whose `prototype` the caller
+// then merges or assigns into. A helper that returns the raw value for
+// `constructor` therefore still lets a source object shaped like
+// `{ constructor: { ... } }` mutate `Object` itself, because the caller
+// recurses into the value the helper just approved. A complete denylist names
+// `constructor` and `prototype` as well, or the helper checks that the key is
+// the object's own property, which no plain object satisfies for either name.
+//
+// The binding is scoped to a value-returning helper — a function that reads a
+// computed property and performs no dynamic property write of its own — since
+// that is the form whose result the caller traverses. A single-level setter
+// that blocks `__proto__` and assigns `obj[key] = value` needs nothing more,
+// so a dynamic property write in the same function suppresses this.
+binding incompleteKeyDenylistGuardedReadPrototypePollution {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.prototypeKeyGuard == "true" and node.context.literal contains "__proto__" and node.context.index contains "[]" and not (node.context.dynamicPropertyWrite == "true") and not (containsAny(node.context.literal, ["constructor", "prototype"])) and not (node.context.prototypeNameGuard == "true") and not (node.context.ownPropertyKeyGuard == "true") and not (containsAny(node.context.callPath, ["hasOwnProperty", "Object.hasOwn", "Object.getOwnPropertyNames", "Object.create"]))
+  emit issue code.IncompleteKeyDenylistGuardedReadPrototypePollution at node
+}

@@ -1,0 +1,184 @@
+# Rank 1334 / CVE-2024-6868: LocalAI's model gallery installs a model by
+# downloading every file a gallery config names into the models directory; the
+# download path is confined with utils.VerifyPath, but pkg/downloader/uri.go then
+# notices the downloaded file is an archive and hands it to
+# utils.ExtractArchive(filePath, basePath). ExtractArchive picked an unarchiver
+# with archiver.ByExtension, tuned the tar reader (OverwriteExisting, MkdirAll,
+# ContinueOnError) and called un.Unarchive(archive, dst) -- mholt/archiver
+# reproduces symlink entries verbatim, so a tar carrying a symlink out of the
+# models directory followed by an entry named through it writes anywhere the
+# server can write, including the backend assets the process later executes:
+# arbitrary file write escalating to RCE (CWE-22/CWE-59). Fix
+# a181dd0ebc5d3092fc50f61674d552604fe8ef9c adds an archiver.Walk pre-pass over
+# the archive that refuses any entry whose mode carries os.ModeSymlink before
+# unarchiving.
+#
+# code.ArchiveSymlinkFilterBypass / VYQL-PATH-007 is the concept for exactly this
+# weakness, but it had no Go form -- only the Python and JavaScript detectors --
+# so `vyql match` labelled nothing at all over pkg/utils/untar.go and the package
+# scan reported the unrelated WeakHash/WeakRandomValue/LockAcquire findings only.
+# The Go binding names the extraction primitive, not this repository: any function
+# handing an archive to mholt/archiver's Unarchive, which extracts link entries as
+# the library documents, while never looking at entry types. Its neutralisers are
+# the two documented ways to look: the library's read-only entry iterator
+# archiver.Walk, or an inline link-type test (os.ModeSymlink / fs.ModeSymlink on
+# an entry mode, tar.TypeSymlink / tar.TypeLink on a header, a Linkname or Lstat
+# inspection).
+#
+# The third and fourth cases carry the genericity: a wrapper named nothing like
+# LocalAI's, calling the package-level archiver.Unarchive helper rather than an
+# interface value, reports on its own account and stops reporting once it screens
+# header link types inline -- a different spelling of both the extraction and the
+# check than the fixed revision's.
+
+test "rank1334: a gallery archive is unarchived without screening entry types"
+  lang go
+  file pkg/utils/untar.go
+  expect VYQL-PATH-007
+  expect_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  package utils
+
+  import (
+  	"fmt"
+
+  	"github.com/mholt/archiver/v3"
+  )
+
+  func ExtractArchive(archive, dst string) error {
+  	uaIface, err := archiver.ByExtension(archive)
+  	if err != nil {
+  		return err
+  	}
+
+  	un, ok := uaIface.(archiver.Unarchiver)
+  	if !ok {
+  		return fmt.Errorf("format specified by source filename is not an archive format: %s (%T)", archive, uaIface)
+  	}
+
+  	mytar := &archiver.Tar{
+  		OverwriteExisting:      true,
+  		MkdirAll:               true,
+  		ImplicitTopLevelFolder: false,
+  		ContinueOnError:        true,
+  	}
+
+  	switch v := uaIface.(type) {
+  	case *archiver.Tar:
+  		uaIface = mytar
+  	case *archiver.TarGz:
+  		v.Tar = mytar
+  	}
+  	return un.Unarchive(archive, dst)
+  }
+  ```
+
+test "rank1334: an archiver.Walk pre-pass refusing symlink entries clears it"
+  lang go
+  file pkg/utils/untar.go
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  package utils
+
+  import (
+  	"fmt"
+  	"os"
+
+  	"github.com/mholt/archiver/v3"
+  )
+
+  func ExtractArchive(archive, dst string) error {
+  	uaIface, err := archiver.ByExtension(archive)
+  	if err != nil {
+  		return err
+  	}
+
+  	un, ok := uaIface.(archiver.Unarchiver)
+  	if !ok {
+  		return fmt.Errorf("format specified by source filename is not an archive format: %s (%T)", archive, uaIface)
+  	}
+
+  	mytar := &archiver.Tar{
+  		OverwriteExisting:      true,
+  		MkdirAll:               true,
+  		ImplicitTopLevelFolder: false,
+  		ContinueOnError:        true,
+  	}
+
+  	switch v := uaIface.(type) {
+  	case *archiver.Tar:
+  		uaIface = mytar
+  	case *archiver.TarGz:
+  		v.Tar = mytar
+  	}
+
+  	err = archiver.Walk(archive, func(f archiver.File) error {
+  		if f.FileInfo.Mode()&os.ModeSymlink != 0 {
+  			return fmt.Errorf("archive contains a symlink")
+  		}
+  		return nil
+  	})
+
+  	if err != nil {
+  		return err
+  	}
+
+  	return un.Unarchive(archive, dst)
+  }
+  ```
+
+test "rank1334: a wrapper named unlike any repro, unarchiving through the package helper, misses the same check"
+  lang go
+  file internal/bundle/unpack.go
+  expect VYQL-PATH-007
+  expect_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  package bundle
+
+  import "github.com/mholt/archiver/v3"
+
+  func unpackBundle(src, dest string) error {
+  	return archiver.Unarchive(src, dest)
+  }
+  ```
+
+test "rank1334: the same wrapper screening header link types inline clears it"
+  lang go
+  file internal/bundle/unpack.go
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  package bundle
+
+  import (
+  	"archive/tar"
+  	"fmt"
+  	"os"
+
+  	"github.com/mholt/archiver/v3"
+  )
+
+  func unpackBundle(src, dest string) error {
+  	f, err := os.Open(src)
+  	if err != nil {
+  		return err
+  	}
+  	defer f.Close()
+  	tr := tar.NewReader(f)
+  	for {
+  		hdr, err := tr.Next()
+  		if err != nil {
+  			break
+  		}
+  		if hdr.Typeflag == tar.TypeSymlink || hdr.Typeflag == tar.TypeLink {
+  			return fmt.Errorf("archive contains a link entry: %s", hdr.Name)
+  		}
+  	}
+  	return archiver.Unarchive(src, dest)
+  }
+  ```
