@@ -27,28 +27,47 @@
 # (lhc_web/modules/lhfaq/faqwidget.php), which the widget template renders
 # through htmlspecialchars -- also useless against `{{`.
 #
-# Detection reuses code.IncompleteTemplateValidation / VYQL-INJ-024, already the
-# concept for "a template engine is used without the validation that makes
-# caller-supplied template syntax inert" (rank 661 for Jinja2, rank 1271 for
-# Twig). Nothing was labelled before: PHP had no vocabulary for "this echo lands
-# in markup a client-side template engine compiles", so the only thing the
-# scanner saw was an HtmlRender sink with an HTML escape on the path, which it
-# correctly cleared. The new PHP review token pairs the two facts a template
-# carries in its own text -- AngularJS/Vue interpolation plus a directive
-# attribute that says the engine compiles this markup, and an echo whose
-# expression reads a request superglobal -- and clears when the delimiters are
-# rewritten. Both frameworks document exactly this: never let request data reach
-# markup the engine compiles, because HTML escaping is not the control for it.
+# code.IncompleteTemplateValidation / VYQL-INJ-024 is the concept for "a
+# template engine is used without the validation that makes caller-supplied
+# template syntax inert", and Jinja2 and Twig reach it through their own
+# bindings. PHP does not: nothing labels "this echo lands in markup a
+# client-side template engine compiles", so all the scanner sees here is an
+# HtmlRender sink with an HTML escape on the path, which it clears -- correct
+# for HTML, wrong for `{{ ... }}`.
 #
-# On the target repository at the vulnerable revision, 81 templates carry `{{`,
-# 2 of them mention a request superglobal, and 1 echoes one: the vulnerable
-# template, which is the single row the token produces. It is gone at the fixed
-# revision.
+# ATTENTION, engine gap. The tree carries no PHP review token for this shape,
+# deliberately. A token pairing the two facts such a template holds in its own
+# text -- an AngularJS or Vue directive attribute beside a `{{ ... }}`
+# interpolation, and an echo reading a request superglobal -- can only test
+# those facts as substrings of the whole file with its whitespace stripped, so
+# co-membership in one file is the entire relation between them. A Vue
+# directive on the first line combines with a superglobal echo 150 lines below;
+# a directive name that occurs only inside an HTML comment, only as a
+# JavaScript string literal, or only as `<pre>` documentation prose counts the
+# same as one on a live element. A Blade view (`{{ $post->title }}`,
+# interpolated and escaped server-side, never handed to a client engine) beside
+# an unrelated Vue island and one legacy superglobal echo fires too, which is
+# precisely the case a directive gate is there to exclude. The forms such a
+# token would have to cover to match what the frameworks document are equally
+# out of reach at that granularity:
+# `<?=` short echo, which is how most PHP templates echo at all; request data
+# reaching the echo through a variable; Vue's `@click` and `:class` shorthands;
+# sources beyond the four superglobals; and a correct delimiter-stripping fix
+# written as an escaped regex, which still reports.
+#
+# Discriminating this needs the echo's own markup context -- which element and
+# attribute the value lands in, and whether that element sits inside markup a
+# client-side engine compiles -- a relation between the echo and the
+# surrounding HTML tree, not a property of the file's text. The first case
+# below is pinned as a miss until that exists.
+#
+# verify_current_expected: attention-engine-gap
 
 test "rank1328: the online-users search parameter is echoed into an AngularJS-compiled attribute"
   lang php
   file lhc_web/design/defaulttheme/tpl/lhchat/onlineusers/section_online_users.tpl.php
-  expect VYQL-INJ-024
+  reject VYQL-INJ-024
+  reject_review code.IncompleteTemplateValidation
   code
   ```
   <div class="row">
