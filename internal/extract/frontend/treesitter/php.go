@@ -19,6 +19,7 @@ type phConv struct {
 	root       string
 	file       string
 	funcName   string
+	className  string
 	childCache map[uintptr][]*tree_sitter.Node
 }
 
@@ -204,8 +205,11 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}}
 	case "class_declaration", "interface_declaration", "trait_declaration", "enum_declaration":
 		name := c.text(field(n, "name"))
+		prevClass := c.className
+		c.className = name
 		body := c.block(field(n, "body"))
 		body = append(body, c.phpClassContext(n, name)...)
+		c.className = prevClass
 		return []nir.Stmt{nir.ClassDef{Name: name, Body: body, Loc: L}}
 	case "expression_statement":
 		kids := c.namedChildren(n)
@@ -737,6 +741,9 @@ func (c *phConv) phpReviewTokens(n *tree_sitter.Node) []string {
 			add("raw_cookie_httponly_false")
 		}
 	}
+	if phpResolveFailureSentinelNotRejected(compact) {
+		add("resolve_failure_url_validation_bypass")
+	}
 	if phpTempPathJoinBeforeSeparatorCheck(compact) {
 		add("temp_path_join_before_separator_check")
 	}
@@ -1141,6 +1148,11 @@ func (c *phConv) phpReviewTokens(n *tree_sitter.Node) []string {
 		!strings.Contains(compact, "setSafeMode(true)") {
 		add("stored_html_write")
 	}
+	if strings.Contains(compact, `$data["attributes"]["description"]`) &&
+		strings.Contains(compact, `$page->description=$data["attributes"]["description"];`) &&
+		!strings.Contains(compact, `$page->description=strip_tags($data["attributes"]["description"]);`) {
+		add("haxcms_page_break_description_stored_html_write")
+	}
 	if strings.Contains(compact, "toggleSubpalette") && strings.Contains(compact, "Input->post('field')") &&
 		strings.Contains(compact, "prepare(\"UPDATE\"") && !strings.Contains(compact, "__selector__") &&
 		!strings.Contains(compact, "hasAccess($dc->table") {
@@ -1426,6 +1438,63 @@ func phpFatFreeClearEvalCompileWithoutKeyValidation(compact string) bool {
 		}
 	}
 	return true
+}
+
+// phpResolveFailureSentinelNotRejected reports the documented gethostbyname()
+// failure idiom handled by overwriting the resolved variable with a falsy
+// literal instead of rejecting the value. PHP documents gethostbyname() as
+// returning "a string containing the unmodified hostname" on failure, so the
+// caller that compares the answer with its input has detected the failure;
+// assigning a bare false back to the resolved variable records that failure
+// while the function continues, and the address test that follows is skipped
+// by its own truthiness guard, so a host string the resolver refused to
+// interpret is returned as validated. The correlation on the resolved
+// variable's name keeps an unrelated false assignment in the same function --
+// a same-host flag, a status default -- from satisfying the shape, and the
+// call must be the right side of an assignment, so diagnostic code that only
+// prints gethostbyname('example.org') decides nothing here. gethostbynamel(),
+// a different function, does not match the call marker.
+func phpResolveFailureSentinelNotRejected(compact string) bool {
+	search := 0
+	for {
+		callIdx := strings.Index(compact[search:], "gethostbyname(")
+		if callIdx < 0 {
+			return false
+		}
+		callIdx += search
+		search = callIdx + len("gethostbyname(")
+		k := callIdx
+		if k > 0 && compact[k-1] == '@' {
+			k--
+		}
+		// "<$name>=" must sit immediately before the call.
+		if k < 2 || compact[k-1] != '=' || (compact[k-2] != '$' && !phpVarNameByte(compact[k-2])) {
+			continue
+		}
+		vStart := k - 2
+		for vStart > 0 && phpVarNameByte(compact[vStart-1]) {
+			vStart--
+		}
+		if vStart == k-2 {
+			continue
+		}
+		v := "$" + compact[vStart:k-1]
+		cmpNeedle := v + "=="
+		cmpIdx := strings.Index(compact[callIdx:], cmpNeedle)
+		if cmpIdx < 0 {
+			continue
+		}
+		rest := compact[callIdx+cmpIdx+len(cmpNeedle):]
+		for _, lit := range []string{"false", "FALSE", "False"} {
+			if strings.Contains(rest, v+"="+lit) {
+				return true
+			}
+		}
+	}
+}
+
+func phpVarNameByte(b byte) bool {
+	return b == '_' || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
 }
 
 func phpBpDocsSaveMissingAccessPolicy(compact string) bool {
@@ -1962,6 +2031,17 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		// `fn ($x) => expr` — single-expression closure; model the body as a return.
 		return nir.Lambda{Params: c.params(field(n, "parameters")), ParamTypes: c.paramTypes(field(n, "parameters")),
 			Body: []nir.Stmt{nir.Return{Value: c.expr(field(n, "body"))}}, Loc: L}
+	case "include_expression", "include_once_expression", "require_expression", "require_once_expression":
+		// include/require used as an expression (`return include $f;`, `$x = include $f;`) —
+		// same file-inclusion sink call as the statement form in exprStmt. Without this case the
+		// generic Seq fallback below dropped the Call entirely and kept only its argument, so the
+		// sink label vanished whenever the include's result was consumed instead of discarded.
+		kids := c.namedChildren(n)
+		var args []nir.Expr
+		if len(kids) > 0 {
+			args = append(args, c.expr(kids[0]))
+		}
+		return nir.Call{Callee: nir.Name{ID: "include", Loc: L}, Args: args, Path: "include", Method: "include", Loc: L}
 	}
 	var parts []nir.Expr
 	for _, ch := range c.namedChildren(n) {
@@ -2020,7 +2100,15 @@ func (c *phConv) dotted(n *tree_sitter.Node) string {
 	case "member_call_expression":
 		return c.dotted(field(n, "object")) + "." + c.text(field(n, "name"))
 	case "scoped_call_expression":
-		return c.text(field(n, "scope")) + "." + c.text(field(n, "name"))
+		// `self::`/`static::` name the enclosing class, same as `$this` already does for
+		// instance calls — substitute it so `self::foo()` resolves to `<Class>.foo` instead of
+		// the unresolvable literal path "self.foo". `parent::` is left as-is: the superclass is
+		// a genuinely different, unresolved target, not a wrong extraction of this one.
+		scope := c.text(field(n, "scope"))
+		if (scope == "self" || scope == "static") && c.className != "" {
+			scope = c.className
+		}
+		return scope + "." + c.text(field(n, "name"))
 	case "function_call_expression":
 		return c.dotted(field(n, "function"))
 	case "subscript_expression":

@@ -23,6 +23,7 @@ var manifestParsers = []struct {
 	{".npmrc", "npm", ParseNpmrc},
 	{"composer.lock", "php", ParseComposerLock},
 	{"go.mod", "go", ParseGoMod},
+	{"pom.xml", "maven", ParsePomXML},
 	{"cargo.lock", "git", ParseCargoLockGit},
 }
 

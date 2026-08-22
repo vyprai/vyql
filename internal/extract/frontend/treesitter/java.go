@@ -687,6 +687,13 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node, params []str
 	if name != "" {
 		add("function_name:" + name)
 	}
+	// The declared return type is the sibling fact of a parameter's declared
+	// type on the same declaration node, and answers the same question from
+	// the other end: what a caller receives. A constructor has no `type`
+	// field and yields nothing.
+	if rt := paramTypeFromField(c, n); rt != "" {
+		add("return_type:" + rt)
+	}
 	text := c.text(n)
 	add(text)
 	add(javaCompactText(text))

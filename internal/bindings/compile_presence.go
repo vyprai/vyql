@@ -391,6 +391,8 @@ func v2PresenceValuePrefix(field string) string {
 		return "lang="
 	case "name":
 		return "name="
+	case "abi":
+		return "abi="
 	case "callPath":
 		return "call_path:"
 	case "call":
@@ -469,6 +471,8 @@ func v2PresenceValuePrefix(field string) string {
 		return "slice:"
 	case "field":
 		return "field:"
+	case "fieldTag":
+		return "field_tag:"
 	case "macroName":
 		return "macro_name:"
 	case "macroBody":
@@ -541,6 +545,8 @@ func v2PresenceValuePrefix(field string) string {
 		return "return_call_path:"
 	case "returnIdentifier":
 		return "return_identifier:"
+	case "returnType":
+		return "return_type:"
 	case "metadataExportAfterSensitiveKey":
 		return "metadata_export_after_sensitive_key:"
 	case "metadataExportAfterSensitiveSource":

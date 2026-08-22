@@ -216,6 +216,22 @@ func CtorTypesFor(tech string) map[string]string {
 	return out
 }
 
+// sourceReceiverType is the receiver type a receiver-constrained SOURCE matches
+// against. It accepts lowering's recv_may_type -- the constructor type carried by a
+// control-flow merge whose every operand is that same constructor -- as well as the
+// exact recv_type, because a source needs a KNOWN receiver type to be labelled at
+// all: reading a may-type here can only add a source that a merged receiver would
+// otherwise lose. Sinks deliberately do not read it. There a known type is what
+// WITHHOLDS the label (an unknown one keeps the sink at syntactic fidelity), and
+// "built by this constructor on every path this merge joins" is not the
+// authoritative disproof that withholding a sink requires.
+func sourceReceiverType(n usg.Node) string {
+	if t := n.Prop("recv_type"); t != "" {
+		return t
+	}
+	return n.Prop("recv_may_type")
+}
+
 func (spec bindingSpec) sourceApplicator() Applicator {
 	fidelity := "resolved"
 	if spec.containsMatch {
@@ -275,7 +291,7 @@ func (spec bindingSpec) sourceApplicator() Applicator {
 						(in.NodeType != "" && len(in.Paths) == 0 && len(in.Methods) == 0)
 					if in.Receiver {
 						matched = method != "" && containsStr(in.Methods, method) &&
-							constraintAllows(in.Constraint, n.Prop("recv_type"))
+							constraintAllows(in.Constraint, sourceReceiverType(n))
 					}
 					if matched {
 						if !callArgCountMatches(n, in.ArgCountSet, in.ArgCountMin, in.ArgCountMax) {

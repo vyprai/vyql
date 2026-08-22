@@ -746,7 +746,13 @@ func (c *csConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		left := field(inner, "left")
 		right := c.expr(field(inner, "right"))
 		if left != nil && left.Kind() == "identifier" {
-			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
+			target := c.text(left)
+			// a compound assignment (x += y) also reads the target; a plain
+			// Assign models only the write and drops the target's prior taint.
+			if csCompoundAssignOp(c.csOp(inner)) {
+				return []nir.Stmt{nir.AugAssign{Target: target, Value: right, Loc: c.loc(inner)}}
+			}
+			return []nir.Stmt{nir.Assign{Targets: []string{target}, Value: right}}
 		}
 		// member/element property write `obj.prop = x`: model as a path call
 		// (Method="") so the assigned value flows into a write node that path
@@ -758,6 +764,17 @@ func (c *csConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+// csCompoundAssignOp reports whether op is a compound assignment operator
+// (x += y and friends). The grammar folds these into assignment_expression,
+// so the operator token is the only discriminator.
+func csCompoundAssignOp(op string) bool {
+	switch op {
+	case "+=", "-=", "*=", "/=":
+		return true
+	}
+	return false
 }
 
 // csBranch flattens one if-branch body: a `{}` block, a brace-less single statement, or a

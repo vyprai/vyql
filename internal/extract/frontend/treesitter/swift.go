@@ -251,6 +251,14 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		out := []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 		return append(out, c.trailingLambdaStmts(n)...)
+	case "try_expression", "await_expression":
+		// `try f(x)` as a whole statement lowers the operand exactly as the
+		// same statement spelled without `try`: expr() already sees through
+		// the wrapper (Thru) in value position, and a try in statement
+		// position is the ordinary throwing-call idiom, not a value producer.
+		if k := c.namedChildren(n); len(k) > 0 {
+			return c.stmt(k[len(k)-1])
+		}
 	case "control_transfer_statement":
 		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() != "throw_keyword" {
@@ -263,6 +271,35 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// Swift if: condition(s) then a body block, optionally `else` + block/if. Split the
 		// first body from the else so the join-merge keeps the live branch and a constant
 		// condition prunes.
+		//
+		// `if case Pattern = subject { ... }` (and its guard spelling) is a pattern
+		// match rather than a boolean condition: the pattern's let-bound
+		// identifiers receive the subject, which is what the body reads. The
+		// binding runs first in the taken branch, whole-subject per identifier —
+		// the sound direction, matching the switch lowering.
+		if subject, vars, ok := c.swCaseMatch(n); ok && len(vars) > 0 {
+			var then, els []nir.Stmt
+			seenBody := false
+			for _, ch := range c.namedChildren(n) {
+				switch ch.Kind() {
+				case "statements":
+					if !seenBody {
+						then = c.decls(ch)
+						seenBody = true
+					} else {
+						els = c.decls(ch)
+					}
+				case "else":
+					els = c.collectBlocks(ch)
+				case "if_statement":
+					els = c.stmt(ch) // else-if
+				}
+			}
+			for _, v := range vars {
+				then = append([]nir.Stmt{nir.Assign{Targets: []string{v}, Value: subject, Loc: L}}, then...)
+			}
+			return []nir.Stmt{nir.If{Then: then, Else: els}}
+		}
 		var cond nir.Expr
 		var then, els []nir.Stmt
 		seenBody := false
@@ -286,7 +323,28 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 		}
 		return []nir.Stmt{nir.If{Cond: cond, Then: then, Else: els}}
-	case "for_statement", "while_statement", "repeat_while_statement":
+	case "for_statement":
+		// `for x in seq { ... }` binds the loop variable to the iterated
+		// sequence. The NIR loop already carries that relation (Iter/Vars,
+		// the same fields the JavaScript for-in lowering fills), so a tainted
+		// sequence reaches the loop variable's reads instead of stopping at
+		// the loop head. The `for`/`in` keywords and the braces are unnamed
+		// children, which leaves the pattern, the sequence expression and the
+		// body statements as the named ones.
+		loop := nir.Loop{Body: c.collectBlocks(n), Loc: L}
+		for _, ch := range c.namedChildren(n) {
+			switch ch.Kind() {
+			case "pattern":
+				loop.Vars = c.swPatternBindings(ch)
+			case "statements", "else":
+			default:
+				if loop.Iter == nil {
+					loop.Iter = c.expr(ch)
+				}
+			}
+		}
+		return []nir.Stmt{loop}
+	case "while_statement", "repeat_while_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "do_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
@@ -350,6 +408,16 @@ func (c *swConv) swSwitch(n *tree_sitter.Node) nir.Stmt {
 					lbl = k[0]
 				}
 				labs = append(labs, c.expr(lbl))
+				// `case .install(let args):` binds args to the matched subject's
+				// associated value; the binding is the arm's reads of it. Whole-
+				// subject per identifier is the sound direction (the engine's
+				// element-of handling is no finer).
+				if sw.Subject != nil {
+					for _, v := range c.swLetBindings(e) {
+						bind := []nir.Stmt{nir.Assign{Targets: []string{v}, Value: sw.Subject, Loc: c.loc(e)}}
+						stmts = append(bind, stmts...)
+					}
+				}
 			case "statements":
 				stmts = append(stmts, c.decls(e)...)
 			}
@@ -628,6 +696,14 @@ func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 				}
 			}
 		}
+		if c.swIsSubscript(n) && len(args) > 0 && callee != nil {
+			// `base[key]` parses as a call whose argument list opens with `[`
+			// rather than `(` (the optional-chained `base?[key]` spelling
+			// included). It is an index read of the callee, not a call, so it
+			// lowers to the same construct `subscript_expression` uses and the
+			// base's taint reaches the read.
+			return nir.Index{Base: c.expr(callee), Key: args[0], Path: c.dotted(callee), Loc: L}
+		}
 		return nir.Call{Callee: c.expr(callee), Args: args, Path: path, Method: method, Loc: L}
 	case "additive_expression":
 		l, r := c.expr(field(n, "lhs")), c.expr(field(n, "rhs"))
@@ -692,6 +768,112 @@ func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 		return parts[0]
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+// swPatternBindings collects the identifiers a pattern binds, skipping the
+// wildcard `_`: a for-in pattern is a plain name (`for url in`) or a tuple of
+// them (`for (i, url) in`).
+func (c *swConv) swPatternBindings(n *tree_sitter.Node) []string {
+	if n == nil {
+		return nil
+	}
+	var out []string
+	var walk func(m *tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		if m.Kind() == "simple_identifier" {
+			if id := c.text(m); id != "" && id != "_" {
+				out = append(out, id)
+			}
+			return
+		}
+		for _, ch := range c.namedChildren(m) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return out
+}
+
+// swLetBindings collects the identifiers a case pattern let-binds
+// (`.install(let args)` -> args). Only value-binding patterns count: the bare
+// identifiers of an enum-case pattern name the case, not a binding. A
+// value_binding_pattern wraps only the `let`/`var` keyword — the bound name is
+// its following sibling.
+func (c *swConv) swLetBindings(n *tree_sitter.Node) []string {
+	if n == nil {
+		return nil
+	}
+	var out []string
+	kids := c.namedChildren(n)
+	for i, ch := range kids {
+		if ch.Kind() == "value_binding_pattern" {
+			if i+1 < len(kids) && kids[i+1].Kind() == "simple_identifier" {
+				if id := c.text(kids[i+1]); id != "" && id != "_" {
+					out = append(out, id)
+				}
+			}
+			continue
+		}
+		out = append(out, c.swLetBindings(ch)...)
+	}
+	return out
+}
+
+// swCaseMatch recognises `case <pattern> = <expr>` — the pattern-match form of
+// if and guard — and returns the subject expression with the identifiers the
+// pattern let-binds. The `case` and `=` are unnamed children; named children
+// before the `=` build the pattern, the last one after it is the subject.
+func (c *swConv) swCaseMatch(n *tree_sitter.Node) (nir.Expr, []string, bool) {
+	isCase, eqEnd := false, uint(0)
+	for i := uint(0); i < n.ChildCount(); i++ {
+		switch n.Child(i).Kind() {
+		case "case":
+			isCase = true
+		case "=":
+			eqEnd = n.Child(i).EndByte()
+		}
+	}
+	if !isCase || eqEnd == 0 {
+		return nil, nil, false
+	}
+	var vars []string
+	var subject *tree_sitter.Node
+	for _, ch := range c.namedChildren(n) {
+		switch ch.Kind() {
+		case "statements", "else", "if_statement":
+		default:
+			if ch.EndByte() <= eqEnd {
+				vars = append(vars, c.swLetBindings(ch)...)
+			} else {
+				subject = ch
+			}
+		}
+	}
+	if subject == nil {
+		return nil, nil, false
+	}
+	return c.expr(subject), vars, true
+}
+
+// swIsSubscript reports whether n is a subscript access `base[key]`: Swift's
+// grammar parses it as a call_expression whose value_arguments open with `[`
+// rather than `(`, and an empty argument list is a call, not an index.
+func (c *swConv) swIsSubscript(n *tree_sitter.Node) bool {
+	for _, ch := range c.namedChildren(n) {
+		if ch.Kind() != "call_suffix" {
+			continue
+		}
+		for _, va := range c.namedChildren(ch) {
+			if va.Kind() != "value_arguments" {
+				continue
+			}
+			if va.ChildCount() == 0 {
+				return false
+			}
+			return va.Child(0).Kind() == "["
+		}
+	}
+	return false
 }
 
 // swCallee returns the function part of a call expression: its first named child,

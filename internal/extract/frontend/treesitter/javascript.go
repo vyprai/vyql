@@ -1488,7 +1488,13 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		paramTypes := c.funcParamTypes(n)
 		body := c.funcBody(n)
 		decorators := c.jsDecoratorTokens(n)
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.jsFunctionContext(name, n), Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: exported}}
+		out := []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.jsFunctionContext(name, n), Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: exported}}
+		// A factory function returns its API as an object literal of shorthand
+		// methods, e.g. `function Email(opts){ return { async send(p){…} } }`.
+		// c.expr's object case lowers only pairs, so those method bodies are dead
+		// code unless the same walk the object-valued declaration paths already use
+		// runs here too.
+		return append(out, c.returnedObjectMethodFuncDefs(n, exported)...)
 	case "class_declaration", "abstract_class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
 	case "field_definition", "public_field_definition":
@@ -1548,6 +1554,9 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					out = append(out, nir.Assign{Targets: []string{c.text(name)}, Value: v, Decl: true})
 					if val != nil && val.Kind() == "object" {
 						out = append(out, c.objectMethodFuncDefs(val, false)...)
+					}
+					if val != nil && val.Kind() == "call_expression" {
+						out = append(out, c.callArgObjectMethodFuncDefs(val)...)
 					}
 					if val != nil {
 						out = append(out, c.classExpressionFuncDefs(val)...)
@@ -2052,6 +2061,28 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+// jsCallArgNodes lists a call's argument expressions. tree-sitter treats a comment
+// as a named child of the argument list, so `import(/* @vite-ignore */ path)` and
+// `exec(/* nosemgrep */ cmd)` would otherwise shift every argument one place to the
+// right and a binding emitting at args[0] would label the comment instead of the
+// value. Inline argument annotations are ordinary in bundler and linter directives,
+// so the shift silently deletes the sink.
+func (c *jsConv) jsCallArgNodes(call *tree_sitter.Node) []*tree_sitter.Node {
+	args := field(call, "arguments")
+	if args == nil {
+		return nil
+	}
+	kids := c.namedChildren(args)
+	out := make([]*tree_sitter.Node, 0, len(kids))
+	for _, a := range kids {
+		if a == nil || a.Kind() == "comment" {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
 }
 
 func (c *jsConv) iife(call *tree_sitter.Node, L string) []nir.Stmt {
@@ -2766,10 +2797,8 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 			path = "import"
 		}
 		var arglist []nir.Expr
-		if args := field(n, "arguments"); args != nil {
-			for _, a := range c.namedChildren(args) {
-				arglist = append(arglist, c.expr(a))
-			}
+		for _, a := range c.jsCallArgNodes(n) {
+			arglist = append(arglist, c.expr(a))
 		}
 		for i, a := range arglist {
 			if lam, ok := a.(nir.Lambda); ok {
@@ -2796,10 +2825,8 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		ctor := field(n, "constructor")
 		path := c.dotted(ctor)
 		var arglist []nir.Expr
-		if args := field(n, "arguments"); args != nil {
-			for _, a := range c.namedChildren(args) {
-				arglist = append(arglist, c.expr(a))
-			}
+		for _, a := range c.jsCallArgNodes(n) {
+			arglist = append(arglist, c.expr(a))
 		}
 		method := path
 		if i := strings.LastIndex(path, "."); i >= 0 {
@@ -2810,6 +2837,15 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		name := c.jsxAttributeName(n)
 		if name == "dangerouslySetInnerHTML" {
 			arg := c.jsxDangerouslySetInnerHTMLArg(c.jsxAttributeValue(n))
+			return nir.Call{Callee: nir.Name{ID: name, Loc: L}, Args: []nir.Expr{arg}, Path: name, Method: name, Loc: L}
+		}
+		if jsJsxRawMarkupAttribute[name] {
+			// innerHTML/outerHTML parse the value as markup rather than
+			// setting text, so the attribute is the same DOM property write
+			// the imperative `el.innerHTML = v` form is; React's
+			// dangerouslySetInnerHTML above is the same write in its own
+			// spelling.
+			arg := c.jsxExpressionArg(c.jsxAttributeValue(n))
 			return nir.Call{Callee: nir.Name{ID: name, Loc: L}, Args: []nir.Expr{arg}, Path: name, Method: name, Loc: L}
 		}
 		if val := c.jsxAttributeValue(n); val != nil {
@@ -2943,6 +2979,23 @@ func (c *jsConv) jsxDangerouslySetInnerHTMLArg(n *tree_sitter.Node) nir.Expr {
 		}
 	}
 	return c.expr(n)
+}
+
+// jsxExpressionArg lowers a JSX attribute value to the expression it carries,
+// unwrapping the `{ ... }` container so the value's own nodes survive.
+func (c *jsConv) jsxExpressionArg(n *tree_sitter.Node) nir.Expr {
+	n = c.unwrapJSXExpression(n)
+	if n == nil {
+		return nir.Const{Loc: "?:0"}
+	}
+	return c.expr(n)
+}
+
+// jsJsxRawMarkupAttribute lists the DOM properties a JSX attribute can set
+// whose value is parsed as markup rather than treated as text.
+var jsJsxRawMarkupAttribute = map[string]bool{
+	"innerHTML": true,
+	"outerHTML": true,
 }
 
 func (c *jsConv) unwrapJSXExpression(n *tree_sitter.Node) *tree_sitter.Node {

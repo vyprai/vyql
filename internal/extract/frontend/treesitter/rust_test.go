@@ -444,3 +444,57 @@ func countRustAnalysisNodes(nodes []usg.Node, path string) int {
 	}
 	return count
 }
+
+func TestRustFunctionContextRecordsExternAbi(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "lib.rs")
+	src := []byte(`
+extern "C"
+fn c_proxy(userdata: *mut u8) {
+    let callback = get(userdata);
+    callback(1);
+}
+
+extern
+fn default_abi(x: i32) {
+    work(x);
+}
+
+extern "C-unwind"
+fn unwinding(x: i32) {
+    work(x);
+}
+
+fn plain(x: i32) {
+    work(x);
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := ExtractRust([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]string{
+		"c_proxy":     "abi=C",
+		"default_abi": "abi=C",
+		"unwinding":   "abi=C-unwind",
+	} {
+		got := rustFunctionContextArgs(nodes, name)
+		if !strings.Contains(got, want) {
+			t.Fatalf("extern function %s context missing %q; context=%q", name, want, got)
+		}
+	}
+	if got := rustFunctionContextArgs(nodes, "plain"); strings.Contains(got, "abi=") {
+		t.Fatalf("plain function context carries an abi token; context=%q", got)
+	}
+}
