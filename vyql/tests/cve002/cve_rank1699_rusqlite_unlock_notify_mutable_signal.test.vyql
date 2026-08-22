@@ -1,0 +1,163 @@
+# rusqlite's unlock-notify path signals a shared UnlockNotification from an
+# FFI callback (src/unlock_notify.rs). Two defects sit in the signal path, both
+# fixed by the same commit:
+#
+# 1. The callback materialises a `&mut UnlockNotification` out of the raw
+#    `*mut c_void` array SQLite hands it (`&mut *(*arg as *mut UnlockNotification)`)
+#    while the waiting thread holds `&mut self` inside `wait`. Two live `&mut`
+#    to one object is an aliasing violation: the memory safety the advisory
+#    reports. SQLite registers caller-supplied pointers with no exclusivity
+#    guarantee, and interior mutability (the Mutex field) is the only sound way
+#    to reach shared state from a callback. The patched callback keeps the
+#    pointer arithmetic but reads `&UnlockNotification` only.
+#
+# 2. `fired` writes the predicate through the mutex-guard temporary
+#    (`*self.mutex.lock().unwrap() = true;`), which drops the guard at the end
+#    of the statement, then calls `self.cond.notify_one()` with the mutex
+#    unlocked. A waiter that checks the flag between the store and the notify
+#    then blocks forever: the notify is not ordered against the check-then-wait
+#    the mutex would otherwise make atomic. The patched form binds the guard to
+#    a variable so it is still held across the notify.
+#
+# The first half is the FFI-instance of the existing unsafe-mutable-alias
+# review point (VYQL-MEM-009): a foreign-ABI function body creating a `&mut`
+# by casting and dereferencing a raw pointer has no exclusivity provenance.
+# The second half is a language-neutral lost-wakeup shape (pthread_cond_signal,
+# sync.Cond.Signal, Condvar::notify_one all share it): notify with no live
+# mutex guard.
+
+test "rusqlite: FFI callback materialises &mut from the raw pointer it receives"
+  lang rust
+  file unlock_notify_cb.rs
+  expect VYQL-MEM-009
+  expect_review code.UnsafeMutableAlias
+  code
+  ```
+  use std::os::raw::{c_int, c_void};
+  use std::panic::catch_unwind;
+  use std::slice::from_raw_parts;
+  use std::sync::{Condvar, Mutex};
+
+  struct UnlockNotification {
+      cond: Condvar,
+      mutex: Mutex<bool>,
+  }
+
+  impl UnlockNotification {
+      fn fired(&mut self) {
+          *self.mutex.lock().unwrap() = true;
+          self.cond.notify_one();
+      }
+  }
+
+  unsafe extern "C" fn unlock_notify_cb(ap_arg: *mut *mut c_void, n_arg: c_int) {
+      let args = from_raw_parts(ap_arg, n_arg as usize);
+      for arg in args {
+          let _ = catch_unwind(|| {
+              let un: &mut UnlockNotification = &mut *(*arg as *mut UnlockNotification);
+              un.fired()
+          });
+      }
+  }
+  ```
+
+test "rusqlite: patched callback reaches the shared object through & only"
+  lang rust
+  file unlock_notify_cb.rs
+  reject VYQL-MEM-009
+  code
+  ```
+  use std::os::raw::{c_int, c_void};
+  use std::panic::{catch_unwind, AssertUnwindSafe};
+  use std::slice::from_raw_parts;
+  use std::sync::{Condvar, Mutex};
+
+  struct UnlockNotification {
+      cond: Condvar,
+      mutex: Mutex<bool>,
+  }
+
+  impl UnlockNotification {
+      fn fired(&self) {
+          let mut flag = self.mutex.lock().unwrap();
+          *flag = true;
+          self.cond.notify_one();
+      }
+  }
+
+  unsafe extern "C" fn unlock_notify_cb(ap_arg: *mut *mut c_void, n_arg: c_int) {
+      let args = from_raw_parts(ap_arg as *const &UnlockNotification, n_arg as usize);
+      for un in args {
+          let _ = catch_unwind(AssertUnwindSafe(|| un.fired()));
+      }
+  }
+  ```
+
+test "rusqlite: signaler drops the guard temporary before notifying"
+  lang rust
+  file fired.rs
+  expect VYQL-RACE-009
+  expect_review code.CondvarNotifyWithoutGuard
+  code
+  ```
+  use std::sync::{Condvar, Mutex};
+
+  struct UnlockNotification {
+      cond: Condvar,
+      mutex: Mutex<bool>,
+  }
+
+  impl UnlockNotification {
+      fn fired(&mut self) {
+          *self.mutex.lock().unwrap() = true;
+          self.cond.notify_one();
+      }
+
+      fn wait(&mut self) {
+          let mut fired = self.mutex.lock().unwrap();
+          while !*fired {
+              fired = self.cond.wait(fired).unwrap();
+          }
+      }
+  }
+  ```
+
+test "rusqlite: signaler holds the guard across the notify"
+  lang rust
+  file fired.rs
+  reject VYQL-RACE-009
+  code
+  ```
+  use std::sync::{Condvar, Mutex};
+
+  struct UnlockNotification {
+      cond: Condvar,
+      mutex: Mutex<bool>,
+  }
+
+  impl UnlockNotification {
+      fn fired(&self) {
+          let mut flag = self.mutex.lock().unwrap();
+          *flag = true;
+          self.cond.notify_one();
+      }
+
+      fn wait(&self) {
+          let mut fired = self.mutex.lock().unwrap();
+          while !*fired {
+              fired = self.cond.wait(fired).unwrap();
+          }
+      }
+  }
+  ```
+
+test "rusqlite: a single-cast &mut deref outside a foreign ABI stays clean"
+  lang rust
+  file round_trip.rs
+  reject VYQL-MEM-009
+  code
+  ```
+  fn push(buffer: &mut [u8]) {
+      let _buf: &mut [u8] = unsafe { &mut *(buffer.as_mut_ptr() as *mut [u8]) };
+  }
+  ```

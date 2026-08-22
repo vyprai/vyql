@@ -1,0 +1,123 @@
+# Rank 1604 / CVE-2022-23647: PrismJS's command-line plugin
+# interpolated the data-output attribute's lines into its highlighted
+# markup without encoding, so a page whose data-output carried markup
+# executed it when the highlighted block rendered (DOM cross-site
+# scripting, CWE-79; PR #3341). The rebuild loop in
+# plugins/command-line/prism-command-line.js did `codeLines[i] =
+# '<span class="token output">' + outputLines[i] + '</span>'` --
+# every other line flows through Prism's highlight pipeline which
+# escapes markup, but the output lines spliced in from the attribute
+# missed that encoding (a comment in the fixed revision: "outputLines removed
+# from codeLines so missed out on escaping of markup so do it
+# here"). The fixing commit e002e78c34 (
+# "Command Line: Escape markup in command line output (#3341)"):
+# `Prism.util.encode(outputLines[i])` encodes the splice. No pool
+# correction.
+#
+# ATTENTION, escaped-vs-raw branches. The pipeline escapes its main
+# path -- one splice bypasses the encoding -- the same
+# present-but-incomplete family as ranks 1551 (first-quote-only
+# replace) and 1564 (unquoted bind types): nothing can ask "does
+# every interpolation into rendered markup pass the encoder" --
+# branch-completeness over an escape helper. Prism.util.encode is
+# PrismJS's own utility, so a binding on it detects this library
+# rather than the weakness. Measured on the real code: scanning
+# prism-command-line.js reports zero findings at both revisions (the
+# DOM sink assignment sits in a different function than the splice;
+# no taint path forms across them). No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1604 records the raw
+# splice and the encoded form, both asserting reject VYQL-INJ-004:
+# when branch-escape vocabulary lands, the raw splice must flip to
+# expect.
+
+test "rank1604: the output lines splice into markup unescaped"
+  lang javascript
+  file plugins/command-line/prism-command-line.js
+  reject VYQL-INJ-004
+  code
+  ```
+  (function () {
+      if (typeof Prism === 'undefined') {
+          return;
+      }
+
+      var PrismUtilities = Prism.util;
+
+      Prism.hooks.add('before-insert', function (env) {
+          var pre = env.element.parentNode;
+          var getAttribute = function (name) {
+              return pre.getAttribute('data-' + name);
+          };
+
+          var outputLines = getAttribute('output');
+          if (outputLines) {
+              outputLines = outputLines.split(/\n/);
+          } else {
+              outputLines = [];
+          }
+
+          var codeLines = env.code.split(/\n/);
+
+          var newValue = '';
+          for (var i = 0, l = codeLines.length; i < l; i++) {
+              if (outputLines.hasOwnProperty(i)) {
+                  codeLines[i] = '<span class="token output">'
+                      + outputLines[i] + '</span>';
+              } else {
+                  codeLines[i] = '<span class="token command">'
+                      + codeLines[i] + '</span>';
+              }
+              newValue += codeLines[i] + '\n';
+          }
+
+          env.highlightedCode = newValue;
+      });
+  }());
+  ```
+
+test "rank1604: the fixed revision encodes the spliced output"
+  lang javascript
+  file plugins/command-line/prism-command-line.js
+  reject VYQL-INJ-004
+  code
+  ```
+  (function () {
+      if (typeof Prism === 'undefined') {
+          return;
+      }
+
+      var PrismUtilities = Prism.util;
+
+      Prism.hooks.add('before-insert', function (env) {
+          var pre = env.element.parentNode;
+          var getAttribute = function (name) {
+              return pre.getAttribute('data-' + name);
+          };
+
+          var outputLines = getAttribute('output');
+          if (outputLines) {
+              outputLines = outputLines.split(/\n/);
+          } else {
+              outputLines = [];
+          }
+
+          var codeLines = env.code.split(/\n/);
+
+          var newValue = '';
+          for (var i = 0, l = codeLines.length; i < l; i++) {
+              if (outputLines.hasOwnProperty(i)) {
+                  // outputLines were removed from codeLines so missed out on escaping
+                  // of markup so do it here.
+                  codeLines[i] = '<span class="token output">'
+                      + Prism.util.encode(outputLines[i]) + '</span>';
+              } else {
+                  codeLines[i] = '<span class="token command">'
+                      + codeLines[i] + '</span>';
+              }
+              newValue += codeLines[i] + '\n';
+          }
+
+          env.highlightedCode = newValue;
+      });
+  }());
+  ```

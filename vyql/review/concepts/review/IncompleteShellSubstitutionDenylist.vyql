@@ -1,0 +1,7 @@
+module code;
+
+review code.IncompleteShellSubstitutionDenylist {
+  category: command
+  kind: attention
+  text: "review shell command screening regexes for missing zsh eval glob qualifiers, such as *(e:cmd:), when command and process substitution forms are already matched"
+}

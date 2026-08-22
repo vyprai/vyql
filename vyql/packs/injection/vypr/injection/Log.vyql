@@ -7,4 +7,5 @@ rule Log {
     severity: medium
   }
   taint core.UserControlledData -> code.LogOutput
+  unless path coveredBy core.LogEscape
 }

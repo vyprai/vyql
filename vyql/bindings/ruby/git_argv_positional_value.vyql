@@ -1,0 +1,36 @@
+module bindings.ruby.gitargvpositionalvalue;
+
+// A git wrapper's argument vector is an option vector first: git parses every
+// element that begins with `-` as an option until the end-of-options separator
+// `--` ends the option section. Ruby wrappers that shell out to git build the
+// vector as an array and quote each element when they interpolate the command
+// string, and quoting protects the shell but not git's own option parser --
+// a value spelled `--upload-pack=...` is one shell-safe token that git reads
+// as an option, and several git subcommands (fetch, push, clone, ls-remote)
+// execute the program a `--upload-pack`/`--receive-pack` option names.
+//
+// ruby-git wraps every git subcommand the same way: `Git::Lib` methods build
+// `arr_opts` and hand it to the private runner `command(subcommand, arr_opts)`,
+// which escapes each element with single quotes and runs the joined string.
+// The public API spells the caller-supplied positional values `remote`
+// (Git::Base#fetch/push/pull), `branch` and `treeish`, and a vector whose
+// array literal is initialized *from* one of them has that value at index 0 --
+// ahead of every flag the method adds later, so nothing can end option
+// parsing before the value. The remediated spelling initializes the vector
+// empty (or from a flag literal), appends `--`, and only then the positional
+// value, so no assignment initializes an array directly from the positional
+// name.
+//
+// The `assign:` conjunct carries the discrimination: it reads the node's own
+// structured tokens, which are function-confined. The `call:` conjunct only
+// witnesses that a command runner exists -- in the Ruby frontend a `call:`
+// predicate is satisfied file-wide, so it is file-level evidence and the
+// function-local shape stays the discriminator.
+
+binding gitArgvPositionalValueLeadsVector {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "ruby"
+    and containsAny(node.context.assign, ["=[remote]", "=[branch]", "=[treeish]"])
+    and node.context.call in ["command"]
+  emit issue code.CommandOptionInjection at node
+}

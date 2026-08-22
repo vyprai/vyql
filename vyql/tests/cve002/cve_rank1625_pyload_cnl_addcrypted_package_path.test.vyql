@@ -1,0 +1,70 @@
+# pyload's Click'n'Load endpoint takes the package name from the request form
+# and joins it onto the storage folder after stripping only the separator and
+# drive-colon characters, then opens the result for writing. A name that
+# canonicalises outside the folder after the join -- platform separator forms
+# the strip chain does not remove -- writes the submitted container to an
+# arbitrary path (CWE-22). The fixed revision keeps the strip chain but normalises the
+# joined path and rejects the request unless the absolute path stays under the
+# absolute storage folder followed by a separator.
+#
+# VYQL-PATH-001 covers the vulnerable form: flask.request.form.get is
+# code.HttpInput, the .replace() strip chain propagates taint through
+# os.path.join into the open() call as code.FilePathAccess, and neither
+# core.PathCanonicalization nor core.PathAccessCheck is satisfied. On the
+# patched form the normpath and abspath/startswith containment check are
+# recognised and the finding is gone.
+
+test "pyload: flash addcrypted joins the form package name onto the storage folder"
+  lang python
+  file pyload/webui/app/blueprints/cnl_blueprint.py
+  expect VYQL-PATH-001
+  code
+  ```
+  import os
+
+  import flask
+
+
+  def addcrypted():
+      api = flask.current_app.config["PYLOAD_API"]
+
+      package = flask.request.form.get(
+          "package", flask.request.form.get("source", flask.request.form.get("referer"))
+      )
+      dl_path = api.get_config_value("general", "storage_folder")
+      dlc_path = os.path.join(
+          dl_path, package.replace("/", "").replace("\\", "").replace(":", "") + ".dlc"
+      )
+      dlc = flask.request.form["crypted"].replace(" ", "+")
+      with open(dlc_path, mode="wb") as fp:
+          fp.write(dlc)
+  ```
+
+test "pyload: fix normalises the joined path and confines it to the storage folder"
+  lang python
+  file pyload/webui/app/blueprints/cnl_blueprint.py
+  reject VYQL-PATH-001
+  code
+  ```
+  import os
+
+  import flask
+
+
+  def addcrypted():
+      api = flask.current_app.config["PYLOAD_API"]
+
+      package = flask.request.form.get(
+          "package", flask.request.form.get("source", flask.request.form.get("referer"))
+      )
+      dl_path = api.get_config_value("general", "storage_folder")
+      dlc_filename = package.replace("/", "").replace("\\", "").replace(":", "") + ".dlc"
+      dlc_path = os.path.join(dl_path, dlc_filename)
+      dlc_path = os.path.normpath(dlc_path)
+      # Ensure dlc_path is within dl_path
+      if not os.path.abspath(dlc_path).startswith(os.path.abspath(dl_path) + os.sep):
+          return "failed: invalid package name\r\n", 400
+      dlc = flask.request.form["crypted"].replace(" ", "+")
+      with open(dlc_path, mode="wb") as fp:
+          fp.write(dlc)
+  ```

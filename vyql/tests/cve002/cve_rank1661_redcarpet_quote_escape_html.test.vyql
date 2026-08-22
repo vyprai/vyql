@@ -1,0 +1,158 @@
+# Rank 1661 / CVE-2020-26298: redcarpet's HTML renderer emitted the quoted
+# span of the :quote extension raw, ignoring the :escape_html option. The
+# extension's parser, char_quote in ext/redcarpet/markdown.c, hands the
+# renderer callback a struct buf over the raw document bytes (data +
+# f_begin to f_end) with no intervening parse_inline, so the span never
+# reaches rndr_normal_text -- the only callback that consults HTML_ESCAPE
+# when escaping literal text. rndr_quote in ext/redcarpet/html.c then
+# writes it with bufput between <q> and </q>, so markup such as
+# "<svg/onload=pwned>" inside "..." reached the page unescaped even with
+# :escape_html enabled (cross-site scripting, CWE-79). The fixed revision reads the
+# render options and routes the span through escape_html when
+# HTML_ESCAPE is set. The gem is Ruby but the defect and its fix live in
+# the C extension; the remediation is present at a699c822 and absent at
+# its parent 6270d6b (v3.5.0). .
+#
+# ATTENTION, escaping-option vocabulary. The discriminating fact is not
+# in html.c: at the parent, 19 renderer callbacks write a content
+# parameter between tag literals with no escape in their own body
+# (rndr_quote, rndr_emphasis, rndr_double_emphasis, rndr_strikethrough,
+# rndr_underline, rndr_highlight, rndr_blockquote, rndr_header,
+# rndr_paragraph, rndr_list, rndr_listitem, rndr_table, rndr_tablerow,
+# rndr_tablecell, rndr_superscript, rndr_triple_emphasis, rndr_footnotes,
+# rndr_footnote_def, rndr_raw_block), and the fixed revision clears exactly one of
+# them; the other 18 receive content that parse_inline routes
+# through rndr_normal_text, or fully rendered child output, so they are
+# safe while sharing the shape. A shape-keyed emission (code.RawHtmlResponse,
+# VYQL-INJ-204) therefore scores 19 flags at the parent against 18 at the
+# fix -- inside the +/-2 run-to-run noise, with 18 false positives on the
+# CVE's own file; the same defect as rank 1343's regex finding, that the
+# discriminator is not in the pattern. The taint route needs a
+# user-controlled source in C: no C binding emits core.UserControlledData
+# (only generated package bindings do), the document enters the extension
+# from Ruby through StringValuePtr in rc_markdown.c with no documented C
+# API to bind, and marking renderer callback parameters user-controlled
+# generally is rank 1322's measured-unshippable shape (+88 findings for 1
+# true positive). The neutralising side is labelled (htmlEscape197
+# binds escape_html to core.HtmlEscape) and code.HtmlRender's C bindings
+# cover fputs and fwrite only; bufput is the project's own buffer append,
+# used for non-HTML output in markdown.c and buffer.c as well, so naming
+# it as an HTML sink fails the genericity test. Measured on the real
+# code: identical rule histograms (union over three --cache off runs) at
+# both revisions; the only VYQL-INJ-004 rows sit in test/test_helper.rb
+# at both; vyql match on the vulnerable html.c reports no source and no
+# HtmlRender sink. No ENGINE-GAPS.md entry: no construct is mishandled,
+# the source never starts. Spec cve_rank1661 records the raw quote
+# renderer, the option-honouring fix, and the emphasis sibling whose
+# content arrives pre-escaped, all three asserting reject VYQL-INJ-004:
+# when a user-input source reaches the renderer-callback path, the first
+# block must flip to expect while the sibling must keep rejecting.
+
+test "rank1661: the quote renderer emits its span raw regardless of the escape option"
+  lang c
+  file ext/redcarpet/html.c
+  reject VYQL-INJ-004
+  code
+  ```
+  #include <stdint.h>
+  #include <stddef.h>
+
+  struct buf {
+    uint8_t *data;
+    size_t size;
+  };
+
+  #define BUFPUTSL(output, literal) bufput(output, literal, sizeof(literal) - 1)
+
+  void bufput(struct buf *, const uint8_t *, size_t);
+
+  static int
+  rndr_quote(struct buf *ob, const struct buf *text, void *opaque)
+  {
+    if (!text || !text->size)
+      return 0;
+
+    BUFPUTSL(ob, "<q>");
+    bufput(ob, text->data, text->size);
+    BUFPUTSL(ob, "</q>");
+
+    return 1;
+  }
+  ```
+
+test "rank1661: the fixed revision escapes the span when the escape option is set"
+  lang c
+  file ext/redcarpet/html.c
+  reject VYQL-INJ-004
+  code
+  ```
+  #include <stdint.h>
+  #include <stddef.h>
+
+  struct buf {
+    uint8_t *data;
+    size_t size;
+  };
+
+  struct html_renderopt {
+    unsigned int flags;
+  };
+
+  #define HTML_ESCAPE (1 << 3)
+  #define BUFPUTSL(output, literal) bufput(output, literal, sizeof(literal) - 1)
+
+  void bufput(struct buf *, const uint8_t *, size_t);
+  void escape_html(struct buf *, const uint8_t *, size_t);
+
+  static int
+  rndr_quote(struct buf *ob, const struct buf *text, void *opaque)
+  {
+    if (!text || !text->size)
+      return 0;
+
+    struct html_renderopt *options = opaque;
+
+    BUFPUTSL(ob, "<q>");
+
+    if (options->flags & HTML_ESCAPE)
+      escape_html(ob, text->data, text->size);
+    else
+      bufput(ob, text->data, text->size);
+
+    BUFPUTSL(ob, "</q>");
+
+    return 1;
+  }
+  ```
+
+test "rank1661: an emphasis sibling with the same shape receives escaped content"
+  lang c
+  file ext/redcarpet/html.c
+  reject VYQL-INJ-004
+  code
+  ```
+  #include <stdint.h>
+  #include <stddef.h>
+
+  struct buf {
+    uint8_t *data;
+    size_t size;
+  };
+
+  #define BUFPUTSL(output, literal) bufput(output, literal, sizeof(literal) - 1)
+
+  void bufput(struct buf *, const uint8_t *, size_t);
+
+  static int
+  rndr_emphasis(struct buf *ob, const struct buf *text, void *opaque)
+  {
+    if (!text || !text->size)
+      return 0;
+
+    BUFPUTSL(ob, "<em>");
+    bufput(ob, text->data, text->size);
+    BUFPUTSL(ob, "</em>");
+
+    return 1;
+  }
+  ```

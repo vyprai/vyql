@@ -1,0 +1,50 @@
+module bindings.python.sqlalchemy_fingerprint_column_uniqueness;
+
+// A SQLAlchemy declarative model that stores a public-key fingerprint beside
+// the account that owns it is a credential-to-principal mapping: SSH tooling
+// identifies a key by its fingerprint rather than by its text, so whatever
+// resolves a presented key against that table lands on the row's user, and two
+// rows sharing one fingerprint put the same credential on two accounts. Whether
+// the fingerprint reaches an authorization decision is a property of the
+// application, not of the schema, so this emits a review concept rather than a
+// verdict.
+//
+// SQLAlchemy documents the boundary that keeps the mapping one-to-one, and
+// documents exactly where it is declared: the `unique=True` flag on the
+// `Column` itself, an `Index(..., unique=True)` over it, or a
+// `UniqueConstraint` naming it in `__table_args__`. A model that declares the
+// mapping without any of the three leaves the insert path free to register the
+// same fingerprint under a second account, and the `IntegrityError` a handler
+// raises for duplicates fires only for the constraints the schema actually
+// declared. The anchor is the fingerprint column itself -- `fingerprint` is the
+// term of art every key-management surface uses for the canonical identity of
+// a credential -- declared on a model module that also carries an owner column,
+// which is what makes the table a principal mapping rather than a cache.
+//
+// The neutraliser accepts any declaration that ties a uniqueness constraint to
+// the fingerprint, and is deliberately generous: a token ending in
+// `unique=True)` accepts the flag inline as the column's last argument whatever
+// its type, and the remaining needles name the fingerprint inside an `Index`
+// or a `UniqueConstraint` or ahead of an inline flag followed by more
+// arguments. The trailing-argument needle accepts that position on any column
+// of the module, not only the fingerprint, so a sibling column declared
+// `unique=True` last also satisfies it: a module that constrains something
+// else and leaves the fingerprint open is not reported. Generosity here costs
+// recall, not precision, which is the right trade for keeping every
+// boundary-declaring module quiet. All clauses read assignment tokens, which
+// the frontend derives from the AST, so a commented-out constraint does not
+// silence the flag. A module context carries at most 512 structured tokens, so
+// in a schema module declaring hundreds of columns a late fingerprint
+// declaration can fall past the cap and go unreported; that is the boundary of
+// this route, measured on a thousand-line schema module whose identical table
+// declared early in a sibling module is reported.
+binding sqlalchemyFingerprintColumnWithoutUniqueness {
+  query pattern presenceNode where node.scope == "module"
+    and node.context.language == "python"
+    and containsAny(node.context.assign, ["__tablename__="])
+    and containsAny(node.context.assign, ["fingerprint=Column("])
+    and containsAny(node.context.assign, ["userid=Column(", "user_id=Column(", "user=Column(", "owner=Column(", "owner_id=Column(", "account_id=Column("])
+    and not (node.context.assign endsWith "unique=True)")
+    and not containsAny(node.context.assign, ["fingerprint,unique=True", "'fingerprint',unique=True", "\"fingerprint\",unique=True", "'Fingerprint',unique=True", "\"Fingerprint\",unique=True", "UniqueConstraint('fingerprint'", "UniqueConstraint(\"fingerprint\"", "UniqueConstraint('Fingerprint'", "UniqueConstraint(\"Fingerprint\"", "'fingerprint',Text,unique=True", "\"fingerprint\",Text,unique=True", "'Fingerprint',Text,unique=True", "\"Fingerprint\",Text,unique=True"])
+  emit issue code.UserIdentityMappingReview at node
+}

@@ -1,0 +1,7 @@
+module code;
+
+review code.CondvarNotifyWithoutGuard {
+  category: concurrency
+  kind: attention
+  text: "review whether this condvar notify can race a waiter's check-then-wait; keep the mutex guard live across the predicate write and the notify"
+}

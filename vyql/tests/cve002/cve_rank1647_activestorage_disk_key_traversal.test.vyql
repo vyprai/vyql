@@ -1,0 +1,152 @@
+# Rank 1647 / CVE-2026-33195 (GHSA-9xrj-h377-fr87, CWE-22): Active Storage's
+# disk service resolved every filesystem operation through a key it never
+# validated.
+#
+# DiskService#path_for in activestorage/lib/active_storage/service/disk_service.rb
+# built its path as `File.join root, folder_for(key), key`, so a blob key
+# carrying `../` segments escaped the storage root: File.open, File.delete and
+# Dir.glob all consumed the joined path, reading, removing and listing files
+# the caller chose. Keys are application-supplied (the fixed revision documents custom
+# keys as trusted strings), so the service's public key parameter is the entry
+# point. The fixed revision (1a5e2f6a4) rejects dot segments and wraps the join in
+# File.expand_path with a root-prefix containment check.
+#
+# Detection is complete. Under the library profile the exported
+# key parameter is a code.ExternalEntryInput source (library.param-source),
+# taint flows through the join into the File.open / File.delete / Dir.glob
+# code.FilePathAccess sinks, and VYQL-PATH-001 reports each one. On the
+# patched form the same rule reports nothing: File.expand_path is bound as
+# core.PathCanonicalization (pathCanonicalization20 in
+# vyql/bindings/packages/ruby/m5895bccf.vyql) and clears the taint through
+# the join. Measured on the activestorage gem subtree: 7 findings with sinks
+# in disk_service.rb at the vulnerable revision, 0 at the fixed revision, stable over three
+# runs each (the full rails tree exceeds the scan bound).
+#
+# Corpus correction. The pool row's commit 1db4b89687 is "Preparing for
+# 8.1.2.1 release" -- a release bump touching version files, changelogs and
+# lockfiles only. The real fix is 1a5e2f6a4, "Prevent path traversal in
+# ActiveStorage DiskService", referenced by the advisory.
+
+test "rank1647: a service key joined into the storage path and opened"
+  lang ruby
+  profile library
+  file lib/active_storage/service/disk_service.rb
+  expect VYQL-PATH-001
+  code
+  ```
+  require "fileutils"
+
+  module ActiveStorage
+    class Service::DiskService < Service
+      attr_accessor :root
+
+      def initialize(root:, public: false, **options)
+        @root = root
+        @public = public
+      end
+
+      def download_chunk(key, range)
+        File.open(path_for(key), "rb") do |file|
+          file.seek range.begin
+          file.read range.size
+        end
+      rescue Errno::ENOENT
+        raise FileNotFoundError
+      end
+
+      def delete(key)
+        File.delete path_for(key)
+      rescue Errno::ENOENT
+        # Ignore files deleted earlier
+      end
+
+      def delete_prefixed(prefix)
+        Dir.glob(path_for("#{prefix}*")).each do |path|
+          FileUtils.rm_rf(path)
+        end
+      end
+
+      def path_for(key) # :nodoc:
+        File.join root, folder_for(key), key
+      end
+
+      private
+        def folder_for(key)
+          [ key[0..1], key[2..3] ].join("/")
+        end
+    end
+  end
+  ```
+
+test "rank1647: the service key validated, expanded and contained in the root"
+  lang ruby
+  profile library
+  file lib/active_storage/service/disk_service.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  require "fileutils"
+
+  module ActiveStorage
+    class Service::DiskService < Service
+      attr_accessor :root
+
+      def initialize(root:, public: false, **options)
+        @root = root
+        @public = public
+      end
+
+      def download_chunk(key, range)
+        File.open(path_for(key), "rb") do |file|
+          file.seek range.begin
+          file.read range.size
+        end
+      rescue Errno::ENOENT
+        raise FileNotFoundError
+      end
+
+      def delete(key)
+        File.delete path_for(key)
+      rescue Errno::ENOENT
+        # Ignore files deleted earlier
+      end
+
+      def delete_prefixed(prefix)
+        Dir.glob(path_for("#{prefix}*")).each do |path|
+          FileUtils.rm_rf(path)
+        end
+      end
+
+      def path_for(key) # :nodoc:
+        if key.blank?
+          raise ActiveStorage::InvalidKeyError, "key is blank"
+        end
+
+        begin
+          if key.split("/").intersect?(%w[. ..])
+            raise ActiveStorage::InvalidKeyError, "key has path traversal segments"
+          end
+        rescue Encoding::CompatibilityError
+          raise ActiveStorage::InvalidKeyError, "key has incompatible encoding"
+        end
+
+        begin
+          path = File.expand_path(File.join(root, folder_for(key), key))
+        rescue ArgumentError
+          raise ActiveStorage::InvalidKeyError, "key is an invalid string"
+        end
+
+        unless path.start_with?(File.expand_path(root) + "/")
+          raise ActiveStorage::InvalidKeyError, "key is outside of disk service root"
+        end
+
+        path
+      end
+
+      private
+        def folder_for(key)
+          [ key[0..1], key[2..3] ].join("/")
+        end
+    end
+  end
+  ```

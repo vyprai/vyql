@@ -1,0 +1,146 @@
+# Rank 1695 / CVE-2024-45409: ruby-saml's XMLSecurity::SignedDocument#
+# validate_signature resolved the parts of an XML signature with
+# document-rooted XPath selectors. `REXML::XPath.first(sig_element,
+# "//ds:Reference", ...)` looks like it selects the Reference under the
+# signature element it is handed, but a leading `//` selects from the document
+# root however the context node is chosen, so the Reference, DigestMethod,
+# DigestValue and Transforms all came from wherever in the response an
+# attacker placed them, and the signed element itself came from
+# `document.at_xpath("//*[@ID=$id]")`, the first element carrying that ID. A
+# response with a legitimately signed element beside an attacker-authored
+# element re-using its ID passes the digest and signature checks and then has
+# the attacker's content canonicalized and hashed in place of the signed one.
+#
+# The fixed revision 1ec5392b resolves Reference, DigestMethod, DigestValue and
+# Transforms with `./` selectors relative to the signature's SignedInfo, and
+# enumerates the ID matches with `document.xpath` and rejects duplicates --
+# its own comment reads "ensures no elements with same ID to prevent
+# signature wrapping attack". Locating the signature itself with
+# `//ds:Signature` stays document-rooted in both revisions, which is the
+# first-signature-only weakness, not this one; the selectors that changed are
+# exactly the ones that name what content the signature covers.
+
+test "rank1695: signature components are selected from the document root"
+  lang ruby
+  file lib/xml_security.rb
+  expect VYQL-AUTH-062
+  expect_review code.SamlAssertionWrappingBypass
+  code
+  ```
+  module XMLSecurity
+    class SignedDocument < BaseDocument
+      def validate_signature(base64_cert, soft = true)
+        sig_element = REXML::XPath.first(
+          @working_copy,
+          "//ds:Signature",
+          {"ds"=>DSIG}
+        )
+
+        noko_sig_element = document.at_xpath('//ds:Signature', 'ds' => DSIG)
+        noko_signed_info_element = noko_sig_element.at_xpath('./ds:SignedInfo', 'ds' => DSIG)
+        canon_string = noko_signed_info_element.canonicalize(canon_algorithm)
+
+        # check digests
+        ref = REXML::XPath.first(sig_element, "//ds:Reference", {"ds"=>DSIG})
+
+        hashed_element = document.at_xpath("//*[@ID=$id]", nil, { 'id' => extract_signed_element_id })
+
+        canon_hashed_element = hashed_element.canonicalize(canon_algorithm, inclusive_namespaces)
+
+        digest_algorithm = algorithm(REXML::XPath.first(
+          ref,
+          "//ds:DigestMethod",
+          { "ds" => DSIG }
+        ))
+        hash = digest_algorithm.digest(canon_hashed_element)
+        encoded_digest_value = REXML::XPath.first(
+          ref,
+          "//ds:DigestValue",
+          { "ds" => DSIG }
+        )
+        digest_value = Base64.decode64(OneLogin::RubySaml::Utils.element_text(encoded_digest_value))
+
+        unless digests_match?(hash, digest_value)
+          return append_error("Digest mismatch", soft)
+        end
+
+        cert_text = Base64.decode64(base64_cert)
+        cert = OpenSSL::X509::Certificate.new(cert_text)
+        unless cert.public_key.verify(signature_algorithm.new, signature, canon_string)
+          return append_error("Key validation error", soft)
+        end
+
+        true
+      end
+    end
+  end
+  ```
+
+test "rank1695: signature components are selected relative to the signature and duplicate ids rejected"
+  lang ruby
+  file lib/xml_security.rb
+  reject VYQL-AUTH-062
+  reject_review code.SamlAssertionWrappingBypass
+  code
+  ```
+  module XMLSecurity
+    class SignedDocument < BaseDocument
+      def validate_signature(base64_cert, soft = true)
+        sig_element = REXML::XPath.first(
+          @working_copy,
+          "//ds:Signature",
+          {"ds"=>DSIG}
+        )
+
+        noko_sig_element = document.at_xpath('//ds:Signature', 'ds' => DSIG)
+        noko_signed_info_element = noko_sig_element.at_xpath('./ds:SignedInfo', 'ds' => DSIG)
+        canon_string = noko_signed_info_element.canonicalize(canon_algorithm)
+
+        # get signed info
+        signed_info_element = REXML::XPath.first(
+          sig_element,
+          "./ds:SignedInfo",
+          { "ds" => DSIG }
+        )
+
+        # check digests
+        ref = REXML::XPath.first(signed_info_element, "./ds:Reference", {"ds"=>DSIG})
+
+        reference_nodes = document.xpath("//*[@ID=$id]", nil, { 'id' => extract_signed_element_id })
+
+        if reference_nodes.length > 1 # ensures no elements with same ID to prevent signature wrapping attack.
+          return append_error("Duplicated IDs found", soft)
+        end
+
+        hashed_element = reference_nodes[0]
+
+        canon_hashed_element = hashed_element.canonicalize(canon_algorithm, inclusive_namespaces)
+
+        digest_algorithm = algorithm(REXML::XPath.first(
+          ref,
+          "./ds:DigestMethod",
+          { "ds" => DSIG }
+        ))
+        hash = digest_algorithm.digest(canon_hashed_element)
+        encoded_digest_value = REXML::XPath.first(
+          ref,
+          "./ds:DigestValue",
+          { "ds" => DSIG }
+        )
+        digest_value = Base64.decode64(OneLogin::RubySaml::Utils.element_text(encoded_digest_value))
+
+        unless digests_match?(hash, digest_value)
+          return append_error("Digest mismatch", soft)
+        end
+
+        cert_text = Base64.decode64(base64_cert)
+        cert = OpenSSL::X509::Certificate.new(cert_text)
+        unless cert.public_key.verify(signature_algorithm.new, signature, canon_string)
+          return append_error("Key validation error", soft)
+        end
+
+        true
+      end
+    end
+  end
+  ```

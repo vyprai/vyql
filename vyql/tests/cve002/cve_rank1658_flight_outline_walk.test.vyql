@@ -1,0 +1,132 @@
+# Rank 1658 / CVE-2025-55182: the Flight reply deserializer resolved a
+# client-supplied "$id:seg:seg" outline reference by walking the
+# deserialized objects one segment at a time with a plain subscript,
+# so a reference such as $3:constructor:constructor reached through
+# the prototype chain to the Function constructor, and a crafted
+# Promise-like .then resolves via the chunk wake path --
+# unauthenticated remote code execution on any Server Function
+# endpoint (CVSS 10.0; the React blog post and Dynatrace's analysis
+# name the missing attribute check). The walk in getOutlinedModel
+# (packages/react-server/src/ReactFlightReplyServer.js) ran
+# `value = value[path[i]]` with no own-property check, where path is
+# reference.split(':') and reference is a slice of the reply model
+# string; loadServerReference then handed metaData.id to
+# resolveServerReference/requireModule with no typeof check. Pool
+# The fixing commit 7dc903cd29 ("Patch FlightReplyServer with
+# fixes from ReactFlightClient (#35277)", 822 lines in this file):
+# both walk sites now read
+# `if (typeof value === 'object' && hasOwnProperty.call(value, name))`,
+# loadServerReference rejects a non-string id, getChunk and
+# resolveStream take only string FormData entries, and the wake loops
+# invoke only typeof-function listeners. Remediation verified present
+# at the fixed revision.
+#
+# ATTENTION, two stacked gaps.
+#
+# 1. Engine, frontend: a function whose signature carries Flow-only
+# type syntax extracts nothing at all. The plain JavaScript grammar
+# errors on the generic parameter (getOutlinedModel<T>) and on union
+# parameter types (reference: void | string), and the whole function
+# -- calls, subscripts, its analysis.function.context -- drops from
+# the graph. Measured on the real file: 30 top-level functions yield
+# 14 contexts (one named, thirteen empty lambdas); getOutlinedModel,
+# parseModelString, reviveModel and loadServerReference yield zero
+# nodes (`vyql query -call` reports 0 for each), so `vyql match` on
+# the file reports no source, no sink and no control. Minimal pair:
+# `function walk<T>(ref: string): T` gives zero contexts where
+# `function walk(ref: string)` gives one with the split and the
+# subscript walk visible; a sibling function is unaffected, so the
+# loss is per function, not file-wide. The .ts route through the same
+# shared walker extracts the generic signature with the walk tokens
+# present, which is the shape of the change (route Flow-annotated .js
+# through the TypeScript grammar). ENGINE-GAPS.md entry reported.
+#
+# 2. Vocabulary, provenance: even with extraction, the segments come
+# from reference.split(':') where reference is a slice of the reply
+# model string -- the untrusted-property-name family of ranks 1518,
+# 1584 and 1613. Nothing labels the delimiter-separated names of a
+# wire format as untrusted, and the control half exists:
+# own_property_key_guard=true fires on the patched walk (verified
+# against the frontend on the fixed file's shape), so only the
+# positive half is missing. A guard-free presence binding over
+# split+subscript walks is unshippable: the reachable set is 15 of
+# 168 split-carrying files on next.js, 38 of 266 on lime-survey and
+# 35 of 181 on microweber, and the hits are vendored browser
+# libraries (ace editor workers, jquery.sparkline, highcharts) whose
+# walks read trusted config paths. No definition change shipped.
+#
+# Measured on the real code: zero findings at both revisions (the
+# whole-tree scan reports 2060 findings, none in this file).
+# Spec cve_rank1658 records the unguarded walk and the
+# own-property-guarded form, both asserting reject VYQL-INJ-013:
+# when Flow signatures extract and untrusted-name provenance lands,
+# the unguarded form must flip to expect.
+
+test "rank1658: the outline walk follows the prototype chain"
+  lang javascript
+  file packages/react-server/src/ReactFlightReplyServer.js
+  reject VYQL-INJ-013
+  code
+  ```
+  function getOutlinedModel<T>(
+    response: Response,
+    reference: string,
+    parentObject: Object,
+    key: string,
+    map: (response: Response, model: any) => T,
+  ): T {
+    const path = reference.split(':');
+    const id = parseInt(path[0], 16);
+    const chunk = getChunk(response, id);
+    switch (chunk.status) {
+      case INITIALIZED:
+        let value = chunk.value;
+        for (let i = 1; i < path.length; i++) {
+          value = value[path[i]];
+        }
+        return map(response, value);
+      default:
+        throw chunk.reason;
+    }
+  }
+  ```
+
+test "rank1658: the fixed revision reads only own properties on the walk"
+  lang javascript
+  file packages/react-server/src/ReactFlightReplyServer.js
+  reject VYQL-INJ-013
+  code
+  ```
+  function getOutlinedModel<T>(
+    response: Response,
+    reference: string,
+    parentObject: Object,
+    key: string,
+    map: (
+      response: Response,
+      model: any,
+      parentObject: Object,
+      key: string,
+    ) => T,
+  ): T {
+    const path = reference.split(':');
+    const id = parseInt(path[0], 16);
+    const chunk = getChunk(response, id);
+    switch (chunk.status) {
+      case INITIALIZED:
+        let value = chunk.value;
+        for (let i = 1; i < path.length; i++) {
+          const name = path[i];
+          if (
+            typeof value === 'object' &&
+            hasOwnProperty.call(value, name)
+          ) {
+            value = value[name];
+          }
+        }
+        return map(response, value, parentObject, key);
+      default:
+        throw chunk.reason;
+    }
+  }
+  ```

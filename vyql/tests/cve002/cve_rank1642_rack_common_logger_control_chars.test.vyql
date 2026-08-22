@@ -1,0 +1,103 @@
+# Rank 1642 / CVE-2022-30123: Rack::CommonLogger formatted request-controlled
+# values (method, path, query string) into its access-log line and handed the
+# message to logger.write without escaping, so control characters in a request
+# method such as "GET\b" forged log output. The fixed revix escapes non-printable
+# characters with an in-place gsub! before the write; the sibling fix in lint.rb
+# uses String#dump for the same purpose in an exception message.
+
+test "rack common logger writes request-controlled text to the log unescaped"
+  lang ruby
+  expect VYQL-INJ-009
+  code
+  ```
+  module Rack
+    class CommonLogger
+      FORMAT = %{%s - %s [%s] "%s %s%s%s %s" %d %s %0.4f\n}
+
+      def log(env, status, response_headers, began_at)
+        request = Rack::Request.new(env)
+
+        msg = sprintf(FORMAT,
+          request.ip || "-",
+          request.get_header("REMOTE_USER") || "-",
+          request.request_method,
+          request.path_info,
+          request.query_string.empty? ? "" : "?#{request.query_string}",
+          status.to_s[0..3])
+
+        logger = @logger || request.get_header(RACK_ERRORS)
+        if logger.respond_to?(:write)
+          logger.write(msg)
+        else
+          logger << msg
+        end
+      end
+    end
+  end
+  ```
+
+test "rack common logger escapes non-printable characters before the write"
+  lang ruby
+  reject VYQL-INJ-009
+  code
+  ```
+  module Rack
+    class CommonLogger
+      FORMAT = %{%s - %s [%s] "%s %s%s%s %s" %d %s %0.4f\n}
+
+      def log(env, status, response_headers, began_at)
+        request = Rack::Request.new(env)
+
+        msg = sprintf(FORMAT,
+          request.ip || "-",
+          request.get_header("REMOTE_USER") || "-",
+          request.request_method,
+          request.path_info,
+          request.query_string.empty? ? "" : "?#{request.query_string}",
+          status.to_s[0..3])
+
+        msg = msg.gsub(/[^[:print:]\n]/) { |c| "\\x#{c.ord}" }
+
+        logger = @logger || request.get_header(RACK_ERRORS)
+        if logger.respond_to?(:write)
+          logger.write(msg)
+        else
+          logger << msg
+        end
+      end
+    end
+  end
+  ```
+
+test "the fixed revision's own in-place gsub! spelling still reports"
+  lang ruby
+  expect VYQL-INJ-009
+  code
+  ```
+  module Rack
+    class CommonLogger
+      FORMAT = %{%s - %s [%s] "%s %s%s%s %s" %d %s %0.4f\n}
+
+      def log(env, status, response_headers, began_at)
+        request = Rack::Request.new(env)
+
+        msg = sprintf(FORMAT,
+          request.ip || "-",
+          request.get_header("REMOTE_USER") || "-",
+          request.request_method,
+          request.path_info,
+          request.query_string.empty? ? "" : "?#{request.query_string}",
+          status.to_s[0..3])
+
+        msg.gsub!(/[^[:print:]\n]/) { |c| "\\x#{c.ord}" }
+
+        logger = @logger || request.get_header(RACK_ERRORS)
+        if logger.respond_to?(:write)
+          logger.write(msg)
+        else
+          logger << msg
+        end
+      end
+    end
+  end
+  ```

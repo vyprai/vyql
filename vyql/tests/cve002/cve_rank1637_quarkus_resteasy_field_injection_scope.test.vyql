@@ -1,0 +1,130 @@
+# Rank 1637 / CVE-2025-1247: Quarkus RESTEasy Reactive registered every
+# @Path resource class as a @Singleton CDI bean by default
+# (ResteasyReactiveCDIProcessor.beanDefiningAnnotations maps PATH to
+# BuiltinScope.SINGLETON), so a resource that takes its request parameters
+# by field injection -- @QueryParam/@HeaderParam/@PathParam/@FormParam/
+# @MatrixParam/@CookieParam/@BeanParam or the Rest* variants on fields --
+# held one request's values in a bean shared by every concurrent request,
+# serving user A's parameters to user B (CWE-488, exposure of a data
+# element to the wrong session). The fixed revision (merge d8df15cec of PR #46178;
+# the combined diff is empty so the change reads via `git diff 620f645ac
+# d8df15cec`) adds a build step, not a line change: ResteasyReactiveScanner
+# gains hasJaxRsFieldInjection walking fields and superclasses, and
+# ResteasyReactiveCDIProcessor.requestScopedResources either adds
+# @RequestScoped to a scope-less field-injection resource or fails the
+# build with a DeploymentException when an explicit non-request scope
+# (@Dependent, @ApplicationScoped, @Singleton) is set. The PATH->SINGLETON
+# registration line itself is untouched at both revisions, and the
+# remediation is present at <fix> and absent at <fix>^. No pool
+# correction.
+#
+# ATTENTION, wiring-not-dataflow family (the 1514/1535/1540/1556/1557/1593
+# shape, here scoping rather than authorization). The leak is performed by
+# the framework's bean lifecycle, so no application-level taint path
+# exists, and the discriminator -- the runtime's singleton default -- is a
+# property of the framework build, not of the application source. Two
+# measured blockers sit in front of even a presence route:
+# (1) Java field annotations produce no token anywhere -- the
+#     field_declaration case in java.go lowers @HeaderParam String foo to a
+#     bare Assign, so `node.token contains "HeaderParam"` matches nothing
+#     at class or function scope (probe-measured); the safe method-
+#     parameter spelling IS extracted via jvParamAnnotationTokens, so the
+#     scanner can see exactly the form that is not the vulnerability.
+# (2) A class's own annotations do not reach the class context node --
+#     class_annotation: tokens land only on analysis.parameter.entry nodes
+#     and only for methods that have parameters, so neither "@Path
+#     resource" nor "lacks @RequestScoped" is readable at node.scope ==
+#     "class" or "function" (probe-measured).
+# A binding on the framework's new requestScopedResources step would key
+# on the fixing commit's own layout, and the 1380 counterweight does not
+# apply: the control is a build-time processor step, no API-documented
+# call remains inside a guarded application method. On this tree the
+# application shape cannot discriminate in principle -- the fixed revision's own
+# regression tests add more scope-less field-injection resources at the
+# patched revision, so an application-level binding scores equal-or-higher
+# on the fixed tree. Measured on the real code: scanning
+# extensions/resteasy-reactive reports 35 findings and
+# independent-projects/resteasy-reactive 29, none on any file the fixed revision
+# touches (the only common/processor rows are a WeakHash in HashUtil and
+# a LogOutput sink at EndpointIndexer:325). No CWE-488 or wrong-session
+# vocabulary exists anywhere in the knowledge base. ENGINE-GAPS.md entry
+# filed for the Java field-annotation extraction (blocks every binding
+# that must read what a field is annotated with). This spec is the only
+# file the rank adds. Spec cve_rank1637 records the scope-less
+# field-injection resource and the @RequestScoped form, both asserting
+# reject VYQL-AUTH-079: when wrong-session-exposure vocabulary lands, the
+# scope-less form must flip to expect.
+
+test "rank1637: request parameters field-injected into a scope-less resource"
+  lang java
+  file extensions/resteasy-reactive/rest/deployment/src/test/java/io/quarkus/resteasy/reactive/server/test/injection/HeaderFieldNoScopeTest.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  package io.quarkus.resteasy.reactive.server.test.injection;
+
+  import jakarta.ws.rs.GET;
+  import jakarta.ws.rs.HeaderParam;
+  import jakarta.ws.rs.Path;
+  import jakarta.ws.rs.Produces;
+  import jakarta.ws.rs.core.MediaType;
+
+  import org.jboss.resteasy.reactive.RestHeader;
+
+  public class HeaderFieldNoScopeTest {
+
+      @Path("/test")
+      public static class Resource {
+
+          @HeaderParam("foo")
+          String foo;
+
+          @RestHeader
+          String bar;
+
+          @GET
+          @Produces(MediaType.TEXT_PLAIN)
+          public String hello() {
+              return "foo: " + foo + ", bar: " + bar;
+          }
+      }
+  }
+  ```
+
+test "rank1637: the fixed revision scopes the field-injection resource per request"
+  lang java
+  file extensions/resteasy-reactive/rest/deployment/src/test/java/io/quarkus/resteasy/reactive/server/test/injection/QueryFieldRequestScopeTest.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  package io.quarkus.resteasy.reactive.server.test.injection;
+
+  import jakarta.enterprise.context.RequestScoped;
+  import jakarta.ws.rs.GET;
+  import jakarta.ws.rs.Path;
+  import jakarta.ws.rs.Produces;
+  import jakarta.ws.rs.QueryParam;
+  import jakarta.ws.rs.core.MediaType;
+
+  import org.jboss.resteasy.reactive.RestQuery;
+
+  public class QueryFieldRequestScopeTest {
+
+      @Path("/test")
+      @RequestScoped
+      public static class Resource {
+
+          @QueryParam("foo")
+          String foo;
+
+          @RestQuery
+          String bar;
+
+          @GET
+          @Produces(MediaType.TEXT_PLAIN)
+          public String hello() {
+              return "foo: " + foo + ", bar: " + bar;
+          }
+      }
+  }
+  ```

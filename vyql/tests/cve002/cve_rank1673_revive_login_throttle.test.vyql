@@ -1,0 +1,138 @@
+# Rank 1673 / CVE-2016-9124: Revive Adserver's login password check
+# throttled nothing, so the login page could be driven at machine
+# speed and passwords guessed in parallel (improper restriction of
+# excessive authentication attempts, CWE-307; h1 report 96115, fix
+# commit 847941390f "Mitigate h1 report 96115"). The check in
+# lib/OX/Extension/authentication/authentication.php looked up the
+# row by `OA_Dal::factoryDO('users')`, assigned
+# `md5($password)` to the password field and returned the fetch
+# result -- no failure penalty of any kind, and the one delay the
+# tree carries a constant `sleep(3)` in the OA_Auth caller,
+# which serialises nothing: parallel attempts each wait the same
+# three seconds. The fixed revision removes the constant sleep and gives
+# checkPassword a random 1-5s failure delay (`mt_rand` + `usleep`)
+# plus a per-username advisory lock (`OA_DB_AdvisoryLock::factory()`,
+# `->get('auth.'.md5($username))`, `->release()`) that both
+# serialises attempts on one account and quadruples the delay while
+# another attempt on the same name is underway. Verified: the
+# unthrottled form is present at the parent, the lock-and-delay form
+# at the fixed revision.
+#
+# ATTENTION, throttle-decision completeness: the defect is a missing
+# control on a non-taint path -- nothing can ask "does the
+# credential-verification function penalise failures", the same
+# decision-vocabulary family as ranks 1538 and 1546 (rate limiting)
+# and 1567/1581 (one guard call missing from a submit path). The
+# counterweight test fails on its positive half: the fixed revision does leave
+# PHP-documented calls (`usleep`, `mt_rand`) inside the guarded
+# method, but the guarded operation itself has no API-documented
+# identifier that is not this project's own vocabulary
+# (`OA_Dal::factoryDO`, `->find()`, `->fetch()`, `checkPassword`
+# itself), and the one PHP-documented token in the vulnerable body
+# (`md5`) identifies the adjacent weak-hash weakness, not this one.
+# Measured on the real code: scanning the authentication plugin at
+# the parent reports WeakHash rows on every `md5` (including the one
+# inside checkPassword) and StateChangingOp rows on other methods;
+# the fixed revision adds a WeakRandomValue row on its own `mt_rand` -- the
+# brute-force defect is invisible at both revisions. The candidate
+# general shape ("password-hash assignment with no delay call in the
+# body") fires on the password write paths of ordinary code: 133
+# corpus files match the assignment shape, nearly all registration,
+# install and reset handlers. No ENGINE-GAPS.md entry: what is
+# missing is ontology design (a credential-check-throttle question),
+# not a localised construct. No definition change shipped. Spec
+# cve_rank1673 records the unthrottled check and the lock-and-delay
+# form, both asserting reject VYQL-AUTH-079: when throttle-decision
+# vocabulary lands for PHP (VYQL-AUTH-105's reviewCondition is
+# exactly "an authentication-sensitive endpoint accepts attempts
+# without a throttle"), the unthrottled form must flip to expect.
+
+test "rank1673: the password check throttles nothing"
+  lang php
+  file lib/OX/Extension/authentication/authentication.php
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  require_once MAX_PATH . '/lib/OA/Dal.php';
+
+  class Plugins_Authentication extends OX_Component
+  {
+      /**
+       * A method to check a username and password
+       *
+       * @param string $username
+       * @param string $password
+       * @return mixed A DataObjects_Users instance, or false if no matching user was found
+       */
+      function checkPassword($username, $password)
+      {
+          $doUser = OA_Dal::factoryDO('users');
+          $doUser->username = strtolower($username);
+          $doUser->password = md5($password);
+
+          $doUser->find();
+
+          if ($doUser->fetch()) {
+              return $doUser;
+          } else {
+              return false;
+          }
+      }
+  }
+  ```
+
+test "rank1673: the fixed revision delays failures and serialises per username"
+  lang php
+  file lib/OX/Extension/authentication/authentication.php
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  require_once MAX_PATH . '/lib/OA/Dal.php';
+  require_once MAX_PATH . '/lib/OA/DB/AdvisoryLock.php';
+
+  class Plugins_Authentication extends OX_Component
+  {
+      function checkPassword($username, $password)
+      {
+          // Random 1-5 second base delay for failures.
+          $waitMs = mt_rand(1000, 5000);
+
+          $oLock = OA_DB_AdvisoryLock::factory();
+
+          $username = strtolower($username);
+
+          // Exclusive advisory lock per username.
+          $lock = $oLock->get('auth.' . md5($username));
+
+          if (!$lock) {
+              // Another attempt on this username is underway:
+              // discourage parallel brute forcing with a 4x delay.
+              usleep($waitMs * 4000);
+          }
+
+          $doUser = OA_Dal::factoryDO('users');
+          $doUser->username = $username;
+          $doUser->password = md5($password);
+
+          $doUser->find();
+
+          if ($doUser->fetch()) {
+              $oLock->release();
+
+              return $doUser;
+          }
+
+          if ($lock) {
+              usleep($waitMs * 1000);
+          }
+
+          $oLock->release();
+
+          return false;
+      }
+  }
+  ```

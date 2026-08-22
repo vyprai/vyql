@@ -1,0 +1,274 @@
+# runc's container init reached the final execve still holding internal
+# host-side file descriptors -- the O_PATH dirfd for the container rootfs
+# among them -- and a container image controls the working directory recorded
+# in config.json, so `cwd: /proc/self/fd/N` resolves through a leaked fd to a
+# directory on the host filesystem. The container process then starts with
+# its working directory, or an exec target reached through /proc/self/fd/N,
+# outside the container's mount namespace and can walk the host from there
+# (CWE-403, exposure of file descriptors to an unintended control sphere;
+# CVE-2024-21626, fix commit 02120488a4c0fc487d1ed2867e901eeed7ce8ecf, the
+# merge of GHSA-xr7r-f8xq-vfvv). The treewept fds with
+# `utils.CloseExecFrom` in finalizeNamespace at the vulnerable revision, but
+# close-on-exec only bites at execve: the `unix.Chdir(config.Cwd)` runs
+# before it and the working-directory reference survives execve untouched,
+# which is why the fixed revision adds a control at every remaining boundary rather
+# than widening the sweep:
+#
+#   * Container.start marks all fds >= 3 close-on-exec before spawning
+#     "runc init" (`utils.CloseExecFrom(3)`), container_linux.go.
+#   * linuxStandardInit.Init and linuxSetnsInit.Init close everything not
+#     passed to the container before `system.Exec` (`utils.UnsafeCloseFrom(
+#     l.config.PassedFilesCount + 3)`), standard_init_linux.go and
+#     setns_init_linux.go.
+#   * finalizeNamespace verifies after the chdir that the working directory
+#     is still inside the mount namespace root (`verifyCwd()`, whose body is
+#     `unix.Getwd` + `filepath.IsAbs`), init_linux.go.
+#
+# ATTENTION, the delegated-check attribution-gap family measured for
+# Go at ranks 1377, 1389 and 1399: every one of the three remediations is a
+# call to a project-internal helper, and no API-documented call is left
+# inside the function each one guards. Measured on a minimal pair (function
+# context facts, Go):
+#
+#   * Go `call:` tokens drop the package qualifier -- `system.Exec(...)`
+#     lowers to `call == "Exec"`, and `call contains "system."` never
+#     matches -- so a positive anchor on the exec boundary either names
+#     runc's internal wrapper (`node.context.callPath contains
+#     "system.Exec"`) or matches every `.Exec` receiver including `db.Exec`
+#     SQL.
+#   * A closefrom-family negation (`not containsAny(node.context.call,
+#     ["CloseFrom","CloseOnExec","CloseRange","closefrom","close_range"])`)
+#     separates the vulnerable from the patched Init only through the
+#     substring "CloseFrom" inside the fixed revision's own helper name
+#     `UnsafeCloseFrom`; the same fix with the sweep helper renamed
+#     (`utils.SweepAbove(...)`) still matches, so the renaming test a
+#     discriminating negation must survive fails on it.
+#   * The cwd-verification control puts its only documented calls
+#     (`unix.Getwd`, `filepath.IsAbs`) inside verifyCwd, and a negation on
+#     `Getwd` in finalizeNamespace's context sees nothing at either
+#     revision -- a control that leaves the guarded function is invisible to
+#     function-confined facts, and keying the helper's own name is the
+#     fixing commit's layout.
+#   * `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over the fixed revision
+#     parent reports 0 findings at setns_init_linux.go,
+#     standard_init_linux.go, init_linux.go and Container.start across
+#     three runs (47 findings at P0-P3, stable). The exec sites do carry a
+#     syntactic `code.SqlExecution` label from go.sinks (`callee.method ==
+#     "Exec"` on `system.Exec`) that produces no finding at either revision
+#     and describes the adjacent mislabel, not this weakness.
+#
+# No ENGINE-GAPS.md entry: the blocker is the measured attribution-gap
+# family, not a new localised construct. No definition change shipped.
+# Spec cve_rank1698 records the unguarded and the swept exec boundary
+# (asserting reject VYQL-RES-001, the resource-leak rule whose CWE-772 class
+# a descriptor surviving execve belongs to) and the chdir without and with
+# the post-chdir verification (asserting reject VYQL-PATH-001): when
+# descriptor-boundary or cwd-containment vocabulary lands for Go, the
+# unguarded forms must flip to expect.
+
+test "rank1698: setns init execs with the container-rootfs fds still open"
+  lang go
+  file libcontainer/setns_init_linux.go
+  reject VYQL-RES-001
+  code
+  ```
+  package libcontainer
+
+  import (
+  	"fmt"
+  	"os"
+  	"os/exec"
+
+  	"github.com/opencontainers/runc/libcontainer/seccomp"
+  	"github.com/opencontainers/runc/libcontainer/system"
+  )
+
+  type linuxSetnsInit struct {
+  	config     *initConfig
+  	dmzExe     *os.File
+  	logPipe    *os.File
+  	pipe       *os.File
+  }
+
+  func (l *linuxSetnsInit) Init() error {
+  	// Check for the arg early to make sure it exists.
+  	name, err := exec.LookPath(l.config.Args[0])
+  	if err != nil {
+  		return err
+  	}
+  	// Set seccomp as close to execve as possible.
+  	if l.config.Config.Seccomp != nil && l.config.NoNewPrivileges {
+  		seccompFd, err := seccomp.InitSeccomp(l.config.Config.Seccomp)
+  		if err != nil {
+  			return fmt.Errorf("unable to init seccomp: %w", err)
+  		}
+  		if err := syncParentSeccomp(l.pipe, seccompFd); err != nil {
+  			return err
+  		}
+  	}
+  	// Close the log pipe fd so the parent's ForwardLogs can exit.
+  	if err := l.logPipe.Close(); err != nil {
+  		return fmt.Errorf("close log pipe: %w", err)
+  	}
+  	if l.dmzExe != nil {
+  		l.config.Args[0] = name
+  		return system.Fexecve(l.dmzExe.Fd(), l.config.Args, os.Environ())
+  	}
+  	return system.Exec(name, l.config.Args, os.Environ())
+  }
+  ```
+
+test "rank1698: the fixed revision closes everything not passed to the container first"
+  lang go
+  file libcontainer/setns_init_linux.go
+  reject VYQL-RES-001
+  code
+  ```
+  package libcontainer
+
+  import (
+  	"fmt"
+  	"os"
+  	"os/exec"
+
+  	"github.com/opencontainers/runc/libcontainer/seccomp"
+  	"github.com/opencontainers/runc/libcontainer/system"
+  	"github.com/opencontainers/runc/libcontainer/utils"
+  )
+
+  type linuxSetnsInit struct {
+  	config     *initConfig
+  	dmzExe     *os.File
+  	logPipe    *os.File
+  	pipe       *os.File
+  }
+
+  func (l *linuxSetnsInit) Init() error {
+  	// Check for the arg early to make sure it exists.
+  	name, err := exec.LookPath(l.config.Args[0])
+  	if err != nil {
+  		return err
+  	}
+  	// Set seccomp as close to execve as possible.
+  	if l.config.Config.Seccomp != nil && l.config.NoNewPrivileges {
+  		seccompFd, err := seccomp.InitSeccomp(l.config.Config.Seccomp)
+  		if err != nil {
+  			return fmt.Errorf("unable to init seccomp: %w", err)
+  		}
+  		if err := syncParentSeccomp(l.pipe, seccompFd); err != nil {
+  			return err
+  		}
+  	}
+  	// Close the log pipe fd so the parent's ForwardLogs can exit.
+  	if err := l.logPipe.Close(); err != nil {
+  		return fmt.Errorf("close log pipe: %w", err)
+  	}
+  	if l.dmzExe != nil {
+  		l.config.Args[0] = name
+  		return system.Fexecve(l.dmzExe.Fd(), l.config.Args, os.Environ())
+  	}
+  	// Close all file descriptors we are not passing to the container.
+  	// The execve target could use internal runc fds as the execve path,
+  	// potentially giving access to binary files from the host.
+  	if err := utils.UnsafeCloseFrom(l.config.PassedFilesCount + 3); err != nil {
+  		return err
+  	}
+  	return system.Exec(name, l.config.Args, os.Environ())
+  }
+  ```
+
+test "rank1698: finalizeNamespace chdirs into the image-chosen cwd unverified"
+  lang go
+  file libcontainer/init_linux.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package libcontainer
+
+  import (
+  	"fmt"
+
+  	"golang.org/x/sys/unix"
+
+  	"github.com/opencontainers/runc/libcontainer/utils"
+  )
+
+  // finalizeNamespace drops the caps, sets the correct user and working
+  // dir, and closes any leaked file descriptors before executing the
+  // command inside the namespace.
+  func finalizeNamespace(config *initConfig) error {
+  	// Ensure that all unwanted fds we may have accidentally inherited
+  	// are marked close-on-exec so they stay out of the container.
+  	if err := utils.CloseExecFrom(config.PassedFilesCount + 3); err != nil {
+  		return fmt.Errorf("error closing exec fds: %w", err)
+  	}
+  	// we only do chdir if it's specified
+  	doChdir := config.Cwd != ""
+  	if doChdir {
+  		if err := unix.Chdir(config.Cwd); err != nil {
+  			return fmt.Errorf("chdir to cwd (%q) set in config.json failed: %w", config.Cwd, err)
+  		}
+  	}
+  	if err := system.ClearKeepCaps(); err != nil {
+  		return fmt.Errorf("unable to clear keep caps: %w", err)
+  	}
+  	return nil
+  }
+  ```
+
+test "rank1698: the fixed revision verifies the working directory is inside the container"
+  lang go
+  file libcontainer/init_linux.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package libcontainer
+
+  import (
+  	"errors"
+  	"fmt"
+  	"path/filepath"
+
+  	"golang.org/x/sys/unix"
+
+  	"github.com/opencontainers/runc/libcontainer/utils"
+  )
+
+  // verifyCwd ensures that the current directory is actually inside the
+  // mount namespace root of the current process. getcwd(2) prefixes
+  // "(unreachable)" when the cwd escaped the mount namespace root, and
+  // both glibc's getcwd(3) and Go's Getwd() surface that as ENOENT.
+  func verifyCwd() error {
+  	if wd, err := unix.Getwd(); errors.Is(err, unix.ENOENT) {
+  		return errors.New("current working directory is outside of container mount namespace root -- possible container breakout detected")
+  	} else if err != nil {
+  		return fmt.Errorf("failed to verify if current working directory is safe: %w", err)
+  	} else if !filepath.IsAbs(wd) {
+  		return fmt.Errorf("current working directory is not absolute -- possible container breakout detected: cwd is %q", wd)
+  	}
+  	return nil
+  }
+
+  func finalizeNamespace(config *initConfig) error {
+  	// Ensure that all unwanted fds we may have accidentally inherited
+  	// are marked close-on-exec so they stay out of the container.
+  	if err := utils.CloseExecFrom(config.PassedFilesCount + 3); err != nil {
+  		return fmt.Errorf("error closing exec fds: %w", err)
+  	}
+  	// we only do chdir if it's specified
+  	doChdir := config.Cwd != ""
+  	if doChdir {
+  		if err := unix.Chdir(config.Cwd); err != nil {
+  			return fmt.Errorf("chdir to cwd (%q) set in config.json failed: %w", config.Cwd, err)
+  		}
+  	}
+  	// Make sure our final working directory is inside the container.
+  	if err := verifyCwd(); err != nil {
+  		return err
+  	}
+  	if err := system.ClearKeepCaps(); err != nil {
+  		return fmt.Errorf("unable to clear keep caps: %w", err)
+  	}
+  	return nil
+  }
+  ```

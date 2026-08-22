@@ -1,0 +1,243 @@
+# Rank 1680 / CVE-2025-14308 (robocode 9acfd9c146): RobotFileOutputStream, the
+# host-side stream a sandboxed robot writes its data file through, overrode
+# FileOutputStream.write(byte[] b, int off, int len) and checked only
+# `len < 0` before forwarding the raw off and len to super.write. The robot
+# chooses all three arguments. FileOutputStream's own check adds off and len
+# at int width, so a pair that wraps negative passes it, and the write leaves
+# at an offset the array never had: the integer overflow the advisory scores
+# at 10.0. The fixed revision bounds the pair in the non-wrapping spelling --
+# off < 0 || len < 0 || len > b.length || off > b.length - len.
+#
+# FIXED by reusing code.OffsetLengthBoundsOverflow (VYQL-NUM-014, CWE-190/125)
+# with its first Java binding, keyed on the JDK's own documented contract:
+# OutputStream.write(byte[], int, int) throws IndexOutOfBoundsException
+# "if off is negative, len is negative, or len is greater than b.length -
+# off". The shape is a write on a byte[]/char[] carrying the slice arguments
+# (three or more parameters) that delegates the raw pair to another write,
+# makes a comparison of its own -- it has begun to validate the transfer --
+# and never mentions the array's length. A transparent pass-through is not
+# reported: it forwards the contract whole and the stream it forwards to owns
+# the checks.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off), stable over
+# three runs per revision. robocode at 9acfd9c^: exactly one VYQL-NUM-014,
+# RobotFileOutputStream.java:47, the CVE method; at 9acfd9c: none. Over
+# ~13,600 java files across eleven sibling trees the binding reports six
+# rows, each read and each the same shape -- partial validation then an
+# unbounded forward: lucene test-framework TestRuleLimitSysouts:123
+# (`if (len > 0) count += len; super.write(b, off, len)`), resteasy's two
+# vendored Base64 encoders and tjws ThrottledOutputStream:145, nifi
+# SocketChannelOutputStream:84 (ByteBuffer.wrap(b, off, len)), onedev's
+# jgit EolAwareOutputStream:90. logback, netty, lucene/core, openam, pulsar
+# and three nifi modules report none. No file in the OWASP Java Benchmark
+# corpus declares a write(byte[]/char[], int, int) override at all.
+
+test "an array-slice write override that checks the length sign and forwards the raw offset and length to the underlying write"
+  lang java
+  expect VYQL-NUM-014
+  expect_review code.OffsetLengthBoundsOverflow
+  code
+  ```
+  package net.sf.robocode.host.io;
+
+  import java.io.FileOutputStream;
+  import java.io.IOException;
+
+  public class RobotFileOutputStream extends FileOutputStream {
+
+      private final RobotFileSystemManager fileSystemManager;
+
+      public RobotFileOutputStream(String filename, boolean append, RobotFileSystemManager fileSystemManager) throws IOException {
+          super(filename, append);
+          this.fileSystemManager = fileSystemManager;
+          fileSystemManager.addStream(this);
+      }
+
+      @Override
+      public final void write(byte[] b) throws IOException {
+          try {
+              fileSystemManager.checkQuota(b.length);
+              super.write(b);
+          } catch (IOException e) {
+              close();
+              throw e;
+          }
+      }
+
+      @Override
+      public final void write(byte[] b, int off, int len) throws IOException {
+          if (len < 0) {
+              throw new IndexOutOfBoundsException();
+          }
+          try {
+              fileSystemManager.checkQuota(len);
+              super.write(b, off, len);
+          } catch (IOException e) {
+              close();
+              throw e;
+          }
+      }
+
+      @Override
+      public final void write(int b) throws IOException {
+          fileSystemManager.checkQuota(1);
+          super.write(b);
+      }
+  }
+  ```
+
+test "the fixed revision bounds offset and length against the array length in the non-wrapping spelling"
+  lang java
+  reject VYQL-NUM-014
+  code
+  ```
+  package net.sf.robocode.host.io;
+
+  import java.io.FileOutputStream;
+  import java.io.IOException;
+
+  public class RobotFileOutputStream extends FileOutputStream {
+
+      private final RobotFileSystemManager fileSystemManager;
+
+      public RobotFileOutputStream(String filename, boolean append, RobotFileSystemManager fileSystemManager) throws IOException {
+          super(filename, append);
+          this.fileSystemManager = fileSystemManager;
+          fileSystemManager.addStream(this);
+      }
+
+      @Override
+      public final void write(byte[] b, int off, int len) throws IOException {
+          if (b == null) {
+              throw new NullPointerException();
+          }
+          if (off < 0 || len < 0 || len > b.length || off > b.length - len) {
+              throw new ArrayIndexOutOfBoundsException();
+          }
+          try {
+              fileSystemManager.checkQuota(len);
+              super.write(b, off, len);
+          } catch (IOException e) {
+              close();
+              throw e;
+          }
+      }
+  }
+  ```
+
+test "a transparent pass-through override forwards the contract whole and is not reported"
+  lang java
+  reject VYQL-NUM-014
+  code
+  ```
+  package com.example;
+
+  import java.io.FileOutputStream;
+  import java.io.IOException;
+
+  public class NonCloseableFileOutputStream extends FileOutputStream {
+
+      public NonCloseableFileOutputStream(String name) throws IOException {
+          super(name);
+      }
+
+      @Override
+      public void close() {}
+
+      @Override
+      public void write(byte[] b, int off, int len) throws IOException {
+          super.write(b, off, len);
+      }
+  }
+  ```
+
+test "a quota wrapper that bounds the slice against the array length before delegating is not reported"
+  lang java
+  reject VYQL-NUM-014
+  code
+  ```
+  package com.example;
+
+  import java.io.FilterOutputStream;
+  import java.io.IOException;
+
+  public class QuotaOutputStream extends FilterOutputStream {
+
+      private long written;
+
+      public QuotaOutputStream(java.io.OutputStream out) {
+          super(out);
+      }
+
+      @Override
+      public void write(byte[] b, int off, int len) throws IOException {
+          if (len > 0) {
+              written += len;
+          }
+          if (off > b.length - len) {
+              throw new IndexOutOfBoundsException();
+          }
+          out.write(b, off, len);
+      }
+  }
+  ```
+
+test "the whole-array overload mentions b.length but carries no slice pair and is not reported"
+  lang java
+  reject VYQL-NUM-014
+  code
+  ```
+  package com.example;
+
+  import java.io.FileOutputStream;
+  import java.io.IOException;
+
+  public class CountingFileOutputStream extends FileOutputStream {
+
+      public CountingFileOutputStream(String name) throws IOException {
+          super(name);
+      }
+
+      @Override
+      public void write(byte[] b) throws IOException {
+          if (b.length > 0) {
+              count(b.length);
+          }
+          super.write(b);
+      }
+
+      private void count(int n) {}
+  }
+  ```
+
+test "a slice write over a non-array buffer type is not the array-slice contract and is not reported"
+  lang java
+  reject VYQL-NUM-014
+  code
+  ```
+  package com.example;
+
+  import java.io.IOException;
+  import java.nio.ByteBuffer;
+
+  public class NativeFileDescriptor {
+
+      private final int fd;
+
+      public NativeFileDescriptor(int fd) {
+          this.fd = fd;
+      }
+
+      public final int write(ByteBuffer buf, int pos, int limit) throws IOException {
+          int res = write(fd, buf, pos, limit);
+          if (res >= 0) {
+              return res;
+          }
+          throw new IOException("write failed");
+      }
+
+      private static int write(int fd, ByteBuffer buf, int pos, int limit) {
+          return -1;
+      }
+  }
+  ```

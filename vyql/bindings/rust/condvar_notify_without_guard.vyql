@@ -1,0 +1,31 @@
+module bindings.rust.condvar_notify_without_guard;
+
+// A condition variable pairs with the mutex that guards its predicate. The
+// waiter must check the predicate and block while holding the guard, because
+// wait releases the mutex and sleeps atomically; the matching obligation on
+// the signalling side is to keep that guard live across the predicate write
+// and the notify. Rust's temporary rules make the violating shape easy to
+// write:
+//
+//     *self.mutex.lock().unwrap() = true;   // guard drops at the semicolon
+//     self.cond.notify_one();               // notify with the mutex unlocked
+//
+// Storing through the lock() temporary ends the guard's lifetime at the end of
+// the statement, so a waiter that checks the flag between the store and the
+// notify then blocks on a notification that has already fired and sleeps
+// forever -- the lost wakeup. Binding the guard to a variable
+// (`let mut flag = self.mutex.lock().unwrap(); *flag = true;
+// self.cond.notify_one();`) keeps the mutex held across the notify and is the
+// form this binding stays quiet on.
+//
+// The store is recognised through the assignment token, whose left side is the
+// lock() call itself; a method call through the temporary
+// (`m.lock().unwrap().push(x)`) emits no assignment token and is not seen.
+// The `.await` exclusion is not cosmetic: an async lock is not a
+// std::sync::Mutex guard, and the notifiers it pairs with (tokio::sync::Notify
+// and peers) are permit-based with no check-then-block window, so the
+// lost-wakeup protocol does not apply to them.
+binding condvarNotifyWithoutGuard {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call in ["notify_one", "notify_all"] and node.context.assign contains "lock()" and not (node.context.assign contains "lock().await")
+  emit issue code.CondvarNotifyWithoutGuard at node
+}

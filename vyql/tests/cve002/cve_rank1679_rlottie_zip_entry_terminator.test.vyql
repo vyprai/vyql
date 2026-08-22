@@ -1,0 +1,219 @@
+# Rank 1679 / CVE-2025-53076: rlottie's dotLottie path decompressed an
+# attacker-supplied zip stream into a heap buffer and handed the raw char*
+# to its rapidjson parser with no byte count attached (CWE-125 buffer
+# over-read through CWE-20 improper input validation).
+#
+# uncompressZip (src/lottie/lottieparser.cpp:2413 at the vulnerable revision) reads
+# the archive entry with zip_entry_read(zip, (void**)&buf, &bufSize),
+# closes the stream and returns buf. The entry bytes are not
+# NUL-terminated and bufSize never leaves the function, so model::parse's
+# `LottieParserImpl obj(input)` -- whose LookaheadParserHandler base
+# stores the pointer in a rapidjson StringStream that reads until a parse
+# error or a zero byte -- scans past the allocation. The same path carried
+# two more defects the one fix commit closes: uncompressZip's failure
+# returns (zip_stream_open failure, zip_entry_openbyindex failure) are
+# nullptr and model::parse passed that to the parser unguarded, and
+# model::parse ran free(input) between constructing the parser and calling
+# obj.VerifyType(), so the whole parse walks freed memory. The fixed revision adds the
+# null and empty checks, reallocates buf to bufSize+1 and writes the
+# terminator, moves the free after the parse, and closes the stream on the
+# openbyindex failure path.
+#
+# ATTENTION, engine gap: nothing is labelled on either side of the defect.
+#   - vyql resolve: zip_stream_open, zip_entry_openbyindex, zip_entry_read
+#     and the LookaheadParserHandler constructor are all unresolved; the
+#     generated kubazip package that labels zip_entry_read is
+#     dependency()-gated and inert for C/C++ (the frontend emits no
+#     code.Import), and it taints call.result -- the byte count -- not the
+#     out-parameter buffer, the cReaders eight-name-table gap (1206, 1407).
+#   - vyql match on the real file labels free(input) at :2460
+#     code.PointerFree and nothing else in the region. VYQL-MEM-007 needs
+#     a code.PointerUse reachable after the release, but the use is the
+#     parser object reading the pointer its constructor captured;
+#     code.PointerUse is bound to the deref primitive only (1645), so the
+#     rule cannot fire, and both revisions carry the identical free label
+#     because the fixed revision moves the release rather than removing it.
+#   - The over-read itself needs a fact the engine does not have: a buffer
+#     consumed as a length-less C string while the producing call reported
+#     a byte count -- the read side of the capacity-correlation gap (1370).
+#     The caller-side guard the fixed revision adds (`if (!input)`) is a unary
+#     expression that emits no context token, so a presence binding cannot
+#     separate the patched caller from the vulnerable one either.
+#
+# A producer-side binding (zip_entry_read present, no terminator write in
+# the function) is measured and rejected on genericity, not effort: the
+# fact that makes rlottie's code dangerous -- the consumer's size-less
+# char* constructor -- lives in another function the binding cannot see,
+# so the binding must assume it and fires on the API's correct binary
+# consumers (std::string(buf, bufSize), size-bounded loops), and the
+# narrowed form "buffer returned while the size is discarded" is
+# inexpressible because the C/C++ frontend emits no return-statement
+# token. The only zip_entry_read user among the reachable clones is
+# rlottie itself, so the corpus cannot measure the false-positive rate
+# either.
+#
+# Also observed, not this rank's to fix: the fixed revision's own remediation fires
+# VYQL-MEM-049 (ReallocFailurePathInputFree, high) on
+# `if (!terminatedBuf) { free(buf); return nullptr; }` -- freeing the
+# untouched original after a failed realloc is correct realloc semantics
+# -- while the over-read fires nothing. The scanner reports the safe code
+# and not the defect, again (1370, 1371, 1378).
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1679: the decompressed entry is parsed as an unterminated char* and freed mid-parse"
+  lang cpp
+  file src/lottie/lottieparser.cpp
+  reject VYQL-MEM-007
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <cstddef>
+
+  struct zip_t;
+  struct Composition { int frames; };
+
+  zip_t* zip_stream_open(const char* stream, size_t size, int cache, char mode);
+  int zip_entry_openbyindex(zip_t* zip, int index);
+  long zip_entry_read(zip_t* zip, void** buf, size_t* bufsize);
+  void zip_entry_close(zip_t* zip);
+  void zip_stream_close(zip_t* zip);
+
+  struct LookaheadParserHandler {
+      LookaheadParserHandler(char* str);
+      bool VerifyType();
+      int parseComposition();
+      Composition* composition();
+  };
+
+  static bool checkDotLottie(const char* str) {
+      return str[0] == 0x50 && str[1] == 0x4B;
+  }
+
+  static char* uncompressZip(const char* str, size_t length) {
+      auto zip = zip_stream_open(str, length, 0, 'r');
+      if (!zip) {
+          return nullptr;
+      }
+
+      if (zip_entry_openbyindex(zip, 1)) {
+          return nullptr;
+      }
+
+      char* buf = nullptr;
+      size_t bufSize;
+      zip_entry_read(zip, (void**)&buf, &bufSize);
+
+      zip_entry_close(zip);
+      zip_stream_close(zip);
+
+      return buf;
+  }
+
+  Composition* model_parse(char* str, size_t length) {
+      auto input = str;
+
+      auto dotLottie = checkDotLottie(str);
+      if (dotLottie) {
+          input = uncompressZip(str, length);
+      }
+
+      LookaheadParserHandler obj(input);
+
+      if (dotLottie) free(input);
+
+      if (obj.VerifyType()) {
+          obj.parseComposition();
+          auto composition = obj.composition();
+          if (composition) {
+              return composition;
+          }
+      }
+      return nullptr;
+  }
+  ```
+
+test "rank1679: the fixed revision terminates the buffer, guards the null return and frees after the parse"
+  lang cpp
+  file src/lottie/lottieparser.cpp
+  reject VYQL-MEM-007
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <cstddef>
+
+  struct zip_t;
+  struct Composition { int frames; };
+
+  zip_t* zip_stream_open(const char* stream, size_t size, int cache, char mode);
+  int zip_entry_openbyindex(zip_t* zip, int index);
+  long zip_entry_read(zip_t* zip, void** buf, size_t* bufsize);
+  void zip_entry_close(zip_t* zip);
+  void zip_stream_close(zip_t* zip);
+
+  struct LookaheadParserHandler {
+      LookaheadParserHandler(char* str);
+      bool VerifyType();
+      int parseComposition();
+      Composition* composition();
+  };
+
+  static bool checkDotLottie(const char* str) {
+      return str[0] == 0x50 && str[1] == 0x4B;
+  }
+
+  static char* uncompressZip(const char* str, size_t length) {
+      auto zip = zip_stream_open(str, length, 0, 'r');
+      if (!zip) {
+          return nullptr;
+      }
+
+      if (zip_entry_openbyindex(zip, 1)) {
+          zip_stream_close(zip);
+          return nullptr;
+      }
+
+      char* buf = nullptr;
+      size_t bufSize;
+      zip_entry_read(zip, (void**)&buf, &bufSize);
+
+      zip_entry_close(zip);
+      zip_stream_close(zip);
+
+      if (buf == nullptr || bufSize == 0) {
+          free(buf);
+          return nullptr;
+      }
+
+      char* terminatedBuf = static_cast<char*>(realloc(buf, bufSize + 1));
+      if (!terminatedBuf) {
+          free(buf);
+          return nullptr;
+      }
+
+      terminatedBuf[bufSize] = '\0';
+      return terminatedBuf;
+  }
+
+  Composition* model_parse(char* str, size_t length) {
+      auto input = str;
+
+      auto dotLottie = checkDotLottie(str);
+      if (dotLottie) {
+          input = uncompressZip(str, length);
+          if (!input) {
+              return nullptr;
+          }
+      }
+
+      LookaheadParserHandler obj(input);
+
+      bool ok = obj.VerifyType();
+      int parsed = ok ? obj.parseComposition() : 0;
+      Composition* composition = parsed ? obj.composition() : nullptr;
+
+      if (dotLottie) free(input);
+
+      return composition;
+  }
+  ```

@@ -1,0 +1,72 @@
+# Rank 1613 / CVE-2026-41242: protobuf.js accepted .proto message
+# names without filtering, so a crafted type declaration containing
+# __proto__ or other special characters reached the object model's
+# keyed lookups and polluted Object.prototype for the parser's
+# process (prototype pollution through an unfiltered type name,
+# CWE-1321/CWE-75; #2124, fixed by #2127). The Type constructor in
+# src/type.js stored `this.name = name` verbatim -- the name comes
+# from the parsed .proto file. The fixing commit ff7b2afef8
+# ("fix: filter invalid characters from the type
+# name (#2127)", +1 line): `name = name.replace(/\W/g, "")` strips
+# every non-word character before the name is stored. No pool
+# correction.
+#
+# ATTENTION, identifier sanitisation at parse boundaries. The same
+# untrusted-identifier family as ranks 1605 (Pritunl's profile id)
+# and 1584 (Oro's query keys): the parser accepts an identifier from
+# untrusted input and the object model uses it as a property key --
+# nothing can ask "is every parsed identifier reduced to a safe
+# alphabet before it becomes a property name", because the
+# pollution happens through JavaScript's key semantics rather than
+# an assignment rule can see. A binding on protobuf.js's own Type
+# would detect this library rather than the weakness. Measured on
+# the real code: scanning src/type.js reports zero findings at both
+# revisions. No ENGINE-GAPS.md entry. No definition change shipped.
+# Spec cve_rank1613 records the raw name store and the filtered
+# form, both asserting reject VYQL-INJ-013: when parsed-identifier
+# vocabulary lands, the raw form must flip to expect.
+
+test "rank1613: the type name is stored verbatim"
+  lang javascript
+  file src/type.js
+  reject VYQL-INJ-013
+  code
+  ```
+  class Type extends NamespaceBase {
+
+      constructor(name, options) {
+          super(name, options);
+
+          this.name = name;
+          this.fields = {};
+      }
+
+      add(field) {
+          this.fields[field.name] = field;
+          return this;
+      }
+  }
+  ```
+
+test "rank1613: the fixed revision strips non-word characters"
+  lang javascript
+  file src/type.js
+  reject VYQL-INJ-013
+  code
+  ```
+  class Type extends NamespaceBase {
+
+      constructor(name, options) {
+          super(name, options);
+
+          name = name.replace(/\W/g, "");
+          this.name = name;
+          this.fields = {};
+      }
+
+      add(field) {
+          this.fields[field.name] = field;
+          return this;
+      }
+  }
+  ```

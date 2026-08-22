@@ -1,0 +1,112 @@
+# Rank 1600 / CVE-2026-47392: PraisonAI's agent code sandbox blocked
+# a dunder attribute list that omitted the C-builtins escape hatch,
+# so sandboxed code reaching `len.__self__` (and siblings) obtained
+# the real builtins module and escaped the restricted environment
+# (sandbox escape through blocklist incompleteness,
+# CWE-693/CWE-94; GHSA-4mr5-g6f9-cfrh, fixed in the "security batch
+# - 10 hardening fixes" merge). _validate_code_ast in
+# src/praisonai-agents/praisonaiagents/tools/python_tools.py walked
+# the AST rejecting _SANDBOX_BLOCKED_ATTRS members -- without
+# '__self__' (the in-code comment credits the GHSA: "C builtins leak
+# real builtins module"), the frame/code introspection attributes
+# (gi_frame, cr_frame, f_globals and friends), and the
+# get/setattr-family overrides. The row is corrected in place:
+# the row held a72e156c4d (the v4.6.40 release bump); the real fix
+# is b0d8f777528f3253a0cfb0a3ef65455da6ae32f6, the PR #1684 merge
+# named by the advisory. 
+#
+# ATTENTION, blocklist completeness. The sandbox exists and its AST
+# walk runs -- the defect is the same enumeration-completeness gap
+# as rank 1575 (picklescan's globals table): the Python object
+# model offers more escape hatches than the list names, and nothing
+# can ask "does the sandbox's attribute blocklist cover every
+# introspection path to the builtins module" -- that is
+# language-semantics knowledge (the change derives it from CPython's
+# C-level binding rules). A binding on PraisonAI's own sandbox
+# would detect this application rather than the weakness. Measured
+# on the real code: scanning python_tools.py reports 7 findings at
+# both revisions (its own exec-path heuristics; unchanged by the
+# fix). No ENGINE-GAPS.md entry. No definition change shipped.
+# Spec cve_rank1600 records the sandbox without __self__ and the
+# completed blocklist, both asserting reject VYQL-INJ-003: when
+# blocklist-completeness vocabulary lands, the missing-entry form
+# must flip to expect.
+
+test "rank1600: the sandbox blocks a list without the c escape"
+  lang python
+  file src/praisonai-agents/praisonaiagents/tools/python_tools.py
+  reject VYQL-INJ-003
+  code
+  ```
+  import ast
+
+  _SANDBOX_BLOCKED_ATTRS = frozenset({
+      '__subclasses__', '__bases__', '__mro__', '__globals__',
+      '__code__', '__class__', '__dict__', '__builtins__',
+      '__import__', '__loader__', '__spec__', '__init_subclass__',
+      '__set_name__', '__reduce__', '__reduce_ex__',
+      '__traceback__', '__qualname__', '__module__',
+      '__wrapped__', '__closure__', '__annotations__',
+  })
+
+  def _validate_code_ast(code):
+      try:
+          tree = ast.parse(code)
+      except SyntaxError:
+          return None
+
+      for node in ast.walk(tree):
+          if isinstance(node, ast.Attribute):
+              if node.attr in _SANDBOX_BLOCKED_ATTRS:
+                  return f"Access to attribute '{node.attr}' is restricted"
+      return None
+
+  def run_sandboxed(code):
+      problem = _validate_code_ast(code)
+      if problem:
+          return problem
+      return execute_restricted(code)
+  ```
+
+test "rank1600: the fixed revision blocks the builtins escape attributes"
+  lang python
+  file src/praisonai-agents/praisonaiagents/tools/python_tools.py
+  reject VYQL-INJ-003
+  code
+  ```
+  import ast
+
+  _SANDBOX_BLOCKED_ATTRS = frozenset({
+      '__subclasses__', '__bases__', '__mro__', '__globals__',
+      '__code__', '__class__', '__dict__', '__builtins__',
+      '__import__', '__loader__', '__spec__', '__init_subclass__',
+      '__set_name__', '__reduce__', '__reduce_ex__',
+      '__traceback__', '__qualname__', '__module__',
+      '__wrapped__', '__closure__', '__annotations__',
+      '__self__',  # C builtins leak real builtins module (GHSA-4mr5-g6f9-cfrh)
+      'gi_frame', 'gi_code', 'cr_frame', 'cr_code',
+      'ag_frame', 'ag_code', 'tb_frame', 'tb_next',
+      'f_globals', 'f_locals', 'f_builtins', 'f_code',
+      'co_consts', 'co_names',
+      '__getattribute__', '__getattr__', '__setattr__', '__delattr__',
+      '__dir__', '__get__', '__set__', '__delete__',
+  })
+
+  def _validate_code_ast(code):
+      try:
+          tree = ast.parse(code)
+      except SyntaxError:
+          return None
+
+      for node in ast.walk(tree):
+          if isinstance(node, ast.Attribute):
+              if node.attr in _SANDBOX_BLOCKED_ATTRS:
+                  return f"Access to attribute '{node.attr}' is restricted"
+      return None
+
+  def run_sandboxed(code):
+      problem = _validate_code_ast(code)
+      if problem:
+          return problem
+      return execute_restricted(code)
+  ```

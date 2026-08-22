@@ -4106,3 +4106,17 @@ binding commandOptionInjection1520 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["spawn", "child_process.spawn", "spawnSync", "child_process.spawnSync", "execFile", "child_process.execFile", "execFileSync", "child_process.execFileSync"]) and containsAny(node.context.assign, ["=['-", "=[\"-"]) and containsAny(node.context.assign, ["'].concat(", "\"].concat("]) and not containsAny(node.context.regex, ["^-", "^\\-", "^[-]"]) and not containsAny(node.context.callPath, ["startsWith", "escape", "Escape", "quote", "Quote"]) and not containsAny(node.context.assign, ["'--'", "\"--\""])
   emit issue code.CommandOptionInjection at node
 }
+
+binding incompleteShellSubstitutionDenylist2213 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains ".test" and node.context.literal contains "$\\(" and node.context.literal contains "=\\(" and not (node.context.literal contains "(e:")
+  emit issue code.IncompleteShellSubstitutionDenylist at node
+}
+
+binding allowlistValidation1912 {
+  query pattern callExpr where callee.path ~= "isValidHost"
+  emit check core.AllowlistValidation at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

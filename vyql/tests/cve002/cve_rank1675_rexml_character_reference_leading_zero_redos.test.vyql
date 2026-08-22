@@ -1,0 +1,226 @@
+# Rank 1675 / CVE-2024-49761 (GHSA-2rxp-v6pw-ch6m): REXML's base parser
+# unescapes entity references in parsed XML with a static regex whose `0*`
+# prefix and whose first alternation branch `\\d+` can both consume the same
+# run of `0` characters, so the engine must retry every split of that run --
+# a ReDoS quadratic in the number of digits between `&#` and `x...;`
+# (CWE-1333 inefficient regular expression complexity, CWE-400).
+#
+# `Private::CHARACTER_REFERENCES` (lib/rexml/parsers/baseparser.rb:153 at the
+# fix parent) is `/&#0*((?:\\d+)|(?:x[a-fA-F0-9]+));/`, and
+# `BaseParser#unnormalize` applies it to the string it is handed with a
+# global `rv.gsub!(Private::CHARACTER_REFERENCES) { ... }` (baseparser.rb:571).
+# The string is parsed XML content, which is the input an XML parser exists to
+# accept, so the cost is entirely the attacker's; the advisory's trigger is
+# "many digits between &# and x...; in a hex numeric character reference", and
+# only Ruby 3.1's regexp engine is affected. The fixed revision removes the `0*` prefix
+# entirely: leading zeros before `x` are invalid XML character references
+# anyway (the added regression test asserts `&#x61;&#0x61;` unescapes to the
+# literal text `a&#0x61;`), and a digit run then has exactly one consumer --
+# `\\d+` alone -- instead of two overlapping ones.
+#
+# The pool row is correct in every field: ce59f2eb1aeb is a real, readable,
+# single-library-file commit plus its regression test ("parser: fix a bug that
+# &#0x...; is accepted as a character reference"), the vulnerable regex with
+# the `0*` prefix is present at its parent, the remediation (no `0*`, and the
+# simplified block that parses the `x` prefix explicitly) is present at the
+# commit itself, and the v3.3.9 release tag contains it. .
+#
+# ATTENTION, engine gap -- the same classifier family rank 1648 recorded for
+# the rails-html-sanitizer url() regex, re-measured here rather than inherited,
+# with a different specific trigger: this pattern's ambiguity is a *run-split*
+# between a prefix quantifier and a nested class branch, not the polynomial
+# backtracking of an unanchored lazy class.
+#
+# What fires today, measured. `vyql match` over the real
+# lib/rexml/parsers/baseparser.rb at the vulnerable revision reports no label of any
+# kind at :153 (the definition) or :571 (the gsub); the only sink labels in
+# the file are `code.RegexMatch`/`code.RegexMatchSink` on the two *interpolated*
+# literals at :111 and :147, both of which contain `(?:#{ATTDEF})*`, a repeated
+# group with a repeat inside. Bounded scans (`--cache off --max-ram 6GB`) of
+# the full checkout at both revisions report 98 findings each and the two
+# finding sets are byte-identical, with nothing on baseparser.rb at all.
+#
+# The diagnosis: `rubyRegexMayBacktrack` (internal/extract/frontend/
+# treesitter/ruby.go:1152) answers false for this literal, so it lowers to a
+# bare `nir.Const` (ruby.go:1078) and no `__regex.match` call node exists for
+# `regexMatch205` (vyql/bindings/ruby/m5a48bf47.vyql:1125) to label. Under it,
+# `regexambig.Ambiguous` returns false because the pattern has neither a
+# repeated group containing a repeat nor two *sibling* single-character
+# repeats: `regexSplitsOneCharRun` (internal/extract/regexambig/
+# regexambig.go:616) scans one branch's top-level atoms only, and the second
+# consumer of the zero-run -- `\\d+` -- is nested inside the *unquantified*
+# alternation group `((?:\\d+)|(?:x[a-fA-F0-9]+))`, so the atom scan sees only
+# the group (a non-repeat) and stops at it. `rubyRegexMayBacktrack`'s own
+# same-quantified-literal-in-two-branches check splits at the `|` inside the
+# group and finds one quantified literal. The overlap computation the shape
+# needs exists in the package (`regexRepeatOverlapsContinuation`,
+# regexambig.go:425) but only uses to *withdraw* a report during
+# disambiguation, never to raise one.
+#
+# The binding route is measured and is expressible but not shippable. A probe
+# binding keying `0*((?:` in `node.context.literal` fired at the module-scope
+# and all three nested class-scope presence nodes of a repro of the real code,
+# so the pattern text is reachable at module and class scope and a text binding
+# discriminates 1 -> 0 against the patched literal. It fails genericity: the
+# only key a text binding can hold is this CVE's own spelling. The same
+# run-split written `\\d*(?:\\d+|...)`, `[0-9]*((?:[0-9]+)|...)`, or with any
+# other leading character is invisible to it, and the module/class scope
+# clause is itself an artifact of this project placing the regex in
+# `module Private` -- rank 1648's same-family pattern sat inline in a method
+# body, in function scope. Enumerated across the campaign's clones (14,368
+# non-test .rb files, 10,627 unique regex literals): a single unescaped
+# literal character carrying a backtracking quantifier followed by an
+# overlapping unbounded continuation occurs exactly once -- this CVE's own
+# literal -- so the needle list is the incident's fingerprint, not a weakness
+# class. That is AGENTS.md's genericity test failing, and it is the family
+# outcome ranks 1343 and 1648 measured (the discriminator is not in the
+# pattern text).
+#
+# The engine fix this rank would need is a new classification trigger in the
+# shared leaf package -- promote `regexRepeatOverlapsContinuation` to a report
+# trigger for a single-char backtracking repeat whose continuation's first set
+# contains that character, or descend into unquantified alternation groups in
+# `regexSplitsOneCharRun`. Either changes which regexes are called ambiguous
+# for every language sharing the package (the JS frontend at
+# javascript.go:1113 and the shared lowering at lowering.go:2163), and reverses
+# a precision restriction the code documents in place ("Restricted to
+# single-character sets ... flagging those reports most real-world regexes").
+# Not mechanical. A second, independent blocker sits on the taint route even
+# after classification: the pattern is defined as a module constant 400 lines
+# from its use, so a classified literal produces its node at the definition
+# with no edge to the consuming `gsub!`, and -- as rank 1648 measured with an
+# isolating pair -- a regex supplied as a call argument lowers to an
+# `__regex.match` node whose only argument is the pattern text, with no link
+# to the receiver it is applied to. Only the presence route (VYQL-DOS-003 at
+# the definition site) could ever report this spelling.
+#
+# The isolating pair below holds the source fixed and varies only how the
+# second consumer of the zero-run is spelled: a sibling single-character
+# repeat, which the classifier sees today, versus the digit class inside the
+# unquantified alternation group, which it does not.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1675: the character-reference regex splits a zero run between the 0* prefix and the nested digit branch"
+  lang ruby
+  file lib/rexml/parsers/baseparser.rb
+  profile library
+  reject VYQL-DOS-001
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  module REXML
+    module Parsers
+      class BaseParser
+        module Private
+          CHARACTER_REFERENCES = /&#0*((?:\d+)|(?:x[a-fA-F0-9]+));/
+        end
+        private_constant :Private
+
+        def unnormalize( string, entities=nil, filter=nil )
+          rv = string.dup
+          matches = rv.scan( REFERENCE_RE )
+          return rv if matches.size == 0
+          rv.gsub!( Private::CHARACTER_REFERENCES ) {
+            m=$1
+            m = "0#{m}" if m[0] == ?x
+            [Integer(m)].pack('U*')
+          }
+          rv
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1675: the fixed regex leaves one consumer for a digit run and the block parses the x prefix explicitly"
+  lang ruby
+  file lib/rexml/parsers/baseparser.rb
+  profile library
+  reject VYQL-DOS-001
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  module REXML
+    module Parsers
+      class BaseParser
+        module Private
+          CHARACTER_REFERENCES = /&#((?:\d+)|(?:x[a-fA-F0-9]+));/
+        end
+        private_constant :Private
+
+        def unnormalize( string, entities=nil, filter=nil )
+          rv = string.dup
+          matches = rv.scan( REFERENCE_RE )
+          return rv if matches.size == 0
+          rv.gsub!( Private::CHARACTER_REFERENCES ) {
+            m=$1
+            if m.start_with?("x")
+              code_point = Integer(m[1..-1], 16)
+            else
+              code_point = Integer(m, 10)
+            end
+            [code_point].pack('U*')
+          }
+          rv
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1675 pair: the same run-split with the second consumer as a sibling single-char repeat is reported"
+  lang ruby
+  profile library
+  expect VYQL-DOS-002
+  code
+  ```
+  class CharRef
+    def call(value)
+      case value
+      when /&#0*0+;/
+        "a"
+      else
+        value
+      end
+    end
+  end
+  ```
+
+test "rank1675 pair: the CVE's spelling, the digit class inside the unquantified alternation group, is not reported"
+  lang ruby
+  profile library
+  reject VYQL-DOS-002
+  code
+  ```
+  class CharRef
+    def call(value)
+      case value
+      when /&#0*((?:\d+)|(?:x[a-fA-F0-9]+));/
+        "a"
+      else
+        value
+      end
+    end
+  end
+  ```
+
+test "rank1675 pair: the fixed spelling keeps the alternation and drops the 0* prefix"
+  lang ruby
+  profile library
+  reject VYQL-DOS-002
+  code
+  ```
+  class CharRef
+    def call(value)
+      case value
+      when /&#((?:\d+)|(?:x[a-fA-F0-9]+));/
+        "a"
+      else
+        value
+      end
+    end
+  end
+  ```

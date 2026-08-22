@@ -1,0 +1,107 @@
+# Rank 1662 / CVE-2018-11219: Redis' bundled Lua struct package took
+# its unpack offset straight from the script (attacker-controlled
+# through EVAL), stored it in a size_t, and gated the buffer read with
+# a check whose sum can wrap (CWE-190 leading to an out-of-bounds
+# read, CWE-125; GHSA-pqpx-gpvg-4m34). b_unpack in
+# deps/lua/src/lua_struct.c did `size_t pos = luaL_optinteger(L, 3, 1)
+# - 1;` -- a negative script offset wraps to a huge size_t -- and then
+# guarded each read with `luaL_argcheck(L, pos+size <= ld, 2, "data
+# string too short")`, where pos+size wraps past SIZE_MAX back to a
+# small value, passes the guard, and the `data+pos` reads
+# (getinteger, memcpy, lua_pushlstring, memchr) land before the data
+# pointer; the commit's own PoC is
+# `return struct.unpack('f', "xxxxxxxxxxxxx",-3)`. The fixing commit
+# e89086e0 ("Security: fix Lua struct
+# package offset handling."): the offset is checked against its floor
+# before the 1-based adjustment -- `luaL_argcheck(L, pos > 0, 3,
+# "offset must be 1 or greater"); pos--;` -- and the upper-bound
+# check is rewritten into the wrap-safe form `size <= ld && pos <= ld
+# - size` (the form the 'c0' branch uses). No row
+# correction.
+#
+# ATTENTION, uncorrelated buffer offset. The Lua C-API boundary is
+# unlabelled, and labelling it does not discriminate: a probe source
+# binding on luaL_optinteger/luaL_checkinteger (code.ExternalEntryInput
+# at call.result) makes VYQL-NUM-003/VYQL-MEM-005/VYQL-MEM-003 fire
+# from the offset through the `data+pos` arithmetic -- 28 findings on
+# this tree (13 in lua_struct.c, 15 in lstrlib.c's own optinteger
+# use) -- identically at both revisions, because the fixed revision neither
+# removes the offset nor the arithmetic; it makes the guard sound.
+# The discriminator is which of two arithmetic forms the bound check
+# takes (`pos+size <= ld`, wrappable, versus `size <= ld && pos <= ld
+# - size`) plus the added `pos > 0` floor: relating a buffer's length
+# out-param (ld from luaL_checklstring) to the offset indexing it, and
+# deciding whether a comparison's operands can wrap, is range
+# analysis, not a pattern over one expression -- the same bounded-
+# index family recorded for ranks 1096/1102/1151 (and 1213's
+# unsigned-wraparound guard), with the floor half the same axis as the
+# ccHasUpperBoundGuard row (1026/1032). The generic C
+# core.IntegerOverflowGuard binding (integerOverflowGuard211) keys on
+# *_MAX limit constants, which neither form mentions, and a
+# luaL_argcheck check binding would credit both revisions equally --
+# the vulnerable form's own argcheck is present at the same loop.
+# Measured on the real code: scanning the redis checkout reports the
+# same lua_struct.c findings at both revisions (VYQL-MEM-003/-016 on
+# the two memcpy sites from the fmt-derived size axis,
+# VYQL-MEM-005 rows, the offset axis silent without the probe).
+# No definition change shipped: the probe adds 28 findings and zero
+# discrimination. Spec cve_rank1662 records the wrapping-sum guard
+# and the floored/subtraction-form guard -- the two snippets differ
+# only in the two argcheck forms -- both asserting reject
+# VYQL-MEM-003: when the offset is correlated with the buffer length
+# it indexes, the wrapping-sum form must flip to expect.
+
+test "rank1662: the unpack offset is gated by a wrapping sum"
+  lang c
+  file deps/lua/src/lua_struct.c
+  reject VYQL-MEM-003
+  code
+  ```
+  typedef struct lua_State lua_State;
+  extern const char *luaL_checklstring(lua_State *L, int n, unsigned long *l);
+  extern long luaL_optinteger(lua_State *L, int n, long d);
+  extern void luaL_argcheck(lua_State *L, int cond, int narg, const char *msg);
+
+  int b_unpack(lua_State *L)
+  {
+      unsigned long ld;
+      const char *data = luaL_checklstring(L, 2, &ld);
+      unsigned long pos = luaL_optinteger(L, 3, 1) - 1;
+      unsigned long size = 4;
+
+      luaL_argcheck(L, pos + size <= ld, 2, "data string too short");
+
+      float f;
+      memcpy(&f, data + pos, size);
+      return 1;
+  }
+  ```
+
+test "rank1662: the fixed revision floors the offset and subtracts the bound"
+  lang c
+  file deps/lua/src/lua_struct.c
+  reject VYQL-MEM-003
+  code
+  ```
+  typedef struct lua_State lua_State;
+  extern const char *luaL_checklstring(lua_State *L, int n, unsigned long *l);
+  extern long luaL_optinteger(lua_State *L, int n, long d);
+  extern void luaL_argcheck(lua_State *L, int cond, int narg, const char *msg);
+
+  int b_unpack(lua_State *L)
+  {
+      unsigned long ld;
+      const char *data = luaL_checklstring(L, 2, &ld);
+      unsigned long pos = luaL_optinteger(L, 3, 1);
+      luaL_argcheck(L, pos > 0, 3, "offset must be 1 or greater");
+      pos--;
+      unsigned long size = 4;
+
+      luaL_argcheck(L, size <= ld && pos <= ld - size,
+                       2, "data string too short");
+
+      float f;
+      memcpy(&f, data + pos, size);
+      return 1;
+  }
+  ```

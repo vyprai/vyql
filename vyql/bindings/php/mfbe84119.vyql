@@ -2825,3 +2825,54 @@ binding redirectAllowlist481 {
     }
   }
 }
+
+binding storedDataRead620 {
+  query pattern callExpr where callee.path ~= "$_SESSION"
+  emit source code.StoredDataRead at call.result
+}
+
+// rcube_utils::get_input_value() and rcube_utils::get_input_string()
+// are Roundcube's documented request-parameter readers ("Read request
+// parameter value and convert it for internal use"); both read
+// $_GET/$_POST/$_COOKIE, so every call result is request data. The
+// string form only coerces the type, it validates nothing -- binding
+// both is what keeps a reader-form swap from reading as a fix.
+binding roundcubeRequestRead590 {
+  query pattern callExpr where callee.path ~= "rcube_utils.get_input_value"
+  emit source code.HttpInput at call.result
+}
+
+binding roundcubeRequestReadString591 {
+  query pattern callExpr where callee.path ~= "rcube_utils.get_input_string"
+  emit source code.HttpInput at call.result
+}
+
+// rcube_session::append($path, $key, $value) is Roundcube's session
+// store write: the dotted $path becomes the session variable name and
+// $key a subkey, with attacker-reachable bytes landing in the blob
+// the store's custom serializer emits raw
+// (`$var . '|' . serialize($value)`) and its custom decoder feeds to
+// native unserialize(). Writing request data into a session store is
+// the CWE-501 crossing code.TrustBoundary already covers for plain
+// $_SESSION subscripts; this covers the framework wrapper form. The
+// name position is where the parameter name comes from, so any
+// argument may carry the crossing.
+binding sessionStoreAppend592 {
+  query pattern callExpr where callee.path ~= "session.append"
+  emit sink code.TrustBoundary at args.any
+}
+
+// rcube_utils::is_simple_string() is the documented `^[\w.-]+$`
+// allowlist check; when its result gates the request the checked
+// value passed the allowlist. Dominance coverage, not a path
+// transform: the call tests its argument, it does not clean it, and
+// the rule decides a dominating check neutralises the crossing.
+binding roundcubeSimpleString593 {
+  query pattern callExpr where callee.path ~= "rcube_utils.is_simple_string"
+  emit check core.InputValidation at call {
+    covers dominates {
+      from: call
+      to: call
+    }
+  }
+}

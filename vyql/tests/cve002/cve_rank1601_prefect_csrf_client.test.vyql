@@ -1,0 +1,96 @@
+# Rank 1601 / CVE-2023-6022: Prefect's orchestration client sent
+# state-changing requests to the (often localhost) orchestration API
+# with no CSRF token, so a malicious page in the same browser could
+# drive a user's local Prefect server cross-site (cross-site request
+# forgery against the local API, CWE-352; PR #12314). The client in
+# src/prefect/client/base.py issued POST/PUT/PATCH/DELETE through
+# plain httpx with no challenge-response -- nothing bound a request
+# to the client the API trusts. The fixing commit 227dfcc7e3
+# ("Add CSRF support to orchestration client
+# (#12314)"): the client gains enable_csrf_support with a per-client
+# uuid (csrf_client_id), a server-fetched expiring csrf_token
+# attached to every change request (_add_csrf_headers), and a
+# 403-"Invalid CSRF token" retry that clears and re-fetches the
+# token; orchestration.py enables the support and settings expose
+# the tokens. .
+#
+# ATTENTION, csrf-decision completeness at the API client. The same
+# family as ranks 1567 (phpbb form key), 1581 (pkp forms) and 1592
+# (polarlearn oauth state): the guard is a protocol-level
+# challenge-response the corpus's app-specific CSRF patterns cannot
+# see, and nothing can ask "does every state-changing client request
+# carry the token" -- protocol-client vocabulary. A binding on
+# Prefect's own client would detect this application rather than
+# the weakness. Measured on the real code: scanning base.py reports
+# 1 finding at the parent and 3 at the fixed revision (the new rows are
+# heuristic noise on the added code; the gap itself is never
+# visible). No ENGINE-GAPS.md entry. No definition change shipped.
+# Spec cve_rank1601 records the plain change request and the
+# token-attached form, both asserting reject VYQL-AUTH-079: when
+# csrf-client vocabulary lands, the plain form must flip to
+# expect.
+
+test "rank1601: change requests carry no challenge token"
+  lang python
+  file src/prefect/client/base.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  import httpx
+
+
+  class PrefectHttpxClient(httpx.AsyncClient):
+      async def send(self, request, *args, **kwargs):
+          response = await super().send(request, *args, **kwargs)
+          return response
+
+      async def create_flow(self, name):
+          return await self.post("/flows/", json={"name": name})
+  ```
+
+test "rank1601: the fixed revision attaches a csrf token to every change"
+  lang python
+  file src/prefect/client/base.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  import uuid
+  from datetime import datetime, timezone
+
+  import httpx
+  from prefect.client.schemas.objects import CsrfToken
+
+
+  class PrefectHttpxClient(httpx.AsyncClient):
+      def __init__(self, *args, enable_csrf_support=False, **kwargs):
+          self.enable_csrf_support = enable_csrf_support
+          self.csrf_token = None
+          self.csrf_token_expiration = None
+          self.csrf_client_id = uuid.uuid4()
+          super().__init__(*args, **kwargs)
+
+      async def _add_csrf_headers(self, request):
+          if self.csrf_token is None or (
+              self.csrf_token_expiration
+              and datetime.now(timezone.utc) > self.csrf_token_expiration
+          ):
+              response = await self.get(
+                  "/csrf/token",
+                  params={"client": str(self.csrf_client_id)},
+              )
+              token = CsrfToken(**response.json())
+              self.csrf_token = token.token
+              self.csrf_token_expiration = token.expiration
+
+          request.headers["x-prefect-csrf"] = self.csrf_token
+          request.headers["x-prefect-csrf-client"] = str(self.csrf_client_id)
+
+      async def send(self, request, *args, **kwargs):
+          is_change_request = request.method.lower() in {"post", "put", "patch", "delete"}
+          if self.enable_csrf_support and is_change_request:
+              await self._add_csrf_headers(request)
+          return await super().send(request, *args, **kwargs)
+
+      async def create_flow(self, name):
+          return await self.post("/flows/", json={"name": name})
+  ```

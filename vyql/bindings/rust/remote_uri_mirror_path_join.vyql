@@ -1,0 +1,34 @@
+module bindings.rust.remote_uri_mirror_path_join;
+
+// A client that mirrors remote content to a local tree derives each mirror
+// location from a locator the remote server published: the URI of a snapshot
+// or delta out of an RRDP notification file, a link out of a listing page, a
+// URL out of a manifest. Joining the locator's string form onto a local base
+// directory hands the server control of the path components -- a `..` segment
+// walks the join out of the base, and the file or directory that gets created
+// there lands with the mirroring process's privileges. The URI is remote data
+// even when it reaches this crate already constructed: the notification file
+// is parsed by a dependency, so no source label can meet the fs::File::create
+// sink inside the client.
+//
+// The shape is the join and the materialisation in one function: a Path::join
+// fed by the string form of a uri/url value, and a file or directory creation
+// on the result. The locator spellings are the borrow accessors -- as_str and
+// path -- because the Display render (url.to_string()) is how a URL is written
+// into prose and templates, not how it is joined: apollo-router's changeset
+// tool renders p.url.to_string() into markdown text in the same function that
+// joins a locally typed slug, and that is not a remote name reaching a path.
+// to_str is excluded with it, as a prefix of the render spelling. The
+// neutralising markers are std's own containment and
+// traversal vocabulary -- starts_with or strip_prefix against the base, a
+// components() walk, a ParentDir or CurDir arm, canonicalize, is_absolute, a
+// named sanitizer, or a literal "." / ".." segment comparison -- so a check
+// written in place is honoured, and a fix that extracts the checked path
+// construction into a helper takes the join out of the storing function.
+// Reading a joined URI back is deliberately outside this binding: the
+// download-and-store shape is what carries the write, and read-side traversal
+// is the taint rules' job.
+binding remoteUriMirrorPathJoin {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call == "join" and containsAny(node.context.selector, ["uri.as_str", "url.as_str", "uri.path", "url.path"]) and containsAny(node.context.callPath, ["File.create", "create_dir_all", "create_dir", "fs.write", "fs.copy", "fs.rename", "fs.hard_link", "fs.symlink"]) and not (containsAny(node.context.call, ["starts_with", "strip_prefix", "components", "canonicalize", "is_absolute", "sanitize"])) and not (containsAny(node.context.callPath, ["ParentDir", "CurDir"])) and not (node.token contains "\"..\"") and not (node.token contains "\".\"")
+  emit issue code.RemoteListingDownloadPath at node
+}

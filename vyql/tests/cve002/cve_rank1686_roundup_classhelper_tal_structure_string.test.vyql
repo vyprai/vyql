@@ -1,0 +1,136 @@
+# Rank 1686 / CVE-2024-39124: the Roundup classhelper popups rendered the
+# `property` and `form` query parameters into a `<script>` element through a
+# ZPT `tal:content` whose expression carried the `structure` modifier, so the
+# interpolated values reached the page unescaped and a crafted
+# `?@template=help&property=</script><script>...` URL executed in the popup
+# (CWE-79). `structure` is ZPT's documented "emit the result without HTML
+# quoting" switch; the fixed revision drops it and leaves the interpolation alone, so
+# the discriminating fact is the modifier, not any value. The fixing commit commit
+# 860e3c8d0 remediates exactly this CVE in 24 template lines across the five
+# shipped tracker templates plus website/issues; the same commit's
+# roundup/cgi/client.py hunks belong to CVE-2024-39125 (Referer reflected
+# through an unescaped error message) and CVE-2024-39126 (Content-Security-
+# Policy on downloads), so the pool row's `python` language field names the
+# repository, not the file the fixed revision lands in. No row correction: repo, CVE
+# and commit are all correct.
+#
+# ATTENTION, template-attribute value spans lines -- the whole weakness lives
+# in `tal:content="structure string:..."` attribute values, which no `.html`
+# route reads as a unit. The JavaScript frontend extracts only the bytes
+# between `<script>` and `</script>` (`htmlScriptSource`,
+# internal/extract/frontend/treesitter/javascript.go:207) and the element is
+# empty here because the generated script *is* the attribute value; the
+# config frontend's `.html` paths are `scanHTMLReferrerLinks` and the
+# `config_text_template_*` scopes, and `scanTextTemplate`
+# (internal/extract/frontend/config/config.go:312) evaluates every rule
+# against one trimmed line, as does `scanTemplateExpressions` at :378 for the
+# jelly/jsp scopes -- its only cross-line state is a sticky `escapeActive`
+# flag and a variable-alias set. Roundup's own layout puts the `structure
+# string:` opener and the `${request/form/...}` interpolation two to three
+# lines apart, so "raw string expression that interpolates a request path"
+# is not expressible. Measured on the real templates, three runs each side:
+# a `tal` scope with the line needle `structure string:` reports 36 findings
+# at the parent and still 14 at the fixed revision -- 10 on page.html's
+# `string:$m <br/>` message renders, 2 on milestone.item.html's
+# `string:Created on`, and 2 on the static `<script>` bodies the fixed revision itself
+# split out of _generic.help-submit.html, which carry no interpolation at
+# all, so the binding would flag lines the remediation wrote; narrowing the
+# needle to `structure string:<!--` (the legacy script-hiding idiom) gives a
+# clean 14 -> 0 but catches only 14 of the 24 vulnerable instances -- the
+# same weakness written without the comment idiom, as roundup's own calendar
+# and help templates are, walks past it, which is the repro-shape test and
+# not a binding worth keeping. Nothing is labelled on the real files today:
+# `vyql match` on the classhelper template reports no source, sink or
+# control, and the unmodified scanner reports 25 VYQL-INJ-028 rows on this
+# tree at both revisions, all of them the jinja2 family's `|safe` filters,
+# identical before and after. No definition change shipped. Spec
+# cve_rank1686 records the classhelper script block unescaped, escaped, and
+# the ordinary `structure context/.../field` widget form, all asserting
+# reject VYQL-INJ-028: when template attribute values are extracted as a
+# unit, the first must flip to expect and the other two must not.
+
+test "rank1686: a classhelper popup renders request parameters into a script element with the structure modifier"
+  lang config
+  file _generic.help.html
+  reject VYQL-INJ-028
+  code
+  ```
+  <html tal:define="property request/form/property/value | nothing">
+    <head>
+      <link rel="stylesheet" type="text/css" href="@@file/style.css" />
+      <tal:block tal:condition="python:'property' in request.form">
+      <title><tal:x tal:content="property | default" i18n:translate="" /> help</title>
+      <script language="Javascript" type="text/javascript"
+          tal:content="structure string:
+          // this is the name of the field in the original form that we're working on
+          form  = window.opener.document.${request/form/form/value};
+          field  = '${request/form/property/value}';">
+      </script>
+      </tal:block>
+    </head>
+   <body class="body" onload="resetList();">
+   <form name="frm_help" tal:attributes="action request/base"
+         tal:define="props python:request.form['properties'].value.split(',')">
+     <input type="text" name="text_preview" size="24" class="preview"
+            onchange="reviseList(this.value);"/>
+   </form>
+   </body>
+  </html>
+  ```
+
+test "rank1686: the classhelper popup escapes the interpolated script block"
+  lang config
+  file _generic.help.html
+  reject VYQL-INJ-028
+  code
+  ```
+  <html tal:define="property request/form/property/value | nothing">
+    <head>
+      <link rel="stylesheet" type="text/css" href="@@file/style.css" />
+      <tal:block tal:condition="python:'property' in request.form">
+      <title><tal:x tal:content="property | default" i18n:translate="" /> help</title>
+      <script language="Javascript" type="text/javascript"
+          tal:content="string:
+          // this is the name of the field in the original form that we're working on
+          form  = window.opener.document.${request/form/form/value};
+          field  = '${request/form/property/value}';">
+      </script>
+      </tal:block>
+    </head>
+   <body class="body" onload="resetList();">
+   <form name="frm_help" tal:attributes="action request/base"
+         tal:define="props python:request.form['properties'].value.split(',')">
+     <input type="text" name="text_preview" size="24" class="preview"
+            onchange="reviseList(this.value);"/>
+   </form>
+   </body>
+  </html>
+  ```
+
+test "rank1686: a helper that hands a built field widget through keeps the structure modifier"
+  lang config
+  file user.register.html
+  reject VYQL-INJ-028
+  code
+  ```
+  <html tal:define="property request/form/property/value | nothing">
+    <head>
+      <title>Register</title>
+    </head>
+   <body class="body">
+   <form method="POST" name="itemSynopsis"
+         tal:attributes="action context/designator">
+   <table class="form">
+    <tr>
+     <th i18n:translate="">Username</th>
+     <td tal:content="structure context/username/field">username</td>
+    </tr>
+    <tr>
+     <th i18n:translate="">Password</th>
+     <td tal:content="structure context/password/field">password</td>
+    </tr>
+   </table>
+   </form>
+   </body>
+  </html>
+  ```

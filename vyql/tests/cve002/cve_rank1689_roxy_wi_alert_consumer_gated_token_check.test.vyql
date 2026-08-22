@@ -1,0 +1,118 @@
+# roxy-wi's CGI endpoints are module-level scripts under app/, and the
+# token gate in app/options.py ran only when an unrelated request
+# parameter is absent:
+#
+#     if form.getvalue('alert_consumer') is None:
+#         if not sql.check_token_exists(form.getvalue("token")):
+#             print('error: Your token has been expired')
+#             sys.exit()
+#
+# A POST to /app/options.py carrying alert_consumer=notNull reached every
+# downstream handler -- log viewing, certificate operations, SSH command
+# execution -- with no credential checked at all (CWE-288, an alternate
+# path around the authentication control; GHSA-hr76-3hxp-5mm3). The fixed revision
+# makes the gate unconditional, validates the token's UUID form first,
+# and deletes the parameter's handler entirely.
+#
+# The row names a different commit than the row names release commit
+# 2e060eb (v6.1.1.0), which never touches app/options.py, and its parent
+# is the fixing change -- 6d6b4e0babfddf0a0f28f3f7349923a781c844a2
+# (an ancestor of both the tag and the row's commit) is the fixing fix:
+# it drops the alert_consumer guard and removes the handler. The
+# language field is python, not javascript; the javascript in the row's
+# diff is a toastr string check in inc/users.js from the same release.
+#
+# ATTENTION, conditional authentication. The credential check is present
+# in both revisions and sits in the same module scope in both; what the
+# fix changes is whether it runs. That is the wiring/configuration
+# family of 1514, 1535, 1540, 1556, 1557 and 1593 with a new member: the
+# control does not move out of the file, it is merely skipped on an
+# attacker-chosen branch. Diagnosis on the real code: nothing is
+# labelled at the gate -- cgi.FieldStorage.getvalue has no Python
+# request-source binding at all (the 86 existing code.HttpInput source
+# bindings cover request.*/req.*/self.request.* receivers, not the
+# stdlib cgi module), and sql.check_token_exists is a project-internal
+# name, so a binding naming it would be repro-shaped. Even with both
+# labels, no rule could discriminate: core.AuthenticationCheck coverage
+# (VYQL-AUTH-001's unless clause, VYQL-SMELL-STATE/DATA) is
+# presence-based, and a check inside an if whose condition reads request
+# input counts as covering exactly as much as an unconditional one. The
+# 1380 counterweight fails: form.getvalue("token") and
+# sql.check_token_exists survive into the fixed revision identically, so no
+# API-documented call separates the forms; keying on alert_consumer
+# itself is the fixing commit's own vocabulary. Measured on the real
+# code: 423 findings at 6d6b4e0^ against 422 at the fixed revision, diffing only
+# by line shifts on the same DynamicCommandExec sinks; and an
+# upper-bound probe binding every getvalue/getfirst/getlist call as
+# code.HttpInput adds 107 findings on the vulnerable tree (21 vs 20
+# VYQL-INJ-001 command injections) with the same non-discriminating
+# delta on the fixed tree, so no form of the missing request-source
+# binding catches this CVE. No definition change shipped. Spec
+# cve_rank1689 records the gated and unconditional gate, both asserting
+# reject VYQL-AUTH-001: when check coverage becomes
+# condition-aware -- a credential check nested under a conditional that
+# reads request input without covering the endpoint -- the gated form
+# must flip to expect.
+
+test "roxy-wi: the token check runs only when the alert consumer parameter is absent"
+  lang python
+  file app/options.py
+  reject VYQL-AUTH-001
+  code
+  ```
+  import sys
+
+  import funct
+  import sql
+
+  form = funct.form
+  serv = funct.is_ip_or_dns(form.getvalue('serv'))
+
+  if form.getvalue('alert_consumer') is None:
+      if not sql.check_token_exists(form.getvalue("token")):
+          print('error: Your token has been expired')
+          sys.exit()
+
+  if form.getvalue('getcerts') is not None and serv is not None:
+      cert_path = sql.get_setting('cert_path')
+      commands = ["sudo ls -1t " + cert_path + " |grep -E 'pem|crt|key'"]
+      try:
+          funct.ssh_command(serv, commands, ip="1")
+      except Exception as e:
+          print('error: Cannot connect to the server: ' + e.args[0])
+  ```
+
+test "roxy-wi: fix checks the token unconditionally and validates its UUID form"
+  lang python
+  file app/options.py
+  reject VYQL-AUTH-001
+  code
+  ```
+  import sys
+  from uuid import UUID
+
+  import funct
+  import sql
+
+  form = funct.form
+  serv = funct.is_ip_or_dns(form.getvalue('serv'))
+  token = form.getvalue("token")
+
+  try:
+      uuid_obj = UUID(token, version=4)
+  except ValueError:
+      print('error: Your token is not valid')
+      sys.exit()
+
+  if not sql.check_token_exists(token):
+      print('error: Your token has been expired')
+      sys.exit()
+
+  if form.getvalue('getcerts') is not None and serv is not None:
+      cert_path = sql.get_setting('cert_path')
+      commands = ["sudo ls -1t " + cert_path + " |grep -E 'pem|crt|key'"]
+      try:
+          funct.ssh_command(serv, commands, ip="1")
+      except Exception as e:
+          print('error: Cannot connect to the server: ' + e.args[0])
+  ```

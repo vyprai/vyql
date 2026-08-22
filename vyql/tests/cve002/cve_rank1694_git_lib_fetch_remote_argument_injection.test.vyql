@@ -1,0 +1,108 @@
+# CVE-2022-25648: ruby-git's Git::Lib#fetch placed a caller-supplied remote
+# name into the git argument vector with nothing before it to end option
+# parsing (CWE-74, CWE-88).
+#
+#   def fetch(remote, opts)
+#     arr_opts = [remote]
+#     arr_opts << opts[:ref] if opts[:ref]
+#     ...
+#     command('fetch', arr_opts)
+#   end
+#
+# Lib#command shell-quotes every element (escape_for_sh wraps each in single
+# quotes), so there is no shell metacharacter route -- but quoting does not
+# stop git from *parsing* the argument. A remote named
+# `--upload-pack=touch VULNERABILITY_EXISTS;` is one shell-safe token that git
+# reads as an option, and `git fetch --upload-pack=...` executes the named
+# program as the transport helper. The library's public fetch passes the
+# string straight through (Git::Base#fetch -> self.lib.fetch(remote, opts)),
+# so the value is whatever the application holds in its remote variable.
+#
+# Fix 291ca0946b reorders the vector and inserts the end-of-options separator
+# ahead of both positional values: `arr_opts << '--'; arr_opts << remote;
+# arr_opts << opts[:ref]`. After `--`, git treats every following argument as
+# a refspec, so no spelling of the remote can become an option.
+#
+# Same weakness class as the cocoapods-downloader ls-remote vector (recorded
+# at rank 1050, which pinned the orphaned sink, the missing `--` control
+# concept and the invisible backtick) and the isomorphic-git clone vector
+# (binding commandOptionInjection252 in
+# vyql/bindings/javascript/mfb63017a.vyql): a caller-controlled positional
+# enters a git argv with no `--` ahead of it. Detection here is presence
+# based, the same route those took, and the existing rule VYQL-INJ-031 judges
+# it: binding gitArgvPositionalValueLeadsVector
+# (vyql/bindings/ruby/git_argv_positional_value.vyql) reports the function
+# whose argument vector is initialized directly from the positional name
+# (Git::Lib#fetch's `arr_opts = [remote]`), which is the spelling that puts
+# the caller value at index 0 where no separator can precede it; the remediated
+# spelling initializes the vector empty and appends `--` first. VYQL-VAL-004
+# fires on the same label as a second consumer of the concept.
+#
+# A taint route cannot discriminate this fix: `remote` reaches the runner in
+# both revisions (the escape is shell quoting, and `--` clears no taint), so
+# the end-of-options separator would have to be a control concept -- rank
+# 1050's missing-vocabulary finding, which still stands: no concept declares
+# an argument separator, and code.CommandOptionInjectionSink remains
+# unconsumed by any rule. Nor can a presence binding key on the absence of a
+# bare `--` literal: in the Ruby frontend an analysis.function.context node
+# carries no lexical scope, so `literal:`/`call:`/`scopeCall` predicates
+# evaluate file-wide (the empty-scope fallback in scopedPredicateHitSet.matches,
+# the same family as the PHP file-wide scoping recorded in the loop notes) --
+# at the vulnerable revision, thirteen sibling methods in lib.rb append
+# '--', which silences every function in the file. The `assign:` conjunct is
+# the one function-confined route, so the discrimination rides on it.
+#
+# Measured on the real checkout: the fixed revision's parent reports VYQL-INJ-031 exactly
+# once, on Git::Lib#fetch (lib/git/lib.rb:879), stable over three --cache off
+# runs; the fixed revision reports none, same three runs; the two labels on fetch are the
+# only finding deltas between the revisions. Across every .rb file in the
+# corpus clones (~29k files) the assign shape `= [remote]` / `= [branch]` /
+# `= [treeish]` occurs only here, so the binding adds no collateral finding.
+#
+# verify_current_expected: fixed, 1 -> 0.
+
+test "rank1694: a caller-named remote leads the fetch argument vector"
+  lang ruby
+  file lib/git/lib.rb
+  expect VYQL-INJ-031
+  code
+  ```
+  module Git
+    class Lib
+      def fetch(remote, opts)
+        arr_opts = [remote]
+        arr_opts << opts[:ref] if opts[:ref]
+        arr_opts << '--tags' if opts[:t] || opts[:tags]
+        arr_opts << '--prune' if opts[:p] || opts[:prune]
+        arr_opts << '--unshallow' if opts[:unshallow]
+        arr_opts << '--depth' << opts[:depth] if opts[:depth]
+
+        command('fetch', arr_opts)
+      end
+    end
+  end
+  ```
+
+test "rank1694: the patched fetch ends option parsing before the positional values"
+  lang ruby
+  file lib/git/lib.rb
+  reject VYQL-INJ-031
+  code
+  ```
+  module Git
+    class Lib
+      def fetch(remote, opts)
+        arr_opts = []
+        arr_opts << '--tags' if opts[:t] || opts[:tags]
+        arr_opts << '--prune' if opts[:p] || opts[:prune]
+        arr_opts << '--unshallow' if opts[:unshallow]
+        arr_opts << '--depth' << opts[:depth] if opts[:depth]
+        arr_opts << '--'
+        arr_opts << remote
+        arr_opts << opts[:ref] if opts[:ref]
+
+        command('fetch', arr_opts)
+      end
+    end
+  end
+  ```

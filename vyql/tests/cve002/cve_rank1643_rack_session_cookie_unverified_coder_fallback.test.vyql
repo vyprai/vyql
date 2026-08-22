@@ -1,0 +1,166 @@
+# CVE-2026-39324: Rack::Session::Cookie fell back to the unverified
+# coder when decryption failed. In unpacked_cookie_data
+# (lib/rack/session/cookie.rb), a cookie the configured encryptors
+# could not decrypt left session_data nil, and the branch
+#
+#   elsif !session_data && coder
+#     session_data = coder.decode(cookie_data)
+#
+# handed the raw cookie to the coder -- Base64::Marshal by default,
+# whose decode runs ::Marshal.load(super(str)). A forged plain
+# Base64::Marshal cookie thereforee deserialized unauthenticated in
+# any deployment that had configured :secrets (untrusted
+# deserialization, CWE-502). The fixed revision adds encryptors.empty? to the
+# guard, so a deployment with encryptors rejects the cookie instead of
+# falling back.
+#
+# ATTENTION, engine gap plus a configuration-shaped guard.
+#
+# 1. The taint chain is intact except for one hop. request.cookies[key]
+#    is labelled code.HttpInput (ruby.input) and ::Marshal.load is
+#    labelled code.Deserialization (ruby.sinks), but coder.decode never
+#    resolves: Ruby dispatch reaches resolveTargets with no receiver
+#    type (nothing records the type of @coder = options[:coder] ||=
+#    Base64::Marshal.new -- an op-assign hides the constructor call at
+#    lowering.go:3065, and the attr_reader spelling `coder` is not
+#    linked to the ivar), so the call falls to the
+#    unique-method-name-across-program fallback (lowering.go:5112).
+#    `decode` is defined in six classes in cookie.rb, the fallback
+#    short-circuits ambiguous, and taint terminates at the call. The
+#    first test below reports the identical chain with one `decode`
+#    definition in the file -- proving the source, the sink, and the
+#    super(s) argument hop all work -- while the second, differing only
+#    in a second class defining decode, stays silent.
+# 2. The guard the fixed revision adds is runtime configuration, not dataflow.
+#    With the ambiguity removed (single decode definition), the
+#    patched form `elsif !session_data && encryptors.empty? && coder`
+#    still reports VYQL-DESER-001 -- measured on the third test's
+#    single-decode twin. The path cookie -> coder.decode ->
+#    Marshal.load exists in both revisions; only the encryptor
+#    configuration decides it, which taint cannot see. The 1380
+#    counterweight fails: the one call the fixed revision leaves inside the
+#    guarded method is encryptors.empty?, this library's own reader,
+#    and a core.SafeDeserialization binding keyed on it would be this
+#    patch's own vocabulary rather than anything derivable from the
+#    documentation. Same family as the configuration-side fixes at
+#    1514/1535/1540/1556/1557/1593.
+#
+# On the real tree at f43638c^ the scan reports 10 findings, identical
+# at the fixed revision; the Marshal.load rows source from library.param-source
+# (the decode parameter itself), not the cookie. When Ruby receiver
+# types land, tests two and three start reporting and must be
+# re-measured against the real revisions.
+
+test "rack session cookie fallback: a unique coder decode reports the unverified deserialization"
+  lang ruby
+  file lib/rack/session/cookie.rb
+  expect VYQL-DESER-001
+  code
+  ```
+  class Coder
+    def decode(str)
+      Marshal.load(super(str)) rescue nil
+    end
+  end
+
+  class Session
+    attr_reader :coder
+
+    def initialize(options = {})
+      @coder = options[:coder] ||= Coder.new
+    end
+
+    def unpacked_cookie_data(request)
+      if cookie_data = request.cookies["rack.session"]
+        session_data = coder.decode(cookie_data)
+      end
+      session_data || {}
+    end
+  end
+  ```
+
+test "rack session cookie fallback: a second decode definition silences the chain"
+  lang ruby
+  file lib/rack/session/cookie.rb
+  reject VYQL-DESER-001
+  code
+  ```
+  class CoderBase
+    def decode(str)
+      Base64.decode64(str)
+    end
+  end
+
+  class Coder < CoderBase
+    def decode(str)
+      Marshal.load(super(str)) rescue nil
+    end
+  end
+
+  class Session
+    attr_reader :coder
+
+    def initialize(options = {})
+      @coder = options[:coder] ||= Coder.new
+    end
+
+    def unpacked_cookie_data(request)
+      if cookie_data = request.cookies["rack.session"]
+        session_data = coder.decode(cookie_data)
+      end
+      session_data || {}
+    end
+  end
+  ```
+
+test "rack session cookie fallback: the encryptors.empty? guard does not clear the path"
+  lang ruby
+  file lib/rack/session/cookie.rb
+  reject VYQL-DESER-001
+  code
+  ```
+  class CoderBase
+    def decode(str)
+      Base64.decode64(str)
+    end
+  end
+
+  class Coder < CoderBase
+    def decode(str)
+      Marshal.load(super(str)) rescue nil
+    end
+  end
+
+  class Encryptor
+    def decrypt(data)
+      raise "invalid message"
+    end
+  end
+
+  class Session
+    attr_reader :coder, :encryptors
+
+    def initialize(options = {})
+      @encryptors = [Encryptor.new]
+      @coder = options[:coder] ||= Coder.new
+    end
+
+    def unpacked_cookie_data(request)
+      if cookie_data = request.cookies["rack.session"]
+        session_data = nil
+        encryptors.each do |encryptor|
+          begin
+            session_data = encryptor.decrypt(cookie_data)
+            break
+          rescue
+            next
+          end
+        end
+        if !session_data && encryptors.empty? && coder
+          session_data = coder.decode(cookie_data)
+        end
+      end
+      session_data || {}
+    end
+  end
+  ```

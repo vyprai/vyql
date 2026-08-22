@@ -1,0 +1,93 @@
+# Rank 1605 / CVE-2016-7063: Pritunl's macOS client built privileged
+# paths from the server-supplied profile id without filtering, so a
+# crafted id carrying traversal segments escaped its directory and
+# overwrote privileged files (path traversal to privilege escalation,
+# CWE-22/CWE-78; reported by Anthony Weems of Praetorian; fixed in
+# release 1.0.1116.6). The profile handling in service/profile/
+# profile.go used p.Id verbatim in the paths the privileged helper
+# writes. The row is corrected in place: it held 0e5559c2ba
+# (the "Set version" release commit -- the nocommit flag holds);
+# the real fix is 2c4c6bf6c3, "Filter profile id to prevent path
+# traversal leading to privilege escalation on macOS": a new
+# FilterStr in service/profile/utils.go strips every non-alphanumeric
+# character (`regexp.MustCompile("[^a-zA-Z0-9]+")`) and profile.go
+# applies it -- `p.Id = FilterStr(p.Id)` -- before any use. No
+
+#
+# ATTENTION, identifier sanitisation at trust boundaries. The id
+# arrives from the (potentially hostile) server and becomes a path
+# component -- the same untrusted-identifier family as rank 1568
+# (phpipam's table name): nothing can ask "is every externally
+# supplied identifier reduced to a safe alphabet before use in a
+# path or command", because FilterStr is project-local and the
+# flow crosses the client-server boundary. A binding on Pritunl's
+# own FilterStr would detect this client rather than the weakness.
+# Measured on the real code: scanning service/profile/profile.go
+# reports zero findings at both revisions. No ENGINE-GAPS.md entry.
+# No definition change shipped. Spec cve_rank1605 records the raw
+# id reaching the path join and the filtered form, both asserting
+# reject VYQL-PATH-001: when identifier-sanitisation vocabulary
+# lands, the raw form must flip to expect.
+
+test "rank1605: the profile id reaches paths unfiltered"
+  lang go
+  file service/profile/profile.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package profile
+
+  import (
+      "path/filepath"
+  )
+
+  type Profile struct {
+      Id   string
+      Name string
+  }
+
+  func (p *Profile) ConfPath(baseDir string) string {
+      return filepath.Join(baseDir, p.Id, "conf.ovpn")
+  }
+
+  func (p *Profile) LogPath(baseDir string) string {
+      return filepath.Join(baseDir, p.Id, "log")
+  }
+  ```
+
+test "rank1605: the fixed revision strips the id to its alphabet"
+  lang go
+  file service/profile/profile.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package profile
+
+  import (
+      "path/filepath"
+      "regexp"
+  )
+
+  var alphaNumRe = regexp.MustCompile("[^a-zA-Z0-9]+")
+
+  func FilterStr(input string) string {
+      return string(alphaNumRe.ReplaceAll([]byte(input), []byte("")))
+  }
+
+  type Profile struct {
+      Id   string
+      Name string
+  }
+
+  func (p *Profile) Filter() {
+      p.Id = FilterStr(p.Id)
+  }
+
+  func (p *Profile) ConfPath(baseDir string) string {
+      return filepath.Join(baseDir, p.Id, "conf.ovpn")
+  }
+
+  func (p *Profile) LogPath(baseDir string) string {
+      return filepath.Join(baseDir, p.Id, "log")
+  }
+  ```

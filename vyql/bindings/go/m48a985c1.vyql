@@ -1927,3 +1927,13 @@ binding requestScopePolicyReviewApiCallFetch349 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.functionName contains "Fetch" and node.context.callPath contains "SubstituteAllInType" and node.context.callPath contains "Execute" and not (node.context.selector contains "policyNamespace")
   emit issue code.RequestScopePolicyReview at node
 }
+
+binding weakJwtSecret920 {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "type.context" and containsAny(node.context.fieldTag, ["env:\\\"JWT_SECRET\\\"", "env:\\\"JWT_SECRET,", "env:\\\"JWT_SIGNING_SECRET\\\"", "env:\\\"JWT_SIGNING_SECRET,", "env:\\\"TOKEN_SECRET\\\"", "env:\\\"TOKEN_SECRET,", "env:\\\"SESSION_SECRET\\\"", "env:\\\"SESSION_SECRET,", "env:\\\"SIGNING_SECRET\\\"", "env:\\\"SIGNING_SECRET,", "env:\\\"HMAC_SECRET\\\"", "env:\\\"HMAC_SECRET,", "env:\\\"AUTH_SECRET\\\"", "env:\\\"AUTH_SECRET,", "env:\\\"COOKIE_SECRET\\\"", "env:\\\"COOKIE_SECRET,", "env:\\\"SECRET_KEY\\\"", "env:\\\"SECRET_KEY,", "envconfig:\\\"JWT_SECRET\\\"", "envconfig:\\\"JWT_SECRET,", "envconfig:\\\"JWT_SIGNING_SECRET\\\"", "envconfig:\\\"JWT_SIGNING_SECRET,", "envconfig:\\\"TOKEN_SECRET\\\"", "envconfig:\\\"TOKEN_SECRET,", "envconfig:\\\"SESSION_SECRET\\\"", "envconfig:\\\"SESSION_SECRET,", "envconfig:\\\"SIGNING_SECRET\\\"", "envconfig:\\\"SIGNING_SECRET,", "envconfig:\\\"HMAC_SECRET\\\"", "envconfig:\\\"HMAC_SECRET,", "envconfig:\\\"AUTH_SECRET\\\"", "envconfig:\\\"AUTH_SECRET,", "envconfig:\\\"COOKIE_SECRET\\\"", "envconfig:\\\"COOKIE_SECRET,", "envconfig:\\\"SECRET_KEY\\\"", "envconfig:\\\"SECRET_KEY,"]) and not containsAny(node.context.fieldTag, ["validate:\\\"gte=", "validate:\\\"min=", "validate:\\\"len=", ",gte=", ",min=", ",len="])
+  emit issue code.WeakJwtSecret at node
+}
+
+binding handshakeConfirmedInitialKeysNotDropped977 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "cryptoStreamHandler.SetHandshakeConfirmed" and node.context.callPath contains "dropEncryptionLevel" and not (node.context.callArg contains "dropEncryptionLevel:protocol.EncryptionInitial")
+  emit issue code.ProtocolStateReview at node
+}

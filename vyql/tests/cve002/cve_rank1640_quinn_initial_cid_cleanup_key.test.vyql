@@ -1,0 +1,442 @@
+# Rank 1640 / CVE-2024-45311 (GHSA-vr26-jcq5-fjj8, RUSTSEC-2024-0373):
+# quinn-proto's server endpoint keyed its incoming-connection routing map by the
+# destination connection ID of the packet that created the entry, but cleaned
+# those entries up by the original destination connection ID recorded inside the
+# retry token, so after a retry the two values differ and the cleanup removed
+# the wrong key or nothing at all. A processed attempt could therefore leave a
+# stale `RouteDatagramTo::Incoming(idx)` entry behind, and the next packet whose
+# DCID routes to it indexes a slab slot that isdy gone --
+# `&mut self.incoming_buffers[incoming_idx]` at quinn-proto/src/endpoint.rs:213
+# panics on the vacant key. A remote unauthenticated peer triggers this at will,
+# so the impact is availability (the advisory's 7.5). A second half of the same
+# defect: the zero-length-CID insert path (`insert_initial_incoming`) had no
+# `len() == 0` guard while its sibling `insert_initial` did, so a zero-length
+# DCID -- legal QUIC, identified by address rather than CID -- left the same
+# stale entry behind because neither `accept` (guarded by `dst_cid.len() != 0`)
+# nor `ConnectionIndex::remove` (guarded by `conn.init_cid.len() > 0`) ever
+# reclaimed it.
+#
+# Pool row verified in every field: e01609ccd8 is the advisory's own merge from
+# the private fork ("Merge commit from fork"); the parent c292a3c carries the
+# vulnerable shape at three cleanup sites -- `remove_initial(incoming
+# .orig_dst_cid)` at endpoint.rs:576 and :605 inside `accept`, and again at :805
+# inside `clean_up_incoming` (called by `retry`, `refuse` and `ignore`) -- while
+# every insert path keys by the packet's CID (`insert_initial_incoming
+# (header.dst_cid, ...)` at :534, `insert_initial(dst_cid, ...)` at :655). The
+# remediation is present at the fixed revision: all three cleanups remove by the packet's
+# CID, the zero-length guards are centralised inside the three ConnectionIndex
+# methods (:1026, :1035, :1044) where no call site can bypass them, and
+# `ConnectionIndex::remove` is gated on `conn.side.is_server()` instead of a
+# CID length. Both halves of the 1390 check hold. .
+#
+# What fires without this change: nothing. `scan --cache off` over the parent
+# reports 102 findings -- 102 VYQL-MEM-006, 8 VYQL-CRY-003, 2 VYQL-MEM-009 --
+# and the fixed revision reports the same 102 at the same constructs (the only
+# diff is line-number drift where the change adds lines); the ten endpoint.rs
+# rows are NullableDeref noise on method-chain derefs at :286-:903, none of them
+# the cleanup sites, the insert sites or the slab index. Findings in the file
+# are not coverage. `vyql match` on endpoint.rs reports no source labels at all,
+# and the map operations are labelled only incidentally (the generic
+# `callee.method == "insert"` TrustBoundary binding).
+#
+# The discriminating fact is not derivable from any function-local evidence,
+# measured two ways with throwaway probes (removed, not shipped):
+#
+# 1. A function-scoped binding on the call-argument token
+#    `remove_initial:incoming.orig_dst_cid` discriminates the revision pair 2
+#    (accept, clean_up_incoming) -> 0 -- but purely by matching the argument
+#    spelling the fixed revision changes. `orig_dst_cid`, `dst_cid` and `retry_src_cid` are
+#    all documented connection IDs; nothing in quinn's documentation or the QUIC
+#    RFC says which one keys the internal map, so nobody writes this binding
+#    from the library's documentation alone -- it recognises this patch, not the
+#    weakness, and a variant that passes `retry_src_cid` (case (d), equally
+#    wrong) walks past it. The 1394 trap, in the argument rather than the name.
+#
+# 2. No function context contains both the insert and any remove: a combined
+#    probe over `insert_initial_incoming` and `remove_initial` in one
+#    function-scoped context matches zero functions. The insert lives in
+#    `handle_first_packet`, the removes in `accept`, `clean_up_incoming` and
+#    `ConnectionIndex::remove` -- separate functions of one `impl`, and Rust
+#    function facts are function-local with no impl-level context node (the
+#    1364 family). Even with that hop, the question that separates the revisions
+#    is value identity between two same-typed fields whose equality depends on
+#    protocol state (before vs after a retry), which no observation models.
+#
+# Vocabulary considered and rejected: UnboundedProtocolStateByIdentifier
+# (VYQL-DOS-008, the rule pinned below) is the nearest active rule -- the stale
+# entries do accumulate one per attacker-chosen DCID with no reclamation, and
+# the DoS class matches -- but its only binding is Go, and its condition asks
+# for per-identifier size limits that this defect does not turn on.
+# UnboundedStateGrowthReview has no consuming rule (inert). ProtocolStateReview
+# (VYQL-AUTH-082, the 1364 concept) judges a missing gate on accepted protocol
+# data; here the packet is routed by the map exactly as designed and the defect
+# is the map's own bookkeeping. The panic-family concepts
+# (EmmettUnhandledCookieParseException, CookieMaxAgeDurationSecondsPanic,
+# NilMapMergeWritePanic, Free5gcChfRechargeInfoSplitPanic) are parser-triggered
+# panics in specific components, one component over. UncaughtFfiUnwind is the
+# FFI boundary. None fires, and none could: the missing piece is state-key
+# consistency vocabulary -- whether an entry is reclaimed under the key it holds
+# stored under -- which is not a localised construct but an invariant, so no
+# ENGINE-GAPS.md entry. A binding on quinn's own endpoint.rs would detect this
+# crate rather than the weakness.
+#
+# verify_current_expected: attention-vocabulary-gap, all four forms rejected;
+# when state-reclamation vocabulary lands, (a), (c) and (d) must flip to expect
+# VYQL-DOS-008 and (b) must not.
+
+test "rank1640: (a) cleanup removes the incoming-connection entry by the pre-retry original destination CID while every insert keyed by the packet's CID"
+  lang rust
+  file quinn-proto/src/endpoint.rs
+  reject VYQL-DOS-008
+  code
+  ```
+  use slab::Slab;
+  use std::collections::HashMap;
+
+  pub struct ConnectionId(Vec<u8>);
+  impl ConnectionId {
+      fn len(&self) -> usize { self.0.len() }
+  }
+  pub struct ConnectionHandle(usize);
+  pub struct IncomingBuffer { pub total_bytes: u64 }
+
+  enum RouteDatagramTo {
+      Incoming(usize),
+      Connection(ConnectionHandle),
+  }
+
+  pub struct Incoming {
+      pub packet: InitialPacket,
+      pub retry_src_cid: Option<ConnectionId>,
+      pub orig_dst_cid: ConnectionId,
+      pub incoming_idx: usize,
+  }
+  pub struct InitialPacket {
+      pub header: InitialHeader,
+  }
+  pub struct InitialHeader {
+      pub src_cid: ConnectionId,
+      pub dst_cid: ConnectionId,
+  }
+
+  pub struct Endpoint {
+      index: ConnectionIndex,
+      incoming_buffers: Slab<IncomingBuffer>,
+  }
+
+  pub struct ConnectionIndex {
+      connection_ids_initial: HashMap<ConnectionId, RouteDatagramTo>,
+  }
+
+  impl ConnectionIndex {
+      /// Associate an incoming connection with its initial destination CID
+      fn insert_initial_incoming(&mut self, dst_cid: ConnectionId, incoming_key: usize) {
+          self.connection_ids_initial
+              .insert(dst_cid, RouteDatagramTo::Incoming(incoming_key));
+      }
+
+      /// Remove an association with an initial destination CID
+      fn remove_initial(&mut self, dst_cid: ConnectionId) {
+          self.connection_ids_initial.remove(&dst_cid);
+      }
+
+      /// Associate a connection with its initial destination CID
+      fn insert_initial(&mut self, dst_cid: ConnectionId, connection: ConnectionHandle) {
+          self.connection_ids_initial
+              .insert(dst_cid, RouteDatagramTo::Connection(connection));
+      }
+  }
+
+  impl Endpoint {
+      fn handle_first_packet(&mut self, header: InitialHeader) -> Incoming {
+          let orig_dst_cid = header.dst_cid;
+          let incoming_idx = self.incoming_buffers.insert(IncomingBuffer { total_bytes: 0 });
+          self.index.insert_initial_incoming(header.dst_cid, incoming_idx);
+          Incoming {
+              packet: InitialPacket { header },
+              retry_src_cid: None,
+              orig_dst_cid,
+              incoming_idx,
+          }
+      }
+
+      /// Attempt to accept this incoming connection (an error may still occur)
+      pub fn accept(&mut self, incoming: Incoming) -> Result<(ConnectionHandle,), ()> {
+          let InitialHeader { dst_cid, .. } = incoming.packet.header;
+
+          if self.cids_exhausted() {
+              self.index.remove_initial(incoming.orig_dst_cid);
+              return Err(());
+          }
+
+          let ch = ConnectionHandle(self.incoming_buffers.vacant_key());
+          if dst_cid.len() != 0 {
+              self.index.insert_initial(dst_cid, ch);
+          }
+          Ok((ch,))
+      }
+
+      fn cids_exhausted(&self) -> bool { false }
+
+      /// Clean up endpoint data structures associated with an `Incoming`.
+      fn clean_up_incoming(&mut self, incoming: &Incoming) {
+          self.index.remove_initial(incoming.orig_dst_cid);
+          self.incoming_buffers.remove(incoming.incoming_idx);
+      }
+
+      pub fn retry(&mut self, incoming: Incoming) { self.clean_up_incoming(&incoming); }
+      pub fn refuse(&mut self, incoming: Incoming) { self.clean_up_incoming(&incoming); }
+      pub fn ignore(&mut self, incoming: Incoming) { self.clean_up_incoming(&incoming); }
+  }
+  ```
+
+test "rank1640: (b) cleanup removes by the packet's CID and the zero-length guard lives inside the map methods"
+  lang rust
+  file quinn-proto/src/endpoint.rs
+  reject VYQL-DOS-008
+  code
+  ```
+  use slab::Slab;
+  use std::collections::HashMap;
+
+  pub struct ConnectionId(Vec<u8>);
+  impl ConnectionId {
+      fn len(&self) -> usize { self.0.len() }
+  }
+  pub struct ConnectionHandle(usize);
+  pub struct IncomingBuffer { pub total_bytes: u64 }
+
+  enum RouteDatagramTo {
+      Incoming(usize),
+      Connection(ConnectionHandle),
+  }
+
+  pub struct Incoming {
+      pub packet: InitialPacket,
+      pub retry_src_cid: Option<ConnectionId>,
+      pub orig_dst_cid: ConnectionId,
+      pub incoming_idx: usize,
+  }
+  pub struct InitialPacket {
+      pub header: InitialHeader,
+  }
+  pub struct InitialHeader {
+      pub src_cid: ConnectionId,
+      pub dst_cid: ConnectionId,
+  }
+
+  pub struct Endpoint {
+      index: ConnectionIndex,
+      incoming_buffers: Slab<IncomingBuffer>,
+  }
+
+  pub struct ConnectionIndex {
+      connection_ids_initial: HashMap<ConnectionId, RouteDatagramTo>,
+  }
+
+  impl ConnectionIndex {
+      /// Associate an incoming connection with its initial destination CID
+      fn insert_initial_incoming(&mut self, dst_cid: ConnectionId, incoming_key: usize) {
+          if dst_cid.len() == 0 {
+              return;
+          }
+          self.connection_ids_initial
+              .insert(dst_cid, RouteDatagramTo::Incoming(incoming_key));
+      }
+
+      /// Remove an association with an initial destination CID
+      fn remove_initial(&mut self, dst_cid: ConnectionId) {
+          if dst_cid.len() == 0 {
+              return;
+          }
+          let removed = self.connection_ids_initial.remove(&dst_cid);
+          debug_assert!(removed.is_some());
+      }
+
+      /// Associate a connection with its initial destination CID
+      fn insert_initial(&mut self, dst_cid: ConnectionId, connection: ConnectionHandle) {
+          if dst_cid.len() == 0 {
+              return;
+          }
+          self.connection_ids_initial
+              .insert(dst_cid, RouteDatagramTo::Connection(connection));
+      }
+  }
+
+  impl Endpoint {
+      fn handle_first_packet(&mut self, header: InitialHeader) -> Incoming {
+          let orig_dst_cid = header.dst_cid;
+          let incoming_idx = self.incoming_buffers.insert(IncomingBuffer { total_bytes: 0 });
+          self.index.insert_initial_incoming(header.dst_cid, incoming_idx);
+          Incoming {
+              packet: InitialPacket { header },
+              retry_src_cid: None,
+              orig_dst_cid,
+              incoming_idx,
+          }
+      }
+
+      /// Attempt to accept this incoming connection (an error may still occur)
+      pub fn accept(&mut self, incoming: Incoming) -> Result<(ConnectionHandle,), ()> {
+          let InitialHeader { dst_cid, .. } = incoming.packet.header;
+
+          if self.cids_exhausted() {
+              self.index.remove_initial(dst_cid);
+              return Err(());
+          }
+
+          let ch = ConnectionHandle(self.incoming_buffers.vacant_key());
+          self.index.insert_initial(dst_cid, ch);
+          Ok((ch,))
+      }
+
+      fn cids_exhausted(&self) -> bool { false }
+
+      /// Clean up endpoint data structures associated with an `Incoming`.
+      fn clean_up_incoming(&mut self, incoming: &Incoming) {
+          self.index.remove_initial(incoming.packet.header.dst_cid);
+          self.incoming_buffers.remove(incoming.incoming_idx);
+      }
+
+      pub fn retry(&mut self, incoming: Incoming) { self.clean_up_incoming(&incoming); }
+      pub fn refuse(&mut self, incoming: Incoming) { self.clean_up_incoming(&incoming); }
+      pub fn ignore(&mut self, incoming: Incoming) { self.clean_up_incoming(&incoming); }
+  }
+  ```
+
+test "rank1640: (c) a zero-length destination CID inserts a routing entry that no accept or remove path reclaims"
+  lang rust
+  file quinn-proto/src/endpoint.rs
+  reject VYQL-DOS-008
+  code
+  ```
+  use slab::Slab;
+  use std::collections::HashMap;
+
+  pub struct ConnectionId(Vec<u8>);
+  impl ConnectionId {
+      fn len(&self) -> usize { self.0.len() }
+  }
+  pub struct ConnectionHandle(usize);
+  pub struct IncomingBuffer { pub total_bytes: u64 }
+
+  enum RouteDatagramTo {
+      Incoming(usize),
+      Connection(ConnectionHandle),
+  }
+
+  pub struct ConnectionIndex {
+      connection_ids_initial: HashMap<ConnectionId, RouteDatagramTo>,
+      connection_ids: HashMap<ConnectionId, ConnectionHandle>,
+  }
+
+  pub struct ConnectionMeta {
+      init_cid: ConnectionId,
+  }
+
+  impl ConnectionIndex {
+      fn insert_initial_incoming(&mut self, dst_cid: ConnectionId, incoming_key: usize) {
+          // Zero-length CID: inserted anyway, so the empty key is shared by
+          // every connection attempt that sends one.
+          self.connection_ids_initial
+              .insert(dst_cid, RouteDatagramTo::Incoming(incoming_key));
+      }
+
+      fn insert_initial(&mut self, dst_cid: ConnectionId, connection: ConnectionHandle) {
+          self.connection_ids_initial
+              .insert(dst_cid, RouteDatagramTo::Connection(connection));
+      }
+
+      fn insert_cid(&mut self, cid: ConnectionId, ch: ConnectionHandle) {
+          self.connection_ids.insert(cid, ch);
+      }
+
+    /// Remove all references to a connection
+      fn remove(&mut self, conn: &ConnectionMeta) {
+          if conn.init_cid.len() > 0 {
+              self.connection_ids_initial.remove(&conn.init_cid);
+          }
+      }
+  }
+
+  pub struct Endpoint {
+      index: ConnectionIndex,
+  }
+
+  impl Endpoint {
+      pub fn accept(&mut self, dst_cid: ConnectionId) -> ConnectionHandle {
+          let ch = ConnectionHandle(0);
+          // accept overwrites the incoming entry only for non-empty CIDs
+          if dst_cid.len() != 0 {
+              self.index.insert_initial(dst_cid, ch);
+          }
+          ch
+      }
+
+      pub fn drained(&mut self, conn: &ConnectionMeta) {
+          // and remove reclaims it only for non-empty CIDs
+          self.index.remove(conn);
+      }
+  }
+  ```
+
+test "rank1640: (d) cleanup removing by the retry source CID is the same wrong-key defect under a different name"
+  lang rust
+  file quinn-proto/src/endpoint.rs
+  reject VYQL-DOS-008
+  code
+  ```
+  use std::collections::HashMap;
+
+  pub struct ConnectionId(Vec<u8>);
+  impl ConnectionId {
+      fn len(&self) -> usize { self.0.len() }
+  }
+  pub struct ConnectionHandle(usize);
+
+  enum RouteDatagramTo {
+      Incoming(usize),
+      Connection(ConnectionHandle),
+  }
+
+  pub struct Incoming {
+      pub dst_cid: ConnectionId,
+      pub retry_src_cid: Option<ConnectionId>,
+      pub incoming_idx: usize,
+  }
+
+  pub struct ConnectionIndex {
+      connection_ids_initial: HashMap<ConnectionId, RouteDatagramTo>,
+  }
+
+  pub struct Endpoint {
+      index: ConnectionIndex,
+  }
+
+  impl ConnectionIndex {
+      fn insert_initial_incoming(&mut self, dst_cid: ConnectionId, incoming_key: usize) {
+          self.connection_ids_initial
+              .insert(dst_cid, RouteDatagramTo::Incoming(incoming_key));
+      }
+
+      fn remove_initial(&mut self, dst_cid: ConnectionId) {
+          self.connection_ids_initial.remove(&dst_cid);
+      }
+  }
+
+  impl Endpoint {
+      fn handle_first_packet(&mut self, header_dst_cid: ConnectionId, idx: usize) {
+          self.index.insert_initial_incoming(header_dst_cid, idx);
+      }
+
+      /// Clean up endpoint data structures associated with an `Incoming`.
+      fn clean_up_incoming(&mut self, incoming: &Incoming) {
+          self.index
+              .remove_initial(incoming.retry_src_cid.clone().unwrap_or(incoming.dst_cid));
+      }
+
+      pub fn retry(&mut self, incoming: Incoming) { self.clean_up_incoming(&incoming); }
+      pub fn refuse(&mut self, incoming: Incoming) { self.clean_up_incoming(&incoming); }
+      pub fn ignore(&mut self, incoming: Incoming) { self.clean_up_incoming(&incoming); }
+  }
+  ```

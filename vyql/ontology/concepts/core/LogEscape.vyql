@@ -1,0 +1,8 @@
+module core;
+
+concept LogEscape : check {
+  applies: path
+  covers: [path]
+  cwe: [CWE_117]
+  neutralizes: [injection.LogInjection]
+}

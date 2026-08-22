@@ -1,0 +1,139 @@
+# Rank 1622 / CVE-2026-32708: PX4's Zenoh uORB subscriber sized a
+# stack variable-length array straight from the received payload length,
+# so a remote publisher could force an arbitrary stack allocation and
+# crash the Zenoh bridge task (stack buffer overflow, CWE-121; GHSA-
+# 69g4-hcqf-j45p). The reassembly branch of data_handler in
+# src/modules/zenoh/subscribers/uorb_subscriber.hpp did `size_t len =
+# z_bytes_len(payload);` and then `unsigned char
+# reassembled_payload[len];` -- with Z_FEATURE_UNSTABLE_API's
+# FRAG_MAX_SIZE=512 fragmentation, any payload over 512 bytes takes the
+# non-contiguous path, and a 16 MB message sizes a 16 MB VLA on a thread
+# stack. The fixing commit is not 0b6e4687d (nocommit confirmed: it
+# removes stale mavlink_tests references left by an earlier deletion and
+# touches no zenoh code); the real fix is 2d79b9ea3 on main ("fix(zenoh):
+# validate payload size before stack allocation", naming the GHSA in its
+# message; 69a6b9eee is its twin on release/1.17). The fixing correction
+# reported, not applied.
+#
+# ATTENTION, declaration-size lowering plus guard correlation. The
+# variable-length array declaration lowers to no node at all: the
+# declaration case of the C/C++/ObjC frontend visits only
+# init_declarator values, and array_declarator appears solely inside
+# declName to unwrap the identifier, so the size expression is never
+# extracted -- no taint sink and no presence target exists for the
+# allocation. Measured with a throwaway binding labelling z_bytes_len's
+# result taint.UntrustedData: the source resolves, and `vyql trace`
+# reports the taint dead-ends at the two external calls
+# (z_bytes_reader_read, dds_stream_read) because the VLA is invisible.
+# The fixed revision keeps both VLAs (`char data[_uorb_meta->o_size]` and
+# `reassembled_payload[len]`), so array presence can never discriminate:
+# the discriminator is the added `len > max_payload_size || len < 4`
+# upper-bound check, the same bound-check-vs-allocation-size
+# correlation the memory rules do not carry (rank 1370's capacity
+# parameter, rank 1580's lower-bound-only length checks, on the
+# declaration-size axis of ranks 1297/1300). A plain VLA rule is also
+# unshippable on volume: 607 VLA-shaped declarations in this tree's
+# src/, boards/ and platforms/ alone, firing identically on the patched
+# revision. Measured on the real code: the zenoh module scans 48
+# findings at both revisions, the only two on uorb_subscriber.hpp being
+# RawMemoryCopySize rows on the two constant-size memcpys in
+# fix_timestamp and the input_rc fixup -- the safe copies report, the
+# unbounded allocation does not. No definition change shipped. Spec
+# cve_rank1622 records the payload-length-sized VLA and the
+# max-payload-size-guarded form, both asserting reject VYQL-MEM-004:
+# when declaration-size vocabulary and bound correlation land, the
+# unguarded form must flip to expect.
+
+test "rank1622: the reassembly buffer is a VLA sized by the payload length"
+  lang cpp
+  file src/modules/zenoh/subscribers/uorb_subscriber.hpp
+  reject VYQL-MEM-004
+  code
+  ```
+  #include <stddef.h>
+  #include <stdint.h>
+
+  typedef struct z_loaned_sample_t z_loaned_sample_t;
+  typedef struct z_loaned_bytes_t z_loaned_bytes_t;
+  typedef struct { unsigned char *buf; size_t size; } z_bytes_reader_t;
+
+  const z_loaned_bytes_t *z_sample_payload(const z_loaned_sample_t *sample);
+  size_t z_bytes_len(const z_loaned_bytes_t *payload);
+  z_bytes_reader_t z_bytes_get_reader(const z_loaned_bytes_t *payload);
+  void z_bytes_reader_read(z_bytes_reader_t *reader, unsigned char *buf, size_t len);
+  void dds_stream_read(unsigned char *buffer, size_t len, const uint32_t *ops);
+
+  typedef struct { uint16_t o_size; } orb_metadata;
+
+  class uORB_Zenoh_Subscriber
+  {
+  public:
+  	void data_handler(const z_loaned_sample_t *sample)
+  	{
+  		char data[_uorb_meta->o_size];
+
+  		const z_loaned_bytes_t *payload = z_sample_payload(sample);
+  		size_t len = z_bytes_len(payload);
+
+  		unsigned char reassembled_payload[len];
+  		z_bytes_reader_t reader = z_bytes_get_reader(payload);
+  		z_bytes_reader_read(&reader, reassembled_payload, len);
+
+  		dds_stream_read(&reassembled_payload[4], len, _cdr_ops);
+  	}
+
+  private:
+  	const orb_metadata *_uorb_meta;
+  	const uint32_t *_cdr_ops;
+  };
+  ```
+
+test "rank1622: the fixed revision bounds the payload length before the allocation"
+  lang cpp
+  file src/modules/zenoh/subscribers/uorb_subscriber.hpp
+  reject VYQL-MEM-004
+  code
+  ```
+  #include <stddef.h>
+  #include <stdint.h>
+
+  typedef struct z_loaned_sample_t z_loaned_sample_t;
+  typedef struct z_loaned_bytes_t z_loaned_bytes_t;
+  typedef struct { unsigned char *buf; size_t size; } z_bytes_reader_t;
+
+  const z_loaned_bytes_t *z_sample_payload(const z_loaned_sample_t *sample);
+  size_t z_bytes_len(const z_loaned_bytes_t *payload);
+  z_bytes_reader_t z_bytes_get_reader(const z_loaned_bytes_t *payload);
+  void z_bytes_reader_read(z_bytes_reader_t *reader, unsigned char *buf, size_t len);
+  void dds_stream_read(unsigned char *buffer, size_t len, const uint32_t *ops);
+
+  typedef struct { uint16_t o_size; } orb_metadata;
+
+  class uORB_Zenoh_Subscriber
+  {
+  public:
+  	void data_handler(const z_loaned_sample_t *sample)
+  	{
+  		char data[_uorb_meta->o_size];
+
+  		const z_loaned_bytes_t *payload = z_sample_payload(sample);
+  		size_t len = z_bytes_len(payload);
+
+  		const size_t max_payload_size = _uorb_meta->o_size + 4;
+
+  		if (len > max_payload_size || len < 4) {
+  			return;
+  		}
+
+  		unsigned char reassembled_payload[len];
+  		z_bytes_reader_t reader = z_bytes_get_reader(payload);
+  		z_bytes_reader_read(&reader, reassembled_payload, len);
+
+  		dds_stream_read(&reassembled_payload[4], len, _cdr_ops);
+  	}
+
+  private:
+  	const orb_metadata *_uorb_meta;
+  	const uint32_t *_cdr_ops;
+  };
+  ```

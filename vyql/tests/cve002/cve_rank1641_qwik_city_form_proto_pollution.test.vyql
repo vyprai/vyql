@@ -1,0 +1,186 @@
+# Rank 1641 / CVE-2026-25150: Qwik City's form parser wrote every
+# FormData entry name it hands into nested objects, so a form field
+# named `__proto__.polluted` (or `constructor.polluted`,
+# `prototype[]`, …) set properties on Object.prototype for the server
+# process (prototype pollution, CWE-1321). formToObj in
+# packages/qwik-city/src/middleware/request-handler/request-event.ts
+# walked `[...formData.entries()]` with two nested `.reduce` calls,
+# splitting each name on '.' and assigning `object[key] = value` -- the
+# key segment reaches the prototype machinery unchecked. The fixing commit Pol commit
+# 5f65bae2bc carries the change ("refactor: form parsing", a fork merge):
+# a new `isDangerousKey` predicate rejects `__proto__`/`constructor`/
+# `prototype` at every path position and bracket key, the root and
+# nested containers become `Object.create(null)`, and the walk is
+# rewritten as a plain `for…of` loop. .
+#
+# ATTENTION, prototype pollution through special property names -- the
+# measured family of ranks 1518, 1584 and 1613, but this instance dies
+# on the dataflow, not the provenance. The sink is bound: the
+# `object[key] = …` writes lower to `__js_dynamic_property_write` and
+# VYQL-INJ-013 reports the sibling file resolve-request-handlers.ts in
+# the same directory. The chain from `request.formData()` breaks twice
+# in the engine: `.reduce` is absent from `elementCallbackMethods`
+# (internal/extract/lowering/lowering.go:216), so a reduce callback's
+# parameters inherit no taint at all where the same walk through
+# `.map` reports (third test below, which fires today); and the outer
+# callback's `([name, value])` parameter is dropped by `jsConv.params`
+# -- the destructuring-parameter gap recorded for rank 1462.
+# A third, sink-side blocker is measured: with a source label present
+# on `request.formData()` (the Fetch-API body-reader binding, ungated
+# from its `dependency("next")` gate), the PATCHED for-of form reports
+# 3 VYQL-INJ-013 findings while the vulnerable reduce form still
+# reports none, because the fixed revision's `isDangerousKey` sibling predicate
+# does not reach the sink's guard attribution (the TypeScript
+# delegated-check instance at rank 1372). Ungating that binding alone
+# changes nothing on graphql-http, mlflow/server/js or qwik-city/src
+# (16/464/165 findings at both revisions), so it did not ship: the
+# reduce modeling and the guard attribution must land together with
+# it, or the fixed code out-scores the vulnerable code. No definition
+# change shipped.
+#
+# Spec cve_rank1641 records the reduce-walked parser and the
+# segment-filtering fix, both asserting reject VYQL-INJ-013: when the
+# reduce-callback and destructuring-parameter gaps land, the first
+# block must flip to expect and the second must stay reject. The last
+# two blocks are the minimal pair for the reduce gap on shipped
+# vocabulary (`request.headers` is the source): the same walk through
+# `.map` reports, the `.reduce` twin does not.
+
+test "rank1641: the form parser walks entry names through nested reduces"
+  lang javascript
+  file packages/qwik-city/src/middleware/request-handler/request-event.ts
+  reject VYQL-INJ-013
+  code
+  ```
+  const parseRequest = async ({ request }: any, sharedMap: Map<string, any>) => {
+    const type = request.headers.get('content-type')?.split(/[;,]/, 1)[0].trim() ?? '';
+    if (type === 'application/x-www-form-urlencoded' || type === 'multipart/form-data') {
+      const formData = await request.formData();
+      sharedMap.set('q-data-form', formData);
+      return formToObj(formData);
+    }
+    return undefined;
+  };
+
+  const formToObj = (formData: FormData): Record<string, any> => {
+    const values = [...formData.entries()].reduce<any>((values, [name, value]) => {
+      name.split('.').reduce((object: any, key: string, index: number, keys: any) => {
+        // Bracket notation for arrays, notably for multi selects
+        if (key.endsWith('[]')) {
+          const arrayKey = key.slice(0, -2);
+          object[arrayKey] = object[arrayKey] || [];
+          return (object[arrayKey] = [...object[arrayKey], value]);
+        }
+
+        // If it is not last index, return nested object or array
+        if (index < keys.length - 1) {
+          return (object[key] = object[key] || (Number.isNaN(+keys[index + 1]) ? {} : []));
+        }
+
+        return (object[key] = value);
+      }, values);
+
+      // Return modified values
+      return values;
+    }, {});
+
+    // Return values object
+    return values;
+  };
+  ```
+
+test "rank1641: the fixed revision filters the dangerous segments"
+  lang javascript
+  file packages/qwik-city/src/middleware/request-handler/request-event.ts
+  reject VYQL-INJ-013
+  code
+  ```
+  const parseRequest = async ({ request }: any, sharedMap: Map<string, any>) => {
+    const type = request.headers.get('content-type')?.split(/[;,]/, 1)[0].trim() ?? '';
+    if (type === 'application/x-www-form-urlencoded' || type === 'multipart/form-data') {
+      const formData = await request.formData();
+      sharedMap.set('q-data-form', formData);
+      return formToObj(formData);
+    }
+    return undefined;
+  };
+
+  const isDangerousKey = (k: string) => k === '__proto__' || k === 'constructor' || k === 'prototype';
+
+  const formToObj = (formData: FormData): Record<string, any> => {
+    const values = Object.create(null);
+
+    for (const [name, value] of formData) {
+      const keys = name.split('.');
+      let hasDangerousKey = false;
+
+      for (let i = 0; i < keys.length; i++) {
+        if (isDangerousKey(keys[i])) {
+          hasDangerousKey = true;
+          break;
+        }
+      }
+
+      if (hasDangerousKey) {
+        continue;
+      }
+
+      let object = values;
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+
+        // Bracket notation for arrays, notably for multi selects
+        if (key.endsWith('[]')) {
+          const arrayKey = key.slice(0, -2);
+          if (isDangerousKey(arrayKey)) {
+            break;
+          }
+          object[arrayKey] = object[arrayKey] || [];
+          object[arrayKey].push(value);
+          break;
+        }
+
+        // If it is not last index, return nested object or array
+        if (i < keys.length - 1) {
+          object = object[key] =
+            object[key] || (Number.isNaN(+keys[i + 1]) ? Object.create(null) : []);
+        } else {
+          object[key] = value;
+        }
+      }
+    }
+
+    return values;
+  };
+  ```
+
+test "rank1641: the same walk through map reports"
+  lang javascript
+  file packages/qwik-city/src/middleware/request-handler/form-walk.ts
+  expect VYQL-INJ-013
+  code
+  ```
+  export function walkMap(request: Request): any {
+    const out: any = {};
+    request.headers.get('x').split('.').map((key: string) => {
+      out[key] = 1;
+    });
+    return out;
+  }
+  ```
+
+test "rank1641: the same walk through reduce does not"
+  lang javascript
+  file packages/qwik-city/src/middleware/request-handler/form-walk.ts
+  reject VYQL-INJ-013
+  code
+  ```
+  export function walkReduce(request: Request): any {
+    const out: any = {};
+    request.headers.get('x').split('.').reduce((object: any, key: string) => {
+      out[key] = 1;
+      return object;
+    }, out);
+    return out;
+  }
+  ```

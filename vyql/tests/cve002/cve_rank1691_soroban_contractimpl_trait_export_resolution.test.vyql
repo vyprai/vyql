@@ -1,0 +1,147 @@
+# Rank 1691 / CVE-2026-26267 (GHSA-4chv-4c6w-w254, recorded CWE-670; the
+# measured shape is wrong-function resolution at an exported entry point):
+# soroban-sdk's #[contractimpl] proc macro emitted the WASM export wrapper for
+# a trait impl block as `<Type>::func()`, and Rust's name resolution prefers
+# an inherent associated function over a trait function for that syntax, so a
+# contract whose type carried an inherent method sharing the trait method's
+# name exported the INHERENT implementation: the on-chain entry point ran
+# different code than the #[contractimpl] block annotated. e92a3933 ("Fix
+# trait method call resolution in contractimpl (#1729)", 2026-02-14) emits
+# `<Type as Trait>::func()` when a trait is in play. The vulnerable construct
+# is present at the parent (soroban-sdk-macros/src/derive_fn.rs:52, `let call
+# = quote! { <#impl_ty>::#ident };`) and the remediation at the commit.
+#
+# ATTENTION, no layer can see the defect, three ways measured.
+#
+# 1. Where the change lands (the proc macro), the only discriminator between the
+#    revisions is the fixing commit's own layout. The vulnerable token text
+#    `quote! { <#impl_ty>::#ident }` is still present at the commit -- it is
+#    the else branch of the same `let` -- so any token- or text-keyed binding
+#    fires identically on both revisions; only the presence of `as #t` (or the
+#    `if let Some(t) = trait_ident` wrapper) distinguishes, which keys on the
+#    fix's own spelling of a private metavariable. Measured on both revisions
+#    of the real tree: 1390 findings / 135 high on each, and the only two
+#    findings in soroban-sdk-macros are VYQL-MEM-006 NullableDeref noise at
+#    derive_fn.rs:58 and :116, unchanged at both revisions.
+#
+# 2. Where the defect manifests (consumer contracts), the trigger is an
+#    inherent method colliding with a #[contractimpl] trait-impl method on the
+#    same type. An exhaustive sweep of every impl in the tree at the parent
+#    (270 Rust files; 5 types carry #[contractimpl] trait impls) finds zero
+#    true collisions -- the single name-keyed cross-file hit joins three
+#    DISTINCT per-module `Contract` types (contract_duration.rs,
+#    contract_timepoint.rs, contract_custom_account_impl.rs), which is the
+#    name-join trap, not a collision. The only instance ever written is the
+#    regression test the change itself adds, so a consumer-side binding reports
+#    MORE on the fixed revision: inverted discrimination, and an empty
+#    reachable set outside this incident.
+#
+# 3. The facts a consumer-side binding would need do not exist. #[contractimpl]
+#    sits on the impl block, and the Rust frontend drops impl-item attributes
+#    at the impl boundary: stmtH's "impl_item" case
+#    (internal/extract/frontend/treesitter/rust.go) ignores the attrs its
+#    caller collected and re-walks the body with a fresh decls(), and no fact
+#    carries the impl's trait or self type. Minimal pair, measured: the same
+#    attribute on a function yields an analysis.parameter.entry fact a
+#    binding can key on (args.any.context.attrName -- a probe binding emitted
+#    code.HttpInput from it), while the identical attribute on an impl block
+#    yields zero facts (vyql query -call analysis.parameter.entry: 1 node vs
+#    0). That is the Rust no-impl-level-fact family recorded at rank
+#    1364. Even with impl attributes and impl identity, the collision itself
+#    is a cross-item same-name join between two sibling impl blocks that only
+#    real type identity can validate -- the sweep's false hit above is what a
+#    name-only join produces -- and no binding construct expresses it
+#    (scopeCall is call-shaped and same-or-nested lexical scopes).
+#
+# The blocks below pin the measured zeros on the real shapes. The rejects name
+# VYQL-MEM-006, the only rule family that reports anywhere in this repository
+# (992 of 1390 findings), to assert the scanner reads these files and judges
+# nothing about the defect. The first block is the fixed revision's own regression
+# contract (the trigger shape); when an impl-identity fact and a
+# collision/export rule exist, it must flip to expect. The second block is the
+# repository's real no-collision trait impl (CustomAccountInterface). The
+# third is the safe inherent-impl form that any naive contractimpl-keyed
+# binding would have to stay silent on -- telling it apart from the trait form
+# needs exactly the impl trait-identity fact that is missing.
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1691: a contractimpl trait method sharing a name with an inherent method"
+  lang rust
+  reject VYQL-MEM-006
+  code
+  ```
+  use soroban_sdk::{contract, contractimpl, Env};
+
+  #[contract]
+  pub struct Contract;
+
+  impl Contract {
+      pub fn value(_env: Env) -> u32 {
+          1
+      }
+  }
+
+  pub trait ContractTrait {
+      fn value(env: Env) -> u32;
+  }
+
+  #[contractimpl]
+  impl ContractTrait for Contract {
+      fn value(_env: Env) -> u32 {
+          2
+      }
+  }
+  ```
+
+test "rank1691: a contractimpl trait method with no same-named inherent method"
+  lang rust
+  reject VYQL-MEM-006
+  code
+  ```
+  use soroban_sdk::{
+      auth::{Context, CustomAccountInterface},
+      contract, contracterror, contractimpl,
+      crypto::Hash,
+      Env, Vec,
+  };
+
+  #[contract]
+  pub struct Contract;
+
+  #[contracterror]
+  #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+  pub enum Error {
+      Fail = 1,
+  }
+
+  #[contractimpl]
+  impl CustomAccountInterface for Contract {
+      type Signature = ();
+      type Error = Error;
+
+      fn __check_auth(
+          _env: Env,
+          _signature_payload: Hash<32>,
+          _signatures: Self::Signature,
+          _auth_contexts: Vec<Context>,
+      ) -> Result<(), Self::Error> {
+          Ok(())
+      }
+  }
+  ```
+
+test "rank1691: a contractimpl inherent impl, where unqualified resolution is correct"
+  lang rust
+  reject VYQL-MEM-006
+  code
+  ```
+  use soroban_sdk::{contract, contractimpl, Duration};
+
+  #[contract]
+  pub struct Contract;
+
+  #[contractimpl]
+  impl Contract {
+      pub fn exec(_d: Duration) {}
+  }
+  ```

@@ -1,0 +1,86 @@
+# Rank 1616 / CVE-2023-0299: Publify's core models declared string
+# attributes whose length only MySQL's implicit 255-character column
+# limit bounded -- on other databases the values persisted unbounded
+# and broke deployments relying on the implicit cap (missing
+# cross-database input bounds, CWE-20/CWE-400; the sweep fixing all
+# string attributes at once). The models under publify_core/app/
+# models carried no length validations for string columns. Pool
+# commit 34f6e9c98e is the fixing change,"Validate lengths
+# of string attributes", 18 models): a shared
+# validates_default_string_length(*names) concern applies
+# `validates name, length: { maximum: STRING_LIMIT }` (255) to every
+# string attribute -- titles, authors, permalinks, emails, urls,
+# mime types, redirect paths -- plus an explicit 40 for ip. No pool
+# correction (the task list's repo! flag mirrors rank 1615's: the
+# advisory names publify/publify while this commit lives in
+# publify/publify_core; the pool row's repository is the one holding
+# the fixing change).
+#
+# ATTENTION, cross-database attribute budgets. The same family as
+# rank 1615 (the name-length fix eleven minutes earlier in the
+# sibling repo), generalised: the implicit database limit is not a
+# validation, and no rule can ask "does every string attribute
+# enforce the limit its schema assumes" -- model-validation
+# vocabulary across schema dialects. A binding on Publify's own
+# concern would detect this application rather than the weakness.
+# Measured on the real code: scanning app/models/user.rb reports
+# zero findings at both revisions. No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1616 records the
+# unvalidated string attributes and the shared-limit form, both
+# asserting reject VYQL-DOS-029: when attribute-budget vocabulary
+# lands, the unvalidated form must flip to expect.
+
+test "rank1616: string attributes carry no length validation"
+  lang ruby
+  file publify_core/app/models/user.rb
+  reject VYQL-DOS-029
+  code
+  ```
+  class User < ActiveRecord::Base
+    validates :email, presence: true, uniqueness: true
+    validates :login, presence: true, uniqueness: true
+    validates :name, presence: true
+
+    def permalink_url(anchor)
+      "#{blog.base_url}authors/#{login}##{anchor}"
+    end
+  end
+  ```
+
+test "rank1616: the fixed revision applies the default string limit"
+  lang ruby
+  file publify_core/app/models/user.rb
+  reject VYQL-DOS-029
+  code
+  ```
+  class User < ActiveRecord::Base
+    include Validations::DefaultStringLimits
+
+    validates :email, presence: true, uniqueness: true
+    validates :login, presence: true, uniqueness: true
+    validates :name, presence: true
+
+    validates_default_string_length :email, :login, :name, :display_name,
+                                    :permalink, :filter, :state
+
+    def permalink_url(anchor)
+      "#{blog.base_url}authors/#{login}##{anchor}"
+    end
+  end
+
+  module Validations
+    module DefaultStringLimits
+      extend ActiveSupport::Concern
+
+      STRING_LIMIT = 255
+
+      class_methods do
+        def validates_default_string_length(*names)
+          names.each do |name|
+            validates name, length: { maximum: STRING_LIMIT }
+          end
+        end
+      end
+    end
+  end
+  ```

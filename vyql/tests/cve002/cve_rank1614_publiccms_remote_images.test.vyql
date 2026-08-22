@@ -1,0 +1,126 @@
+# Rank 1614 / CVE-2021-27693: PublicCMS's UEditor integration fetched
+# remote image URLs supplied by the editor and stored whatever the
+# content sniffer could type, so any fetchable content -- internal
+# service responses included -- persists into the site's files
+# and returned as an upload (server-side request forgery with
+# content persistence, CWE-918/CWE-436; issue #51). The remote-image
+# branch of UeditorAdminController (publiccms-parent/publiccms-core/
+# src/main/java/com/publiccms/controller/admin/sys/) did `FileType
+# fileType = FileTypeDetector.detectFileType(inputStream); String
+# suffix = fileType.getCommonExtension(); if
+# (CommonUtils.notEmpty(suffix)) { ... CmsFileUtils.
+# copyInputStreamToFile(inputStream, filePath); ... }` -- any
+# detected type passes, HTML and text included. The fixing commit
+# 0f4c487291 is the fixing change,the issue-linked commit):
+# the gate becomes `null != fileType.getMimeType() &&
+# fileType.getMimeType().startsWith("image/") &&
+# CommonUtils.notEmpty(suffix)`, and an empty result list returns
+# failure instead of success. .
+#
+# ATTENTION, fetched-content type gates. The fetch exists and the
+# type detection runs -- the gate accepts every sniffable type
+# rather than the image family the feature promises, the same
+# content-type family as rank 1609 (safe-svg's declared type) with
+# inspection present but the ALLOWLIST missing: nothing can ask
+# "does the remote-fetch save path restrict persisted content to the
+# expected family" -- feature-scope vocabulary on the sniffing API.
+# A binding on PublicCMS's own controller would detect this CMS
+# rather than the weakness. Measured on the real code: scanning
+# UeditorAdminController.java reports 3 findings at both revisions
+# (an INJ-001 SQL row at :157-:164, an INJ-009 log row and one more
+# heuristic -- all unrelated to the fetch). No ENGINE-GAPS.md entry.
+# No definition change shipped. Spec cve_rank1614 records the
+# any-type save gate and the image-only form, both asserting reject
+# VYQL-RF-001: when fetched-content vocabulary lands, the any-type
+# form must flip to expect.
+
+test "rank1614: fetched content saves with any detected type"
+  lang java
+  file publiccms-parent/publiccms-core/src/main/java/com/publiccms/controller/admin/sys/UeditorAdminController.java
+  reject VYQL-RF-001
+  code
+  ```
+  package com.publiccms.controller.admin.sys;
+
+  import java.io.BufferedInputStream;
+  import java.util.ArrayList;
+  import java.util.List;
+  import java.util.Map;
+
+  public class UeditorAdminController {
+
+      public Map<String, Object> catchRemoteImage(List<String> sources) throws Exception {
+          List<String> list = new ArrayList<>();
+
+          for (String source : sources) {
+              HttpGet httpGet = new HttpGet(source);
+              CloseableHttpResponse entity = httpClient.execute(httpGet);
+
+              try (BufferedInputStream inputStream = new BufferedInputStream(entity.getContent())) {
+                  FileType fileType = FileTypeDetector.detectFileType(inputStream);
+                  String suffix = fileType.getCommonExtension();
+
+                  if (CommonUtils.notEmpty(suffix)) {
+                      String fileName = CmsFileUtils.getUploadFileName(suffix);
+                      String filePath = siteComponent.getWebFilePath(site, fileName);
+                      CmsFileUtils.copyInputStreamToFile(inputStream, filePath);
+
+                      list.add(fileName);
+                  }
+              }
+          }
+
+          Map<String, Object> map = getResultMap(true);
+          map.put("list", list);
+          return map;
+      }
+  }
+  ```
+
+test "rank1614: the fixed revision saves images only"
+  lang java
+  file publiccms-parent/publiccms-core/src/main/java/com/publiccms/controller/admin/sys/UeditorAdminController.java
+  reject VYQL-RF-001
+  code
+  ```
+  package com.publiccms.controller.admin.sys;
+
+  import java.io.BufferedInputStream;
+  import java.util.ArrayList;
+  import java.util.List;
+  import java.util.Map;
+
+  public class UeditorAdminController {
+
+      public Map<String, Object> catchRemoteImage(List<String> sources) throws Exception {
+          List<String> list = new ArrayList<>();
+
+          for (String source : sources) {
+              HttpGet httpGet = new HttpGet(source);
+              CloseableHttpResponse entity = httpClient.execute(httpGet);
+
+              try (BufferedInputStream inputStream = new BufferedInputStream(entity.getContent())) {
+                  FileType fileType = FileTypeDetector.detectFileType(inputStream);
+                  String suffix = fileType.getCommonExtension();
+
+                  if (null != fileType.getMimeType() && fileType.getMimeType().startsWith("image/")
+                          && CommonUtils.notEmpty(suffix)) {
+                      String fileName = CmsFileUtils.getUploadFileName(suffix);
+                      String filePath = siteComponent.getWebFilePath(site, fileName);
+                      CmsFileUtils.copyInputStreamToFile(inputStream, filePath);
+
+                      list.add(fileName);
+                  }
+              }
+          }
+
+          if (list.isEmpty()) {
+              return getResultMap(false);
+          } else {
+              Map<String, Object> map = getResultMap(true);
+              map.put("list", list);
+              return map;
+          }
+      }
+  }
+  ```

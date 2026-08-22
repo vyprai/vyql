@@ -4,5 +4,5 @@ review code.MiddlewarePathMatchNormalizationMismatch {
   category: access_control
   expected: [core.AuthorizationCheck]
   kind: attention
-  text: "review every path a component derives from the request itself so it agrees with the router on duplicate slashes, trailing slashes, case, parameter delimiters and which percent escapes are decoded, because the router's answer is what decided the middleware"
+  text: "review every path a component derives from the request itself so it agrees with whatever decided access to it — the router that matched it, a middleware it ran, an authorization check over it — on duplicate slashes, trailing slashes, case, parameter delimiters and which percent escapes are decoded, because that earlier answer is what the derived path has to match"
 }

@@ -1,0 +1,132 @@
+# Rank 1665 / CVE-2026-44429: the MCP registry accepted a publisher-
+# supplied websiteUrl that parses, is absolute and uses https, and
+# nothing more -- net/url.Parse accepts a literal double quote, single
+# quote, angle bracket and ASCII space, so a URL carrying `"` escaped
+# the href attribute of the catalogue UI's anchor template and
+# injected an event handler (stored cross-site scripting through an
+# under-validating URL check, CWE-79/CWE-116; GHSA-rqv2-m695-f8j4,
+# PR #1249, v1.7.7). validateWebsiteURL in internal/validators/
+# validators.go ran url.Parse, IsAbs and a Scheme != "https"
+# comparison on the field and returns. The fixed revision adds a
+# strings.IndexAny(websiteURL, "\"'<> \t\n\r") rejection after the
+# scheme check; the advisory names this commit.
+#
+# The render site the advisory describes is neutralised one
+# commit earlier -- PR #1248 (fbfd63c, the parent of the fixing commit)
+# introduced escapeAttr for the two href interpolations in
+# internal/api/handlers/v0/ui_index.html -- so the revision pair this
+# row names differs only in the Go validator, and only there.
+#
+# ATTENTION, validation-completeness against a downstream render
+# context. The Go side carries no label at all: vyql match on
+# internal/validators reports only code.RegexCompileSink on the
+# package-level regexp.MustCompile declarations (validators.go:23-51),
+# nothing inside validateWebsiteURL, and publish.go's input.Body is
+# not a source either -- there is no taint shape, the check set is
+# simply too small for what the value is later rendered into. The
+# only discriminating construct between the two revisions is the
+# absence of a character-class rejection in the validator, and that
+# absence is not a signal on its own: across the 71 Go trees under
+# /tmp/cve-work/rank*/, 156 functions in 145 files call
+# url.Parse/url.ParseRequestURI and read .Scheme with no
+# strings.IndexAny/ContainsAny/ContainsRune/regexp scan, against 14
+# that do -- proxy builders, redirect validators, OIDC issuer checks,
+# URL normalisers, all ordinary. A binding on that absence fires ~156
+# times for one true positive, and it has no anchor to the render
+# context that makes it a weakness: the join runs Go validator ->
+# published JSON field -> attribute interpolation in another file and
+# another language, which the binding language cannot express. The
+# CWE-matching concept code.StoredUrlHrefAttributeXss (VYQL-INJ-195)
+# is the right landing spot, but its condition is about the render
+# site, which is escaped at the parent. No ENGINE-GAPS.md
+# entry. No definition change shipped. Spec cve_rank1665 records the
+# under-validating validator and the IndexAny form, both asserting
+# reject VYQL-INJ-195: when validation-completeness vocabulary lands,
+# the under-validating form must flip to expect.
+
+test "rank1665: the website url is checked for parse, absoluteness and scheme only"
+  lang go
+  file internal/validators/validators.go
+  reject VYQL-INJ-195
+  code
+  ```
+  package validators
+
+  import (
+      "fmt"
+      "net/url"
+  )
+
+  const SchemeHTTPS = "https"
+
+  // validateWebsiteURL accepts a publisher-supplied website URL.
+  func validateWebsiteURL(websiteURL string) []string {
+      var issues []string
+
+      if websiteURL == "" {
+          return issues
+      }
+
+      parsedURL, err := url.Parse(websiteURL)
+      if err != nil {
+          issues = append(issues, fmt.Sprintf("invalid websiteUrl: %v", err))
+          return issues
+      }
+
+      if !parsedURL.IsAbs() {
+          issues = append(issues, fmt.Sprintf("websiteUrl must be absolute (include scheme): %s", websiteURL))
+      }
+
+      if parsedURL.Scheme != SchemeHTTPS {
+          issues = append(issues, fmt.Sprintf("websiteUrl must use https scheme: %s", websiteURL))
+      }
+
+      return issues
+  }
+  ```
+
+test "rank1665: the fixed revision rejects characters invalid in a URI"
+  lang go
+  file internal/validators/validators.go
+  reject VYQL-INJ-195
+  code
+  ```
+  package validators
+
+  import (
+      "fmt"
+      "net/url"
+      "strings"
+  )
+
+  const SchemeHTTPS = "https"
+
+  // validateWebsiteURL accepts a publisher-supplied website URL.
+  func validateWebsiteURL(websiteURL string) []string {
+      var issues []string
+
+      if websiteURL == "" {
+          return issues
+      }
+
+      parsedURL, err := url.Parse(websiteURL)
+      if err != nil {
+          issues = append(issues, fmt.Sprintf("invalid websiteUrl: %v", err))
+          return issues
+      }
+
+      if !parsedURL.IsAbs() {
+          issues = append(issues, fmt.Sprintf("websiteUrl must be absolute (include scheme): %s", websiteURL))
+      }
+
+      if parsedURL.Scheme != SchemeHTTPS {
+          issues = append(issues, fmt.Sprintf("websiteUrl must use https scheme: %s", websiteURL))
+      }
+
+      if i := strings.IndexAny(websiteURL, "\"'<> \t\n\r"); i >= 0 {
+          issues = append(issues, fmt.Sprintf("websiteUrl contains an invalid character %q at position %d: %s", websiteURL[i], i, websiteURL))
+      }
+
+      return issues
+  }
+  ```

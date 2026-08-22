@@ -1,0 +1,250 @@
+# Rank 1645 / CVE-2021-32495: radare2's pyc parser frees the very object
+# get_object returns through the reference table (CWE-416 use after free).
+#
+# get_object (libr/bin/format/pyc/marshal.c:1009) reserves a placeholder for
+# every object whose marshal code carries FLAG_REF: `ret = get_none_object()`
+# then `ref_idx = r_list_append(refs, ret)`, so the list node's `data` field
+# holds `ret` itself. The type switch then rebuilds `ret` for every real type,
+# which leaves the placeholder unreferenced, and the epilogue replaces the
+# table entry: `if (flag && ref_idx) { free_object(ref_idx->data);
+# ref_idx->data = copy_object(ret); } return ret;`. For a code byte of 0x80
+# alone the switch falls into its `case 0:` nop, `ret` is never reassigned,
+# and `ref_idx->data` still *is* `ret` -- so `free_object(ref_idx->data)`
+# releases the object the function hands back, and `copy_object(ret)` reads it
+# again after the free. The fixed revision guards the release with
+# `if (ref_idx->data != ret)`.
+#
+# ATTENTION, engine gap, and two absences stack here.
+#
+# First, the free is not even labelled: the only C binding for
+# code.PointerFree is `node.path ~= "free"`, and dotted-segment matching does
+# not reach the single-segment spelling `free_object` -- the same absence rank
+# 1314 records for libsixel's `sixel_allocator_free`. A probe binding emitting
+# code.PointerFree at `node.path ~= "free_object"` labels both call sites in a
+# repro of get_object and still reports nothing, and on the real checkout it
+# moves the pyc subtree from 16 to 30 findings: the +14 are VYQL-MEM-008
+# pairings of the recursive free_object calls inside free_object's own switch
+# with every other release in the file, and not one of them lands on the
+# epilogue at marshal.c:1139-1143.
+#
+# Second, and decisive: no rule connects a release to the return of the
+# released pointer. VYQL-MEM-007 asks code.PointerFree to reach
+# code.PointerUse, and code.PointerUse is bound only to the ESIL `__deref`
+# primitive, so a return is not a use. The degenerate, textually provable form
+# `free(ret); return ret;` -- where pointer identity needs no aliasing at all
+# -- reports nothing while `free(ret)` is labelled code.PointerFree (pinned
+# below in self_free_return.c). Closing that hole with a use-on-return binding
+# would transplant rank 1314's measured defect instead: `reaches` does not
+# check pointer identity, so every cleanup path of the shape
+# `free(tmp); return out;` would pair, and on this very file the fixed revision's own
+# correct epilogue would fire in every non-nop path.
+#
+# Third, the defect itself needs free/ownership provenance, the family rank
+# 1312 records: proving `ref_idx->data == ret` requires knowing that
+# `r_list_append(refs, ret)` stores `ret` into the returned node's field, and
+# that `ret` is not reassigned between the append and the epilogue -- the
+# switch reassigns it in every branch except `case 0:`. The `propagate`
+# binding route to a pointee is the known scan-breaking trap and out-parameter
+# taint is the hardcoded cReaders table, so this is C-frontend design work,
+# not a data change. This is the C instance of the native-parser
+# memory-lifetime family (1509, 1511, 1516, 1527, 1528, 1530, 1543, 1547,
+# 1561, 1576, 1590), not a new family.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1645: the pyc ref table frees the object get_object returns"
+  lang c
+  file marshal.c
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-011
+  code
+  ```
+  #include <stdbool.h>
+  #include <stdint.h>
+
+  typedef uint8_t ut8;
+  typedef struct RBuffer RBuffer;
+  typedef struct RList RList;
+
+  typedef struct pyc_object {
+      ut8 type;
+      void *data;
+  } pyc_object;
+
+  typedef struct RListIter {
+      struct RListIter *next, *prev;
+      void *data;
+  } RListIter;
+
+  static RList *refs;
+
+  static ut8 get_ut8(RBuffer *buffer, bool *error);
+  static pyc_object *get_none_object(void);
+  static pyc_object *get_small_tuple_object(RBuffer *buffer);
+  static void free_object(pyc_object *object);
+  static pyc_object *copy_object(pyc_object *object);
+  static RListIter *r_list_append(RList *list, void *data);
+
+  #define FLAG_REF 0x80
+
+  static pyc_object *get_object(RBuffer *buffer) {
+      bool error = false;
+      pyc_object *ret = NULL;
+      ut8 code = get_ut8 (buffer, &error);
+      ut8 flag = code & FLAG_REF;
+      RListIter *ref_idx = NULL;
+      ut8 type = code & ~FLAG_REF;
+
+      if (error) {
+          return NULL;
+      }
+
+      if (flag) {
+          ret = get_none_object ();
+          if (!ret) {
+              return NULL;
+          }
+          ref_idx = r_list_append (refs, ret);
+          if (!ref_idx) {
+              free_object (ret);
+              return NULL;
+          }
+      }
+
+      switch (type) {
+      case 148: /* TYPE_SMALL_TUPLE */
+          ret = get_small_tuple_object (buffer);
+          break;
+      case 0:
+          // nop
+          break;
+      default:
+          return NULL;
+      }
+
+      if (flag && ref_idx) {
+          free_object (ref_idx->data);
+          ref_idx->data = copy_object (ret);
+      }
+      return ret;
+  }
+  ```
+
+test "rank1645: the ref table release is guarded against the returned object"
+  lang c
+  file marshal.c
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-011
+  code
+  ```
+  #include <stdbool.h>
+  #include <stdint.h>
+
+  typedef uint8_t ut8;
+  typedef struct RBuffer RBuffer;
+  typedef struct RList RList;
+
+  typedef struct pyc_object {
+      ut8 type;
+      void *data;
+  } pyc_object;
+
+  typedef struct RListIter {
+      struct RListIter *next, *prev;
+      void *data;
+  } RListIter;
+
+  static RList *refs;
+
+  static ut8 get_ut8(RBuffer *buffer, bool *error);
+  static pyc_object *get_none_object(void);
+  static pyc_object *get_small_tuple_object(RBuffer *buffer);
+  static void free_object(pyc_object *object);
+  static pyc_object *copy_object(pyc_object *object);
+  static RListIter *r_list_append(RList *list, void *data);
+
+  #define FLAG_REF 0x80
+
+  static pyc_object *get_object(RBuffer *buffer) {
+      bool error = false;
+      pyc_object *ret = NULL;
+      ut8 code = get_ut8 (buffer, &error);
+      ut8 flag = code & FLAG_REF;
+      RListIter *ref_idx = NULL;
+      ut8 type = code & ~FLAG_REF;
+
+      if (error) {
+          return NULL;
+      }
+
+      if (flag) {
+          ret = get_none_object ();
+          if (!ret) {
+              return NULL;
+          }
+          ref_idx = r_list_append (refs, ret);
+          if (!ref_idx) {
+              free_object (ret);
+              return NULL;
+          }
+      }
+
+      switch (type) {
+      case 148: /* TYPE_SMALL_TUPLE */
+          ret = get_small_tuple_object (buffer);
+          break;
+      case 0:
+          // nop
+          break;
+      default:
+          return NULL;
+      }
+
+      if (flag && ref_idx) {
+          if (ref_idx->data != ret) {
+              free_object (ref_idx->data);
+          }
+          ref_idx->data = copy_object (ret);
+      }
+      return ret;
+  }
+  ```
+
+test "rank1645: a freed pointer returned by its own function is not a use"
+  lang c
+  file self_free_return.c
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-011
+  code
+  ```
+  #include <stdlib.h>
+
+  struct box { void *data; };
+
+  void *steal(struct box *b)
+  {
+      void *ret = b->data;
+      free (ret);
+      return ret;
+  }
+  ```
+
+test "rank1645: two releases of the same field in one function are reported"
+  lang c
+  file double_release.c
+  expect VYQL-MEM-008
+  code
+  ```
+  #include <stdlib.h>
+
+  struct box { void *data; };
+
+  void release_twice(struct box *b)
+  {
+      free (b->data);
+      free (b->data);
+  }
+  ```

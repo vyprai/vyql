@@ -471,6 +471,8 @@ func v2PresenceValuePrefix(field string) string {
 		return "slice:"
 	case "field":
 		return "field:"
+	case "fieldTag":
+		return "field_tag:"
 	case "macroName":
 		return "macro_name:"
 	case "macroBody":
