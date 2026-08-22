@@ -1,0 +1,255 @@
+# CVE-2026-5187 (wolfSSL, recorded language c; the axis is CWE-129/787, a
+# heap out-of-bounds write from an array-capacity check that covers less than
+# the write it guards, not the advisory title's generic "off-by-one").
+# `DecodeObjectId()` in wolfcrypt/src/asn.c decodes a DER object identifier
+# into a caller-supplied `word16 out[]` whose element count arrives through
+# `word32* outSz`. The loop guards every store with
+# `if (y >= (int)*outSz) return BUFFER_E;` -- one free element -- but the
+# first-arc branch stores TWO elements unconditionally:
+#     if (y == 0) { out[0] = t / 40; out[1] = t % 40; y = 2; }
+# so `outSz == 1` passes the check and `out[1]` writes one element past the
+# buffer. The second location is caller-side: both call sites (DumpOID and
+# DecodeCertExtensions) declare `word16 decOid[MAX_OID_SZ]` and pass
+# `word32 decOidSz = sizeof(decOid)` -- MAX_OID_SZ * sizeof(word16), twice
+# the element count the callee counts in -- so a long OID writes up to
+# MAX_OID_SZ elements past the array. The fixed revision (PR 10025) moves the check to
+# the write it guards -- `if (y == 0) { if ((int)*outSz < 2) return
+# BUFFER_E; ... }` -- and corrects both callers to `decOidSz = MAX_OID_SZ`.
+#
+# Measured, the change-carrying file alone, three `--cache off` runs per
+# revision: 924 findings on the parent and 924 on the fixed revision, byte-stable
+# inside each revision and byte-identical across them (same finding-set
+# digest) -- the change is invisible. Nothing lands in DecodeObjectId at
+# either revision; the three findings inside its line range are LOW
+# VYQL-MEM-006 NullableDeref rows on the `*outSz` dereferences themselves,
+# which fire identically before and after. The file's 7 high findings sit
+# elsewhere (a MEM-041 at 35781, six SEC-002 rows at 22840-22872).
+# Findings in the function are not coverage. `vyql match` on the function
+# labels `out[0]` and `out[1]` as code.IndexAccessSink -- and labels
+# nothing for `out[y++]`, because ccHasUpperBoundGuard (c.go:4491) credits
+# `y >= *outSz` as that store's upper bound: the engine actively treats the
+# insufficient check as sufficient. `vyql match` on the caller labels
+# nothing at all -- a declared array's capacity and a `sizeof` over it
+# produce no node and no context token.
+#
+# No shipped rule judges the relation: VYQL-MEM-017
+# (CountDerivedElementAccess) wants a count-derived index and these indices
+# are constants; VYQL-MEM-041 wants a `count - 1` index; VYQL-MEM-016 wants
+# a raw memory copy; VYQL-MEM-066 (IndexOperatorWithoutBoundsCheck) is
+# Rust-only; VYQL-MEM-042's capacity binding is a text-needled per-incident
+# shape for a different library. The discriminator is the number of
+# elements the guard establishes versus the number the guarded branch
+# writes, and no layer has it -- the check-side sibling of the capacity
+# family on file (1370: an output buffer's capacity parameter never
+# correlated with a write length; 1837: a bounds check's length never
+# compared with the guarded access's size), with the caller-side half being
+# the declared-array-capacity gap (1756: `char timeBuf[32];` emits no node,
+# nothing evaluates sizeof). Not mechanical for the same reason 1837 and
+# 1756 record: it needs guard-versus-write-width facts and declared-
+# capacity/sizeof evaluation, new cross-statement relations, not a
+# localized correction.
+#
+# Precision constraint, enumerated: the same-base `[0] = ... [1] = ...`
+# store-pair idiom this would have to key on occurs 957 times in the first
+# 400 non-test .c files of this repository alone (4090 for the general
+# k/k+1 form) and 192 times in vim's src/*.c, of which exactly one site
+# here is the vulnerability; 38 sites here (28 in vim) feed an element
+# array's sizeof into a size variable. A shape-only binding without the
+# numeric relation fires on all of them and does not even discriminate the
+# fix, since the patched branch keeps both stores and a `*outSz`
+# comparison.
+#
+# All cases assert reject VYQL-MEM-017: nothing fires today because no
+# binding or rule can see the element counts. When guard-capacity versus
+# write-width vocabulary lands (the 1837/1756 sweep), case 1 and case 3
+# must flip to expect while the patched forms and the correctly-sized
+# guard idiom stay reject.
+
+test "rank1958: two-slot first-arc store under a one-slot capacity check"
+  lang c
+  file asn.c
+  reject VYQL-MEM-017
+  code
+  ```
+  typedef unsigned char byte;
+  typedef unsigned short word16;
+  typedef unsigned int word32;
+
+  #define BUFFER_E -132
+
+  int DecodeObjectId(const byte* in, word32 inSz, word16* out, word32* outSz)
+  {
+      int x = 0, y = 0;
+      word32 t = 0;
+      int cnt = 0;
+
+      if (in == 0 || outSz == 0) {
+          return -173;
+      }
+
+      while (inSz--) {
+          if (cnt == 4)
+              return -170;
+          t = (t << 7) | (in[x] & 0x7F);
+          cnt++;
+          if (!(in[x] & 0x80)) {
+              if (y >= (int)*outSz) {
+                  return BUFFER_E;
+              }
+              if (y == 0) {
+                  out[0] = (word16)(t / 40);
+                  out[1] = (word16)(t % 40);
+                  y = 2;
+              }
+              else {
+                  out[y++] = (word16)t;
+              }
+              t = 0;
+              cnt = 0;
+          }
+          x++;
+      }
+
+      *outSz = (word32)y;
+
+      return 0;
+  }
+  ```
+
+test "rank1958: fix sizes the check to the two-slot write it guards"
+  lang c
+  file asn.c
+  reject VYQL-MEM-017
+  code
+  ```
+  typedef unsigned char byte;
+  typedef unsigned short word16;
+  typedef unsigned int word32;
+
+  #define BUFFER_E -132
+
+  int DecodeObjectId(const byte* in, word32 inSz, word16* out, word32* outSz)
+  {
+      int x = 0, y = 0;
+      word32 t = 0;
+      int cnt = 0;
+
+      if (in == 0 || outSz == 0) {
+          return -173;
+      }
+
+      while (inSz--) {
+          if (cnt == 4)
+              return -170;
+          t = (t << 7) | (in[x] & 0x7F);
+          cnt++;
+          if (!(in[x] & 0x80)) {
+              if (y == 0) {
+                  if ((int)*outSz < 2) {
+                      return BUFFER_E;
+                  }
+                  out[0] = (word16)(t / 40);
+                  out[1] = (word16)(t % 40);
+                  y = 2;
+              }
+              else {
+                  if (y >= (int)*outSz) {
+                      return BUFFER_E;
+                  }
+                  out[y++] = (word16)t;
+              }
+              t = 0;
+              cnt = 0;
+          }
+          x++;
+      }
+
+      *outSz = (word32)y;
+
+      return 0;
+  }
+  ```
+
+test "rank1958: caller passes an array's sizeof as an element count"
+  lang c
+  file asn_caller.c
+  reject VYQL-MEM-017
+  code
+  ```
+  typedef unsigned char byte;
+  typedef unsigned short word16;
+  typedef unsigned int word32;
+
+  #define MAX_OID_SZ 32
+
+  int DecodeObjectId(const byte* in, word32 inSz, word16* out, word32* outSz);
+
+  static int DecodeCertExtensionsUnknown(const byte* oidData, word32 oidSz)
+  {
+      word16 decOid[MAX_OID_SZ];
+      word32 decOidSz = sizeof(decOid);
+      int ret;
+
+      ret = DecodeObjectId(oidData, oidSz, decOid, &decOidSz);
+      if (ret == 0) {
+          return (int)decOid[0];
+      }
+      return ret;
+  }
+  ```
+
+test "rank1958: fix passes the element count, not the byte size"
+  lang c
+  file asn_caller.c
+  reject VYQL-MEM-017
+  code
+  ```
+  typedef unsigned char byte;
+  typedef unsigned short word16;
+  typedef unsigned int word32;
+
+  #define MAX_OID_SZ 32
+
+  int DecodeObjectId(const byte* in, word32 inSz, word16* out, word32* outSz);
+
+  static int DecodeCertExtensionsUnknown(const byte* oidData, word32 oidSz)
+  {
+      word16 decOid[MAX_OID_SZ];
+      word32 decOidSz = MAX_OID_SZ;
+      int ret;
+
+      ret = DecodeObjectId(oidData, oidSz, decOid, &decOidSz);
+      if (ret == 0) {
+          return (int)decOid[0];
+      }
+      return ret;
+  }
+  ```
+
+test "rank1958: guard sized to the write width is the ordinary safe idiom"
+  lang c
+  file asn_safe.c
+  reject VYQL-MEM-017
+  code
+  ```
+  typedef unsigned short word16;
+  typedef unsigned int word32;
+
+  #define BUFFER_E -132
+
+  /* Arc pair decoder whose check covers both stores: the idiom the
+   * vulnerable form is indistinguishable from without element counts. */
+  int DecodeFirstArcs(const word32 first, word16* out, word32* outSz)
+  {
+      if (out == 0 || outSz == 0) {
+          return -173;
+      }
+      if ((int)*outSz < 2) {
+          return BUFFER_E;
+      }
+      out[0] = (word16)(first / 40);
+      out[1] = (word16)(first % 40);
+      *outSz = 2;
+      return 0;
+  }
+  ```

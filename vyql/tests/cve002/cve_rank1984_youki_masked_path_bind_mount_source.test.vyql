@@ -1,0 +1,187 @@
+# A container runtime masks paths an image should not see by bind-mounting a
+# fixed special file over each of them (libcontainer/src/process/init/
+# process.rs `masked_path` at the parent of the change). The mount is issued by
+# name: `syscall.mount(Some(Path::new("/dev/null")), path, None,
+# MsFlags::MS_BIND, None)`, so the kernel resolves `/dev/null` a second time
+# when the mount runs -- inside the container's own mount namespace, where the
+# image controls what that name resolves to. A validation of the path at any
+# earlier moment binds a different resolution than the one the mount uses, and
+# a planted symlink in the window mounts host content over the masked path.
+#
+# The fixed revision opens the device once with O_PATH, verifies the file descriptor is
+# character device 1:3, and mounts from the fd (`mount_from_fd`), so no name
+# is resolved at mount time. The masking mount for directories keeps naming a
+# source -- `Path::new("tmpfs")` with MS_RDONLY -- which is a filesystem-type
+# mount, not a bind: the source is a type name, and there is no object behind
+# it to redirect. The two reject cases below that carry MS_BIND are the other
+# binds the fixed revision leaves in place elsewhere in the tree, each excluded on its own
+# documented grounds: a remount ignores the source argument, and a recursive
+# bind re-flags a subtree the caller holds.
+#
+# Measured, both revisions of youki's crates/, three `--cache off` runs each:
+# the parent reports VYQL-PATH-086 exactly once, at process.rs:501
+# (`masked_path`), and the fixed revision reports zero; the rest of the tree is unchanged
+# at 150/148 VYQL-MEM-006, 2 VYQL-MEM-009 and 1 VYQL-MEM-063. The reachable
+# set for the shape is the runtime itself: an exhaustive grep over the other
+# clones finds no rust file outside this tree carrying MS_BIND, so the
+# collateral count for the binding is zero by enumeration rather than by
+# sampling.
+
+test "rank1984: masking a container path by bind-mounting a fixed path source by name"
+  lang rust
+  expect VYQL-PATH-086
+  expect_review code.BindMountPathSourceWithoutFdAnchor
+  code
+  ```
+  use std::path::Path;
+
+  use nix::mount::MsFlags;
+
+  pub trait Syscall {
+      fn mount(
+          &self,
+          source: Option<&Path>,
+          target: &Path,
+          fstype: Option<&str>,
+          flags: MsFlags,
+          data: Option<&str>,
+      ) -> Result<(), ()>;
+  }
+
+  // For files, bind mounts /dev/null over the top of the specified path.
+  fn masked_path(path: &Path, syscall: &dyn Syscall) -> Result<(), ()> {
+      if let Err(_err) = syscall.mount(
+          Some(Path::new("/dev/null")),
+          path,
+          None,
+          MsFlags::MS_BIND,
+          None,
+      ) {
+          // ignore error if path is not exist.
+          return Ok(());
+      }
+
+      Ok(())
+  }
+  ```
+
+test "rank1984: masking from a device fd held once and verified leaves no name to resolve"
+  lang rust
+  reject VYQL-PATH-086
+  reject_review code.BindMountPathSourceWithoutFdAnchor
+  code
+  ```
+  use std::path::Path;
+
+  use nix::mount::MsFlags;
+
+  pub trait Syscall {
+      fn mount(
+          &self,
+          source: Option<&Path>,
+          target: &Path,
+          fstype: Option<&str>,
+          flags: MsFlags,
+          data: Option<&str>,
+      ) -> Result<(), ()>;
+      fn mount_from_fd(&self, source_fd: &Fd, target: &Path) -> Result<(), ()>;
+  }
+
+  struct Fd;
+
+  // For files, bind mounts /dev/null over the top of the specified path,
+  // from the descriptor opened and verified once before the loop.
+  fn masked_paths(paths: &Vec<String>, syscall: &dyn Syscall) -> Result<(), ()> {
+      let (dev_null_fd, _dev_null_stat) = open_device_fd(Path::new("/dev/null"))?;
+
+      for path_str in paths {
+          let path = Path::new(path_str);
+          if !path.exists() {
+              // Skip if the path does not exist.
+              continue;
+          }
+
+          if path.is_dir() {
+              // Destination is a directory, mount a read-only tmpfs over it.
+              syscall.mount(
+                  Some(Path::new("tmpfs")),
+                  path,
+                  Some("tmpfs"),
+                  MsFlags::MS_RDONLY,
+                  None,
+              )?;
+          } else {
+              // Destination is a file, bind mount /dev/null over it.
+              syscall.mount_from_fd(&dev_null_fd, path)?;
+          }
+      }
+
+      Ok(())
+  }
+  ```
+
+test "rank1984: a remount of a fixed path reconfigures a mount that exists and takes no source"
+  lang rust
+  reject VYQL-PATH-086
+  reject_review code.BindMountPathSourceWithoutFdAnchor
+  code
+  ```
+  use std::path::Path;
+
+  use nix::mount::MsFlags;
+
+  pub trait Syscall {
+      fn mount(
+          &self,
+          source: Option<&Path>,
+          target: &Path,
+          fstype: Option<&str>,
+          flags: MsFlags,
+          data: Option<&str>,
+      ) -> Result<(), ()>;
+  }
+
+  fn make_readonly(path: &Path, syscall: &dyn Syscall) -> Result<(), ()> {
+      syscall.mount(
+          Some(Path::new(path)),
+          path,
+          None,
+          MsFlags::MS_BIND | MsFlags::MS_REMOUNT | MsFlags::MS_RDONLY,
+          None,
+      )?;
+      Ok(())
+  }
+  ```
+
+test "rank1984: a recursive self-bind of a directory is a subtree re-flag, not a named source"
+  lang rust
+  reject VYQL-PATH-086
+  reject_review code.BindMountPathSourceWithoutFdAnchor
+  code
+  ```
+  use std::path::Path;
+
+  use nix::mount::MsFlags;
+
+  pub trait Syscall {
+      fn mount(
+          &self,
+          source: Option<&Path>,
+          target: &Path,
+          fstype: Option<&str>,
+          flags: MsFlags,
+          data: Option<&str>,
+      ) -> Result<(), ()>;
+  }
+
+  fn make_private(root: &Path, syscall: &dyn Syscall) -> Result<(), ()> {
+      syscall.mount(
+          Some(Path::new("/")),
+          root,
+          None,
+          MsFlags::MS_BIND | MsFlags::MS_REC,
+          None,
+      )?;
+      Ok(())
+  }
+  ```

@@ -1,0 +1,167 @@
+# Rank 1987 / CVE-2026-34723 (GHSA-hcm9-ch62-5727, CWE-284): once a Zammad
+# system has more than two users, GET /api/v1/getting_started hands an
+# unauthenticated caller the whole internal setup state. The action's own
+# guard line is dead code for that path --
+#
+#   app/controllers/getting_started_controller.rb (parent of 9587452):
+#     def index
+#       return if setup_done_response          # renders + returns true first
+#       return if auto_wizard_enabled_response
+#       return if setup_done && !authentication_check   # unreachable when done
+#       render json: { setup_done: setup_done, ... }
+#     end
+#
+# because setup_done_response renders groups, email addresses, config and
+# channel drivers whenever setup_done holds and returns true, so index
+# returns before the authentication line runs. No before_action guards the
+# action: the class declares `prepend_before_action -> { authorize! },
+# only: [:base]`, and index/auto_wizard_admin are outside the only-list.
+# Fix 9587452 moves the check into the render helper's gate,
+# `return false if !setup_done || !authentication_check`, and deletes the
+# dead line -- the helper renders only for authenticated callers and
+# auto_wizard_admin inherits the same gate.
+#
+# What the scanner sees on the real file, both revisions identical:
+#   - vyql match labels params -> code.HttpInput, Group.where /
+#     EmailAddress.where -> code.DatabaseRead, and authorize! (line 4, the
+#     class-body lambda) -> core.AuthorizationCheck. The render call is
+#     unlabelled: the only Ruby render sink binding is gated on
+#     dependency("rails"), and the SCA manifest table has no Gemfile reader
+#     (internal/extract/sca/discover.go:14), so every dependency-gated Ruby
+#     binding is inert on any tree -- the same family as the missing
+#     Gradle/NuGet readers recorded for rank 1069, now with its Ruby
+#     instance measured.
+#   - No rule connects a database read to a render as a disclosure finding
+#     in any language; DatabaseRead is a source only for stored-XSS and
+#     stored-command rules.
+#   - Bounded scans (timeout 180, --max-ram 6GB, --cache off), three runs
+#     per revision: app/controllers 127 findings, app/ 1086 findings, both
+#     byte-identical across the fixed revisioned revision, and zero rows on
+#     getting_started_controller.rb at either revision.
+#
+# Nothing is shippable here, measured:
+#   - The fixed revision's only atoms are the project's own concern-method name. Every
+#     other token in the file is identical across the revisions, so any
+#     discriminating binding must key `authentication_check` --
+#     ApplicationController::Authenticates' private method, not a library
+#     API. Enumerated across every corpus clone, `authentication_check`
+#     occurs in zammad alone (0 hits in vagrant, view_component and every
+#     other Ruby tree); a binding keyed on it is inert everywhere else and
+#     fails the genericity test outright.
+#   - The generic form without project vocabulary -- a method that renders
+#     model data with no authentication call in its own scope -- fires on
+#     64 methods in 42 of zammad's 145 controller files (enumerated by
+#     grep), because 101 of those controllers hang their auth on class-level
+#     `prepend_before_action :authentication_check /
+#     :authenticate_and_authorize!` wiring that a function scope cannot
+#     see. Exactly one of the 64 is this CVE, and the shape reports the
+#     patched revision identically: the endpoint-with-no-authorization-
+#     signal variants measured to score the same on vulnerable and patched
+#     trees (rank 1331), and the wiring-decided-authorization family
+#     (ranks 1514, 1535, 1540, 1556, 1557, 1593).
+#   - The documented-API counterweight does not exist: the guarded method
+#     gains only the project-internal call; its other calls (render,
+#     where, Setting.get) are present in both revisions.
+#
+# VYQL-AUTH-075 (code.PublicRestDataEndpointMissingAuthorization) is the
+# concept this arrangement would light up if the vocabulary ever exists;
+# both blocks pin the miss it reports nothing today.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1987: a setup-state-gated helper renders internal system state with no authentication in scope"
+  lang ruby
+  file getting_started_controller.rb
+  reject VYQL-AUTH-075
+  code
+  ```
+  class GettingStartedController < ApplicationController
+    prepend_before_action -> { authorize! }, only: [:base]
+
+    def index
+      # check if first user exists
+      return if setup_done_response
+
+      # if admin user exists, we need to be authenticated
+      return if setup_done && !authentication_check
+
+      render json: {
+        setup_done:  setup_done,
+        import_mode: Setting.get('import_mode'),
+      }
+    end
+
+    def base
+      authorize!
+      render json: { result: 'ok' }
+    end
+
+    private
+
+    def setup_done
+      User.count > 2
+    end
+
+    def setup_done_response
+      return false if !setup_done
+
+      groups = Group.where(active: true)
+      addresses = EmailAddress.where(active: true)
+
+      render json: {
+        setup_done: true,
+        addresses:  addresses,
+        groups:     groups,
+        config:     { product_logo: Setting.get('product_logo') },
+      }
+      true
+    end
+  end
+  ```
+
+test "rank1987: the patched helper keeps the setup-state gate and adds the authentication gate"
+  lang ruby
+  file getting_started_controller.rb
+  reject VYQL-AUTH-075
+  code
+  ```
+  class GettingStartedController < ApplicationController
+    prepend_before_action -> { authorize! }, only: [:base]
+
+    def index
+      # check if first user exists
+      return if setup_done_response
+
+      render json: {
+        setup_done:  setup_done,
+        import_mode: Setting.get('import_mode'),
+      }
+    end
+
+    def base
+      authorize!
+      render json: { result: 'ok' }
+    end
+
+    private
+
+    def setup_done
+      User.count > 2
+    end
+
+    def setup_done_response
+      return false if !setup_done || !authentication_check
+
+      groups = Group.where(active: true)
+      addresses = EmailAddress.where(active: true)
+
+      render json: {
+        setup_done: true,
+        addresses:  addresses,
+        groups:     groups,
+        config:     { product_logo: Setting.get('product_logo') },
+      }
+      true
+    end
+  end
+  ```

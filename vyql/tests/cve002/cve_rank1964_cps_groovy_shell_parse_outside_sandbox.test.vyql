@@ -1,0 +1,192 @@
+# The Jenkins Pipeline: Groovy plugin (workflow-cps) compiles every pipeline
+# script through groovy.lang.GroovyShell: CpsGroovyShell extends GroovyShell,
+# and its doParse delegates to super.parse(codeSource), the documented
+# compile entry point. Compilation is not a pure syntactic operation -- the
+# classes the script defines are loaded and linked while it runs, so a script
+# that defines a class whose constructor executes code (the shape the fixed revision's
+# own regression test uses, through CpsScript) runs that code during what the
+# caller meant as a compile-only check. The sandbox the pipeline runs under
+# (script-security, applied through GroovySandbox.createBaseCompilerConfiguration
+# and the sandbox transformers) only intercepts calls while a sandbox is
+# entered on the thread, so compiling user-supplied script text with no
+# sandbox scope entered hands the text unsandboxed execution (SECURITY-1336,
+# CWE-94). The change is one wrap: doParse's body moves inside
+# GroovySandbox.runInSandbox(() -> ..., Whitelist.all()).
+#
+# Sibling kinship: the script-security plugin's own groovy-sandbox escape is
+# covered by an SCA pin on the vulnerable library release, and the
+# shared-library plugin's checkout traversal by the Jenkins root-dir file
+# name concept -- this is the plugin-side compile escape, a different layer
+# of the same advisory family, and nothing is minted to overlap them.
+#
+# The sink reuses code.CodeEval and the existing VYQL-INJ-003 rule, whose
+# `unless endpoint coveredBy core.CodeExecutionValidation` is exactly the
+# question this weakness asks: is the compile inside a sandbox scope? The
+# binding names the one-argument super.parse delegation a GroovyShell
+# subclass performs, and the check names script-security's documented scope
+# calls (GroovySandbox.runInSandbox, GroovySandbox.enter) at function scope,
+# because both wrap their work in an argument closure -- a dominance-anchored
+# check never reaches into the lambda the fixed revision actually guards.
+#
+# Two keying decisions are pinned by reject cases, both measured as
+# false-positive shapes before they exist:
+#   - receiver typing cannot carry the sink. A `super` receiver resolves to
+#     no type in the scanner IR, so `callee.receiver.type == "GroovyShell"`
+#     matches every parser-delegation spell equally -- on the tika tree it
+#     labelled all fifteen super.parse delegations in org.apache.tika.parser
+#     as code evaluation, and on the shared-library plugin it reported
+#     LibraryAdder's own name-parsing helper as a critical code injection.
+#     Parser frameworks carry their handler and context arguments on the same
+#     call, so the argument count separates the script-compile spell from
+#     ordinary delegation.
+#   - the loader spelling (GroovyClassLoader.parseClass, the form the
+#     script-compile validation endpoint uses) is deliberately not a sink: a
+#     loader call site carries no sandbox scope of its own -- whether that
+#     compile is sandboxed is decided by the shell factory that configured
+#     the loader, so flagging the call site reports the patched and
+#     unpatched tree alike.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off), byte-stable
+# across three runs per revision: the plugin at the fixed revision's parent reports
+# VYQL-INJ-003 twice, both on CpsGroovyShell.doParse's two super.parse
+# branches (lines 131 and 134), with the source the public parse API's
+# codeSource parameter; at the fixed revision it reports zero. The shared-library
+# plugin, tika-core and the full sibling-clone corpus (no one-argument
+# super.parse outside this plugin) report zero findings and zero new labels.
+
+test "rank1964: a Groovy shell subclass compiles script source with no sandbox scope"
+  lang java
+  profile library
+  file src/main/java/org/jenkinsci/plugins/workflow/cps/CpsGroovyShell.java
+  expect VYQL-INJ-003
+  code
+  ```
+  package org.jenkinsci.plugins.workflow.cps;
+
+  import groovy.lang.GroovyCodeSource;
+  import groovy.lang.GroovyShell;
+  import groovy.lang.Script;
+
+  class CpsGroovyShell extends GroovyShell {
+
+      private final Object execution;
+
+      CpsGroovyShell(Object execution) {
+          this.execution = execution;
+      }
+
+      @Override
+      public Script parse(GroovyCodeSource codeSource) {
+          return doParse(codeSource);
+      }
+
+      private Script doParse(GroovyCodeSource codeSource) {
+          if (execution != null) {
+              return super.parse(codeSource);
+          } else {
+              return super.parse(codeSource);
+          }
+      }
+  }
+  ```
+
+test "rank1964: the compile runs inside the sandbox scope"
+  lang java
+  profile library
+  file src/main/java/org/jenkinsci/plugins/workflow/cps/CpsGroovyShell.java
+  reject VYQL-INJ-003
+  code
+  ```
+  package org.jenkinsci.plugins.workflow.cps;
+
+  import groovy.lang.GroovyCodeSource;
+  import groovy.lang.GroovyShell;
+  import groovy.lang.Script;
+  import org.jenkinsci.plugins.scriptsecurity.sandbox.Whitelist;
+  import org.jenkinsci.plugins.scriptsecurity.sandbox.groovy.GroovySandbox;
+
+  class CpsGroovyShell extends GroovyShell {
+
+      private final Object execution;
+
+      CpsGroovyShell(Object execution) {
+          this.execution = execution;
+      }
+
+      @Override
+      public Script parse(GroovyCodeSource codeSource) {
+          return doParse(codeSource);
+      }
+
+      private Script doParse(GroovyCodeSource codeSource) {
+          try {
+              return GroovySandbox.runInSandbox(() -> {
+                  if (execution != null) {
+                      return super.parse(codeSource);
+                  } else {
+                      return super.parse(codeSource);
+                  }
+              }, Whitelist.all());
+          } catch (RuntimeException x) {
+              throw x;
+          } catch (Exception x) {
+              throw new AssertionError(x);
+          }
+      }
+  }
+  ```
+
+test "rank1964: a parser subclass delegating its handler-carrying parse is not script compilation"
+  lang java
+  profile library
+  file src/main/java/org/apache/tika/parser/DelegatingParser.java
+  reject VYQL-INJ-003
+  code
+  ```
+  package org.apache.tika.parser;
+
+  import java.io.InputStream;
+  import org.apache.tika.metadata.Metadata;
+  import org.apache.tika.sax.BodyContentHandler;
+  import org.xml.sax.ContentHandler;
+
+  public class DelegatingParser extends AbstractParser {
+
+      @Override
+      public void parse(InputStream stream, ContentHandler handler, Metadata metadata, ParseContext context)
+              throws Exception {
+          super.parse(stream, handler, metadata, context);
+      }
+  }
+  ```
+
+test "rank1964: a class's own one-argument parse helper is not script compilation"
+  lang java
+  profile library
+  file src/main/java/org/jenkinsci/plugins/workflow/libs/LibraryAdder.java
+  reject VYQL-INJ-003
+  code
+  ```
+  package org.jenkinsci.plugins.workflow.libs;
+
+  import java.util.HashMap;
+  import java.util.List;
+  import java.util.Map;
+
+  public class LibraryAdder {
+
+      @Override
+      public Map<String, String> add(List<String> libraries) {
+          Map<String, String> libraryVersions = new HashMap<>();
+          for (String library : libraries) {
+              String[] parsed = parse(library);
+              libraryVersions.put(parsed[0], parsed[1]);
+          }
+          return libraryVersions;
+      }
+
+      private String[] parse(String library) {
+          return library.split("@");
+      }
+  }
+  ```

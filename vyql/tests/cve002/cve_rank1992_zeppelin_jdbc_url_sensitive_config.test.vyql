@@ -1,0 +1,263 @@
+# Rank 1992 / CVE-2024-31864 (CWE-94): the JDBC interpreter built
+# its connection URL from per-user interpreter configuration and
+# handed it to the driver pool with no screening of connector
+# parameters, so a user-set URL carrying MySQL/MariaDB connector
+# switches reached the connection intact -- allowLoadLocalInfile
+# lets a rogue database server read arbitrary files off the Zeppelin
+# host through LOAD DATA LOCAL INFILE, autoDeserialize makes the
+# connector deserialize Java objects the server sends (code
+# execution), allowLocalInfile and allowUrlInLocalInfile widen the
+# same file-read primitive. getConnection(InterpreterContext) in
+# jdbc/src/main/java/org/apache/zeppelin/jdbc/JDBCInterpreter.java
+# did `String url = properties.getProperty(URL_KEY); url =
+# appendProxyUserToURL(url, user); String connectionUrl =
+# appendTagsToURL(url, context);` and passed connectionUrl down
+# getConnectionFromPool -> createConnectionPool -> `new
+# DriverManagerConnectionFactory(url, properties)` ->
+# DriverManager.getConnection(jdbcDriver). The properties object is
+# the per-user configuration: getJDBCConfiguration(user) keys it by
+# the authenticated user and setUserProperty(context) merges the
+# user's own overrides in, which is what makes the URL cross a trust
+# boundary a deployment's static application.properties does not.
+# The fixing commit e65b5430e4 (GHSA-66j8-
+# c83m-gj5f, ZEPPELIN-5990 "Disable sensitive configuration for JDBC
+# url"): getConnection gains `validateConnectionUrl(connectionUrl);`
+# before the pool call, and the new private helper throws
+# IllegalArgumentException when the URL case-insensitively contains
+# any of allowLoadLocalInfile / autoDeserialize / allowLocalInfile /
+# allowUrlInLocalInfile, with interpret() catching the throw. No
+
+#
+# ATTENTION, the config-provenance boundary rank 1526 recorded for
+# this same JDBC-URL class, now with its second instance. Neither
+# end of the path is labelled in Java: java.util.Properties.
+# getProperty is a configuration read no binding treats as input
+# (the trust boundary lives in who may set the property -- here
+# per-user interpreter configuration keyed by getUser(context),
+# wiring the taint engine cannot see), and no binding in the corpus
+# names DriverManager or DriverManagerConnectionFactory at all, so
+# the connection position is not a sink. `vyql match` on the file
+# labels nothing on the URL line or the factory line. The two
+# earlier ranks that shipped detection on this weakness class
+# (1156 h2o, 1212 inlong) both keyed on a control artifact present
+# in the vulnerable code -- the denylist's own literals, the
+# single-pass filter's replace loop -- and Zeppelin's vulnerable
+# form has no control artifact at all: the fixed revision adds the whole
+# denylist, so the discriminating literals ("allowLoadLocalInfile"
+# and peers) exist only at the fixed revision. A negation on their absence
+# passes the rename test (the literals are MySQL Connector/J's
+# documented parameter names, not the fixed revision's private vocabulary),
+# but the positive half cannot be expressed without either
+# Zeppelin's own per-user configuration API (repro-shaped) or the
+# generic "property read reaches a connection" shape, which fires
+# on every Java program that opens a connection from configuration
+# -- the 1331 measured-unshippable absence-of-control family. No
+# ENGINE-GAPS.md entry: the missing pieces are corpus vocabulary
+# (config-object provenance source, connection-string sink), the
+# same two rank 1526 named. No definition change shipped. Spec
+# cve_rank1992 records both directions asserting reject
+# VYQL-RF-001: when config-object vocabulary and a connection sink
+# land, the unscreened form must flip to expect.
+#
+# verify_current_expected: fixed, 0 -> 0 (both directions reject).
+
+test "rank1992: the connection url from per-user configuration reaches the driver pool unscreened"
+  lang java
+  file jdbc/src/main/java/org/apache/zeppelin/jdbc/JDBCInterpreter.java
+  reject VYQL-RF-001
+  code
+  ```
+  package org.apache.zeppelin.jdbc;
+
+  import java.sql.Connection;
+  import java.sql.DriverManager;
+  import java.sql.SQLException;
+  import java.util.HashMap;
+  import java.util.Properties;
+  import org.apache.commons.dbcp2.ConnectionFactory;
+  import org.apache.commons.dbcp2.DriverManagerConnectionFactory;
+
+  public class JDBCInterpreter {
+
+    private final HashMap<String, Properties> basePropertiesMap = new HashMap<>();
+
+    public Connection getConnection(String user, String proxyUser)
+        throws SQLException, ClassNotFoundException {
+      if (basePropertiesMap.get("default") == null) {
+        return null;
+      }
+      JDBCUserConfigurations jdbcUserConfigurations = getJDBCConfiguration(user);
+      final Properties properties = jdbcUserConfigurations.getProperty();
+      String url = properties.getProperty("default.url");
+      url = appendProxyUserToURL(url, proxyUser);
+      String connectionUrl = appendTagsToURL(url, user);
+      return getConnectionFromPool(connectionUrl, user, properties);
+    }
+
+    private Connection getConnectionFromPool(String url, String user, Properties properties)
+        throws SQLException, ClassNotFoundException {
+      if (!getJDBCConfiguration(user).isConnectionInDBDriverPool()) {
+        createConnectionPool(url, user, properties);
+      }
+      return DriverManager.getConnection("jdbc:apache:commons:dbcp:default" + user);
+    }
+
+    private void createConnectionPool(String url, String user, Properties properties)
+        throws SQLException, ClassNotFoundException {
+      String driverClass = properties.getProperty("default.driver");
+      ConnectionFactory connectionFactory = new DriverManagerConnectionFactory(url, properties);
+      PoolingDriver driver = new PoolingDriver();
+      driver.registerPool("default" + user, new GenericObjectPool(null));
+      Class.forName(driverClass);
+    }
+
+    private JDBCUserConfigurations getJDBCConfiguration(String user) {
+      return new JDBCUserConfigurations(basePropertiesMap.get("default"));
+    }
+
+    private String appendProxyUserToURL(String url, String user) {
+      StringBuilder connectionUrl = new StringBuilder(url);
+      return connectionUrl.toString();
+    }
+
+    private String appendTagsToURL(String url, String user) {
+      return url;
+    }
+  }
+
+  class JDBCUserConfigurations {
+    private final Properties properties;
+
+    JDBCUserConfigurations(Properties properties) {
+      this.properties = properties;
+    }
+
+    Properties getProperty() {
+      return properties;
+    }
+
+    boolean isConnectionInDBDriverPool() {
+      return false;
+    }
+  }
+
+  class PoolingDriver {
+    void registerPool(String name, Object pool) {
+    }
+  }
+
+  class GenericObjectPool {
+    GenericObjectPool(Object factory) {
+    }
+  }
+  ```
+
+test "rank1992: the screened url is rejected before the pool is built"
+  lang java
+  file jdbc/src/main/java/org/apache/zeppelin/jdbc/JDBCInterpreter.java
+  reject VYQL-RF-001
+  code
+  ```
+  package org.apache.zeppelin.jdbc;
+
+  import java.sql.Connection;
+  import java.sql.DriverManager;
+  import java.sql.SQLException;
+  import java.util.HashMap;
+  import java.util.Properties;
+  import org.apache.commons.dbcp2.ConnectionFactory;
+  import org.apache.commons.dbcp2.DriverManagerConnectionFactory;
+
+  public class JDBCInterpreter {
+
+    private static final String ALLOW_LOAD_LOCAL_IN_FILE_NAME = "allowLoadLocalInfile";
+    private static final String AUTO_DESERIALIZE = "autoDeserialize";
+    private static final String ALLOW_LOCAL_IN_FILE_NAME = "allowLocalInfile";
+    private static final String ALLOW_URL_IN_LOCAL_IN_FILE_NAME = "allowUrlInLocalInfile";
+
+    private final HashMap<String, Properties> basePropertiesMap = new HashMap<>();
+
+    public Connection getConnection(String user, String proxyUser)
+        throws SQLException, ClassNotFoundException {
+      if (basePropertiesMap.get("default") == null) {
+        return null;
+      }
+      JDBCUserConfigurations jdbcUserConfigurations = getJDBCConfiguration(user);
+      final Properties properties = jdbcUserConfigurations.getProperty();
+      String url = properties.getProperty("default.url");
+      url = appendProxyUserToURL(url, proxyUser);
+      String connectionUrl = appendTagsToURL(url, user);
+      validateConnectionUrl(connectionUrl);
+      return getConnectionFromPool(connectionUrl, user, properties);
+    }
+
+    private void validateConnectionUrl(String url) {
+      if (containsIgnoreCase(url, ALLOW_LOAD_LOCAL_IN_FILE_NAME)
+          || containsIgnoreCase(url, AUTO_DESERIALIZE)
+          || containsIgnoreCase(url, ALLOW_LOCAL_IN_FILE_NAME)
+          || containsIgnoreCase(url, ALLOW_URL_IN_LOCAL_IN_FILE_NAME)) {
+        throw new IllegalArgumentException("Connection URL contains sensitive configuration");
+      }
+    }
+
+    private boolean containsIgnoreCase(String haystack, String needle) {
+      return haystack.toLowerCase().contains(needle.toLowerCase());
+    }
+
+    private Connection getConnectionFromPool(String url, String user, Properties properties)
+        throws SQLException, ClassNotFoundException {
+      if (!getJDBCConfiguration(user).isConnectionInDBDriverPool()) {
+        createConnectionPool(url, user, properties);
+      }
+      return DriverManager.getConnection("jdbc:apache:commons:dbcp:default" + user);
+    }
+
+    private void createConnectionPool(String url, String user, Properties properties)
+        throws SQLException, ClassNotFoundException {
+      String driverClass = properties.getProperty("default.driver");
+      ConnectionFactory connectionFactory = new DriverManagerConnectionFactory(url, properties);
+      PoolingDriver driver = new PoolingDriver();
+      driver.registerPool("default" + user, new GenericObjectPool(null));
+      Class.forName(driverClass);
+    }
+
+    private JDBCUserConfigurations getJDBCConfiguration(String user) {
+      return new JDBCUserConfigurations(basePropertiesMap.get("default"));
+    }
+
+    private String appendProxyUserToURL(String url, String user) {
+      StringBuilder connectionUrl = new StringBuilder(url);
+      return connectionUrl.toString();
+    }
+
+    private String appendTagsToURL(String url, String user) {
+      return url;
+    }
+  }
+
+  class JDBCUserConfigurations {
+    private final Properties properties;
+
+    JDBCUserConfigurations(Properties properties) {
+      this.properties = properties;
+    }
+
+    Properties getProperty() {
+      return properties;
+    }
+
+    boolean isConnectionInDBDriverPool() {
+      return false;
+    }
+  }
+
+  class PoolingDriver {
+    void registerPool(String name, Object pool) {
+    }
+  }
+
+  class GenericObjectPool {
+    GenericObjectPool(Object factory) {
+    }
+  }
+  ```

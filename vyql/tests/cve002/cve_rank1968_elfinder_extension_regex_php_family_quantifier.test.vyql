@@ -1,0 +1,108 @@
+# A file-manager connector exposes an upload volume whose only executable-
+# extension screen is a volume attribute pattern: a regex that alternates
+# extensions after a literal dot and anchors them at the end of the name
+# (`editor/elfinder/php/connector.php` at the parent of the change). The
+# PHP-family entry of that alternation is written `php*`, which in regex
+# quantifies the letter `p` — it matches `.ph` and `.php` and nothing else
+# in the family — so an upload renamed to a variant extension such as
+# `.php4` or `.phps` passes the screen and keeps write permission, and
+# deployments that still map those extensions to the PHP handler execute
+# it (CWE-184). The fixed revision widens the entry to `php.*`, the wildcard the
+# pattern's other anchors imply.
+#
+# Case 1 is the vulnerable pattern as the connector builds it, with the
+# MIME deny list and the driver options it ships beside. Case 2 is the
+# patched pattern, identical except for the wildcard. Case 3 holds that
+# the regex anchors are load-bearing: in a filename glob `php*` is the
+# correct spelling of the family, so the same token without the escaped
+# dot and the `$` anchor must not flag.
+test "rank1968: an upload screen regex whose PHP-family entry quantifies a letter instead of a wildcard"
+  lang php
+  file connector.php
+  expect VYQL-INJ-070
+  code
+  ```
+  <?php
+
+  require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . '../../../config.php');
+
+  $rootpath = x_clean_input($_REQUEST['uploadDir']);
+  $rooturl = x_clean_input($_REQUEST['uploadURL']);
+
+  $opts = array(
+      'roots' => array(
+          array(
+              'driver'        => 'LocalFileSystem',
+              'path'          => $rootpath . '/media',
+              'URL'           => $rooturl . '/media',
+              'uploadDeny'    => array('text/x-php', 'application/x-php'),
+              'disabled'      => array('archive', 'extract', 'forward', 'netmount', 'netunmount', 'zipdl'),
+              'attributes' => array(
+                  array(
+                      'pattern' => '/(readme\.txt)|\.(html|php|php5|php*|phtml|phar|inc|py|pl|sh)$/i',
+                      'read'   => false,
+                      'write'  => false,
+                      'locked' => true,
+                      'hidden' => true
+                  )
+              )
+          )
+      )
+  );
+
+  $connector = new elFinderConnector(new elFinder($opts));
+  $connector->run();
+  ```
+
+test "rank1968: the same screen with the wildcard entry admits the family"
+  lang php
+  file connector.php
+  reject VYQL-INJ-070
+  code
+  ```
+  <?php
+
+  require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . '../../../config.php');
+
+  $rootpath = x_clean_input($_REQUEST['uploadDir']);
+  $rooturl = x_clean_input($_REQUEST['uploadURL']);
+
+  $opts = array(
+      'roots' => array(
+          array(
+              'driver'        => 'LocalFileSystem',
+              'path'          => $rootpath . '/media',
+              'URL'           => $rooturl . '/media',
+              'uploadDeny'    => array('text/x-php', 'application/x-php'),
+              'disabled'      => array('archive', 'extract', 'forward', 'netmount', 'netunmount', 'zipdl'),
+              'attributes' => array(
+                  array(
+                      'pattern' => '/(readme\.txt)|\.(html|php|php5|php.*|phtml|phar|inc|py|pl|sh)$/i',
+                      'read'   => false,
+                      'write'  => false,
+                      'locked' => true,
+                      'hidden' => true
+                  )
+              )
+          )
+      )
+  );
+
+  $connector = new elFinderConnector(new elFinder($opts));
+  $connector->run();
+  ```
+
+test "rank1968: a filename glob spelling the family with a star is not a screen regex"
+  lang php
+  file cleanup.php
+  reject VYQL-INJ-070
+  code
+  ```
+  <?php
+
+  // In glob syntax php* is the family spelling: no escaped dot, no $ anchor.
+  $stale = glob($dir . '/php*');
+  foreach ($stale as $file) {
+      unlink($file);
+  }
+  ```

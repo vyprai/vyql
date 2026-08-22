@@ -1,0 +1,249 @@
+# Winter CMS's backend Users controller opens a self-service account page
+# that requires no permission: the constructor clears $requiredPermissions
+# when the action is myaccount (modules/backend/controllers/Users.php at the
+# parent of the 1.2.12 fix), and myaccount_onSave proxies
+#
+#   $this->asExtension('FormController')->update_onSave($this->user->id, 'myaccount');
+#
+# The form behavior decides which fields a save may carry from a context
+# value, and at the parent that value came from the request:
+#
+#   public function formGetContext()
+#   {
+#       return post('form_context', $this->context);   // FormController.php:445
+#   }
+#
+# The widget filters fields by context (modules/backend/widgets/Form.php:723
+# drops every field whose context list does not include the active one), so
+# posting form_context=update loads the role / groups / permissions fields
+# -- context [create, update] in models/user/fields.yaml -- into the form.
+# getSaveData then reads the posted values (Form.php:1181,
+# `$data = $this->arrayName ? post($this->arrayName) : post();`) and
+# FormModelSaver::setModelAttributes applies them one by one:
+#
+#   foreach ($saveData as $attribute => $value) {
+#       ...
+#       $model->{$attribute} = $value;                 // FormModelSaver.php:85
+#   }
+#
+# so an authenticated backend user posting User[role]=... rewrites their own
+# role, permissions and is_superuser flag (CWE-269 over the CWE-915 mass
+# assignment mechanism). The fixed revisioned revision changes two things: formGetContext returns
+# $this->context only, and Backend\Models\User gains a beforeSave() hook
+# that throws AuthorizationException when the current user is dirty on
+# role_id / is_superuser / permissions, lacks backend.manage_users for
+# other accounts, or is not a superuser while touching superuser state.
+#
+# What fires on the real code: nothing on the vector, on either revision.
+# Bounded scans of the whole checkout (timeout 180, --max-ram 6GB, --cache
+# off) report 914 findings; the touched files carry only generic
+# code.StateChangingOp marks on the ->update() / ->save() calls
+# (Users.php:131/186, FormController.php:322) and an unrelated WeakHash.
+#
+# Three measured blockers, in path order:
+#
+#   1. post() has no source binding in any language. Winter's request
+#      helper lives in winter/storm, outside this checkout, so
+#      post('form_context', ...) and post($this->arrayName) are calls with
+#      no callee body and no label. The block below distills the helper
+#      locally over $_POST so the source is genuinely live -- and the
+#      dynamic store still reports nothing, which isolates the next blocker
+#      rather than the source.
+#
+#   2. The dynamic member store has no sink binding. The minimal pair
+#      (blocks 2 and 3) holds the source, the loop and the model fixed and
+#      varies only the store spelling: $model->fill($saveData) reports
+#      VYQL-INJ-012, the identical data written through
+#      $model->{$attribute} = $value reports 0. The engine is not the
+#      blocker here -- vyql graph shows the store lowering to a call node
+#      ($model.$attribute) whose argument carries the value's taint
+#      (Arg FLOWS-> Call); nothing labels that node.
+#
+#   3. The remediation cannot clear a taint finding on this path. The fixed revision
+#      does not touch FormModelSaver or the widget: the patched framework
+#      still reads post($this->arrayName) and still applies it through
+#      $model->{$attribute} = $value -- that is the designed save path,
+#      with the fields.yaml context gating as the intended access control.
+#      A sink on the dynamic store plus a post() source would fire
+#      identically on the patched tree, and injection.MassAssignment has no
+#      neutralizing check concept anywhere, so no unless clause could
+#      express the field gating. The fixed revisioned revision's own changes are invisible to a
+#      path anchored on the store: which fields a context loads is YAML
+#      configuration, and the beforeSave hook is a model-event dispatch
+#      into another class -- the same cross-class hook family measured for
+#      declarative validation and WordPress hook dispatch.
+#
+# verify_current_expected: attention-precision. Block 1 pins the real
+# chain's miss with the source live. Block 2 pins that the miss is the
+# store spelling, not the source or the rule. Block 4 pins the
+# non-discrimination: it rejects for the same reason as block 1, and flips
+# to a meaningful expect only if a check concept for
+# injection.MassAssignment ever exists -- a binding on the dynamic store
+# without that control would be unsuppressible on remediated code.
+
+test "rank1953: a self-service form save writes posted fields onto the account model through a dynamic property store"
+  lang php
+  file myaccount-save.php
+  reject VYQL-INJ-012
+  code
+  ```
+  <?php
+
+  class FormWidget {
+      public $context;
+      public $allFields = array('login', 'email', 'role', 'permissions', 'is_superuser');
+
+      public function getContext() {
+          return $this->context;
+      }
+
+      public function getSaveData() {
+          $result = array();
+          $data = post('User');
+          foreach ($this->allFields as $field) {
+              if (isset($data[$field])) {
+                  $result[$field] = $data[$field];
+              }
+          }
+          return $result;
+      }
+  }
+
+  class FormControllerBehavior {
+      public $context = 'myaccount';
+
+      public function formGetContext() {
+          return post('form_context', $this->context);
+      }
+
+      public function update_onSave($recordId = null, $context = null) {
+          $model = BackendAuth::findUserById($recordId);
+          $context = $this->formGetContext();
+          $saveData = $this->formWidget->getSaveData();
+          $this->setModelAttributes($model, $saveData);
+          $model->save();
+      }
+
+      public function setModelAttributes($model, $saveData) {
+          foreach ($saveData as $attribute => $value) {
+              $model->{$attribute} = $value;
+          }
+      }
+  }
+
+  function post($key, $default = null) {
+      return $_POST[$key] ?? $default;
+  }
+  ```
+
+test "rank1953: the same posted data applied through fill reports the mass assignment"
+  lang php
+  file myaccount-fill.php
+  expect VYQL-INJ-012
+  code
+  ```
+  <?php
+
+  class FormControllerBehavior {
+      public function setModelAttributes($model, $saveData) {
+          foreach ($saveData as $attribute => $value) {
+              if ($value !== null) {
+                  $attributes[$attribute] = $value;
+              }
+          }
+          $model->fill($attributes);
+      }
+  }
+
+  function post($key, $default = null) {
+      return $_POST[$key] ?? $default;
+  }
+
+  $behavior = new FormControllerBehavior();
+  $behavior->setModelAttributes($model, post('User'));
+  ```
+
+test "rank1953: the dynamic property store reports nothing for the same data"
+  lang php
+  file myaccount-store.php
+  reject VYQL-INJ-012
+  code
+  ```
+  <?php
+
+  class FormControllerBehavior {
+      public function setModelAttributes($model, $saveData) {
+          foreach ($saveData as $attribute => $value) {
+              $model->{$attribute} = $value;
+          }
+      }
+  }
+
+  function post($key, $default = null) {
+      return $_POST[$key] ?? $default;
+  }
+
+  $behavior = new FormControllerBehavior();
+  $behavior->setModelAttributes($model, post('User'));
+  ```
+
+test "rank1953: the patched context resolution and save hook leave the designed save path in place"
+  lang php
+  file myaccount-save-patched.php
+  reject VYQL-INJ-012
+  code
+  ```
+  <?php
+
+  class FormWidget {
+      public $context;
+      public $allFields = array('login', 'email');
+
+      public function getSaveData() {
+          $result = array();
+          $data = post('User');
+          foreach ($this->allFields as $field) {
+              if (isset($data[$field])) {
+                  $result[$field] = $data[$field];
+              }
+          }
+          return $result;
+      }
+  }
+
+  class FormControllerBehavior {
+      public $context = 'myaccount';
+
+      public function formGetContext() {
+          return $this->context;
+      }
+
+      public function update_onSave($recordId = null, $context = null) {
+          $model = BackendAuth::findUserById($recordId);
+          $context = $this->context = $context ?? $this->formGetContext();
+          $saveData = $this->formWidget->getSaveData();
+          $this->setModelAttributes($model, $saveData);
+          $model->save();
+      }
+
+      public function setModelAttributes($model, $saveData) {
+          foreach ($saveData as $attribute => $value) {
+              $model->{$attribute} = $value;
+          }
+      }
+  }
+
+  class User {
+      public function beforeSave() {
+          $actor = BackendAuth::getUser();
+          if ($actor && $actor->getKey() === $this->getKey()
+              && $this->isDirty(array('role_id', 'is_superuser', 'permissions'))) {
+              throw new AuthorizationException('denied');
+          }
+      }
+  }
+
+  function post($key, $default = null) {
+      return $_POST[$key] ?? $default;
+  }
+  ```

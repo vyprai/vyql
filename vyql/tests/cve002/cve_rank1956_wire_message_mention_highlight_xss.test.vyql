@@ -1,0 +1,195 @@
+# Rank 1956 / CVE-2022-24799 (GHSA-5568-rfh8-vmhq, CWE-79): the Wire
+# webapp renders chat messages through markdown-it with a custom fence
+# `highlight` callback (src/script/util/messageRenderer.ts at fix parent
+# d1445525^):
+#
+#     markdownit.set({
+#       highlight: function (code): string {
+#         const containsMentions = mentionEntities.some(mention => {
+#           const hash = createMentionHash(mention);
+#           return code.includes(hash);
+#         });
+#         if (containsMentions) {
+#           // disable code highlighting if there is a mention in there
+#           return code;                       // <-- unescaped
+#         }
+#         return hljs.highlightAuto(code).value;
+#       },
+#     });
+#
+# markdown-it embeds whatever the highlight callback returns into the
+# rendered fence HTML verbatim (its own fence renderer wraps the string
+# without escaping it), and the callback's `code` parameter is a slice of
+# the received chat message, so a message whose fenced block contains a
+# mention hash ships its own HTML to the victim's DOM: stored XSS. Fix
+# d1445525 wraps the branch's return in underscore's `escape()` (and,
+# hardening the same render path, passes function replacements to the two
+# `String.replace(mentionHash, ...)` calls so `$&`-style replacement
+# patterns in mention text cannot splice surrounding markup). The
+# advisory names the vector: "Insufficient escaping in markdown 'code
+# highlighting'". The vulnerable form is present at the vulnerable revision, the
+# remediation at the fixed revision; the row's commit is a plain single-file fix
+# commit. .
+#
+# ATTENTION, engine fact gap: the raw passthrough the fixed revision removes is a
+# *return expression* fact, and no binding can address it.
+#   - vyql match on the file (and on the stripped snippets below) reports
+#     one markdown-it label only: the existing code.RenderedMarkup source
+#     at markdownit.render's result (javascript.input,
+#     markdown_render_markup_source.vyql) -- identical at both revisions,
+#     and it is by-design safe here (the instance runs html: false).
+#     Nothing labels the highlight callback: no source at its `code`
+#     parameter, no sink at its return, no HtmlEscape on the underscore
+#     `escape` the fixed revision adds (only the dotted `_.escape`/`lodash.escape`
+#     forms are bound).
+#   - vyql graph shows the USG knows the raw passthrough:
+#     `highlight#param#code --FLOWS--> highlight#ret#`, and the
+#     registration call exists as a `markdownit.set` call node. Neither
+#     endpoint of that edge is addressable: the parameter route (`query
+#     param as param`, internal/bindings/compile_binding.go:675) forbids a
+#     where clause, fires only for exported params under a profile that
+#     lists the concept (bindings_apply.go:1270), and would label every
+#     exported parameter of every markdown-it-importing file; return
+#     nodes are internal pseudo-calls (`analysis.function.return`,
+#     lowering.go:1251) consumed by functionReturnDecoratorAbsent
+#     (bindings_core.go:202) with no emission target; and no edge joins
+#     the registration call to the callback's parameter -- the
+#     argument-to-callback join measured missing at rank 1925.
+#   - probe binding (markdown-it-gated, function scope, highlighter call
+#     present, no escape-family call): 3 context hits on the vulnerable
+#     file, 0 on the patched -- and 1 hit on a file transcribed from
+#     markdown-it's own README example (the canonical, safe hljs
+#     integration), because `hljs.highlight(lang, str).value` returns
+#     escaped markup and no token distinguishes it from
+#     `return code`. Narrowing the probe to `highlightAuto` -- this
+#     repository's own spelling -- escapes the README hit only by keying
+#     on the vulnerable commit's vocabulary, the rank-1394 trap. The
+#     highlighter-family/no-escape conjunction flags the library's
+#     documented default usage, so it is unshippable in the wide form and
+#     repro-shaped in the narrow one.
+#   - a `.replace` replacement-string sink for the two hardening hunks
+#     is priced and rejected: the second-argument shape is ordinary code
+#     everywhere (`str.replace(/x/, val)`), and neither hunk is the
+#     advisory's vector.
+# What is missing is a binding-language capability, not vocabulary: an
+# emission target for a function's return value (or a callable-source
+# route at a registered callback's parameters), which is a new dataflow
+# relation between a registration call and the callback it names -- judged
+# not mechanical.
+#
+# verify_current_expected: attention-engine-gap, all four tests rejected.
+# When a return/registration-join fact lands with a markdown-it highlight
+# binding, the first test flips to expect VYQL-INJ-004 and the third and
+# fourth must stay reject (they are the minimal pair: same registration,
+# same highlighter, differing only in the raw parameter return).
+
+test "rank1956: the mention-aware fence highlighter returns message content unescaped"
+  lang javascript
+  file src/script/util/messageRenderer.ts
+  reject VYQL-INJ-004
+  reject_review code.RenderedMarkup
+  code
+  ```
+  import hljs from 'highlight.js';
+  import MarkdownIt from 'markdown-it';
+
+  const markdownit = new MarkdownIt('zero', {breaks: true, html: false, linkify: true});
+
+  export const renderMessage = (message, mentionTexts) => {
+    markdownit.set({
+      highlight: function (code) {
+        const containsMentions = Object.keys(mentionTexts).some(hash => code.includes(hash));
+        if (containsMentions) {
+          // disable code highlighting if there is a mention in there
+          // highlighting will be wrong anyway because this is not valid code
+          return code;
+        }
+        return hljs.highlightAuto(code).value;
+      },
+    });
+    return markdownit.render(message);
+  };
+  ```
+
+test "rank1956: the patched highlighter escapes the branch the fixed revision touches"
+  lang javascript
+  file src/script/util/messageRenderer-fixed.ts
+  reject VYQL-INJ-004
+  code
+  ```
+  import hljs from 'highlight.js';
+  import MarkdownIt from 'markdown-it';
+  import {escape} from 'underscore';
+
+  const markdownit = new MarkdownIt('zero', {breaks: true, html: false, linkify: true});
+
+  export const renderMessage = (message, mentionTexts) => {
+    markdownit.set({
+      highlight: function (code) {
+        const containsMentions = Object.keys(mentionTexts).some(hash => code.includes(hash));
+        if (containsMentions) {
+          // disable code highlighting if there is a mention in there
+          return escape(code);
+        }
+        return hljs.highlightAuto(code).value;
+      },
+    });
+    return markdownit.render(message);
+  };
+  ```
+
+test "rank1956: the same registration without the raw parameter return is the safe twin"
+  lang javascript
+  file src/script/util/messageRenderer-safe-twin.ts
+  reject VYQL-INJ-004
+  code
+  ```
+  import hljs from 'highlight.js';
+  import MarkdownIt from 'markdown-it';
+
+  const markdownit = new MarkdownIt('zero', {breaks: true, html: false, linkify: true});
+
+  export const renderMessage = (message, mentionTexts) => {
+    markdownit.set({
+      highlight: function (code) {
+        const containsMentions = Object.keys(mentionTexts).some(hash => code.includes(hash));
+        if (containsMentions) {
+          // same registration, same highlighter, same mention branch --
+          // only the returned expression differs from the first test
+          return hljs.highlightAuto(code).value;
+        }
+        return hljs.highlightAuto(code).value;
+      },
+    });
+    return markdownit.render(message);
+  };
+  ```
+
+test "rank1956: markdown-it's documented hljs integration returns highlighter output, not raw text"
+  lang javascript
+  file src/script/util/readme-example.ts
+  reject VYQL-INJ-004
+  code
+  ```
+  import hljs from 'highlight.js';
+  import MarkdownIt from 'markdown-it';
+
+  // markdown-it's own README example: every return path is either the
+  // highlighter's escaped markup or the empty string that defers escaping
+  // to the renderer. A presence rule keying on "highlight callback with
+  // no escape call" flags exactly this file and must not.
+  const md = MarkdownIt({
+    highlight: function (str, lang) {
+      if (lang && hljs.getLanguage(lang)) {
+        try {
+          return hljs.highlight(lang, str).value;
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      return '';
+    },
+  });
+
+  export const render = text => md.render(text);
+  ```

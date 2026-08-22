@@ -1,0 +1,109 @@
+# Batik's AbstractDocument restores its DOMImplementation from the
+# serialized stream by reading a class name with s.readObject() and
+# reflecting it: Class.forName over the name, then a static-method lookup,
+# and when that fails a getDeclaredConstructor().newInstance() fallback.
+# The fallback instantiates whatever class the stream named with no check
+# that it is a DOMImplementation, so a crafted stream runs an arbitrary
+# constructor (CWE-470 on top of CWE-502). The fixed revision bounds the class set
+# before instantiating: DOMImplementation.class.isAssignableFrom(c), and a
+# SecurityException otherwise.
+test "batik readobject hook instantiates the class the stream names"
+  lang java
+  expect VYQL-DESER-023
+  code
+  ```
+  package org.apache.batik.dom;
+
+  import java.io.IOException;
+  import java.io.ObjectInputStream;
+  import java.lang.reflect.Method;
+  import org.w3c.dom.DOMImplementation;
+
+  public abstract class AbstractDocument {
+
+      protected transient DOMImplementation implementation;
+
+      private void readObject(ObjectInputStream s)
+          throws IOException, ClassNotFoundException {
+          s.defaultReadObject();
+
+          Class c = Class.forName((String) s.readObject());
+
+          try {
+              Method m = c.getMethod("getDOMImplementation", (Class[]) null);
+              implementation = (DOMImplementation) m.invoke(null, (Object[]) null);
+          } catch (Exception e) {
+              try {
+                  implementation = (DOMImplementation) c.getDeclaredConstructor().newInstance();
+              } catch (Exception ex) {
+              }
+          }
+      }
+  }
+  ```
+
+test "batik readobject hook bounds the class before instantiating it"
+  lang java
+  reject VYQL-DESER-023
+  code
+  ```
+  package org.apache.batik.dom;
+
+  import java.io.IOException;
+  import java.io.ObjectInputStream;
+  import java.lang.reflect.Method;
+  import org.w3c.dom.DOMImplementation;
+
+  public abstract class AbstractDocument {
+
+      protected transient DOMImplementation implementation;
+
+      private void readObject(ObjectInputStream s)
+          throws IOException, ClassNotFoundException {
+          s.defaultReadObject();
+
+          Class c = Class.forName((String) s.readObject());
+
+          try {
+              Method m = c.getMethod("getDOMImplementation", (Class[]) null);
+              implementation = (DOMImplementation) m.invoke(null, (Object[]) null);
+          } catch (Exception e) {
+              if (DOMImplementation.class.isAssignableFrom(c)) {
+                  try {
+                      implementation = (DOMImplementation) c.getDeclaredConstructor().newInstance();
+                  } catch (Exception ex) {
+                  }
+              } else {
+                  throw new SecurityException("Trying to create object that is not a DOMImplementation.");
+              }
+          }
+      }
+  }
+  ```
+
+test "a check on the constructed object leaves the class set unbounded"
+  lang java
+  expect VYQL-DESER-023
+  code
+  ```
+  package org.apache.batik.dom;
+
+  import java.io.IOException;
+  import java.io.ObjectInputStream;
+
+  public abstract class AbstractDocument {
+
+      protected transient Object implementation;
+
+      private void readObject(ObjectInputStream s)
+          throws IOException, ClassNotFoundException {
+          s.defaultReadObject();
+
+          Class c = Class.forName((String) s.readObject());
+          Object o = c.getDeclaredConstructor().newInstance();
+          if (o instanceof org.apache.batik.dom.DomImplementationMarker) {
+              implementation = o;
+          }
+      }
+  }
+  ```
