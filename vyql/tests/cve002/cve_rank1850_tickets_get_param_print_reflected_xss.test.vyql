@@ -1,0 +1,130 @@
+# openises/tickets (CVE-2026-48235): the ticketing app's page templates
+# print request parameters straight into the HTML they emit. add_note.php
+# reflected $_GET['ticket_id'] into a hidden input's VALUE attribute,
+# street_view.php printed $_GET['thelat'] and $_GET['thelng'] into a
+# <SCRIPT> island as JS variables, and single.php interpolated
+# $_GET['ticket_id'] into a printed heading. The fixed revision
+# ecfeb406a016766cae81c749e14b5145a9f2dbff (the pool row's SHA has one
+# corrupted character: 14b5145a9f, not 14b514a9f) wraps each reflected
+# value at the print: htmlspecialchars($v, ENT_QUOTES, 'UTF-8') for
+# strings in attribute context, intval() for numeric ids and floatval()
+# for coordinates, across 29 files.
+#
+# The vulnerable files are classic template pages: top-level PHP, HTML
+# between ?> and <?php, and the reflected print inside an if-block or a
+# script island. The cases keep that structure rather than collapsing to
+# a bare echo, because the print has to survive the inline-HTML islands
+# for the label to mean anything on the real pages.
+#
+# intval()/floatval() force a numeric type, so the reflected value can no
+# longer carry markup: that is the patched form of the numeric-id and
+# coordinate sites and a reject here. Until numericCastHtmlEscape860
+# (vyql/bindings/php/mfbe84119.vyql) credited the casts as
+# core.HtmlEscape on the path, VYQL-INJ-004 kept reporting the remediated
+# numeric sites -- single.php:71, single_unit.php:57 and
+# street_view.php:40-41 all fired at the fixed revision. Measured on the
+# 29 changed files: 401 INJ-004 at the vulnerable revision against 352 at
+# the fixed one before the binding, 399 against 323 after; whole tree
+# 5847 -> 5795 vulnerable and 5798 -> 5721 fixed, and every suppressed
+# finding sampled (landb.php:1256, mail_edit.php:217, tables.php:1369,
+# file_upload.php:357, functions_major_nm.inc.php:186) prints a value
+# that passes through intval() on its path.
+#
+# Residual, documented rather than litigated: search.php:352 prints
+# $post_frm_query, derived as strip_tags($_POST['frm_query']) upstream,
+# and the fixed revision still wraps the print in htmlspecialchars because
+# strip_tags leaves quotes and the VALUE attribute is single-quoted. The
+# path-level HtmlEscape credit for strip_tags is long-established
+# shipped behaviour and the right call in body context, so that one site
+# reads clean; the attribute-context breakout it leaves is below what a
+# path-level check can express.
+
+test "tickets: a hidden input VALUE reflects the request ticket id unescaped"
+  lang php
+  file add_note.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+  if (empty($_POST)) {
+      $heading = "Add Note";
+  ?>
+      <INPUT TYPE='hidden' NAME='frm_ticket_id' VALUE='<?php print $_GET['ticket_id']; ?>' />
+  <?php
+  }
+  ?>
+  ```
+
+test "tickets: htmlspecialchars at the print closes the reflection"
+  lang php
+  file add_note.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+  if (empty($_POST)) {
+      $heading = "Add Note";
+  ?>
+      <INPUT TYPE='hidden' NAME='frm_ticket_id' VALUE='<?php print htmlspecialchars($_GET['ticket_id'], ENT_QUOTES, 'UTF-8'); ?>' />
+  <?php
+  }
+  ?>
+  ```
+
+test "tickets: coordinates printed into a script island are reflected"
+  lang php
+  file street_view.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+  $api_key = get_variable('gmaps_api_key');
+  ?>
+  <SCRIPT>
+      var myPano;
+      var lat = <?php print $_GET['thelat'];?>;
+      var lng = <?php print $_GET['thelng'];?>;
+  </SCRIPT>
+  ```
+
+test "tickets: floatval at the print closes the coordinate reflection"
+  lang php
+  file street_view.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+  $api_key = get_variable('gmaps_api_key');
+  ?>
+  <SCRIPT>
+      var myPano;
+      var lat = <?php print floatval($_GET['thelat']);?>;
+      var lng = <?php print floatval($_GET['thelng']);?>;
+  </SCRIPT>
+  ```
+
+test "tickets: an interpolated ticket id in a printed heading is reflected"
+  lang php
+  file single.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+  if (empty($row_ticket)) {
+      print "<CENTER><H3>No data for Ticket # {$_GET['ticket_id']} </H3>";
+      }
+  ?>
+  ```
+
+test "tickets: intval at the print closes the numeric-id reflection"
+  lang php
+  file single_unit.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+  ?>
+      <SPAN onClick='location="?func=responder&edit=true&id&id=<?php print intval($_GET['id']);?>";'>Edit</SPAN>
+  <?php
+  ?>
+  ```

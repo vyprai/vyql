@@ -1,0 +1,160 @@
+# Rank 1817 / CVE-2025-0343: apple/swift-asn1 terminated the process on
+# malformed DER/BER instead of reporting through its error channel.
+#
+# Every type decoder had the same shape at ae33e594^: a `throws` initializer
+# whose tag-mismatch branch throws ASN1Error, but whose content-shape branch
+# calls `preconditionFailure(...)` -- an unconditional, uncatchable trap. A
+# constructed encoding for any primitive type (BIT STRING, INTEGER, OCTET
+# STRING, OID, UTCTime, GeneralizedTime) or a primitive encoding where an
+# explicit tag promises constructed content reached one of eight such traps
+# through the public DER.parse/BER.parse entry points, so caller-supplied
+# bytes crashed any process decoding them. CWE-617/CWE-754.
+#
+# The fixed revision replaces each trap with `throw ASN1Error.invalidASN1Object(...)`
+# and, for the two time types, routes both DER and BER decoding through
+# ASN1OctetString so the shape check lives in one throwing decoder. Eight
+# traps removed; four deliberately kept (representation invariants inside
+# serialization code and an exhaustive-switch default), all on data the
+# library itself produced.
+#
+# Detection reuses the existing code.ReachableAssertionReview family
+# (VYQL-DOS-040) widened to Swift: preconditionFailure and fatalError are
+# the standard library's two documented unconditional termination entry
+# points, so each reachable call is the review boundary for whether external
+# input can violate the invariant. Measured with the scanner on the real
+# tree, union over three --cache off runs: 11 findings at the parent -- 10
+# on Sources/, exactly the eight removed decode traps plus the two
+# deliberately kept invariants, and 1 in a benchmark fixture -- against 3 at
+# the fixed revision (the two kept invariants in serialization paths plus the benchmark
+# fixture); the default report moves 20 -> 31 and 20 -> 23 respectively, all
+# other findings unchanged. The only other Swift tree available under the
+# corpus emits no flag: its single fatalError sits in a computed-property
+# body, which extracts no call node.
+#
+# Known recall boundary, stated rather than hidden: the Swift frontend
+# extracts no call node for a call whose argument list starts on the next
+# line, so `preconditionFailure(\n  "..."\n)` is unlabelled
+# (Sources/.../ObjectIdentifier.swift:96/113 at the parent). Both affected
+# sites are among the deliberately kept invariants, so no removed trap is
+# missed.
+
+test "rank1817: primitive content decoded through a fatal trap"
+  lang swift
+  file ASN1OctetString.swift
+  expect VYQL-DOS-040
+  expect_review code.ReachableAssertionReview
+  code
+  ```
+  public enum ASN1Error: Error {
+      case invalidASN1Object(reason: String)
+      case unexpectedFieldType(ASN1Identifier)
+  }
+
+  public enum ASN1NodeContent {
+      case primitive([UInt8])
+      case constructed([ASN1Node])
+  }
+
+  public struct ASN1OctetString {
+      public var bytes: ArraySlice<UInt8>
+
+      @inlinable
+      public init(derEncoded node: ASN1Node, withIdentifier identifier: ASN1Identifier) throws {
+          guard node.identifier == identifier else {
+              throw ASN1Error.unexpectedFieldType(node.identifier)
+          }
+
+          guard case .primitive(let content) = node.content else {
+              preconditionFailure("ASN.1 parser generated primitive node with constructed content")
+          }
+
+          self.bytes = content[...]
+      }
+  }
+  ```
+
+test "rank1817: explicitly tagged object unwrapped through a fatal trap"
+  lang swift
+  file DER.swift
+  expect VYQL-DOS-040
+  expect_review code.ReachableAssertionReview
+  code
+  ```
+  extension DER {
+      @inlinable
+      public static func optionalExplicitlyTagged<T>(_ nodes: inout ASN1NodeIterator, tagNumber: Int, tagClass: ASN1Identifier.TagClass, _ initializer: (ASN1Node) throws -> T) throws -> T? {
+          guard let node = nodes.next() else {
+              return nil
+          }
+
+          // We expect a single child.
+          guard case .constructed(let childNodes) = node.content else {
+              // This error is an internal parser error: the tag above is always constructed.
+              preconditionFailure("Explicit tags are always constructed")
+          }
+
+          var nodeIterator = childNodes.makeIterator()
+          guard let child = nodeIterator.next(), nodeIterator.next() == nil else {
+              throw ASN1Error.invalidASN1Object(reason: "Too many child nodes")
+          }
+          return try initializer(child)
+      }
+  }
+  ```
+
+test "rank1817: constructed content reported through the error channel"
+  lang swift
+  file ASN1OctetString.swift
+  reject VYQL-DOS-040
+  reject_review code.ReachableAssertionReview
+  code
+  ```
+  public enum ASN1Error: Error {
+      case invalidASN1Object(reason: String)
+      case unexpectedFieldType(ASN1Identifier)
+  }
+
+  public enum ASN1NodeContent {
+      case primitive([UInt8])
+      case constructed([ASN1Node])
+  }
+
+  public struct ASN1OctetString {
+      public var bytes: ArraySlice<UInt8>
+
+      @inlinable
+      public init(derEncoded node: ASN1Node, withIdentifier identifier: ASN1Identifier) throws {
+          guard node.identifier == identifier else {
+              throw ASN1Error.unexpectedFieldType(node.identifier)
+          }
+
+          guard case .primitive(let content) = node.content else {
+              throw ASN1Error.invalidASN1Object(reason: "ASN1OctetString encoded with constructed encoding")
+          }
+
+          self.bytes = content[...]
+      }
+  }
+  ```
+
+test "rank1817: a decoder delegating to a throwing shape check"
+  lang swift
+  file GeneralizedTime.swift
+  reject VYQL-DOS-040
+  reject_review code.ReachableAssertionReview
+  code
+  ```
+  public struct GeneralizedTime: Hashable, Sendable {
+      @inlinable
+      public init(derEncoded node: ASN1Node, withIdentifier identifier: ASN1Identifier) throws {
+          let content = try ASN1OctetString(derEncoded: node, withIdentifier: identifier).bytes
+          self = try TimeUtilities.generalizedTimeFromBytes(content)
+      }
+
+      @inlinable
+      public init(berEncoded node: ASN1Node, withIdentifier identifier: ASN1Identifier) throws {
+          let content = try ASN1OctetString(berEncoded: node, withIdentifier: identifier).bytes
+          self = try TimeUtilities.generalizedTimeFromBytes(content)
+      }
+  }
+  ```

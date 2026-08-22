@@ -1,0 +1,235 @@
+# jenkinsci/support-core-plugin, CVE-2022-45383 (SECURITY-2804). The support
+# bundle is controller-wide diagnostic and secret material, and the two
+# entry points that hand it out authorize on a permission that is separable
+# from controller administration:
+#
+#   SupportAction.getTarget()  -- the StaplerProxy check every /support/
+#                                 request passes through
+#       Jenkins.get().checkPermission(CREATE_BUNDLE);
+#   SupportCommand.run()       -- the `support` CLI command
+#       Jenkins.get().checkPermission(SupportPlugin.CREATE_BUNDLE);
+#
+# CREATE_BUNDLE is a plugin-declared hudson.security.Permission,
+#
+#   new Permission(SUPPORT_PERMISSIONS, "DownloadBundle", ...,
+#       Jenkins.ADMINISTER, PermissionScope.JENKINS),
+#
+# so ADMINISTER implies it, but the grant runs the other way too: it is its
+# own checkbox in the authorization matrix, grantable to any subject without
+# Overall/Administer. The fixed revision (9b7a1d48db0f) swaps both checks -- and the two
+# jelly `permission="${...CREATE_BUNDLE}"` attributes -- to Jenkins.ADMINISTER,
+# and deprecates the permission. A subject holding only DownloadBundle could
+# download and delete bundles at the parent; at the fixed revision it cannot. The row
+# checks out end to end: the advisory's CVE is this SECURITY issue, the parent
+# carries the vulnerable form, the remediation is present at the fixed revision.
+#
+# What fires today, union over three `timeout 180 ./bin/vyql scan --cache off
+# --max-ram 6GB` runs per revision, identical inside each revision and
+# byte-identical between them: 122 findings / 105 at or above high on both
+# 9b7a1d48db0f^ and 9b7a1d48db0f, the same rule distribution (INJ-004 63,
+# PATH-001 29, DOS-001 6, INJ-009 5, AUTH-079 4, ...), and not one finding on
+# SupportAction.java:91 or SupportCommand.java:78 at either revision. The
+# SupportAction findings that do exist are the doDeleteBundles parameter
+# flows into HtmlRender/FilePathAccess/LogOutput, untouched at both revisions.
+# `vyql match` shows why: `Jenkins.get().checkPermission` is labelled
+# core.AuthorizationCheck (resolved) at both revisions, and identically at the
+# three sibling sites in the same tree that check Jenkins.ADMINISTER
+# (SupportObjectAction.java:128, SupportPluginManagement.java:134,
+# SupportAutomatedBundleConfiguration.java:181). The label carries no
+# permission identity, so vulnerable and correct checks are the same fact.
+#
+# The counterweight test -- "does the fixed revision leave an API-documented call inside
+# the method it guards" -- is satisfied but discriminates nothing: the call
+# left inside getTarget() and run() at both revisions is checkPermission
+# itself; the only token that changes is its argument constant, and keying on
+# the presence of `Jenkins.ADMINISTER` keys on the fixed revision's own spelling. The
+# same permission under its older `Hudson.ADMINISTER` name, a static-import
+# alias, or any correct non-ADMINISTER check would re-flag.
+#
+# The collateral of the one candidate shape, "checks a permission other than
+# Jenkins.ADMINISTER", enumerated by grep over the corpus clones:
+# script-security-plugin carries 13+ `checkPermission(Jenkins.RUN_SCRIPTS)`
+# sites -- the correct permission for script approval, core Jenkins and not
+# ADMINISTER; git-plugin five `Item.EXTENDED_READ` / `Item.CONFIGURE` /
+# `CredentialsProvider.USE_ITEM` checks plus a dynamic `getPermission()`;
+# mercurial-plugin three `Item.EXTENDED_READ`; active-directory-plugin a
+# dynamic `getRequiredPermission()`. Every one is the documented intended use
+# of hudson.security.Permission: a plugin declares a permission implied-by the
+# strength its data warrants and checks that. Which strength a given
+# endpoint's data warrants is the per-endpoint policy decision SECURITY-2804
+# made for exactly these two sites; it is not encoded in the code, in the
+# Permission JavaDoc, or in any taint path. Not an engine gap -- the call
+# resolves and is labelled; the missing thing is a judgment no binding can
+# carry without firing on the entire healthy Jenkins plugin corpus.
+#
+# The authorization-strength family, prior ranks 1514, 1535, 1540, 1556,
+# 1557, 1593.
+#
+# verify_current_expected: attention, both revisions rejected below; the
+# pins are against VYQL-AUTH-079, the sensitive-operation audit rule that
+# does fire elsewhere in this tree (SupportActionTest.java:261), asserting it
+# does not reach the bundle endpoints or the permission checks.
+
+test "rank1811: the bundle root action authorizing every request on the plugin's own grantable permission"
+  lang java
+  file SupportAction.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  import hudson.model.RootAction;
+  import hudson.security.Permission;
+  import jenkins.model.Jenkins;
+  import org.kohsuke.stapler.StaplerProxy;
+  import org.kohsuke.stapler.StaplerRequest;
+  import org.kohsuke.stapler.StaplerResponse;
+
+  import java.io.File;
+  import java.io.IOException;
+  import java.util.logging.Logger;
+
+  public class SupportAction implements RootAction, StaplerProxy {
+      public static final Permission CREATE_BUNDLE = SupportPlugin.CREATE_BUNDLE;
+      private final Logger logger = Logger.getLogger(SupportAction.class.getName());
+
+      @Override
+      public Object getTarget() {
+          Jenkins.get().checkPermission(CREATE_BUNDLE);
+          return this;
+      }
+
+      public String getIconFileName() {
+          return "/plugin/support-core/images/support.svg";
+      }
+
+      public String getDisplayName() {
+          return "Support";
+      }
+
+      public String getUrlName() {
+          return "support";
+      }
+
+      public void doDownloadBundles(StaplerRequest req, StaplerResponse rsp) throws IOException {
+          File fileToDownload = new File(SupportPlugin.getRootDirectory(), getSelectedBundle(req));
+          rsp.setContentType("application/zip");
+          rsp.addHeader("Content-Disposition", "inline; filename=" + fileToDownload.getName() + ";");
+          FileUtils.copyFile(fileToDownload, rsp.getOutputStream());
+          logger.info("Bundle " + fileToDownload.getAbsolutePath() + " successfully downloaded");
+      }
+
+      String getSelectedBundle(StaplerRequest req) {
+          return req.getParameter("bundle");
+      }
+  }
+  ```
+
+test "rank1811: the CLI support command authorizing on the plugin's own grantable permission"
+  lang java
+  file SupportCommand.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  import hudson.cli.CLIAction;
+  import hudson.cli.CLICommand;
+  import jenkins.model.Jenkins;
+
+  import java.io.OutputStream;
+  import java.util.ArrayList;
+  import java.util.List;
+
+  public class SupportCommand extends CLICommand implements CLIAction {
+      @Override
+      public String getName() {
+          return "support";
+      }
+
+      @Override
+      protected int run() throws Exception {
+          Jenkins.get().checkPermission(SupportPlugin.CREATE_BUNDLE);
+          List<Object> selected = new ArrayList<>();
+          for (Object c : SupportPlugin.getComponents()) {
+              selected.add(c);
+          }
+          OutputStream os = stdout;
+          SupportPlugin.setRequesterAuthentication(Jenkins.getAuthentication());
+          try {
+              SupportPlugin.writeBundle(os, selected);
+          } finally {
+              SupportPlugin.clearRequesterAuthentication();
+          }
+          return 0;
+      }
+  }
+  ```
+
+test "rank1811: both entry points requiring the controller administration permission"
+  lang java
+  file SupportActionAdminister.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  import hudson.model.RootAction;
+  import jenkins.model.Jenkins;
+  import org.kohsuke.stapler.StaplerProxy;
+
+  public class SupportActionAdminister implements RootAction, StaplerProxy {
+      @Override
+      public Object getTarget() {
+          Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+          return this;
+      }
+
+      public String getUrlName() {
+          return "support";
+      }
+  }
+  ```
+
+test "rank1811: the item action requiring administration at the vulnerable revision"
+  lang java
+  file SupportObjectActionAdminister.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  import hudson.model.Action;
+  import jenkins.model.Jenkins;
+  import net.sf.json.JSONObject;
+  import org.kohsuke.stapler.StaplerRequest;
+  import org.kohsuke.stapler.StaplerResponse;
+  import org.kohsuke.stapler.verb.POST;
+
+  import java.io.IOException;
+
+  public class SupportObjectActionAdminister implements Action {
+      @POST
+      public final void doGenerateAndDownload(StaplerRequest req, StaplerResponse rsp) throws IOException {
+          Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+          rsp.setContentType("application/zip");
+          JSONObject json = req.getSubmittedForm();
+          SupportPlugin.writeBundle(rsp.getOutputStream(), SupportPlugin.getComponents(json));
+      }
+  }
+  ```
+
+test "rank1811: the permission declaration that makes the grant separable from administration"
+  lang java
+  file SupportPluginPermission.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  import hudson.Plugin;
+  import hudson.model.Messages;
+  import hudson.security.Permission;
+  import hudson.security.PermissionGroup;
+  import hudson.security.PermissionScope;
+  import jenkins.model.Jenkins;
+
+  public class SupportPluginPermission extends Plugin {
+      public static final PermissionGroup SUPPORT_PERMISSIONS =
+              new PermissionGroup(SupportPluginPermission.class, Messages.SupportPlugin_PermissionGroup());
+
+      public static final Permission CREATE_BUNDLE =
+              new Permission(SUPPORT_PERMISSIONS, "DownloadBundle", Messages.SupportPlugin_CreateBundle(),
+                      Jenkins.ADMINISTER, PermissionScope.JENKINS);
+  }
+  ```

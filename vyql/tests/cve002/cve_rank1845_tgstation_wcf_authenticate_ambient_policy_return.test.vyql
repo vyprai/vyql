@@ -1,0 +1,133 @@
+# tgstation/tgstation-server, CVE-2018-17107 (GHSA issue #690). The change diff,
+# not the title, gives the weakness: the server registers a custom WCF
+# ServiceAuthenticationManager whose Authenticate override reads Username and
+# Password message headers and calls LogonUser over them. On the success path
+# it returns a fresh policy collection wrapping the logged-on Windows
+# identity. On every other path -- headers absent, LogonUser refusing the
+# credentials, or any exception swallowed by the bare catch -- it fell through
+# to
+#
+#   return authPolicy;
+#
+# returning the authPolicy parameter the framework hands the callback. That
+# parameter is not a neutral default: WCF caches what the callback
+# returned and passes the cache back in, so a failed login inherits the
+# authorization decision of the last caller that did authenticate. Once anyone
+# is logged in, every username/password pair succeeds, which is the 9.8-CVSS
+# "later logins succeed regardless of credentials entered". The fixed revision replaces
+# the fallthrough with a fresh empty policy collection, so a refused login now
+# contributes no authorization state.
+#
+# CWE-287/CWE-255. The discriminator is the body's reference to the ambient
+# policy parameter: the patched method never touches it (its sole reference
+# is the removed return), while the documented parameter itself stays in both
+# signatures. The binding keys on the hook's documented shape -- an Authenticate
+# override taking a ReadOnlyCollection policy parameter -- plus that reference.
+
+test "rank1845: Authenticate override returns the cached ambient policy collection on its failure path"
+  lang csharp
+  file AuthenticationHeaderDecoder.cs
+  expect VYQL-AUTH-162
+  code
+  ```
+  using System;
+  using System.Collections.ObjectModel;
+  using System.Collections.Generic;
+  using System.IdentityModel.Policy;
+  using System.Runtime.InteropServices;
+  using System.Security.Principal;
+  using System.ServiceModel;
+  using System.ServiceModel.Channels;
+
+  namespace TGS.Server.Security
+  {
+      sealed class AuthenticationHeaderDecoder : ServiceAuthenticationManager
+      {
+          [DllImport("advapi32.dll", SetLastError = true)]
+          static extern bool LogonUser(string lpszUsername, string lpszDomain, string lpszPassword, int dwLogonType, int dwLogonProvider, out IntPtr phToken);
+
+          [DllImport("kernel32.dll", SetLastError = true)]
+          static extern bool CloseHandle(IntPtr handle);
+
+          public override ReadOnlyCollection<IAuthorizationPolicy> Authenticate(ReadOnlyCollection<IAuthorizationPolicy> authPolicy, Uri listenUri, ref Message message)
+          {
+              try
+              {
+                  var userPosition = message.Headers.FindHeader("Username", "http://tempuri.org");
+                  var passPosition = message.Headers.FindHeader("Password", "http://tempuri.org");
+
+                  if (userPosition != -1 && passPosition != -1)
+                  {
+                      var user = message.Headers.GetHeader<string>(userPosition);
+                      var pass = message.Headers.GetHeader<string>(passPosition);
+
+                      var splits = user.Split('\\');
+
+                      var res = LogonUser(splits.Length > 1 ? splits[1] : splits[0], splits.Length > 1 ? splits[0] : null, pass, 3, 0, out IntPtr token);
+                      if (res)
+                      {
+                          OperationContext.Current.OperationCompleted += (a, b) => { CloseHandle(token); };
+                          return new ReadOnlyCollection<IAuthorizationPolicy>(new List<IAuthorizationPolicy> { new WindowsAuthorizationPolicy(new WindowsIdentity(token)) });
+                      }
+                  }
+              }
+              catch { }
+              return authPolicy;
+          }
+      }
+  }
+  ```
+
+test "rank1845: refused logins return a fresh empty policy collection, not the cached one"
+  lang csharp
+  file AuthenticationHeaderDecoder.cs
+  reject VYQL-AUTH-162
+  code
+  ```
+  using System;
+  using System.Collections.ObjectModel;
+  using System.Collections.Generic;
+  using System.IdentityModel.Policy;
+  using System.Runtime.InteropServices;
+  using System.Security.Principal;
+  using System.ServiceModel;
+  using System.ServiceModel.Channels;
+
+  namespace TGS.Server.Security
+  {
+      sealed class AuthenticationHeaderDecoder : ServiceAuthenticationManager
+      {
+          [DllImport("advapi32.dll", SetLastError = true)]
+          static extern bool LogonUser(string lpszUsername, string lpszDomain, string lpszPassword, int dwLogonType, int dwLogonProvider, out IntPtr phToken);
+
+          [DllImport("kernel32.dll", SetLastError = true)]
+          static extern bool CloseHandle(IntPtr handle);
+
+          public override ReadOnlyCollection<IAuthorizationPolicy> Authenticate(ReadOnlyCollection<IAuthorizationPolicy> authPolicy, Uri listenUri, ref Message message)
+          {
+              try
+              {
+                  var userPosition = message.Headers.FindHeader("Username", "http://tempuri.org");
+                  var passPosition = message.Headers.FindHeader("Password", "http://tempuri.org");
+
+                  if (userPosition != -1 && passPosition != -1)
+                  {
+                      var user = message.Headers.GetHeader<string>(userPosition);
+                      var pass = message.Headers.GetHeader<string>(passPosition);
+
+                      var splits = user.Split('\\');
+
+                      var res = LogonUser(splits.Length > 1 ? splits[1] : splits[0], splits.Length > 1 ? splits[0] : null, pass, 3, 0, out IntPtr token);
+                      if (res)
+                      {
+                          OperationContext.Current.OperationCompleted += (a, b) => { CloseHandle(token); };
+                          return new ReadOnlyCollection<IAuthorizationPolicy>(new List<IAuthorizationPolicy> { new WindowsAuthorizationPolicy(new WindowsIdentity(token)) });
+                      }
+                  }
+              }
+              catch { }
+              return new ReadOnlyCollection<IAuthorizationPolicy>(new List<IAuthorizationPolicy>());
+          }
+      }
+  }
+  ```

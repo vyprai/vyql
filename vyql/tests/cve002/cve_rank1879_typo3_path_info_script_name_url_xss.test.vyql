@@ -1,0 +1,313 @@
+# TYPO3 (CVE-2023-24814, CWE-79) derives the script name from
+# PATH_INFO on CGI servers. NormalizedParams::determineScriptName
+# (typo3/sysext/core/Classes/Http/NormalizedParams.php:638 at the parent
+# of 0005a6fd86) prefers the attacker-controlled path suffix over the
+# webserver's SCRIPT_NAME:
+#
+#   $possiblePathInfo = ($serverParams['ORIG_PATH_INFO'] ?? '') ?: ($serverParams['PATH_INFO'] ?? '');
+#   $possibleScriptName = ($serverParams['ORIG_SCRIPT_NAME'] ?? '') ?: ($serverParams['SCRIPT_NAME'] ?? '');
+#   $scriptName = Environment::isRunningOnCgiServer() && $possiblePathInfo
+#       ? $possiblePathInfo
+#       : $possibleScriptName;
+#
+# so a request to /index.php/<script>alert(1)</script> makes the payload
+# the script name. GeneralUtility::getIndpEnv('SCRIPT_NAME')
+# (sysext/core/Classes/Utility/GeneralUtility.php:2311) carries the same
+# preference. The value then becomes URL material -- $this->scriptName,
+# dirname() of it into $this->requestDir, determineSiteUrl into
+# $this->siteUrl / $this->sitePath -- and the frontend controller pastes
+# it into page HTML unescaped
+# (sysext/frontend/Classes/Controller/TypoScriptFrontendController.php):
+#
+#   2010:  $this->absRefPrefix = $normalizedParams->getSitePath();   // config.absRefPrefix = auto
+#   2433:  $replace = ['"' . $this->absRefPrefix . '_assets/', ...];
+#   2448:  $this->content = str_replace($search, $replace, $this->content);
+#
+# The fixed revision takes SCRIPT_NAME only, rawurlencodes it per path component
+# before it becomes a URL, and htmlspecialchars()s absRefPrefix at the
+# content write.
+#
+# Nothing reports this on either revision, and the first blocker is not
+# the source vocabulary: $_SERVER['PATH_INFO'] and $_SERVER[
+# 'ORIG_PATH_INFO'] are bound (php httpInput16/httpInput20), and
+# the same reads inside getIndpEnv do carry taint out of the method's
+# return to cross-file sinks in a real scan. The chain the CVE actually
+# uses reads the PSR-7 array instead -- $request->getServerParams() --
+# which has no source binding; a probe binding it to code.HttpInput is
+# measured on the real tree and adds zero findings anywhere (six Class
+# subtrees, 2153 php files, 917 findings both sides; core re-run twice
+# per side), because every consumer stores into a member property
+# immediately. That is the second blocker, and the one that also kills
+# the sink leg: a $this->prop store never taints the $this->prop read
+# that follows -- same function or sibling method -- so $this->
+# scriptName in NormalizedParams and $this->absRefPrefix in the
+# controller both drop the value. The identical store on a local object
+# flows end to end through Elem/Attr slots (lowering.go's field-write
+# case), which is what the second and third snippets pin. The root is
+# the self receiver's identity: php lowers $this to Name{"$this"} while
+# the lowering's stable self node and its receiver-aliasing machinery
+# (funcInfo.selfNode, aliasReceiverSelf) key "this", and the implicit-
+# this synthesis gate (lowering.go:3094) additionally requires
+# ClassDef.Members, which only the C# frontend populates. Two throwaway
+# patches together (php.go emitting declared members; eval normalising
+# "$this" to the self key) flip both snippets and the distilled page
+# below to VYQL-INJ-004, confirming the pair of roots; each alone does
+# nothing. Both are PHP-scan-wide -- every class member store and every
+# $this receiver -- so they are not a sub-agent's mechanical call; this
+# is the rank-1842 member-property family in its stronger form (there
+# the local-object store kept its element slot; here the $this store
+# keeps nothing at all). A fourth, smaller finding is pinned last: a
+# fully-qualified static call (\Vendor\Project\Class::method()) does not
+# resolve while the bare spelling does, so the FQCN call form -- the
+# usual spelling in namespaced code -- loses the taint at the hop. The
+# real TYPO3 callers reach NormalizedParams through short names, so that
+# one is a neighbour on this path, not the blocker; it is the PHP cousin
+# of the Rust module-qualified-call gap recorded at rank 1847.
+#
+# verify_current_expected: attention-engine-gap; the page snippets are
+# rejected because no binding labels getServerParams and the value dies
+# at the first $this store. The local-object and bare-call cases are the
+# controls that fire today with shipped vocabulary. The same-function
+# and cross-method $this cases flip to expect when the self-receiver
+# store carries (they need the php.go members fact and the "$this" key
+# alignment together); the page cases then additionally need the PSR-7
+# source binding, and the FQCN case needs the qualified scoped call to
+# resolve. The escaped cases stay rejected throughout.
+
+test "rank1879: PATH_INFO becomes the script name and the page prefix reaches the content write"
+  lang php
+  file page.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+  declare(strict_types=1);
+
+  namespace TYPO3\CMS\Core\Http;
+
+  class NormalizedParams
+  {
+      private $scriptName = '';
+      private $siteUrl = '';
+
+      public static function createFromRequest($request): NormalizedParams
+      {
+          return new NormalizedParams($request->getServerParams());
+      }
+
+      public function __construct(array $serverParams)
+      {
+          $scriptName = $this->scriptName = self::determineScriptName($serverParams);
+          $requestDir = 'https://example.org' . dirname($scriptName) . '/';
+          $this->siteUrl = self::determineSiteUrl($requestDir);
+      }
+
+      protected static function determineScriptName(array $serverParams): string
+      {
+          $possiblePathInfo = ($serverParams['ORIG_PATH_INFO'] ?? '') ?: ($serverParams['PATH_INFO'] ?? '');
+          $possibleScriptName = ($serverParams['ORIG_SCRIPT_NAME'] ?? '') ?: ($serverParams['SCRIPT_NAME'] ?? '');
+          return \TYPO3\CMS\Core\Core\Environment::isRunningOnCgiServer() && $possiblePathInfo
+              ? $possiblePathInfo
+              : $possibleScriptName;
+      }
+
+      protected static function determineSiteUrl(string $requestDir): string
+      {
+          return $requestDir;
+      }
+
+      public function getSiteUrl(): string
+      {
+          return $this->siteUrl;
+      }
+  }
+  ```
+
+  ```
+  <?php
+  declare(strict_types=1);
+
+  namespace TYPO3\CMS\Frontend\Controller;
+
+  class TypoScriptFrontendController
+  {
+      public $absRefPrefix = '';
+      public $content = '<a href="_assets/x.css">';
+
+      public function process($request)
+      {
+          $normalizedParams = \TYPO3\CMS\Core\Http\NormalizedParams::createFromRequest($request);
+          $this->absRefPrefix = $normalizedParams->getSiteUrl();
+          $this->setAbsRefPrefix();
+      }
+
+      protected function setAbsRefPrefix()
+      {
+          if (!$this->absRefPrefix) {
+              return;
+          }
+          $replace = [
+              '"' . $this->absRefPrefix . '_assets/',
+          ];
+          $this->content = str_replace(['"_assets/'], $replace, $this->content);
+          echo $this->content;
+      }
+  }
+  ```
+
+test "rank1879: the same store on a local object reaches the echo"
+  lang php
+  file local-object.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  class NormalizedParams
+  {
+      public $scriptName = '';
+  }
+
+  $params = new NormalizedParams();
+  $params->scriptName = ($_SERVER['ORIG_PATH_INFO'] ?? '') ?: ($_SERVER['PATH_INFO'] ?? '');
+  echo '<base href="' . $params->scriptName . '">';
+  ```
+
+test "rank1879: a same-function this store does not reach its own read"
+  lang php
+  file self-samefn.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  class NormalizedParams
+  {
+      public $scriptName = '';
+
+      public function determine()
+      {
+          $this->scriptName = ($_SERVER['ORIG_PATH_INFO'] ?? '') ?: ($_SERVER['PATH_INFO'] ?? '');
+          echo '<base href="' . $this->scriptName . '">';
+      }
+  }
+
+  $params = new NormalizedParams();
+  $params->determine();
+  ```
+
+test "rank1879: a this store in one method does not reach the sibling that renders it"
+  lang php
+  file self-sibling.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  class TypoScriptFrontendController
+  {
+      public $absRefPrefix = '';
+      public $content = '<a href="_assets/x.css">';
+
+      public function process()
+      {
+          $this->absRefPrefix = ($_SERVER['ORIG_PATH_INFO'] ?? '') ?: ($_SERVER['PATH_INFO'] ?? '');
+          $this->setAbsRefPrefix();
+      }
+
+      public function setAbsRefPrefix()
+      {
+          $replace = [
+              '"' . $this->absRefPrefix . '_assets/',
+          ];
+          $this->content = str_replace(['"_assets/'], $replace, $this->content);
+          echo $this->content;
+      }
+  }
+
+  $controller = new TypoScriptFrontendController();
+  $controller->process();
+  ```
+
+test "rank1879: the escaped prefix stays off the content write"
+  lang php
+  file local-object-escaped.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  class NormalizedParams
+  {
+      public $scriptName = '';
+  }
+
+  $params = new NormalizedParams();
+  $params->scriptName = ($_SERVER['ORIG_PATH_INFO'] ?? '') ?: ($_SERVER['PATH_INFO'] ?? '');
+  $encodedAbsRefPrefix = htmlspecialchars($params->scriptName, ENT_QUOTES | ENT_HTML5);
+  echo '<base href="' . $encodedAbsRefPrefix . '">';
+  ```
+
+test "rank1879: a fully-qualified static call does not resolve"
+  lang php
+  file static-fqcn.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  declare(strict_types=1);
+
+  namespace Vendor\Project;
+
+  class NormalizedParams
+  {
+      public static function determineScriptName(): string
+      {
+          return ($_SERVER['ORIG_PATH_INFO'] ?? '') ?: ($_SERVER['PATH_INFO'] ?? '');
+      }
+  }
+
+  namespace Other;
+
+  class Page
+  {
+      public function process()
+      {
+          $s = \Vendor\Project\NormalizedParams::determineScriptName();
+          echo '<base href="' . $s . '">';
+      }
+  }
+  ```
+
+test "rank1879: the same call by its short name resolves and carries the taint out"
+  lang php
+  file static-bare.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  declare(strict_types=1);
+
+  namespace Vendor\Project;
+
+  class NormalizedParams
+  {
+      public static function determineScriptName(): string
+      {
+          return ($_SERVER['ORIG_PATH_INFO'] ?? '') ?: ($_SERVER['PATH_INFO'] ?? '');
+      }
+  }
+
+  namespace Other;
+
+  class PageUse
+  {
+      public function process()
+      {
+          $s = NormalizedParams::determineScriptName();
+          echo '<base href="' . $s . '">';
+      }
+  }
+  ```

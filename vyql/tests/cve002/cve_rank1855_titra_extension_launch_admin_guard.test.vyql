@@ -1,0 +1,187 @@
+# Rank 1855 / CVE-2022-2595: titra's server-side Meteor methods for the
+# extension store called checkAuthentication, which only throws when the
+# caller has no userId at all, where every other administration surface in
+# the application calls checkAdminAuthentication, which additionally looks
+# up Meteor.users and throws unless isAdmin. The fixing commit,
+# fe8c3cdeb70e53b9f38f1022186ab16324d332c5, swaps the callee at seven call
+# sites across imports/api/extensions/methods.js and
+# imports/api/customfields/server/methods.js. Any signed-in user could
+# therefore upload an extension (addExtension takes a base64 zip from the
+# client and stores its server.js), then call launchExtension, whose body is
+# `eval(extension.server)` -- server-side code execution for every account
+# holder, which is why the advisory scores it critical (CWE-862/269).
+#
+# What fires. Meteor documents `Meteor.methods(object)` as "defines
+# functions that can be invoked over the network by clients", so the method
+# body is the only place the caller's privilege can be enforced. A body that
+# executes dynamic code is the highest privilege such a name can exercise,
+# and an authentication check answers a strictly weaker question than that
+# needs. The new rule reports the module that registers remote methods,
+# executes dynamic code, and carries no authorization vocabulary.
+#
+# Measured over three `--cache off` runs on the real checkouts: 24 findings
+# at fe8c3cdeb^ including exactly one VYQL-AUTH-163 on
+# imports/api/extensions/methods.js:1, and 23 findings at fe8c3cdeb with
+# zero VYQL-AUTH-163 -- the new row is the only delta between the two
+# revisions. Renaming checkAdminAuthentication to a spelling outside the
+# suppression list in the patched tree brings the finding back, so the
+# discrimination is on recognizing an authorization gate, not on a token
+# unique to the fixed revision.
+#
+# Coverage is the extension store, which carries the code execution. The
+# three custom-field methods in the same commit mutate a collection and
+# offer no generic marker that separates them from titra's dozens of
+# ordinary per-user methods, all of which legitimately call
+# checkAuthentication; keying on the collection name would be repro-shaped.
+
+test "rank1855: meteor method evals stored extension code behind an authentication check"
+  lang javascript
+  file imports/api/extensions/methods.js
+  expect VYQL-AUTH-163
+  expect_review code.RemoteMethodCodeExecutionMissingAuthorization
+  code
+  ```
+  import AdmZip from 'adm-zip'
+  import Extensions from './extensions'
+  import { checkAuthentication } from '../../utils/server_method_helpers'
+
+  Meteor.methods({
+    addExtension({ zipFile }) {
+      checkAuthentication(this)
+      const regex = /^data:.+\/(.+);base64,(.*)$/
+      const matches = zipFile.match(regex)
+      const data = matches[2]
+      let zip
+      if (data) {
+        zip = new AdmZip(Buffer.from(data, 'base64'))
+      } else {
+        return new Meteor.Error('Invalid extension upload.')
+      }
+      const newExtension = {}
+      for (const zipEntry of zip.getEntries()) {
+        if (zipEntry.entryName === 'extension.json') {
+          const extensionDetails = JSON.parse(zipEntry.getData().toString('utf-8'))
+          extensionDetails.userId = this.userId
+          extensionDetails.isActive = true
+          Object.assign(newExtension, extensionDetails)
+        }
+        if (zipEntry.entryName === 'server.js') {
+          newExtension.server = zipEntry.getData().toString('utf-8')
+        }
+      }
+      if (!Extensions.findOne({ name: newExtension.name })) {
+        Extensions.insert(newExtension)
+        return 'notifications.success'
+      }
+      return new Meteor.Error('Extension has been added before.')
+    },
+    launchExtension({ extensionId }) {
+      checkAuthentication(this)
+      const extension = Extensions.findOne({ _id: extensionId })
+      if (extension) {
+        eval(extension.server)
+        return 'notifications.success'
+      }
+      return new Meteor.Error('Extension does not exist')
+    },
+  })
+  ```
+
+test "rank1855: the same method guarded by the admin authorization check"
+  lang javascript
+  file imports/api/extensions/methods.js
+  reject VYQL-AUTH-163
+  reject_review code.RemoteMethodCodeExecutionMissingAuthorization
+  code
+  ```
+  import AdmZip from 'adm-zip'
+  import Extensions from './extensions'
+  import { checkAdminAuthentication } from '../../utils/server_method_helpers'
+
+  Meteor.methods({
+    addExtension({ zipFile }) {
+      checkAdminAuthentication(this)
+      const regex = /^data:.+\/(.+);base64,(.*)$/
+      const matches = zipFile.match(regex)
+      const data = matches[2]
+      let zip
+      if (data) {
+        zip = new AdmZip(Buffer.from(data, 'base64'))
+      } else {
+        return new Meteor.Error('Invalid extension upload.')
+      }
+      const newExtension = {}
+      for (const zipEntry of zip.getEntries()) {
+        if (zipEntry.entryName === 'server.js') {
+          newExtension.server = zipEntry.getData().toString('utf-8')
+        }
+      }
+      if (!Extensions.findOne({ name: newExtension.name })) {
+        Extensions.insert(newExtension)
+        return 'notifications.success'
+      }
+      return new Meteor.Error('Extension has been added before.')
+    },
+    launchExtension({ extensionId }) {
+      checkAdminAuthentication(this)
+      const extension = Extensions.findOne({ _id: extensionId })
+      if (extension) {
+        eval(extension.server)
+        return 'notifications.success'
+      }
+      return new Meteor.Error('Extension does not exist')
+    },
+  })
+  ```
+
+test "rank1855: an authorized gate from the wider ecosystem also suppresses"
+  lang javascript
+  file imports/api/extensions/methods.js
+  reject VYQL-AUTH-163
+  reject_review code.RemoteMethodCodeExecutionMissingAuthorization
+  code
+  ```
+  import Extensions from './extensions'
+
+  Meteor.methods({
+    launchExtension({ extensionId }) {
+      if (!Roles.userIsInRole(this.userId, 'admin')) {
+        throw new Meteor.Error('notifications.auth_error_method')
+      }
+      const extension = Extensions.findOne({ _id: extensionId })
+      if (extension) {
+        eval(extension.server)
+        return 'notifications.success'
+      }
+      return new Meteor.Error('Extension does not exist')
+    },
+  })
+  ```
+
+test "rank1855: a remote method module with no dynamic code reports nothing"
+  lang javascript
+  file imports/api/customfields/server/methods.js
+  reject VYQL-AUTH-163
+  reject_review code.RemoteMethodCodeExecutionMissingAuthorization
+  code
+  ```
+  import CustomFields from '../customfields.js'
+  import { checkAuthentication } from '../../../utils/server_method_helpers'
+
+  Meteor.methods({
+    addCustomField: function addCustomField({
+      name, desc, type, possibleValues,
+    }) {
+      check(name, String)
+      check(type, String)
+      check(desc, String)
+      check(possibleValues, Match.Maybe([String]))
+      checkAuthentication(this)
+      if (CustomFields.findOne({ name })) {
+        throw new Meteor.Error('error-custom-field-exists', 'Custom field already exists', { method: 'addCustomField' })
+      }
+      CustomFields.insert({ name, desc, type, possibleValues })
+      return 'notifications.success'
+    },
+  })
+  ```

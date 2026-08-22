@@ -1,0 +1,214 @@
+# Rank 1830 / CVE-2026-45545 (nextcloud/tables, CWE-89): the v1 API's
+# createColumn and updateColumn take the column type as a plain request
+# string and hand it to ColumnService::create, which persists it through
+# Column::fromDto -> setType into tables_columns.type, a varchar(20).
+# Every row read then concatenates that stored value into a table name:
+# Row2Mapper::getFilterExpression does
+#
+#     ->leftJoin('sl', 'tables_row_cells_' . $column->getType(), 'v', ...)
+#
+# and addSortQueryForMultipleSleeveFinder builds
+# `$valueTable = 'tables_row_cells_' . $column->getType();` before the
+# same join. The query builder binds values but has no placeholder form
+# for a table identifier, so the stored type is copied into the statement
+# as SQL text; the advisory's "up to 20 bytes" is exactly the column's
+# declared length. getCellMapperFromType goes further and splices the same
+# value into a class name handed to Server::get().
+#
+# The fixing commit 5c30527f8c (it is the merge of
+# PR #2309, which the advisory references; the combined diff is empty and
+# `git diff <parent> <sha>` reads it in full). The remediation is an
+# allowlist at both ends of the stored value and none at the interpolation
+# site: Api1Controller wraps the request string as
+# `type: ColumnType::from($type)->value`, and Column gains a real
+# `getType()` returning `ColumnType::from($this->type)->value` where the
+# vulnerable revision had only the magic `@method` annotation. lib/Db/
+# Row2Mapper.php is untouched -- `git diff <parent> <sha> -- lib/Db/
+# Row2Mapper.php` is empty -- so the interpolation is byte-identical
+# before and at the fixed revision.
+#
+# ATTENTION, stored identifier with no in-function discriminator. Two
+# things block a shippable binding and both are measured:
+#
+# 1. No taint path. The request string reaches the sink only through a
+#    database round trip: written by mapper->insert at column-create
+#    time, read back through columnMapper->find at row-query time. The
+#    operand at the join is a getter over a persisted entity, which no
+#    source label reaches -- `vyql match` on lib/Controller/
+#    Api1Controller.php reports no code.HttpInput at all, because a
+#    routed action method's parameter carries no entry-point label in
+#    PHP. code.UnvalidatedSqlIdentifierInterpolation (VYQL-INJ-152,
+#    CWE-89), which covers this class for Python and Go,
+#    assumes the identifier text is caller-controlled *in the building
+#    function*; here it is not.
+#
+# 2. The only locus that discriminates is the write site, and keying
+#    there names this application's own vocabulary. The interpolation
+#    site cannot discriminate because the fixed revision does not touch it, and the
+#    allowlist that does neutralise it sits in Column::getType(), a
+#    different class -- the delegated-check family recorded for
+#    PHP at rank 1394. What the fixed revision left inside the guarded method is
+#    `ColumnType::from($type)`, and a binding requiring "no enum
+#    allowlist in this function" over createColumn would have to
+#    recognise a ColumnDto construction to be narrow enough, which is
+#    the incident's own type, not a library's documented API.
+#
+# The sink-side presence shape is measured unshippable on its own.
+# Enumerated exhaustively by grep over every clone under /tmp/cve-work
+# (not sampled): 6855 PHP query-builder from/join calls, of which 1132
+# pass a non-literal table argument across 488 files, and the dominant
+# forms are the ORM's own table metadata -- ->from($V->getTableName()),
+# ->from($V->getMainTable()), ->from($V->table), ->from($V->getTable(
+# 'catalog/product')). Narrowing to a table argument that is a
+# concatenation with a literal still leaves 108 sites, and those are the
+# ordinary framework idioms too: ->from($this->prefix.'page_redirects'),
+# ->leftJoin($table . ' as ' . $alias), ->from($survey->
+# responsesTableName.' s'), ->leftJoin($alias, MAUTIC_TABLE_PREFIX.
+# 'users'). Nothing in the function distinguishes a table prefix or an
+# alias from a stored discriminator; that distinction is provenance, and
+# the provenance crosses the persistence boundary.
+#
+# Measured with `--cache off`, union of three runs per revision, whole
+# tree: 239 findings at 5c30527f^ and 237 at 5c30527f. The difference is
+# 44 removed / 42 added, all VYQL-RF-043, VYQL-RF-003, VYQL-AUTH-002 and
+# VYQL-AUTH-079 rows relocated by the refactor's line shifts, and none of
+# them in lib/Db/Row2Mapper.php. No ENGINE-GAPS.md entry: the blocker is
+# a modelling boundary shared by every static analyser, not a construct
+# the engine mishandles, and the delegated-check half is recorded
+# as a family. No definition change shipped.
+#
+# Spec cve_rank1830 records the stored-type table name and the fixed revision's
+# write-site allowlist, both asserting reject VYQL-INJ-152: when
+# identifier-provenance vocabulary lands, the stored-type form must flip
+# to expect.
+
+test "rank1830: a stored column type concatenated into a join table name"
+  lang php
+  file lib/Db/Row2Mapper.php
+  reject VYQL-INJ-152
+  reject_review code.UnvalidatedSqlIdentifierInterpolation
+  code
+  ```
+  <?php
+  namespace OCA\Tables\Db;
+
+  use OCP\DB\IQueryBuilder;
+
+  class Row2Mapper {
+  	private function getFilterExpression(IQueryBuilder $qb, Column $column, string $operator, string|array $value): IQueryBuilder {
+  		$qb2 = $this->db->getQueryBuilder();
+  		$qb2->selectAlias('sl.id', 'row_id')
+  			->from('tables_row_sleeves', 'sl')
+  			->leftJoin('sl', 'tables_row_cells_' . $column->getType(), 'v', $qb->expr()->andX(
+  				$qb->expr()->eq('sl.id', 'v.row_id'),
+  				$qb->expr()->eq('v.column_id', $qb->createNamedParameter($column->getId(), IQueryBuilder::PARAM_INT)),
+  			));
+  		return $qb2;
+  	}
+  }
+  ```
+
+test "rank1830: the same stored type through an intermediate variable"
+  lang php
+  file lib/Db/Row2Mapper.php
+  reject VYQL-INJ-152
+  reject_review code.UnvalidatedSqlIdentifierInterpolation
+  code
+  ```
+  <?php
+  namespace OCA\Tables\Db;
+
+  use OCP\DB\IQueryBuilder;
+
+  class Row2Mapper {
+  	private function addSortQueryForMultipleSleeveFinder(IQueryBuilder $qb, string $sleevesAlias, ?array $sort): void {
+  		foreach ($sort as $i => $sortData) {
+  			$column = $this->columnMapper->find($sortData['columnId']);
+  			$valueTable = 'tables_row_cells_' . $column->getType();
+  			$alias = 'sort' . $i;
+  			$qb->leftJoin($sleevesAlias, $valueTable, $alias,
+  				$qb->expr()->andX(
+  					$qb->expr()->eq($sleevesAlias . '.id', $alias . '.row_id'),
+  				)
+  			);
+  		}
+  	}
+  }
+  ```
+
+test "rank1830: the fixed revision allowlists the request type before it is persisted"
+  lang php
+  file lib/Controller/Api1Controller.php
+  reject VYQL-INJ-152
+  reject_review code.UnvalidatedSqlIdentifierInterpolation
+  code
+  ```
+  <?php
+  namespace OCA\Tables\Controller;
+
+  use OCA\Tables\Constants\ColumnType;
+  use OCA\Tables\Dto\Column as ColumnDto;
+  use OCA\Tables\Service\ColumnService;
+
+  class Api1Controller extends ApiController {
+  	public function createColumn(
+  		int $tableId,
+  		?int $viewId,
+  		string $title,
+  		string $type,
+  		?string $subtype,
+  		ColumnService $columnService,
+  	): DataResponse {
+  		try {
+  			$column = $columnService->create($this->userId, $tableId, $viewId,
+  				new ColumnDto(
+  					title: $title,
+  					type: ColumnType::from($type)->value,
+  					subtype: $subtype,
+  				)
+  			);
+  			return new DataResponse($column->jsonSerialize());
+  		} catch (PermissionError $e) {
+  			return new DataResponse(['message' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+  		}
+  	}
+  }
+  ```
+
+test "rank1830: the fixed revision also allowlists the getter the table name is built from"
+  lang php
+  file lib/Db/Column.php
+  reject VYQL-INJ-152
+  reject_review code.UnvalidatedSqlIdentifierInterpolation
+  code
+  ```
+  <?php
+  namespace OCA\Tables\Db;
+
+  use OCA\Tables\Constants\ColumnType;
+
+  class Column extends EntitySuper implements JsonSerializable {
+  	public function getType(): string {
+  		return ColumnType::from($this->type)->value;
+  	}
+  }
+  ```
+
+test "rank1830: a model's own table name is the ordinary ORM idiom and is not this weakness"
+  lang php
+  file lib/Database/Relations/DefinedConstraints.php
+  reject VYQL-INJ-152
+  reject_review code.UnvalidatedSqlIdentifierInterpolation
+  code
+  ```
+  <?php
+  namespace October\Rain\Database\Relations;
+
+  class DefinedConstraints {
+  	public function build(Model $query, Model $related): void {
+  		$query->join($this->related->getTable(), $this->relatedPivotKey, '=', $this->relatedKey);
+  		$prefix = $this->connection->getTablePrefix();
+  		$query->from($prefix . 'deferred_bindings', 'd');
+  	}
+  }
+  ```

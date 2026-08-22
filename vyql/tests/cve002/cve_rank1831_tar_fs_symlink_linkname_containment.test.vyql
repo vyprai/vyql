@@ -1,0 +1,170 @@
+# Rank 1831 / CVE-2024-12905 (GHSA-6jf7-p2xx-8jp9): tar-fs extracts a
+# symlink entry by handing the archive's own link-target field straight to
+# fs.symlink (index.js):
+#
+#   function onsymlink () {
+#     if (win32) return next()
+#     xfs.unlink(name, function () {
+#       xfs.symlink(header.linkname, name, stat)
+#     })
+#   }
+#
+# The entry's own name is confined twice over -- path.join(cwd, path.join('/',
+# header.name)) collapses `..` components and a validate() walk checks the
+# parent directory against the root -- but the link's target is a different
+# string under a different field name and is never looked at. fs.symlink
+# resolves the target against the process working directory when the link is
+# read, not against the extraction root, so linkname: "../../etc/passwd"
+# creates a link inside the destination that points outside it, and every
+# later entry written through that link lands outside too (CWE-22/CWE-59).
+# Fix a1dd7e7 resolves the destination the link will actually have --
+# path.resolve(path.dirname(name), header.linkname) -- and refuses it unless
+# it starts with a now-absolute cwd.
+#
+# Detection reuses the archive link-target concept: the module context is
+# labelled code.ArchiveSymlinkFilterBypass and VYQL-PATH-007 judges it. The
+# sink call is identical before and at the fixed revisioned revision, so the discrimination is
+# the containment comparison, not taint. The negation reads the documented
+# spellings of that comparison -- startsWith on the resolved target,
+# path.relative, realpath -- at module scope rather than in the function that
+# creates the link, because the containment is a helper the extraction driver
+# shares across its entry handlers and a link-creating handler nested three
+# functions deep does not see its sibling's comparison (the attribution-gap
+# family). Renaming the fixed revision's own helper and variable (inCwd, dst) leaves the
+# rejection standing; resolving the target without ever comparing it still
+# reports; refusing symlink entries outright reports nothing. Measured on the
+# real checkout, three --cache off runs per revision: 3 -> 2 findings, the
+# added one being VYQL-PATH-007 at index.js:1, absent at the fixed revision.
+
+test "rank1831: tar entry link target handed to symlink with no containment against the extraction root"
+  lang javascript
+  file extract.js
+  expect VYQL-PATH-007
+  code
+  ```
+  const fs = require('fs')
+  const path = require('path')
+  const tar = require('tar-stream')
+
+  exports.extract = function extract (cwd, opts) {
+    if (!cwd) cwd = '.'
+    if (!opts) opts = {}
+    const xfs = opts.fs || fs
+    const extract = opts.extract || tar.extract()
+
+    extract.on('entry', onentry)
+    return extract
+
+    function onentry (header, stream, next) {
+      const name = path.join(cwd, path.join('/', header.name))
+      const dir = path.dirname(name)
+
+      validate(xfs, dir, path.join(cwd, '.'), function (err, valid) {
+        if (err) return next(err)
+        if (!valid) return next(new Error(dir + ' is not a valid path'))
+        switch (header.type) {
+          case 'file': return onfile()
+          case 'link': return onlink()
+          case 'symlink': return onsymlink()
+        }
+      })
+
+      function stat (err) {
+        next(err)
+      }
+
+      function onsymlink () {
+        if (win32) return next() // skip symlinks on win for now before it can be tested
+        xfs.unlink(name, function () {
+          xfs.symlink(header.linkname, name, stat)
+        })
+      }
+
+      function onlink () {
+        if (win32) return next()
+        xfs.unlink(name, function () {
+          const dst = path.join(cwd, path.join('/', header.linkname))
+          xfs.link(dst, name, function (err) {
+            stat(err)
+          })
+        })
+      }
+
+      function onfile () {
+        const ws = xfs.createWriteStream(name)
+        ws.on('close', stat)
+      }
+    }
+  }
+  ```
+
+test "rank1831: link target resolved and refused unless it stays under the extraction root"
+  lang javascript
+  file extract.js
+  reject VYQL-PATH-007
+  code
+  ```
+  const fs = require('fs')
+  const path = require('path')
+  const tar = require('tar-stream')
+
+  exports.extract = function extract (cwd, opts) {
+    if (!cwd) cwd = '.'
+    if (!opts) opts = {}
+    cwd = path.resolve(cwd)
+
+    const xfs = opts.fs || fs
+    const extract = opts.extract || tar.extract()
+
+    extract.on('entry', onentry)
+    return extract
+
+    function inCwd (dst) {
+      return dst.startsWith(cwd)
+    }
+
+    function onentry (header, stream, next) {
+      const name = path.join(cwd, path.join('/', header.name))
+      const dir = path.dirname(name)
+
+      validate(xfs, dir, path.join(cwd, '.'), function (err, valid) {
+        if (err) return next(err)
+        if (!valid) return next(new Error(dir + ' is not a valid path'))
+        switch (header.type) {
+          case 'file': return onfile()
+          case 'link': return onlink()
+          case 'symlink': return onsymlink()
+        }
+      })
+
+      function stat (err) {
+        next(err)
+      }
+
+      function onsymlink () {
+        if (win32) return next() // skip symlinks on win for now before it can be tested
+        xfs.unlink(name, function () {
+          const dst = path.resolve(path.dirname(name), header.linkname)
+          if (!inCwd(dst)) return next(new Error(name + ' is not a valid symlink'))
+
+          xfs.symlink(header.linkname, name, stat)
+        })
+      }
+
+      function onlink () {
+        if (win32) return next()
+        xfs.unlink(name, function () {
+          const dst = path.join(cwd, path.join('/', header.linkname))
+          xfs.link(dst, name, function (err) {
+            stat(err)
+          })
+        })
+      }
+
+      function onfile () {
+        const ws = xfs.createWriteStream(name)
+        ws.on('close', stat)
+      }
+    }
+  }
+  ```

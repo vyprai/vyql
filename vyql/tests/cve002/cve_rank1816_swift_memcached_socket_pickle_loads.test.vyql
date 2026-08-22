@@ -1,0 +1,141 @@
+# A memcached client hand-rolls the text protocol over a raw socket: it
+# connects with socket.socket, wraps the socket in a file object with
+# sock.makefile(), and reads the server's reply out of that file object.
+# Whatever the memcached server (or whoever can reach that TCP conversation)
+# sends back is bytes the program did not compute, and the client hands them
+# straight to pickle.loads when the reply's flag word says pickle -- the flag
+# word itself being reply bytes. Pickle executes the globals the stream names,
+# so a cache entry an attacker can write becomes code execution in the proxy.
+#
+# The remediation serialises with JSON instead and keeps the pickle read path
+# only behind an explicit configuration opt-in, so the default reply is decoded
+# by json.loads, which builds only JSON's own value types.
+#
+# swift is a library consumed by the proxy server, and the module resolves
+# under the library profile: its public methods' parameters are entry points,
+# so the client object itself carries caller-controlled input through
+# _get_conns into the file object, and VYQL-DESER-001 reports both
+# pickle.loads sites (memcached.py:171 and :305 at the fixed revision's parent) at
+# critical. The reject below is the fixed revision's default path -- the JSON decode --
+# which is the form the remediation installs.
+#
+# Two residuals the ledger states rather than hides. The opt-in guard the fixed revision
+# leaves around the pickle read (`if self._allow_unpickle:`) earns nothing: a
+# boolean attribute of self deciding whether the dangerous branch runs is not
+# a core.SafeDeserialization control, and keying one on the fixed revision's own
+# attribute name would be a repro-shaped patch, so the guarded pickle.loads
+# reports exactly as the ungated original does. And the read side of the
+# socket has no source of its own -- the finding rides the parameter entry,
+# not the network read, because a generator's yielded value never reaches its
+# consumer: `_get_conns` yields `(server, sock.makefile(), sock)` and the
+# consumer's `fp.read(size)` sees an untainted object, while the same file
+# object built by a plain `return` carries the label end to end.
+
+test "rank1816: a memcached client unpickles the reply it reads off the socket"
+  lang python
+  file swift/common/memcached.py
+  profile library
+  expect VYQL-DESER-001
+  code
+  ```
+  import cPickle as pickle
+  import socket
+  from hashlib import md5
+
+  PICKLE_FLAG = 1
+
+
+  def md5hash(key):
+      return md5(key).hexdigest()
+
+
+  class MemcacheRing(object):
+
+      def _get_conns(self, key):
+          pos = 0
+          while True:
+              server = ('127.0.0.1', 11211)
+              try:
+                  sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                  sock.settimeout(0.3)
+                  sock.connect(server)
+                  sock.settimeout(2.0)
+                  yield server, sock.makefile(), sock
+              except Exception, e:
+                  self._exception_occurred(server, e, 'connecting')
+
+      def get(self, key):
+          key = md5hash(key)
+          value = None
+          for (server, fp, sock) in self._get_conns(key):
+              try:
+                  sock.sendall('get %s\r\n' % key)
+                  line = fp.readline().strip().split()
+                  while line[0].upper() != 'END':
+                      if line[0].upper() == 'VALUE' and line[1] == key:
+                          size = int(line[3])
+                          value = fp.read(size)
+                          if int(line[2]) & PICKLE_FLAG:
+                              value = pickle.loads(value)
+                      line = fp.readline().strip().split()
+                  self._return_conn(server, fp, sock)
+                  return value
+              except Exception, e:
+                  self._exception_occurred(server, e)
+  ```
+
+test "rank1816: the reply is decoded as JSON instead"
+  lang python
+  file swift/common/memcached.py
+  profile library
+  reject VYQL-DESER-001
+  code
+  ```
+  import json
+  import socket
+  from hashlib import md5
+
+  PICKLE_FLAG = 1
+  JSON_FLAG = 2
+
+
+  def md5hash(key):
+      return md5(key).hexdigest()
+
+
+  class MemcacheRing(object):
+
+      def _get_conns(self, key):
+          pos = 0
+          while True:
+              server = ('127.0.0.1', 11211)
+              try:
+                  sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                  sock.settimeout(0.3)
+                  sock.connect(server)
+                  sock.settimeout(2.0)
+                  yield server, sock.makefile(), sock
+              except Exception, e:
+                  self._exception_occurred(server, e, 'connecting')
+
+      def get(self, key):
+          key = md5hash(key)
+          value = None
+          for (server, fp, sock) in self._get_conns(key):
+              try:
+                  sock.sendall('get %s\r\n' % key)
+                  line = fp.readline().strip().split()
+                  while line[0].upper() != 'END':
+                      if line[0].upper() == 'VALUE' and line[1] == key:
+                          size = int(line[3])
+                          value = fp.read(size)
+                          if int(line[2]) & PICKLE_FLAG:
+                              value = None
+                          elif int(line[2]) & JSON_FLAG:
+                              value = json.loads(value)
+                      line = fp.readline().strip().split()
+                  self._return_conn(server, fp, sock)
+                  return value
+              except Exception, e:
+                  self._exception_occurred(server, e)
+  ```

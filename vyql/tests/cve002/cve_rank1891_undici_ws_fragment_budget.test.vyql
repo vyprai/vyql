@@ -1,0 +1,315 @@
+# Rank 1891 / CVE-2026-12151: undici's WebSocket client parser
+# buffered received message fragments with only a fragment-count cap,
+# so a malicious server could exhaust memory on the client (denial of
+# service, CWE-400; the nocommit flag reflects advisory-side absence -- the
+# commit a027a4a04 resolves and reads fine, the v7.x backport of the
+# WebSocket maxPayloadSize fixes). At the vulnerable revision, ByteParser in
+# lib/web/websocket/receiver.js read each frame's attacker-chosen
+# payloadLength (up to 2^31 bytes), accumulated the payloads into
+# #fragments with #fragmentsBytes += fragment.length, and bounded the
+# message only by #maxFragments (a frame count, default 131072) --
+# nothing capped the cumulative byte size. The count cap is itself
+# bypassable: the accounting call is guarded by the frame's length,
+# `if (body.length && !this.writeFragments(body))`, so a server
+# streaming empty continuation frames never reached the counter (the
+# advisory's named vector); the permessage-deflate path had the same
+# `data.length &&` guard and a separate hardcoded 4 MB decompression
+# cap instead of the configured limit. The fixed revision threads a maxPayloadSize
+# option through dispatcher-base and both parser entry points, adds
+# #validatePayloadLength() failing the connection once
+# `payloadLength + fragmentsBytes > maxPayloadSize` before data is
+# read and again after decompression, and drops the length guard so
+# `if (!this.writeFragments(body))` counts zero-byte frames. No pool
+# correction.
+#
+# ATTENTION, cross-iteration accumulation budget with a counter-bypass
+# branch. The defect is a receive loop whose only bounds are a frame
+# count that empty frames skip and no byte budget at all -- the same
+# loop-carried budget family as rank 1534's header accumulation and
+# rank 1559's wire length, with the bypassing-branch variant of rank
+# 1612 (one path around the accounting call) realised as a truthiness
+# guard on the counted item: the corpus's CWE-400 rules judge
+# per-iteration progress (VYQL-DOS-029 parsers, VYQL-DOS-028 buffered
+# reads) and oversized defaults (VYQL-DOS-024, socket.io-shaped), but
+# no concept names a budget carried across message fragments, so
+# nothing can ask "does the accumulated fragment or byte count stop at
+# a cap before the buffer is materialised". The branch discriminator
+# (`body.length && !this.writeFragments(body)` versus the unguarded
+# call) is also unreadable at the binding layer: JavaScript emits no
+# call-argument tokens. A binding on undici's own writeFragments /
+# fragmentsBytes would detect this library rather than the weakness,
+# and a generic "push plus byte-accumulate without cap" presence fires
+# on ordinary buffering everywhere. Measured on the real code:
+# scanning lib/web/websocket/receiver.js reports zero findings at both
+# revisions (the tree scan reports 633 findings elsewhere, none in the
+# websocket parser), and the minimal pair below reports zero on both
+# forms -- a double miss, pinned. No definition change shipped. Spec
+# cve_rank1891 records the bypassable accumulation and the budgeted
+# form, both asserting reject VYQL-DOS-029: when fragment-budget
+# vocabulary lands, the unguarded-accounting form must flip to expect.
+
+test "rank1891: fragment accounting skipped for empty frames, no byte budget"
+  lang javascript
+  file lib/web/websocket/receiver.js
+  reject VYQL-DOS-029
+  code
+  ```
+  'use strict'
+
+  const { Writable } = require('node:stream')
+
+  class ByteParser extends Writable {
+    #buffers = []
+    #fragmentsBytes = 0
+    #byteOffset = 0
+    #loop = false
+    #state = 0
+    #info = {}
+    #fragments = []
+    #maxFragments = 0
+
+    constructor (handler, extensions, options = {}) {
+      super()
+      this.#handler = handler
+      this.#extensions = extensions == null ? new Map() : extensions
+      this.#maxFragments = options.maxFragments ?? 0
+    }
+
+    run (callback) {
+      while (this.#loop) {
+        if (this.#state === 3) {
+          if (this.#byteOffset < this.#info.payloadLength) {
+            return callback()
+          }
+
+          const body = this.consume(this.#info.payloadLength)
+
+          if (!isControlFrame(this.#info.opcode)) {
+            if (!this.#info.compressed) {
+              if (body.length && !this.writeFragments(body)) {
+                return
+              }
+
+              if (!this.#info.fragmented && this.#info.fin) {
+                websocketMessageReceived(this.#handler, this.#info.binaryType, this.consumeFragments())
+              }
+
+              this.#state = 0
+            } else {
+              this.#extensions.get('permessage-deflate').decompress(body, this.#info.fin, (error, data) => {
+                if (error) {
+                  failWebsocketConnection(this.#handler, 1007, error.message)
+                  return
+                }
+
+                if (data.length && !this.writeFragments(data)) {
+                  return
+                }
+
+                if (!this.#info.fin) {
+                  this.#state = 0
+                  this.#loop = true
+                  this.run(callback)
+                  return
+                }
+
+                websocketMessageReceived(this.#handler, this.#info.binaryType, this.consumeFragments())
+
+                this.#loop = true
+                this.#state = 0
+                this.run(callback)
+              })
+
+              this.#loop = false
+              break
+            }
+          }
+        }
+      }
+    }
+
+    writeFragments (fragment) {
+      if (
+        this.#maxFragments > 0 &&
+        this.#fragments.length === this.#maxFragments
+      ) {
+        failWebsocketConnection(this.#handler, 1008, 'Too many message fragments')
+        return false
+      }
+
+      this.#fragmentsBytes += fragment.length
+      this.#fragments.push(fragment)
+      return true
+    }
+
+    consumeFragments () {
+      const fragments = this.#fragments
+
+      if (fragments.length === 1) {
+        this.#fragmentsBytes = 0
+        return fragments.shift()
+      }
+
+      const output = Buffer.allocUnsafeSlow(this.#fragmentsBytes)
+
+      let offset = 0
+      for (let i = 0; i < fragments.length; ++i) {
+        const buffer = fragments[i]
+        output.set(buffer, offset)
+        offset += buffer.length
+      }
+
+      this.#fragments = []
+      this.#fragmentsBytes = 0
+
+      return output
+    }
+  }
+  ```
+
+test "rank1891: the fixed revision counts every frame and enforces a cumulative byte budget"
+  lang javascript
+  file lib/web/websocket/receiver.js
+  reject VYQL-DOS-029
+  code
+  ```
+  'use strict'
+
+  const { Writable } = require('node:stream')
+
+  class ByteParser extends Writable {
+    #buffers = []
+    #fragmentsBytes = 0
+    #byteOffset = 0
+    #loop = false
+    #state = 0
+    #info = {}
+    #fragments = []
+    #maxFragments = 0
+    #maxPayloadSize = 0
+
+    constructor (handler, extensions, options = {}) {
+      super()
+      this.#handler = handler
+      this.#extensions = extensions == null ? new Map() : extensions
+      this.#maxFragments = options.maxFragments ?? 0
+      this.#maxPayloadSize = options.maxPayloadSize ?? 0
+    }
+
+    #validatePayloadLength () {
+      if (
+        this.#maxPayloadSize > 0 &&
+        !isControlFrame(this.#info.opcode) &&
+        this.#info.payloadLength + this.#fragmentsBytes > this.#maxPayloadSize
+      ) {
+        failWebsocketConnection(this.#handler, 1009, 'Payload size exceeds maximum allowed size')
+        return false
+      }
+
+      return true
+    }
+
+    run (callback) {
+      while (this.#loop) {
+        if (this.#state === 1) {
+          this.#info.payloadLength = this.consume(1)[0] & 0x7F
+          this.#state = 3
+
+          if (!this.#validatePayloadLength()) {
+            return
+          }
+        } else if (this.#state === 3) {
+          if (this.#byteOffset < this.#info.payloadLength) {
+            return callback()
+          }
+
+          const body = this.consume(this.#info.payloadLength)
+
+          if (!isControlFrame(this.#info.opcode)) {
+            if (!this.#info.compressed) {
+              if (!this.writeFragments(body)) {
+                return
+              }
+
+              if (!this.#info.fragmented && this.#info.fin) {
+                websocketMessageReceived(this.#handler, this.#info.binaryType, this.consumeFragments())
+              }
+
+              this.#state = 0
+            } else {
+              this.#extensions.get('permessage-deflate').decompress(body, this.#info.fin, (error, data) => {
+                if (error) {
+                  const code = error instanceof MessageSizeExceededError ? 1009 : 1007
+                  failWebsocketConnection(this.#handler, code, error.message)
+                  return
+                }
+
+                if (!this.writeFragments(data)) {
+                  return
+                }
+
+                if (this.#maxPayloadSize > 0 && this.#fragmentsBytes > this.#maxPayloadSize) {
+                  failWebsocketConnection(this.#handler, 1009, new MessageSizeExceededError().message)
+                  return
+                }
+
+                if (!this.#info.fin) {
+                  this.#state = 0
+                  this.#loop = true
+                  this.run(callback)
+                  return
+                }
+
+                websocketMessageReceived(this.#handler, this.#info.binaryType, this.consumeFragments())
+
+                this.#loop = true
+                this.#state = 0
+                this.run(callback)
+              }, this.#fragmentsBytes)
+
+              this.#loop = false
+              break
+            }
+          }
+        }
+      }
+    }
+
+    writeFragments (fragment) {
+      if (
+        this.#maxFragments > 0 &&
+        this.#fragments.length === this.#maxFragments
+      ) {
+        failWebsocketConnection(this.#handler, 1008, 'Too many message fragments')
+        return false
+      }
+
+      this.#fragmentsBytes += fragment.length
+      this.#fragments.push(fragment)
+      return true
+    }
+
+    consumeFragments () {
+      const fragments = this.#fragments
+
+      if (fragments.length === 1) {
+        this.#fragmentsBytes = 0
+        return fragments.shift()
+      }
+
+      const output = Buffer.allocUnsafeSlow(this.#fragmentsBytes)
+
+      let offset = 0
+      for (let i = 0; i < fragments.length; ++i) {
+        const buffer = fragments[i]
+        output.set(buffer, offset)
+        offset += buffer.length
+      }
+
+      this.#fragments = []
+      this.#fragmentsBytes = 0
+
+      return output
+    }
+  }
+  ```

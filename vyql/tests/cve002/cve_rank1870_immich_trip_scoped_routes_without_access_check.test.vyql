@@ -1,0 +1,171 @@
+# trek's Immich integration exposed six trip-scoped Express routes that read
+# `req.params.tripId` straight into a database query with no trip-membership
+# check. GET/POST /trips/:tripId/photos, DELETE/PUT
+# /trips/:tripId/photos/:assetId[/sharing] and GET/POST
+# /trips/:tripId/album-links all carried the `authenticate` JWT middleware --
+# which answers who the caller is, not which trips they may touch -- so any
+# authenticated user could enumerate, add, unlink and reshare another trip's
+# photos and album links by supplying its id. Every sibling route file in the
+# server gated trip access; routes/immich.ts simply never adopted the
+# check. The fixed revision adds one guard call inside each handler:
+#
+#     if (!canAccessTrip(tripId, authReq.user.id)) return res.status(404).json({ error: 'Trip not found' });
+#
+# Pinned as a miss: the scanner reports no authorization finding on either
+# revision. Measured over a full --cache off scan per revision: no finding of
+# any kind names access control on routes/immich.ts, and the two AUTH rules
+# that fire on the tree (VYQL-AUTH-079 twice, VYQL-AUTH-001 twice, all on
+# client React pages) are byte-identical before and at the fixed revision; the patched
+# tree scores one finding more than the vulnerable one, landing on the guard
+# the fixed revision itself adds. What does fire on these handlers is VYQL-INJ-001 on
+# the `req.params.tripId -> db.prepare(...)` leg -- the query is parameterized
+# and the finding is the SqlExecution sink's near-miss, present in both
+# revisions, with nothing to say about who may read the row.
+#
+# No binding is shippable for the shape, and the codebase itself is the
+# measurement of why:
+#
+# - The guard the fixed revision adds is a project-internal helper (db/database.ts
+#   `canAccessTrip`), and this repository spells the same semantic check at
+#   least six ways: `canAccessTrip`, the `requireTripAccess` middleware,
+#   file-local wrappers `verifyTripAccess`, `verifyAccess`,
+#   `verifyTripOwnership`, and `isOwner`. A negation keyed on any list of
+#   those names is not answerable to library documentation -- Express
+#   documents no authorization API -- and dies to the rename test.
+# - Two of the repository's four guard shapes are invisible to a
+#   function-scoped binding at any naming: router-level wiring
+#   (`router.use(authenticate, adminOnly)` guards all fourteen admin routes
+#   from outside every handler), and authorization inlined as a SQL ownership
+#   constraint. The inlined form is decisive: the *vulnerable* photos query
+#   itself carries `(tp.user_id = ? OR tp.shared = 1)`, while the safe
+#   trips.ts `GET /:id` guard is a near-identical clause
+#   (`WHERE t.id = :tripId AND (t.user_id = :userId OR m.user_id IS NOT
+#   NULL)`); what separates them is which table the constraint applies to,
+#   which is a judgement about query semantics a binding may not encode.
+# - Enumerating the reachable set: 103 scoped-param routes in this server,
+#   16 guarded by middleware, 42 by an in-body check, and 45 that carry no
+#   guard the per-handler reading can see -- of which exactly six are this
+#   defect, and trips.ts GET /:id and tags.ts PUT /:id are provably safe
+#   routes among the false positives. Six true positives against dozens of
+#   fires in the very repository that motivates the rule.
+#
+# This is the measured authorization-by-wiring family, not a new gap: the fixed revision
+# is invisible to a taint path, and the one call it leaves inside the guarded
+# functions is internal vocabulary, so the documented-API counterweight does
+# not apply. A future fact that reads per-resource ownership -- whether a
+# named guard or a principal-constrained query -- would flip the first block
+# to `expect VYQL-AUTH-095` (code.UnboundAuthorizationTarget covers
+# CWE-639/862/863 and is rule-consumed; only Python emits it today) while the
+# guarded block below stays rejected. The first block also expects
+# VYQL-INJ-001, which is what fires on it today: the req.params ->
+# db.prepare leg labels and reports on both revisions, so the rejects above
+# are a live miss rather than an unanalysed file.
+
+test "immich trip-scoped route handler queries by request param without a trip access check"
+  lang javascript
+  file routes/immich.ts
+  expect VYQL-INJ-001
+  reject VYQL-AUTH-001
+  reject VYQL-AUTH-095
+  code
+  ```
+  import express, { Request, Response } from 'express';
+  import { db } from '../db/database';
+  import { authenticate } from '../middleware/auth';
+  import { AuthRequest } from '../types';
+
+  const router = express.Router();
+
+  // Get all photos for a trip (own + shared by others)
+  router.get('/trips/:tripId/photos', authenticate, (req: Request, res: Response) => {
+    const authReq = req as AuthRequest;
+    const { tripId } = req.params;
+
+    const photos = db.prepare(`
+      SELECT tp.immich_asset_id, tp.user_id, tp.shared, tp.added_at,
+             u.username, u.avatar, u.immich_url
+      FROM trip_photos tp
+      JOIN users u ON tp.user_id = u.id
+      WHERE tp.trip_id = ?
+      AND (tp.user_id = ? OR tp.shared = 1)
+      ORDER BY tp.added_at ASC
+    `).all(tripId, authReq.user.id);
+
+    res.json({ photos });
+  });
+
+  // Add photos to a trip
+  router.post('/trips/:tripId/photos', authenticate, (req: Request, res: Response) => {
+    const authReq = req as AuthRequest;
+    const { tripId } = req.params;
+    const { asset_ids, shared = true } = req.body;
+
+    if (!Array.isArray(asset_ids) || asset_ids.length === 0) {
+      return res.status(400).json({ error: 'asset_ids required' });
+    }
+
+    const insert = db.prepare(
+      'INSERT OR IGNORE INTO trip_photos (trip_id, user_id, immich_asset_id, shared) VALUES (?, ?, ?, ?)'
+    );
+    for (const assetId of asset_ids) {
+      insert.run(tripId, authReq.user.id, assetId, shared ? 1 : 0);
+    }
+
+    res.json({ success: true });
+  });
+  ```
+
+test "immich trip-scoped route handler rejects a trip the caller cannot access"
+  lang javascript
+  file routes/immich.ts
+  reject VYQL-AUTH-001
+  reject VYQL-AUTH-095
+  code
+  ```
+  import express, { Request, Response } from 'express';
+  import { db, canAccessTrip } from '../db/database';
+  import { authenticate } from '../middleware/auth';
+  import { AuthRequest } from '../types';
+
+  const router = express.Router();
+
+  // Get all photos for a trip (own + shared by others)
+  router.get('/trips/:tripId/photos', authenticate, (req: Request, res: Response) => {
+    const authReq = req as AuthRequest;
+    const { tripId } = req.params;
+    if (!canAccessTrip(tripId, authReq.user.id)) return res.status(404).json({ error: 'Trip not found' });
+
+    const photos = db.prepare(`
+      SELECT tp.immich_asset_id, tp.user_id, tp.shared, tp.added_at,
+             u.username, u.avatar, u.immich_url
+      FROM trip_photos tp
+      JOIN users u ON tp.user_id = u.id
+      WHERE tp.trip_id = ?
+      AND (tp.user_id = ? OR tp.shared = 1)
+      ORDER BY tp.added_at ASC
+    `).all(tripId, authReq.user.id);
+
+    res.json({ photos });
+  });
+
+  // Add photos to a trip
+  router.post('/trips/:tripId/photos', authenticate, (req: Request, res: Response) => {
+    const authReq = req as AuthRequest;
+    const { tripId } = req.params;
+    if (!canAccessTrip(tripId, authReq.user.id)) return res.status(404).json({ error: 'Trip not found' });
+    const { asset_ids, shared = true } = req.body;
+
+    if (!Array.isArray(asset_ids) || asset_ids.length === 0) {
+      return res.status(400).json({ error: 'asset_ids required' });
+    }
+
+    const insert = db.prepare(
+      'INSERT OR IGNORE INTO trip_photos (trip_id, user_id, immich_asset_id, shared) VALUES (?, ?, ?, ?)'
+    );
+    for (const assetId of asset_ids) {
+      insert.run(tripId, authReq.user.id, assetId, shared ? 1 : 0);
+    }
+
+    res.json({ success: true });
+  });
+  ```

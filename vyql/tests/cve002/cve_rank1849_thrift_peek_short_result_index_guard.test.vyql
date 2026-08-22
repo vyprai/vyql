@@ -1,0 +1,244 @@
+# Rank 1849 / CVE-2019-0210 (GHSA-jq7p-26h5-w78r): a Thrift server written
+# in Go panics on malformed input through TJSONProtocol / TSimpleJSONProtocol.
+# The fixing commit 264a3f318ed3e9e51573f67f963c8509786bcec2 changes one
+# comparison in safePeekContains (lib/go/thrift/simple_json_protocol.go:1316):
+#
+#   for i := 0; i < len(b); i++ {
+#       a, _ := p.reader.Peek(i + 1)
+#   -   if len(a) == 0 || a[i] != b[i] {
+#   +   if len(a) < (i + 1) || a[i] != b[i] {
+#
+# bufio.Reader.Peek(n) is documented to return fewer than n bytes ("If Peek
+# returns fewer than n bytes, it also returns an error explaining why the
+# read is short"), so `a` can hold 1..i bytes while a[i] is read. The
+# vulnerable guard rejects only the empty result, which covers exactly the
+# i == 0 iteration; from i == 1 on, a short result passes `len(a) == 0` and
+# a[i] is out of bounds -- in Go, a panic, remotely triggerable by any
+# truncated payload that reaches ReadBool/ReadI32/ReadDouble/ReadString
+# (each calls safePeekContains(JSON_NULL)). The fixed revision makes the guard require
+# the peeked length to cover i+1. CWE-125/129; the advisory scores the
+# impact as denial of service (CVSS 7.5). The pool row is correct:
+# repository, language, CVE and commit all check, the vulnerable construct
+# is present at 264a3f3^ and the remediation at 264a3f3. No corpus
+# correction.
+#
+# What fires today. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`
+# over lib/go/thrift at the parent reports 11 findings over three runs --
+# one VYQL-RF-001, one VYQL-RES-001 and nine VYQL-INJ-009 library-param
+# rows on transport constructors -- none anywhere in simple_json_protocol.go.
+# At the fixed revision the same three runs report the same 11 (same
+# fingerprints), so the pair is indistinguishable to the scanner today.
+#
+# Vocabulary is checked for reuse before anything is written. The
+# insufficient-length-guard family has two members and neither fits:
+# code.ZeroCountLastElementAccess (VYQL-MEM-041) is the inverse failure --
+# "indexed at count - 1 without first rejecting zero elements" -- while this
+# code DOES reject zero elements and fails to reject the short result;
+# code.CountDerivedElementAccess (VYQL-MEM-010) wants a count-derived index
+# with no non-empty guard at all, and this code has a visible guard that
+# checks the wrong bound. code.IndexAccess / code.IndexAccessSink
+# (VYQL-MEM-005) need an attacker-controlled INDEX; here the index is a
+# trusted loop counter and the sliced value is the short one.
+# code.IndexOperatorWithoutBoundsCheck is an Index impl with raw-pointer
+# arithmetic and no comparison; code.UnsignedIndexConversionGuardBypass is a
+# conversion axis; code.Free5gcChfRechargeInfoSplitPanic is the nearest
+# semantic ("indexes the result of strings.Split without proving the split
+# result length") but is vendor-embedded in its name, condition and evidence
+# text, so widening it would rewrite VYQL-DOS-015's meaning rather than
+# widen its coverage. A third sibling of the count/emptiness pair is also
+# what the ontology guidance warns against, so nothing is minted.
+#
+# A binding is built and measured anyway, to pin exactly which fact is
+# missing rather than assert it. The best expressible form (function scope:
+# a Peek call, a len()-on-the-left comparison, an ==0 comparison, a
+# subscript with a non-zero-constant index atom, and no :0 index token)
+# reports the vulnerable function and nothing else on the CVE pair: 1 HIGH
+# at simple_json_protocol.go:1316 over three runs at the parent, 0 over
+# three runs at the fixed revision, and 0 on the canonical corpus for this API -- the
+# standard library's own Peek users (bufio, net/textproto, net/mail,
+# mime/multipart, text/scanner, net/http: 140 files, 155 findings, none of
+# them this shape), the scanner's own 278-file Go tree, and every other
+# clone under /tmp/cve-work/rank*/ (none contains a Go Peek call site). It
+# survives renaming every variable in the vulnerable function. But it fires
+# a HIGH row on a function where the peeked buffer IS guarded correctly
+# (len(peeked) < 4 before peeked[3]) while an unrelated len(parts) == 0
+# check and an unrelated loop-bounded parts[k] subscript sit in the same
+# body -- the fifth case below. Peek, the ==0 comparison and the subscript
+# are three function-scope tokens with no fact tying them to one value:
+# `a, _ := p.reader.Peek(i + 1)` emits no assign token at all, because
+# goAtomToken returns "" for every *ast.CallExpr except len(), so nothing
+# records that `a` came from Peek, and no predicate can say "the len()
+# guard and the subscript share the variable the Peek produced". That is
+# the co-membership shape the engine review rejects, and it is the fourth
+# measured consequence of the goAtomToken root defect on file
+# ("Go: a check cannot be attributed to the value it is applied to",
+# consequences 1420/1427/1430), compounding the guard-bound-versus-index
+# correlation gap the C capacity/write-length family (1370), the C
+# loop-trip-count gaps (1297/1300/1305) and the Rust reserved-capacity gap
+# (1706) record. Not mechanical for the same reason that entry
+# states: widening goAtomToken past len() changes the token vocabulary
+# every Go binding reads, and the correlation itself needs a relational
+# fact, not a wider substring.
+#
+# verify_current_expected: attention-engine-gap; all five forms are rejected
+# today. The first and fifth differ only in which value the guard protects,
+# and only the first is defective -- a fix flips the first and last to
+# expect and must keep the middle three rejected.
+
+test "rank1849: safePeekContains indexes the Peek result at i under a guard that only rejects the empty result"
+  lang go
+  file simple_json_protocol.go
+  reject VYQL-MEM-041
+  code
+  ```
+  package thrift
+
+  import "bufio"
+
+  // SafePeekContains reports whether the reader's next bytes equal b,
+  // reading only what is necessary. The guard rejects only the empty
+  // result: a Peek that returns 1..i bytes passes len(a) == 0 and a[i]
+  // reads out of bounds.
+  func (p *TSimpleJSONProtocol) safePeekContains(b []byte) bool {
+  	for i := 0; i < len(b); i++ {
+  		a, _ := p.reader.Peek(i + 1)
+  		if len(a) == 0 || a[i] != b[i] {
+  			return false
+  		}
+  	}
+  	return true
+  }
+
+  type TSimpleJSONProtocol struct {
+  	reader *bufio.Reader
+  }
+  ```
+
+test "rank1849: the fixed revision requires the peeked length to cover i+1 before indexing"
+  lang go
+  file simple_json_protocol_fixed.go
+  reject VYQL-MEM-041
+  code
+  ```
+  package thrift
+
+  import "bufio"
+
+  func (p *TSimpleJSONProtocol) safePeekContains(b []byte) bool {
+  	for i := 0; i < len(b); i++ {
+  		a, _ := p.reader.Peek(i + 1)
+  		if len(a) < (i + 1) || a[i] != b[i] {
+  			return false
+  		}
+  	}
+  	return true
+  }
+
+  type TSimpleJSONProtocol struct {
+  	reader *bufio.Reader
+  }
+  ```
+
+test "rank1849: the canonical safe Peek idiom guards emptiness and reads index zero"
+  lang go
+  file peek_one.go
+  reject VYQL-MEM-041
+  code
+  ```
+  package thrift
+
+  import "bufio"
+
+  // Peek(1) plus a non-empty guard makes b[0] in bounds; this is the most
+  // common correct use of the API and any binding on this shape must not
+  // fire on it.
+  func firstByte(reader *bufio.Reader) (byte, bool) {
+  	b, _ := reader.Peek(1)
+  	if len(b) == 0 {
+  		return 0, false
+  	}
+  	return b[0], true
+  }
+  ```
+
+test "rank1849: a loop bounded by the sliced value's own length is in bounds at every iteration"
+  lang go
+  file same_slice_loop.go
+  reject VYQL-MEM-041
+  code
+  ```
+  package thrift
+
+  // The index and the bound come from the same slice, so a[i] cannot run
+  // past it.
+  func allAscii(a []byte) bool {
+  	if len(a) == 0 {
+  		return true
+  	}
+  	for i := 0; i < len(a); i++ {
+  		if a[i] > 127 {
+  			return false
+  		}
+  	}
+  	return true
+  }
+  ```
+
+test "rank1849: an unrelated empty check and subscript beside a correctly guarded Peek result"
+  lang go
+  file co_membership.go
+  reject VYQL-MEM-041
+  code
+  ```
+  package thrift
+
+  import (
+  	"bufio"
+  	"strings"
+  )
+
+  // The peeked buffer is guarded by len(peeked) < 4 before peeked[3];
+  // parts[k] is bounded by its own loop. The Peek call, the len(parts)==0
+  // comparison and the parts[k] subscript co-occur in one function with no
+  // defect, which is exactly the co-membership false positive the
+  // expressible binding shape buys.
+  func parseFields(reader *bufio.Reader, s string) bool {
+  	parts := strings.Split(s, ",")
+  	if len(parts) == 0 {
+  		return false
+  	}
+  	peeked, _ := reader.Peek(4)
+  	if len(peeked) < 4 {
+  		return false
+  	}
+  	for k := 0; k < len(parts); k++ {
+  		if parts[k] == "" {
+  			return true
+  		}
+  	}
+  	return peeked[3] == ';'
+  }
+  ```
+
+test "rank1849: the same defect under renamed variables"
+  lang go
+  file renamed.go
+  reject VYQL-MEM-041
+  code
+  ```
+  package thrift
+
+  import "bufio"
+
+  // No thrift vocabulary: any future binding must fire here on the shape,
+  // not on names.
+  func matchesAt(reader *bufio.Reader, w []byte) bool {
+  	for k := 0; k < len(w); k++ {
+  		got, _ := reader.Peek(k + 1)
+  		if len(got) == 0 || got[k] != w[k] {
+  			return false
+  		}
+  	}
+  	return true
+  }
+  ```

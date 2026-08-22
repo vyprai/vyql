@@ -1,0 +1,192 @@
+# Rank 1892 / CVE-2023-36821: Uptime Kuma's plugin system let any
+# authenticated user install a plugin from a repository URL they supplied.
+# server/socket-handlers/plugins-handler.js registered
+#   socket.on("installPlugin", async (repoURL, name, callback) => {
+#       checkLogin(socket);
+#       pluginManager.downloadPlugin(repoURL, name);
+#       await pluginManager.loadPlugin(name);
+#       ...
+# so the client-supplied repoURL reached PluginsManager.downloadPlugin, which
+# ran Git.clone -- `childProcess.spawnSync("git", ["clone", repoURL, targetDir])`
+# in server/git.js with no `--` delimiter ahead of the URL (a repoURL spelling
+# `--upload-pack=...` is a git argv option) -- and then PluginsManager.loadPlugin
+# ran PluginWrapper.load in server/plugins-manager.js, which executes the
+# downloaded tree in-process: `childProcess.spawnSync("npm", ["install"], { cwd:
+# this.pluginDir })` runs the malicious package's lifecycle scripts, and
+# `require(path.join(process.cwd(), indexFile))` loads its code. Authenticated
+# remote code execution (GHSA-7grx-f945-mj96 / CWE-94). The fixed revision (a0736e0, "Drop
+# unused code") deletes the whole plugin system: plugins-handler.js,
+# plugins-manager.js and git.js are removed, and server.js stops registering the
+# handler.
+#
+# Detection is by the two presence rules that sit exactly on the defect hops.
+# VYQL-INJ-019 reports code.PackageInstallExecution on the npm-install
+# spawnSync inside PluginWrapper.load (plugins-manager.js:210 on the real
+# vulnerable tree), and VYQL-INJ-031 reports code.CommandOptionInjection on the
+# delimiter-less git clone argv in Git.clone (git.js:5). Measured --cache off,
+# timeout 180, --max-ram 6GB over server/ (104 js files): 105 findings at the
+# fix parent 4b913c8 including both rows above, 101 at the fixed revision df8fcff with
+# neither (the only rows that disappear are the four on plugins-manager.js and
+# git.js). The socket-event callback parameter itself is not labelled as a
+# source -- only the module-exported handler's own (socket, server) parameters
+# carry code.ExternalEntryInput -- so no source-to-sink chain exists from
+# repoURL to either sink; coverage is the two presence rows, which the feature
+# removal clears.
+
+test "rank1892: loading a downloaded plugin runs npm install inside its directory"
+  lang javascript
+  file plugins-manager.js
+  expect VYQL-INJ-019
+  code
+  ```
+  const fs = require("fs");
+  const path = require("path");
+  const childProcess = require("child_process");
+  const { Git } = require("./git");
+
+  class PluginWrapper {
+
+    server = undefined;
+    pluginDir = undefined;
+    pluginClass = undefined;
+
+    constructor(server, pluginDir) {
+      this.server = server;
+      this.pluginDir = pluginDir;
+    }
+
+    async load() {
+      let indexFile = this.pluginDir + "/index.js";
+
+      if (fs.existsSync(indexFile)) {
+        // Install dependencies
+        let result = childProcess.spawnSync("npm", [ "install" ], {
+          cwd: this.pluginDir,
+          env: {
+            ...process.env,
+            PLAYWRIGHT_BROWSERS_PATH: "../../browsers",
+          }
+        });
+
+        this.pluginClass = require(path.join(process.cwd(), indexFile));
+
+        if (typeof this.pluginClass === "function") {
+          let object = new this.pluginClass(this.server);
+          await object.load();
+        } else {
+          throw new Error("Invalid plugin, it does not export a class");
+        }
+      }
+    }
+  }
+
+  class PluginsManager {
+
+    pluginsDir = "./data/plugins/";
+    server;
+
+    constructor(server) {
+      this.server = server;
+    }
+
+    async loadPlugin(name) {
+      let plugin = new PluginWrapper(this.server, this.pluginsDir + name);
+      await plugin.load();
+    }
+
+    downloadPlugin(repoURL, name) {
+      if (fs.existsSync(this.pluginsDir + name)) {
+        fs.rmSync(this.pluginsDir + name, { recursive: true });
+      }
+      let result = Git.clone(repoURL, this.pluginsDir, name);
+      return result;
+    }
+  }
+
+  module.exports.pluginsHandler = (socket, server) => {
+
+    const pluginManager = new PluginsManager(server);
+
+    socket.on("installPlugin", async (repoURL, name, callback) => {
+      try {
+        checkLogin(socket);
+        pluginManager.downloadPlugin(repoURL, name);
+        await pluginManager.loadPlugin(name);
+        callback({ ok: true });
+      } catch (error) {
+        callback({ ok: false, msg: error.message });
+      }
+    });
+  };
+  ```
+
+test "rank1892: the install clones the client-supplied repo url without a delimiter"
+  lang javascript
+  file git.js
+  expect VYQL-INJ-031
+  code
+  ```
+  const childProcess = require("child_process");
+
+  class Git {
+
+    static clone(repoURL, cwd, targetDir = ".") {
+      let result = childProcess.spawnSync("git", [
+        "clone",
+        repoURL,
+        targetDir,
+      ], {
+        cwd: cwd,
+      });
+
+      if (result.status !== 0) {
+        throw new Error(result.stderr.toString("utf-8"));
+      } else {
+        return result.stdout.toString("utf-8") + result.stderr.toString("utf-8");
+      }
+    }
+  }
+
+  module.exports = {
+    Git,
+  };
+  ```
+
+test "rank1892: the read-only plugin handler the removal leaves behind"
+  lang javascript
+  file plugin-list-handler.js
+  reject VYQL-INJ-019
+  reject VYQL-INJ-031
+  code
+  ```
+  const { checkLogin } = require("../util-server");
+  const axios = require("axios");
+
+  module.exports.pluginsHandler = (socket, server) => {
+
+    // Get Plugin List
+    socket.on("getPluginList", async (callback) => {
+      try {
+        checkLogin(socket);
+
+        let pluginList = [];
+        try {
+          const res = await axios.get("https://uptime.kuma.pet/c/plugins.json");
+          pluginList = res.data.pluginList;
+        } catch (e) {
+          pluginList = [];
+        }
+
+        callback({
+          ok: true,
+          pluginList,
+        });
+      } catch (error) {
+        callback({
+          ok: false,
+          msg: error.message,
+        });
+      }
+    });
+  };
+  ```

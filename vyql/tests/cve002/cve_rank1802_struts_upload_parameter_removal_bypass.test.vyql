@@ -1,0 +1,208 @@
+# Rank 1802 / CVE-2024-53677 (CWE-22, CWE-20): a Struts 2.3.x file upload
+# publishes the interceptor's own parameter names -- <inputName>,
+# <inputName>ContentType, <inputName>FileName -- into the request's
+# parameter map, over entries an attacker has supplied as extra
+# multipart form fields. The remediation for the earlier traversal over
+# these names removed an existing entry before the put only when its key
+# is case-insensitively equal to the interceptor's key:
+#
+#   private void putCaseInsensitive(Map<String, Object> params, String key, Object value) {
+#       Iterator<Map.Entry<String, Object>> iterator = params.entrySet().iterator();
+#       while (iterator.hasNext()) {
+#           Map.Entry<String, Object> entry = iterator.next();
+#           if (key.equalsIgnoreCase(entry.getKey())) {
+#               iterator.remove();
+#           }
+#       }
+#       params.put(key, value);
+#   }
+#
+# The parameters binder downstream evaluates every surviving key as an
+# OGNL expression, and `top.uploadFileName[0]` -- a key that contains
+# the published name without being equal to it -- survives the
+# equality-only removal, navigates onto the action's uploadFileName
+# property, and hands the attacker the stored file name: path traversal
+# through a parameter the library thought it had overridden. The fixed revision
+# (930fef76, "Extend check before adding file upload params") widens
+# the removal predicate from equality to containment:
+#
+#   if (entry.getKey().toLowerCase().contains(key.toLowerCase())) {
+#
+# and, because containment on the bare inputName would delete unrelated
+# parameters, reverts that one put to a plain params.put -- the derived
+# ContentType/FileName names keep the checked put.
+#
+# What fires without this change. `timeout 180 ./bin/vyql scan --cache off
+# --max-ram 6GB` over core/src/main/java/org/apache/struts2/interceptor
+# reports 7 findings at 056228cd (the fixed revision's parent) and the same 7 at
+# 930fef76, three --cache off runs each, none of them in
+# FileUploadInterceptor.java; over core/src/main/java both revisions
+# report 49 findings, identical sets. `vyql match` on the file labels
+# only getLocaleProvider.getLocale as code.HttpInput and an unrelated
+# HtmlRender arg; `vyql graph` shows the vulnerable helper fully
+# lowered -- key.equalsIgnoreCase (Call), iterator.remove (Call),
+# params.put (Call), with the params and key params flowing into them
+# -- so the engine resolves everything and no construct is mishandled.
+# Findings elsewhere in the tree are not coverage.
+#
+# No binding is shippable here, and the reason is structural. The fixed revision
+# changes one string-comparison predicate inside a private helper; the
+# dataflow at both revisions is identical (the request's parameter map
+# in, the same put out), so no taint route can separate them and no
+# API-documented call left inside the guarded method differs between
+# revisions -- the guarded-method counterweight does not apply. The
+# only available discriminators are the fixed revision's own vocabulary: the
+# helper names (putCaseInsensitive / putWithCheck), or the removal
+# predicate's spelling. Keying the neutraliser on `contains` fires on
+# four equally-enforcing variants of the patched form (indexOf(key) >=
+# 0, a regionMatches scan, Pattern.quote(key) with find, startsWith/
+# endsWith pairs) and keys the binding to the incident rather than the
+# weakness. Keying the finding on equality-only removal -- flag
+# equalsIgnoreCase guarding an entry removal before a map put -- puts
+# the judgement in the binding layer, and the judgement is only true
+# where an expression-evaluating binder consumes the map: the same
+# equality removal over a config or session map is correct code, and
+# the consumer is invisible at the removal site. Enumerated rather
+# than sampled, the loose form (equalsIgnoreCase plus a remove plus a
+# put in one 40-line window) matches 16 files across every repository
+# cloned for this campaign (130,080 Java files), 15 besides this one;
+# the tight single-function form matches 3 -- a NiFi session
+# scheduler, an OpenAM attribute mapper, a Snowflake JDBC addBatch --
+# all ordinary equality-keyed maps where the removal is sound. The
+# name-worthy weakness class (parameter override with incomplete
+# removal) has no concept, and minting one that fires only where an
+# expression binder consumes the map is this incident's shape, not a
+# class unrelated code can hit. This sits with the measured family of
+# fixes that strengthen an existing control's completeness -- the
+# 1500-1616 wiring/configuration rows and the rejection of
+# discriminators encoding the fixing commit's own layout. No
+# ENGINE-GAPS.md entry: the graph resolves the whole helper. No
+# definition change shipped. Spec cve_rank1802 records the
+# equality-only override, the patched containment form, and an
+# equality removal over a plain map, all asserting reject
+# VYQL-PATH-001: when parameter-override vocabulary lands, the
+# equality-only override form must flip to expect.
+
+test "rank1802: upload parameter names published into the request parameter map after an equality-only removal"
+  lang java
+  file FileUploadInterceptor.java
+  reject VYQL-PATH-001
+  code
+  ```
+  import java.util.ArrayList;
+  import java.util.Iterator;
+  import java.util.List;
+  import java.util.Map;
+
+  public class FileUploadInterceptor {
+
+      public String intercept(MultiPartRequestWrapper multiWrapper, ActionContext ac) {
+          Enumeration fileParameterNames = multiWrapper.getFileParameterNames();
+          while (fileParameterNames.hasMoreElements()) {
+              String inputName = (String) fileParameterNames.nextElement();
+              String[] fileName = multiWrapper.getFileNames(inputName);
+              File[] files = multiWrapper.getFiles(inputName);
+              if (files != null && files.length > 0) {
+                  List<File> acceptedFiles = new ArrayList<File>(files.length);
+                  List<String> acceptedFileNames = new ArrayList<String>(files.length);
+                  for (int index = 0; index < files.length; index++) {
+                      acceptedFiles.add(files[index]);
+                      acceptedFileNames.add(fileName[index]);
+                  }
+                  if (!acceptedFiles.isEmpty()) {
+                      Map<String, Object> params = ac.getParameters();
+                      String fileNameName = inputName + "FileName";
+                      putCaseInsensitive(params, inputName, acceptedFiles.toArray(new File[acceptedFiles.size()]));
+                      putCaseInsensitive(params, fileNameName, acceptedFileNames.toArray(new String[acceptedFileNames.size()]));
+                  }
+              }
+          }
+          return "success";
+      }
+
+      private void putCaseInsensitive(Map<String, Object> params, String key, Object value) {
+          Iterator<Map.Entry<String, Object>> iterator = params.entrySet().iterator();
+          while (iterator.hasNext()) {
+              Map.Entry<String, Object> entry = iterator.next();
+              if (key.equalsIgnoreCase(entry.getKey())) {
+                  iterator.remove();
+              }
+          }
+          params.put(key, value);
+      }
+  }
+  ```
+
+test "rank1802: containment removal drops the embedding keys before the parameter put"
+  lang java
+  file FileUploadInterceptorPatched.java
+  reject VYQL-PATH-001
+  code
+  ```
+  import java.util.ArrayList;
+  import java.util.Iterator;
+  import java.util.List;
+  import java.util.Map;
+
+  public class FileUploadInterceptorPatched {
+
+      public String intercept(MultiPartRequestWrapper multiWrapper, ActionContext ac) {
+          Enumeration fileParameterNames = multiWrapper.getFileParameterNames();
+          while (fileParameterNames.hasMoreElements()) {
+              String inputName = (String) fileParameterNames.nextElement();
+              String[] fileName = multiWrapper.getFileNames(inputName);
+              File[] files = multiWrapper.getFiles(inputName);
+              if (files != null && files.length > 0) {
+                  List<File> acceptedFiles = new ArrayList<File>(files.length);
+                  List<String> acceptedFileNames = new ArrayList<String>(files.length);
+                  for (int index = 0; index < files.length; index++) {
+                      acceptedFiles.add(files[index]);
+                      acceptedFileNames.add(fileName[index]);
+                  }
+                  if (!acceptedFiles.isEmpty()) {
+                      Map<String, Object> params = ac.getParameters();
+                      String fileNameName = inputName + "FileName";
+                      params.put(inputName, acceptedFiles.toArray(new File[acceptedFiles.size()]));
+                      putWithCheck(params, fileNameName, acceptedFileNames.toArray(new String[acceptedFileNames.size()]));
+                  }
+              }
+          }
+          return "success";
+      }
+
+      private void putWithCheck(Map<String, Object> params, String key, Object value) {
+          Iterator<Map.Entry<String, Object>> iterator = params.entrySet().iterator();
+          while (iterator.hasNext()) {
+              Map.Entry<String, Object> entry = iterator.next();
+              if (entry.getKey().toLowerCase().contains(key.toLowerCase())) {
+                  iterator.remove();
+              }
+          }
+          params.put(key, value);
+      }
+  }
+  ```
+
+test "rank1802: equality removal over a map no expression binder consumes is correct code"
+  lang java
+  file ScopeMapOverride.java
+  reject VYQL-PATH-001
+  code
+  ```
+  import java.util.Iterator;
+  import java.util.Map;
+
+  public class ScopeMapOverride {
+
+      public void registerScope(Map<String, Object> scopes, String scopeName, Object handler) {
+          Iterator<Map.Entry<String, Object>> iterator = scopes.entrySet().iterator();
+          while (iterator.hasNext()) {
+              Map.Entry<String, Object> entry = iterator.next();
+              if (scopeName.equalsIgnoreCase(entry.getKey())) {
+                  iterator.remove();
+              }
+          }
+          scopes.put(scopeName, handler);
+      }
+  }
+  ```

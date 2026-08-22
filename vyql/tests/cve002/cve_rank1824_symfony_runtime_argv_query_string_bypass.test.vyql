@@ -1,0 +1,261 @@
+# Rank 1824 / CVE-2026-47767: symfony/symfony Runtime. The 2024 hardening of
+# SymfonyRuntime (CVE-2024-50340) made getInput() refuse to build console
+# input when the request looked like a web request:
+#
+#   private function getInput(): ArgvInput
+#   {
+#       if (!empty($_GET) && filter_var(ini_get('register_argc_argv'), \FILTER_VALIDATE_BOOL)) {
+#           throw new \Exception('CLI applications cannot be run safely on non-CLI SAPIs with register_argc_argv=On.');
+#       }
+#       ...
+#       $input = new ArgvInput();
+#
+# and the constructor only reached it under the same test:
+#
+#   } elseif (empty($_GET) && isset($_SERVER['argv']) && class_exists(ArgvInput::class)) {
+#       $this->options = $options;
+#       $this->getInput();
+#
+# ArgvInput's constructor defaults to $_SERVER['argv'], and PHP builds argv
+# from the raw query string on a web SAPI with register_argc_argv=On -- the
+# setting the guard itself consults. $_GET holds only the parsed name=value
+# pairs, so a query string of bare tokens (`GET /index.php?-e`) leaves $_GET
+# empty while argv carries the tokens: the attacker injects console options
+# (--env/-e, --no-debug become environment state through putenv) past the
+# guard. 3228c3806 replaces both tests with the raw-channel signal:
+#
+#   -   } elseif (empty($_GET) && isset($_SERVER['argv']) && ...) {
+#   +   } elseif (!isset($_SERVER['QUERY_STRING']) && isset($_SERVER['argv']) && ...) {
+#   -       if (!empty($_GET) && filter_var(ini_get('register_argc_argv'), \FILTER_VALIDATE_BOOL)) {
+#   +       if (isset($_SERVER['QUERY_STRING']) && filter_var(ini_get('register_argc_argv'), \FILTER_VALIDATE_BOOL)) {
+#
+# What fires without this change: nothing on either revision -- the file's only
+# labels are the two $_GET HttpInput sources at the guard sites and an echo
+# HtmlRender, and no taint route exists (the argv subscript is not a bound
+# source, the sink is putenv, and the fixed revision changes no dataflow at all: both
+# revisions construct ArgvInput and putenv its parsed options; only the guard's
+# channel test differs). The presence route is the only discriminating one.
+#
+# Vocabulary is checked for reuse first: code.CommandOptionInjection judges
+# values passed INTO option-taking commands (delimiters/allowlists),
+# code.EnvFileVariableInjection judges .env line escaping,
+# code.ClientControlledSecurityDecision is a taint sink for privilege
+# decisions -- none judges an input-trust decision keyed on the parsed GET
+# channel, so code.ArgvTrustedOnEmptyGet / VYQL-VAL-032 is minted (CWE-807:
+# the decision relies on a lossy projection of the client's input).
+#
+# The binding states the channel fact, not the incident: a function that
+# decides "not a web request" from $_GET (or $HTTP_GET_VARS) emptiness and
+# then consumes argv-backed console input -- ArgvInput (whose own docblock
+# spells `new ArgvInput($_SERVER['argv'])`), PHP's getopt, or a direct
+# $_SERVER['argv']/$argv read -- accepts query-derived arguments unless it
+# also tests a raw-channel signal ($_SERVER['QUERY_STRING'], PHP_SAPI,
+# php_sapi_name(); the SAPI case below is a different documented spelling
+# than the fixed revision's, so the flag does not key on this commit's vocabulary). All
+# clauses are AST-derived and function confined for PHP class methods
+# (identifier:, call:, subscript: measured on the real file), so an argv read
+# in a sibling method does not satisfy the consumer clause. isset is not
+# accepted as the emptiness decision: GenericRuntime::getArgument reads
+# $_GET and $_SERVER['argv'] and carries an unrelated isset($_SERVER['PATH'])
+# -- measured firing before isset drops out from the decision list. The
+# literal: route is not used in the negation because it sees comment text in
+# PHP, so a commented-out guard does not suppress; getenv('QUERY_STRING') as
+# the raw-channel check is likewise not recognised (its argument reaches only
+# the literal route), and a guard moved into a helper the function calls does
+# not suppress either, since the clauses are function-confined -- both
+# false-negative-direction residuals.
+#
+# Measured: 2 -> 0 on src/Symfony/Component/Runtime over three --cache off
+# runs per revision (SymfonyRuntime.php:91 and :217 on the parent, nothing on
+# the fixed revision; 0/0/0 with the binding absent). The reachable set across the whole
+# monorepo is one file: 12 .php files carry an argv-consumer spelling
+# ($_SERVER['argv'], new ArgvInput, getopt), 8 carry a $_GET read, and only
+# SymfonyRuntime.php carries both. ArgvInput.php itself (Console component,
+# 55 findings stable with and without the binding) reads $_SERVER['argv'] with
+# no $_GET decision and correctly reports nothing. Across every other clone
+# under /tmp/cve-work/rank*/: 79 argv-consumer files, 895 $_GET files, both
+# spellings in librenms html/network-map.php only (getopt('d::') plus $_GET
+# request handling), which reports nothing -- the file is procedural with no
+# function context to label.
+
+test "rank1824: getInput builds ArgvInput behind a guard that reads the parsed GET channel"
+  lang php
+  expect VYQL-VAL-032
+  expect_review code.ArgvTrustedOnEmptyGet
+  code
+  ```
+  <?php
+  class SymfonyRuntime extends GenericRuntime
+  {
+      private $input;
+
+      private function getInput(): ArgvInput
+      {
+          if (!empty($_GET) && filter_var(ini_get('register_argc_argv'), \FILTER_VALIDATE_BOOL)) {
+              throw new \Exception('CLI applications cannot be run safely on non-CLI SAPIs with register_argc_argv=On.');
+          }
+
+          if (null !== $this->input) {
+              return $this->input;
+          }
+
+          $input = new ArgvInput();
+
+          if (null !== $env = $input->getParameterOption(['--env', '-e'], null, true)) {
+              putenv('APP_ENV='.$_SERVER['APP_ENV'] = $_ENV['APP_ENV'] = $env);
+          }
+
+          return $this->input = $input;
+      }
+  }
+  ```
+
+test "rank1824: getInput gates argv on the raw query string"
+  lang php
+  reject VYQL-VAL-032
+  reject_review code.ArgvTrustedOnEmptyGet
+  code
+  ```
+  <?php
+  class SymfonyRuntime extends GenericRuntime
+  {
+      private $input;
+
+      private function getInput(): ArgvInput
+      {
+          if (isset($_SERVER['QUERY_STRING']) && filter_var(ini_get('register_argc_argv'), \FILTER_VALIDATE_BOOL)) {
+              throw new \Exception('CLI applications cannot be run safely on non-CLI SAPIs with register_argc_argv=On.');
+          }
+
+          if (null !== $this->input) {
+              return $this->input;
+          }
+
+          $input = new ArgvInput();
+
+          if (null !== $env = $input->getParameterOption(['--env', '-e'], null, true)) {
+              putenv('APP_ENV='.$_SERVER['APP_ENV'] = $_ENV['APP_ENV'] = $env);
+          }
+
+          return $this->input = $input;
+      }
+  }
+  ```
+
+test "rank1824: the constructor reaches argv input under the parsed GET channel test"
+  lang php
+  expect VYQL-VAL-032
+  expect_review code.ArgvTrustedOnEmptyGet
+  code
+  ```
+  <?php
+  class SymfonyRuntime extends GenericRuntime
+  {
+      private $input;
+
+      public function __construct(array $options = [])
+      {
+          if (isset($options['env'])) {
+              $_SERVER['APP_ENV'] = $options['env'];
+          } elseif (empty($_GET) && isset($_SERVER['argv']) && class_exists(ArgvInput::class)) {
+              $this->options = $options;
+              $this->getInput();
+          }
+      }
+  }
+  ```
+
+test "rank1824: the constructor gates argv on the raw query string"
+  lang php
+  reject VYQL-VAL-032
+  reject_review code.ArgvTrustedOnEmptyGet
+  code
+  ```
+  <?php
+  class SymfonyRuntime extends GenericRuntime
+  {
+      private $input;
+
+      public function __construct(array $options = [])
+      {
+          if (isset($options['env'])) {
+              $_SERVER['APP_ENV'] = $options['env'];
+          } elseif (!isset($_SERVER['QUERY_STRING']) && isset($_SERVER['argv']) && class_exists(ArgvInput::class)) {
+              $this->options = $options;
+              $this->getInput();
+          }
+      }
+  }
+  ```
+
+test "rank1824: a SAPI check also gates argv-backed input"
+  lang php
+  reject VYQL-VAL-032
+  reject_review code.ArgvTrustedOnEmptyGet
+  code
+  ```
+  <?php
+  class SymfonyRuntime extends GenericRuntime
+  {
+      private function getInput(): ArgvInput
+      {
+          if (!empty($_GET) && \PHP_SAPI !== 'cli') {
+              throw new \Exception('CLI applications cannot be run safely on non-CLI SAPIs.');
+          }
+
+          return $this->input = new ArgvInput();
+      }
+  }
+  ```
+
+test "rank1824: an argv read in a sibling method does not satisfy the consumer clause"
+  lang php
+  reject VYQL-VAL-032
+  reject_review code.ArgvTrustedOnEmptyGet
+  code
+  ```
+  <?php
+  class SymfonyRuntime extends GenericRuntime
+  {
+      public function getRunner($application)
+      {
+          $application->setName($_SERVER['argv'][0]);
+
+          return $application;
+      }
+
+      public function boot(array $options = [])
+      {
+          if (!empty($_GET)) {
+              $_SERVER['APP_ENV'] = 'dev';
+          }
+
+          return $options;
+      }
+  }
+  ```
+
+test "rank1824: a commented-out query string guard does not suppress"
+  lang php
+  expect VYQL-VAL-032
+  expect_review code.ArgvTrustedOnEmptyGet
+  code
+  ```
+  <?php
+  class ConsoleBoot
+  {
+      private $input;
+
+      public function getInput()
+      {
+          // if (isset($_SERVER['QUERY_STRING'])) {
+          //     throw new \Exception('not safe on non-CLI SAPIs');
+          // }
+          if (!empty($_GET)) {
+              $_SERVER['APP_ENV'] = 'dev';
+          }
+
+          return $this->input = new ArgvInput();
+      }
+  }
+  ```

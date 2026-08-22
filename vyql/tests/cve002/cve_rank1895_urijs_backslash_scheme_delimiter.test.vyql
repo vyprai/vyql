@@ -1,0 +1,216 @@
+# Rank 1895 / CVE-2021-27516: URI.js's own URL grammar decided the
+# scheme-authority delimiter by a literal comparison on an unnormalised
+# substring. URI.parse (src/URI.js:529 at the parent) tested
+# `string.substring(pos + 1, pos + 3) === '//'` to take the authority
+# branch, while URI.parseHost twenty lines below normalises its input with
+# `string.replace(/\\/g, '/')` and cites Chrome/IE/Opera backslash
+# behaviour in its own comment -- so `https:/\attacker.com` fell into the
+# urn branch, parts.hostname stayed null, and every consumer allowlisting
+# on URI.js's hostname while the browser or fetch resolves the same string
+# to https://attacker.com/ is bypassed (CWE-20/CWE-918, SSRF/allowlist
+# bypass). The fixing commit a1ad8bcbc39a4d136d7e252e76e957f3ece70839 is the
+# fix ("fix(parse): treat backslash as forwardslash in scheme
+# delimiter"): the compared substring is normalised with
+# .replace(/\\/g, '/') before the test. First released in v1.19.6, the
+# parent is v1.19.5, matching the advisory's affected range. Construct
+# present at the parent, remediation present at the fixed revision. No pool
+# correction.
+#
+# ATTENTION, URL-grammar normalisation consistency -- the same
+# the-spelling-the-check-examines-is-not-the-spelling-the-consumer-resolves
+# family as ranks 1522 (bracket-blind hosts), 1582/1583/1598 (wildcard and
+# userinfo and unvalidated host segments), 1606 (range list), 1608
+# (blacklist instead of scheme allowlist). The defect is inside the
+# parser's own grammar, not at a validation site: detecting it needs to
+# know that this library's contract treats backslash as slash in the
+# authority position, which is stated nowhere in URI.js's documentation
+# and is contradicted by the parser's own first branch. Measured on the
+# real checkout (timeout 180, --max-ram 6GB, --cache off, three runs,
+# deterministic): 126 findings tree-wide, 103 at or above high, byte
+# identical at the parent and the fixed revision across all 249 source/sink/rule
+# description lines; the four findings naming src/URI.js are the module's
+# merge/punycode machinery (:26 prototype-pollution sink, :58 DomInput,
+# :70 HtmlRender, :2312 ProtoPollute), none inside URI.parse or
+# parseHost. On a minimal repro `vyql match` labels no source and no sink
+# in either revision (only threat.CharFilter on the .replace calls and
+# core.PathAccessCheck on the protocol regex), `vyql trace -from
+# code.DomInput -to code.UrlFetch` reports 0 sources, `vyql explain`
+# reports no findings. The one existing concept for backslash-as-slash
+# normalisation, code.AjaxBackslashProtocolRelativeUrlXss (ranks 637/638,
+# VYQL-INJ-140), is a whole-file text detector keyed on the AJAX
+# pagination loader's own fix shape ($.ajax, url:, [0]!='/' and [1]=='/'
+# guards, negated on startsWith("/\\") -- javascript.go:658) and has no
+# notion of a scheme delimiter; a second detector keyed on
+# `substring(...) === '//'` negated by an adjacent .replace(/\\/g, '/')
+# would discriminate only by the fixing commit's own text and would fire
+# on src/URI.js:516, the protocol-relative branch the same fix left
+# untouched, at both revisions. WeakRedirectUrlValidation (VYQL-RF-039)
+# names slash normalisation but its subject is a redirect-validation
+# helper, not a parser grammar; core.PathCanonicalization is a file-path
+# control with no URL counterpart. The literal `=== '//'` shape occurs
+# twice in real code across 1080 non-minified JS files in the 87 rank
+# clones, both in src/URI.js -- no second instance to justify a general
+# parser-grammar concept. No ENGINE-GAPS.md entry: the blocker is
+# vocabulary, not a construct the engine mishandles. No definition change
+# shipped. Spec cve_rank1895 records the urn-branch fallthrough and the
+# normalised form, both asserting reject VYQL-RF-001: when
+# URL-grammar-normalisation vocabulary lands, the unnormalised form must
+# flip to expect.
+
+test "rank1895: the scheme delimiter test sees the raw substring"
+  lang javascript
+  file src/URI.js
+  reject VYQL-RF-001
+  code
+  ```
+  var URI = {};
+
+  URI.parse = function(string, parts) {
+    var pos;
+    if (!parts) {
+      parts = {};
+    }
+
+    // extract fragment
+    pos = string.indexOf('#');
+    if (pos > -1) {
+      parts.fragment = string.substring(pos + 1) || null;
+      string = string.substring(0, pos);
+    }
+
+    // extract query
+    pos = string.indexOf('?');
+    if (pos > -1) {
+      parts.query = string.substring(pos + 1) || null;
+      string = string.substring(0, pos);
+    }
+
+    // extract protocol
+    if (string.substring(0, 2) === '//') {
+      // relative-scheme
+      parts.protocol = null;
+      string = URI.parseAuthority(string.substring(2), parts);
+    } else {
+      pos = string.indexOf(':');
+      if (pos > -1) {
+        parts.protocol = string.substring(0, pos) || null;
+        if (parts.protocol && !parts.protocol.match(/^[a-z][a-z0-9+.-]*$/i)) {
+          // : may be within the path
+          parts.protocol = undefined;
+        } else if (string.substring(pos + 1, pos + 3) === '//') {
+          string = URI.parseAuthority(string.substring(pos + 3), parts);
+        } else {
+          string = string.substring(pos + 1);
+          parts.urn = true;
+        }
+      }
+    }
+
+    parts.path = string;
+    return parts;
+  };
+
+  // Copy chrome, IE, opera backslash-handling behavior.
+  // Back slashes before the query string get converted to forward slashes
+  URI.parseHost = function(string, parts) {
+    string = string.replace(/\\/g, '/');
+
+    var pos = string.indexOf('/');
+    if (pos === -1) {
+      pos = string.length;
+    }
+
+    var t = string.substring(0, pos).split(':');
+    parts.hostname = t[0] || null;
+    parts.port = t[1] || null;
+    return parts;
+  };
+
+  URI.parseAuthority = function(string, parts) {
+    var pos = string.indexOf('@');
+    if (pos > -1) {
+      parts.username = string.substring(0, pos) || null;
+      string = string.substring(pos + 1);
+    }
+    return URI.parseHost(string, parts);
+  };
+  ```
+
+test "rank1895: the fixed revision normalises the compared substring"
+  lang javascript
+  file src/URI.js
+  reject VYQL-RF-001
+  code
+  ```
+  var URI = {};
+
+  URI.parse = function(string, parts) {
+    var pos;
+    if (!parts) {
+      parts = {};
+    }
+
+    // extract fragment
+    pos = string.indexOf('#');
+    if (pos > -1) {
+      parts.fragment = string.substring(pos + 1) || null;
+      string = string.substring(0, pos);
+    }
+
+    // extract query
+    pos = string.indexOf('?');
+    if (pos > -1) {
+      parts.query = string.substring(pos + 1) || null;
+      string = string.substring(0, pos);
+    }
+
+    // extract protocol
+    if (string.substring(0, 2) === '//') {
+      // relative-scheme
+      parts.protocol = null;
+      string = URI.parseAuthority(string.substring(2), parts);
+    } else {
+      pos = string.indexOf(':');
+      if (pos > -1) {
+        parts.protocol = string.substring(0, pos) || null;
+        if (parts.protocol && !parts.protocol.match(/^[a-z][a-z0-9+.-]*$/i)) {
+          // : may be within the path
+          parts.protocol = undefined;
+        } else if (string.substring(pos + 1, pos + 3).replace(/\\/g, '/') === '//') {
+          string = URI.parseAuthority(string.substring(pos + 3), parts);
+        } else {
+          string = string.substring(pos + 1);
+          parts.urn = true;
+        }
+      }
+    }
+
+    parts.path = string;
+    return parts;
+  };
+
+  // Copy chrome, IE, opera backslash-handling behavior.
+  // Back slashes before the query string get converted to forward slashes
+  URI.parseHost = function(string, parts) {
+    string = string.replace(/\\/g, '/');
+
+    var pos = string.indexOf('/');
+    if (pos === -1) {
+      pos = string.length;
+    }
+
+    var t = string.substring(0, pos).split(':');
+    parts.hostname = t[0] || null;
+    parts.port = t[1] || null;
+    return parts;
+  };
+
+  URI.parseAuthority = function(string, parts) {
+    var pos = string.indexOf('@');
+    if (pos > -1) {
+      parts.username = string.substring(0, pos) || null;
+      string = string.substring(pos + 1);
+    }
+    return URI.parseHost(string, parts);
+  };
+  ```

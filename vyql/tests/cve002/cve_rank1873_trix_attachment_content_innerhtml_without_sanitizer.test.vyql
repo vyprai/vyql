@@ -1,0 +1,122 @@
+# Trix renders attachment content straight into the DOM. An attachment's
+# markup arrives as JSON in a data-trix-attachment attribute, is parsed back
+# into the document model on paste, and reaches the view as
+# Attachment.getContent():
+#
+#   src/trix/views/attachment_view.js:35-37 at the parent of 7656f578:
+#
+#     if (this.attachment.hasContent()) {
+#       innerElement.innerHTML = this.attachment.getContent()
+#     }
+#
+# Nothing sanitizes that value on the way to the assignment -- the paste path
+# sanitized only data.content when contentType is exactly "text/html", and
+# the view trusts whatever the document model carries -- so pasted markup
+# becomes stored DOM XSS (CWE-79). The fixed revision routes every innerHTML assignment
+# of untrusted markup through a new HTMLSanitizer.setHTML(element, html)
+# that sanitizes before assigning.
+#
+# The taint route from the pasted attribute to the view is out of reach: the
+# JSON.parse result crosses the parser's piece constructors, the document
+# model and an attributes HashMap before Attachment.getContent() returns it,
+# and the trace stops at the first of those hops. What the revisions do
+# differ in is the render statement itself: the vulnerable form assigns a
+# content getter's result straight into innerHTML, and the patched form
+# routes the same getter through the sanitizer, which leaves no innerHTML
+# assignment in the calling function at all -- rename the added setHTML
+# helper and the patched form still does not assign through innerHTML. The
+# getter and the assignment are required on one statement, not merely in one
+# function: at function scope the same two clauses fire on 137 functions in
+# a rich-text editor tree where every test asserts on getContent() output
+# near an unrelated innerHTML write (0 of the 137 assign the getter directly),
+# while the statement-scoped form keeps the one real render site and reports
+# nothing on that tree.
+
+test "rank1873: an attachment view renders content-getter markup into innerHTML with no sanitizer in scope"
+  lang javascript
+  file attachment-view.js
+  expect VYQL-INJ-278
+  code
+  ```
+  import { makeElement } from "trix/core/helpers"
+  import ObjectView from "trix/views/object_view"
+
+  export default class AttachmentView extends ObjectView {
+    render() {
+      const innerElement = makeElement({ tagName: "figure", editable: false })
+
+      if (this.attachment.hasContent()) {
+        innerElement.innerHTML = this.attachment.getContent()
+      } else {
+        this.createContentNodes().forEach((node) => {
+          innerElement.appendChild(node)
+        })
+      }
+
+      innerElement.appendChild(this.createCaptionElement())
+      return innerElement
+    }
+  }
+  ```
+
+test "rank1873: the same render routed through the sanitizer reports nothing"
+  lang javascript
+  file attachment-view-sanitized.js
+  reject VYQL-INJ-278
+  code
+  ```
+  import { makeElement } from "trix/core/helpers"
+  import ObjectView from "trix/views/object_view"
+  import HTMLSanitizer from "trix/models/html_sanitizer"
+
+  export default class AttachmentView extends ObjectView {
+    render() {
+      const innerElement = makeElement({ tagName: "figure", editable: false })
+
+      if (this.attachment.hasContent()) {
+        HTMLSanitizer.setHTML(innerElement, this.attachment.getContent())
+      } else {
+        this.createContentNodes().forEach((node) => {
+          innerElement.appendChild(node)
+        })
+      }
+
+      innerElement.appendChild(this.createCaptionElement())
+      return innerElement
+    }
+  }
+  ```
+
+test "rank1873: an innerHTML assignment that sanitizes beforehand reports nothing"
+  lang javascript
+  file html-parser-prefixed.js
+  reject VYQL-INJ-278
+  code
+  ```
+  import HTMLSanitizer from "trix/models/html_sanitizer"
+
+  export default class HTMLParser extends BasicObject {
+    parse() {
+      this.createHiddenContainer()
+      const html = HTMLSanitizer.sanitize(this.html).getHTML()
+      this.containerElement.innerHTML = html
+      const walker = walkTree(this.containerElement, { usingFilter: nodeFilter })
+      while (walker.nextNode()) {
+        this.processNode(walker.currentNode)
+      }
+      return this.blocks
+    }
+  }
+  ```
+
+test "rank1873: the same direct assignment with a sanitizer in the call reports nothing"
+  lang javascript
+  file render-purified.js
+  reject VYQL-INJ-278
+  code
+  ```
+  const renderPurified = (editor, el) => {
+    el.innerHTML = DOMPurify.sanitize(editor.getContent())
+    return el
+  }
+  ```

@@ -1,0 +1,342 @@
+# Rank 1840 / CVE-2023-34451 (GHSA-w24w-wp77-qffm, "CometBFT may duplicate
+# transactions in the mempool's data structures", fixed in v0.34.29 and
+# v0.37.2): the mempool tracks outstanding transactions in two structures that
+# must agree -- mem.txs (an ordered clist.CList) and mem.txsMap (a sync.Map
+# from tx key to the list element). CheckTx's only duplicate suppression is the
+# bounded seen-tx cache (`if !mem.cache.Push(tx) { return ErrTxInCache }`), and
+# that cache is LRU-evictable: flood more than cache_size distinct txs and an
+# earlier tx's entry is gone. A resubmitted tx then passes the cache check,
+# goes through the ABCI app, and resCbFirstTime appends it to mem.txs again via
+# addTx (PushBack + txsMap.Store) without ever consulting txsMap -- the map
+# still tracks only the first element, so RemoveTxByKey, which resolves the
+# element through the map, removes one copy and leaves the other in the list
+# forever. The stuck copy is gossiped to peers indefinitely and the mempool
+# fills with unremovable entries until the node is restarted: memory-exhaustion
+# DoS from repeated RPC submissions (CWE-400, CWE-772).
+#
+# The fixed revision adds the missing membership check in resCbFirstTime: consult
+# mem.txsMap.Load(types.Tx(tx).Key()) before constructing the mempoolTx, record
+# the sender on the existing entry, and return without inserting. The guard
+# goes in the caller; addTx is untouched, and getCElement's own txsMap.Load
+# exists at both revisions, so nothing textual in the file distinguishes them
+# except the fixed revision's own added call.
+#
+# The row's commit 6de7effb05581f9bea2e8af06e4e74a85c34bc5f
+# is PR #2778 ("mempool no gossip back", 2019), which the advisory cites as the
+# PR that INTRODUCED txsMap -- at its parent the only `txsMap` in the tree is a
+# local variable in a test helper, so the recorded fix^ tree does not contain
+# the vulnerability at all. The fixing change is PR #890's merge commit
+# a09f5d33ecd8846369b93cae9063291eb8abc3a0 ("Prevent a transaction to appear
+# twice in the mempool", 2023-06-06), in the same repository (tendermint/
+# tendermint redirects to cometbft/cometbft). Both revisions below come from
+# that commit and its parent 9333aa8540fbd5ee6888fff5527fb2e64455a184.
+#
+# Detection state: nothing is labelled on the insert path -- `vyql match` on
+# the shape reports no source, no sink and no control, and the tree scans give
+# 229 findings at both revisions with the only mempool labels being a
+# code.LockAcquire on Flush's RLock and a syntactic code.Deserialization on
+# getCElement's type assertion. The defect is a state-consistency invariant
+# between two keyed structures plus a removal path in a third function; there
+# is no taint path, and the only textual discriminator between the revisions is
+# the fixed revision's own added txsMap.Load call (the 1411 lesson: a name-keyed
+# negation on it flags a legitimately-fixed tree where the guard is placed in
+# addTx instead, which is why case (c) below must stay a reject). The broad
+# shape -- a function inserting into a keyed collection with no membership
+# check in its body -- is measured unshippable: 2708 function blocks call
+# `.Store(` without any `.Load(`/`LoadOrStore` across the campaign clones'
+# 75546 Go files, 140 more for `.PushBack(`, one generated 20k-line tracing
+# shim alone accounting for 958. Closest live concept checked for reuse:
+# code.UnboundedProtocolStateByIdentifier (VYQL-DOS-008, CWE-400/770) -- the
+# right judgement class, remote-supplied entries accumulating in protocol
+# state, but its one Go binding is product-specific (go-ipfs bitswap names)
+# and its reviewCondition keys on missing per-identifier size limits, which
+# this mempool has (isFull, config.Size, MaxTxsBytes); the growth is of
+# unremovable entries, not uncapped ones. All cases pin the miss against
+# VYQL-DOS-008 and flip to expect once a container-key relation exists (the
+# 1411 memo-invalidation family, extended to insert paths).
+
+test "rank1840: mempool insert path appends to the list and stores into the key index with no membership check"
+  lang go
+  file mempool/clist_mempool.go
+  reject VYQL-DOS-008
+  reject_review code.UnboundedProtocolStateByIdentifier
+  code
+  ```
+  package mempool
+
+  import (
+  	"sync"
+  	"sync/atomic"
+
+  	abci "github.com/cometbft/cometbft/abci/types"
+  	"github.com/cometbft/cometbft/libs/clist"
+  	"github.com/cometbft/cometbft/types"
+  )
+
+  type CListMempool struct {
+  	height   int64
+  	txsBytes int64
+
+  	txs    *clist.CList // concurrent linked-list of good txs
+  	txsMap sync.Map     // txKey -> CElement
+
+  	// Keep a cache of already-seen txs.
+  	// This reduces the pressure on the proxyApp.
+  	cache TxCache
+  }
+
+  type mempoolTx struct {
+  	height    int64
+  	gasWanted int64
+  	tx        types.Tx
+  }
+
+  func (mem *CListMempool) addTx(memTx *mempoolTx) {
+  	e := mem.txs.PushBack(memTx)
+  	mem.txsMap.Store(memTx.tx.Key(), e)
+  	atomic.AddInt64(&mem.txsBytes, int64(len(memTx.tx)))
+  }
+
+  func (mem *CListMempool) getCElement(txKey types.TxKey) (*clist.CElement, bool) {
+  	if e, ok := mem.txsMap.Load(txKey); ok {
+  		return e.(*clist.CElement), true
+  	}
+  	return nil, false
+  }
+
+  // callback, which is called after the app checked the tx for the first time.
+  func (mem *CListMempool) resCbFirstTime(
+  	tx []byte,
+  	txInfo TxInfo,
+  	res *abci.Response,
+  ) {
+  	switch r := res.Value.(type) {
+  	case *abci.Response_CheckTx:
+  		var postCheckErr error
+  		if mem.postCheck != nil {
+  			postCheckErr = mem.postCheck(tx, r.CheckTx)
+  		}
+  		if (r.CheckTx.Code == abci.CodeTypeOK) && postCheckErr == nil {
+  			if err := mem.isFull(len(tx)); err != nil {
+  				mem.cache.Remove(tx)
+  				return
+  			}
+
+  			memTx := &mempoolTx{
+  				height:    mem.height,
+  				gasWanted: r.CheckTx.GasWanted,
+  				tx:        tx,
+  			}
+  			memTx.addSender(txInfo.SenderID)
+  			mem.addTx(memTx)
+  			mem.notifyTxsAvailable()
+  		}
+  	default:
+  	}
+  }
+
+  func (mem *CListMempool) CheckTx(tx types.Tx, txInfo TxInfo) error {
+  	// if the transaction already exists in the cache
+  	if !mem.cache.Push(tx) {
+  		if memTx := mem.getMemTx(tx.Key()); memTx != nil {
+  			memTx.addSender(txInfo.SenderID)
+  		}
+  		return ErrTxInCache
+  	}
+  	return nil
+  }
+  ```
+
+test "rank1840: insert path consults the key index before appending and records the sender on the existing entry"
+  lang go
+  file mempool/clist_mempool.go
+  reject VYQL-DOS-008
+  reject_review code.UnboundedProtocolStateByIdentifier
+  code
+  ```
+  package mempool
+
+  import (
+  	"sync"
+  	"sync/atomic"
+
+  	abci "github.com/cometbft/cometbft/abci/types"
+  	"github.com/cometbft/cometbft/libs/clist"
+  	"github.com/cometbft/cometbft/types"
+  )
+
+  type CListMempool struct {
+  	height   int64
+  	txsBytes int64
+
+  	txs    *clist.CList // concurrent linked-list of good txs
+  	txsMap sync.Map     // txKey -> CElement
+
+  	// Keep a cache of already-seen txs.
+  	// This reduces the pressure on the proxyApp.
+  	cache TxCache
+  }
+
+  type mempoolTx struct {
+  	height    int64
+  	gasWanted int64
+  	tx        types.Tx
+  }
+
+  func (mem *CListMempool) addTx(memTx *mempoolTx) {
+  	e := mem.txs.PushBack(memTx)
+  	mem.txsMap.Store(memTx.tx.Key(), e)
+  	atomic.AddInt64(&mem.txsBytes, int64(len(memTx.tx)))
+  }
+
+  func (mem *CListMempool) getCElement(txKey types.TxKey) (*clist.CElement, bool) {
+  	if e, ok := mem.txsMap.Load(txKey); ok {
+  		return e.(*clist.CElement), true
+  	}
+  	return nil, false
+  }
+
+  // callback, which is called after the app checked the tx for the first time.
+  func (mem *CListMempool) resCbFirstTime(
+  	tx []byte,
+  	txInfo TxInfo,
+  	res *abci.Response,
+  ) {
+  	switch r := res.Value.(type) {
+  	case *abci.Response_CheckTx:
+  		var postCheckErr error
+  		if mem.postCheck != nil {
+  			postCheckErr = mem.postCheck(tx, r.CheckTx)
+  		}
+  		if (r.CheckTx.Code == abci.CodeTypeOK) && postCheckErr == nil {
+  			if err := mem.isFull(len(tx)); err != nil {
+  				mem.cache.Remove(tx)
+  				return
+  			}
+
+  			// Check transaction not already in the mempool
+  			if e, ok := mem.txsMap.Load(types.Tx(tx).Key()); ok {
+  				memTx := e.(*clist.CElement).Value.(*mempoolTx)
+  				memTx.addSender(txInfo.SenderID)
+  				return
+  			}
+
+  			memTx := &mempoolTx{
+  				height:    mem.height,
+  				gasWanted: r.CheckTx.GasWanted,
+  				tx:        tx,
+  			}
+  			memTx.addSender(txInfo.SenderID)
+  			mem.addTx(memTx)
+  			mem.notifyTxsAvailable()
+  		}
+  	default:
+  	}
+  }
+
+  func (mem *CListMempool) CheckTx(tx types.Tx, txInfo TxInfo) error {
+  	// if the transaction already exists in the cache
+  	if !mem.cache.Push(tx) {
+  		if memTx := mem.getMemTx(tx.Key()); memTx != nil {
+  			memTx.addSender(txInfo.SenderID)
+  		}
+  		return ErrTxInCache
+  	}
+  	return nil
+  }
+  ```
+
+test "rank1840: insert helper that itself refuses a key the index tracks"
+  lang go
+  file mempool/clist_mempool.go
+  reject VYQL-DOS-008
+  reject_review code.UnboundedProtocolStateByIdentifier
+  code
+  ```
+  package mempool
+
+  import (
+  	"sync"
+  	"sync/atomic"
+
+  	abci "github.com/cometbft/cometbft/abci/types"
+  	"github.com/cometbft/cometbft/libs/clist"
+  	"github.com/cometbft/cometbft/types"
+  )
+
+  type CListMempool struct {
+  	height   int64
+  	txsBytes int64
+
+  	txs    *clist.CList // concurrent linked-list of good txs
+  	txsMap sync.Map     // txKey -> CElement
+
+  	// Keep a cache of already-seen txs.
+  	// This reduces the pressure on the proxyApp.
+  	cache TxCache
+  }
+
+  type mempoolTx struct {
+  	height    int64
+  	gasWanted int64
+  	tx        types.Tx
+  }
+
+  func (mem *CListMempool) addTx(memTx *mempoolTx) {
+  	if _, ok := mem.txsMap.Load(memTx.tx.Key()); ok {
+  		return
+  	}
+  	e := mem.txs.PushBack(memTx)
+  	mem.txsMap.Store(memTx.tx.Key(), e)
+  	atomic.AddInt64(&mem.txsBytes, int64(len(memTx.tx)))
+  }
+
+  func (mem *CListMempool) getCElement(txKey types.TxKey) (*clist.CElement, bool) {
+  	if e, ok := mem.txsMap.Load(txKey); ok {
+  		return e.(*clist.CElement), true
+  	}
+  	return nil, false
+  }
+
+  // callback, which is called after the app checked the tx for the first time.
+  func (mem *CListMempool) resCbFirstTime(
+  	tx []byte,
+  	txInfo TxInfo,
+  	res *abci.Response,
+  ) {
+  	switch r := res.Value.(type) {
+  	case *abci.Response_CheckTx:
+  		var postCheckErr error
+  		if mem.postCheck != nil {
+  			postCheckErr = mem.postCheck(tx, r.CheckTx)
+  		}
+  		if (r.CheckTx.Code == abci.CodeTypeOK) && postCheckErr == nil {
+  			if err := mem.isFull(len(tx)); err != nil {
+  				mem.cache.Remove(tx)
+  				return
+  			}
+
+  			memTx := &mempoolTx{
+  				height:    mem.height,
+  				gasWanted: r.CheckTx.GasWanted,
+  				tx:        tx,
+  			}
+  			memTx.addSender(txInfo.SenderID)
+  			mem.addTx(memTx)
+  			mem.notifyTxsAvailable()
+  		}
+  	default:
+  	}
+  }
+
+  func (mem *CListMempool) CheckTx(tx types.Tx, txInfo TxInfo) error {
+  	// if the transaction already exists in the cache
+  	if !mem.cache.Push(tx) {
+  		if memTx := mem.getMemTx(tx.Key()); memTx != nil {
+  			memTx.addSender(txInfo.SenderID)
+  		}
+  		return ErrTxInCache
+  	}
+  	return nil
+  }
+  ```

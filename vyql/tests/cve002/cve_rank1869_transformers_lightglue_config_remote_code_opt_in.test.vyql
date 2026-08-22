@@ -1,0 +1,162 @@
+# LightGlue's native integration forwarded the config object's own
+# trust_remote_code flag into the HuggingFace auto-class loaders. The flag is
+# documented as the caller's explicit trust decision -- when it is True,
+# AutoConfig.from_pretrained / AutoModel*.from_config download the model
+# repository's own Python files and execute them -- but the config object is
+# itself built from the repository's config.json, so a malicious repository
+# sets "trust_remote_code": true and its code runs without the caller opting
+# in (CWE-829, CWE-94). The fixed revision drops the keyword from both call sites and the
+# codegen source; the loaders stay, only the artifact-supplied opt-in goes.
+#
+# The weakness class is new vocabulary: code.LoadedDataControlsCodeExecutionOptIn
+# (VYQL-INJ-277) covers any loader whose code-execution opt-in is read back
+# from the object being loaded. The Python binding
+# (bindings/python/remote_code_opt_in_from_loaded_data.vyql) is written from
+# the loaders' own documentation and discriminates on the argument text: the
+# caller's-choice spellings measured in the same checkout -- the auto-class API
+# forwarding its own trust_remote_code parameter, an explicit
+# trust_remote_code=True literal in conversion tooling, and the argparse
+# args./model_args./data_args.trust_remote_code the example scripts read from
+# the operator's command line (24 findings on examples/pytorch/language-
+# modeling before that decline, 0 after) -- never read the flag from an
+# attribute of the artifact, so none carries the ".trust_remote_code" argument
+# text the binding requires. The one residual, stated in the binding:
+# transformers' CLI server stores the operator's --trust_remote-code option as
+# self.trust_remote_code, textually identical to a config class reading its
+# own field, so its two loader calls still read through.
+
+test "a loader whose remote-code opt-in is read from the loaded config"
+  lang python
+  profile library
+  expect VYQL-INJ-277
+  expect_review code.LoadedDataControlsCodeExecutionOptIn
+  file src/transformers/models/lightglue/configuration_lightglue.py
+  code
+  ```
+  from transformers import AutoConfig
+  from transformers.models.auto.auto_factory import CONFIG_MAPPING
+
+
+  class LightGlueConfig:
+      trust_remote_code: bool = False
+
+      def __post_init__(self, **kwargs):
+          if isinstance(self.keypoint_detector_config, dict):
+              self.keypoint_detector_config["model_type"] = self.keypoint_detector_config.get("model_type", "superpoint")
+              if self.keypoint_detector_config["model_type"] not in CONFIG_MAPPING:
+                  self.keypoint_detector_config = AutoConfig.from_pretrained(
+                      self.keypoint_detector_config["_name_or_path"], trust_remote_code=self.trust_remote_code
+                  )
+  ```
+
+test "a detector construction taking the opt-in from the config object"
+  lang python
+  profile library
+  expect VYQL-INJ-277
+  expect_review code.LoadedDataControlsCodeExecutionOptIn
+  file src/transformers/models/lightglue/modeling_lightglue.py
+  code
+  ```
+  from transformers import AutoModelForKeypointDetection
+
+
+  class LightGlueForKeypointMatching:
+      def __init__(self, config):
+          super().__init__(config)
+          self.keypoint_detector = AutoModelForKeypointDetection.from_config(
+              config.keypoint_detector_config, trust_remote_code=config.trust_remote_code
+          )
+  ```
+
+test "the patched form loads through the registry without the opt-in"
+  lang python
+  profile library
+  reject VYQL-INJ-277
+  reject_review code.LoadedDataControlsCodeExecutionOptIn
+  file src/transformers/models/lightglue/configuration_lightglue.py
+  code
+  ```
+  from transformers.models.auto.auto_factory import CONFIG_MAPPING
+
+
+  class LightGlueConfig:
+      def __post_init__(self, **kwargs):
+          if isinstance(self.keypoint_detector_config, dict):
+              self.keypoint_detector_config["model_type"] = self.keypoint_detector_config.get("model_type", "superpoint")
+              self.keypoint_detector_config = CONFIG_MAPPING[self.keypoint_detector_config["model_type"]](
+                  **self.keypoint_detector_config, attn_implementation="eager"
+              )
+  ```
+
+test "the patched detector construction passes only the config"
+  lang python
+  profile library
+  reject VYQL-INJ-277
+  reject_review code.LoadedDataControlsCodeExecutionOptIn
+  file src/transformers/models/lightglue/modeling_lightglue.py
+  code
+  ```
+  from transformers import AutoModelForKeypointDetection
+
+
+  class LightGlueForKeypointMatching:
+      def __init__(self, config):
+          super().__init__(config)
+          self.keypoint_detector = AutoModelForKeypointDetection.from_config(config.keypoint_detector_config)
+  ```
+
+test "the auto-class API forwarding its own parameter is the documented opt-in route"
+  lang python
+  profile library
+  reject VYQL-INJ-277
+  reject_review code.LoadedDataControlsCodeExecutionOptIn
+  file src/transformers/models/auto/configuration_auto.py
+  code
+  ```
+  from transformers import AutoConfig
+
+
+  def from_pretrained(self, pretrained_model_name_or_path, trust_remote_code=False, **kwargs):
+      config = AutoConfig.from_pretrained(
+          pretrained_model_name_or_path, trust_remote_code=trust_remote_code, **kwargs
+      )
+      return config
+  ```
+
+test "an explicit trust_remote_code=True literal is the caller's own choice"
+  lang python
+  profile library
+  reject VYQL-INJ-277
+  reject_review code.LoadedDataControlsCodeExecutionOptIn
+  file src/transformers/models/internvl/convert_internvl_weights_to_hf.py
+  code
+  ```
+  from transformers import AutoModel
+
+
+  def convert(path):
+      base_config = AutoModel.from_pretrained(path, trust_remote_code=True).config
+      return base_config
+  ```
+
+test "the argparse spelling is the operator's typed command-line opt-in"
+  lang python
+  profile library
+  reject VYQL-INJ-277
+  reject_review code.LoadedDataControlsCodeExecutionOptIn
+  file examples/pytorch/language-modeling/run_clm.py
+  code
+  ```
+  from transformers import AutoConfig, AutoModelForCausalLM
+
+
+  def main():
+      parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
+      model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+      config = AutoConfig.from_pretrained(
+          model_args.model_name_or_path,
+          trust_remote_code=model_args.trust_remote_code,
+      )
+      model = AutoModelForCausalLM.from_config(config, trust_remote_code=model_args.trust_remote_code)
+  ```

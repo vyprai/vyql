@@ -1,0 +1,249 @@
+# ujson's objToJSONFile (src/ujson/python/objToJSON.c) serialises an object
+# with the internal objToJSON and hands the resulting string to a file
+# object's write method. Every acquired reference in the function is
+# released on the success path and on some error paths, but two error
+# returns dropped only part of what the function owned: when the second
+# PyTuple_Pack (the one wrapping the serialised string for the write call)
+# failed, and when PyObject_CallObject reported the write failing, the
+# cleanup released `write` and `argtuple` and returned NULL without
+# dropping `string` -- the serialisation result, owned since
+# `string = objToJSON(...)`. A caller-driven failing write (a file object
+# whose write raises) leaks the whole serialised document on every call;
+# repeated dumps grow the process without bound (CWE-401). The same commit
+# also adds the missing bailout for the first PyTuple_Pack failing, which
+# passed NULL straight into objToJSON.
+#
+# The fixed revision adds Py_DECREF(string) to both error blocks (and the bailout).
+#
+# CPython reference-count calls now carry the resource-handle and
+# resource-release concepts (PyTuple_Pack / PyObject_GetAttr(String) /
+# PyObject_CallObject as acquisitions, Py_DECREF / Py_XDECREF / Py_CLEAR as
+# releases), so a C extension function that acquires a reference and drops
+# it nowhere on some path reports VYQL-RES-001 -- the third case below pins
+# a real instance of that shape in the same module (object_is_decimal_type
+# leaks both its module and its Decimal attribute on the success path), and
+# the fourth pins that a release silences the pairing.
+#
+# This function's bug is still invisible, in both revisions, for a reason
+# the type-state rule cannot see: `unless h.postDominates coveredBy
+# core.ResourceRelease` asks whether *a* release post-dominates the
+# acquisition and does not pair the two by variable, so the Py_XDECREF calls
+# that do run in each error block satisfy the clause for the Py_DECREF that
+# is missing beside them. Partial cleanup and full cleanup are
+# indistinguishable, and the leaked reference's acquisition is the internal
+# objToJSON call, which no documented-API binding can label. The missing
+# bailout half is equally out of reach: the failed PyTuple_Pack result is
+# passed to the internal call rather than dereferenced locally, so the
+# nullable-result analysis (member-assignment then dereference, the
+# narrowness on record for rank 1191/1015) never fires either.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "ujson: objToJSONFile error paths drop some owned references and not others"
+  lang c
+  file objToJSONFile.c
+  reject VYQL-RES-001
+  reject VYQL-MEM-018
+  code
+  ```
+  #include <Python.h>
+
+  static PyObject* objToJSON (PyObject* self, PyObject *args, PyObject *kwargs);
+
+  PyObject* objToJSONFile(PyObject* self, PyObject *args, PyObject *kwargs)
+  {
+    PyObject *data;
+    PyObject *file;
+    PyObject *string;
+    PyObject *write;
+    PyObject *argtuple;
+    PyObject *write_result;
+
+    if (!PyArg_ParseTuple (args, "OO", &data, &file))
+    {
+      return NULL;
+    }
+
+    if (!PyObject_HasAttrString (file, "write"))
+    {
+      PyErr_Format (PyExc_TypeError, "expected file");
+      return NULL;
+    }
+
+    write = PyObject_GetAttrString (file, "write");
+
+    if (!PyCallable_Check (write))
+    {
+      Py_XDECREF(write);
+      PyErr_Format (PyExc_TypeError, "expected file");
+      return NULL;
+    }
+
+    argtuple = PyTuple_Pack(1, data);
+
+    string = objToJSON (self, argtuple, kwargs);
+
+    if (string == NULL)
+    {
+      Py_XDECREF(write);
+      Py_XDECREF(argtuple);
+      return NULL;
+    }
+
+    Py_XDECREF(argtuple);
+
+    argtuple = PyTuple_Pack (1, string);
+    if (argtuple == NULL)
+    {
+      Py_XDECREF(write);
+      return NULL;
+    }
+
+    write_result = PyObject_CallObject (write, argtuple);
+    if (write_result == NULL)
+    {
+      Py_XDECREF(write);
+      Py_XDECREF(argtuple);
+      return NULL;
+    }
+
+    Py_DECREF(write_result);
+    Py_XDECREF(write);
+    Py_DECREF(argtuple);
+    Py_XDECREF(string);
+
+    Py_RETURN_NONE;
+  }
+  ```
+
+test "ujson: objToJSONFile error paths each drop every owned reference"
+  lang c
+  file objToJSONFile_fixed.c
+  reject VYQL-RES-001
+  reject VYQL-MEM-018
+  code
+  ```
+  #include <Python.h>
+
+  static PyObject* objToJSON (PyObject* self, PyObject *args, PyObject *kwargs);
+
+  PyObject* objToJSONFile(PyObject* self, PyObject *args, PyObject *kwargs)
+  {
+    PyObject *data;
+    PyObject *file;
+    PyObject *string;
+    PyObject *write;
+    PyObject *argtuple;
+    PyObject *write_result;
+
+    if (!PyArg_ParseTuple (args, "OO", &data, &file))
+    {
+      return NULL;
+    }
+
+    if (!PyObject_HasAttrString (file, "write"))
+    {
+      PyErr_Format (PyExc_TypeError, "expected file");
+      return NULL;
+    }
+
+    write = PyObject_GetAttrString (file, "write");
+
+    if (!PyCallable_Check (write))
+    {
+      Py_XDECREF(write);
+      PyErr_Format (PyExc_TypeError, "expected file");
+      return NULL;
+    }
+
+    argtuple = PyTuple_Pack(1, data);
+    if (argtuple == NULL)
+    {
+      Py_XDECREF(write);
+      return NULL;
+    }
+
+    string = objToJSON (self, argtuple, kwargs);
+
+    if (string == NULL)
+    {
+      Py_XDECREF(write);
+      Py_XDECREF(argtuple);
+      return NULL;
+    }
+
+    Py_XDECREF(argtuple);
+
+    argtuple = PyTuple_Pack (1, string);
+    if (argtuple == NULL)
+    {
+      Py_XDECREF(write);
+      Py_DECREF(string);
+      return NULL;
+    }
+
+    write_result = PyObject_CallObject (write, argtuple);
+    if (write_result == NULL)
+    {
+      Py_XDECREF(write);
+      Py_DECREF(string);
+      Py_XDECREF(argtuple);
+      return NULL;
+    }
+
+    Py_DECREF(write_result);
+    Py_XDECREF(write);
+    Py_DECREF(argtuple);
+    Py_XDECREF(string);
+
+    Py_RETURN_NONE;
+  }
+  ```
+
+test "ujson: object_is_decimal_type leaks its imports on the success path"
+  lang c
+  file object_is_decimal_type.c
+  expect VYQL-RES-001
+  code
+  ```
+  #include <Python.h>
+
+  int object_is_decimal_type(PyObject *obj)
+  {
+    PyObject *module = PyImport_ImportModule("decimal");
+    if (module == NULL) {
+      PyErr_Clear();
+      return 0;
+    }
+    PyObject *type_decimal = PyObject_GetAttrString(module, "Decimal");
+    if (type_decimal == NULL) {
+      Py_DECREF(module);
+      PyErr_Clear();
+      return 0;
+    }
+    int result = PyObject_IsInstance(obj, type_decimal);
+    if (result == -1) {
+      Py_DECREF(module);
+      Py_DECREF(type_decimal);
+      PyErr_Clear();
+      return 0;
+    }
+    return result;
+  }
+  ```
+
+test "a write attribute released before returning is clean"
+  lang c
+  file use_writer.c
+  reject VYQL-RES-001
+  code
+  ```
+  #include <Python.h>
+
+  PyObject* use_writer(PyObject *file)
+  {
+    PyObject *write = PyObject_GetAttrString(file, "write");
+    Py_XDECREF(write);
+    Py_RETURN_NONE;
+  }
+  ```

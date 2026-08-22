@@ -1,0 +1,286 @@
+# Rank 1836 / CVE-2024-56521: TCPDF's TCPDF_STATIC::url_exists() and the cURL
+# branch of file_get_contents() fetched remote files over TLS with certificate
+# validation switched off. Both set every option one call at a time,
+#
+#   curl_setopt($crs, CURLOPT_SSL_VERIFYPEER, false);
+#   curl_setopt($crs, CURLOPT_SSL_VERIFYHOST, false);
+#
+# in include/tcpdf_static.php, and then curl_exec($crs). PHP's own manual
+# states what each costs: CURLOPT_SSL_VERIFYPEER "TRUE to verify the peer's
+# certificate", CURLOPT_SSL_VERIFYHOST "2 to verify that a Common Name exists
+# and matches to the provided host name ... 0 to not check the names". A
+# template's images, stylesheets and fonts are fetched from whatever URL the
+# document author embedded, so a machine in the middle on that hop serves the
+# bytes that land in the generated PDF. CWE-295.
+#
+# Fix aab43ab0a824e956276141a28a24c7c0be20f554 replaces the per-option calls
+# with a single curl_setopt_array($crs, $curlopts) built by array_replace over
+# two class constants, CURLOPT_DEFAULT carrying CURLOPT_SSL_VERIFYPEER => true
+# and CURLOPT_SSL_VERIFYHOST => 2, so the handle is not told to skip the
+# check. The row's commit is the fixed revision itself, read directly: the per-option
+# calls are present at aab43ab0^ and gone at aab43ab0, and the enabling
+# constants are present at the fixed revision.
+#
+# What fires without this change: nothing at the parent, and two rows at the
+# fix -- the array-form route reported the patched file, because the review
+# fact is derived from the enclosing scope's text and at class and file scope
+# the option name (in CURLOPT_DEFAULT, set to true) and a "false" (in
+# ini_get('safe_mode') === false) are mere co-members of one blob. So the
+# shipped state is wrong in both directions on this one file. The per-option
+# spelling had no route at all: the only PHP path to
+# code.CertValidationDisabled is that review fact, gated on
+# curl_setopt_array, while the C and C++ bindings carry the same shape
+# for curl_easy_setopt(CURLOPT_SSL_VERIFYPEER, 0).
+#
+# Two changes, both in vyql/bindings/php/. Four per-call bindings state the
+# option contract from the manual, not from the fixing commit: a curl_setopt()
+# whose arguments name CURLOPT_SSL_VERIFYPEER and carry the disabling atom
+# false or 0, the twin for CURLOPT_SSL_VERIFYHOST (2 is the documented
+# checking value; 1 only checks existence and is left alone, matching the C
+# bindings), and the same two options matched on an inline
+# curl_setopt_array(...) array. Nothing from the change is named -- it removes
+# the call entirely, so the discriminating fact is simply that the disabling
+# call is gone, and the array form it installs passes a variable, which
+# carries no literals. Second, the review-fact consumers are confined to
+# function scope, where the scope is the code that made the call; the
+# per-call array binding carries the inline spelling, so top-level code keeps
+# its finding.
+#
+# The value predicate is per call, not per function: each curl_setopt() node
+# carries only its own three arguments, so a 0 or false belonging to
+# CURLOPT_TIMEOUT or CURLOPT_RETURNTRANSFER in a sibling call does not satisfy
+# the option clause. Case (d) pins that.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off, three runs each,
+# every count identical across the three): TCPDF's include/ at aab43ab0^ goes
+# from 26 findings and no VYQL-CFG-004 to 30 with four, on the four disabling
+# calls (tcpdf_static.php:1836, 1837, 1971, 1972); at the fixed revision it goes from 28
+# findings and two VYQL-CFG-004 to 26 and none. The full TCPDF checkout does
+# not finish inside 180s, so include/ is the measured tree. Collateral, same
+# method, CFG-004 rows before -> after: livehelperchat lhc_web/lib 2 -> 21
+# (the 2 beforehand are the Google_CurlIO class and file nodes, where
+# CURLOPT_SSL_VERIFYPEER => true sits beside CURLOPT_FAILONERROR => false;
+# the 21 after are the real disabling calls); librenms LibreNMS 0 -> 2;
+# roundcube plugins 0 -> 6; a payment library's src 6 -> 4; magento
+# lib/Varien 3 -> 1; magento Mage/Usa 9 -> 4; mybb inc 2 -> 1; misp app/Lib
+# 2 -> 0. Across the other clones under /tmp/cve-work/rank*/ an exhaustive
+# grep enumerates 48 CURLOPT_SSL_VERIFYPEER and 40 CURLOPT_SSL_VERIFYHOST
+# disabling call sites in PHP. Net over the measured trees: 35 new per-call
+# rows of which 34 are real disabling calls, 17 scope rows gone of which 15
+# are false positives or duplicates of a row that stays.
+#
+# Two residuals, both stated here rather than hidden. The inline-array
+# bindings match the option name and the value anywhere in the same array, so
+# an unrelated CURLOPT_HEADER => false beside an enabled certificate option
+# also fires -- measured once, on Mage_Usa Ups.php:1131, a file the scope
+# route reported three times. And confining the review fact to
+# function scope loses the array built in one method and passed in another:
+# misp's CurlClient assigns $options[CURLOPT_SSL_VERIFYHOST] = 0 in one
+# method and calls curl_setopt_array() in a sibling, and neither method's
+# text holds both.
+#
+# The cases: (a) is url_exists() as the parent had it; (b) is the same
+# function at both revisions; (c) is the second hunk's cURL branch at the
+# parent; (d) proves the option atom must be on the same call; (e) is the
+# integer spelling phpcas and Moodle's S3 client use; (f) and (g) are the
+# documented checking values on both options.
+
+test "rank1836: url_exists disables certificate validation one curl_setopt at a time"
+  lang php
+  file include/tcpdf_static.php
+  expect VYQL-CFG-004
+  code
+  ```
+  <?php
+  class TCPDF_STATIC {
+      public static function url_exists($url) {
+          $crs = curl_init();
+          // encode query params in URL to get right response form the server
+          $url = self::encodeUrlQuery($url);
+          curl_setopt($crs, CURLOPT_URL, $url);
+          curl_setopt($crs, CURLOPT_NOBODY, true);
+          curl_setopt($crs, CURLOPT_FAILONERROR, true);
+          if ((ini_get('open_basedir') == '') && (!ini_get('safe_mode'))) {
+              curl_setopt($crs, CURLOPT_FOLLOWLOCATION, true);
+          }
+          curl_setopt($crs, CURLOPT_CONNECTTIMEOUT, 5);
+          curl_setopt($crs, CURLOPT_TIMEOUT, 30);
+          curl_setopt($crs, CURLOPT_SSL_VERIFYPEER, false);
+          curl_setopt($crs, CURLOPT_SSL_VERIFYHOST, false);
+          curl_setopt($crs, CURLOPT_USERAGENT, 'tc-lib-file');
+          curl_setopt($crs, CURLOPT_MAXREDIRS, 5);
+          if (defined('CURLOPT_PROTOCOLS')) {
+              curl_setopt($crs, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS | CURLPROTO_HTTP |  CURLPROTO_FTP | CURLPROTO_FTPS);
+          }
+          curl_exec($crs);
+          $code = curl_getinfo($crs, CURLINFO_HTTP_CODE);
+          curl_close($crs);
+          return ($code == 200);
+      }
+  }
+  ```
+
+test "rank1836: the fixed revision sets the whole option array in one call with verification on"
+  lang php
+  file include/tcpdf_static.php
+  reject VYQL-CFG-004
+  code
+  ```
+  <?php
+  class TCPDF_STATIC {
+      protected const CURLOPT_DEFAULT = [
+          CURLOPT_CONNECTTIMEOUT => 5,
+          CURLOPT_MAXREDIRS => 5,
+          CURLOPT_PROTOCOLS => CURLPROTO_HTTPS | CURLPROTO_HTTP | CURLPROTO_FTP | CURLPROTO_FTPS,
+          CURLOPT_SSL_VERIFYHOST => 2,
+          CURLOPT_SSL_VERIFYPEER => true,
+          CURLOPT_TIMEOUT => 30,
+          CURLOPT_USERAGENT => 'tcpdf',
+      ];
+
+      protected const CURLOPT_FIXED = [
+          CURLOPT_FAILONERROR => true,
+          CURLOPT_RETURNTRANSFER => true,
+      ];
+
+      public static function url_exists($url) {
+          $crs = curl_init();
+          $curlopts = [];
+          if (
+              (ini_get('open_basedir') == '')
+              && (ini_get('safe_mode') === ''
+              || ini_get('safe_mode') === false)
+          ) {
+              $curlopts[CURLOPT_FOLLOWLOCATION] = true;
+          }
+          $curlopts = array_replace($curlopts, self::CURLOPT_DEFAULT);
+          $curlopts = array_replace($curlopts, K_CURLOPTS);
+          $curlopts = array_replace($curlopts, self::CURLOPT_FIXED);
+          $curlopts[CURLOPT_URL] = $url;
+          curl_setopt_array($crs, $curlopts);
+          curl_exec($crs);
+          $code = curl_getinfo($crs, CURLINFO_HTTP_CODE);
+          curl_close($crs);
+          return ($code == 200);
+      }
+  }
+  ```
+
+test "rank1836: the file_get_contents cURL branch disables both checks at the parent"
+  lang php
+  file include/tcpdf_static.php
+  expect VYQL-CFG-004
+  code
+  ```
+  <?php
+  class TCPDF_STATIC {
+      public static function file_get_contents($path) {
+          $ret = false;
+          if (!ini_get('allow_url_fopen') && ini_get('allow_url_fopen') !== '0') {
+              if (function_exists('curl_init')) {
+                  $crs = curl_init();
+                  curl_setopt($crs, CURLOPT_URL, $path);
+                  curl_setopt($crs, CURLOPT_FAILONERROR, true);
+                  curl_setopt($crs, CURLOPT_RETURNTRANSFER, true);
+                  if ((ini_get('open_basedir') == '') && (!ini_get('safe_mode'))) {
+                      curl_setopt($crs, CURLOPT_FOLLOWLOCATION, true);
+                  }
+                  curl_setopt($crs, CURLOPT_CONNECTTIMEOUT, 5);
+                  curl_setopt($crs, CURLOPT_TIMEOUT, 30);
+                  curl_setopt($crs, CURLOPT_SSL_VERIFYPEER, false);
+                  curl_setopt($crs, CURLOPT_SSL_VERIFYHOST, false);
+                  curl_setopt($crs, CURLOPT_USERAGENT, 'tc-lib-file');
+                  curl_setopt($crs, CURLOPT_MAXREDIRS, 5);
+                  $ret = curl_exec($crs);
+                  curl_close($crs);
+              }
+          }
+          return $ret;
+      }
+  }
+  ```
+
+test "rank1836: a disabling value on a neighbouring option is not a skipped certificate check"
+  lang php
+  file include/tcpdf_static.php
+  reject VYQL-CFG-004
+  code
+  ```
+  <?php
+  class TCPDF_STATIC {
+      public static function url_exists($url) {
+          $crs = curl_init();
+          $url = self::encodeUrlQuery($url);
+          curl_setopt($crs, CURLOPT_URL, $url);
+          curl_setopt($crs, CURLOPT_NOBODY, true);
+          curl_setopt($crs, CURLOPT_FAILONERROR, true);
+          curl_setopt($crs, CURLOPT_CONNECTTIMEOUT, 10);
+          curl_setopt($crs, CURLOPT_TIMEOUT, 30);
+          curl_setopt($crs, CURLOPT_SSL_VERIFYPEER, true);
+          curl_setopt($crs, CURLOPT_SSL_VERIFYHOST, 2);
+          curl_setopt($crs, CURLOPT_USERAGENT, 'tc-lib-file');
+          curl_exec($crs);
+          $code = curl_getinfo($crs, CURLINFO_HTTP_CODE);
+          curl_close($crs);
+          return ($code == 200);
+      }
+  }
+  ```
+
+test "rank1836: the integer spelling of both disabling values"
+  lang php
+  file include/tcpdf_static.php
+  expect VYQL-CFG-004
+  code
+  ```
+  <?php
+  class CAS_Request_CurlRequest {
+      private $ch;
+      public function send() {
+          $this->ch = curl_init();
+          curl_setopt($this->ch, CURLOPT_SSL_VERIFYPEER, 0);
+          curl_setopt($this->ch, CURLOPT_SSL_VERIFYHOST, 0);
+          curl_exec($this->ch);
+      }
+  }
+  ```
+
+test "rank1836: the documented checking values on both options are clean"
+  lang php
+  file include/tcpdf_static.php
+  reject VYQL-CFG-004
+  code
+  ```
+  <?php
+  class GatewayClient {
+      public function fetch($url) {
+          $ch = curl_init();
+          curl_setopt($ch, CURLOPT_URL, $url);
+          curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+          curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+          curl_exec($ch);
+          curl_close($ch);
+      }
+  }
+  ```
+
+test "rank1836: the array spelling with verification left on is clean"
+  lang php
+  file include/tcpdf_static.php
+  reject VYQL-CFG-004
+  code
+  ```
+  <?php
+  class HttpClient {
+      public function fetch($url) {
+          $ch = curl_init();
+          curl_setopt_array($ch, [
+              CURLOPT_URL => $url,
+              CURLOPT_SSL_VERIFYPEER => true,
+              CURLOPT_SSL_VERIFYHOST => 2,
+          ]);
+          curl_exec($ch);
+          curl_close($ch);
+      }
+  }
+  ```

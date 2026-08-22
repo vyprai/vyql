@@ -1,0 +1,217 @@
+# Traffic Server's HTTP state machine buffers a request body across a
+# redirect (proxy/http/HttpSM.cc at the parent of c735ae73): the buffered
+# copy lives in _postbuf, whose postdata_copy_buffer_start is an
+# IOBufferReader* that PostDataBuffers::clear() sets to nullptr after
+# freeing the buffer. A POST carrying "Expect: 100-continue" reaches
+# tunnel_handler_100_continue, which destroys the response header,
+# deallocates the tunnel buffers, calls this->postbuf_clear() -- nulling
+# postdata_copy_buffer_start -- and then, when the server is still open,
+# calls do_setup_client_request_body_tunnel (HttpSM.cc:2975-2991):
+#
+#   t_state.hdr_info.client_response.destroy();
+#   tunnel.deallocate_buffers();
+#   this->postbuf_clear();
+#   tunnel.reset();
+#   ...
+#   } else {
+#     do_setup_client_request_body_tunnel(HTTP_SERVER_VC);
+#   }
+#
+# is_buffering_request_body is still set, so the FIRST arm of the redirect
+# condition fires and copies from the nulled reader without the null test
+# the sibling arm carries (HttpSM.cc:6318-6325):
+#
+#   if (is_buffering_request_body ||
+#       (t_state.redirect_info.redirect_in_process && enable_redirection &&
+#        this->_postbuf.postdata_copy_buffer_start != nullptr)) {
+#     MIOBuffer *postdata_producer_buffer = new_empty_MIOBuffer(...);
+#     ...
+#     postdata_producer_buffer->write(this->_postbuf.postdata_copy_buffer_start);
+#
+# MIOBuffer::write(IOBufferReader *r) evaluates r->block before anything
+# else (iocore/eventsystem/IOBuffer.cc:191-193), so the proxy dereferences
+# null in-process and crashes: a remote DoS (CWE-476) reachable with
+# request_buffer_enabled and number_of_redirections >= 1, reproduced by
+# the fixed revision's own autest (tests/gold_tests/post/simple-post-valid-buffer-
+# check.test.py, "This make ats crash"). The fixed revision c735ae73 removes
+# the postbuf_clear() call from the 100-continue handler and guards both
+# arms of the condition with _postbuf.is_valid() (the header's spelling of
+# postdata_copy_buffer_start != nullptr).
+#
+# What fires on the real code: nothing, on either revision. Bounded scans
+# of src/proxy/http (timeout 180, --max-ram 6GB, --cache off), three runs
+# per side, report 245 findings on the parent and 245 on the fixed revision, and the
+# only differences between the two finding sets are the one-line offsets
+# the removed call leaves behind -- no finding appears or disappears, and
+# nothing touches HttpSM.cc:2982, 6318 or 6325. The 17 findings the scans
+# do place in HttpSM.cc (NullableDeref at 3759/3777/3781/4738/4778/5652,
+# RawMemoryCopySize at 7724/8402/8410/8439/8469, and the rest) sit on
+# other functions' safe code, the usual findings-in-the-function-are-not-
+# coverage pattern. The invalidation itself IS labelled: the
+# this->postdata_copy_buffer = nullptr / postdata_copy_buffer_start =
+# nullptr writes inside PostDataBuffers::clear() lower to
+# analysis.field.clear_null and emit code.OwnerFieldClear at
+# HttpSM.cc:8845-8846 -- but the only rule consuming that concept is the
+# leak-direction VYQL-RES-002 (clear dominates a free), and nothing orders
+# it against a later use.
+#
+# The blocker is measured, not assumed, with a minimal pair built on probe
+# bindings labelling postbuf_clear() as code.PointerFree and the
+# postdata_producer_buffer->write(...) call as code.PointerUse (VYQL-MEM-
+# 007 is PointerFree reaches PointerUse): with free and use in ONE
+# function the rule fires 1 finding; with the free in the 100-continue
+# handler and the use in the callee it directly calls -- the real shape --
+# it fires 0, because Reaches is region-comparability within one function
+# (internal/solvers/cfg.go:35) and two functions' regions are siblings.
+# The use-after-clear ordering this CVE needs is therefore an
+# interprocedural relation the solver does not have: the mirror image of
+# the recorded "pointer held across a call the callee may
+# invalidate" gap, in the free/ownership-provenance family.
+#
+# The callee-side route is spelling-keyed and is rejected on measurement.
+# A function-scoped binding on uses of postdata_copy_buffer_start without
+# an is_valid() call in the body scores 1 on the vulnerable snippet and 0
+# on the fixed one -- but the identical fix with is_valid renamed to valid
+# scores 1 again, and the vulnerable function itself carries the same
+# check inline one arm over (HttpSM.cc:6319). The binding discriminates
+# by the remediation's method name, not by the weakness: what actually
+# distinguishes the revisions is that the null exclusion sits on the
+# sibling arm of the || rather than the arm that governs the use, and
+# branch-sensitive guard correlation is a second absent relation. The
+# shipped nullable-guard machinery (analysis.nullable_result.
+# unchecked_deref, a whole-body-text match for stored call results
+# dereferenced with ->) covers none of the three axes this shape differs
+# on: the value is a field read, the use is a call argument, and the guard
+# must be correlated to a branch arm.
+#
+# The shape's reachable set is confined to HttpSM.cc and its header
+# (exhaustive grep over src/, include/ and plugins/): four postbuf_clear()
+# call sites, six postdata_copy_buffer_start mentions, two _postbuf.init
+# sites, all listed above or in the same file.
+
+test "rank1868: a request-body buffer cleared in the 100-continue handler and written from in the tunnel setup it calls"
+  lang cpp
+  file src/proxy/http/HttpSM.cc
+  reject VYQL-MEM-007
+  reject VYQL-MEM-006
+  code
+  ```
+  class IOBufferReader;
+  class MIOBuffer {
+  public:
+    void write(IOBufferReader *r);
+  };
+
+  class PostDataBuffers {
+  public:
+    MIOBuffer      *postdata_copy_buffer       = nullptr;
+    IOBufferReader *postdata_copy_buffer_start = nullptr;
+    void clear();
+    bool is_valid() { return postdata_copy_buffer_start != nullptr; }
+  };
+
+  class HttpSM {
+    PostDataBuffers _postbuf;
+    bool is_buffering_request_body = false;
+    bool enable_redirection = false;
+    bool redirect_in_process = false;
+    void postbuf_clear() { _postbuf.clear(); }
+    void do_setup_client_request_body_tunnel();
+    void tunnel_handler_100_continue(bool eos);
+  };
+
+  void HttpSM::do_setup_client_request_body_tunnel()
+  {
+    if (is_buffering_request_body ||
+        (redirect_in_process && enable_redirection &&
+         this->_postbuf.postdata_copy_buffer_start != nullptr)) {
+      MIOBuffer *postdata_producer_buffer = new MIOBuffer();
+      postdata_producer_buffer->write(this->_postbuf.postdata_copy_buffer_start);
+    }
+  }
+
+  void HttpSM::tunnel_handler_100_continue(bool eos)
+  {
+    this->postbuf_clear();
+    if (!eos) {
+      do_setup_client_request_body_tunnel();
+    }
+  }
+  ```
+
+test "rank1868: the fixed form keeps the buffer valid and checks it on both arms"
+  lang cpp
+  file src/proxy/http/HttpSM.cc
+  reject VYQL-MEM-007
+  reject VYQL-MEM-006
+  code
+  ```
+  class IOBufferReader;
+  class MIOBuffer {
+  public:
+    void write(IOBufferReader *r);
+  };
+
+  class PostDataBuffers {
+  public:
+    MIOBuffer      *postdata_copy_buffer       = nullptr;
+    IOBufferReader *postdata_copy_buffer_start = nullptr;
+    void clear();
+    bool is_valid() { return postdata_copy_buffer_start != nullptr; }
+  };
+
+  class HttpSM {
+    PostDataBuffers _postbuf;
+    bool is_buffering_request_body = false;
+    bool enable_redirection = false;
+    bool redirect_in_process = false;
+    void postbuf_clear() { _postbuf.clear(); }
+    void do_setup_client_request_body_tunnel();
+    void tunnel_handler_100_continue(bool eos);
+  };
+
+  void HttpSM::do_setup_client_request_body_tunnel()
+  {
+    if ((is_buffering_request_body && this->_postbuf.is_valid()) ||
+        (redirect_in_process && enable_redirection && this->_postbuf.is_valid())) {
+      MIOBuffer *postdata_producer_buffer = new MIOBuffer();
+      postdata_producer_buffer->write(this->_postbuf.postdata_copy_buffer_start);
+    }
+  }
+
+  void HttpSM::tunnel_handler_100_continue(bool eos)
+  {
+    if (!eos) {
+      do_setup_client_request_body_tunnel();
+    }
+  }
+  ```
+
+test "rank1868: the same clear and write in one function is the pair the order rule covers"
+  lang cpp
+  file src/proxy/http/HttpSM.cc
+  reject VYQL-MEM-007
+  code
+  ```
+  class IOBufferReader;
+  class MIOBuffer {
+  public:
+    void write(IOBufferReader *r);
+  };
+  class PostDataBuffers {
+  public:
+    void clear();
+    IOBufferReader *postdata_copy_buffer_start = nullptr;
+  };
+  class HttpSM {
+    PostDataBuffers _postbuf;
+    void postbuf_clear() { _postbuf.clear(); }
+    void handler();
+  };
+  void HttpSM::handler()
+  {
+    this->postbuf_clear();
+    MIOBuffer *b = new MIOBuffer();
+    b->write(this->_postbuf.postdata_copy_buffer_start);
+  }
+  ```

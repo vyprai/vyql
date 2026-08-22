@@ -1,0 +1,223 @@
+# Rank 1898 / CVE-2018-20060: urllib3's PoolManager.urlopen follows a 3xx
+# itself. The request it builds for the next hop reuses the `kw` dict of the
+# original request, `kw['headers']` included, so the `Authorization` header the
+# caller attached for the first host is replayed verbatim at whatever host the
+# 3xx names -- and the 3xx is written by the server the first request reached,
+# so that server chooses the next host and receives the credential meant for
+# the original one. CWE-200, no injection involved: the URL fetched is exactly
+# the one the client is told to fetch.
+#
+# The fixed revision (560bd227, "Remove Authorization header when redirecting cross-host")
+# adds the `Retry.remove_headers_on_redirect` option, defaults it to
+# `frozenset(['Authorization'])`, and makes urlopen pop those headers from
+# `kw['headers']` before the recursive hop whenever the redirect target is a
+# different host. The header name itself is delegated to retry.py's
+# `DEFAULT_REDIRECT_HEADERS_BLACKLIST` class constant, so the follower function
+# never spells it; what the follower does spell, in every revision since, is
+# the option read `retries.remove_headers_on_redirect` -- urllib3's documented
+# public API for this control, unchanged from 1.23 through 2.x (where only the
+# paired origin check renames is_same_host -> is_same_origin).
+#
+# Vocabulary. Same weakness class as rank 1862's tornado widening:
+# `code.CredentialHeadersForwardedAcrossRedirect` (VYQL-SEC-052), minted for
+# node-fetch's CVE-2022-0235 at rank 1455 with a JavaScript binding and widened
+# to Python at 1862. This rank adds the sibling binding for the spelling that
+# family could not read: a follower whose redirect budget lives on a Retry
+# object incremented through a call (`retries.increment(...)`) rather than a
+# field assignment (`.max_redirects=` et al.), whose Location read is delegated
+# to the documented response accessor (`response.get_redirect_location()`)
+# rather than a `Location` literal in the follower's own body, and whose header
+# store is a kwargs subscript (`kw['headers']`) rather than `.headers[`.
+#
+# Discrimination: the negation keeps 1862's credential-name needles on
+# assignment tokens (a strip list held in a local, credential fields cleared)
+# and adds the option read on selector tokens. The origin comparison is
+# deliberately not a needle, for the reason the family records: a follower that
+# compares origins but strips nothing would be silenced by it, and the
+# comparison helper is named freely.
+test "rank1898: PoolManager.urlopen replays the caller's header set at the host the 3xx names"
+  lang python
+  file urllib3/poolmanager.py
+  expect VYQL-SEC-052
+  expect_review code.CredentialHeadersForwardedAcrossRedirect
+  code
+  ```
+  from urllib3.util.retry import Retry
+  from urllib3.util.url import parse_url, urljoin
+
+
+  class PoolManager(RequestMethods):
+      def urlopen(self, method, url, redirect=True, **kw):
+          u = parse_url(url)
+          conn = self.connection_from_host(u.host, port=u.port, scheme=u.scheme)
+
+          kw['assert_same_host'] = False
+          kw['redirect'] = False
+          if 'headers' not in kw:
+              kw['headers'] = self.headers
+
+          if self.proxy is not None and u.scheme == "http":
+              response = conn.urlopen(method, url, **kw)
+          else:
+              response = conn.urlopen(method, u.request_uri, **kw)
+
+          redirect_location = redirect and response.get_redirect_location()
+          if not redirect_location:
+              return response
+
+          # Support relative URLs for redirecting.
+          redirect_location = urljoin(url, redirect_location)
+
+          # RFC 7231, Section 6.4.4
+          if response.status == 303:
+              method = 'GET'
+
+          retries = kw.get('retries')
+          if not isinstance(retries, Retry):
+              retries = Retry.from_int(retries, redirect=redirect)
+
+          try:
+              retries = retries.increment(method, url, response=response, _pool=conn)
+          except MaxRetryError:
+              if retries.raise_on_redirect:
+                  raise
+              return response
+
+          kw['retries'] = retries
+          kw['redirect'] = redirect
+
+          return self.urlopen(method, redirect_location, **kw)
+  ```
+
+test "rank1898: the same follower stripping the hop's unsafe headers through the Retry option"
+  lang python
+  file urllib3/poolmanager.py
+  reject VYQL-SEC-052
+  reject_review code.CredentialHeadersForwardedAcrossRedirect
+  code
+  ```
+  from urllib3.util.retry import Retry
+  from urllib3.util.url import parse_url, urljoin
+
+
+  class PoolManager(RequestMethods):
+      def urlopen(self, method, url, redirect=True, **kw):
+          u = parse_url(url)
+          conn = self.connection_from_host(u.host, port=u.port, scheme=u.scheme)
+
+          kw['assert_same_host'] = False
+          kw['redirect'] = False
+          if 'headers' not in kw:
+              kw['headers'] = self.headers.copy()
+
+          if self.proxy is not None and u.scheme == "http":
+              response = conn.urlopen(method, url, **kw)
+          else:
+              response = conn.urlopen(method, u.request_uri, **kw)
+
+          redirect_location = redirect and response.get_redirect_location()
+          if not redirect_location:
+              return response
+
+          # Support relative URLs for redirecting.
+          redirect_location = urljoin(url, redirect_location)
+
+          # RFC 7231, Section 6.4.4
+          if response.status == 303:
+              method = 'GET'
+
+          retries = kw.get('retries')
+          if not isinstance(retries, Retry):
+              retries = Retry.from_int(retries, redirect=redirect)
+
+          # Strip headers marked as unsafe to forward to the redirected location.
+          # Check remove_headers_on_redirect to avoid a potential network call within
+          # conn.is_same_host() which may use socket.gethostbyname() in the future.
+          if (retries.remove_headers_on_redirect
+                  and not conn.is_same_host(redirect_location)):
+              for header in retries.remove_headers_on_redirect:
+                  kw['headers'].pop(header, None)
+
+          try:
+              retries = retries.increment(method, url, response=response, _pool=conn)
+          except MaxRetryError:
+              if retries.raise_on_redirect:
+                  raise
+              return response
+
+          kw['retries'] = retries
+          kw['redirect'] = redirect
+
+          return self.urlopen(method, redirect_location, **kw)
+  ```
+
+test "rank1898: a follower that hardcodes its strip list in a local is the same control"
+  lang python
+  file urllib3/poolmanager.py
+  reject VYQL-SEC-052
+  reject_review code.CredentialHeadersForwardedAcrossRedirect
+  code
+  ```
+  from urllib3.util.url import parse_url, urljoin
+
+
+  class PoolManager(RequestMethods):
+      def urlopen(self, method, url, redirect=True, **kw):
+          u = parse_url(url)
+          conn = self.connection_from_host(u.host, port=u.port, scheme=u.scheme)
+
+          kw['assert_same_host'] = False
+          kw['redirect'] = False
+          if 'headers' not in kw:
+              kw['headers'] = self.headers.copy()
+
+          response = conn.urlopen(method, u.request_uri, **kw)
+
+          redirect_location = redirect and response.get_redirect_location()
+          if not redirect_location:
+              return response
+
+          redirect_location = urljoin(url, redirect_location)
+
+          strip = ['Authorization']
+          if not conn.is_same_host(redirect_location):
+              for header in strip:
+                  kw['headers'].pop(header, None)
+
+          return self.urlopen(method, redirect_location, **kw)
+  ```
+
+test "rank1898: a handler writing a Location header is emitting a redirect, not following one"
+  lang python
+  file lib/routes.py
+  reject VYQL-SEC-052
+  reject_review code.CredentialHeadersForwardedAcrossRedirect
+  code
+  ```
+  from http.server import BaseHTTPRequestHandler
+
+
+  class RedirectHandler(BaseHTTPRequestHandler):
+      def do_GET(self):
+          target = self.path_qs.get('next')
+          self.send_response(302)
+          self.send_header('Location', target)
+          self.send_header('Content-Length', '0')
+          self.end_headers()
+  ```
+
+test "rank1898: a test asserting on a redirect response reads the hop, it does not build one"
+  lang python
+  file tests/test_poolmanager.py
+  reject VYQL-SEC-052
+  reject_review code.CredentialHeadersForwardedAcrossRedirect
+  code
+  ```
+  class TestPoolManager:
+      def test_follows_redirect(self):
+          http = PoolManager()
+          r = http.urlopen('GET', self.base_url + '/redirect',
+                           headers={'Authorization': 'foo'})
+          assert r.status == 200
+          assert r.get_redirect_location() is None
+  ```

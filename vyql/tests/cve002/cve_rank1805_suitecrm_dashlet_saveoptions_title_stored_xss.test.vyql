@@ -1,0 +1,173 @@
+# Rank 1805 / CVE-2023-6126 (GHSA-q79g-vm3j-m2fc, recorded CWE-94, really a
+# stored HTML injection, CWE-79): salesagility/suitecrm 7.14.2 bundles the fixing change.
+# The dashlet framework's documented options hook is
+# Dashlet::saveOptions(array $req) -- "the array to pull options from", always
+# $_REQUEST at its call sites (include/MySugar/MySugar.php:167,
+# include/MVC/Controller/SugarController.php:893). The returned options array
+# is persisted in user preferences and handed back to the dashlet constructor
+# on every later page load. One option field is markup by contract: `title`
+# lands on Dashlet::$title and the base class renders it straight into the
+# dashlet header (get_form_header($this->title, ...) at
+# include/Dashlets/Dashlet.php:194, plus the form_title/DASHLET_TITLE template
+# assigns), so a title stored unencoded is stored HTML. The generic dashlets
+# copied the request parameter straight through:
+#
+#   include/Dashlets/DashletGeneric.php:545
+#   include/Dashlets/DashletGenericChart.php:235
+#     $options['title'] = $req['dashletTitle'];
+#
+# 54bc56c3bd9f1db75408db1c1d7d652c3f5f71e9 escapes both at the save boundary:
+#
+#   -   $options['title'] = $req['dashletTitle'];
+#   +   $options['title'] = htmlentities(html_entity_decode($req['dashletTitle']));
+#
+# The pool row is a release commit ("SuiteCRM 7.14.2 Release") that bundles
+# six CVE fixes; the diff reads in full from the row itself, the parent
+# f7e7e6c2 carries both vulnerable lines, and the release notes name
+# CVE-2023-6126 as the "Dashlet HTML Injection Vulnerability", so the row
+# stands as the scan target with no correction.
+#
+# What fires without this change: nothing on either file. The bounded scan of
+# include/Dashlets at the vulnerable revision reports 8 findings (3x
+# VYQL-PATH-002 on Dashlet.php loadLanguage, 2x VYQL-INJ-001/004 on
+# DashletGenericChart chart data, VYQL-INJ-004 on sortData, VYQL-RES-001, and
+# HtmlRender labels on unset lines -- the known unset->echo lowering artefact)
+# and nothing at all on saveOptions. The whole-tree scan exceeds 180s, so the
+# reachable set is enumerated exhaustively instead: 10 assignments of a
+# request-derived value into $options['title'] inside a saveOptions method
+# across the tree (grep over every .php file), 2 fixed by this commit and 8
+# same-hook siblings the commit did not touch.
+#
+# Vocabulary is checked for reuse first. code.StoredHtmlWrite / VYQL-INJ-028
+# exist and judge exactly this shape ("stored HTML is written
+# without a proven sanitizer before later rendering", expected core.HtmlEscape,
+# CWE-79), and the PHP bindings label $_REQUEST as code.HttpInput --
+# but the taint path is severed at the persistence boundary (setPreference ->
+# getPreference -> constructor -> header render happens on a later request),
+# so the review concept is the right route and needs only a binding, not a
+# concept or a rule. The binding keys on the framework's own documented
+# surface -- the saveOptions hook name and the title option field -- not on
+# the request parameter name, so it sweeps the 8 sibling dashlets
+# (TopCampaigns, MyClosedOpportunities, Invaders, RSS, JotPad, iFrame,
+# Calendar, SugarFeed; all still unencoded on the current hotfix-7.14.x tip,
+# RSSDashlet verified) rather than only the two fixed lines. Measured on the
+# suitecrm checkout: 2 findings on include/Dashlets+include/MySugar with the
+# binding, 0 without; 8 findings on the dashlet module directories, all on
+# saveOptions title assignments from the exhaustive enumeration; 0 collateral
+# across the 3 other clones under /tmp/cve-work/rank*/ that declare a
+# saveOptions (magento-lts x2, mediawiki) -- none of them assigns a
+# request-derived `title` option at all.
+#
+# Cases 3, 4 and 5 pin the confinement and the negation: the title assignment
+# in a sibling method of the same class does not satisfy the hook clause (the
+# assign token is function-confined for PHP class methods), an encoder
+# anywhere in the same function suppresses, and a commented-out encoder does
+# not (call tokens are AST-derived).
+
+test "rank1805: saveOptions stores the request-supplied dashlet title unencoded"
+  lang php
+  expect VYQL-INJ-028
+  expect_review code.StoredHtmlWrite
+  code
+  ```
+  <?php
+  class MyAccountsDashlet extends DashletGeneric
+  {
+      public function saveOptions($req)
+      {
+          $options = array();
+          if (!empty($req['dashletTitle'])) {
+              $options['title'] = $req['dashletTitle'];
+          }
+          $options['displayRows'] = empty($req['displayRows']) ? '5' : $req['displayRows'];
+          $options['autoRefresh'] = empty($req['autoRefresh']) ? '0' : $req['autoRefresh'];
+          return $options;
+      }
+  }
+  ```
+
+test "rank1805: saveOptions encodes the dashlet title before storing it"
+  lang php
+  reject VYQL-INJ-028
+  reject_review code.StoredHtmlWrite
+  code
+  ```
+  <?php
+  class MyAccountsDashlet extends DashletGeneric
+  {
+      public function saveOptions($req)
+      {
+          $options = array();
+          if (!empty($req['dashletTitle'])) {
+              $options['title'] = htmlentities(html_entity_decode($req['dashletTitle']));
+          }
+          $options['displayRows'] = empty($req['displayRows']) ? '5' : $req['displayRows'];
+          $options['autoRefresh'] = empty($req['autoRefresh']) ? '0' : $req['autoRefresh'];
+          return $options;
+      }
+  }
+  ```
+
+test "rank1805: a title assignment in a sibling method does not satisfy the hook clause"
+  lang php
+  reject VYQL-INJ-028
+  reject_review code.StoredHtmlWrite
+  code
+  ```
+  <?php
+  class MyAccountsDashlet extends DashletGeneric
+  {
+      public function configureView($req)
+      {
+          $options = array();
+          $options['title'] = $req['someTitle'];
+          return $options;
+      }
+
+      public function saveOptions($req)
+      {
+          $options = array();
+          $options['displayRows'] = empty($req['displayRows']) ? '5' : $req['displayRows'];
+          return $options;
+      }
+  }
+  ```
+
+test "rank1805: an encoding call elsewhere in saveOptions suppresses the finding"
+  lang php
+  reject VYQL-INJ-028
+  reject_review code.StoredHtmlWrite
+  code
+  ```
+  <?php
+  class MyAccountsDashlet extends DashletGeneric
+  {
+      public function saveOptions($req)
+      {
+          $options = array();
+          $clean = htmlentities($req['otherField']);
+          $options['otherField'] = $clean;
+          $options['title'] = $req['title'];
+          return $options;
+      }
+  }
+  ```
+
+test "rank1805: a commented-out encoder does not count as encoding"
+  lang php
+  expect VYQL-INJ-028
+  expect_review code.StoredHtmlWrite
+  code
+  ```
+  <?php
+  class InvadersDashlet extends Dashlet
+  {
+      public function saveOptions($req)
+      {
+          $options = array();
+          // $options['title'] = htmlentities($_REQUEST['title']);
+          $options['title'] = $_REQUEST['title'];
+          return $options;
+      }
+  }
+  ```

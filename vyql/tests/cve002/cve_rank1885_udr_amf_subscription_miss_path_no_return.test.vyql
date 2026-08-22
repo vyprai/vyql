@@ -1,0 +1,231 @@
+# The UDR's RemoveAmfSubscriptionsInfoProcedure, the SBI handler behind
+# DELETE /nudr-dr/v1/subscription-data/{ueId}/ee-subscriptions/{subsId}/
+# amf-subscriptions, panics on any request whose ueId is not in the
+# subscription store (CWE-754 + CWE-704 -> panic-DoS, CVSS 6.5): it loads the
+# UE context with a comma-ok
+#
+#   value, ok := udrSelf.UESubsCollection.Load(ueId)
+#
+# and the miss branch records the 404 problem details but does not return, so
+# execution falls straight into
+#
+#   UESubsData := value.(*udr_context.UESubsData)
+#
+# a Go type assertion on a nil interface, which panics. Gin's recovery
+# middleware turns the panic into a 500 and the endpoint stays repeatedly
+# panicable by any peer holding a valid nudr-dr token. Fix commit 8a1d3c6
+# (merge of PR #60) adds `c.Set(...); c.JSON(int(pd.Status), pd); return`
+# inside both miss branches and rebinds the second lookup so the map entry's
+# nilness is checked before the field read. The remediation is present at
+# <fix> and the vulnerable construct at <fix>^; the second miss branch
+# (SUBSCRIPTION_NOT_FOUND) has the identical no-return defect at the parent.
+#
+# The row's `repo!` flag resolves in the row's favour: the SHA lives in BOTH
+# free5gc/udr and free5gc/free5gc with the identical tree hash (4db5629) --
+# the umbrella vendors the component's history -- and the advisory's own
+# description names the UDR handler and PR free5gc/udr#60. Failure mode 12,
+# as at 1427 and 1556: the advisory records the umbrella while the component
+# row is the right scan target. .
+#
+# ATTENTION, engine gap -- the comma-ok / nilness-guard-correlation family of
+# rank 1099 (nil deref after a oneof accessor, "design work on the concept
+# and the guard analysis together"), now with its Go comma-ok instance
+# measured. The two sibling handlers in the very same file carry the safe
+# idiom -- miss branch writes the 404 and returns -- and the fixed revision changes no
+# name, adds no helper and removes no call: the only delta is the placement
+# of bare `return` statements. Three facts make that invisible:
+#
+#   1. A bare `return` emits no context token at all. goFunctionTokens'
+#      ReturnStmt case (internal/extract/frontend/golang/golang.go:1297)
+#      iterates x.Results, and an early-exit guard returns nothing.
+#   2. Branch containment does not exist in the binding query language:
+#      every presence predicate is a flat function-scope token
+#      (internal/bindings/compile_presence.go:343-500), so no query can ask
+#      whether the miss branch terminates.
+#   3. The type assertion `value.(*T)` lowers to a bare Const node with no
+#      in-edge from the asserted operand -- `value` flows nowhere -- and
+#      goAtomToken has no TypeAssertExpr case, so the comma-ok pair and the
+#      assertion leave no related tokens either.
+#
+# Measured here, not inherited. `vyql match` on the file labels no source,
+# no sink and no control at either revision; the tree scan reports 3
+# findings (all VYQL-CRY-003 WeakRandomValue in internal/context/context.go)
+# at both revisions. A probe over the Go function context keyed on the
+# generic shape (Load + ProblemDetailsNotFound + the asserted type's
+# selector) labels BOTH function-context nodes at BOTH revisions -- the
+# vulnerable handler and its safe sibling above it -- and at scan level
+# emits 10 VYQL-MEM-006 findings at both revisions with identical
+# fingerprints: 1 true + 9 false at the parent, 0 true + 10 false at the
+# fix, since all nine other Load/ProblemDetailsNotFound handlers in the tree
+# return inside their miss branches. The 1380 counterweight fails:
+# the calls the fixed revision adds are gin's documented c.Set/c.JSON, and both
+# sit in the vulnerable function's trailing `if pd != nil` block, so a
+# negation on them scores 0/0. The only vocabulary the fixed revision touches that the
+# parent lacks is the local `eeSub` of the second lookup's rebind, which is
+# the fixing commit's own naming -- the genericity failure 1427 and 1760
+# measured on their rename probes.
+#
+# Not mechanical: the missing piece is a branch-correlated nilness analysis
+# (which region a return terminates, and whether the comma-ok companion
+# guards the use), not a localized correction to a known construct. The
+# cheapest first step of any sweep is the bare-return token (golang.go
+# ReturnStmt case), but it changes no result on its own -- no predicate can
+# consume region membership yet -- so it is groundwork, not a fix.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1885: the miss branch records the 404 but does not return, then asserts the value"
+  lang go
+  file internal/sbi/processor/event_amf_subscription_info_document.go
+  reject VYQL-MEM-006
+  code
+  ```
+  package processor
+
+  import (
+      "github.com/gin-gonic/gin"
+
+      "github.com/free5gc/openapi/models"
+      udr_context "github.com/free5gc/udr/internal/context"
+      "github.com/free5gc/udr/internal/logger"
+      "github.com/free5gc/udr/internal/util"
+      "github.com/free5gc/util/metrics/sbi"
+  )
+
+  func (p *Processor) RemoveAmfSubscriptionsInfoProcedure(c *gin.Context, subsId string, ueId string) {
+      udrSelf := udr_context.GetSelf()
+      value, ok := udrSelf.UESubsCollection.Load(ueId)
+      var pd *models.ProblemDetails = nil
+
+      if !ok {
+          pd = util.ProblemDetailsNotFound("USER_NOT_FOUND")
+          logger.DataRepoLog.Errorf("RemoveAmfSubscriptionsInfoProcedure err: %s", pd.Detail)
+      }
+
+      UESubsData := value.(*udr_context.UESubsData)
+      _, ok = UESubsData.EeSubscriptionCollection[subsId]
+
+      if !ok {
+          pd = util.ProblemDetailsNotFound("SUBSCRIPTION_NOT_FOUND")
+          logger.DataRepoLog.Errorf("RemoveAmfSubscriptionsInfoProcedure err: %s", pd.Detail)
+      }
+
+      if UESubsData.EeSubscriptionCollection[subsId].AmfSubscriptionInfos == nil {
+          pd = util.ProblemDetailsNotFound("AMFSUBSCRIPTION_NOT_FOUND")
+      }
+
+      if pd != nil {
+          logger.DataRepoLog.Errorf("RemoveAmfSubscriptionsInfoProcedure err: %s", pd.Detail)
+          c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
+          c.JSON(int(pd.Status), pd)
+          return
+      }
+
+      UESubsData.EeSubscriptionCollection[subsId].AmfSubscriptionInfos = nil
+      c.Status(http.StatusNoContent)
+  }
+  ```
+
+test "rank1885: the fixed revision returns from inside both miss branches"
+  lang go
+  file internal/sbi/processor/event_amf_subscription_info_document.go
+  reject VYQL-MEM-006
+  code
+  ```
+  package processor
+
+  import (
+      "github.com/gin-gonic/gin"
+
+      "github.com/free5gc/openapi/models"
+      udr_context "github.com/free5gc/udr/internal/context"
+      "github.com/free5gc/udr/internal/logger"
+      "github.com/free5gc/udr/internal/util"
+      "github.com/free5gc/util/metrics/sbi"
+  )
+
+  func (p *Processor) RemoveAmfSubscriptionsInfoProcedure(c *gin.Context, subsId string, ueId string) {
+      udrSelf := udr_context.GetSelf()
+      value, ok := udrSelf.UESubsCollection.Load(ueId)
+      var pd *models.ProblemDetails
+
+      if !ok {
+          pd = util.ProblemDetailsNotFound("USER_NOT_FOUND")
+          logger.DataRepoLog.Errorf("RemoveAmfSubscriptionsInfoProcedure err: %s", pd.Detail)
+          c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
+          c.JSON(int(pd.Status), pd)
+          return
+      }
+
+      UESubsData := value.(*udr_context.UESubsData)
+      eeSub, ok := UESubsData.EeSubscriptionCollection[subsId]
+
+      if !ok {
+          pd = util.ProblemDetailsNotFound("SUBSCRIPTION_NOT_FOUND")
+          logger.DataRepoLog.Errorf("RemoveAmfSubscriptionsInfoProcedure err: %s", pd.Detail)
+          c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
+          c.JSON(int(pd.Status), pd)
+          return
+      }
+
+      if eeSub == nil || eeSub.AmfSubscriptionInfos == nil {
+          pd = util.ProblemDetailsNotFound("AMFSUBSCRIPTION_NOT_FOUND")
+      }
+
+      if pd != nil {
+          logger.DataRepoLog.Errorf("RemoveAmfSubscriptionsInfoProcedure err: %s", pd.Detail)
+          c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
+          c.JSON(int(pd.Status), pd)
+          return
+      }
+
+      eeSub.AmfSubscriptionInfos = nil
+      c.Status(http.StatusNoContent)
+  }
+  ```
+
+test "rank1885: the sibling handler with the safe idiom must stay silent"
+  lang go
+  file internal/sbi/processor/event_amf_subscription_info_document.go
+  reject VYQL-MEM-006
+  code
+  ```
+  package processor
+
+  import (
+      "github.com/gin-gonic/gin"
+
+      "github.com/free5gc/openapi/models"
+      udr_context "github.com/free5gc/udr/internal/context"
+      "github.com/free5gc/udr/internal/logger"
+      "github.com/free5gc/udr/internal/util"
+      "github.com/free5gc/util/metrics/sbi"
+  )
+
+  func (p *Processor) CreateAMFSubscriptionsProcedure(c *gin.Context, subsId string, ueId string,
+      AmfSubscriptionInfo []models.AmfSubscriptionInfo,
+  ) {
+      udrSelf := udr_context.GetSelf()
+      value, ok := udrSelf.UESubsCollection.Load(ueId)
+      if !ok {
+          pd := util.ProblemDetailsNotFound("USER_NOT_FOUND")
+          logger.DataRepoLog.Errorf("CreateAMFSubscriptionsProcedure err: %s", pd.Detail)
+          c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
+          c.JSON(int(pd.Status), pd)
+          return
+      }
+      UESubsData := value.(*udr_context.UESubsData)
+
+      _, ok = UESubsData.EeSubscriptionCollection[subsId]
+      if !ok {
+          pd := util.ProblemDetailsNotFound("SUBSCRIPTION_NOT_FOUND")
+          logger.DataRepoLog.Errorf("CreateAMFSubscriptionsProcedure err: %s", pd.Detail)
+          c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
+          c.JSON(int(pd.Status), pd)
+          return
+      }
+
+      UESubsData.EeSubscriptionCollection[subsId].AmfSubscriptionInfos = AmfSubscriptionInfo
+      c.Status(http.StatusNoContent)
+  }
+  ```

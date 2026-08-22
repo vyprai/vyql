@@ -1,0 +1,393 @@
+# A shell-command fixer re-executes the previous command it reads from the
+# SH_PREV_CMD environment variable: src/main.rs `env::var("SH_PREV_CMD")`
+# -> `misc::expand_aliases` -> `fix::fix_command` -> `get_command_output`
+# -> `shell_words::split` -> `Command::new(&split_command[0]).args(..)`.
+# Re-running the command is the tool's documented purpose; the defect is
+# what the child inherits. At the parent (5293957b^, 1979ca4) nothing on
+# that path examines or drops the process's own credentials, so with the
+# binary setuid/setgid, or launched under sudo or doas, the re-executed
+# command runs with the elevated effective uid/gid and keeps SUDO_UID,
+# SUDO_GID, SUDO_USER, SUDO_COMMAND and DOAS_USER in its environment --
+# a caller-controlled command executed as root (CWE-269; the advisory
+# branch is advisory-fix/command-reexec).
+#
+# The fixed revision 5293957b adds PermissionIssue::detect/fix in the new
+# src/fix/output.rs. detect() distinguishes euid != getuid(), SUDO_UID/
+# SUDO_GID set, and DOAS_USER set; fix() installs a `pre_exec` hook calling
+# libc::initgroups/setgid/setuid to return to the invoking user before the
+# child execs, rewrites USER/HOME, and env_remove()s the five sudo/doas
+# variables. The command executed, its argv and the variable it comes from
+# are byte-identical across the revision pair; only credential handling
+# changed.
+#
+# Measured, both revisions, three --cache off runs each over the whole
+# checkout: 3 findings at the parent and 6 at the fixed revision, every one VYQL-MEM-006
+# NullableDeref review noise (the fixed revision's three extra rows are that rule on the
+# new output.rs). Nothing touches the re-execution path, the credential
+# handling, or either revision's std::process::Command.
+#
+# The taint route is not the discriminator, and that is measured rather
+# than assumed. Rust binds both ends (envVariable0 on `env.var`,
+# commandExecution11/13 on `Command::new`/`.args`) and VYQL-INJ-002 fires on
+# this shape -- case 1 below. To check whether the route separates the
+# revisions, both checkouts are rescanned with the module-qualified hops
+# rewritten as use-imported bare calls, which is the only change: the
+# parent then reports CRITICAL VYQL-INJ-002 from SH_PREV_CMD and so does
+# the fixed revision, identically. That finding is not the re-execution sink, though --
+# on both revisions its sink is `structs::Command::new(command, ..)` at
+# src/fix.rs:36/:56, the application's own `pub struct Command { command,
+# output: CommandOutput }` data constructor, which commandExecution11's
+# `callee.path ~= "Command.new"` matches because `~=` is segment-aware in
+# both directions (the urlFetch123 defect family). The real
+# std::process::Command spawn at get_command_output is reached by neither
+# revision, through any spelling, for the two stacked reasons cases 2-4
+# isolate.
+#
+# What would separate the revisions is the credential axis, and the
+# vulnerable revision carries no code fact for it: whether the process is
+# privileged is a deployment property the fixed revision itself only learns at runtime
+# from geteuid()/getuid() and the sudo/doas environment. The one code-level
+# proxy -- "spawns a Command with no pre_exec/setuid/setgid" -- is
+# unshippable and measured: 354 `Command::new` call sites in 204 .rs files
+# across the corpus clones, of which exactly one file contains pre_exec or
+# setuid. A 354-for-1 key, against the 51-for-1 shape recorded as
+# measured-unshippable.
+#
+# Reuse is checked before concluding. code.CommandStringWrapperExecution
+# and code.DynamicCommandExec are the CWE-78 assembly axis -- a command
+# string built before execution; this path is argv-split and the assembly is
+# the tool's function. code.ParsedUserIdDefaultRootPrivilegeEscalation is
+# CWE-269 but the UID-parsing-default axis; PrivilegedWorkflowUntrusted-
+# CodeExecution, PrivilegedContainer and PrivilegedOp are CI-workflow, IaC
+# and smartcontract axes. A sibling concept for "re-executes an untrusted
+# command while holding elevated credentials" is emittable only through the
+# 354-for-1 absence key, so it would be a concept with no honest binding.
+# The 1380 counterweight fails in both directions: the fixed revision adds the
+# documented calls (geteuid, initgroups, setuid) rather than leaving one
+# behind, and keying on their absence flags every subprocess spawn.
+#
+# ATTENTION, the privilege-state/configuration family (1514, 1535, 1540,
+# 1556, 1557, 1593): the discriminator is runtime credential state that no
+# static fact in the vulnerable revision expresses.
+#
+# Two engine gaps stack on the real path, and the cases below ladder through
+# them one construct at a time.
+#
+# (a) Rust function returns carry no taint -- the gap on file at rank 1632
+#     (rust.go emits no nir.Return, so `expand_aliases`' result is clean at
+#     its call site). Case 1 -> case 2 isolates it inside a single file.
+# (b) A Rust module-qualified free-function call never resolves. rust.go's
+#     expr() flattens a scoped_identifier into one nir.Name whose ID keeps
+#     the `::` source spelling, while resolveTargets keys funcQual by
+#     `<file-module>::<bare name>` and funcShort by the bare name alone, so
+#     `fix::fix_command` misses both and the guarded unique-name fallback is
+#     never consulted with the right key. The same callee reached through
+#     `use fix::fix_command;` and a bare call does resolve. This is not the
+#     1364 family (delegated `self`-method calls inside an impl); it is a
+#     free function reached through its module path, and it is the idiomatic
+#     spelling -- 1286 of the 9721 .rs files in the corpus clones declare a
+#     module and call through it. Case 3 -> case 4 isolates it.
+#
+# When either gap closes, the cases pinning it must be revisited: case 2
+# flips to expect when returns propagate, and case 4 when module-qualified
+# calls resolve. Case 5 stays reject against a credential rule, which does
+# not exist today.
+
+test "rank1847: environment-supplied command re-executed -- the route itself works"
+  lang rust
+  file src/main.rs
+  code
+  ```
+  use std::process::Command;
+
+  pub fn fix_command(command: String, expand_command: String) -> std::io::Result<String> {
+      let _ = command;
+      let command_output = get_command_output(expand_command)?;
+      Ok(command_output.stdout)
+  }
+
+  fn get_command_output(expand_command: String) -> std::io::Result<CommandOutput> {
+      let split_command = shell_words::split(&expand_command)
+          .map_err(|e| std::io::Error::other(format!("Failed to parse command: {e}")))?;
+
+      if split_command.is_empty() {
+          return Err(std::io::Error::other("Empty command provided"));
+      }
+
+      let child = Command::new(&split_command[0])
+          .args(&split_command[1..])
+          .env("LANG", "C")
+          .env("LC_ALL", "C")
+          .spawn()?;
+
+      let output = child.wait_with_output()?;
+      Ok(CommandOutput::from(output))
+  }
+
+  fn main() -> Result<(), std::io::Error> {
+      let command =
+          std::env::var("SH_PREV_CMD").context("SH_PREV_CMD environment variable is not set.")?;
+      // the expand_aliases hop is elided here because a Rust function's
+      // return value carries no taint (rank 1632); the environment value is
+      // passed as the expand_command argument directly so the route under
+      // test is the one the tool really takes from fix_command onwards.
+      let fixed_command = fix_command(command.clone(), command)?;
+      println!("{fixed_command}");
+      Ok(())
+  }
+  ```
+  expect VYQL-INJ-002
+
+test "rank1847: the same value crossing one function return loses its taint"
+  lang rust
+  file src/main.rs
+  code
+  ```
+  use std::process::Command;
+
+  fn expand_aliases(command: &str) -> String {
+      command.to_string()
+  }
+
+  pub fn fix_command(command: String, expand_command: String) -> std::io::Result<String> {
+      let _ = command;
+      let command_output = get_command_output(expand_command)?;
+      Ok(command_output.stdout)
+  }
+
+  fn get_command_output(expand_command: String) -> std::io::Result<CommandOutput> {
+      let split_command = shell_words::split(&expand_command)
+          .map_err(|e| std::io::Error::other(format!("Failed to parse command: {e}")))?;
+
+      if split_command.is_empty() {
+          return Err(std::io::Error::other("Empty command provided"));
+      }
+
+      let child = Command::new(&split_command[0])
+          .args(&split_command[1..])
+          .env("LANG", "C")
+          .env("LC_ALL", "C")
+          .spawn()?;
+
+      let output = child.wait_with_output()?;
+      Ok(CommandOutput::from(output))
+  }
+
+  fn main() -> Result<(), std::io::Error> {
+      let command =
+          std::env::var("SH_PREV_CMD").context("SH_PREV_CMD environment variable is not set.")?;
+      let expand_command = expand_aliases(&command);
+      let fixed_command = fix_command(command, expand_command)?;
+      println!("{fixed_command}");
+      Ok(())
+  }
+  ```
+  reject VYQL-INJ-002
+
+test "rank1847: the tool's three-file layout, use-imported spelling"
+  lang rust
+  file src/main.rs
+  code
+  ```
+  mod fix;
+  mod misc;
+
+  use fix::fix_command;
+  use misc::expand_aliases;
+  use std::env;
+
+  fn main() -> Result<(), std::io::Error> {
+      let command =
+          env::var("SH_PREV_CMD").context("SH_PREV_CMD environment variable is not set.")?;
+      let expand_command = expand_aliases(&command)?;
+      let fixed_command = fix_command(command, expand_command)?;
+      println!("{fixed_command}");
+      Ok(())
+  }
+  ```
+  file src/misc.rs
+  code
+  ```
+  pub fn expand_aliases(command: &str) -> Result<String, std::io::Error> {
+      Ok(command.to_string())
+  }
+  ```
+  file src/fix.rs
+  code
+  ```
+  use std::process::Command;
+
+  pub fn fix_command(command: String, expand_command: String) -> std::io::Result<String> {
+      let _ = command;
+      let command_output = get_command_output(expand_command)?;
+      Ok(command_output.stdout)
+  }
+
+  fn get_command_output(expand_command: String) -> std::io::Result<CommandOutput> {
+      let split_command = shell_words::split(&expand_command)
+          .map_err(|e| std::io::Error::other(format!("Failed to parse command: {e}")))?;
+
+      if split_command.is_empty() {
+          return Err(std::io::Error::other("Empty command provided"));
+      }
+
+      let child = Command::new(&split_command[0])
+          .args(&split_command[1..])
+          .env("LANG", "C")
+          .env("LC_ALL", "C")
+          .spawn()?;
+
+      let output = child.wait_with_output()?;
+      Ok(CommandOutput::from(output))
+  }
+  ```
+  reject VYQL-INJ-002
+
+test "rank1847: the shipped module-qualified spelling resolves neither hop"
+  lang rust
+  file src/main.rs
+  code
+  ```
+  mod fix;
+  mod misc;
+
+  use std::env;
+
+  fn main() -> Result<(), std::io::Error> {
+      let command =
+          env::var("SH_PREV_CMD").context("SH_PREV_CMD environment variable is not set.")?;
+      let expand_command = misc::expand_aliases(&command)?;
+      let fixed_command = fix::fix_command(command, expand_command)?;
+      println!("{fixed_command}");
+      Ok(())
+  }
+  ```
+  file src/misc.rs
+  code
+  ```
+  pub fn expand_aliases(command: &str) -> Result<String, std::io::Error> {
+      Ok(command.to_string())
+  }
+  ```
+  file src/fix.rs
+  code
+  ```
+  use std::process::Command;
+
+  pub fn fix_command(command: String, expand_command: String) -> std::io::Result<String> {
+      let _ = command;
+      let command_output = get_command_output(expand_command)?;
+      Ok(command_output.stdout)
+  }
+
+  fn get_command_output(expand_command: String) -> std::io::Result<CommandOutput> {
+      let split_command = shell_words::split(&expand_command)
+          .map_err(|e| std::io::Error::other(format!("Failed to parse command: {e}")))?;
+
+      if split_command.is_empty() {
+          return Err(std::io::Error::other("Empty command provided"));
+      }
+
+      let child = Command::new(&split_command[0])
+          .args(&split_command[1..])
+          .env("LANG", "C")
+          .env("LC_ALL", "C")
+          .spawn()?;
+
+      let output = child.wait_with_output()?;
+      Ok(CommandOutput::from(output))
+  }
+  ```
+  reject VYQL-INJ-002
+
+test "rank1847: fix drops to the invoking user before the re-executed command runs"
+  lang rust
+  file src/main.rs
+  code
+  ```
+  mod fix;
+  mod misc;
+
+  use std::env;
+
+  fn main() -> Result<(), std::io::Error> {
+      let command =
+          env::var("SH_PREV_CMD").context("SH_PREV_CMD environment variable is not set.")?;
+      let expand_command = misc::expand_aliases(&command)?;
+      let fixed_command = fix::fix_command(command, expand_command)?;
+      println!("{fixed_command}");
+      Ok(())
+  }
+  ```
+  file src/misc.rs
+  code
+  ```
+  pub fn expand_aliases(command: &str) -> Result<String, std::io::Error> {
+      Ok(command.to_string())
+  }
+  ```
+  file src/fix.rs
+  code
+  ```
+  mod output;
+
+  pub fn fix_command(command: String, expand_command: String) -> std::io::Result<String> {
+      let _ = command;
+      let command_output = output::get_command_output(expand_command)?;
+      Ok(command_output.stdout)
+  }
+  ```
+  file src/fix/output.rs
+  code
+  ```
+  use std::os::unix::process::CommandExt;
+  use std::process::Command;
+
+  pub fn get_command_output(expand_command: String) -> Result<CommandOutput, AppError> {
+      let split_command = split_command(&expand_command);
+
+      if split_command.is_empty() {
+          return Err(AppError::Other("Command is empty".to_string()));
+      }
+
+      let timeout = get_command_timeout(&split_command[0]);
+
+      let mut command = Command::new(&split_command[0]);
+      command
+          .args(&split_command[1..])
+          .env("LANG", "C")
+          .env("LC_ALL", "C");
+
+      let permission_issue = PermissionIssue::detect();
+      permission_issue.fix(&mut command)?;
+
+      let output = command.output()?;
+      Ok(CommandOutput::from(output))
+  }
+
+  impl PermissionIssue {
+      fn fix(self, command: &mut Command) -> Result<(), AppError> {
+          let (uid, gid) = self.target_ids()?;
+
+          command.env_remove("SUDO_UID");
+          command.env_remove("SUDO_GID");
+          command.env_remove("SUDO_USER");
+          command.env_remove("SUDO_COMMAND");
+          command.env_remove("DOAS_USER");
+
+          unsafe {
+              command.pre_exec(move || {
+                  if libc::setgid(gid) != 0 {
+                      return Err(std::io::Error::last_os_error());
+                  }
+                  if libc::setuid(uid) != 0 {
+                      return Err(std::io::Error::last_os_error());
+                  }
+                  Ok(())
+              });
+          }
+          Ok(())
+      }
+  }
+  ```
+  reject VYQL-INJ-002

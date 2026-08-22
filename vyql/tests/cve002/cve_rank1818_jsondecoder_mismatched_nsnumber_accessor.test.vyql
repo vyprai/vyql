@@ -1,0 +1,218 @@
+# Rank 1818 / CVE-2022-1642 (GHSA-239c-6cv2-wwx8): apple/swift-corelibs-foundation's
+# JSONDecoder converted a decoded JSON number into a fixed-width integer by
+# round-tripping an NSNumber accessor: each case of _fixedWidthInteger
+# (Sources/Foundation/JSONDecoder.swift:453-477 at the fixed revision's parent e82400e)
+# validated representability with one accessor and then converted through a
+# different one --
+#     if type == Int8.self, NSNumber(value: nsNumber.int8Value) == nsNumber {
+#         return nsNumber.uint8Value as! T
+#     }
+# so a value that passed the signed round-trip check is consumed through the
+# unsigned accessor: -1 decoded into an Int8 field yields 255 and traps or
+# corrupts, and the Int case guarded `return nsNumber.intValue` with
+# `NSNumber(value: nsNumber.uintValue) == nsNumber`, which no negative value
+# can ever satisfy, so every negative Int decode throws dataCorrupted. The fixed revision
+# (b541491, a merge whose combined diff is empty -- read with
+# `git diff b541491^1 b541491`) makes each conversion read the accessor its
+# own guard validated: int8Value/int16Value/int32Value/int64Value returns and
+# an intValue round-trip for Int. The pool row is correct: the mismatched
+# pairs are present at the parent and the matched pairs at the fixed revision.
+#
+# What fires today, measured from the worktree with the cache cleared:
+# `vyql match` labels nothing at all on either revision of the real file --
+# no source, no sink, no control. Three `timeout 180 ./bin/vyql scan -profile
+# generic --cache off --max-ram 6GB` runs per revision over
+# Sources/Foundation (148 swift files) report an identical 16 findings on the
+# vulnerable tree (e82400e) and the fixed tree (b541491), every one
+# VYQL-LIFE-001, and none of them names JSONDecoder.swift. A stable A/B
+# zero-delta. A strict grep for the round-trip idiom
+# (`NSNumber(value: x.<int-accessor>) ==`) finds it in exactly one file of
+# the whole tree -- JSONDecoder.swift, ten times -- and in none of the other
+# ~436 rank clones, so the reachable set is the CVE site itself and there is
+# no collateral question anywhere in the pool.
+#
+# ATTENTION, an engine gap, both revisions pinned as misses. Neither side of
+# the mismatch exists as a graph node:
+#
+# Blocker 1 -- the guard is dropped by the Swift if-lowering.
+# internal/extract/frontend/treesitter/swift.go's if_statement handler keeps
+# only the FIRST child of the condition list (`if cond == nil`), so every
+# comma-separated condition after the first contributes nothing. Measured
+# directly: `if a == 1, b == 2 {}` lowers to exactly one __binop.eq. In the
+# real file each round-trip `NSNumber(value: nsNumber.int8Value) == nsNumber`
+# is the second condition of its if, so it has no BinOp, no Call and no Attr:
+# `vyql query -call NSNumber` returns zero nodes on a 4600-line file that
+# names NSNumber dozens of times.
+#
+# Blocker 2 -- the conversion read is opaque. `return nsNumber.uint8Value
+# as! T` lowers to a bare __object_literal Seq; the accessor Attr node is
+# never emitted, in either revision.
+#
+# Blocker 3 -- even with nodes, the discriminator is branch-local accessor
+# identity, which no scope expresses. The only surface carrying the accessor
+# spellings is the file-wide module context. Measured with a throwaway
+# module-scope binding (callPath contains int8Value AND uint8Value, since
+# reverted): it labels the module node of the vulnerable file, the fixed
+# file, and both minimal repros identically -- zero discrimination -- because
+# the fixed function still contains every accessor spelling in its correctly
+# paired UInt8/UInt16/... branches. So the recorded Swift gap (no
+# per-function context facts) would not help either: per-function
+# co-presence also fires on the fixed function. What the weakness needs is
+# the relation "the accessor consumed under a guard differs from the accessor
+# that guard round-tripped" -- a branch-scoped, argument-identity fact that
+# no frontend emits and no rule form consumes, in any language.
+#
+# Considered and declined: (1) a text route over the module's raw-text token
+# (e.g. contains "int8Value)==nsNumber{returnnsNumber.uint8Value") would
+# discriminate 1->0 but keys on the fixing commit's own layout -- the local's
+# name is load-bearing in any adjacency needle, a switch-spelled or reordered
+# variant walks past it, and whole-file text is the shape rejected on this
+# campaign before. (2) The taint route is unavailable in principle: the
+# decoded number is not a tainted source reaching a sink, and what is wrong
+# is which accessor is read, not what flows. (3) The delegated-check
+# counterweight does not apply: the fixed revision adds and removes no call -- both
+# revisions read the same accessor set, paired differently.
+#
+# Not mechanical. The if-condition-list drop (blocker 1) is a localized
+# frontend defect, but repairing it alone yields no detection; the detection
+# needs new per-branch fact emission scan-wide plus a relational predicate no
+# rule language carries today. The change belongs in the Swift frontend
+# (lower every condition of an if/guard condition list) together with a
+# branch-scoped check/consume accessor-identity fact.
+#
+# verify_current_expected: attention-engine-gap; case 1 expected, cases 2-4
+# pinned.
+
+test "rank1818: the shipped swift vocabulary the scanner does see beside the decoder, stdin read written straight out"
+  lang swift
+  file Sources/Foundation/DebugDump.swift
+  profile generic
+  expect VYQL-INJ-004
+  code
+  ```
+  import Foundation
+
+  final class DebugDump {
+      func dump() {
+          let line = readLine()
+          FileHandle.standardOutput.write(line?.data(using: .utf8)!)
+      }
+  }
+  ```
+
+test "rank1818: decoder validates the signed round-trip but converts through the unsigned accessor"
+  lang swift
+  file Sources/Foundation/JSONDecoder.swift
+  profile generic
+  reject VYQL-VAL-031
+  code
+  ```
+  import Foundation
+
+  enum JSONValue {
+      case number(Double)
+  }
+
+  extension NSNumber {
+      static func fromJSONNumber(_ number: Double) -> NSNumber? { NSNumber(value: number) }
+  }
+
+  final class JSONDecoderImpl {
+      func _fixedWidthInteger<T: FixedWidthInteger>(_ value: JSONValue, type: T.Type, additionalKey: String?) throws -> T {
+          guard case .number(let number) = value else {
+              throw createTypeMismatchError(type: T.self, for: additionalKey, value: value)
+          }
+          if let integer = T(number) {
+              return integer
+          }
+          if let nsNumber = NSNumber.fromJSONNumber(number) {
+              if type == UInt8.self, NSNumber(value: nsNumber.uint8Value) == nsNumber {
+                  return nsNumber.uint8Value as! T
+              }
+              if type == Int8.self, NSNumber(value: nsNumber.int8Value) == nsNumber {
+                  return nsNumber.uint8Value as! T
+              }
+              if type == UInt16.self, NSNumber(value: nsNumber.uint16Value) == nsNumber {
+                  return nsNumber.uint16Value as! T
+              }
+              if type == Int16.self, NSNumber(value: nsNumber.int16Value) == nsNumber {
+                  return nsNumber.uint16Value as! T
+              }
+              if type == Int.self, NSNumber(value: nsNumber.uintValue) == nsNumber {
+                  return nsNumber.intValue as! T
+              }
+          }
+          throw createTypeMismatchError(type: T.self, for: additionalKey, value: value)
+      }
+
+      func createTypeMismatchError(type: Any.Type, for key: String?, value: JSONValue) -> Error { NSError() }
+  }
+  ```
+
+test "rank1818: the patched decoder, each conversion reading the accessor its own guard round-tripped"
+  lang swift
+  file Sources/Foundation/JSONDecoderPatched.swift
+  profile generic
+  reject VYQL-VAL-031
+  code
+  ```
+  import Foundation
+
+  enum JSONValue {
+      case number(Double)
+  }
+
+  extension NSNumber {
+      static func fromJSONNumber(_ number: Double) -> NSNumber? { NSNumber(value: number) }
+  }
+
+  final class JSONDecoderImplPatched {
+      func _fixedWidthInteger<T: FixedWidthInteger>(_ value: JSONValue, type: T.Type, additionalKey: String?) throws -> T {
+          guard case .number(let number) = value else {
+              throw createTypeMismatchError(type: T.self, for: additionalKey, value: value)
+          }
+          if let integer = T(number) {
+              return integer
+          }
+          if let nsNumber = NSNumber.fromJSONNumber(number) {
+              if type == UInt8.self, NSNumber(value: nsNumber.uint8Value) == nsNumber {
+                  return nsNumber.uint8Value as! T
+              }
+              if type == Int8.self, NSNumber(value: nsNumber.int8Value) == nsNumber {
+                  return nsNumber.int8Value as! T
+              }
+              if type == UInt16.self, NSNumber(value: nsNumber.uint16Value) == nsNumber {
+                  return nsNumber.uint16Value as! T
+              }
+              if type == Int16.self, NSNumber(value: nsNumber.int16Value) == nsNumber {
+                  return nsNumber.int16Value as! T
+              }
+              if type == Int.self, NSNumber(value: nsNumber.intValue) == nsNumber {
+                  return nsNumber.intValue as! T
+              }
+          }
+          throw createTypeMismatchError(type: T.self, for: additionalKey, value: value)
+      }
+
+      func createTypeMismatchError(type: Any.Type, for key: String?, value: JSONValue) -> Error { NSError() }
+  }
+  ```
+
+test "rank1818: the Int case whose unsigned round-trip guard no negative value can satisfy, correct return behind a wrong check"
+  lang swift
+  file Sources/Foundation/JSONDecoderIntGuard.swift
+  profile generic
+  reject VYQL-VAL-031
+  code
+  ```
+  import Foundation
+
+  final class IntDecoderImpl {
+      func decodeInt<T: FixedWidthInteger>(_ nsNumber: NSNumber, type: T.Type) throws -> T {
+          if type == Int.self, NSNumber(value: nsNumber.uintValue) == nsNumber {
+              return nsNumber.intValue as! T
+          }
+          throw NSError(domain: "NSCocoaErrorDomain", code: 3840)
+      }
+  }
+  ```

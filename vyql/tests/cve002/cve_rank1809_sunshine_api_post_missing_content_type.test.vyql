@@ -1,0 +1,174 @@
+# Rank 1809 / CVE-2025-53095 (CWE-352): Sunshine's HTTPS API serves its
+# state-changing endpoints -- /api/apps, /api/config, /api/password,
+# /api/pin, /api/unpair, /api/covers/upload -- through Simple-Web-Server
+# handlers that authenticate with HTTP Basic credentials the browser
+# caches and re-sends for the origin, then read the request body straight
+# off the documented Request::content stream:
+#
+#   void saveApp(resp_https_t response, req_https_t request) {
+#     if (!authenticate(response, request)) {
+#       return;
+#     }
+#     std::stringstream ss;
+#     ss << request->content.rdbuf();
+#     nlohmann::json input_tree = nlohmann::json::parse(ss);
+#
+# Nothing names the request's content type, so a cross-site page can drive
+# the endpoint with a simple form post (application/x-www-form-urlencoded,
+# multipart/form-data or text/plain -- content types a browser may set
+# without a CORS preflight) under the cached Basic credentials, and the
+# parsed body reaches config writes, app launches and credential changes;
+# the advisory escalates this to command injection through the app
+# command lines the UI edits. The fixed revision (738ac93a, "Mandate content-type on
+# POST calls") adds check_content_type(response, request, contentType),
+# which looks up "content-type" in Request::header, strips any ";"
+# parameters, lowercases both sides and rejects on mismatch, and calls it
+# first in eleven POST/DELETE handlers with "application/json".
+#
+# FIXED at the binding layer, widening the new language-neutral concept
+# code.RequestBodyParseMissingContentTypeCheck (rule VYQL-RF-052) to C++.
+# The binding is written from the Simple-Web-Server documentation alone:
+# a function that reads the Request::content body stream and never names
+# the content-type header or an expected media type. SimpleWeb spells the
+# body field `content`, and ccStructuredContextTokens emits the field
+# expression as selector:request.content (and selector:request.content.
+# rdbuf for the streambuf extraction), so the positive clause is an exact
+# `in [...]` over those tokens -- the substring form would also match
+# Qt's request.contentLength() and Squid's request->content_length, the
+# 1387 prefix-remainder trap. The negation reads AST string literals,
+# which per the C++ measurement at rank 1454 are function-confined and
+# comment-proof: an inline `request->header.find("content-type")` gate
+# and a delegated check_content_type(response, request,
+# "application/json") call both satisfy it inside the handler, while the
+# helper's own body -- which holds the header lookup -- stays in the
+# helper's context and does not leak.
+#
+# Discrimination measured on the repro pair above (saveApp verbatim from
+# src/confighttp.cpp:535 plus the send_response helper): expect fires 1,
+# the patched form 0. Two genuinely-enforcing variants also stay at 0:
+# the fixed revision with check_content_type renamed to ensure_media_type (the
+# binding reads the "application/json" literal the gate passes, not the
+# helper's name), and the gate inlined as
+# request->header.find("content-type") != "application/json" with no
+# helper at all.
+#
+# On the real checkout, src/ subtree, three --cache off runs each:
+# 394 findings at d6820ba (the fixed revision's parent) including exactly six
+# VYQL-RF-052 at confighttp.cpp:537, 705, 811, 857, 940 and 1010 --
+# saveApp, unpair, saveConfig, uploadCover, savePassword, savePin, the
+# six handlers that read request->content; 388 findings and zero
+# VYQL-RF-052 at 738ac93a, the delta being exactly those six (11 high+
+# before, 5 after). The five handlers the fixed revision also gates but that never
+# read a body (closeApp, deleteApp, unpairAll, resetDisplayDevicePersistence,
+# restart) are correctly out of scope: they have no body parse to gate.
+# Reachable set enumerated by grep across the ~428 corpus clones: no
+# other tree uses SimpleWeb, reads ->content.rdbuf() or names a request
+# `content` field at all; the only near-shapes are Qt's
+# request.contentLength() (qhttp2protocolhandler.cpp,
+# qhttpnetworkconnection.cpp, qhttpprotocolhandler.cpp) and Squid's
+# request->content_length (client_side.cc, http.cc), and bounded scans
+# of those report 107 / 26 / 7 findings with zero VYQL-RF-052.
+
+test "rank1809: an API handler parses the request body without enforcing a content type"
+  lang cpp
+  file src/confighttp.cpp
+  expect VYQL-RF-052
+  expect_review code.RequestBodyParseMissingContentTypeCheck
+  code
+  ```
+  #include <Simple-Web-Server/server_https.hpp>
+  #include <nlohmann/json.hpp>
+  #include <sstream>
+
+  namespace confighttp {
+    using resp_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<SimpleWeb::HTTPS>::Response>;
+    using req_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<SimpleWeb::HTTPS>::Request>;
+
+    void send_response(resp_https_t response, const nlohmann::json &output_tree) {
+      response->write(output_tree.dump());
+    }
+
+    void saveApp(resp_https_t response, req_https_t request) {
+      if (!authenticate(response, request)) {
+        return;
+      }
+
+      print_req(request);
+
+      std::stringstream ss;
+      ss << request->content.rdbuf();
+      try {
+        nlohmann::json input_tree = nlohmann::json::parse(ss);
+        input_tree.erase("index");
+        nlohmann::json output_tree;
+        output_tree["status"] = true;
+        send_response(response, output_tree);
+      } catch (std::exception &e) {
+        response->write(SimpleWeb::StatusCode::client_error_bad_request, e.what());
+      }
+    }
+  }
+  ```
+
+test "rank1809: the handler gates the body read on the request content type"
+  lang cpp
+  file src/confighttp.cpp
+  reject VYQL-RF-052
+  reject_review code.RequestBodyParseMissingContentTypeCheck
+  code
+  ```
+  #include <Simple-Web-Server/server_https.hpp>
+  #include <nlohmann/json.hpp>
+  #include <sstream>
+
+  namespace confighttp {
+    using resp_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<SimpleWeb::HTTPS>::Response>;
+    using req_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<SimpleWeb::HTTPS>::Request>;
+
+    void send_response(resp_https_t response, const nlohmann::json &output_tree) {
+      response->write(output_tree.dump());
+    }
+
+    bool check_content_type(resp_https_t response, req_https_t request, const std::string_view &contentType) {
+      auto requestContentType = request->header.find("content-type");
+      if (requestContentType == request->header.end()) {
+        bad_request(response, request, "Content type not provided");
+        return false;
+      }
+      std::string actualContentType = requestContentType->second;
+      size_t semicolonPos = actualContentType.find(';');
+      if (semicolonPos != std::string::npos) {
+        actualContentType = actualContentType.substr(0, semicolonPos);
+      }
+      std::string expectedContentType(contentType);
+      if (actualContentType != expectedContentType) {
+        bad_request(response, request, "Content type mismatch");
+        return false;
+      }
+      return true;
+    }
+
+    void saveApp(resp_https_t response, req_https_t request) {
+      if (!check_content_type(response, request, "application/json")) {
+        return;
+      }
+      if (!authenticate(response, request)) {
+        return;
+      }
+
+      print_req(request);
+
+      std::stringstream ss;
+      ss << request->content.rdbuf();
+      try {
+        nlohmann::json input_tree = nlohmann::json::parse(ss);
+        input_tree.erase("index");
+        nlohmann::json output_tree;
+        output_tree["status"] = true;
+        send_response(response, output_tree);
+      } catch (std::exception &e) {
+        response->write(SimpleWeb::StatusCode::client_error_bad_request, e.what());
+      }
+    }
+  }
+  ```

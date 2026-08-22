@@ -1,0 +1,234 @@
+# withstudiocms/studiocms, CVE-2026-30944 (CWE-639/CWE-863). The dashboard
+# API's token-mint handler authenticates the caller, checks only that the
+# caller is an editor, and then issues the bearer credential for whichever
+# user id the request body carries. `createApiToken` reads its subject from
+# `payload.user` -- the decoded request body -- while the authenticated
+# principal (`userData.user.id`, from the session's `CurrentUser` context)
+# sits unused three lines above; nothing compares the two and nothing compares
+# ranks, so an editor mints an owner's API token and uses it against the REST
+# API as that owner. The remediation drops the `user` field from the payload
+# schema entirely and passes `userData.user.id` to the mint instead; the
+# sibling `revokeApiToken` handler gets the same treatment plus an explicit
+# `tokenData.userId !== userData.user.id` ownership comparison.
+#
+# The pool row's commit 9eec9c3b45523b635cfe16d55aa55afabacbebe3 is one commit
+# late: it is the child of the fixing change. GHSA-667w-mmh7-mrr4 references
+# f4a209fc090c90195e2419fff47b48a46eab7441 ("refactor(api): clean up API
+# handlers and remove unnecessary variables for improved security"), and at
+# 9eec9c3^ -- which is f4a209f itself -- `createApiToken` mints for
+# `userData.user.id`. The corrected pair is f4a209f^ (b4b660a, vulnerable) vs
+# f4a209f (remediated); 
+#
+# What fires today, union over three `timeout 180 ./bin/vyql scan --cache off
+# --max-ram 6GB` runs per revision: 246 findings / 113 at or above high on
+# b4b660a and the identical 246/113 on f4a209f -- `vyql match` on the handler
+# file reports no source, no sink and no control at either revision, so the
+# fix moves nothing the scanner can see.
+#
+# ATTENTION, two independent blockers, both revisions pinned as misses.
+#
+# Blocker 1 -- the engine emits no node for an object-pattern function
+# parameter. `c.params()` (`internal/extract/frontend/treesitter/javascript.go`)
+# collects only `identifier` patterns, and the `paramsFromFunctionText` fallback
+# keeps only whole-param identifiers, so `function* ({ payload: { user } })`
+# lowers with an empty parameter list: no `code.Param`, no `nir.Assign` for the
+# destructured names, and `markCallLambdaParams` therefore adds no parameter
+# entry for the `Effect.fn` handler either. The body's `user` is a free `Name`
+# with no incoming edge. Declarative destructuring does not have this defect --
+# `bindingNames` lowers `const { user } = payload` to an `Assign` per leaf, and
+# a request field destructured in a declaration still reports -- so cases 4 and
+# 6 against case 5 differ only in the construct.
+# This is the standard shape for a body-reading handler in every modern
+# TypeScript framework (Effect's `HttpApiBuilder` handlers, Next.js server
+# actions, tRPC resolvers), and 9356 files across the corpus clones carry an
+# object-pattern parameter, so the gap severs the whole request surface of
+# those handlers, not just this one. Not mechanical: it introduces a new
+# dataflow relation (parameter to destructured leaf) on a function shared by
+# every JS/TS extraction path, and it changes `param_count:` tokens and
+# parameter-entry facts that shipped bindings key on.
+#
+# Blocker 2 -- the vocabulary half is project-internal on both ends. The only
+# source that could carry the payload is `@withstudiocms/effect`'s
+# `readAPIContextJson` (used at this revision only by that library's own tests
+# and one legacy setup page), and the only sink is `@withstudiocms/sdk`'s
+# `sdk.REST_API.tokens.new`, which has exactly one call site in the corpus.
+# Labelling either answers to StudioCMS's own SDK rather than to a library a
+# stranger would bind, and with blocker 1 in place the source has no node to
+# land on at the vulnerable revision anyway. The counterweight test -- "did the
+# fix leave an API-documented call inside the guarded function" -- is satisfied
+# (`sdk.REST_API.tokens.new` stays), but discriminating on it means reading the
+# call's first argument, and no JS predicate can: the frontend emits no
+# call-argument tokens, and keying on the argument's *name* (`user`) encodes
+# the payload field name the fixed revision deletes.
+#
+# verify_current_expected: attention-engine-gap, isolating pair below; both
+# revisions rejected. Case 4 is the pair's reporting half and stays expected.
+
+test "rank1803: the token-mint handler issuing the credential for the payload's own user id"
+  lang javascript
+  file packages/studiocms/frontend/pages/studiocms_api/_handlers/dashboard/apiTokens.ts
+  reject VYQL-AUTH-002
+  reject_review code.ObjectLookupByUserInput
+  code
+  ```
+  import { HttpApiBuilder } from '@effect/platform';
+  import { CurrentUser } from '@withstudiocms/api-spec/astro-context';
+  import { DashboardAPIError } from '@withstudiocms/api-spec/dashboard';
+  import { SDKCore } from '@withstudiocms/sdk';
+  import { Effect } from 'effect';
+
+  const developerConfig = { demoMode: false };
+
+  export const ApiTokensHandler = HttpApiBuilder.group(
+  	'StudioCMSDashboardApiSpec',
+  	'apiTokens',
+  	(handlers) =>
+  		handlers.handle(
+  			'createApiToken',
+  			Effect.fn(
+  				function* ({ payload: { user, description } }) {
+  					if (developerConfig.demoMode !== false) {
+  						return yield* new DashboardAPIError({
+  							error: 'Demo mode is enabled, this action is not allowed.',
+  						});
+  					}
+
+  					const [sdk, userData] = yield* Effect.all([SDKCore, CurrentUser]);
+
+  					const isAuthorized = userData.userPermissionLevel.isEditor;
+
+  					if (!userData.isLoggedIn || !isAuthorized) {
+  						return yield* new DashboardAPIError({ error: 'Unauthorized' });
+  					}
+
+  					const newToken = yield* sdk.REST_API.tokens.new(user, description);
+
+  					return { token: newToken.key };
+  				}
+  			)
+  		)
+  );
+  ```
+
+test "rank1803: the patched handler minting for the session principal instead"
+  lang javascript
+  file packages/studiocms/frontend/pages/studiocms_api/_handlers/dashboard/apiTokensPatched.ts
+  reject VYQL-AUTH-002
+  reject_review code.ObjectLookupByUserInput
+  code
+  ```
+  import { HttpApiBuilder } from '@effect/platform';
+  import { CurrentUser } from '@withstudiocms/api-spec/astro-context';
+  import { DashboardAPIError } from '@withstudiocms/api-spec/dashboard';
+  import { SDKCore } from '@withstudiocms/sdk';
+  import { Effect } from 'effect';
+
+  const developerConfig = { demoMode: false };
+
+  export const ApiTokensHandlerPatched = HttpApiBuilder.group(
+  	'StudioCMSDashboardApiSpec',
+  	'apiTokens',
+  	(handlers) =>
+  		handlers.handle(
+  			'createApiToken',
+  			Effect.fn(
+  				function* ({ payload: { description } }) {
+  					if (developerConfig.demoMode !== false) {
+  						return yield* new DashboardAPIError({
+  							error: 'Demo mode is enabled, this action is not allowed.',
+  						});
+  					}
+
+  					const [sdk, userData] = yield* Effect.all([SDKCore, CurrentUser]);
+
+  					const isAuthorized = userData.userPermissionLevel.isEditor;
+
+  					if (!userData.isLoggedIn || !userData.user || !isAuthorized) {
+  						return yield* new DashboardAPIError({ error: 'Unauthorized' });
+  					}
+
+  					const newToken = yield* sdk.REST_API.tokens.new(userData.user.id, description);
+
+  					return { token: newToken.key };
+  				}
+  			)
+  		)
+  );
+  ```
+
+test "rank1803: the earlier astro-route spelling, whose taint path is live but whose body reader has no source"
+  lang javascript
+  file packages/studiocms/frontend/pages/studiocms_api/dashboard/api-tokens.ts
+  reject VYQL-AUTH-002
+  reject_review code.ObjectLookupByUserInput
+  code
+  ```
+  import { readAPIContextJson } from '@withstudiocms/effect';
+  import { SDKCore } from '@withstudiocms/sdk';
+
+  export const POST = (ctx) =>
+  	(function* () {
+  		const sdk = yield* SDKCore;
+
+  		const userData = ctx.locals.StudioCMS.security?.userSessionData;
+
+  		if (!userData?.isLoggedIn) {
+  			return { status: 403, body: 'Unauthorized' };
+  		}
+
+  		const isAuthorized = ctx.locals.StudioCMS.security?.userPermissionLevel.isEditor;
+  		if (!isAuthorized) {
+  			return { status: 403, body: 'Unauthorized' };
+  		}
+
+  		const jsonData = yield* readAPIContextJson<{ description: string; user: string }>(ctx);
+
+  		if (!jsonData.user) {
+  			return { status: 400, body: 'Invalid form data, user is required' };
+  		}
+
+  		const newToken = yield* sdk.REST_API.tokens.new(jsonData.user, jsonData.description);
+
+  		return { token: newToken.key };
+  	})();
+  ```
+
+test "rank1803: a request field read through attribute access, the minimal pair's reporting half"
+  lang javascript
+  file packages/studiocms/frontend/pages/studiocms_api/dashboard/handlerAttr.ts
+  expect VYQL-PATH-001
+  code
+  ```
+  import { readFileSync } from 'fs';
+
+  export function handlerAttr(req) {
+  	return readFileSync(req.query.path);
+  }
+  ```
+
+test "rank1803: the same request field, destructured in the handler signature, reports nothing"
+  lang javascript
+  file packages/studiocms/frontend/pages/studiocms_api/dashboard/handlerDestructured.ts
+  reject VYQL-PATH-001
+  code
+  ```
+  import { readFileSync } from 'fs';
+
+  export function handlerDestructured({ query }) {
+  	return readFileSync(query.path);
+  }
+  ```
+
+test "rank1803: the same field read destructured in a declaration, which does carry the flow"
+  lang javascript
+  file packages/studiocms/frontend/pages/studiocms_api/dashboard/handlerDeclared.ts
+  expect VYQL-PATH-001
+  code
+  ```
+  import { readFileSync } from 'fs';
+
+  export function handlerDeclared(req) {
+  	const { path } = req.query;
+  	return readFileSync(path);
+  }
+  ```

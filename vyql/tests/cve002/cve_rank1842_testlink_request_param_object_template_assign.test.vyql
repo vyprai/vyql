@@ -1,0 +1,220 @@
+# TestLink's export/import pages read their return URL straight out of the
+# request and hand it to Smarty. init_args declares the parameter with the
+# accessor's rawest type -- no normalisation, just a length bound:
+#
+#   $iParams = array("doAction" => array(tlInputParameter::STRING_N,0,50),
+#            "export_filename" => array(tlInputParameter::STRING_N,0,100),
+#            "goback_url" => array(tlInputParameter::STRING_N,0,2048));
+#
+#   R_PARAMS($iParams,$args);
+#   ...
+#   return $args;
+#
+# and the page body copies it onto the template object and assigns the whole
+# object:
+#
+#   $gui->goback_url = !is_null($args->goback_url) ? $args->goback_url : '';
+#   $smarty->assign('gui',$gui);
+#   $smarty->display($templateCfg->template_dir . $templateCfg->default_template);
+#
+# (lib/cfields/cfieldsExport.php:57-67 and :32,47 at the parent of
+# 2d17cd00f9; cfieldsImport.php carries the same init_args.) The template
+# puts the value inside a JavaScript string in an event handler --
+# `onclick="location='{$gui->goback_url}'"` at
+# gui/templates/tl-classic/cfields/cfieldsExport.tpl:72 -- so a URL carrying
+# a quote breaks out of the handler (CWE-79). The fixed revision drops goback_url from
+# the parameter table and derives it from the session's configured base
+# href, `$args->goback_url = $_SESSION['basehref'] .
+# 'lib/cfields/cfieldsView.php';`, which is the same shape the sibling
+# export pages still carry (usersExport.php, platformsExport.php,
+# execExport.php, tcPrint.php ... ten files name goback_url at the fixed
+# revision).
+#
+# Nothing reports this today, and the reason is not a missing label: the
+# chain crosses two PHP constructs the engine does not carry, either of
+# which is enough to stop it.
+#
+#   1. A by-reference fill. R_PARAMS takes `&$args` and writes
+#      `$args->$pName = $value;` inside I_PARAMS
+#      (lib/functions/inputparameter.inc.php:186). Writes through a
+#      reference parameter do not reach the caller's variable: `vyql trace`
+#      on the minimal pair below shows the source reaching the callee's
+#      element node and nothing returning. The same function returning the
+#      array reports end to end.
+#
+#   2. A member-property store never taints the object. `$gui->goback_url
+#      = <tainted>` lowers to a PATH-sink Call with Method deliberately
+#      empty (php.go, assignment_expression / member_access_expression) so
+#      path mappings can match writes; the value flows into the property's
+#      element node, so a later `$gui->goback_url` read is tainted, but the
+#      object itself is not. A subscript store is different: __setitem__
+#      also flows the value into the container (lowering.go, "synthetic
+#      subscript store"), so handing the whole array onward carries the
+#      taint and handing the whole object does not. A template engine's
+#      assign('name', $obj) is exactly a whole-object hand-off.
+#
+# On top of those, Smarty's assign has no HtmlRender sink at all --
+# bindings/packages/generated/php/smarty_smarty.vyql binds only fetch and
+# display, at args[0], the template path -- so the sink leg is missing too.
+# That leg alone is measured and is not worth its cost: labelling
+# `assign` args[1] as code.HtmlRender takes TestLink's lib subtree from
+# 645 to 858 findings (three --cache off runs each, both stable) and not
+# one of the added rows is this page, because construct 2 still blocks the
+# value from reaching the argument. The 213 added rows are the
+# $_SESSION-sourced StoredDataRead paths that reach every other
+# sink in the tree.
+#
+# No binding can separate the revisions while the constructs stay open:
+# both revisions read parameters through R_PARAMS, both assign $gui to the
+# template, and both write $gui->goback_url -- the only textual difference
+# is the parameter's own name, which is the fixing commit's vocabulary, not
+# an API. So the miss is pinned here rather than worked around in data.
+#
+# verify_current_expected: attention-engine-gap; the first snippet is
+# rejected because the request value cannot cross the by-reference fill or
+# the member-property store, and no sink binds the template assign. The
+# object/array and by-reference/return pairs below isolate the two
+# constructs: each pair differs in exactly one line and only one side
+# reports. Both reject cases flip to expect when their construct is
+# carried; the page itself needs the Smarty assign sink as well, and it
+# will then need `$_SESSION['basehref']` to read as configuration rather
+# than stored data, since the changeed revision's discrimination is the value's origin.
+
+test "rank1842: a request return URL handed to the template engine through a filled object"
+  lang php
+  file cfieldsExport.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  $args = init_args();
+
+  $gui = new stdClass();
+  $gui->page_title = lang_get('export_cfields');
+  $gui->goback_url = !is_null($args->goback_url) ? $args->goback_url : '';
+  $gui->export_filename = is_null($args->export_filename) ? 'customFields.xml' : $args->export_filename;
+
+  $smarty = new TLSmarty();
+  $smarty->assign('gui', $gui);
+  $smarty->display($templateCfg->template_dir . $templateCfg->default_template);
+
+  function init_args()
+  {
+    $args = new stdClass();
+    $_REQUEST = strings_stripSlashes($_REQUEST);
+
+    $iParams = array("doAction" => array(tlInputParameter::STRING_N, 0, 50),
+             "export_filename" => array(tlInputParameter::STRING_N, 0, 100),
+             "goback_url" => array(tlInputParameter::STRING_N, 0, 2048));
+
+    R_PARAMS($iParams, $args);
+    $args->userID = $_SESSION['userID'];
+
+    return $args;
+  }
+  ```
+
+test "rank1842: a member-property store leaves the object clean for a whole-object sink"
+  lang php
+  file goback-object.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  $gui = new stdClass();
+  $gui->goback_url = $_REQUEST['goback_url'];
+
+  echo $gui;
+  ```
+
+test "rank1842: the same store into an array taints the container"
+  lang php
+  file goback-array.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  $gui = array();
+  $gui['goback_url'] = $_REQUEST['goback_url'];
+
+  echo $gui;
+  ```
+
+test "rank1842: a fill through a reference parameter does not reach the caller"
+  lang php
+  file goback-byref.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  function fill(&$arr)
+  {
+    $arr['goback_url'] = $_REQUEST['goback_url'];
+  }
+
+  $args = array();
+  fill($args);
+
+  echo $args['goback_url'];
+  ```
+
+test "rank1842: the same fill returning the array reaches the caller"
+  lang php
+  file goback-return.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  function fill($arr)
+  {
+    $arr['goback_url'] = $_REQUEST['goback_url'];
+
+    return $arr;
+  }
+
+  $args = fill(array());
+
+  echo $args['goback_url'];
+  ```
+
+test "rank1842: a return URL derived from the configured base href stays off the request"
+  lang php
+  file cfieldsExportPatched.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  $args = init_args();
+
+  $gui = new stdClass();
+  $gui->page_title = lang_get('export_cfields');
+  $gui->goback_url = !is_null($args->goback_url) ? $args->goback_url : '';
+  $gui->export_filename = is_null($args->export_filename) ? 'customFields.xml' : $args->export_filename;
+
+  $smarty = new TLSmarty();
+  $smarty->assign('gui', $gui);
+  $smarty->display($templateCfg->template_dir . $templateCfg->default_template);
+
+  function init_args()
+  {
+    $args = new stdClass();
+    $_REQUEST = strings_stripSlashes($_REQUEST);
+
+    $iParams = array("doAction" => array(tlInputParameter::STRING_N, 0, 50),
+             "export_filename" => array(tlInputParameter::STRING_N, 0, 100));
+
+    R_PARAMS($iParams, $args);
+    $args->userID = $_SESSION['userID'];
+
+    $args->goback_url = $_SESSION['basehref'] .
+                        'lib/cfields/cfieldsView.php';
+
+    return $args;
+  }
+  ```
